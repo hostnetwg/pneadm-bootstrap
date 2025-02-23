@@ -1,0 +1,23 @@
+.main-container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 250px; /* dostosuj szerokość do swoich potrzeb */
+  overflow-y: auto;
+  background-color: #f8f9fa; /* opcjonalny kolor tła */
+}
+
+.content {
+  margin-left: 250px; /* ta sama wartość co width w sidebar */
+  flex: 1;
+  overflow-y: auto;
+  height: 100vh;
+  padding: 20px;
+}
