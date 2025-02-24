@@ -22,4 +22,10 @@ class Participant extends Model
     {
         return $this->belongsTo(Course::class);
     }
+
+    public function certificate()
+    {
+        return $this->hasOne(Certificate::class, 'participant_id');
+    }
+    
 }

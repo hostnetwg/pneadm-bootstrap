@@ -27,7 +27,9 @@
                     <th>Email</th>
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
+                    <th>Nr certyfikatu</th>                    
                     <th>Akcje</th>
+                    <th>Certyfikat</th>
                 </tr>
             </thead>
             <tbody>
@@ -40,6 +42,17 @@
                         <td>{{ $participant->birth_date ?? 'Brak' }}</td>
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
                         <td>
+                        <td>
+                            @if ($participant->certificate)
+                                <a href="{{ route('certificates.generate', $participant->id) }}">
+                                    {{ $participant->certificate->certificate_number }}
+                                </a>
+                            @else
+                                Brak certyfikatu
+                            @endif
+                            </td>
+                        </td>
+                        <td>
                             <a href="{{ route('participants.edit', [$course, $participant]) }}" class="btn btn-warning btn-sm">Edytuj</a>
                             <form action="{{ route('participants.destroy', [$course, $participant]) }}" method="POST" style="display:inline;">
                                 @csrf
@@ -47,6 +60,13 @@
                                 <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć uczestnika?')">Usuń</button>
                             </form>
                         </td>
+                        <td>
+                            @if ($participant->certificate)
+                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-success btn-sm">Generuj</a>                                
+                            @else
+                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
+                            @endif
+                        </td>                        
                     </tr>
                 @endforeach
             </tbody>
