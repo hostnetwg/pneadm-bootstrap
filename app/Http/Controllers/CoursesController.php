@@ -128,10 +128,21 @@ class CoursesController extends Controller
     public function destroy($id)
     {
         $course = Course::findOrFail($id);
+    
+        // Sprawdzenie, czy instruktor ma zdjęcie
+        if ($course->image) {
+            $photoPath = public_path('storage/' . $course->image);
+    
+            // Usunięcie pliku, jeśli istnieje
+            if (file_exists($photoPath)) {
+                unlink($photoPath);
+            }
+        }
+        // Usunięcie kursu z bazy danych
         $course->delete();
     
         return redirect()->route('courses.index')->with('success', 'Szkolenie usunięte.');
-    }   
+    }
     
     public function update(Request $request, $id)
     {

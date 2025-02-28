@@ -42,7 +42,8 @@ Route::post('/instructors', [InstructorsController::class, 'store'])->name('cour
 Route::get('/instructors/create', [InstructorsController::class, 'create'])->name('courses.instructors.create');
 Route::get('/instructors/{id}/edit', [InstructorsController::class, 'edit'])->name('courses.instructors.edit');
 Route::post('/instructors/{id}/update', [InstructorsController::class, 'update'])->name('courses.instructors.update');
-Route::post('/instructors/{id}/delete', [InstructorsController::class, 'destroy'])->name('courses.instructors.destroy');
+Route::delete('/instructors/{id}', [InstructorsController::class, 'destroy'])->name('courses.instructors.destroy');
+
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

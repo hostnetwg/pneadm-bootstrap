@@ -9,7 +9,7 @@ class InstructorsController extends Controller
     public function index()
     {
         //$instructors = Instructor::all();  // Pobieranie wszystkich instruktorów
-        $instructors = Instructor::paginate(2); // 10 instruktorów na stronę  
+        $instructors = Instructor::paginate(10); // 10 instruktorów na stronę  
         return view('courses.instructors.index', compact('instructors'));
     }
 
@@ -93,6 +93,18 @@ class InstructorsController extends Controller
     public function destroy($id)
     {
         $instructor = Instructor::findOrFail($id);
+    
+        // Sprawdzenie, czy instruktor ma zdjęcie
+        if ($instructor->photo) {
+            $photoPath = public_path('storage/' . $instructor->photo);
+    
+            // Usunięcie pliku, jeśli istnieje
+            if (file_exists($photoPath)) {
+                unlink($photoPath);
+            }
+        }
+    
+        // Usunięcie rekordu z bazy danych
         $instructor->delete();
     
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został usunięty.');
