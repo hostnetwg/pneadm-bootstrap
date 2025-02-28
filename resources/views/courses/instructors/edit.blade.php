@@ -11,6 +11,7 @@
 
             <form action="{{ route('courses.instructors.update', $instructor->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
+                @method('PUT')
                 <div class="mb-3">
                     <label for="first_name" class="form-label">Imię</label>
                     <input type="text" name="first_name" class="form-control" id="first_name" value="{{ $instructor->first_name }}" required>
