@@ -124,6 +124,21 @@
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
 
+                <div class="mb-3">
+                    <label for="image" class="form-label">Obrazek kursu</label>
+                    <input type="file" name="image" class="form-control" id="image">
+                
+                    @if ($course->image)
+                        <div class="mt-2">
+                            <p>Aktualny obrazek:</p>
+                            <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100">
+                        </div>
+                    @else
+                        <p class="text-muted">Brak aktualnego obrazka</p>
+                    @endif
+                </div>
+                
+
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                 <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
             </form>

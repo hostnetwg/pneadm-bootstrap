@@ -1,4 +1,4 @@
-<?php
+<?php 
 
 namespace App\Models;
 
@@ -12,18 +12,31 @@ class Instructor extends Model
     protected $table = 'instructors';
 
     protected $fillable = [
-        'first_name',
-        'last_name',
-        'email',
-        'phone',
-        'bio',
-        'photo',
-        'is_active',
+        'title',          // Tytuł naukowy, np. "dr", "mgr"
+        'first_name',     // Imię instruktora
+        'last_name',      // Nazwisko instruktora
+        'email',          // Email kontaktowy
+        'phone',          // Numer telefonu
+        'bio',            // Krótki opis instruktora
+        'photo',          // Ścieżka do zdjęcia
+        'signature',      // Ścieżka do podpisu instruktora
+        'is_active',      // Czy instruktor jest aktywny
     ];
 
-    // Pełne imię i nazwisko
+    /**
+     * Zwraca pełne imię i nazwisko.
+     */
     public function getFullNameAttribute()
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * Zwraca tytuł wraz z pełnym imieniem i nazwiskiem.
+     * Przykład: "dr Jan Kowalski" lub "mgr Anna Nowak".
+     */
+    public function getFullTitleNameAttribute()
+    {
+        return trim("{$this->title} {$this->first_name} {$this->last_name}");
     }
 }

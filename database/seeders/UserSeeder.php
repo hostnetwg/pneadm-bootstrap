@@ -20,6 +20,7 @@ class UserSeeder extends Seeder
                 'name' => 'Waldemar',
                 'email' => 'waldemar.grabowski@hostnet.pl',
                 'password' => Hash::make('noYkeT#70'),
+                'role' => 'admin', // Nadanie roli admina                
             ]
         );
 
@@ -29,6 +30,7 @@ class UserSeeder extends Seeder
                 'name' => 'Łukasz',
                 'email' => 'luman0599@gmail.com',
                 'password' => Hash::make('Feniks99'),
+                'role' => 'admin', // Nadanie roli admina
             ]
         );
     }

@@ -19,6 +19,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'waldemar.grabowski@hostnet.pl'],
             [
+                'title' => '',
                 'first_name' => 'Waldemar',
                 'last_name' => 'Grabowski',
                 'email' => 'waldemar.grabowski@hostnet.pl',
@@ -30,8 +31,9 @@ class InstructorSeeder extends Seeder
         );
 
         Instructor::updateOrCreate(
-            ['email' => 'jane.smith@example.com'],
+            ['email' => 'luman0599@gmail.com'],
             [
+                'title' => '',
                 'first_name' => 'Łukasz',
                 'last_name' => 'Grabowski',
                 'email' => 'luman0599@gmail.com',
@@ -45,6 +47,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'roman.lorens@gmail.com'],
             [
+                'title' => 'dr',
                 'first_name' => 'Roman',
                 'last_name' => 'Lorens',
                 'email' => 'roman.lorens@gmail.com',
@@ -57,6 +60,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'anna_wojkowska@wp.pl'],
             [
+                'title' => '',
                 'first_name' => 'Anna',
                 'last_name' => 'Wojkowska',
                 'email' => 'anna_wojkowska@wp.pl',
@@ -69,6 +73,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'donatad@interia.pl'],
             [
+                'title' => '',
                 'first_name' => 'Donata',
                 'last_name' => 'Dzimińska',
                 'email' => 'donatad@interia.pl',
@@ -79,20 +84,9 @@ class InstructorSeeder extends Seeder
             ]
         );   
         Instructor::updateOrCreate(
-            ['email' => 'donatad@interia.pl'],
+            ['email' => 'spcholerzynmk@gmail.com'],
             [
-                'first_name' => 'Donata',
-                'last_name' => 'Dzimińska',
-                'email' => 'donatad@interia.pl',
-                'phone' => '+48 692 963 882',
-                'bio' => 'Ddoświadczona certyfikowana trenerka z 25-letnim stażem pracy w roli nauczyciela, doradcy zawodowego i wykładowcy. Pani Donata specjalizuje się w technologii informacyjnej, pomocy psychologiczno-pedagogicznej oraz doradztwie zawodowym. Ukończyła liczne studia podyplomowe, m.in. z zakresu doradztwa zawodowego, zarządzania zasobami ludzkimi oraz edukacji włączającej, a także posiada szerokie doświadczenie w pracy z uczniami oraz nauczycielami.',
-                'photo' => '',
-                'is_active' => true,                
-            ]
-        );
-        Instructor::updateOrCreate(
-            ['email' => 'donatad@interia.pl'],
-            [
+                'title' => '',
                 'first_name' => 'Marzena',
                 'last_name' => 'Kącik',
                 'email' => 'spcholerzynmk@gmail.com',
@@ -105,6 +99,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'matmar77@op.pl'],
             [
+                'title' => '',
                 'first_name' => 'Mateusz',
                 'last_name' => 'Marciniak',
                 'email' => 'matmar77@op.pl',
@@ -117,6 +112,7 @@ class InstructorSeeder extends Seeder
         Instructor::updateOrCreate(
             ['email' => 'jola.kuropatwa@op.pl'],
             [
+                'title' => '',
                 'first_name' => 'Jolanta',
                 'last_name' => 'Kuropatwa',
                 'email' => 'jola.kuropatwa@op.pl',
@@ -130,6 +126,7 @@ Jednak to jej praca w kuratorium oświaty, gdzie pełniła funkcje wizytatora i 
         Instructor::updateOrCreate(
             ['email' => 'jan.kowalski@hostnet.pl'],
             [
+                'title' => '',                   
                 'first_name' => 'Jan',
                 'last_name' => 'Kowalski',
                 'email' => 'jan.kowalski@hostnet.pl',

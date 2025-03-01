@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UserSeeder::class, // Dodajemy nasz nowy seeder
             InstructorSeeder::class, // Dodajemy nasz nowy seeder
+            UserSeeder::class,
+            CourseSeeder::class,    
+            ParticipantSeeder::class, // Nowy seeder uczestników
         ]);
     }
 }

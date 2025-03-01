@@ -31,6 +31,7 @@
                     <tr>
                         <th>#</th>
                         <th>Zdjęcie</th>
+                        <th>Tytuł</th>                        
                         <th>Imię</th>
                         <th>Nazwisko</th>
                         <th>Email</th>
@@ -47,9 +48,10 @@
                             @if ($instructor->photo)
                                 <img src="{{ asset('storage/' . $instructor->photo) }}" alt="Zdjęcie" width="50">
                             @else
-                                Brak zdjęcia
+                                Brak
                             @endif
                         </td>
+                        <td>{{ $instructor->title }}</td>                        
                         <td>{{ $instructor->first_name }}</td>
                         <td>{{ $instructor->last_name }}</td>
                         <td>{{ $instructor->email }}</td>

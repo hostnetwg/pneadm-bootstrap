@@ -163,9 +163,16 @@ class CoursesController extends Controller
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
     
-        if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('courses', 'public');
+      // Obsługa pliku obrazka
+      if ($request->hasFile('image')) {
+        // Usunięcie starego obrazka, jeśli istnieje
+        if ($course->image && \Storage::disk('public')->exists($course->image)) {
+            \Storage::disk('public')->delete($course->image);
         }
+
+        // Zapis nowego obrazka
+        $validated['image'] = $request->file('image')->store('courses', 'public');
+    }
     
         $course->update($validated);
     

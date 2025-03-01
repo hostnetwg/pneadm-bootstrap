@@ -20,6 +20,7 @@ class InstructorsController extends Controller
         //dd($request->all());
     
         $request->validate([
+            'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:instructors,email',
@@ -33,14 +34,21 @@ class InstructorsController extends Controller
         if ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('instructors', 'public');
         }
-    
+
+        $signaturePath = null;
+        if ($request->hasFile('signature')) {
+            $signaturePath = $request->file('signature')->store('instructors', 'public');
+        }        
+        
         Instructor::create([
+            'title' => $request->input('title'),            
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
             'bio' => $request->input('bio'),
             'photo' => $photoPath,
+            'signature' => $signaturePath,            
             'is_active' => $request->has('is_active'),
         ]);
     
@@ -64,21 +72,40 @@ class InstructorsController extends Controller
         $instructor = Instructor::findOrFail($id);
     
         $request->validate([
+            'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:instructors,email,' . $id,
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',            
             'is_active' => 'nullable|string',
         ]);
     
-        // Jeśli przesłano nowe zdjęcie, zamień stare
         if ($request->hasFile('photo')) {
+            // Usunięcie poprzedniego zdjęcia, jeśli istnieje
+            if ($instructor->photo && \Storage::disk('public')->exists($instructor->photo)) {
+                \Storage::disk('public')->delete($instructor->photo);
+            }
+    
+            // Zapis nowego zdjęcia
             $photoPath = $request->file('photo')->store('instructors', 'public');
             $instructor->photo = $photoPath;
         }
+
+        if ($request->hasFile('signature')) {
+            // Usunięcie poprzedniego zdjęcia signature, jeśli istnieje
+            if ($instructor->signature && \Storage::disk('public')->exists($instructor->signature)) {
+                \Storage::disk('public')->delete($instructor->signature);
+            }
     
+            // Zapis nowego zdjęcia
+            $signaturePath = $request->file('signature')->store('instructors', 'public');
+            $instructor->signature = $signaturePath;
+        }        
+    
+        $instructor->title = $request->input('title');
         $instructor->first_name = $request->input('first_name');
         $instructor->last_name = $request->input('last_name');
         $instructor->email = $request->input('email');
@@ -103,6 +130,16 @@ class InstructorsController extends Controller
                 unlink($photoPath);
             }
         }
+
+        // Sprawdzenie, czy instruktor ma signature
+        if ($instructor->signature) {
+            $signaturePath = public_path('storage/' . $instructor->signature);
+    
+            // Usunięcie pliku signature, jeśli istnieje
+            if (file_exists($signaturePath)) {
+                unlink($signaturePath);
+            }
+        }        
     
         // Usunięcie rekordu z bazy danych
         $instructor->delete();

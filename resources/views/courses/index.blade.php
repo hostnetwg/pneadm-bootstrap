@@ -40,7 +40,11 @@
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
                         <td>{{ $course->id }}</td>
                         <td>
-                            <img src="{{ asset('storage/' . ($course->image ?? 'default-course.png')) }}" alt="Obrazek kursu" width="50">
+                            @if ($course->image)
+                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="50">
+                            @else
+                                <span>Brak</span>
+                            @endif
                         </td>
                         <td>{{ $course->title }}</td>
                         <td>{{ Str::limit($course->description, 50) }}</td>
