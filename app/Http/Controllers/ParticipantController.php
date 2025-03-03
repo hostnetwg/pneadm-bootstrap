@@ -11,11 +11,34 @@ class ParticipantController extends Controller
     /**
      * Wyświetla listę uczestników dla danego kursu.
      */
-    public function index(Course $course)
+    public function index(Request $request, Course $course)
     {
-        $participants = $course->participants()->paginate(10);
-        return view('participants.index', compact('course', 'participants'));
+        $query = Participant::where('course_id', $course->id);
+    
+        if ($request->query('sort') === 'asc') {
+            // Pobranie posortowanych uczestników
+            $sortedParticipants = $query
+                ->orderByRaw("CONVERT(last_name USING utf8mb4) COLLATE utf8mb4_polish_ci")
+                ->orderByRaw("CONVERT(first_name USING utf8mb4) COLLATE utf8mb4_polish_ci")
+                ->get();
+    
+            // Aktualizacja numeracji w bazie danych
+            foreach ($sortedParticipants as $index => $participant) {
+                $participant->update(['order' => $index + 1]);
+            }
+    
+            // Przekierowanie na stronę bez parametru sort, aby uniknąć ponownego sortowania
+            return redirect()->route('participants.index', ['course' => $course->id])
+                ->with('success', 'Lista uczestników została posortowana i zapisana.');
+        }
+    
+        // Pobranie uczestników według zapisanej kolejności
+        $participants = $query->orderBy('order')->paginate(10);
+    
+        return view('participants.index', compact('participants', 'course'));
     }
+    
+    
 
     /**
      * Formularz dodawania nowego uczestnika do kursu.
@@ -37,11 +60,19 @@ class ParticipantController extends Controller
             'birth_date' => 'nullable|date',
             'birth_place' => 'nullable|string|max:255',
         ]);
-
-        $course->participants()->create($request->all());
-
+    
+        // Pobranie ostatniego numeru porządkowego w danym kursie
+        $lastOrder = $course->participants()->max('order') ?? 0;
+    
+        // Tworzenie nowego uczestnika z przypisanym numerem porządkowym
+        $course->participants()->create(array_merge(
+            $request->all(),
+            ['order' => $lastOrder + 1]
+        ));
+    
         return redirect()->route('participants.index', $course)->with('success', 'Uczestnik dodany.');
     }
+    
 
     /**
      * Formularz edycji uczestnika.

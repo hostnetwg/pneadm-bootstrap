@@ -55,7 +55,18 @@ class CertificateController extends Controller
         $instructor = $course->instructor ?? null;
     
         // Generowanie numeru certyfikatu w formacie NR/course_id/ROK/PNE
-        $certificateNumber = sprintf('%d/%d/%s/PNE', $participant->id, $course->id, date('Y')); 
+        // $certificateNumber = sprintf('%d/%d/%s/PNE', $participant->id, $course->id, date('Y')); 
+        // Pobranie liczby certyfikatów już wygenerowanych dla tego kursu
+        $lastCertificate = \App\Models\Certificate::where('course_id', $course->id)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Określenie kolejnego numeru certyfikatu dla danego kursu
+        $nextCertificateNumber = $lastCertificate ? intval(explode('/', $lastCertificate->certificate_number)[0]) + 1 : 1;
+
+        // Generowanie numeru certyfikatu w formacie: NR/Course_id/YYYY
+        $certificateNumber = sprintf('%d/%d/%d/PNE', $nextCertificateNumber, $course->id, date('Y'));
+
 
         // Tworzenie nazwy pliku
         $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
@@ -104,6 +115,25 @@ class CertificateController extends Controller
     
         // Pobieranie pliku PDF (z folderu public/storage)
         return response()->download(storage_path('app/public/' . $filePath));
+    }
+
+    public function destroy(Certificate $certificate)
+    {
+        //dd($certificate->file_path);
+
+        // Sprawdzenie, czy certyfikat ma powiązany plik PDF
+        if ($certificate->file_path) {
+            $filePath = storage_path("app/public/" . str_replace("storage/", "", $certificate->file_path));
+    
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+        }
+    
+        // Usunięcie certyfikatu z bazy danych
+        $certificate->delete();
+    
+        return redirect()->back()->with('success', 'Certyfikat został usunięty.');
     }
     
     

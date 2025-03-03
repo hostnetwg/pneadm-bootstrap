@@ -18,7 +18,13 @@
             <div class="d-flex justify-content-end mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
             </div>
-
+            <div class="mb-3">
+                <form action="{{ route('courses.import') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2" id="csvImportForm">
+                    @csrf
+                    <input type="file" name="csv_file" class="form-control d-none" accept=".csv" id="csvFileInput">
+                    <button type="button" class="btn btn-primary" id="importCsvButton">Importuj listę kursów CSV</button>
+                </form>
+            </div>
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -83,4 +89,15 @@
 
         </div>
     </div>
+    <script>
+        document.getElementById('importCsvButton').addEventListener('click', function() {
+            document.getElementById('csvFileInput').click();
+        });
+
+        document.getElementById('csvFileInput').addEventListener('change', function() {
+            if (this.files.length > 0) {
+                document.getElementById('csvImportForm').submit();
+            }
+        });
+    </script>    
 </x-app-layout>

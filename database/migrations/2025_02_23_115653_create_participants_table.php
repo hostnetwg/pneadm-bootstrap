@@ -10,6 +10,7 @@ return new class extends Migration {
         Schema::create('participants', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('course_id');
+            $table->integer('order')->nullable(); // Pole do określania kolejności
             $table->string('first_name');
             $table->string('last_name');
             $table->string('email')->nullable();

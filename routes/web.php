@@ -22,6 +22,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->name('courses.update');
+    Route::post('/courses/import', [CoursesController::class, 'import'])->name('courses.import');    
 
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników
@@ -32,8 +33,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{participant}', [ParticipantController::class, 'destroy'])->name('participants.destroy'); // Usuwanie
     });
 
-    Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])
-        ->name('certificates.generate');
+    Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])->name('certificates.generate');
+    Route::delete('/certificates/{certificate}', [CertificateController::class, 'destroy'])->name('certificates.destroy');
 
 
     Route::get('participants/{participant}/certificate', [CertificateController::class, 'store'])->name('certificates.store');

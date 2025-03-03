@@ -8,6 +8,8 @@ use App\Models\Instructor;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Validator;
 
 class CoursesController extends Controller
 {
@@ -46,7 +48,7 @@ class CoursesController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'end_date' => 'required|date|after:start_date',
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
@@ -146,13 +148,15 @@ class CoursesController extends Controller
     
     public function update(Request $request, $id)
     {
+
+        //dd($request->all()); // Wyświetli wszystkie dane przesłane w formularzu edycji        
         $course = Course::findOrFail($id);
     
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'end_date' => 'required|date|after:start_date',
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
@@ -209,5 +213,72 @@ class CoursesController extends Controller
     
         return redirect()->route('courses.index')->with('success', 'Szkolenie zaktualizowane!');
     }
-        
+    public function import(Request $request)
+    {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+    
+        $file = $request->file('csv_file');
+        $handle = fopen($file, "r");
+        $header = fgetcsv($handle, 1000, ","); // Pobranie nagłówka
+    
+        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+            // Walidacja liczby kolumn
+            if (count($row) < 17) { // Upewniamy się, że mamy wystarczająco dużo danych
+                continue; // Pomijamy błędne wiersze
+            }
+    
+            // Pobieranie i konwersja dat
+            $startDate = \Carbon\Carbon::parse($row[2]); // Data rozpoczęcia
+            $endDate = \Carbon\Carbon::parse($row[3]); // Data zakończenia
+    
+            // ✅ Sprawdzenie i poprawienie daty zakończenia
+            if ($endDate <= $startDate) {
+                $endDate = $startDate->copy()->addHours(2); // Automatyczna korekta daty zakończenia
+            }
+    
+            // Tworzenie kursu
+            $course = Course::create([
+                'title' => $row[0], // Tytuł kursu
+                'description' => $row[1], // Opis
+                'start_date' => $startDate, // Data rozpoczęcia
+                'end_date' => $endDate, // Data zakończenia (poprawiona, jeśli była błędna)
+                'type' => $row[4], // Typ kursu (online/offline)
+                'category' => $row[5], // Kategoria (open/closed)
+                'instructor_id' => is_numeric($row[6]) ? $row[6] : null, // ID instruktora (lub null)
+                'image' => $row[7] ?? null, // Opcjonalna ścieżka do obrazu
+                'is_active' => filter_var($row[8], FILTER_VALIDATE_BOOLEAN), // Konwersja wartości na boolean
+            ]);
+    
+            // ✅ Obsługa kursów offline (dodanie lokalizacji)
+            if ($row[4] === 'offline') {
+                CourseLocation::create([
+                    'course_id' => $course->id,
+                    'location_name' => $row[9] ?? null, // Nazwa lokalizacji
+                    'address' => $row[10] ?? null, // Adres
+                    'city' => $row[11] ?? null, // Miasto
+                    'country' => $row[12] ?? null, // Kraj
+                    'post_office' => $row[13] ?? null, // Poczta
+                    'postal_code' => $row[14] ?? null, // Kod pocztowy
+                ]);
+            }
+    
+            // ✅ Obsługa kursów online (dodanie platformy i linków)
+            if ($row[4] === 'online') {
+                CourseOnlineDetails::create([
+                    'course_id' => $course->id,
+                    'platform' => $row[15] ?? 'ClickMeeting', // Platforma (domyślnie ClickMeeting)
+                    'meeting_link' => $row[16] ?? null, // Link do spotkania
+                    'meeting_password' => $row[17] ?? null, // Hasło do spotkania
+                ]);
+            }
+        }
+    
+        fclose($handle);
+    
+        return redirect()->route('courses.index')->with('success', 'Kursy zaimportowane!');
+    }
+    
+    
 }

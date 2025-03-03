@@ -40,8 +40,11 @@
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="end_date" class="form-label">Data zakończenia</label>
-                            <input type="datetime-local" name="end_date" class="form-control" id="end_date" value="{{ date('Y-m-d\TH:i', strtotime($course->end_date)) }}" required>
+                            <label>Data zakończenia</label>
+                            <input type="datetime-local" name="end_date" class="form-control" value="{{ old('end_date', $course->end_date ?? '') }}">
+                            @error('end_date')
+                                <div class="text-danger">{{ $message }}</div> <!-- ✅ Wyświetlanie błędu -->
+                            @enderror
                         </div>
                     </div>
                 </div>
@@ -154,4 +157,22 @@ function toggleCourseFields() {
 }
 
 window.onload = toggleCourseFields;
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        let startDateInput = document.querySelector('input[name="start_date"]');
+        let endDateInput = document.querySelector('input[name="end_date"]');
+
+        function validateDates() {
+            let startDate = new Date(startDateInput.value);
+            let endDate = new Date(endDateInput.value);
+
+            if (endDate <= startDate) {
+                alert("Data zakończenia musi być późniejsza niż data rozpoczęcia!");
+                endDateInput.value = ""; // Resetowanie błędnej wartości
+            }
+        }
+
+        endDateInput.addEventListener("change", validateDates);
+    });
 </script>

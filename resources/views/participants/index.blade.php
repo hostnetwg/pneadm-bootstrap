@@ -10,6 +10,10 @@
             <a href="{{ route('courses.index') }}" class="btn btn-secondary me-2">Powrót do listy szkoleń</a>
             <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">Dodaj uczestnika</a>
         </div>
+        <!-- Przycisk sortowania -->
+        <div class="mb-3">
+            <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-info">Sortuj alfabetycznie</a>
+        </div>        
 
         <!-- Komunikat o sukcesie -->
         @if(session('success'))
@@ -22,26 +26,27 @@
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>ID</th>
+                    <th>Nazwisko</th>                    
                     <th>Imię</th>
-                    <th>Nazwisko</th>
                     <th>Email</th>
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
                     <th>Nr certyfikatu</th>                    
-                    <th>Akcje</th>
                     <th>Certyfikat</th>
+                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($participants as $participant)
+                @foreach ($participants as $index => $participant)
                     <tr>
+                        <td>{{ $participant->order }}</td>
                         <td>{{ $participant->id }}</td>
+                        <td>{{ $participant->last_name }}</td>                        
                         <td>{{ $participant->first_name }}</td>
-                        <td>{{ $participant->last_name }}</td>
                         <td>{{ $participant->email ?? 'Brak' }}</td>
                         <td>{{ $participant->birth_date ?? 'Brak' }}</td>
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
-                        <td>
                         <td>
                             @if ($participant->certificate)
                                 <a href="{{ route('certificates.generate', $participant->id) }}">
@@ -53,20 +58,24 @@
                             </td>
                         </td>
                         <td>
+                            @if ($participant->certificate)
+                                <form action="{{ route('certificates.destroy', $participant->certificate->id) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć certyfikat?')">Usuń</button>
+                                </form>
+                            @else
+                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
+                            @endif
+                        </td>                         
+                        <td>
                             <a href="{{ route('participants.edit', [$course, $participant]) }}" class="btn btn-warning btn-sm">Edytuj</a>
                             <form action="{{ route('participants.destroy', [$course, $participant]) }}" method="POST" style="display:inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć uczestnika?')">Usuń</button>
                             </form>
-                        </td>
-                        <td>
-                            @if ($participant->certificate)
-                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-success btn-sm">Generuj</a>                                
-                            @else
-                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
-                            @endif
-                        </td>                        
+                        </td>                       
                     </tr>
                 @endforeach
             </tbody>
