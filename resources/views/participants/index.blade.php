@@ -23,7 +23,7 @@
         @endif
 
         <table class="table table-striped">
-            <thead>
+            <thead class="table-dark">
                 <tr>
                     <th>#</th>
                     <th>ID</th>

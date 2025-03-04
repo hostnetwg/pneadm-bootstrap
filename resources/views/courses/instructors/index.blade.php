@@ -27,7 +27,7 @@
 
             <!-- Tabela z listą instruktorów -->
             <table class="table table-striped">
-                <thead>
+                <thead class="table-dark">
                     <tr>
                         <th>#</th>
                         <th>Zdjęcie</th>
