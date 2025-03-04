@@ -16,6 +16,7 @@ class CourseSeeder extends Seeder
             'description' => 'Zaawansowane szkolenie dotyczące wykorzystania AI w edukacji.',
             'start_date' => Carbon::now()->subDays(7)->setHour(17)->setMinute(0)->setSecond(0), // 7 dni temu, godz. 17:00
             'end_date' => Carbon::now()->subDays(7)->setHour(20)->setMinute(0)->setSecond(0), // 7 dni temu, godz. 20:00
+            'is_paid' => true,
             'type' => 'offline',
             'category' => 'open',
             'instructor_id' => 1, // Można dodać ID instruktora, jeśli istnieje
@@ -43,6 +44,7 @@ class CourseSeeder extends Seeder
             'description' => 'Podstawy projektowania w Canva dla nauczycieli.',
             'start_date' => Carbon::now()->subDays(3)->setHour(16)->setMinute(0)->setSecond(0), // 3 dni temu, godz. 16:00
             'end_date' => Carbon::now()->subDays(3)->setHour(19)->setMinute(0)->setSecond(0), // 3 dni temu, godz. 19:00
+            'is_paid' => false,            
             'type' => 'online',
             'category' => 'closed',
             'instructor_id' => 1,

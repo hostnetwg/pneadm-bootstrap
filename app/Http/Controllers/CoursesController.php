@@ -16,14 +16,51 @@ class CoursesController extends Controller
     /**
      * Wyświetlanie listy kursów
      */
-    public function index()
-    {
-        // Pobranie wszystkich szkoleń z bazy z paginacją
-        $courses = Course::with(['location', 'onlineDetails', 'instructor'])
-        ->orderBy('start_date', 'desc') // Sortowanie według daty rozpoczęcia
-        ->paginate(10); // Paginacja co 10 kursów        
-        return view('courses.index', compact('courses'));
-    }
+
+     public function index(Request $request)
+     {
+         $query = Course::query();
+     
+         // Pobieranie listy instruktorów do widoku
+         $instructors = Instructor::orderBy('last_name')->get();
+     
+         // Pobieranie wartości filtra "date_filter"
+         $dateFilter = $request->query('date_filter', 'upcoming');
+     
+         // Pobieranie wartości filtrów
+         $filters = [
+             'is_paid' => $request->input('is_paid'),
+             'type' => $request->input('type'),
+             'category' => $request->input('category'),
+             'is_active' => $request->input('is_active'),
+             'date_filter' => $dateFilter,
+             'instructor_id' => $request->input('instructor_id'),
+         ];
+     
+         // Określenie domyślnego sortowania
+         $sortColumn = $request->query('sort', 'start_date');
+         $sortDirection = $request->query('direction', ($dateFilter === 'upcoming' ? 'asc' : 'desc'));
+     
+         // Filtracja kursów według daty
+         if ($dateFilter === 'upcoming') {
+             $query->where('end_date', '>=', now());
+         } elseif ($dateFilter === 'past') {
+             $query->where('end_date', '<', now());
+         }
+     
+         // Filtracja według pozostałych pól
+         foreach ($filters as $key => $value) {
+             if (!is_null($value) && $value !== '' && $key !== 'date_filter') { // Pomijamy filtr terminu, bo już jest przetwarzany powyżej
+                 $query->where($key, $value);
+             }
+         }
+     
+         // Pobranie wyników z dynamicznym sortowaniem i paginacją
+         $courses = $query->orderBy($sortColumn, $sortDirection)->paginate(10)->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
+     
+         return view('courses.index', compact('courses', 'instructors', 'filters'));
+     }
+             
 
     /**
      * Formularz dodawania nowego kursu
@@ -49,6 +86,7 @@ class CoursesController extends Controller
             'description' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
+            'is_paid' => 'required|boolean',
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
@@ -158,6 +196,7 @@ class CoursesController extends Controller
             'description' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
+            'is_paid' => 'required|boolean',
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
@@ -168,16 +207,23 @@ class CoursesController extends Controller
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
     
-      // Obsługa pliku obrazka
-      if ($request->hasFile('image')) {
-        // Usunięcie starego obrazka, jeśli istnieje
-        if ($course->image && \Storage::disk('public')->exists($course->image)) {
-            \Storage::disk('public')->delete($course->image);
+        // Jeśli zaznaczono checkbox "Usuń obrazek", usuwamy go
+        if ($request->has('remove_image')) {
+            if ($course->image && \Storage::disk('public')->exists($course->image)) {
+                \Storage::disk('public')->delete($course->image);
+            }
+            $course->image = null; // Usunięcie ścieżki pliku w bazie danych
         }
 
-        // Zapis nowego obrazka
-        $validated['image'] = $request->file('image')->store('courses', 'public');
-    }
+        // Obsługa pliku obrazka
+        if ($request->hasFile('image')) {
+            // Usunięcie starego obrazka, jeśli istnieje
+            if ($course->image && \Storage::disk('public')->exists($course->image)) {
+                \Storage::disk('public')->delete($course->image);
+            }
+            // Zapis nowego obrazka
+            $validated['image'] = $request->file('image')->store('courses', 'public');
+        }        
     
         $course->update($validated);
     
@@ -215,6 +261,7 @@ class CoursesController extends Controller
     
         return redirect()->route('courses.index')->with('success', 'Szkolenie zaktualizowane!');
     }
+
     public function import(Request $request)
     {
         $request->validate([

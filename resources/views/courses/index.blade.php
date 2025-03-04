@@ -21,12 +21,104 @@
                     <button type="button" class="btn btn-secondary" id="importCsvButton">Importuj listę kursów CSV</button>
                 </form>
             </div>
+
+            <form method="GET" action="{{ route('courses.index') }}" class="mb-4 p-3 bg-light rounded shadow-sm">
+                <div class="row g-3 align-items-end">
             
+                    <!-- Filtr: Termin -->
+                    <div class="col-md-2">
+                        <label for="date_filter" class="form-label fw-bold">Termin</label>
+                        <select name="date_filter" class="form-select">
+                            <option value="all" {{ request()->get('date_filter', 'upcoming') === 'all' ? 'selected' : '' }}>Wszystkie</option>                            
+                            <option value="upcoming" {{ request()->get('date_filter', 'upcoming') === 'upcoming' ? 'selected' : '' }}>Nadchodzące</option>
+                            <option value="past" {{ request()->get('date_filter') === 'past' ? 'selected' : '' }}>Po terminie</option>
+                        </select>                                                                                         
+                    </div>
+            
+                    <!-- Filtr: Płatność -->
+                    <div class="col-md-2">
+                        <label for="is_paid" class="form-label fw-bold">Płatność</label>
+                        <select name="is_paid" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="1" {{ request('is_paid') == '1' ? 'selected' : '' }}>Płatne</option>
+                            <option value="0" {{ request('is_paid') == '0' ? 'selected' : '' }}>Bezpłatne</option>
+                        </select>
+                    </div>
+            
+                    <!-- Filtr: Rodzaj kursu -->
+                    <div class="col-md-2">
+                        <label for="type" class="form-label fw-bold">Rodzaj</label>
+                        <select name="type" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="online" {{ request('type') == 'online' ? 'selected' : '' }}>Online</option>
+                            <option value="offline" {{ request('type') == 'offline' ? 'selected' : '' }}>Offline</option>
+                        </select>
+                    </div>
+            
+                    <!-- Filtr: Kategoria -->
+                    <div class="col-md-2">
+                        <label for="category" class="form-label fw-bold">Kategoria</label>
+                        <select name="category" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="open" {{ request('category') == 'open' ? 'selected' : '' }}>Otwarte</option>
+                            <option value="closed" {{ request('category') == 'closed' ? 'selected' : '' }}>Zamknięte</option>
+                        </select>
+                    </div>
+{{--            
+                    <!-- Filtr: Status aktywności -->
+                    <div class="col-md-2">
+                        <label for="is_active" class="form-label fw-bold">Status</label>
+                        <select name="is_active" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="1" {{ request('is_active') == '1' ? 'selected' : '' }}>Aktywne</option>
+                            <option value="0" {{ request('is_active') == '0' ? 'selected' : '' }}>Nieaktywne</option>
+                        </select>
+                    </div> 
+--}}            
+                    <!-- Filtr: Instruktor -->
+                    <div class="col-md-3">
+                        <label for="instructor_id" class="form-label fw-bold">Instruktor</label>
+                        <select name="instructor_id" class="form-select">
+                            <option value="">Wszyscy</option>
+                            @foreach($instructors as $instructor)
+                                <option value="{{ $instructor->id }}" {{ request('instructor_id') == $instructor->id ? 'selected' : '' }}>
+                                    {{ $instructor->first_name }} {{ $instructor->last_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
+                    <!-- Przycisk filtrowania i resetu -->
+                    <div class="col-md-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtruj</button>
+                        <a href="{{ route('courses.index') }}" class="btn btn-secondary flex-grow-1"><i class="fas fa-sync-alt"></i> Resetuj</a>
+                    </div>
+            
+                </div>
+            </form>
+            
+                        
+
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Data</th>                        
+                        <th>#id</th>
+                        <th>
+                            <a href="{{ route('courses.index', array_merge(request()->query(), ['sort' => 'start_date', 'direction' => request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-dark text-decoration-none">
+                                Data
+                                @php
+                                    $currentSort = request()->get('sort', 'start_date');
+                                    $currentDirection = request()->get('direction', request('date_filter') === 'upcoming' ? 'asc' : 'desc');
+                                @endphp
+                                @if($currentSort === 'start_date')
+                                    @if($currentDirection === 'asc')
+                                        🔼
+                                    @else
+                                        🔽
+                                    @endif
+                                @endif
+                            </a>
+                        </th>                                              
                         <th>Obrazek</th>
                         <th>Tytuł</th>
                         {{-- <th>Opis</th> --}}
@@ -53,10 +145,12 @@
                         <td><strong>{{ $course->title }}</strong></td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td>
-                            <strong>{{ ucfirst($course->type) }}</strong> <br>
-                            <span class="badge {{ $course->category === 'open' ? 'bg-success' : 'bg-primary' }}">
-                                {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}
-                            </span>
+                            <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
+                                {{ $course->is_paid ? 'Płatny' : 'Bezpłatny' }}
+                            </span> <br>
+                            {{ ucfirst($course->type) }} <br>
+                            {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}
+
                         </td>
                         <td>
                             @if ($course->type === 'offline' && $course->location)
@@ -89,7 +183,9 @@
             </table>
 
             <div class="mt-3">
-                {{ $courses->links() }}
+                {{-- {{ $courses->links() }} --}}
+                {{ $courses->appends(request()->query())->links() }}
+
             </div>
 
         </div>

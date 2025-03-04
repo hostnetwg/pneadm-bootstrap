@@ -22,7 +22,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->name('courses.update');
-    Route::post('/courses/import', [CoursesController::class, 'import'])->name('courses.import');    
+    Route::post('/courses/import', [CoursesController::class, 'import'])->name('courses.import');   
 
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników

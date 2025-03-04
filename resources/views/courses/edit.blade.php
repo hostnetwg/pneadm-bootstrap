@@ -31,58 +31,65 @@
                     <textarea name="description" class="form-control" id="description" rows="3">{{ $course->description }}</textarea>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="start_date" class="form-label">Data rozpoczęcia</label>
-                            <input type="datetime-local" name="start_date" class="form-control" id="start_date" value="{{ date('Y-m-d\TH:i', strtotime($course->start_date)) }}" required>
+                    <!-- Terminy i szczegóły -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-2">
+                            <label for="start_date" class="form-label fw-bold">Data rozpoczęcia *</label>
+                            <input type="datetime-local" name="start_date" id="start_date" class="form-control @error('start_date') is-invalid @enderror" value="{{ old('start_date', $course->start_date) }}" required>
+                            @error('start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="col-md-2">
+                            <label for="end_date" class="form-label fw-bold">Data zakończenia *</label>
+                            <input type="datetime-local" name="end_date" id="end_date" class="form-control @error('end_date') is-invalid @enderror" value="{{ old('end_date', $course->end_date) }}" required>
+                            @error('end_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="col-md-2">
+                            <label for="is_paid" class="form-label fw-bold">Płatność</label>
+                            <select name="is_paid" class="form-select @error('is_paid') is-invalid @enderror">
+                                <option value="1" {{ old('is_paid', $course->is_paid) == 1 ? 'selected' : '' }}>Płatne</option>
+                                <option value="0" {{ old('is_paid', $course->is_paid) == 0 ? 'selected' : '' }}>Bezpłatne</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="category" class="form-label fw-bold">Kategoria *</label>
+                            <select name="category" class="form-select @error('category') is-invalid @enderror" required>
+                                <option value="open" {{ old('category', $course->category) == 'open' ? 'selected' : '' }}>Otwarte</option>
+                                <option value="closed" {{ old('category', $course->category) == 'closed' ? 'selected' : '' }}>Zamknięte</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="type" class="form-label fw-bold">Rodzaj *</label>
+                            <select name="type" id="type" class="form-select @error('type') is-invalid @enderror" onchange="toggleCourseFields()" required>
+                                <option value="offline" {{ old('type', $course->type) == 'offline' ? 'selected' : '' }}>Stacjonarne</option>
+                                <option value="online" {{ old('type', $course->type) == 'online' ? 'selected' : '' }}>Online</option>
+                            </select>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label>Data zakończenia</label>
-                            <input type="datetime-local" name="end_date" class="form-control" value="{{ old('end_date', $course->end_date ?? '') }}">
-                            @error('end_date')
-                                <div class="text-danger">{{ $message }}</div> <!-- ✅ Wyświetlanie błędu -->
-                            @enderror
+
+                    <div id="online-fields" style="display: {{ $course->type == 'online' ? 'block' : 'none' }};">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="platform" class="form-label">Platforma</label>
+                                <input type="text" name="platform" class="form-control" id="platform" 
+                                    value="{{ $course->onlineDetails->platform ?? '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="meeting_link" class="form-label">Link do spotkania</label>
+                                <input type="text" name="meeting_link" class="form-control" id="meeting_link" 
+                                    value="{{ $course->onlineDetails->meeting_link ?? '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="meeting_password" class="form-label">Hasło do spotkania</label>
+                                <input type="text" name="meeting_password" class="form-control" id="meeting_password" 
+                                    value="{{ $course->onlineDetails->meeting_password ?? '' }}">
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="category" class="form-label">Kategoria</label>
-                        <select name="category" class="form-control" id="category" required>
-                            <option value="open" {{ $course->category == 'open' ? 'selected' : '' }}>Otwarte</option>
-                            <option value="closed" {{ $course->category == 'closed' ? 'selected' : '' }}>Zamknięte</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="type" class="form-label">Rodzaj kursu</label>
-                        <select name="type" id="type" class="form-control" onchange="toggleCourseFields()">
-                            <option value="online" {{ $course->type == 'online' ? 'selected' : '' }}>Online</option>
-                            <option value="offline" {{ $course->type == 'offline' ? 'selected' : '' }}>Stacjonarne</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div id="online-fields" style="display: {{ $course->type == 'online' ? 'block' : 'none' }};">
-                    <div class="mb-3">
-                        <label for="platform" class="form-label">Platforma</label>
-                        <input type="text" name="platform" class="form-control" id="platform" 
-                            value="{{ $course->onlineDetails->platform ?? '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="meeting_link" class="form-label">Link do spotkania</label>
-                        <input type="text" name="meeting_link" class="form-control" id="meeting_link" 
-                            value="{{ $course->onlineDetails->meeting_link ?? '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="meeting_password" class="form-label">Hasło do spotkania</label>
-                        <input type="text" name="meeting_password" class="form-control" id="meeting_password" 
-                            value="{{ $course->onlineDetails->meeting_password ?? '' }}">
-                    </div>
-                </div>
+                    
                 
 
                 <div id="offline-fields" style="display: {{ $course->type == 'offline' ? 'block' : 'none' }};">
@@ -117,37 +124,41 @@
                     </div>
                 </div>                
 
-                <div class="mb-3">
-                    <label for="instructor_id" class="form-label">Instruktor</label>
-                    <select name="instructor_id" class="form-control" id="instructor_id">
-                        <option value="">Brak</option>
-                        @foreach($instructors as $instructor)
-                            <option value="{{ $instructor->id }}" {{ $course->instructor_id == $instructor->id ? 'selected' : '' }}>
-                                {{ $instructor->first_name }} {{ $instructor->last_name }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="instructor_id" class="form-label">Instruktor</label>
+                        <select name="instructor_id" class="form-control" id="instructor_id">
+                            <option value="">Brak</option>
+                            @foreach($instructors as $instructor)
+                                <option value="{{ $instructor->id }}" {{ $course->instructor_id == $instructor->id ? 'selected' : '' }}>
+                                    {{ $instructor->first_name }} {{ $instructor->last_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="image" class="form-label">Obrazek kursu</label>                
+                        <input type="file" name="image" class="form-control" id="image">
+                    
+                        @if (!empty($course->image))
+                            <div class="mt-2">
+                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" class="img-thumbnail" style="max-width: 200px;">
+                    
+                                <div class="form-check mt-2">
+                                    <input type="checkbox" class="form-check-input" id="remove_image" name="remove_image">
+                                    <label class="form-check-label" for="remove_image">Usuń grafikę z kursu</label>
+                                </div>
+                            </div>
+                        @endif                   
+                    </div>
+                    
                 </div>
+                
 
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>
                     <label class="form-check-label" for="is_active">Aktywny</label>
-                </div>
-
-                <div class="mb-3">
-                    <label for="image" class="form-label">Obrazek kursu</label>
-                    <input type="file" name="image" class="form-control" id="image">
-                
-                    @if ($course->image)
-                        <div class="mt-2">
-                            <p>Aktualny obrazek:</p>
-                            <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100">
-                        </div>
-                    @else
-                        <p class="text-muted">Brak aktualnego obrazka</p>
-                    @endif
-                </div>
-                
+                </div>                
 
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                 <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
