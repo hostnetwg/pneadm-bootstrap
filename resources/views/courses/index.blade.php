@@ -31,7 +31,7 @@
                         <select name="date_filter" class="form-select">
                             <option value="all" {{ request()->get('date_filter', 'upcoming') === 'all' ? 'selected' : '' }}>Wszystkie</option>                            
                             <option value="upcoming" {{ request()->get('date_filter', 'upcoming') === 'upcoming' ? 'selected' : '' }}>Nadchodzące</option>
-                            <option value="past" {{ request()->get('date_filter') === 'past' ? 'selected' : '' }}>Po terminie</option>
+                            <option value="past" {{ request()->get('date_filter') === 'past' ? 'selected' : '' }}>Archiwalne</option>
                         </select>                                                                                         
                     </div>
             
@@ -98,13 +98,12 @@
             </form>
             
                         
-
-            <table class="table table-striped">
-                <thead>
+            <table class="table table-striped table-hover table-responsive">
+                <thead class="table-dark">
                     <tr>
-                        <th>#id</th>
-                        <th>
-                            <a href="{{ route('courses.index', array_merge(request()->query(), ['sort' => 'start_date', 'direction' => request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-dark text-decoration-none">
+                        <th class="text-center" style="width: 5%;">#id</th>
+                        <th style="width: 8%;">
+                            <a href="{{ route('courses.index', array_merge(request()->query(), ['sort' => 'start_date', 'direction' => request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-light text-decoration-none">
                                 Data
                                 @php
                                     $currentSort = request()->get('sort', 'start_date');
@@ -119,68 +118,76 @@
                                 @endif
                             </a>
                         </th>                                              
-                        <th>Obrazek</th>
-                        <th>Tytuł</th>
+                        <th class="text-center" style="width: 9%;">Obrazek</th>
+                        <th style="width: 17%;">Tytuł</th>
                         {{-- <th>Opis</th> --}}
-                        <th>Rodzaj</th>
-                        <th>Lokalizacja / Dostęp</th>
-                        <th>Instruktor</th>
-                        <th>Status</th>
-                        <th title="Uczestnicy">U</th>
-                        <th>Akcje</th>
+                        <th style="width: 10%;">Rodzaj</th>
+                        <th style="width: 18%;">Lokalizacja / Dostęp</th>
+                        <th style="width: 10%;">Instruktor</th>
+                        <th style="width: 8%;">Status</th>
+                        <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
+                        <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($courses as $course)
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
-                        <td>{{ $course->id }}</td>
-                        <td>{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>                        
-                        <td>
+                        <td class="text-center align-middle">{{ $course->id }}</td>
+                        <td class="align-middle">{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>                        
+                        <td class="text-center align-middle">
                             @if ($course->image)
-                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="50">
+                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100" class="img-thumbnail">
                             @else
                                 <span></span>
                             @endif
                         </td>
-                        <td><strong>{{ $course->title }}</strong></td>
+                        <td class="align-middle"><strong>{{ $course->title }}</strong></td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
-                        <td>
+                        <td class="align-middle">
                             <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
                                 {{ $course->is_paid ? 'Płatny' : 'Bezpłatny' }}
                             </span> <br>
-                            {{ ucfirst($course->type) }} <br>
-                            {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}
-
+                            <span class="small">{{ ucfirst($course->type) }}</span> <br>
+                            <span class="small">{{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}</span>
                         </td>
-                        <td>
+                        <td class="align-middle small">
                             @if ($course->type === 'offline' && $course->location)
                             <strong>{{ $course->location->location_name ?? 'Brak nazwy lokalizacji' }}</strong><br>
                             {{ $course->location->address ?? 'Brak adresu' }}<br>
                             {{ $course->location->postal_code ?? '' }} {{ $course->location->post_office ?? '' }}
                             @elseif ($course->type === 'online' && $course->onlineDetails)
                                 <strong>Platforma:</strong> {{ $course->onlineDetails->platform ?? 'Nieznana' }}<br>
-                                <a href="{{ $course->onlineDetails->meeting_link ?? '#' }}" target="_blank">Dołącz do spotkania</a>
+                                <a href="{{ $course->onlineDetails->meeting_link ?? '#' }}" class="btn btn-sm btn-outline-primary mt-1" target="_blank">Dołącz do spotkania</a>
                             @else
                                 Brak danych
                             @endif
                         </td>
-                        <td>
+                        <td class="align-middle">
                             {{ $course->instructor ? $course->instructor->first_name . ' ' . $course->instructor->last_name : 'Brak instruktora' }}
                         </td>
-                        <td>{{ $course->is_active ? 'Aktywny' : 'Nieaktywny' }}</td>
-                        <td title="Liczba uczestników">{{ $course->participants->count() }}</td>
-                        <td>
-                            <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-warning btn-sm" style="width: 100px;">Edytuj</a>
-                            <form action="{{ route('courses.destroy', $course->id) }}" method="POST" style="display:inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm" style="width: 100px;" onclick="return confirm('Czy na pewno chcesz usunąć?')">Usuń</button>
-                            </form>
-                            <a href="{{ route('participants.index', $course->id) }}" class="btn btn-info btn-sm" style="width: 100px;">Uczestnicy</a>
+                        <td class="align-middle">
+                            <span class="badge {{ $course->is_active ? 'bg-success' : 'bg-danger' }}">
+                                {{ $course->is_active ? 'Aktywny' : 'Nieaktywny' }}
+                            </span>
+                        </td>
+                        <td class="text-center align-middle" title="Liczba uczestników">
+                            <span class="badge bg-info">{{ $course->participants->count() }}</span>
+                        </td>
+                        <td class="align-middle">
+                            <div class="d-flex flex-column gap-1">
+                                <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-warning btn-sm">Edytuj</a>
+                                <form action="{{ route('courses.destroy', $course->id) }}" method="POST">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Czy na pewno chcesz usunąć?')">Usuń</button>
+                                </form>
+                                <a href="{{ route('participants.index', $course->id) }}" class="btn btn-info btn-sm text-white">Uczestnicy</a>
+                            </div>
                         </td>
                     </tr>@endforeach
                 </tbody>
             </table>
+
 
             <div class="mt-3">
                 {{-- {{ $courses->links() }} --}}
