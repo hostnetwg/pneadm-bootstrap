@@ -14,6 +14,7 @@ class Course extends Model
         'description',
         'start_date',
         'end_date',
+        'is_paid', // 1/0
         'type', // online/offline
         'category', // open/closed
         'instructor_id',
@@ -22,6 +23,7 @@ class Course extends Model
     ];
 
     protected $casts = [
+        'is_paid' => 'boolean', // ✅ Konwersja na boolean dla poprawnego odczytu        
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'is_active' => 'boolean'

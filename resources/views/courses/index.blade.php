@@ -7,32 +7,29 @@
 
     <div class="px-3 py-3">
         <div class="container">
-            <h1>Lista szkoleń</h1>
-
             @if(session('success'))
                 <div class="alert alert-success">
                     {{ session('success') }}
                 </div>
             @endif
 
-            <div class="d-flex justify-content-end mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
-            </div>
-            <div class="mb-3">
                 <form action="{{ route('courses.import') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2" id="csvImportForm">
                     @csrf
                     <input type="file" name="csv_file" class="form-control d-none" accept=".csv" id="csvFileInput">
-                    <button type="button" class="btn btn-primary" id="importCsvButton">Importuj listę kursów CSV</button>
+                    <button type="button" class="btn btn-secondary" id="importCsvButton">Importuj listę kursów CSV</button>
                 </form>
             </div>
+            
             <table class="table table-striped">
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>Data</th>                        
                         <th>Obrazek</th>
                         <th>Tytuł</th>
-                        <th>Opis</th>
-                        <th>Data rozpoczęcia</th>
+                        {{-- <th>Opis</th> --}}
                         <th>Rodzaj</th>
                         <th>Lokalizacja / Dostęp</th>
                         <th>Instruktor</th>
@@ -45,24 +42,32 @@
                     @foreach ($courses as $course)
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
                         <td>{{ $course->id }}</td>
+                        <td>{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>                        
                         <td>
                             @if ($course->image)
                                 <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="50">
                             @else
-                                <span>Brak</span>
+                                <span></span>
                             @endif
                         </td>
-                        <td>{{ $course->title }}</td>
-                        <td>{{ Str::limit($course->description, 50) }}</td>
-                        <td>{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>
-                        <td>{{ $course->type === 'offline' ? 'Stacjonarne' : 'Online' }}</td>
+                        <td><strong>{{ $course->title }}</strong></td>
+                       {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td>
-                            @if ($course->type === 'offline')
-                                {{ $course->location ? $course->location->address . ', ' . $course->location->city : 'Brak lokalizacji' }}
+                            <strong>{{ ucfirst($course->type) }}</strong> <br>
+                            <span class="badge {{ $course->category === 'open' ? 'bg-success' : 'bg-primary' }}">
+                                {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}
+                            </span>
+                        </td>
+                        <td>
+                            @if ($course->type === 'offline' && $course->location)
+                            <strong>{{ $course->location->location_name ?? 'Brak nazwy lokalizacji' }}</strong><br>
+                            {{ $course->location->address ?? 'Brak adresu' }}<br>
+                            {{ $course->location->postal_code ?? '' }} {{ $course->location->post_office ?? '' }}
+                            @elseif ($course->type === 'online' && $course->onlineDetails)
+                                <strong>Platforma:</strong> {{ $course->onlineDetails->platform ?? 'Nieznana' }}<br>
+                                <a href="{{ $course->onlineDetails->meeting_link ?? '#' }}" target="_blank">Dołącz do spotkania</a>
                             @else
-                                <a href="{{ $course->onlineDetails->meeting_link ?? '#' }}" target="_blank">
-                                    {{ $course->onlineDetails->platform ?? 'Brak platformy' }}
-                                </a>
+                                Brak danych
                             @endif
                         </td>
                         <td>

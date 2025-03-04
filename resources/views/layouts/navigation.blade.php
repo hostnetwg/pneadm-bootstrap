@@ -32,32 +32,6 @@
             </div>
         </li>
 
-        <!-- Produkty -->
-        <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ /* Dodaj warunek, jeśli masz trasy dla produktów */ 'collapsed' }}"
-                    data-bs-toggle="collapse" data-bs-target="#products-collapse"
-                    aria-expanded="false">
-                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#table"></use>
-                </svg>
-                Produkty
-                <svg class="bi pe-none ms-auto" width="16" height="16">
-                    <use xlink:href="#chevron-right"></use>
-                </svg>
-            </button>
-            <div class="collapse" id="products-collapse">
-                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li>
-                        <a href="#"
-                           class="link-light d-inline-flex text-decoration-none rounded"
-                           onclick="event.stopPropagation();">
-                           Lista Produktów
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </li>
-
         <!-- courses -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') ? '' : 'collapsed' }}"
@@ -77,7 +51,7 @@
                         <a href="{{ route('courses.index') }}"
                            class="link-light d-inline-flex text-decoration-none rounded"
                            onclick="event.stopPropagation();">
-                           Lista szkoleń
+                           Harmonogram szkoleń
                         </a>
                     </li>
                     <li>
@@ -94,11 +68,44 @@
                            Zaświadczenia
                         </a>
                     </li>
+                    <li>
+                        <a href="#"
+                           class="link-light d-inline-flex text-decoration-none rounded"
+                           onclick="event.stopPropagation();">
+                           Uczestnicy
+                        </a>
+                    </li>                    
                 </ul>
             </div>
         </li>
 
-        <!-- Zamówienia -->
+        <!-- Marketing i reklama -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ /* Dodaj warunek, jeśli masz trasy dla produktów */ 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#products-collapse"
+                    aria-expanded="false">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#table"></use>
+                </svg>
+                Marketing i reklama
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse" id="products-collapse">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="#"
+                           class="link-light d-inline-flex text-decoration-none rounded"
+                           onclick="event.stopPropagation();">
+                           Działania marketingowe
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+
+        <!-- Sprzedaż -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ /* Dodaj warunek, jeśli masz trasy dla zamówień */ 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#orders-collapse"
@@ -106,7 +113,7 @@
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#speedometer2"></use>
                 </svg>
-                Zamówienia
+                Sprzedaż
                 <svg class="bi pe-none ms-auto" width="16" height="16">
                     <use xlink:href="#chevron-right"></use>
                 </svg>

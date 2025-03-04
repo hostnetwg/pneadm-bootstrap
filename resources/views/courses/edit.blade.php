@@ -86,12 +86,19 @@
                 
 
                 <div id="offline-fields" style="display: {{ $course->type == 'offline' ? 'block' : 'none' }};">
-                    <div class="row">
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Adres</label>
-                            <input type="text" name="address" id="address" class="form-control" 
-                                value="{{ $course->location->address ?? '' }}">
-                        </div>                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="location_name">Nazwa lokalizacji</label>
+                                <input type="text" name="location_name" id="location_name" class="form-control"
+                                    value="{{ old('location_name', $course->location->location_name ?? '') }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="address">Adres</label>
+                                <input type="text" name="address" id="address" class="form-control"
+                                    value="{{ old('address', $course->location->address ?? '') }}">
+                            </div>
+                        </div>
+                        <div class="row mt-2">                     
                         <div class="col-md-4">
                             <label for="postal_code" class="form-label">Kod pocztowy</label>
                             <input type="text" name="postal_code" id="postal_code" class="form-control" 

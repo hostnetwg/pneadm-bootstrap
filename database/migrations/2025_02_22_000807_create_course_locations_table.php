@@ -11,6 +11,7 @@ class CreateCourseLocationsTable extends Migration
         Schema::create('course_locations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('course_id');
+            $table->string('location_name')->nullable(); // ✅ Teraz pole może być puste (nullable)
             $table->string('postal_code'); // Dodano kod pocztowy
             $table->string('post_office'); // Dodano pocztę
             $table->string('address');

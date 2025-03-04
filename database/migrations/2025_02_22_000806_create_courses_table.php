@@ -14,6 +14,7 @@ class CreateCoursesTable extends Migration
             $table->text('description')->nullable();
             $table->dateTime('start_date');
             $table->dateTime('end_date');
+            $table->boolean('is_paid')->default(true); // Domyślnie kursy są płatne            
             $table->enum('type', ['online', 'offline']);
             $table->enum('category', ['open', 'closed']);
             $table->unsignedBigInteger('instructor_id')->nullable();

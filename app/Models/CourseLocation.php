@@ -11,9 +11,10 @@ class CourseLocation extends Model
 
     protected $fillable = [
         'course_id',
-        'postal_code',  // ✅ Dodano kod pocztowy
-        'post_office',  // ✅ Dodano pocztę
-        'address',
+        'location_name',
+        'address',        
+        'postal_code',
+        'post_office',
         'country'
     ];
 

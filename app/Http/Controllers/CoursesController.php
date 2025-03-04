@@ -21,7 +21,7 @@ class CoursesController extends Controller
         // Pobranie wszystkich szkoleń z bazy z paginacją
         $courses = Course::with(['location', 'onlineDetails', 'instructor'])
         ->orderBy('start_date', 'desc') // Sortowanie według daty rozpoczęcia
-        ->paginate(5); // Paginacja co 5 kursów        
+        ->paginate(10); // Paginacja co 10 kursów        
         return view('courses.index', compact('courses'));
     }
 
@@ -75,10 +75,11 @@ class CoursesController extends Controller
             // Dla kursu stacjonarnego
             if ($request->type === 'offline') {
                 $locationData = [
-                    'course_id' => $course->id,
+                    'course_id' => $course->id,                    
+                    'location_name' => $request->location_name,
+                    'address' => $request->address,
                     'postal_code' => $request->postal_code,
                     'post_office' => $request->post_office,
-                    'address' => $request->address,
                     'country' => $request->country ?? 'Polska'
                 ];
                 
@@ -185,9 +186,10 @@ class CoursesController extends Controller
             CourseLocation::updateOrCreate(
                 ['course_id' => $course->id],
                 [
+                    'location_name' => $request->location_name,
+                    'address' => $request->address,
                     'postal_code' => $request->postal_code,
                     'post_office' => $request->post_office,
-                    'address' => $request->address,
                     'country' => $request->country,
                 ]
             );

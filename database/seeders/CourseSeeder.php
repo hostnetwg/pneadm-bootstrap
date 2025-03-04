@@ -28,9 +28,10 @@ class CourseSeeder extends Seeder
         // Tworzymy lokalizację dla kursu offline
         DB::table('course_locations')->insert([
             'course_id' => $offlineCourseId,
+            'location_name' => 'Szkoła Podstawowa nr 1',
+            'address' => 'ul. Szkolna 10',            
             'postal_code' => '00-001',
             'post_office' => 'Warszawa',
-            'address' => 'ul. Szkolna 10',
             'country' => 'Polska',
             'created_at' => now(),
             'updated_at' => now(),
