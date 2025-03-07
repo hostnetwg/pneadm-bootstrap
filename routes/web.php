@@ -5,6 +5,9 @@ use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\InstructorsController;
+use App\Http\Controllers\EducationController; // baza Certgen - lista webinarów TIK
+use App\Http\Controllers\NODNSzkoleniaController; // baza Certgen - NODN_szkolenia_lista
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -15,6 +18,19 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+
+/**/
+    // Dostęp do drugiej bazy danych CERTGEN
+    Route::get('/nodn-szkolenia', [NODNSzkoleniaController::class, 'index'])->name('archiwum.certgen_szkolenia.index');
+    Route::get('/nodn-szkolenia/export', [NODNSzkoleniaController::class, 'exportToCourses'])->name('nodn.szkolenia.export');
+
+    Route::get('/education', [EducationController::class, 'index'])->name('education.index');
+    // trasa dla eksportu danych
+    Route::get('/education/export', [EducationController::class, 'exportToCourses'])->name('education.export');
+    Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])
+        ->name('education.exportParticipants');            
+/**/
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
     Route::get('/courses/create', [CoursesController::class, 'create'])->name('courses.create');

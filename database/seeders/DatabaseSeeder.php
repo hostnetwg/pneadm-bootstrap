@@ -15,8 +15,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class, // Dodajemy nasz nowy seeder
             InstructorSeeder::class, // Dodajemy nasz nowy seeder
             UserSeeder::class,
-            CourseSeeder::class,    
-            ParticipantSeeder::class, // Nowy seeder uczestników
+            // CourseSeeder::class,    
+            // ParticipantSeeder::class, // Nowy seeder uczestników
         ]);
     }
 }

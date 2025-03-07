@@ -10,6 +10,8 @@ class CreateCoursesTable extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('id_old')->nullable()->index(); // dodajemy pole id_old  
+            $table->string('source_id_old')->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();
             $table->dateTime('start_date');
@@ -21,6 +23,9 @@ class CreateCoursesTable extends Migration
             $table->string('image')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            // Dodanie unikalnego indeksu
+            $table->unique(['id_old', 'source_id_old']);            
 
             $table->foreign('instructor_id')
                   ->references('id')
