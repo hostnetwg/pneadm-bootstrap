@@ -45,67 +45,6 @@ class EducationController extends Controller
         // zwrócenie danych do widoku razem z aktualnym filtrem
         return view('education.index', compact('educations', 'type'));
     }
-    
-    public function exportToCourses(Request $request)
-    {
-        // opcjonalnie filtruj eksport po "type", jeśli chcesz eksportować tylko wyświetlane dane
-        $type = $request->input('type');
-    
-        $query = Education::on('mysql_certgen');
-    
-        if ($type) {
-            $query->where('type', $type);
-        }
-    
-        $educations = $query->get();
-
-        $importedCount = 0;
-        $skippedCount = 0;        
-    
-        // iteracja po pobranych rekordach i zapisanie do tabeli "courses" w bazie pneadm
-        foreach ($educations as $education) {
-            // Sprawdzamy, czy kurs już istnieje w bazie docelowej
-            $existingCourse = DB::connection('mysql')->table('courses')
-                ->where('id_old', $education->id)
-                ->where('source_id_old', 'BD:Certgen-education')
-                ->exists();
-
-            if ($existingCourse) {
-                $skippedCount++;
-                continue; // Pomijamy ten kurs, ponieważ już istnieje
-            }
-
-            // ✅ Oczyszczanie `title` i `description` z HTML
-            $title = strip_tags($education->title);
-            $description = strip_tags($education->zagadnienia);
-
-            // Wstawienie rekordu do tabeli courses i pobranie jego id
-            $courseId = DB::connection('mysql')->table('courses')->insertGetId([
-                'title' => $education->title,
-                'description' => $education->zagadnienia,
-                'start_date' => $education->data,
-                'end_date' => Carbon::parse($education->data)->addHours(2)->format('Y-m-d H:i:s'),
-                'is_paid' => 0,
-                'type' => 'online',
-                'category' => 'open',
-                'instructor_id' => 1,
-                'is_active' => 1,
-                'id_old' => $education->id, // ← dodajemy tutaj id z tabeli education
-                'source_id_old' => 'BD:Certgen-education',
-            ]);
-
-            // Teraz wstawiamy powiązany rekord do course_online_details
-            DB::connection('mysql')->table('course_online_details')->insert([
-                'course_id' => $courseId,
-                'platform' => 'YouTube',
-                'meeting_link' => $education->link, // pole link z tabeli education
-                'meeting_password' => null, // jeżeli nie ma hasła lub nie używasz
-            ]);            
-        }
-    
-        // powrót z komunikatem sukcesu
-        return redirect()->route('education.index')->with('success', 'Eksport danych zakończony sukcesem.');
-    }
 
     public function exportParticipants($id)
     {
@@ -174,7 +113,97 @@ class EducationController extends Controller
         return redirect()->route('education.index')->with('success', $message);
     }
     
+    public function exportToCourses(Request $request)
+    {
+        // Opcjonalnie filtruj eksport po "type"
+        $type = $request->input('type');
     
-
+        $query = Education::on('mysql_certgen');
+    
+        if ($type) {
+            $query->where('type', $type);
+        }
+    
+        $educations = $query->get();
+    
+        $importedCount = 0;
+        $skippedCount = 0;
+    
+        // ✅ Tworzymy folder `courses/images`, jeśli nie istnieje
+        $storageDirectory = storage_path('app/public/courses/images');
+        if (!file_exists($storageDirectory)) {
+            mkdir($storageDirectory, 0777, true);
+        }
+    
+        foreach ($educations as $education) {
+            // Sprawdzamy, czy kurs już istnieje w bazie docelowej
+            $existingCourse = DB::connection('mysql')->table('courses')
+                ->where('id_old', $education->id)
+                ->where('source_id_old', 'BD:Certgen-education')
+                ->exists();
+    
+            if ($existingCourse) {
+                $skippedCount++;
+                continue; // Pomijamy ten kurs, ponieważ już istnieje
+            }
+    
+            // ✅ Oczyszczanie `title` i `description` z HTML
+            $title = strip_tags($education->title);
+            $description = strip_tags($education->zagadnienia);
+    
+            // ✅ Wstawienie rekordu do tabeli courses i pobranie jego ID
+            $courseId = DB::connection('mysql')->table('courses')->insertGetId([
+                'title' => $title,
+                'description' => $description,
+                'start_date' => $education->data,
+                'end_date' => Carbon::parse($education->data)->addHours(2)->format('Y-m-d H:i:s'),
+                'is_paid' => 0,
+                'type' => 'online',
+                'category' => 'open',
+                'instructor_id' => 1,
+                'is_active' => 1,
+                'id_old' => $education->id, // ← dodajemy tutaj id z tabeli education
+                'source_id_old' => 'BD:Certgen-education',
+                'image' => null, // Tymczasowo puste, zaktualizujemy po pobraniu grafiki
+            ]);
+    
+            // ✅ Tworzenie losowej nazwy pliku
+            $randomSuffix = substr(md5(uniqid(mt_rand(), true)), 0, 6);
+            $imageFileName = "course_{$courseId}_{$randomSuffix}.jpg";
+            $imagePath = "courses/images/{$imageFileName}"; // ✅ Ścieżka w bazie
+    
+            // ✅ Pobieranie grafiki **po zapisaniu kursu**, żeby nie blokować bazy
+            $formattedId = str_pad($education->id, 3, '0', STR_PAD_LEFT);
+            $imageUrl = "https://zdalna-lekcja.pl/grafika/Live%20TIK%20miniatury/Live%20TIK%20miniatura%20{$formattedId}.jpg";
+    
+            try {
+                $imageContents = @file_get_contents($imageUrl); // Pobieramy obraz
+                if ($imageContents !== false) {
+                    file_put_contents("{$storageDirectory}/{$imageFileName}", $imageContents); // Zapisujemy plik
+    
+                    // ✅ Aktualizacja rekordu kursu w bazie o ścieżkę do grafiki
+                    DB::connection('mysql')->table('courses')->where('id', $courseId)->update([
+                        'image' => $imagePath
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error("Nie udało się pobrać obrazu dla kursu ID {$education->id}: " . $e->getMessage());
+            }
+    
+            // ✅ Wstawiamy powiązany rekord do `course_online_details`
+            DB::connection('mysql')->table('course_online_details')->insert([
+                'course_id' => $courseId,
+                'platform' => 'YouTube',
+                'meeting_link' => $education->link, // pole link z tabeli education
+                'meeting_password' => null, // jeżeli nie ma hasła lub nie używasz
+            ]);
+    
+            $importedCount++;
+        }
+    
+        // Powrót z komunikatem sukcesu
+        return redirect()->route('education.index')->with('success', "Eksport zakończony: <b>{$importedCount}</b> kursów dodanych, <b>{$skippedCount}</b> pominiętych.");
+    }
+    
     
 }

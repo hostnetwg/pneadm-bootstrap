@@ -72,15 +72,10 @@ class CoursesController extends Controller
         return view('courses.create', compact('instructors'));
     }
 
-    /**
-     * Obsługa dodawania kursu
-     */
     public function store(Request $request)
     {
-
-        //dd($request->all()); // 👈 Sprawdźmy, jakie dane faktycznie są przesyłane
         \Log::info('Dane formularza:', $request->all());
-        
+    
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -92,25 +87,48 @@ class CoursesController extends Controller
             'instructor_id' => 'nullable|exists:instructors,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
-        
+    
         try {
             DB::beginTransaction();
-            
-            // Obsługa pliku obrazka
-            if ($request->hasFile('image')) {
-                $validated['image'] = $request->file('image')->store('courses', 'public');
-            }
-            
+    
             // Dodanie is_active
             $validated['is_active'] = $request->has('is_active');
-            
+    
             \Log::info('Przed utworzeniem kursu:', $validated);
-            
+    
+            // ✅ Tworzymy kurs **bez grafiki**, grafikę dodamy później
             $course = Course::create($validated);
-            
-           // \Log::info('Po utworzeniu kursu. ID:', $course->id);
-            
-            // Dla kursu stacjonarnego
+    
+            // ✅ Tworzenie folderu `courses/images`, jeśli nie istnieje
+            $storageDirectory = storage_path('app/public/courses/images');
+            if (!file_exists($storageDirectory)) {
+                mkdir($storageDirectory, 0777, true);
+                \Log::info("Utworzono folder: {$storageDirectory}");
+            }
+    
+            // ✅ Obsługa przesłanego pliku obrazka
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                $extension = $file->getClientOriginalExtension(); // Pobieramy oryginalne rozszerzenie pliku
+    
+                // Generowanie nowej nazwy pliku
+                $randomSuffix = substr(md5(uniqid(mt_rand(), true)), 0, 6);
+                $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
+                $imagePath = "courses/images/{$imageFileName}"; // ✅ Ścieżka w bazie
+    
+                // ✅ Zapis pliku w `storage/app/public/courses/images`
+                $saved = $file->move($storageDirectory, $imageFileName);
+    
+                if ($saved) {
+                    // ✅ Aktualizacja rekordu kursu o ścieżkę do pliku
+                    $course->update(['image' => $imagePath]);
+                    \Log::info("Plik zapisany jako: {$imagePath}");
+                } else {
+                    \Log::error("Błąd zapisu pliku: {$imageFileName}");
+                }
+            }
+    
+            // ✅ Dla kursu stacjonarnego
             if ($request->type === 'offline') {
                 $locationData = [
                     'course_id' => $course->id,                    
@@ -125,8 +143,8 @@ class CoursesController extends Controller
                 
                 CourseLocation::create($locationData);
             }
-
-            // Dla kursu online
+    
+            // ✅ Dla kursu online
             if ($request->type === 'online') {
                 $onlineData = [
                     'course_id' => $course->id,
@@ -139,11 +157,10 @@ class CoursesController extends Controller
                 
                 CourseOnlineDetails::create($onlineData);
             }
-
-            
+    
             DB::commit();
             \Log::info('Transakcja zatwierdzona');
-            
+    
             return redirect()->route('courses.index')
                 ->with('success', 'Szkolenie zostało dodane!');
                 
@@ -151,12 +168,13 @@ class CoursesController extends Controller
             DB::rollBack();
             \Log::error('Błąd zapisu kursu: ' . $e->getMessage());
             \Log::error($e->getTraceAsString());
-            
+    
             return back()
                 ->withInput()
                 ->with('error', 'Wystąpił błąd podczas zapisywania kursu: ' . $e->getMessage());
         }
     }
+         
     
     public function edit($id)
     {
@@ -187,8 +205,6 @@ class CoursesController extends Controller
     
     public function update(Request $request, $id)
     {
-
-        //dd($request->all()); // Wyświetli wszystkie dane przesłane w formularzu edycji        
         $course = Course::findOrFail($id);
     
         $validated = $request->validate([
@@ -201,33 +217,50 @@ class CoursesController extends Controller
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
+            'is_active' => 'nullable|string',
         ]);
-        
+    
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
     
-        // Jeśli zaznaczono checkbox "Usuń obrazek", usuwamy go
+        // ✅ Tworzymy folder `courses/images`, jeśli nie istnieje
+        $storageDirectory = storage_path('app/public/courses/images');
+        if (!file_exists($storageDirectory)) {
+            mkdir($storageDirectory, 0777, true);
+        }
+    
+        // ✅ Usunięcie starego obrazka, jeśli użytkownik zaznaczył "Usuń obrazek"
         if ($request->has('remove_image')) {
             if ($course->image && \Storage::disk('public')->exists($course->image)) {
                 \Storage::disk('public')->delete($course->image);
             }
-            $course->image = null; // Usunięcie ścieżki pliku w bazie danych
+            $validated['image'] = null; // Usunięcie ścieżki pliku w bazie danych
         }
-
-        // Obsługa pliku obrazka
+    
+        // ✅ Obsługa nowego pliku graficznego
         if ($request->hasFile('image')) {
-            // Usunięcie starego obrazka, jeśli istnieje
+            // ✅ Usunięcie starego pliku, jeśli istnieje
             if ($course->image && \Storage::disk('public')->exists($course->image)) {
                 \Storage::disk('public')->delete($course->image);
             }
-            // Zapis nowego obrazka
-            $validated['image'] = $request->file('image')->store('courses', 'public');
-        }        
     
+            $file = $request->file('image');
+            $extension = $file->getClientOriginalExtension(); // Pobieramy rozszerzenie pliku
+            $randomSuffix = substr(md5(uniqid(mt_rand(), true)), 0, 6);
+            $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
+            $imagePath = "courses/images/{$imageFileName}";
+    
+            // ✅ Zapis pliku na serwerze
+            $saved = $file->move($storageDirectory, $imageFileName);
+            if ($saved) {
+                $validated['image'] = $imagePath; // Zapis do bazy tylko jeśli zapis pliku się powiódł
+            }
+        }
+    
+        // ✅ Aktualizacja kursu
         $course->update($validated);
     
-        // 🔹 Aktualizacja lokalizacji kursu offline
+        // ✅ Aktualizacja lokalizacji kursu offline
         if ($request->type === 'offline') {
             CourseLocation::updateOrCreate(
                 ['course_id' => $course->id],
@@ -236,7 +269,7 @@ class CoursesController extends Controller
                     'address' => $request->address,
                     'postal_code' => $request->postal_code,
                     'post_office' => $request->post_office,
-                    'country' => $request->country,
+                    'country' => $request->country ?? 'Polska',
                 ]
             );
     
@@ -244,7 +277,7 @@ class CoursesController extends Controller
             CourseOnlineDetails::where('course_id', $course->id)->delete();
         }
     
-        // 🔹 Aktualizacja danych kursu online
+        // ✅ Aktualizacja danych kursu online
         if ($request->type === 'online') {
             CourseOnlineDetails::updateOrCreate(
                 ['course_id' => $course->id],
@@ -261,6 +294,7 @@ class CoursesController extends Controller
     
         return redirect()->route('courses.index')->with('success', 'Szkolenie zaktualizowane!');
     }
+    
 
     public function import(Request $request)
     {

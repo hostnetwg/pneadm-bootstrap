@@ -11,7 +11,7 @@
             {{-- Wyświetlanie komunikatów sukcesu --}}
             @if (session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    {{ session('success') }}
+                    {!! session('success') !!}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             @endif
@@ -19,7 +19,7 @@
             {{-- Wyświetlanie komunikatów błędów --}}
             @if (session('error'))
                 <div class="alert alert-danger">
-                    {{ session('error') }}
+                    {!! session('error') !!}
                 </div>
             @endif
 
