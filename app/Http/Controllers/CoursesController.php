@@ -85,9 +85,10 @@ class CoursesController extends Controller
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'certificate_format' => 'nullable|string|max:255', 
         ]);
-    
+        $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //    
         try {
             DB::beginTransaction();
     
@@ -218,8 +219,10 @@ class CoursesController extends Controller
             'instructor_id' => 'nullable|exists:instructors,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string',
+            'certificate_format' => 'nullable|string|max:255',         
         ]);
-    
+
+        $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //        
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
     

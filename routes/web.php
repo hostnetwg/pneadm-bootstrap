@@ -23,7 +23,12 @@ Route::middleware(['auth'])->group(function () {
 /**/
     // Dostęp do drugiej bazy danych CERTGEN
     Route::get('/nodn-szkolenia', [NODNSzkoleniaController::class, 'index'])->name('archiwum.certgen_szkolenia.index');
-    Route::get('/nodn-szkolenia/export', [NODNSzkoleniaController::class, 'exportToCourses'])->name('nodn.szkolenia.export');
+    //Route::get('/nodn-szkolenia/export', [NODNSzkoleniaController::class, 'exportToCourses'])->name('nodn.szkolenia.export');
+    Route::post('/nodn-szkolenia/export-selected', [NODNSzkoleniaController::class, 'exportSelectedCourses'])->name('nodn.szkolenia.export.selected');    
+
+    Route::get('/nodn/szkolenia/{id}/export-participants', [NODNSzkoleniaController::class, 'exportParticipants'])->name('exportParticipants');
+    Route::get('/nodn/szkolenia/export/{id}', [NODNSzkoleniaController::class, 'exportCourse'])->name('exportCourse');
+
 
     Route::get('/education', [EducationController::class, 'index'])->name('education.index');
     // trasa dla eksportu danych

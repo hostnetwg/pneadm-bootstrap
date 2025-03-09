@@ -20,6 +20,7 @@ class Course extends Model
         'instructor_id',
         'image',
         'is_active',
+        'certificate_format', 
     ];
 
     protected $casts = [

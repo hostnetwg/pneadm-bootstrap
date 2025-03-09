@@ -94,7 +94,13 @@
                            class="link-light d-inline-flex text-decoration-none rounded">
                            NODN - Lista szkoleń
                         </a>
-                    </li>   
+                    </li>
+                    <li>
+                        <a href=""
+                           class="link-light d-inline-flex text-decoration-none rounded">
+                           CSV do tabeli certgen
+                        </a>
+                    </li>  
                 </ul>             
             </div>
         </li>

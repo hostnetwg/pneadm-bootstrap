@@ -153,7 +153,16 @@
                     </div>
                     
                 </div>
-                
+
+                <div class="form-group">
+                    <label for="certificate_format">Format numeracji certyfikatów</label>
+                    <input type="text" name="certificate_format" id="certificate_format" class="form-control" 
+                           value="{{ old('certificate_format', isset($course) ? $course->certificate_format : '{nr}/{course_id}/{year}/PNE') }}" 
+                           placeholder="Wpisz format, np. RL/{nr}/{course_id}/2/{year}/PNE">
+                    <small class="form-text text-muted">
+                        Możesz używać zmiennych: <code>{nr}</code>, <code>{course_id}</code>, <code>{year}</code>.
+                    </small>
+                </div>                
 
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>

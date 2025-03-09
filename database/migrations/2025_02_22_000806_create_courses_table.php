@@ -22,6 +22,7 @@ class CreateCoursesTable extends Migration
             $table->unsignedBigInteger('instructor_id')->nullable();
             $table->string('image')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->string('certificate_format')->default('{nr}/{course_id}/{year}/PNE');
             $table->timestamps();
 
             // Dodanie unikalnego indeksu

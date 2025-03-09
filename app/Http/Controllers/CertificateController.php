@@ -12,38 +12,44 @@ use Carbon\Carbon;
 
 class CertificateController extends Controller
 {
+
+
     public function store($participantId)
     {
-        // Pobranie uczestnika
-        $participant = Participant::find($participantId);
-        if (!$participant) {
-            return redirect()->back()->with('error', 'Uczestnik nie został znaleziony.');
-        }
-  
-
-        // Pobranie kursu powiązanego z uczestnikiem
-        $course = Course::find($participant->course_id);
-        if (!$course) {
-            return redirect()->back()->with('error', 'Szkolenie nie zostało znalezione.');
-        }  
-
-        // Generowanie numeru certyfikatu w formacie: NR/course_id/ROK/PNE
-        $certificateNumber = sprintf('%d/%d/%s/PNE', $participant->id, $course->id, date('Y'));
-
-        // Sprawdzenie, czy certyfikat już istnieje - jeśli tak, aktualizujemy zamiast dodawać nowy
-        $certificate = Certificate::updateOrCreate(
-            [
-                'participant_id' => $participant->id,
-                'course_id' => $course->id,
-            ],
-            [
-                'certificate_number' => $certificateNumber,
-                'generated_at' => now(),
-            ]
+        // Pobieranie uczestnika i kursu
+        $participant = Participant::findOrFail($participantId);
+        $course = Course::findOrFail($participant->course_id);
+    
+        // Pobranie ostatniego certyfikatu dla danego kursu
+        $lastCertificate = Certificate::where('course_id', $course->id)
+            ->orderBy('id', 'desc')
+            ->first();
+    
+        // Określenie kolejnego numeru certyfikatu dla kursu
+        $nextCertificateNumber = $lastCertificate 
+            ? intval(explode('/', $lastCertificate->certificate_number)[0]) + 1 
+            : 1;
+    
+        // Pobranie schematu numeracji lub użycie domyślnego
+        $format = $course->certificate_format ?? "{nr}/{course_id}/{year}";
+    
+        // Generowanie numeru certyfikatu według wzoru
+        $certificateNumber = str_replace(
+            ['{nr}', '{year}', '{course_id}'], 
+            [$nextCertificateNumber, date('Y'), $course->id], 
+            $format
         );
-
-        return redirect()->back()->with('success', 'Certyfikat został zapisany w bazie.');
+    
+        // Zapis numeru certyfikatu w bazie danych (bez generowania PDF)
+        Certificate::updateOrCreate(
+            ['participant_id' => $participant->id, 'course_id' => $course->id],
+            ['certificate_number' => $certificateNumber, 'generated_at' => now()]
+        );
+    
+        return redirect()->back()->with('success', "Certyfikat nr {$certificateNumber} został zapisany.");
     }
+    
+    
 
     public function generate($participantId)
     {
@@ -54,34 +60,41 @@ class CertificateController extends Controller
         // Pobieranie instruktora, jeśli kurs ma relację do instruktora
         $instructor = $course->instructor ?? null;
     
-        // Generowanie numeru certyfikatu w formacie NR/course_id/ROK/PNE
-        // $certificateNumber = sprintf('%d/%d/%s/PNE', $participant->id, $course->id, date('Y')); 
-        // Pobranie liczby certyfikatów już wygenerowanych dla tego kursu
-        $lastCertificate = \App\Models\Certificate::where('course_id', $course->id)
-            ->orderBy('id', 'desc')
+        // Pobranie istniejącego certyfikatu z bazy danych
+        $certificate = Certificate::where('participant_id', $participant->id)
+            ->where('course_id', $course->id)
             ->first();
-
-        // Określenie kolejnego numeru certyfikatu dla danego kursu
-        $nextCertificateNumber = $lastCertificate ? intval(explode('/', $lastCertificate->certificate_number)[0]) + 1 : 1;
-
-        // Generowanie numeru certyfikatu w formacie: NR/Course_id/YYYY
-        $certificateNumber = sprintf('%d/%d/%d/PNE', $nextCertificateNumber, $course->id, date('Y'));
-
-
-        // Tworzenie nazwy pliku
+    
+        // Jeśli certyfikat nie istnieje, zwracamy błąd
+        if (!$certificate) {
+            return redirect()->back()->with('error', 'Certyfikat dla tego uczestnika nie został znaleziony.');
+        }
+    
+        // Używamy istniejącego numeru certyfikatu
+        $certificateNumber = $certificate->certificate_number;
+    
+        // Tworzenie nazwy pliku na podstawie numeru certyfikatu
         $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
         $filePath = 'certificates/' . $fileName; // Ścieżka w public/storage
+    
+        // Tworzenie ścieżki do folderu kursu
+        $courseFolder = 'certificates/' . $course->id;
+        $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
+        $filePath = $courseFolder . '/' . $fileName; // Ścieżka w public/storage
 
         // Sprawdzenie i utworzenie katalogu jeśli nie istnieje
-        if (!Storage::disk('public')->exists('certificates')) {
-            Storage::disk('public')->makeDirectory('certificates', 0777, true);
+        if (!Storage::disk('public')->exists($courseFolder)) {
+            Storage::disk('public')->makeDirectory($courseFolder, 0777, true);
         }
-       
     
-        // Obliczanie czasu trwania szkolenia w minutach
-        $startDateTime = Carbon::parse($course->start_date . ' ' . $course->start_time);
-        $endDateTime = Carbon::parse($course->end_date . ' ' . $course->end_time);
+        // Usuwamy ewentualne spacje i konwertujemy format
+        $startDateTime = Carbon::parse(trim($course->start_date));
+        $endDateTime = Carbon::parse(trim($course->end_date));
+
+        // Obliczanie czasu trwania w minutach
         $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
+
+
     
         // Tworzenie widoku PDF z przekazaniem wszystkich danych
         $pdf = Pdf::loadView('certificates.template', [
@@ -100,22 +113,18 @@ class CertificateController extends Controller
         // Zapisywanie pliku PDF w storage/public/certificates
         Storage::disk('public')->put($filePath, $pdf->output());
     
-        // Zapis w bazie danych (jeśli certyfikat jeszcze nie istnieje)
-        Certificate::updateOrCreate(
-            [
-                'participant_id' => $participant->id,
-                'course_id' => $course->id,
-            ],
-            [
-                'certificate_number' => $certificateNumber,
-                'file_path' => 'storage/' . $filePath, // Poprawiona ścieżka
+        // Aktualizacja ścieżki pliku w bazie (jeśli brak)
+        if (empty($certificate->file_path)) {
+            $certificate->update([
+                'file_path' => 'storage/' . $filePath,
                 'generated_at' => now(),
-            ]
-        );
+            ]);
+        }
     
         // Pobieranie pliku PDF (z folderu public/storage)
         return response()->download(storage_path('app/public/' . $filePath));
     }
+    
 
     public function destroy(Certificate $certificate)
     {
