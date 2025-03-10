@@ -95,12 +95,12 @@
                            NODN - Lista szkoleń
                         </a>
                     </li>
-                    <li>
-                        <a href=""
-                           class="link-light d-inline-flex text-decoration-none rounded">
-                           CSV do tabeli certgen
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('publigo.import.form') }}">
+                            Import CSV
                         </a>
-                    </li>  
+                    </li>
+                    
                 </ul>             
             </div>
         </li>

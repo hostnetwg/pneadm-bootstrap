@@ -8,6 +8,11 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController; // baza Certgen - lista webinarów TIK
 use App\Http\Controllers\NODNSzkoleniaController; // baza Certgen - NODN_szkolenia_lista
 
+use App\Http\Controllers\PubligoController;
+
+
+
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -35,6 +40,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/education/export', [EducationController::class, 'exportToCourses'])->name('education.export');
     Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])
         ->name('education.exportParticipants');            
+
+/*----*/
+Route::get('/publigo/import', [PubligoController::class, 'showImportForm'])->name('publigo.import.form');
+Route::post('/publigo/import', [PubligoController::class, 'import'])->name('publigo.import');
+/*====*/
+
 /**/
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
