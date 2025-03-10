@@ -128,14 +128,36 @@
 
         <!-- Konto -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.edit') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#account-collapse"
-                    aria-expanded="{{ request()->routeIs('profile.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('profile.edit') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#people-circle"></use>
+                </svg>
                 Konto
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('profile.*') ? 'show' : '' }}" id="account-collapse">
+            <div class="collapse {{ request()->routeIs('profile.edit') ? 'show' : '' }}" id="account-collapse">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="{{ route('profile.edit') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Edytuj Profil</a></li>
+                    <li>
+                        <a href="{{ route('profile.edit') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded"
+                           onclick="event.stopPropagation();">
+                           Edytuj Profil
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('logout') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded"
+                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                           Wyloguj
+                        </a>
+                    </li>
+                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                        @csrf
+                    </form>
                 </ul>
             </div>
         </li>
