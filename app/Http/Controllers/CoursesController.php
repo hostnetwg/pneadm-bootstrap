@@ -365,6 +365,88 @@ class CoursesController extends Controller
     
         return redirect()->route('courses.index')->with('success', 'Kursy zaimportowane!');
     }
-    
+/*--------importFromPubligo------------*/
+
+    public function importFromPubligo()
+    {
+        // Pobranie kursów z bazy certgen
+        $szkolenia = DB::connection('mysql_certgen')->table('publigo')->get();
+
+        $importedCount = 0;
+        $skippedCount = 0;
+
+        foreach ($szkolenia as $szkolenie) {
+            // Sprawdzamy, czy kurs już istnieje w docelowej bazie
+            $exists = DB::connection('mysql')->table('courses')
+                ->where('id_old', $szkolenie->id_old)
+                ->where('source_id_old', 'certgen_Publigo')
+                ->exists();
+
+            if ($exists) {
+                $skippedCount++;
+                continue;
+            }
+
+            // Oczyszczanie wartości `title` i `description`
+            $title = strip_tags($szkolenie->title);
+            $description = strip_tags($szkolenie->description);
+
+            // Określenie, czy kurs jest online czy offline
+            $courseType = ($szkolenie->type == 'online') ? 'online' : 'offline';
+
+            // Wstawienie nowego kursu do `courses`
+            $courseId = DB::connection('mysql')->table('courses')->insertGetId([
+                'title' => $title,
+                'description' => $description,
+                'start_date' => $szkolenie->start_date,
+                'end_date' => $szkolenie->end_date,
+                'is_paid' => $szkolenie->is_paid,
+                'type' => $courseType,
+                'category' => $szkolenie->category,
+                'instructor_id' => $szkolenie->instructor_id,
+                'image' => $szkolenie->image,
+                'is_active' => $szkolenie->is_active,
+                'certificate_format' => $szkolenie->certificate_format,
+                'id_old' => $szkolenie->id_old,
+                'source_id_old' => 'certgen_Publigo', // Identyfikator źródła
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Jeśli kurs jest online, zapisujemy do `course_online_details`
+            if ($szkolenie->type == 'online') {
+                DB::connection('mysql')->table('course_online_details')->insert([
+                    'course_id' => $courseId,
+                    'platform' => $szkolenie->platform ?? 'ClickMeeting',
+                    'meeting_link' => $szkolenie->meeting_link,
+                    'meeting_password' => $szkolenie->meeting_password,
+                ]);
+            } 
+            // Jeśli kurs jest offline, zapisujemy do `course_locations`
+            else {
+                DB::connection('mysql')->table('course_locations')->insert([
+                    'course_id' => $courseId,
+                    'location_name' => $szkolenie->location_name,
+                    'postal_code' => $szkolenie->postal_code,
+                    'post_office' => $szkolenie->post_office,
+                    'address' => $szkolenie->address,
+                    'country' => $szkolenie->country ?? 'Polska',
+                ]);
+            }
+
+            $importedCount++;
+        }
+
+        // Komunikat zwrotny
+        $message = "Zaimportowano <b>{$importedCount}</b> kursów.";
+        if ($skippedCount > 0) {
+            $message .= " <br>Pominięto <b>{$skippedCount}</b>, ponieważ już istnieją.";
+        }
+
+        return redirect()->route('courses.index')->with('success', $message);
+    }
+
+
+/*=========importFromPubligo===========*/
     
 }

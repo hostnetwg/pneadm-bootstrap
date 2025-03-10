@@ -35,6 +35,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/education/export', [EducationController::class, 'exportToCourses'])->name('education.export');
     Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])
         ->name('education.exportParticipants');            
+
+        Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');
+
+
 /**/
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');

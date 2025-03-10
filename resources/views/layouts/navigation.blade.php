@@ -90,15 +90,13 @@
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('education.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Webinary TIK BD:Certgen</a></li>
                     <li>
-                        <a href="{{ route('archiwum.certgen_szkolenia.index') }}"
-                           class="link-light d-inline-flex text-decoration-none rounded">
+                        <a href="{{ route('archiwum.certgen_szkolenia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                            NODN - Lista szkoleń
                         </a>
                     </li>
                     <li>
-                        <a href=""
-                           class="link-light d-inline-flex text-decoration-none rounded">
-                           CSV do tabeli certgen
+                        <a href="{{ route('courses.importPubligo') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Certgen - PUBLIGO
                         </a>
                     </li>  
                 </ul>             
