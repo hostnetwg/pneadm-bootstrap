@@ -1,10 +1,17 @@
-<div class="flex-shrink-0 p-3 text-bg-dark h-100 overflow-auto" style="width: 280px;" data-bs-theme="dark">
-    <a href="/" class="d-flex align-items-center pb-3 mb-3 link-light text-decoration-none border-bottom">
+<div class="flex-shrink-0 p-3 text-bg-dark h-100 overflow-auto" style="width: 100%;" data-bs-theme="dark">
+    <div class="d-flex align-items-center pb-3 mb-3 link-light text-decoration-none border-bottom">
         <svg class="bi pe-none me-2" width="30" height="24" fill="white">
             <use xlink:href="#bootstrap"></use>
         </svg>
         <span class="fs-5 fw-semibold">Panel Administracyjny</span>
-    </a>
+        
+        <!-- Dodajemy przycisk zamykania na mobilnych -->
+        <button id="close-sidebar" class="btn btn-link text-light ms-auto d-md-none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+            </svg>
+        </button>
+    </div>
     <ul class="list-unstyled ps-0">
 
         <!-- Dashboard -->
@@ -163,3 +170,18 @@
         </li>
     </ul>
 </div>
+
+<script>
+    // Dodajemy obsługę przycisku zamykania sidebara na mobilnych
+    document.addEventListener('DOMContentLoaded', function() {
+        const closeButton = document.getElementById('close-sidebar');
+        if (closeButton) {
+            closeButton.addEventListener('click', function() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                sidebar.classList.remove('show');
+                overlay.classList.remove('show');
+            });
+        }
+    });
+</script>
