@@ -122,19 +122,6 @@ Jednak to jej praca w kuratorium oświaty, gdzie pełniła funkcje wizytatora i 
                 'photo' => '',
                 'is_active' => true,                
             ]
-        );  
-        Instructor::updateOrCreate(
-            ['email' => 'jan.kowalski@hostnet.pl'],
-            [
-                'title' => '',                   
-                'first_name' => 'Jan',
-                'last_name' => 'Kowalski',
-                'email' => 'jan.kowalski@hostnet.pl',
-                'phone' => '+48 123 456 789',
-                'bio' => 'Przykładowy instruktor.',
-                'photo' => '',
-                'is_active' => true,                
-            ]
-        );                                                       
+        );                                                         
     }
 }
