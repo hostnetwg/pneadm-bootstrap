@@ -46,9 +46,9 @@
         
         /* Przycisk do zwijania/rozwijania menu */
         .sidebar-collapse-btn {
-            position: absolute;
+            position: fixed;
             top: 50%;
-            right: -16px;
+            transform: translateY(-50%);
             width: 32px;
             height: 32px;
             border-radius: 50%;
@@ -58,11 +58,20 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            transform: translateY(-50%);
             cursor: pointer;
             z-index: 1031;
-            transition: right 0.3s ease-in-out;
             box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* Pozycjonowanie przycisku gdy menu jest widoczne */
+        body:not(.sidebar-collapsed) .sidebar-collapse-btn {
+            left: 264px; /* 280px (szerokość menu) - 16px (połowa przycisku) */
+        }
+        
+        /* Pozycjonowanie przycisku gdy menu jest schowane */
+        body.sidebar-collapsed .sidebar-collapse-btn {
+            left: 10px;
         }
         
         .sidebar-collapse-btn .collapse-icon {
@@ -78,34 +87,8 @@
             margin-left: 0;
         }
         
-        body.sidebar-collapsed .sidebar-collapse-btn {
-            right: -50px; /* Przesuń poza widok, pojawia się nowa ikona w lewym górnym rogu */
-        }
-        
-        /* Ikona do rozwijania menu (w lewym górnym rogu) */
-        #sidebar-toggle {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1040;
-            background-color: #343a40;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease-in-out;
-        }
-        
-        body.sidebar-collapsed #sidebar-toggle {
-            opacity: 1;
-            pointer-events: auto;
+        body.sidebar-collapsed .sidebar-collapse-btn .collapse-icon {
+            transform: rotate(180deg);
         }
         
         /* Widok mobilny */
@@ -126,15 +109,18 @@
                 height: calc(100vh - 60px);
             }
             
-            /* Pokazuj przycisk w lewym górnym rogu na mobilnych */
-            #sidebar-toggle {
-                opacity: 1;
-                pointer-events: auto;
+            /* Dostosowanie przycisku na mobilnych */
+            .sidebar-collapse-btn {
+                top: 15px;
+                transform: none;
             }
             
-            /* Ukryj przycisk na boku sidebara na mobilnych */
-            .sidebar-collapse-btn {
-                display: none;
+            body:not(.sidebar-expanded) .sidebar-collapse-btn {
+                left: 10px;
+            }
+            
+            body.sidebar-expanded .sidebar-collapse-btn {
+                left: 264px;
             }
             
             /* Dodajemy overlay przy otwartym menu */
@@ -156,24 +142,19 @@
     </style>
 </head>
 <body class="bg-light">
-    <button id="sidebar-toggle" class="text-light">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-list" viewBox="0 0 16 16">
-            <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
-        </svg>
-    </button>
-
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    
+    <!-- Przycisk zwijania/rozwijania menu (poza sidebarem) -->
+    <div class="sidebar-collapse-btn" id="sidebar-collapse-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left collapse-icon" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+        </svg>
+    </div>
 
     <div class="container-fluid g-0">
         <div class="row g-0">
             <!-- Sidebar -->
             <aside class="col-md-2 bg-dark text-light p-1 sidebar" id="sidebar">
-                <!-- Przycisk do zwijania menu -->
-                <div class="sidebar-collapse-btn" id="sidebar-collapse-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left collapse-icon" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
-                    </svg>
-                </div>
                 @include('layouts.navigation')
             </aside>
 
@@ -201,11 +182,9 @@
     <script src="{{ asset('js/sidebars.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const sidebarToggle = document.getElementById('sidebar-toggle');
             const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
-            const collapseIcon = document.querySelector('.collapse-icon');
             const body = document.body;
             
             // Sprawdź, czy w localStorage jest zapisany stan menu
@@ -237,13 +216,7 @@
                 }
             }
             
-            // Obsługa kliknięcia przycisku toggle w lewym górnym rogu (mobilne)
-            sidebarToggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                toggleSidebar();
-            });
-            
-            // Obsługa kliknięcia przycisku na boku sidebara (desktop)
+            // Obsługa kliknięcia przycisku na boku sidebara
             sidebarCollapseBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 toggleSidebar();
