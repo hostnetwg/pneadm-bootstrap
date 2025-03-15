@@ -32,16 +32,18 @@
         }
         
         .sidebar-offset {
+            transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
             margin-left: 280px;
+            width: calc(100% - 280px);
             height: 100vh;
             overflow: hidden;
-            transition: margin-left 0.3s ease-in-out;
         }
         
         .main-content {
             overflow-y: auto;
             height: calc(100vh - 70px);
             padding-bottom: 2rem;
+            width: 100%;
         }
         
         /* Przycisk do zwijania/rozwijania menu */
@@ -85,6 +87,7 @@
         
         body.sidebar-collapsed .sidebar-offset {
             margin-left: 0;
+            width: 100%;
         }
         
         body.sidebar-collapsed .sidebar-collapse-btn .collapse-icon {
@@ -103,6 +106,7 @@
             
             .sidebar-offset {
                 margin-left: 0;
+                width: 100%;
             }
             
             .main-content {

@@ -5,8 +5,9 @@ use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\InstructorsController;
-use App\Http\Controllers\EducationController; // baza Certgen - lista webinarów TIK
-use App\Http\Controllers\NODNSzkoleniaController; // baza Certgen - NODN_szkolenia_lista
+use App\Http\Controllers\EducationController;
+use App\Http\Controllers\NODNSzkoleniaController;
+use App\Http\Controllers\PubligoController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -33,11 +34,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/education', [EducationController::class, 'index'])->name('education.index');
     // trasa dla eksportu danych
     Route::get('/education/export', [EducationController::class, 'exportToCourses'])->name('education.export');
-    Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])
-        ->name('education.exportParticipants');            
+    Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])->name('education.exportParticipants');            
 
-        Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');
+    /* Certgen:publigo */
+    
+    Route::get('/archiwum/certgen-publigo', [PubligoController::class, 'index'])->name('archiwum.certgen_publigo.index');    
 
+    Route::get('/archiwum/certgen-publigo/create', [PubligoController::class, 'create'])->name('certgen_publigo.create');
+    Route::post('/archiwum/certgen-publigo/store', [PubligoController::class, 'store'])->name('certgen_publigo.store');
+    Route::delete('/archiwum/certgen-publigo/{id}', [PubligoController::class, 'destroy'])->name('certgen_publigo.destroy');
+    Route::get('/archiwum/certgen-publigo/{id}/edit', [PubligoController::class, 'edit'])->name('certgen_publigo.edit');
+    Route::put('/archiwum/certgen-publigo/{id}/update', [PubligoController::class, 'update'])->name('certgen_publigo.update');
+    
+    Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
+    
 
 /**/
 

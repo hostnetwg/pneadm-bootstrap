@@ -102,8 +102,13 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{{ route('courses.importPubligo') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                        <a href="{{ route('archiwum.certgen_publigo.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                            Certgen - PUBLIGO
+                        </a>
+                    </li> 
+                    <li>
+                        <a href="{{ route('courses.importPubligo') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Certgen - PUBLIGO EKSPORT
                         </a>
                     </li>  
                 </ul>             

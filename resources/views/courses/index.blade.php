@@ -124,7 +124,6 @@
                         <th style="width: 10%;">Rodzaj</th>
                         <th style="width: 18%;">Lokalizacja / Dostęp</th>
                         <th style="width: 10%;">Instruktor</th>
-                        <th style="width: 8%;">Status</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
@@ -148,7 +147,10 @@
                                 {{ $course->is_paid ? 'Płatny' : 'Bezpłatny' }}
                             </span> <br>
                             <span class="small">{{ ucfirst($course->type) }}</span> <br>
-                            <span class="small">{{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}</span>
+                            <span class="small">{{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}</span> <br>
+                            <span class="badge {{ $course->is_active ? 'bg-success' : 'bg-danger' }}">
+                                {{ $course->is_active ? 'Aktywny' : 'Nieaktywny' }}
+                            </span>                            
                         </td>
                         <td class="align-middle small">
                             @if ($course->type === 'offline' && $course->location)
@@ -164,11 +166,6 @@
                         </td>
                         <td class="align-middle">
                             {{ $course->instructor ? $course->instructor->first_name . ' ' . $course->instructor->last_name : 'Brak instruktora' }}
-                        </td>
-                        <td class="align-middle">
-                            <span class="badge {{ $course->is_active ? 'bg-success' : 'bg-danger' }}">
-                                {{ $course->is_active ? 'Aktywny' : 'Nieaktywny' }}
-                            </span>
                         </td>
                         <td class="text-center align-middle" title="Liczba uczestników">
                             <span class="badge bg-info">{{ $course->participants->count() }}</span>
