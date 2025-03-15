@@ -8,10 +8,12 @@
     <div class="px-3 py-3">
         <div class="container">
             <div class="d-flex justify-content-between mb-3">
-                <h2>Lista szkoleń Publigo</h2>
+                <a href="{{ route('courses.importPubligo') }}" class="btn btn-secondary">
+                    Certgen - PUBLIGO EKSPORT
+                 </a>                
                 <a href="{{ route('certgen_publigo.create') }}" class="btn btn-success">
                     <i class="fas fa-plus"></i> Dodaj nowe szkolenie
-                </a>
+                </a>                
             </div>
             
             <table class="table table-striped">

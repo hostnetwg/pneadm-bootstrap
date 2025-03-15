@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Publigo;
+use App\Models\Instructor;
 
 class PubligoController extends Controller
 {
@@ -20,7 +21,8 @@ class PubligoController extends Controller
     }
     public function create()
     {
-        return view('archiwum.certgen_publigo.create');
+        $instructors = Instructor::all(); // Pobranie listy instruktorów
+        return view('archiwum.certgen_publigo.create', compact('instructors'));
     }
     
     public function store(Request $request)
@@ -68,8 +70,10 @@ class PubligoController extends Controller
     public function edit($id)
     {
         $szkolenie = Publigo::findOrFail($id);
-        return view('archiwum.certgen_publigo.edit', compact('szkolenie'));
-    }          
+        $instructors = Instructor::all(); // Pobranie listy instruktorów
+        return view('archiwum.certgen_publigo.edit', compact('szkolenie', 'instructors'));
+    }
+             
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
@@ -80,15 +84,15 @@ class PubligoController extends Controller
             'is_paid' => 'boolean',
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
-            'platform' => 'nullable|string|max:255',
-            'meeting_link' => 'nullable|string|max:255',
-            'meeting_password' => 'nullable|string|max:255',
+            'instructor_id' => 'nullable|exists:instructors,id',
+            'certificate_format' => 'nullable|string|max:255',
         ]);
     
         $szkolenie = Publigo::findOrFail($id);
         $szkolenie->update($validated);
     
-        return redirect()->route('archiwum.certgen_publigo.index')->with('success', 'Szkolenie zostało zaktualizowane.');
+        return redirect()->route('certgen_publigo.index')->with('success', 'Szkolenie zostało zaktualizowane.');
     }
+    
     
 }

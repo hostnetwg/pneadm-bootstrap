@@ -106,11 +106,6 @@
                            Certgen - PUBLIGO
                         </a>
                     </li> 
-                    <li>
-                        <a href="{{ route('courses.importPubligo') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           Certgen - PUBLIGO EKSPORT
-                        </a>
-                    </li>  
                 </ul>             
             </div>
         </li>
