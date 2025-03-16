@@ -36,6 +36,11 @@ class Publigo extends Model
         'country',
     ];
 
+    public function instructor()
+    {
+        return $this->belongsTo(Instructor::class, 'instructor_id');
+    }
+    
     /**
      * Relacja do modelu `Course`
      */

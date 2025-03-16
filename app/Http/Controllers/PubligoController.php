@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\Publigo;
 use App\Models\Instructor;
 
@@ -14,11 +15,19 @@ class PubligoController extends Controller
         $sortBy = $request->query('sort', 'start_date'); // Domyślnie sortujemy po start_date
         $order = $request->query('order', 'desc'); // Domyślnie od najnowszego do najstarszego
     
-        // Pobranie danych z bazy
-        $szkolenia = Publigo::orderBy($sortBy, $order)->paginate(10);
+        // Pobranie wszystkich instruktorów z bazy `pneadm` i zapisanie w tablicy [id => imię i nazwisko]
+        $instructors = DB::connection('mysql')->table('instructors')
+            ->select('id', DB::raw("CONCAT(first_name, ' ', last_name) as full_name"))
+            ->pluck('full_name', 'id'); // Pluck zwróci tablicę [id_instruktora => "Imię Nazwisko"]
     
-        return view('archiwum.certgen_publigo.index', compact('szkolenia'));
+        // Pobranie szkoleń z `certgen.publigo`
+        $szkolenia = DB::connection('mysql_certgen')->table('publigo')
+            ->orderBy($sortBy, $order)
+            ->paginate(10);
+    
+        return view('archiwum.certgen_publigo.index', compact('szkolenia', 'instructors'));
     }
+    
     public function create()
     {
         $instructors = Instructor::all(); // Pobranie listy instruktorów
@@ -91,7 +100,7 @@ class PubligoController extends Controller
         $szkolenie = Publigo::findOrFail($id);
         $szkolenie->update($validated);
     
-        return redirect()->route('certgen_publigo.index')->with('success', 'Szkolenie zostało zaktualizowane.');
+        return redirect()->route('archiwum.certgen_publigo.index')->with('success', 'Szkolenie zostało zaktualizowane.');
     }
     
     

@@ -94,27 +94,36 @@
 
                 <!-- Sekcja dla kursów offline -->
                 <div id="offlineFields" style="display: none;">
+                    <!-- Miejsce szkolenia + Adres -->
                     <div class="row mb-3">
-                        <div class="col-md-3">
-                            <label for="location_name" class="form-label">Nazwa miejsca</label>
+                        <div class="col-md-6">
+                            <label for="location_name" class="form-label">Miejsce szkolenia</label>
                             <input type="text" class="form-control" name="location_name" id="location_name">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
+                            <label for="address" class="form-label">Adres</label>
+                            <input type="text" class="form-control" name="address" id="address">
+                        </div>
+                    </div>
+                    
+                    <!-- Kod pocztowy + Poczta + Kraj -->
+                    <div class="row mb-3">
+                        <div class="col-md-2">
                             <label for="postal_code" class="form-label">Kod pocztowy</label>
                             <input type="text" class="form-control" name="postal_code" id="postal_code">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-5">
                             <label for="post_office" class="form-label">Poczta</label>
                             <input type="text" class="form-control" name="post_office" id="post_office">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-5">
                             <label for="country" class="form-label">Kraj</label>
                             <input type="text" class="form-control" name="country" id="country" value="Polska">
                         </div>
                     </div>
                 </div>
-
                 <button type="submit" class="btn btn-primary">Dodaj szkolenie</button>
+                <a href="javascript:history.back()" class="btn btn-secondary">Anuluj</a>                  
             </form>
         </div>
     </div>

@@ -7,80 +7,99 @@
 
     <div class="px-3 py-3">
         <div class="container">
+            <h2>Lista szkoleń (baza: certgen, tabela: publigo)</h2>
+            <!-- Przycisk dodawania nowego szkolenia i eksportu -->
             <div class="d-flex justify-content-between mb-3">
-                <a href="{{ route('courses.importPubligo') }}" class="btn btn-secondary">
-                    Certgen - PUBLIGO EKSPORT
-                 </a>                
-                <a href="{{ route('certgen_publigo.create') }}" class="btn btn-success">
-                    <i class="fas fa-plus"></i> Dodaj nowe szkolenie
-                </a>                
-            </div>
-            
+                <a href="{{ route('certgen_publigo.create') }}" class="btn btn-primary">Dodaj nowe szkolenie</a>
+                <a href="{{ route('courses.importPubligo') }}" class="btn btn-success">Certgen - PUBLIGO EXPORT</a>
+            </div>            
             <table class="table table-striped">
-                <thead>
+                <thead class="table-dark">
                     <tr>
-                        <th>ID</th>
-                       <!-- Przycisk sortowania dla kolumny Data -->
-                       <th>
-                        <a href="{{ route('archiwum.certgen_publigo.index', ['sort' => 'start_date', 'order' => request('order') == 'asc' ? 'desc' : 'asc']) }}">
-                            Data
-                            @if(request('sort') == 'start_date')
-                                @if(request('order') == 'asc')
-                                    🔼 <!-- Ikona sortowania rosnącego -->
+                        <!-- Kolumna Data z domyślną ikoną sortowania -->
+                        <th style="width: 150px;">
+                            <a href="{{ route('archiwum.certgen_publigo.index', ['sort' => 'start_date', 'order' => request('order') == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none">
+                                Data
+                                @if(request('sort') == 'start_date')
+                                    @if(request('order') == 'asc')
+                                        🔼 <!-- Ikona sortowania rosnącego -->
+                                    @else
+                                        🔽 <!-- Ikona sortowania malejącego -->
+                                    @endif
                                 @else
-                                    🔽 <!-- Ikona sortowania malejącego -->
+                                    🔽 <!-- Domyślna ikona sortowania malejącego -->
                                 @endif
-                            @endif
-                        </a>
-                    </th>                        
-                        <th>Tytuł</th>
-                        <th>Opis</th>
-                        <th>Płatne?</th>
-                        <th>Rodzaj</th>
-                        <th>Kategoria</th>
-                        <th>Akcje</th>
+                            </a>
+                        </th>
+
+                        <!-- ID ze starej bazy -->
+                        <th style="width: 100px;">ID Publigo</th>
+
+                        <!-- Tytuł -->
+                        <th style="width: 250px;">Tytuł</th>
+
+                        <!-- Kolumna zbiorcza (is_paid, type, category, is_active) -->
+                        <th style="width: 200px;">Szczegóły</th>
+
+                        <!-- Lokalizacja: Adres offline lub Platforma online -->
+                        <th style="width: 200px;">Lokalizacja</th>
+
+                        <!-- Instruktor -->
+                        <th style="width: 200px;">Instruktor</th>
+
+                        <!-- Akcje -->
+                        <th style="width: 150px;">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($szkolenia as $szkolenie)
                         <tr>
-                            <td>{{ $szkolenie->id }}</td>
+                            <!-- Start Date -->
                             <td>{{ $szkolenie->start_date }}</td>
-                            <td>{{ $szkolenie->title }}</td>
-                            <td>{{ $szkolenie->description }}</td>
-                            <td>{{ $szkolenie->is_paid ? 'Tak' : 'Nie' }}</td>
-                            <td>{{ ucfirst($szkolenie->type) }}</td>
-                            <td>{{ ucfirst($szkolenie->category) }}</td>
-                            <td>
-                                <a href="{{ route('certgen_publigo.edit', $szkolenie->id) }}" class="btn btn-warning btn-sm">
-                                    <i class="fas fa-edit"></i> Edytuj
-                                </a>
-                                <!-- Przycisk otwierający modal -->
-                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $szkolenie->id }}">
-                                    <i class="fas fa-trash"></i> Usuń
-                                </button>
 
-                                <!-- Modal potwierdzający usunięcie -->
-                                <div class="modal fade" id="deleteModal{{ $szkolenie->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $szkolenie->id }}" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="deleteModalLabel{{ $szkolenie->id }}">Potwierdzenie usunięcia</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                Czy na pewno chcesz usunąć szkolenie: <strong>{{ $szkolenie->title }}</strong>?
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
-                                                <form action="{{ route('certgen_publigo.destroy', $szkolenie->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger">Usuń</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
+                            <!-- ID Old -->
+                            <td>{{ $szkolenie->id_old }}</td>
+
+                            <!-- Tytuł -->
+                            <td>{{ $szkolenie->title }}</td>
+
+                            <!-- Szczegóły -->
+                            <td>
+                                <b>Płatne:</b> {{ $szkolenie->is_paid ? 'Tak' : 'Nie' }} <br>
+                                <b>Rodzaj:</b> {{ ucfirst($szkolenie->type) }} <br>
+                                <b>Kategoria:</b> {{ ucfirst($szkolenie->category) }} <br>
+                                <b>Aktywne:</b> {{ $szkolenie->is_active ? 'Tak' : 'Nie' }}
+                            </td>
+
+                            <!-- Lokalizacja -->
+                            <td>
+                                @if($szkolenie->type == 'online')
+                                    <b>Platforma:</b> {{ $szkolenie->platform }}
+                                @else
+                                    <b>Miejsce:</b> {{ $szkolenie->location_name }} <br>
+                                    <b>Adres:</b> {{ $szkolenie->address }} <br>
+                                    <b>Kod pocztowy:</b> {{ $szkolenie->postal_code }} <br>
+                                    <b>Poczta:</b> {{ $szkolenie->post_office }}
+                                @endif
+                            </td>
+
+                            <!-- Instruktor -->
+                            <td>{{ $instructors[$szkolenie->instructor_id] ?? 'Brak' }}</td>
+
+                            <!-- Akcje -->
+                            <td>
+                                <div class="d-grid gap-2">
+                                    <a href="{{ route('certgen_publigo.edit', $szkolenie->id) }}" class="btn btn-warning btn-sm w-100">
+                                        <i class="fas fa-edit"></i> Edytuj
+                                    </a>
+                                    <form action="{{ route('certgen_publigo.destroy', $szkolenie->id) }}" method="POST"
+                                          onsubmit="return confirm('Czy na pewno chcesz usunąć to szkolenie?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm w-100">
+                                            <i class="fas fa-trash"></i> Usuń
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

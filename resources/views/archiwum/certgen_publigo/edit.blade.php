@@ -93,26 +93,32 @@
             <!-- Sekcja OFFLINE -->
             <div id="offlineFields" style="display: {{ $szkolenie->type == 'offline' ? 'block' : 'none' }};">
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-6">
                         <label for="location_name" class="form-label">Miejsce szkolenia</label>
                         <input type="text" class="form-control" id="location_name" name="location_name" value="{{ $szkolenie->location_name }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6">
+                        <label for="address" class="form-label">Adres</label>
+                        <input type="text" class="form-control" id="address" name="address" value="{{ $szkolenie->address }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-2">
                         <label for="postal_code" class="form-label">Kod pocztowy</label>
                         <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ $szkolenie->postal_code }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-5">
                         <label for="post_office" class="form-label">Poczta</label>
                         <input type="text" class="form-control" id="post_office" name="post_office" value="{{ $szkolenie->post_office }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-5">
                         <label for="country" class="form-label">Kraj</label>
                         <input type="text" class="form-control" id="country" name="country" value="{{ $szkolenie->country }}">
                     </div>
                 </div>
             </div>
-
             <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+            <a href="javascript:history.back()" class="btn btn-secondary">Anuluj</a>       
         </form>
     </div>
 </x-app-layout>
