@@ -93,7 +93,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('education.index*') || request()->routeIs('archiwum.certgen_szkolenia.index*') || request()->routeIs('archiwum.certgen_publigo.index*') ? 'show' : '' }}" id="archiwum-collapse">
+            <div class="collapse {{ request()->routeIs('education.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') || request()->routeIs('clickmeeting.trainings.*') ? 'show' : '' }}" id="archiwum-collapse">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('education.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Webinary TIK BD:Certgen</a></li>
                     <li>
@@ -106,6 +106,11 @@
                            Certgen - PUBLIGO
                         </a>
                     </li> 
+                    <li>
+                        <a href="{{ route('clickmeeting.trainings.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           ClickMeeting - Szkolenia
+                        </a>
+                    </li>                     
                 </ul>             
             </div>
         </li>

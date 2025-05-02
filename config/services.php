@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'clickmeeting' => [
+        'url'   => env('CLICKMEETING_API_URL', 'https://api.clickmeeting.com/v1/'),
+        'token' => env('CLICKMEETING_API_TOKEN'),
+    ],
+
+
 ];

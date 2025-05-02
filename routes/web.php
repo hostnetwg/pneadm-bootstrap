@@ -48,6 +48,11 @@ Route::middleware(['auth'])->group(function () {
     
     Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
     
+    // ClickMeeting – lista zaplanowanych szkoleń
+    Route::middleware(['auth', 'verified'])          // lub inny zestaw middleware
+        ->get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
+        ->name('clickmeeting.trainings.index');
+
 
 /**/
 
