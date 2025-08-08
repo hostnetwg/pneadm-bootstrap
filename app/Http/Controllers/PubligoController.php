@@ -86,6 +86,7 @@ class PubligoController extends Controller
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
+            'id_old' => 'nullable|string|max:255',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'required|date',

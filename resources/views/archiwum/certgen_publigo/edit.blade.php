@@ -12,7 +12,7 @@
             <div class="row mb-3">
                 <div class="col-md-3">
                     <label for="id_old" class="form-label">ID ze starej bazy</label>
-                    <input type="text" class="form-control" id="id_old" name="id_old" value="{{ $szkolenie->id_old }}" readonly>
+                    <input type="text" class="form-control" id="id_old" name="id_old" value="{{ $szkolenie->id_old }}">
                 </div>
                 <div class="col-md-9">
                     <label for="title" class="form-label">Tytuł</label>
