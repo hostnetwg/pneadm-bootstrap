@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Publigo Webhook</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; margin: 5px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .response { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Test Publigo Webhook</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Endpoint testowy (bez middleware)</h3>
+        <button onclick="testWebhook('/api/publigo/webhook-test')">Test /api/publigo/webhook-test</button>
+        <div id="response1" class="response"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Główny endpoint (z middleware)</h3>
+        <button onclick="testWebhook('/api/publigo/webhook')">Test /api/publigo/webhook</button>
+        <div id="response2" class="response"></div>
+    </div>
+
+    <script>
+        const testData = {
+            "id": 12345,
+            "user_id": 123,
+            "status": "Zakończone",
+            "currency": "PLN",
+            "date_completed": "2024-01-15 12:00:00",
+            "total": 199.99,
+            "payment_method": "automatic",
+            "url_params": [
+                {
+                    "product_id": "TEST_COURSE_123",
+                    "details": "Test course details",
+                    "external_id": "TEST_COURSE_123"
+                }
+            ],
+            "items": [
+                {
+                    "name": "Test Course",
+                    "id": "TEST_COURSE_123",
+                    "price_id": 1,
+                    "quantity": 1,
+                    "discount": 0,
+                    "subtotal": 199.99,
+                    "price": 199.99
+                }
+            ],
+            "customer": {
+                "first_name": "Jan",
+                "last_name": "Kowalski",
+                "email": "test@example.com"
+            },
+            "biling_address": {
+                "company_name": "Test Company",
+                "tax_id": "1234567890",
+                "street": "Test Street",
+                "building_number": "1",
+                "apartment_number": "1",
+                "postal": "00-000",
+                "city": "Warszawa",
+                "country_code": "PL"
+            },
+            "delivery": {
+                "type": "custom",
+                "phone": "123456789",
+                "street": "Test Street",
+                "building_number": "1",
+                "apartment_number": "1",
+                "postal_code": "00-000",
+                "city": "Warszawa",
+                "parcel_locker_point": null
+            },
+            "additional_fields": {
+                "buy_as_gift": false,
+                "voucher_codes": null,
+                "phone_no": "123456789",
+                "additional_checkbox_checked": false,
+                "additional_checkbox_description": "Test checkbox",
+                "additional_checkbox2_checked": false,
+                "additional_checkbox2_description": "Test checkbox 2",
+                "order_comment": "Test order comment"
+            }
+        };
+
+        async function testWebhook(endpoint) {
+            const responseDiv = endpoint.includes('test') ? 'response1' : 'response2';
+            const responseElement = document.getElementById(responseDiv);
+            
+            responseElement.innerHTML = 'Wysyłanie...';
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.text();
+                
+                responseElement.innerHTML = `
+                    <strong>Status: ${response.status}</strong><br>
+                    <strong>Headers:</strong><br>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}</pre>
+                    <strong>Response:</strong><br>
+                    <pre>${result}</pre>
+                `;
+            } catch (error) {
+                responseElement.innerHTML = `<strong>Error:</strong><br><pre>${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>

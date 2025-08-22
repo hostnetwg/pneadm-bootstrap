@@ -105,3 +105,7 @@ require __DIR__.'/auth.php';
 Route::post('/api/publigo/webhook', [PubligoController::class, 'webhook'])
     ->middleware('publigo.webhook')
     ->name('publigo.webhook');
+
+// Test webhooka bez middleware
+Route::post('/api/publigo/webhook-test', [PubligoController::class, 'webhookTest'])
+    ->name('publigo.webhook.test');

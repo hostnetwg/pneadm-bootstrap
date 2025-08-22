@@ -23,7 +23,8 @@ class PubligoWebhookMiddleware
             'url' => $request->fullUrl(),
             'headers' => $request->headers->all(),
             'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+            'user_agent' => $request->userAgent(),
+            'body' => $request->all()
         ]);
 
         // Sprawdzenie czy to POST request
@@ -32,20 +33,14 @@ class PubligoWebhookMiddleware
             return response()->json(['message' => 'Method not allowed'], 405);
         }
 
-        // Sprawdzenie Content-Type
-        if (!$request->isJson()) {
+        // Sprawdzenie Content-Type - uproszczone
+        $contentType = $request->header('Content-Type');
+        if (!$contentType || !str_contains($contentType, 'application/json')) {
             Log::warning('Invalid content type for webhook', [
-                'content_type' => $request->header('Content-Type')
+                'content_type' => $contentType
             ]);
-            return response()->json(['message' => 'Content-Type must be application/json'], 400);
+            // Nie blokujemy - pozwalamy przejść dalej
         }
-
-        // Tutaj możesz dodać weryfikację tokenu jeśli Publigo.pl go wymaga
-        // $token = $request->header('X-Publigo-Token');
-        // if ($token !== config('services.publigo.webhook_token')) {
-        //     Log::warning('Invalid webhook token', ['token' => $token]);
-        //     return response()->json(['message' => 'Unauthorized'], 401);
-        // }
 
         return $next($request);
     }

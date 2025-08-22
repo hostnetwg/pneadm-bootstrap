@@ -114,26 +114,70 @@ class PubligoController extends Controller
         try {
             // Logowanie otrzymanych danych dla debugowania
             \Log::info('Publigo webhook received', [
-                'data' => $request->all(),
-                'headers' => $request->headers->all()
+                'raw_input' => $request->getContent(), // Surowy input
+                'parsed_data' => $request->all(),
+                'headers' => $request->headers->all(),
+                'content_type' => $request->header('Content-Type'),
+                'method' => $request->method()
             ]);
 
-            // Walidacja podstawowych danych zgodnie z dokumentacją Publigo
-            $request->validate([
-                'id' => 'required|integer',
-                'status' => 'required|string',
-                'customer' => 'required|array',
-                'customer.first_name' => 'required|string',
-                'customer.last_name' => 'required|string',
-                'customer.email' => 'required|email',
-                'url_params' => 'required|array',
-                'url_params.*.product_id' => 'required|string',
+            // Sprawdzamy surowy input
+            $rawInput = $request->getContent();
+            $jsonData = json_decode($rawInput, true);
+            
+            \Log::info('Webhook data analysis', [
+                'raw_input_length' => strlen($rawInput),
+                'raw_input_preview' => substr($rawInput, 0, 200),
+                'json_decode_success' => $jsonData !== null,
+                'json_error' => json_last_error_msg(),
+                'parsed_data_keys' => $jsonData ? array_keys($jsonData) : [],
+                'laravel_parsed_keys' => array_keys($request->all())
             ]);
 
-            $orderId = $request->input('id');
-            $orderStatus = $request->input('status');
-            $customer = $request->input('customer');
-            $urlParams = $request->input('url_params');
+            // Używamy danych z JSON decode jeśli Laravel nie sparsował poprawnie
+            $data = $jsonData ?: $request->all();
+            
+            \Log::info('Webhook data structure', [
+                'keys' => array_keys($data),
+                'has_id' => isset($data['id']),
+                'has_status' => isset($data['status']),
+                'has_customer' => isset($data['customer']),
+                'has_url_params' => isset($data['url_params']),
+                'customer_keys' => isset($data['customer']) ? array_keys($data['customer']) : [],
+                'url_params_count' => isset($data['url_params']) ? count($data['url_params']) : 0
+            ]);
+
+            // Sprawdzamy czy JSON został poprawnie sparsowany
+            if ($jsonData === null) {
+                \Log::error('Invalid JSON data received', [
+                    'raw_input' => $rawInput,
+                    'json_error' => json_last_error_msg()
+                ]);
+                return response()->json(['message' => 'Invalid JSON data'], 400);
+            }
+
+            // Sprawdzamy czy mamy podstawowe dane
+            if (!isset($data['id']) || !isset($data['status']) || !isset($data['customer'])) {
+                \Log::error('Missing required fields in webhook data', ['data' => $data]);
+                return response()->json(['message' => 'Missing required fields'], 400);
+            }
+
+            $orderId = $data['id'] ?? null;
+            $orderStatus = $data['status'] ?? null;
+            $customer = $data['customer'] ?? [];
+            $urlParams = $data['url_params'] ?? [];
+
+            // Sprawdzamy czy customer ma wymagane pola
+            if (!isset($customer['first_name']) || !isset($customer['last_name']) || !isset($customer['email'])) {
+                \Log::error('Missing customer fields', ['customer' => $customer]);
+                return response()->json(['message' => 'Missing customer fields'], 400);
+            }
+
+            // Sprawdzamy czy url_params istnieje
+            if (!isset($urlParams) || !is_array($urlParams) || empty($urlParams)) {
+                \Log::error('Missing or invalid url_params', ['url_params' => $urlParams]);
+                return response()->json(['message' => 'Missing url_params'], 400);
+            }
 
             // Obsługa tylko zamówień zakończonych
             if ($orderStatus !== 'Zakończone') {
@@ -358,5 +402,39 @@ class PubligoController extends Controller
         ]);
 
         return back()->with('success', 'Testowy uczestnik został dodany do kursu: ' . $course->title);
+    }
+
+    /**
+     * Prosty test webhooka - symulacja Twojego działającego kodu PHP
+     */
+    public function webhookTest(Request $request)
+    {
+        // Symulacja Twojego działającego kodu PHP
+        $rawInput = $request->getContent();
+        $json = json_decode($rawInput);
+        
+        \Log::info('Webhook test endpoint hit', [
+            'method' => $request->method(),
+            'headers' => $request->headers->all(),
+            'raw_input' => $rawInput,
+            'json_decode_success' => $json !== null,
+            'json_error' => json_last_error_msg(),
+            'parsed_data' => $request->all()
+        ]);
+
+        if ($json === null) {
+            return response()->json([
+                'error' => 'Invalid JSON',
+                'json_error' => json_last_error_msg(),
+                'raw_input' => $rawInput
+            ], 400);
+        }
+
+        return response()->json([
+            'message' => 'Webhook test endpoint working',
+            'json_data' => $json,
+            'parsed_data' => $request->all(),
+            'timestamp' => now()->toISOString()
+        ]);
     }
 }
