@@ -8,6 +8,7 @@ use App\Models\Publigo;
 use App\Models\Instructor;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Models\WebhookLog;
 
 class PubligoController extends Controller
 {
@@ -111,6 +112,25 @@ class PubligoController extends Controller
      */
     public function webhook(Request $request)
     {
+        // Logowanie do bazy danych
+        $webhookLog = WebhookLog::create([
+            'source' => 'publigo',
+            'endpoint' => '/api/publigo/webhook',
+            'method' => $request->method(),
+            'request_data' => [
+                'raw_input' => $request->getContent(),
+                'parsed_data' => $request->all(),
+                'headers' => $request->headers->all(),
+                'content_type' => $request->header('Content-Type'),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'headers' => $request->headers->all(),
+            'success' => true
+        ]);
+
         try {
             // Logowanie otrzymanych danych dla debugowania
             \Log::info('Publigo webhook received', [
@@ -279,17 +299,36 @@ class PubligoController extends Controller
                 ];
             }
 
-            return response()->json([
+            $response = [
                 'message' => 'Webhook processed successfully',
                 'order_id' => $orderId,
                 'participants' => $registeredParticipants
-            ], 201);
+            ];
+
+            // Aktualizuj log z odpowiedzią
+            $webhookLog->update([
+                'response_data' => $response,
+                'status_code' => 201,
+                'success' => true
+            ]);
+
+            return response()->json($response, 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Webhook validation error', [
                 'errors' => $e->errors(),
                 'data' => $request->all()
             ]);
+            
+            // Aktualizuj log z błędem walidacji
+            if (isset($webhookLog)) {
+                $webhookLog->update([
+                    'error_message' => 'Validation error: ' . json_encode($e->errors()),
+                    'status_code' => 422,
+                    'success' => false
+                ]);
+            }
+            
             return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             \Log::error('Webhook error', [
@@ -297,6 +336,16 @@ class PubligoController extends Controller
                 'trace' => $e->getTraceAsString(),
                 'data' => $request->all()
             ]);
+            
+            // Aktualizuj log z błędem
+            if (isset($webhookLog)) {
+                $webhookLog->update([
+                    'error_message' => $e->getMessage(),
+                    'status_code' => 500,
+                    'success' => false
+                ]);
+            }
+            
             return response()->json(['message' => 'Internal server error'], 500);
         }
     }
@@ -341,26 +390,7 @@ class PubligoController extends Controller
      */
     public function webhookLogs()
     {
-        $logs = collect();
-        try {
-            $logFile = storage_path('logs/laravel.log');
-            if (file_exists($logFile)) {
-                $logLines = file($logFile);
-                $webhookLogs = collect($logLines)->filter(function($line) {
-                    return str_contains($line, 'Publigo webhook');
-                })->reverse();
-                
-                $logs = $webhookLogs->map(function($line) {
-                    return [
-                        'timestamp' => substr($line, 1, 19),
-                        'message' => trim($line)
-                    ];
-                })->paginate(50);
-            }
-        } catch (\Exception $e) {
-            // Ignoruj błędy czytania logów
-        }
-
+        $logs = WebhookLog::orderBy('created_at', 'desc')->paginate(50);
         return view('publigo.webhook-logs', compact('logs'));
     }
 

@@ -76,27 +76,39 @@
                 @foreach($logs as $log)
                     <div class="p-4 border border-gray-200 rounded-lg">
                         <div class="flex justify-between items-start mb-2">
-                            <div class="text-sm text-gray-500">{{ $log['timestamp'] }}</div>
-                            <div class="text-xs">
-                                @if(str_contains($log['message'], 'error'))
-                                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded">Błąd</span>
-                                @elseif(str_contains($log['message'], 'success'))
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Sukces</span>
-                                @else
-                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded">Info</span>
+                            <div class="text-sm text-gray-500">{{ $log->created_at->format('Y-m-d H:i:s') }}</div>
+                            <div class="flex items-center space-x-2">
+                                <div class="text-xs">
+                                    @if($log->success)
+                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Sukces</span>
+                                    @else
+                                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded">Błąd</span>
+                                    @endif
+                                </div>
+                                <span class="text-xs text-gray-500">{{ $log->endpoint }}</span>
+                                @if($log->status_code)
+                                    <span class="text-xs text-gray-500">HTTP {{ $log->status_code }}</span>
                                 @endif
                             </div>
                         </div>
                         
-                        <div class="text-gray-900 text-sm">
-                            @php
-                                $message = $log['message'];
-                                // Usuń timestamp z początku
-                                $message = preg_replace('/^\[.*?\] /', '', $message);
-                                // Usuń poziom logu
-                                $message = preg_replace('/^[A-Z]+: /', '', $message);
-                            @endphp
-                            {{ $message }}
+                        <div class="text-gray-900 text-sm mb-2">
+                            <strong>IP:</strong> {{ $log->ip_address ?? 'N/A' }} | 
+                            <strong>Metoda:</strong> {{ $log->method }} |
+                            <strong>Źródło:</strong> {{ $log->source }}
+                        </div>
+                        
+                        @if($log->error_message)
+                            <div class="text-red-600 text-sm mb-2">
+                                <strong>Błąd:</strong> {{ $log->error_message }}
+                            </div>
+                        @endif
+                        
+                        <div class="text-xs text-gray-500">
+                            <button onclick="showLogDetails({{ $log->id }})" 
+                                    class="text-blue-600 hover:text-blue-900">
+                                Pokaż szczegóły
+                            </button>
                         </div>
                     </div>
                 @endforeach
