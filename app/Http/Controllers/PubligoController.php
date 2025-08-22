@@ -125,17 +125,29 @@ class PubligoController extends Controller
             $rawInput = $request->getContent();
             $jsonData = json_decode($rawInput, true);
             
+            // Sprawdzamy czy to PHP serialized format
+            $phpData = null;
+            if (strpos($rawInput, 'a:') === 0 && strpos($rawInput, '{') === 0) {
+                $phpData = @unserialize($rawInput);
+                \Log::info('PHP serialized data detected', [
+                    'php_unserialize_success' => $phpData !== false,
+                    'php_data_keys' => $phpData ? array_keys($phpData) : []
+                ]);
+            }
+            
             \Log::info('Webhook data analysis', [
                 'raw_input_length' => strlen($rawInput),
                 'raw_input_preview' => substr($rawInput, 0, 200),
                 'json_decode_success' => $jsonData !== null,
                 'json_error' => json_last_error_msg(),
+                'php_unserialize_success' => $phpData !== false,
                 'parsed_data_keys' => $jsonData ? array_keys($jsonData) : [],
+                'php_data_keys' => $phpData ? array_keys($phpData) : [],
                 'laravel_parsed_keys' => array_keys($request->all())
             ]);
 
-            // Używamy danych z JSON decode jeśli Laravel nie sparsował poprawnie
-            $data = $jsonData ?: $request->all();
+            // Używamy danych z PHP unserialize, potem JSON, potem Laravel
+            $data = $phpData ?: ($jsonData ?: $request->all());
             
             \Log::info('Webhook data structure', [
                 'keys' => array_keys($data),
@@ -166,6 +178,7 @@ class PubligoController extends Controller
             $orderStatus = $data['status'] ?? null;
             $customer = $data['customer'] ?? [];
             $urlParams = $data['url_params'] ?? [];
+            $items = $data['items'] ?? [];
 
             // Sprawdzamy czy customer ma wymagane pola
             if (!isset($customer['first_name']) || !isset($customer['last_name']) || !isset($customer['email'])) {
@@ -173,10 +186,14 @@ class PubligoController extends Controller
                 return response()->json(['message' => 'Missing customer fields'], 400);
             }
 
-            // Sprawdzamy czy url_params istnieje
-            if (!isset($urlParams) || !is_array($urlParams) || empty($urlParams)) {
-                \Log::error('Missing or invalid url_params', ['url_params' => $urlParams]);
-                return response()->json(['message' => 'Missing url_params'], 400);
+            // Sprawdzamy czy mamy items lub url_params
+            if ((!isset($urlParams) || !is_array($urlParams) || empty($urlParams)) && 
+                (!isset($items) || !is_array($items) || empty($items))) {
+                \Log::error('Missing both url_params and items', [
+                    'url_params' => $urlParams,
+                    'items' => $items
+                ]);
+                return response()->json(['message' => 'Missing url_params or items'], 400);
             }
 
             // Obsługa tylko zamówień zakończonych
@@ -191,9 +208,11 @@ class PubligoController extends Controller
             $registeredParticipants = [];
 
             // Przetwarzaj każdy produkt w zamówieniu
-            foreach ($urlParams as $urlParam) {
-                $productId = $urlParam['product_id'];
-                $externalId = $urlParam['external_id'] ?? null;
+            $itemsToProcess = !empty($items) ? $items : $urlParams;
+            
+            foreach ($itemsToProcess as $item) {
+                $productId = $item['id'] ?? $item['product_id'] ?? null;
+                $externalId = $item['external_id'] ?? null;
 
                 // Znajdź kurs na podstawie product_id lub external_id z Publigo
                 // Tylko kursy z source_id_old = "certgen_Publigo"
