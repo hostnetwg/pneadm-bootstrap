@@ -432,16 +432,65 @@ class PubligoController extends Controller
         $rawInput = $request->getContent();
         $json = json_decode($rawInput);
         
+        // Sprawdzamy czy to PHP serialized format
+        $phpData = null;
+        if (strpos($rawInput, 'a:') === 0 && strpos($rawInput, '{') === 0) {
+            $phpData = @unserialize($rawInput);
+        }
+        
         \Log::info('Webhook test endpoint hit', [
             'method' => $request->method(),
             'headers' => $request->headers->all(),
             'raw_input' => $rawInput,
+            'raw_input_length' => strlen($rawInput),
+            'raw_input_preview' => substr($rawInput, 0, 200),
             'json_decode_success' => $json !== null,
             'json_error' => json_last_error_msg(),
-            'parsed_data' => $request->all()
+            'php_unserialize_success' => $phpData !== false,
+            'php_data_keys' => $phpData ? array_keys($phpData) : [],
+            'parsed_data' => $request->all(),
+            'parsed_data_keys' => array_keys($request->all())
         ]);
 
+        // Jeśli to PHP serialized data, przetwórz ją jak główny webhook
+        if ($phpData !== false) {
+            \Log::info('Processing PHP serialized data in test endpoint', [
+                'php_data' => $phpData
+            ]);
+            
+            // Symuluj przetwarzanie jak w głównym webhooku
+            $orderId = $phpData['id'] ?? null;
+            $orderStatus = $phpData['status'] ?? null;
+            $customer = $phpData['customer'] ?? [];
+            $items = $phpData['items'] ?? [];
+            
+            \Log::info('Extracted data from PHP serialized', [
+                'order_id' => $orderId,
+                'order_status' => $orderStatus,
+                'customer' => $customer,
+                'items_count' => count($items),
+                'items' => $items
+            ]);
+            
+            return response()->json([
+                'message' => 'Webhook test endpoint working - PHP serialized data processed',
+                'php_data' => $phpData,
+                'extracted_data' => [
+                    'order_id' => $orderId,
+                    'order_status' => $orderStatus,
+                    'customer' => $customer,
+                    'items' => $items
+                ],
+                'timestamp' => now()->toISOString()
+            ]);
+        }
+
         if ($json === null) {
+            \Log::error('Invalid JSON in test endpoint', [
+                'json_error' => json_last_error_msg(),
+                'raw_input' => $rawInput
+            ]);
+            
             return response()->json([
                 'error' => 'Invalid JSON',
                 'json_error' => json_last_error_msg(),

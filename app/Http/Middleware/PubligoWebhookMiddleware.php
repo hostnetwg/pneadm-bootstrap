@@ -58,6 +58,17 @@ class PubligoWebhookMiddleware
             // }
         }
 
+        // Dodatkowe logowanie dla testowego endpointu
+        if (str_contains($request->path(), 'webhook-test')) {
+            Log::info('Test webhook endpoint accessed', [
+                'path' => $request->path(),
+                'method' => $request->method(),
+                'content_type' => $request->header('Content-Type'),
+                'content_length' => $request->header('Content-Length'),
+                'user_agent' => $request->userAgent()
+            ]);
+        }
+
         return $next($request);
     }
 }
