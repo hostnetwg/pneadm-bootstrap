@@ -14,6 +14,13 @@ return [
     |
     */
 
+    'mailgun' => [
+        'domain' => env('MAILGUN_DOMAIN'),
+        'secret' => env('MAILGUN_SECRET'),
+        'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+        'scheme' => 'https',
+    ],
+
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],
@@ -24,21 +31,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_KEY'),
+    'publigo' => [
+        'webhook_token' => env('PUBLIGO_WEBHOOK_TOKEN'),
+        'webhook_url' => env('PUBLIGO_WEBHOOK_URL', 'https://adm.pnedu.pl/api/publigo/webhook'),
+        'api_key' => env('PUBLIGO_API_KEY'),
+        'api_secret' => env('PUBLIGO_API_SECRET'),
     ],
-
-    'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
-        ],
-    ],
-
-    'clickmeeting' => [
-        'url'   => env('CLICKMEETING_API_URL', 'https://api.clickmeeting.com/v1/'),
-        'token' => env('CLICKMEETING_API_TOKEN'),
-    ],
-
 
 ];

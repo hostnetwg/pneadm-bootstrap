@@ -46,6 +46,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/archiwum/certgen-publigo/{id}/edit', [PubligoController::class, 'edit'])->name('certgen_publigo.edit');
     Route::put('/archiwum/certgen-publigo/{id}/update', [PubligoController::class, 'update'])->name('certgen_publigo.update');
     
+    // Zarządzanie webhookami Publigo
+    Route::get('/publigo/webhooks', [PubligoController::class, 'webhooks'])->name('publigo.webhooks');
+    Route::get('/publigo/webhooks/logs', [PubligoController::class, 'webhookLogs'])->name('publigo.webhooks.logs');
+    Route::post('/publigo/test-webhook', [PubligoController::class, 'testWebhook'])->name('publigo.test-webhook');
+    
     Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
     
     // ClickMeeting – lista zaplanowanych szkoleń
@@ -95,3 +100,8 @@ Route::middleware(['auth'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Webhook dla Publigo.pl - nie wymaga autoryzacji
+Route::post('/api/publigo/webhook', [PubligoController::class, 'webhook'])
+    ->middleware('publigo.webhook')
+    ->name('publigo.webhook');
