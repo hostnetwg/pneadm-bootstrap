@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Publigo Webhook z Tokenem</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; margin: 5px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .response { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+        input { padding: 5px; margin: 5px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Test Publigo Webhook z Tokenem</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Bez tokenu</h3>
+        <button onclick="testWebhook('/api/publigo/webhook-test', null)">Test bez tokenu</button>
+        <div id="response1" class="response"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Z tokenem</h3>
+        <input type="text" id="token" placeholder="Wprowadź token" value="test123">
+        <button onclick="testWebhook('/api/publigo/webhook-test', document.getElementById('token').value)">Test z tokenem</button>
+        <div id="response2" class="response"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Główny webhook z tokenem</h3>
+        <button onclick="testWebhook('/api/publigo/webhook', document.getElementById('token').value)">Test główny webhook</button>
+        <div id="response3" class="response"></div>
+    </div>
+
+    <script>
+        const testData = {
+            "id": 12345,
+            "status": "Zakończone",
+            "customer": {
+                "first_name": "Jan",
+                "last_name": "Kowalski",
+                "email": "test@example.com"
+            },
+            "url_params": [
+                {
+                    "product_id": "TEST_COURSE_123"
+                }
+            ]
+        };
+
+        async function testWebhook(endpoint, token) {
+            const responseDiv = endpoint.includes('test') ? (token ? 'response2' : 'response1') : 'response3';
+            const responseElement = document.getElementById(responseDiv);
+            
+            responseElement.innerHTML = 'Wysyłanie...';
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            
+            if (token) {
+                headers['X-Webhook-Token'] = token;
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.text();
+                
+                responseElement.innerHTML = `
+                    <strong>Status: ${response.status}</strong><br>
+                    <strong>Headers:</strong><br>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}</pre>
+                    <strong>Response:</strong><br>
+                    <pre>${result}</pre>
+                `;
+            } catch (error) {
+                responseElement.innerHTML = `<strong>Error:</strong><br><pre>${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -42,6 +42,22 @@ class PubligoWebhookMiddleware
             // Nie blokujemy - pozwalamy przejść dalej
         }
 
+        // Sprawdzenie tokenu webhooka (jeśli jest wymagany)
+        $webhookToken = $request->header('X-Webhook-Token') ?? $request->header('Authorization');
+        if ($webhookToken) {
+            Log::info('Webhook token received', [
+                'token' => $webhookToken,
+                'token_length' => strlen($webhookToken)
+            ]);
+            
+            // Tutaj możesz dodać weryfikację tokenu
+            // $expectedToken = config('services.publigo.webhook_token');
+            // if ($webhookToken !== $expectedToken) {
+            //     Log::warning('Invalid webhook token', ['token' => $webhookToken]);
+            //     return response()->json(['message' => 'Unauthorized'], 401);
+            // }
+        }
+
         return $next($request);
     }
 }
