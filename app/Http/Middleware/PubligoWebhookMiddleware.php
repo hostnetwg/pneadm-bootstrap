@@ -42,20 +42,37 @@ class PubligoWebhookMiddleware
             // Nie blokujemy - pozwalamy przejść dalej
         }
 
-        // Sprawdzenie tokenu webhooka (jeśli jest wymagany)
-        $webhookToken = $request->header('X-Webhook-Token') ?? $request->header('Authorization');
-        if ($webhookToken) {
-            Log::info('Webhook token received', [
-                'token' => $webhookToken,
-                'token_length' => strlen($webhookToken)
+        // Sprawdzenie podpisu Publigo (HMAC-SHA256)
+        $signature = $request->header('x-wpidea-signature');
+        if ($signature) {
+            Log::info('Publigo signature received', [
+                'signature' => $signature,
+                'signature_length' => strlen($signature)
             ]);
             
-            // Tutaj możesz dodać weryfikację tokenu
-            // $expectedToken = config('services.publigo.webhook_token');
-            // if ($webhookToken !== $expectedToken) {
-            //     Log::warning('Invalid webhook token', ['token' => $webhookToken]);
-            //     return response()->json(['message' => 'Unauthorized'], 401);
-            // }
+            // Weryfikacja podpisu Publigo
+            $requestBody = $request->getContent();
+            $apiKey = config('services.publigo.api_key');
+            
+            if ($apiKey) {
+                $computedSignature = base64_encode(hash_hmac('sha256', $requestBody, $apiKey, true));
+                
+                Log::info('Signature verification', [
+                    'received_signature' => $signature,
+                    'computed_signature' => $computedSignature,
+                    'signatures_match' => hash_equals($computedSignature, $signature)
+                ]);
+                
+                if (!hash_equals($computedSignature, $signature)) {
+                    Log::warning('Invalid Publigo signature', [
+                        'received' => $signature,
+                        'computed' => $computedSignature
+                    ]);
+                    return response()->json(['message' => 'Invalid signature'], 401);
+                }
+            }
+        } else {
+            Log::info('No Publigo signature found - proceeding without verification');
         }
 
         // Dodatkowe logowanie dla testowego endpointu

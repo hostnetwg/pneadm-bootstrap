@@ -32,9 +32,8 @@ return [
     ],
 
     'publigo' => [
-        'webhook_token' => env('PUBLIGO_WEBHOOK_TOKEN', 'test123'),
         'webhook_url' => env('PUBLIGO_WEBHOOK_URL', 'https://adm.pnedu.pl/api/publigo/webhook'),
-        'api_key' => env('PUBLIGO_API_KEY'),
+        'api_key' => env('PUBLIGO_API_KEY'), // Klucz licencyjny do weryfikacji podpisu
         'api_secret' => env('PUBLIGO_API_SECRET'),
     ],
 

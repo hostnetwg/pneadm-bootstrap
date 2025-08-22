@@ -42,10 +42,10 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Token Webhooka</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Klucz API (do weryfikacji podpisu)</label>
                 <div class="flex">
                     <input type="password" 
-                           value="{{ $webhookToken ?? 'Nie skonfigurowano' }}" 
+                           value="{{ config('services.publigo.api_key') ? '***' . substr(config('services.publigo.api_key'), -4) : 'Nie skonfigurowano' }}" 
                            readonly 
                            class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-gray-900">
                     <button onclick="togglePasswordVisibility(this)" 
@@ -53,7 +53,8 @@
                         Pokaż
                     </button>
                 </div>
-                <p class="text-sm text-gray-500 mt-1">Token do weryfikacji webhooków (opcjonalny)</p>
+                <p class="text-sm text-gray-500 mt-1">Klucz licencyjny do weryfikacji podpisu HMAC-SHA256</p>
+                <p class="text-xs text-gray-400 mt-1">Publigo używa nagłówka <code>x-wpidea-signature</code></p>
             </div>
         </div>
     </div>
