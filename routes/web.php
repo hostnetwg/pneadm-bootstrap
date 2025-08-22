@@ -101,11 +101,14 @@ Route::middleware(['auth'])->group(function () {
 
 require __DIR__.'/auth.php';
 
-// Webhook dla Publigo.pl - nie wymaga autoryzacji
+// Webhook dla Publigo.pl - bez CSRF protection
 Route::post('/api/publigo/webhook', [PubligoController::class, 'webhook'])
     ->middleware('publigo.webhook')
-    ->name('publigo.webhook');
+    ->name('publigo.webhook')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
-// Test webhooka bez middleware
 Route::post('/api/publigo/webhook-test', [PubligoController::class, 'webhookTest'])
-    ->name('publigo.webhook.test');
+    ->name('publigo.webhook.test')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+
+
