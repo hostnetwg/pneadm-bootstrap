@@ -272,6 +272,12 @@ class PubligoController extends Controller
                     continue;
                 }
 
+                // Sprawdź czy kurs ma ograniczony czas dostępu
+                $accessExpiresAt = null;
+                if ($course->access_duration_days) {
+                    $accessExpiresAt = now()->addDays($course->access_duration_days);
+                }
+
                 // Utwórz nowego uczestnika
                 $participant = Participant::create([
                     'course_id' => $course->id,
@@ -280,7 +286,8 @@ class PubligoController extends Controller
                     'email' => $customer['email'],
                     'birth_date' => null, // Publigo nie wysyła daty urodzenia
                     'birth_place' => null, // Publigo nie wysyła miejsca urodzenia
-                    'order' => Participant::where('course_id', $course->id)->count() + 1
+                    'order' => Participant::where('course_id', $course->id)->count() + 1,
+                    'access_expires_at' => $accessExpiresAt
                 ]);
 
                 \Log::info('Participant created successfully', [
