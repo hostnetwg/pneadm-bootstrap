@@ -1,37 +1,61 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark">
-            Lista uczestników - {{ $course->title }} ({{ date('d.m.Y H:i', strtotime($course->start_date)) }})
-        </h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-semibold fs-4 text-dark mb-1">
+                    <i class="fas fa-users me-2"></i>Lista uczestników
+                </h2>
+                <p class="text-muted mb-0">
+                    <strong>{{ $course->title }}</strong>
+                    <span class="ms-2">
+                        <i class="fas fa-calendar me-1"></i>
+                        {{ date('d.m.Y H:i', strtotime($course->start_date)) }}
+                    </span>
+                </p>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-primary fs-6">{{ $participants->total() }} uczestników</span>
+            </div>
+        </div>
     </x-slot>
 
     <div class="container py-3">
-        <div class="d-flex justify-content-between mb-3">
-            <div>
-                <a href="{{ route('courses.index') }}" class="btn btn-secondary me-2">Powrót do listy szkoleń</a>
-                <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">Dodaj uczestnika</a>
+        <!-- Nagłówek z akcjami -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ route('courses.index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Powrót do listy szkoleń
+                    </a>
+                    <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Dodaj uczestnika
+                    </a>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+                        <i class="fas fa-file-csv me-1"></i> Importuj z CSV
+                    </button>
+                </div>
             </div>
-            <div>
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
-                    <i class="fas fa-file-csv me-1"></i> Importuj z CSV
-                </button>
+            <div class="col-md-4 text-end">
+                <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-outline-info">
+                    <i class="fas fa-sort-alpha-down me-1"></i> Sortuj alfabetycznie
+                </a>
             </div>
-        </div>
-        <!-- Przycisk sortowania -->
-        <div class="mb-3">
-            <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-info">Sortuj alfabetycznie</a>
         </div>        
 
         <!-- Komunikaty -->
         @if(session('success'))
-            <div class="alert alert-success">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
                 {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @if(session('error'))
-            <div class="alert alert-danger">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
                 {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
@@ -118,33 +142,49 @@
 
     <!-- Modal Import CSV -->
     <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">Import uczestników z CSV</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="importModalLabel">
+                        <i class="fas fa-file-csv me-2"></i>Import uczestników z CSV
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('participants.import', $course) }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="csv_file" class="form-label">Wybierz plik CSV</label>
-                            <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <div class="mb-4">
+                            <label for="csv_file" class="form-label fw-bold">
+                                <i class="fas fa-upload me-1"></i>Wybierz plik CSV
+                            </label>
+                            <input type="file" class="form-control form-control-lg" id="csv_file" name="csv_file" accept=".csv" required>
                             <div class="form-text">
-                                Plik CSV powinien zawierać kolumny: ID, E-mail uczestnika, Imię i nazwisko, Numer telefonu, Dostęp wygasa
+                                <i class="fas fa-info-circle me-1"></i>
+                                Plik CSV powinien zawierać kolumny: <strong>ID</strong>, <strong>E-mail uczestnika</strong>, <strong>Imię i nazwisko</strong>, <strong>Numer telefonu</strong>, <strong>Dostęp wygasa</strong>
                             </div>
                         </div>
-                        <div class="alert alert-info">
-                            <strong>Format pliku CSV:</strong><br>
-                            <small>
-                                ID,"E-mail uczestnika","Imię i nazwisko","Numer telefonu",Postęp,"Dopisano do kursu","Dostęp wygasa"<br>
-                                2,waldemar.grabowski@hostnet.pl,"Waldemar Grabowski",501654274,"0 / 1 (0%)","2025-08-22 22:42:40","2025-10-26 22:59:00"
-                            </small>
+                        <div class="alert alert-info border-0">
+                            <div class="d-flex">
+                                <i class="fas fa-lightbulb me-3 mt-1 text-warning"></i>
+                                <div>
+                                    <strong>Format pliku CSV:</strong>
+                                    <div class="mt-2">
+                                        <code class="small">
+                                            ID,"E-mail uczestnika","Imię i nazwisko","Numer telefonu",Postęp,"Dopisano do kursu","Dostęp wygasa"<br>
+                                            2,waldemar.grabowski@hostnet.pl,"Waldemar Grabowski",501654274,"0 / 1 (0%)","2025-08-22 22:42:40","2025-10-26 22:59:00"
+                                        </code>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
-                        <button type="submit" class="btn btn-success">Importuj</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Anuluj
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-upload me-1"></i>Importuj
+                        </button>
                     </div>
                 </form>
             </div>
