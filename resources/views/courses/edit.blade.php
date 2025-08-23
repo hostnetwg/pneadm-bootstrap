@@ -167,7 +167,26 @@
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>
                     <label class="form-check-label" for="is_active">Aktywny</label>
-                </div>                
+                </div>
+
+                <!-- Pola dla integracji z zewnętrznymi systemami -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="id_old" class="form-label">ID ze starej bazy</label>
+                        <input type="text" name="id_old" class="form-control" id="id_old" value="{{ old('id_old', $course->id_old) }}" placeholder="np. 12345">
+                        <div class="form-text">ID kursu w zewnętrznym systemie (opcjonalne)</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="source_id_old" class="form-label">Źródło danych</label>
+                        <select name="source_id_old" class="form-control" id="source_id_old">
+                            <option value="">Brak</option>
+                            <option value="certgen_Publigo" {{ old('source_id_old', $course->source_id_old) == 'certgen_Publigo' ? 'selected' : '' }}>Publigo</option>
+                            <option value="certgen_NODN" {{ old('source_id_old', $course->source_id_old) == 'certgen_NODN' ? 'selected' : '' }}>NODN</option>
+                            <option value="BD:Certgen-education" {{ old('source_id_old', $course->source_id_old) == 'BD:Certgen-education' ? 'selected' : '' }}>Webinar TIK</option>
+                        </select>
+                        <div class="form-text">Źródło danych kursu (opcjonalne)</div>
+                    </div>
+                </div>
 
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                 <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
