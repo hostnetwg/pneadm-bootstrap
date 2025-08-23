@@ -126,6 +126,107 @@ class ParticipantController extends Controller
     }
 
     /**
+     * Import uczestników z pliku CSV.
+     */
+    public function import(Request $request, Course $course)
+    {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+
+        $file = $request->file('csv_file');
+        $importedCount = 0;
+        $skippedCount = 0;
+        $errors = [];
+
+        try {
+            $handle = fopen($file->getPathname(), 'r');
+            
+            // Pomiń nagłówek
+            $header = fgetcsv($handle);
+            
+            while (($row = fgetcsv($handle)) !== false) {
+                try {
+                    // Mapowanie kolumn CSV
+                    $csvData = array_combine($header, $row);
+                    
+                    // Sprawdź czy uczestnik już istnieje
+                    $existingParticipant = Participant::where('email', $csvData['E-mail uczestnika'])
+                                                     ->where('course_id', $course->id)
+                                                     ->first();
+                    
+                    if ($existingParticipant) {
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    // Parsowanie imienia i nazwiska
+                    $fullName = trim($csvData['Imię i nazwisko'], '"');
+                    $nameParts = explode(' ', $fullName, 2);
+                    $firstName = $nameParts[0] ?? '';
+                    $lastName = $nameParts[1] ?? '';
+
+                    // Parsowanie daty wygaśnięcia dostępu
+                    $accessExpiresAt = null;
+                    if (!empty($csvData['Dostęp wygasa'])) {
+                        $expiresDate = trim($csvData['Dostęp wygasa'], '"');
+                        if ($expiresDate && $expiresDate !== '') {
+                            // Próbuj różne formaty daty
+                            $formats = ['Y-m-d H:i:s', 'd.m.Y H:i', 'Y-m-d H:i'];
+                            foreach ($formats as $format) {
+                                try {
+                                    $accessExpiresAt = Carbon::createFromFormat($format, $expiresDate);
+                                    break;
+                                } catch (\Exception $e) {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+
+                    // Pobranie ostatniego numeru porządkowego
+                    $lastOrder = $course->participants()->max('order') ?? 0;
+
+                    // Tworzenie uczestnika
+                    Participant::create([
+                        'course_id' => $course->id,
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'email' => $csvData['E-mail uczestnika'],
+                        'birth_date' => null,
+                        'birth_place' => null,
+                        'access_expires_at' => $accessExpiresAt,
+                        'order' => $lastOrder + 1,
+                    ]);
+
+                    $importedCount++;
+                    
+                } catch (\Exception $e) {
+                    $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - " . $e->getMessage();
+                    $skippedCount++;
+                }
+            }
+            
+            fclose($handle);
+
+            $message = "Zaimportowano {$importedCount} uczestników.";
+            if ($skippedCount > 0) {
+                $message .= " Pominięto {$skippedCount} uczestników (już istnieją lub błąd).";
+            }
+            if (!empty($errors)) {
+                $message .= " Błędy: " . implode('; ', array_slice($errors, 0, 5));
+            }
+
+            return redirect()->route('participants.index', $course)
+                           ->with('success', $message);
+
+        } catch (\Exception $e) {
+            return redirect()->route('participants.index', $course)
+                           ->with('error', 'Błąd podczas importu: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Usunięcie uczestnika.
      */
     public function destroy(Course $course, Participant $participant)

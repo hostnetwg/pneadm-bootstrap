@@ -6,19 +6,32 @@
     </x-slot>
 
     <div class="container py-3">
-        <div class="d-flex justify-content-end mb-3">
-            <a href="{{ route('courses.index') }}" class="btn btn-secondary me-2">Powrót do listy szkoleń</a>
-            <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">Dodaj uczestnika</a>
+        <div class="d-flex justify-content-between mb-3">
+            <div>
+                <a href="{{ route('courses.index') }}" class="btn btn-secondary me-2">Powrót do listy szkoleń</a>
+                <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">Dodaj uczestnika</a>
+            </div>
+            <div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="fas fa-file-csv me-1"></i> Importuj z CSV
+                </button>
+            </div>
         </div>
         <!-- Przycisk sortowania -->
         <div class="mb-3">
             <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-info">Sortuj alfabetycznie</a>
         </div>        
 
-        <!-- Komunikat o sukcesie -->
+        <!-- Komunikaty -->
         @if(session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
             </div>
         @endif
 
@@ -100,6 +113,41 @@
 
         <div class="mt-3">
             {{ $participants->links() }}
+        </div>
+    </div>
+
+    <!-- Modal Import CSV -->
+    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importModalLabel">Import uczestników z CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('participants.import', $course) }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="csv_file" class="form-label">Wybierz plik CSV</label>
+                            <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                            <div class="form-text">
+                                Plik CSV powinien zawierać kolumny: ID, E-mail uczestnika, Imię i nazwisko, Numer telefonu, Dostęp wygasa
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <strong>Format pliku CSV:</strong><br>
+                            <small>
+                                ID,"E-mail uczestnika","Imię i nazwisko","Numer telefonu",Postęp,"Dopisano do kursu","Dostęp wygasa"<br>
+                                2,waldemar.grabowski@hostnet.pl,"Waldemar Grabowski",501654274,"0 / 1 (0%)","2025-08-22 22:42:40","2025-10-26 22:59:00"
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-success">Importuj</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </x-app-layout>

@@ -73,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników
         Route::get('/create', [ParticipantController::class, 'create'])->name('participants.create'); // Formularz dodawania
         Route::post('/', [ParticipantController::class, 'store'])->name('participants.store'); // Dodawanie uczestnika
+        Route::post('/import', [ParticipantController::class, 'import'])->name('participants.import'); // Import CSV
         Route::get('/{participant}/edit', [ParticipantController::class, 'edit'])->name('participants.edit'); // Edycja uczestnika
         Route::put('/{participant}', [ParticipantController::class, 'update'])->name('participants.update'); // Aktualizacja
         Route::delete('/{participant}', [ParticipantController::class, 'destroy'])->name('participants.destroy'); // Usuwanie
