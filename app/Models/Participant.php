@@ -45,9 +45,11 @@ class Participant extends Model
             return false; // Bezterminowy dostęp
         }
         
-        // Porównujemy z aktualnym czasem, uwzględniając godziny i minuty
-        $now = Carbon::now();
-        return $this->access_expires_at->lt($now); // lt = less than (mniejsze niż)
+        // Porównujemy w UTC - czas w bazie jest zawsze w UTC
+        $now = Carbon::now('UTC');
+        $expiresAt = $this->access_expires_at->setTimezone('UTC');
+        
+        return $expiresAt->lt($now); // lt = less than (mniejsze niż)
     }
 
     /**
@@ -75,7 +77,7 @@ class Participant extends Model
             return null; // Bezterminowy dostęp
         }
 
-        if ($this->access_expires_at->isPast()) {
+        if ($this->hasExpiredAccess()) {
             return 'Wygasł';
         }
 

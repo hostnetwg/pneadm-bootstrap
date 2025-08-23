@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Participant;
 use App\Models\Course;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class ParticipantController extends Controller
 {
@@ -62,12 +63,23 @@ class ParticipantController extends Controller
             'access_expires_at' => 'nullable|date',
         ]);
     
+        $data = $request->all();
+        
+        // Obsługa daty wygaśnięcia dostępu
+        if (!empty($data['access_expires_at'])) {
+            // Input datetime-local zwraca format: YYYY-MM-DDTHH:MM
+            // Traktujemy wprowadzony czas jako czas lokalny (Europe/Warsaw)
+            $localTime = Carbon::createFromFormat('Y-m-d\TH:i', $data['access_expires_at'], 'Europe/Warsaw');
+            // NIE konwertujemy na UTC - Laravel zrobi to automatycznie
+            $data['access_expires_at'] = $localTime;
+        }
+    
         // Pobranie ostatniego numeru porządkowego w danym kursie
         $lastOrder = $course->participants()->max('order') ?? 0;
     
         // Tworzenie nowego uczestnika z przypisanym numerem porządkowym
         $course->participants()->create(array_merge(
-            $request->all(),
+            $data,
             ['order' => $lastOrder + 1]
         ));
     
@@ -97,7 +109,18 @@ class ParticipantController extends Controller
             'access_expires_at' => 'nullable|date',
         ]);
 
-        $participant->update($request->all());
+        $data = $request->all();
+        
+        // Obsługa daty wygaśnięcia dostępu
+        if (!empty($data['access_expires_at'])) {
+            // Input datetime-local zwraca format: YYYY-MM-DDTHH:MM
+            // Traktujemy wprowadzony czas jako czas lokalny (Europe/Warsaw)
+            $localTime = Carbon::createFromFormat('Y-m-d\TH:i', $data['access_expires_at'], 'Europe/Warsaw');
+            // NIE konwertujemy na UTC - Laravel zrobi to automatycznie
+            $data['access_expires_at'] = $localTime;
+        }
+
+        $participant->update($data);
 
         return redirect()->route('participants.index', $course)->with('success', 'Uczestnik zaktualizowany.');
     }

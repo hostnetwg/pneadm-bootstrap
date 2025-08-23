@@ -44,7 +44,7 @@
                 <div class="mb-3">
                     <label for="access_expires_at" class="form-label">Data wygaśnięcia dostępu</label>
                     <input type="datetime-local" name="access_expires_at" id="access_expires_at" class="form-control" value="{{ old('access_expires_at', $participant->access_expires_at ? $participant->access_expires_at->format('Y-m-d\TH:i') : '') }}">
-                    <div class="form-text">Pozostaw puste dla bezterminowego dostępu</div>
+                    <div class="form-text">Pozostaw puste dla bezterminowego dostępu. Czas jest w strefie lokalnej (Polska).</div>
                 </div>
     
                 <button type="submit" class="btn btn-primary">Zapisz zmiany</button>

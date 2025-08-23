@@ -50,7 +50,7 @@
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
                         <td>
                             @if ($participant->access_expires_at)
-                                <span class="badge {{ $participant->hasExpiredAccess() ? 'bg-danger' : ($participant->hasActiveAccess() ? 'bg-success' : 'bg-warning') }}" title="{{ $participant->access_expires_at->format('d.m.Y H:i') }}">
+                                <span class="badge {{ $participant->hasExpiredAccess() ? 'bg-danger' : ($participant->hasActiveAccess() ? 'bg-success' : 'bg-warning') }}" title="UTC: {{ $participant->access_expires_at->format('d.m.Y H:i') }} | Lokalny: {{ $participant->access_expires_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}">
                                     {{ $participant->access_expires_at->format('d.m.Y H:i') }}
                                     @if ($participant->hasExpiredAccess())
                                         <br><small>Wygasł</small>
