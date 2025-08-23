@@ -32,6 +32,7 @@
                     <th>Email</th>
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
+                    <th>Data wygaśnięcia dostępu</th>
                     <th>Nr certyfikatu</th>                    
                     <th>Certyfikat</th>
                     <th>Akcje</th>
@@ -47,6 +48,22 @@
                         <td>{{ $participant->email ?? 'Brak' }}</td>
                         <td>{{ $participant->birth_date ?? 'Brak' }}</td>
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
+                        <td>
+                            @if ($participant->access_expires_at)
+                                <span class="badge {{ $participant->hasExpiredAccess() ? 'bg-danger' : ($participant->hasActiveAccess() ? 'bg-success' : 'bg-warning') }}" title="{{ $participant->access_expires_at->format('d.m.Y H:i') }}">
+                                    {{ $participant->access_expires_at->format('d.m.Y') }}
+                                    @if ($participant->hasExpiredAccess())
+                                        <br><small>Wygasł</small>
+                                    @elseif ($participant->hasActiveAccess())
+                                        <br><small>Aktywny</small>
+                                    @else
+                                        <br><small>{{ $participant->getRemainingAccessTime() }}</small>
+                                    @endif
+                                </span>
+                            @else
+                                <span class="badge bg-info">Bezterminowy</span>
+                            @endif
+                        </td>
                         <td>
                             @if ($participant->certificate)
                                 <a href="{{ route('certificates.generate', $participant->id) }}">

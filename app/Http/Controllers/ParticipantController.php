@@ -59,6 +59,7 @@ class ParticipantController extends Controller
             'email' => 'nullable|email|max:255',
             'birth_date' => 'nullable|date',
             'birth_place' => 'nullable|string|max:255',
+            'access_expires_at' => 'nullable|date',
         ]);
     
         // Pobranie ostatniego numeru porządkowego w danym kursie
@@ -93,6 +94,7 @@ class ParticipantController extends Controller
             'email' => 'nullable|email|max:255',
             'birth_date' => 'nullable|date',
             'birth_place' => 'nullable|string|max:255',
+            'access_expires_at' => 'nullable|date',
         ]);
 
         $participant->update($request->all());

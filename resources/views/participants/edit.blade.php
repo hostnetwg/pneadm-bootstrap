@@ -40,6 +40,12 @@
                         <input type="text" name="birth_place" id="birth_place" class="form-control" value="{{ old('birth_place', $participant->birth_place) }}">
                     </div>
                 </div>
+
+                <div class="mb-3">
+                    <label for="access_expires_at" class="form-label">Data wygaśnięcia dostępu</label>
+                    <input type="datetime-local" name="access_expires_at" id="access_expires_at" class="form-control" value="{{ old('access_expires_at', $participant->access_expires_at ? $participant->access_expires_at->format('Y-m-d\TH:i') : '') }}">
+                    <div class="form-text">Pozostaw puste dla bezterminowego dostępu</div>
+                </div>
     
                 <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
                 <a href="javascript:history.back()" class="btn btn-secondary">Anuluj</a>                

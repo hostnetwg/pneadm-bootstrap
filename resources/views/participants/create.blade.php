@@ -36,6 +36,12 @@
                 </div>
             </div>
 
+            <div class="mb-3">
+                <label for="access_expires_at" class="form-label">Data wygaśnięcia dostępu</label>
+                <input type="datetime-local" name="access_expires_at" class="form-control" id="access_expires_at">
+                <div class="form-text">Pozostaw puste dla bezterminowego dostępu</div>
+            </div>
+
             <button type="submit" class="btn btn-success">Dodaj uczestnika</button>
             <a href="javascript:history.back()" class="btn btn-secondary">Anuluj</a>
         </form>
