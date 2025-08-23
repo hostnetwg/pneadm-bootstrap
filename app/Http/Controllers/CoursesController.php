@@ -86,7 +86,9 @@ class CoursesController extends Controller
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'certificate_format' => 'nullable|string|max:255', 
+            'certificate_format' => 'nullable|string|max:255',
+            'id_old' => 'nullable|string|max:255',
+            'source_id_old' => 'nullable|string|max:255',
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //    
         try {

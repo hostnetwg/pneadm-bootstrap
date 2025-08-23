@@ -122,7 +122,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group mb-3">
                     <label for="certificate_format">Format numeracji certyfikatów</label>
                     <input type="text" name="certificate_format" id="certificate_format" class="form-control" 
                            value="{{ old('certificate_format', isset($course) ? $course->certificate_format : '{nr}/{course_id}/{year}/PNE') }}" 
@@ -130,6 +130,25 @@
                     <small class="form-text text-muted">
                         Możesz używać zmiennych: <code>{nr}</code>, <code>{course_id}</code>, <code>{year}</code>.
                     </small>
+                </div>
+
+                <!-- Pola dla integracji ze starym systemem -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="id_old" class="form-label">ID ze starej bazy</label>
+                        <input type="text" name="id_old" class="form-control" id="id_old" value="{{ old('id_old') }}" placeholder="np. 12345">
+                        <div class="form-text">ID kursu w zewnętrznym systemie (opcjonalne)</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="source_id_old" class="form-label">Źródło danych</label>
+                        <select name="source_id_old" class="form-control" id="source_id_old">
+                            <option value="">Brak</option>
+                            <option value="certgen_Publigo" {{ old('source_id_old') == 'certgen_Publigo' ? 'selected' : '' }}>Publigo</option>
+                            <option value="certgen_NODN" {{ old('source_id_old') == 'certgen_NODN' ? 'selected' : '' }}>NODN</option>
+                            <option value="BD:Certgen-education" {{ old('source_id_old') == 'BD:Certgen-education' ? 'selected' : '' }}>Webinar TIK</option>
+                        </select>
+                        <div class="form-text">Źródło danych kursu (opcjonalne)</div>
+                    </div>
                 </div>                
 
                 <div class="form-check mb-3">
