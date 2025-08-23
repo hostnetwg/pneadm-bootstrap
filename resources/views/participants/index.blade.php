@@ -51,7 +51,7 @@
                         <td>
                             @if ($participant->access_expires_at)
                                 <span class="badge {{ $participant->hasExpiredAccess() ? 'bg-danger' : ($participant->hasActiveAccess() ? 'bg-success' : 'bg-warning') }}" title="{{ $participant->access_expires_at->format('d.m.Y H:i') }}">
-                                    {{ $participant->access_expires_at->format('d.m.Y') }}
+                                    {{ $participant->access_expires_at->format('d.m.Y H:i') }}
                                     @if ($participant->hasExpiredAccess())
                                         <br><small>Wygasł</small>
                                     @elseif ($participant->hasActiveAccess())

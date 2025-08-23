@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Participant extends Model
 {
@@ -44,7 +45,9 @@ class Participant extends Model
             return false; // Bezterminowy dostęp
         }
         
-        return $this->access_expires_at->isPast();
+        // Porównujemy z aktualnym czasem, uwzględniając godziny i minuty
+        $now = Carbon::now();
+        return $this->access_expires_at->lt($now); // lt = less than (mniejsze niż)
     }
 
     /**
@@ -77,6 +80,30 @@ class Participant extends Model
         }
 
         return $this->access_expires_at->diffForHumans();
+    }
+
+    /**
+     * Debug - pobierz informacje o czasie dostępu
+     */
+    public function getAccessDebugInfo(): array
+    {
+        if (!$this->access_expires_at) {
+            return [
+                'has_expires' => false,
+                'expires_at' => null,
+                'now' => now()->format('Y-m-d H:i:s'),
+                'is_past' => false,
+                'has_expired' => false
+            ];
+        }
+
+        return [
+            'has_expires' => true,
+            'expires_at' => $this->access_expires_at->format('Y-m-d H:i:s'),
+            'now' => now()->format('Y-m-d H:i:s'),
+            'is_past' => $this->access_expires_at->isPast(),
+            'has_expired' => $this->hasExpiredAccess()
+        ];
     }
     
 }
