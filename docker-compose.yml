@@ -24,6 +24,7 @@ services:
     depends_on:
       - mysql
       - redis
+      - mailpit    # usuń, jeśli nie korzystasz z Mailpit
 
   mysql:
     image: 'mysql/mysql-server:8.0'
@@ -35,7 +36,6 @@ services:
       MYSQL_DATABASE: '${DB_DATABASE}'
       MYSQL_USER: '${DB_USERNAME}'
       MYSQL_PASSWORD: '${DB_PASSWORD}'
-      #MYSQL_ALLOW_EMPTY_PASSWORD: 1
     volumes:
       - 'sail-mysql:/var/lib/mysql'
       - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
@@ -45,18 +45,6 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
       retries: 3
       timeout: 5s
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    depends_on:
-      - mysql
-    environment:
-      PMA_HOST: mysql
-      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
-    ports:
-      - '8080:80'
-    networks:
-      - sail
 
   redis:
     image: 'redis:alpine'
@@ -70,6 +58,29 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       retries: 3
       timeout: 5s
+
+  # Mailpit (opcjonalnie)
+  mailpit:
+    image: 'axllent/mailpit:latest'
+    ports:
+      - '${FORWARD_MAILPIT_PORT:-1026}:1026'
+      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - sail
+
+  # phpMyAdmin dla ADM na porcie 8080 (pnedu ma 8084)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_ARBITRARY: 1
+      UPLOAD_LIMIT: 256M
+    ports:
+      - '8080:80'
+    networks:
+      - sail
 
 networks:
   sail:
