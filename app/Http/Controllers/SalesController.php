@@ -132,9 +132,23 @@ class SalesController extends Controller
                 ->where('id', $id)
                 ->update($data);
             
-            return redirect()->route('sales.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
+            // Przekierowanie z powrotem do listy z zachowaniem parametrów
+            $redirectParams = [];
+            if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
+            if ($request->has('search')) $redirectParams['search'] = $request->input('search');
+            if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
+            if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+            
+            return redirect()->route('sales.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
         } catch (Exception $e) {
-            return redirect()->route('sales.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+            // Przekierowanie z powrotem do listy z zachowaniem parametrów
+            $redirectParams = [];
+            if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
+            if ($request->has('search')) $redirectParams['search'] = $request->input('search');
+            if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
+            if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+            
+            return redirect()->route('sales.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
         }
     }
 }

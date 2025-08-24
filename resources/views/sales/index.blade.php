@@ -212,6 +212,13 @@
                                                 <div class="text-primary fw-semibold">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip) }}</div>
                                             @endif
                                         </div>
+                                        <div class="mt-2">
+                                            @if($zamowienie->nab_nip)
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyNipNabywcy_{{ $zamowienie->id }}(this)">
+                                                    <i class="bi bi-clipboard"></i> NIP
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
 
                                     {{-- ODBIORCA --}}
@@ -225,6 +232,11 @@
                                             <div>{{ $zamowienie->odb_kod ?? '—' }} {{ $zamowienie->odb_poczta ?? '—' }}</div>
                                             <div class="text-primary fw-semibold">nowoczesna-edukacja.pl</div>
                                         </div>
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyOdbiorcaData_{{ $zamowienie->id }}(this)">
+                                                <i class="bi bi-clipboard"></i> ODBIORCA
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -233,6 +245,8 @@
                                     <h6 class="text-info fw-bold mb-2">
                                         <i class="bi bi-receipt"></i> FAKTURA
                                     </h6>
+                                    
+                                    {{-- Informacje o fakturze --}}
                                     @if($hasInvoice)
                                         <div class="text-dark mb-1">
                                             <span class="fw-semibold">Nr faktury:</span> {{ $zamowienie->nr_fakury }}
@@ -248,6 +262,11 @@
                                             <a href="mailto:{{ $zamowienie->zam_email }}" class="text-primary text-decoration-none">
                                                 {{ $zamowienie->zam_email }}
                                             </a>
+                                        </div>
+                                        <div class="mt-1">
+                                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury_{{ $zamowienie->id }}(this)">
+                                                <i class="bi bi-clipboard"></i> Email faktury
+                                            </button>
                                         </div>
                                     @endif
                                     @if($zamowienie->faktura_uwagi)
@@ -275,6 +294,16 @@
                                             </a>
                                         @endif
                                     </div>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-outline-info btn-sm" onclick="copyUczestnik_{{ $zamowienie->id }}(this)">
+                                            <i class="bi bi-clipboard"></i> Uczestnik
+                                        </button>
+                                        @if($zamowienie->konto_email)
+                                            <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika_{{ $zamowienie->id }}(this)">
+                                                <i class="bi bi-clipboard"></i> Email uczestnika
+                                            </button>
+                                        @endif
+                                    </div>
                                 </div>
 
                                 {{-- Notatki --}}
@@ -286,6 +315,60 @@
                                         <div class="text-dark">{{ $zamowienie->notatki }}</div>
                                     </div>
                                 @endif
+
+                                {{-- Formularz edycji na końcu karty --}}
+                                <div class="mt-4 pt-3 border-top">
+                                    <h6 class="text-dark fw-bold mb-3">
+                                        <i class="bi bi-pencil"></i> EDYCJA ZAMÓWIENIA
+                                    </h6>
+                                    <form method="POST" action="{{ route('sales.update', $zamowienie->id) }}" class="mb-3">
+                                        @csrf
+                                        @method('PUT')
+                                        {{-- Ukryte pola dla zachowania parametrów URL --}}
+                                        <input type="hidden" name="per_page" value="{{ $perPage }}">
+                                        <input type="hidden" name="search" value="{{ $search }}">
+                                        <input type="hidden" name="filter" value="{{ $filter }}">
+                                        <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                <label for="nr_fakury_{{ $zamowienie->id }}" class="form-label small">Nr faktury:</label>
+                                                <input type="text" 
+                                                       class="form-control form-control-sm @if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) border-danger bg-danger bg-opacity-10 @endif"
+                                                       id="nr_fakury_{{ $zamowienie->id }}" 
+                                                       name="nr_fakury"
+                                                       value="{{ $zamowienie->nr_fakury }}"
+                                                       placeholder="Wprowadź numer faktury"
+                                                       @if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0)
+                                                       style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);"
+                                                       @endif>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small">Status:</label>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="status_zakonczone_{{ $zamowienie->id }}" name="status_zakonczone" value="1" {{ $zamowienie->status_zakonczone == 1 ? 'checked' : '' }}>
+                                                    <label class="form-check-label small" for="status_zakonczone_{{ $zamowienie->id }}">
+                                                        Zakończone
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mt-2">
+                                            <div class="col-12">
+                                                <label for="notatki_{{ $zamowienie->id }}" class="form-label small">Notatki:</label>
+                                                <textarea class="form-control form-control-sm" 
+                                                          id="notatki_{{ $zamowienie->id }}" 
+                                                          name="notatki" 
+                                                          rows="2" 
+                                                          placeholder="Dodaj notatki...">{{ $zamowienie->notatki }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="bi bi-check-circle"></i> Zapisz zmiany
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     @empty
@@ -317,5 +400,93 @@
 
         </div>
     </div>
+
+    {{-- JavaScript dla kopiowania danych --}}
+    <script>
+        // Funkcje pomocnicze
+        function copyToClipboard(text, clickedButton) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopySuccess(clickedButton);
+                }).catch(() => {
+                    fallbackCopyTextToClipboard(text, clickedButton);
+                });
+            } else {
+                fallbackCopyTextToClipboard(text, clickedButton);
+            }
+        }
+
+        function showCopySuccess(clickedButton) {
+            const originalText = clickedButton.innerHTML;
+            clickedButton.innerHTML = '<i class="bi bi-check"></i> Skopiowano!';
+            clickedButton.classList.remove('btn-outline-primary', 'btn-outline-secondary', 'btn-outline-info', 'btn-outline-warning');
+            clickedButton.classList.add('btn-success');
+            
+            setTimeout(() => {
+                clickedButton.innerHTML = originalText;
+                clickedButton.classList.remove('btn-success');
+                if (originalText.includes('NIP')) {
+                    clickedButton.classList.add('btn-outline-secondary');
+                } else if (originalText.includes('ODBIORCA')) {
+                    clickedButton.classList.add('btn-outline-primary');
+                } else if (originalText.includes('Email faktury')) {
+                    clickedButton.classList.add('btn-outline-warning');
+                } else {
+                    clickedButton.classList.add('btn-outline-info');
+                }
+            }, 2000);
+        }
+
+        function fallbackCopyTextToClipboard(text, clickedButton) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.position = 'fixed';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showCopySuccess(clickedButton);
+            } catch (err) {
+                console.error('Fallback: Nie udało się skopiować', err);
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // Funkcje kopiowania dla każdego zamówienia
+        @foreach($zamowienia as $zamowienie)
+            function copyOdbiorcaData_{{ $zamowienie->id }}(button) {
+                const odbiorcaData = `ODBIORCA: {{ $zamowienie->odb_nazwa ?? '' }}
+{{ $zamowienie->odb_adres ?? '' }}
+{{ $zamowienie->odb_kod ?? '' }} {{ $zamowienie->odb_poczta ?? '' }}
+nowoczesna-edukacja.pl `;
+                copyToClipboard(odbiorcaData, button);
+            }
+
+            function copyNipNabywcy_{{ $zamowienie->id }}(button) {
+                const nip = '{{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip ?? '') }}';
+                copyToClipboard(nip, button);
+            }
+
+            function copyUczestnik_{{ $zamowienie->id }}(button) {
+                const uczestnik = '{{ $zamowienie->konto_imie_nazwisko ?? '' }}';
+                copyToClipboard(uczestnik, button);
+            }
+
+            function copyEmailUczestnika_{{ $zamowienie->id }}(button) {
+                const email = '{{ $zamowienie->konto_email ?? '' }}';
+                copyToClipboard(email, button);
+            }
+
+            function copyEmailFaktury_{{ $zamowienie->id }}(button) {
+                const email = '{{ $zamowienie->zam_email ?? '' }}';
+                copyToClipboard(email, button);
+            }
+        @endforeach
+    </script>
 
 </x-app-layout>
