@@ -135,7 +135,7 @@
             </button>
             <div class="collapse {{ request()->routeIs('sales.*') ? 'show' : '' }}" id="sales-collapse">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Nowe</a></li>
+                    <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia</a></li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Przetworzone</a></li>
                 </ul>
             </div>

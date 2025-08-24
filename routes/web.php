@@ -8,6 +8,7 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
+use App\Http\Controllers\SalesController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -57,6 +58,16 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['auth', 'verified'])          // lub inny zestaw middleware
         ->get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
         ->name('clickmeeting.trainings.index');
+
+    // Sprzedaż - zamówienia
+    Route::middleware(['auth', 'verified'])
+        ->prefix('sales')
+        ->name('sales.')
+        ->group(function () {
+            Route::get('/', [SalesController::class, 'index'])->name('index');
+            Route::get('/{id}', [SalesController::class, 'show'])->name('show');
+            Route::post('/{id}/process', [SalesController::class, 'markAsProcessed'])->name('process');
+        });
 
 
 /**/
