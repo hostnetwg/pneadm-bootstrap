@@ -76,7 +76,18 @@ class SalesController extends Controller
             abort(404, 'Zamówienie nie zostało znalezione.');
         }
 
-        return view('sales.show', compact('zamowienie'));
+        // Pobieramy poprzednie i następne zamówienie
+        $prevOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+            ->where('id', '<', $id)
+            ->orderByDesc('id')
+            ->first();
+
+        $nextOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+            ->where('id', '>', $id)
+            ->orderBy('id')
+            ->first();
+
+        return view('sales.show', compact('zamowienie', 'prevOrder', 'nextOrder'));
     }
 
     /**
@@ -96,5 +107,34 @@ class SalesController extends Controller
         }
 
         return redirect()->route('sales.index')->with('error', 'Nie udało się przetworzyć zamówienia.');
+    }
+
+    /**
+     * Aktualizuje zamówienie.
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            $zamowienie = DB::connection('mysql_certgen')->table('zamowienia_FORM')->find($id);
+            
+            if (!$zamowienie) {
+                return redirect()->route('sales.index')->with('error', 'Zamówienie nie zostało znalezione.');
+            }
+            
+            $data = [
+                'nr_fakury' => $request->input('nr_fakury'),
+                'notatki' => $request->input('notatki'),
+                'status_zakonczone' => $request->has('status_zakonczone') ? 1 : 0,
+                'data_update' => now()
+            ];
+            
+            DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', $id)
+                ->update($data);
+            
+            return redirect()->route('sales.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
+        } catch (Exception $e) {
+            return redirect()->route('sales.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+        }
     }
 }

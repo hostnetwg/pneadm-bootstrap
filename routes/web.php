@@ -61,13 +61,14 @@ Route::middleware(['auth'])->group(function () {
 
     // Sprzedaż - zamówienia
     Route::middleware(['auth', 'verified'])
-        ->prefix('sales')
-        ->name('sales.')
-        ->group(function () {
-            Route::get('/', [SalesController::class, 'index'])->name('index');
-            Route::get('/{id}', [SalesController::class, 'show'])->name('show');
-            Route::post('/{id}/process', [SalesController::class, 'markAsProcessed'])->name('process');
-        });
+    ->prefix('sales')
+    ->name('sales.')
+    ->group(function () {
+        Route::get('/', [SalesController::class, 'index'])->name('index');
+        Route::get('/{id}', [SalesController::class, 'show'])->name('show');
+        Route::put('/{id}', [SalesController::class, 'update'])->name('update');
+        Route::post('/{id}/process', [SalesController::class, 'markAsProcessed'])->name('process');
+    });
 
 
 /**/
