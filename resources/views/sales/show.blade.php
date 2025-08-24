@@ -141,7 +141,9 @@ nowoczesna-edukacja.pl </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>
                                         <i class="bi bi-envelope"></i> 
-                                        <a href="mailto:{{ $zamowienie->konto_email }}" class="text-decoration-none">
+                                        <a href="mailto:{{ $zamowienie->konto_email }}" 
+                                           class="text-decoration-none @if($zamowienie->konto_email == $zamowienie->zam_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->konto_email == $zamowienie->zam_email) title="Ten sam email co do faktury" @endif>
                                             {{ $zamowienie->konto_email }}
                                         </a>
                                     </small>
@@ -168,7 +170,9 @@ nowoczesna-edukacja.pl </div>
                                     <small>
                                         <strong>Fakturę przesłać na:</strong>
                                         <br>
-                                        <a href="mailto:{{ $zamowienie->zam_email }}" class="text-decoration-none">
+                                        <a href="mailto:{{ $zamowienie->zam_email }}" 
+                                           class="text-decoration-none @if($zamowienie->konto_email == $zamowienie->zam_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->konto_email == $zamowienie->zam_email) title="Ten sam email co uczestnika" @endif>
                                             <i class="bi bi-envelope"></i> {{ $zamowienie->zam_email }}
                                         </a>
                                     </small>
