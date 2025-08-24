@@ -25,19 +25,21 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="@if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) text-danger @elseif($zamowienie->status_zakonczone == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
                 <div class="btn-group" role="group">
-                    @if($prevOrder)
-                        <a href="{{ route('sales.show', $prevOrder->id) }}" class="btn btn-outline-primary" title="Poprzednie zamówienie">
-                            <i class="bi bi-chevron-left"></i> Poprzednie
-                        </a>
-                    @endif
-                    <a href="{{ route('sales.index') }}" class="btn btn-outline-secondary">
+                    <a href="{{ $prevOrder ? route('sales.show', $prevOrder->id) : '#' }}" 
+                       class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
+                       title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
+                       @if(!$prevOrder) onclick="return false;" @endif>
+                        <i class="bi bi-chevron-left"></i> Poprzednie
+                    </a>
+                    <a href="{{ route('sales.index') }}" class="btn btn-outline-primary">
                         <i class="bi bi-list"></i> Lista
                     </a>
-                    @if($nextOrder)
-                        <a href="{{ route('sales.show', $nextOrder->id) }}" class="btn btn-outline-primary" title="Następne zamówienie">
-                            Następne <i class="bi bi-chevron-right"></i>
-                        </a>
-                    @endif
+                    <a href="{{ $nextOrder ? route('sales.show', $nextOrder->id) : '#' }}" 
+                       class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
+                       title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
+                       @if(!$nextOrder) onclick="return false;" @endif>
+                        Następne <i class="bi bi-chevron-right"></i>
+                    </a>
                 </div>
             </div>
 
