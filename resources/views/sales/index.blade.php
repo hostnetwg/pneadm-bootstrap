@@ -122,7 +122,7 @@
                 </div>
             </div>
 
-            {{-- ======================  Tabela  ====================== --}}
+            {{-- ======================  Lista zamówień w stylu dokumentu  ====================== --}}
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Zamówienia z formularza</h5>
@@ -131,151 +131,173 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="width: 80px;">ID</th>
-                                    <th style="width: 280px;">Uczestnik</th>
-                                    <th style="width: 250px;">Dane do faktury</th>
-                                    <th style="width: 250px;">Produkt</th>
-                                    <th style="width: 180px;">Cena & Faktura</th>
-                                    <th style="width: 150px;">Notatki</th>
-                                    <th style="width: 80px;">Akcje</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($zamowienia as $zamowienie)
-                                    @php
-                                        $isNew = (!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0;
-                                        $isCompleted = $zamowienie->status_zakonczone == 1;
-                                        $hasInvoice = $zamowienie->nr_fakury && $zamowienie->nr_fakury != '' && $zamowienie->nr_fakury != '0';
-                                    @endphp
-                                    <tr class="@if($isNew) table-warning @elseif($isCompleted) table-secondary @endif">
-                                        <td class="align-middle">
-                                            <span class="badge bg-dark">{{ $zamowienie->id }}</span>
-                                        </td>
-                                        <td class="align-middle">
-                                            @if($zamowienie->data_zamowienia)
-                                                <div class="fw-semibold text-primary mb-1">
-                                                    <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->data_zamowienia)->format('d.m.Y') }}
-                                                </div>
-                                                <div class="text-muted mb-2">
-                                                    <i class="bi bi-clock"></i> {{ \Carbon\Carbon::parse($zamowienie->data_zamowienia)->format('H:i') }}
-                                                </div>
-                                            @endif
-                                            <div class="fw-bold">{{ $zamowienie->konto_imie_nazwisko ?? '—' }}</div>
-                                            @if($zamowienie->konto_email)
-                                                <div class="text-muted">
-                                                    <a href="mailto:{{ $zamowienie->konto_email }}" class="text-decoration-none">
-                                                        <i class="bi bi-envelope"></i> {{ $zamowienie->konto_email }}
-                                                    </a>
-                                                </div>
-                                            @endif
-                                            @if($zamowienie->zam_tel)
-                                                <div class="text-muted">
-                                                    <a href="tel:{{ $zamowienie->zam_tel }}" class="text-decoration-none">
-                                                        <i class="bi bi-telephone"></i> {{ $zamowienie->zam_tel }}
-                                                    </a>
-                                                </div>
-                                            @endif
+                    @forelse ($zamowienia as $zamowienie)
+                        @php
+                            $isNew = (!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0;
+                            $isCompleted = $zamowienie->status_zakonczone == 1;
+                            $hasInvoice = $zamowienie->nr_fakury && $zamowienie->nr_fakury != '' && $zamowienie->nr_fakury != '0';
+                        @endphp
+                        
+                        <div class="card shadow-sm mb-4 @if($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="mb-1">
+                                            <span class="badge bg-dark fs-6">ID: #{{ $zamowienie->id }}</span>
                                             @if($isNew)
-                                                <div class="mt-1">
-                                                    <span class="badge bg-warning text-dark">
-                                                        <i class="bi bi-exclamation-triangle"></i> NOWE
-                                                    </span>
-                                                </div>
-                                            @elseif($isCompleted)
-                                                <div class="mt-1">
-                                                    <span class="badge bg-secondary">
-                                                        <i class="bi bi-check-circle"></i> ZAKOŃCZONE
-                                                    </span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="align-middle">
-                                            <div class="small">
-                                                <div class="fw-semibold text-primary">NABYWCA:</div>
-                                                <div class="text-muted">{{ $zamowienie->nab_nazwa ?? '—' }}</div>
-                                                <div class="text-muted">{{ $zamowienie->nab_adres ?? '—' }}</div>
-                                                <div class="text-muted">{{ $zamowienie->nab_kod ?? '—' }} {{ $zamowienie->nab_poczta ?? '—' }}</div>
-                                                @if($zamowienie->nab_nip)
-                                                    <div class="text-muted">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip) }}</div>
-                                                @endif
-                                            </div>
-                                            <hr class="my-2">
-                                            <div class="small">
-                                                <div class="fw-semibold text-success">ODBIORCA:</div>
-                                                <div class="text-muted">{{ $zamowienie->odb_nazwa ?? '—' }}</div>
-                                                <div class="text-muted">{{ $zamowienie->odb_adres ?? '—' }}</div>
-                                                <div class="text-muted">{{ $zamowienie->odb_kod ?? '—' }} {{ $zamowienie->odb_poczta ?? '—' }}</div>
-                                                <div class="text-muted">nowoczesna-edukacja.pl</div>
-                                            </div>
-                                        </td>
-                                        <td class="align-middle">
-                                            <div class="fw-semibold fs-6">{{ $zamowienie->produkt_nazwa ?? '—' }}</div>
-                                        </td>
-                                        <td class="align-middle">
-                                            @if($zamowienie->produkt_cena)
-                                                <div class="fw-bold text-success mb-1">
-                                                    {{ number_format($zamowienie->produkt_cena, 2) }} zł
-                                                </div>
-                                            @endif
-                                            @if($hasInvoice)
-                                                <div class="mb-1">
-                                                    <span class="badge bg-info">
-                                                        <i class="bi bi-receipt"></i> {{ $zamowienie->nr_fakury }}
-                                                    </span>
-                                                </div>
-                                                @if($zamowienie->zam_email)
-                                                    <div class="text-muted small">
-                                                        <i class="bi bi-envelope"></i> {{ $zamowienie->zam_email }}
-                                                    </div>
-                                                @endif
-                                            @elseif($isNew)
-                                                <div class="mb-1">
-                                                    <span class="badge bg-warning text-dark">
-                                                        <i class="bi bi-clock"></i> OCZEKUJE
-                                                    </span>
-                                                </div>
-                                            @elseif($isCompleted)
-                                                <div class="mb-1">
-                                                    <span class="badge bg-secondary">
-                                                        <i class="bi bi-check-circle"></i> ZAKOŃCZONE
-                                                    </span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="align-middle">
-                                            @if($zamowienie->notatki)
-                                                <span class="badge bg-secondary" title="{{ $zamowienie->notatki }}">
-                                                    <i class="bi bi-sticky"></i> {{ Str::limit($zamowienie->notatki, 30) }}
+                                                <span class="badge bg-warning text-dark ms-2">
+                                                    <i class="bi bi-exclamation-triangle"></i> NOWE
                                                 </span>
-                                            @else
-                                                <span class="text-muted">—</span>
+                                            @elseif($isCompleted)
+                                                <span class="badge bg-secondary ms-2">
+                                                    <i class="bi bi-check-circle"></i> ZAKOŃCZONE
+                                                </span>
+                                            @elseif($hasInvoice)
+                                                <span class="badge bg-success ms-2">
+                                                    <i class="bi bi-receipt"></i> FAKTURA
+                                                </span>
                                             @endif
-                                        </td>
-                                        <td class="align-middle">
-                                            <a href="{{ route('sales.show', $zamowienie->id) }}" 
-                                               class="btn btn-sm btn-outline-primary" 
-                                               title="Szczegóły zamówienia">
-                                                <i class="bi bi-eye"></i>
+                                        </h5>
+                                        @if($zamowienie->data_zamowienia)
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->data_zamowienia)->format('d.m.Y H:i') }}
+                                            </small>
+                                        @endif
+                                    </div>
+                                    <div class="text-end">
+                                        <a href="{{ route('sales.show', $zamowienie->id) }}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           title="Szczegóły zamówienia">
+                                            <i class="bi bi-eye"></i> Szczegóły
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-body">
+                                {{-- SZKOLENIE --}}
+                                <div class="mb-4">
+                                    <h6 class="text-primary fw-bold mb-2">
+                                        <i class="bi bi-calendar-event"></i> SZKOLENIE
+                                    </h6>
+                                    <div class="fs-5 fw-semibold text-dark">{{ $zamowienie->produkt_nazwa ?? '—' }}</div>
+                                    @if($zamowienie->produkt_cena)
+                                        <div class="text-success fw-bold fs-6">
+                                            {{ number_format($zamowienie->produkt_cena, 2) }} PLN
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- Telefon --}}
+                                @if($zamowienie->zam_tel)
+                                    <div class="mb-3">
+                                        <h6 class="text-dark fw-bold mb-1">
+                                            <i class="bi bi-telephone"></i> KONTAKT
+                                        </h6>
+                                        <div class="text-dark">tel. {{ $zamowienie->zam_tel }}</div>
+                                    </div>
+                                @endif
+
+                                <div class="row">
+                                    {{-- NABYWCA --}}
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-primary fw-bold mb-2">
+                                            <i class="bi bi-building"></i> NABYWCA
+                                        </h6>
+                                        <div class="text-dark">
+                                            <div class="fw-semibold">{{ $zamowienie->nab_nazwa ?? '—' }}</div>
+                                            <div>{{ $zamowienie->nab_adres ?? '—' }}</div>
+                                            <div>{{ $zamowienie->nab_kod ?? '—' }} {{ $zamowienie->nab_poczta ?? '—' }}</div>
+                                            @if($zamowienie->nab_nip)
+                                                <div class="text-primary fw-semibold">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip) }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    {{-- ODBIORCA --}}
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-success fw-bold mb-2">
+                                            <i class="bi bi-geo-alt"></i> ODBIORCA
+                                        </h6>
+                                        <div class="text-dark">
+                                            <div class="fw-semibold">{{ $zamowienie->odb_nazwa ?? '—' }}</div>
+                                            <div>{{ $zamowienie->odb_adres ?? '—' }}</div>
+                                            <div>{{ $zamowienie->odb_kod ?? '—' }} {{ $zamowienie->odb_poczta ?? '—' }}</div>
+                                            <div class="text-primary fw-semibold">nowoczesna-edukacja.pl</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- FAKTURA --}}
+                                <div class="mb-3">
+                                    <h6 class="text-info fw-bold mb-2">
+                                        <i class="bi bi-receipt"></i> FAKTURA
+                                    </h6>
+                                    @if($hasInvoice)
+                                        <div class="text-dark mb-1">
+                                            <span class="fw-semibold">Nr faktury:</span> {{ $zamowienie->nr_fakury }}
+                                        </div>
+                                    @else
+                                        <div class="text-warning mb-1">
+                                            <i class="bi bi-clock"></i> Oczekuje na wystawienie faktury
+                                        </div>
+                                    @endif
+                                    @if($zamowienie->zam_email)
+                                        <div class="text-dark">
+                                            <span class="fw-semibold">Email:</span> 
+                                            <a href="mailto:{{ $zamowienie->zam_email }}" class="text-primary text-decoration-none">
+                                                {{ $zamowienie->zam_email }}
                                             </a>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="text-center py-4">
-                                            <div class="text-muted">
-                                                <i class="bi bi-inbox fs-1"></i>
-                                                <p class="mt-2">Brak zamówień do wyświetlenia.</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                                        </div>
+                                    @endif
+                                    @if($zamowienie->faktura_uwagi)
+                                        <div class="text-dark mt-1">
+                                            <span class="fw-semibold">Uwagi:</span> {{ $zamowienie->faktura_uwagi }}
+                                        </div>
+                                    @endif
+                                    @if($zamowienie->faktura_odroczenie)
+                                        <div class="text-dark">
+                                            <span class="fw-semibold">Odroczenie:</span> {{ $zamowienie->faktura_odroczenie }} dni
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- UCZESTNIK --}}
+                                <div class="mb-3">
+                                    <h6 class="text-dark fw-bold mb-2">
+                                        <i class="bi bi-person"></i> UCZESTNIK
+                                    </h6>
+                                    <div class="text-dark">
+                                        <div class="fw-semibold">{{ $zamowienie->konto_imie_nazwisko ?? '—' }}</div>
+                                        @if($zamowienie->konto_email)
+                                            <a href="mailto:{{ $zamowienie->konto_email }}" class="text-primary text-decoration-none">
+                                                {{ $zamowienie->konto_email }}
+                                            </a>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Notatki --}}
+                                @if($zamowienie->notatki)
+                                    <div class="mb-3">
+                                        <h6 class="text-secondary fw-bold mb-2">
+                                            <i class="bi bi-sticky"></i> NOTATKI
+                                        </h6>
+                                        <div class="text-dark">{{ $zamowienie->notatki }}</div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <p class="mt-3 mb-0">Brak zamówień do wyświetlenia.</p>
+                                <small>Dostosuj filtry lub wyszukiwanie</small>
+                            </div>
+                        </div>
+                    @endforelse
+                </div>
                     
                     {{-- Paginacja --}}
                     @if($zamowienia->hasPages())
@@ -295,6 +317,5 @@
 
         </div>
     </div>
-
 
 </x-app-layout>
