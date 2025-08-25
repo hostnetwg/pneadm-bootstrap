@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Exception;
 
 class SalesController extends Controller
 {
@@ -132,23 +133,40 @@ class SalesController extends Controller
                 ->where('id', $id)
                 ->update($data);
             
-            // Przekierowanie z powrotem do listy z zachowaniem parametrów
-            $redirectParams = [];
-            if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
-            if ($request->has('search')) $redirectParams['search'] = $request->input('search');
-            if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
-            if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+            // Sprawdzamy, skąd użytkownik przyszedł
+            $referer = $request->header('referer');
+            $isFromShowPage = $referer && str_contains($referer, route('sales.show', $id));
             
-            return redirect()->route('sales.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
+            if ($isFromShowPage) {
+                // Jeśli użytkownik był na stronie szczegółów, wracamy tam
+                return redirect()->route('sales.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
+            } else {
+                // Jeśli użytkownik był na liście, wracamy do listy z zachowaniem parametrów
+                $redirectParams = [];
+                if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
+                if ($request->has('search')) $redirectParams['search'] = $request->input('search');
+                if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
+                if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+                
+                return redirect()->route('sales.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
+            }
         } catch (Exception $e) {
-            // Przekierowanie z powrotem do listy z zachowaniem parametrów
-            $redirectParams = [];
-            if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
-            if ($request->has('search')) $redirectParams['search'] = $request->input('search');
-            if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
-            if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+            // W przypadku błędu, sprawdzamy skąd użytkownik przyszedł
+            $referer = $request->header('referer');
+            $isFromShowPage = $referer && str_contains($referer, route('sales.show', $id));
             
-            return redirect()->route('sales.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+            if ($isFromShowPage) {
+                return redirect()->route('sales.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+            } else {
+                // Przekierowanie z powrotem do listy z zachowaniem parametrów
+                $redirectParams = [];
+                if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
+                if ($request->has('search')) $redirectParams['search'] = $request->input('search');
+                if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
+                if ($request->has('page')) $redirectParams['page'] = $request->input('page');
+                
+                return redirect()->route('sales.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+            }
         }
     }
 }
