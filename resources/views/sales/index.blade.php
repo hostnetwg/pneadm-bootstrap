@@ -270,12 +270,12 @@
                                         </div>
                                     @endif
                                     @if($zamowienie->faktura_uwagi)
-                                        <div class="text-dark mt-1">
+                                        <div class="text-danger mt-1">
                                             <span class="fw-semibold">Uwagi:</span> {{ $zamowienie->faktura_uwagi }}
                                         </div>
                                     @endif
                                     @if($zamowienie->faktura_odroczenie)
-                                        <div class="text-dark">
+                                        <div class="text-danger">
                                             <span class="fw-semibold">Odroczenie:</span> {{ $zamowienie->faktura_odroczenie }} dni
                                         </div>
                                     @endif

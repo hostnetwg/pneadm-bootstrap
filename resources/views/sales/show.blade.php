@@ -257,16 +257,16 @@ nowoczesna-edukacja.pl </div>
                                     <div class="card-body py-2">
                                         @if($zamowienie->faktura_uwagi)
                                             <div class="mb-1">
-                                                <small>
+                                                <small class="text-danger">
                                                     <strong>Uwagi:</strong> {{ $zamowienie->faktura_uwagi }}
                                                 </small>
                                             </div>
                                         @endif
                                         @if($zamowienie->faktura_odroczenie)
                                             <div class="mb-1">
-                                                <small>
+                                                <small class="text-danger">
                                                     <strong>Odroczenie:</strong> 
-                                                    <span class="badge bg-warning">{{ $zamowienie->faktura_odroczenie }} dni</span>
+                                                    <span class="badge bg-danger">{{ $zamowienie->faktura_odroczenie }} dni</span>
                                                 </small>
                                             </div>
                                         @endif
