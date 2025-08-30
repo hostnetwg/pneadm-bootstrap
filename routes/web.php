@@ -9,6 +9,8 @@ use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\WebhookPubligoController;
+use App\Http\Controllers\ZamowieniaController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +55,22 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/publigo/test-webhook', [PubligoController::class, 'testWebhook'])->name('publigo.test-webhook');
     
     Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
+    
+    // Baza Certgen - dane dla webhook
+    Route::prefix('certgen')->name('certgen.')->group(function () {
+        Route::get('/webhook-data', [WebhookPubligoController::class, 'index'])->name('webhook_data.index');
+        Route::get('/webhook-data/create', [WebhookPubligoController::class, 'create'])->name('webhook_data.create');
+        Route::post('/webhook-data', [WebhookPubligoController::class, 'store'])->name('webhook_data.store');
+        Route::get('/webhook-data/{id}', [WebhookPubligoController::class, 'show'])->name('webhook_data.show');
+        Route::get('/webhook-data/{id}/edit', [WebhookPubligoController::class, 'edit'])->name('webhook_data.edit');
+        Route::put('/webhook-data/{id}', [WebhookPubligoController::class, 'update'])->name('webhook_data.update');
+        Route::delete('/webhook-data/{id}', [WebhookPubligoController::class, 'destroy'])->name('webhook_data.destroy');
+        
+        // Baza Certgen - zamówienia
+        Route::get('/zamowienia', [ZamowieniaController::class, 'index'])->name('zamowienia.index');
+        Route::get('/zamowienia/{id}', [ZamowieniaController::class, 'show'])->name('zamowienia.show');
+        Route::delete('/zamowienia/{id}', [ZamowieniaController::class, 'destroy'])->name('zamowienia.destroy');
+    });
     
     // ClickMeeting – lista zaplanowanych szkoleń
     Route::middleware(['auth', 'verified'])          // lub inny zestaw middleware
