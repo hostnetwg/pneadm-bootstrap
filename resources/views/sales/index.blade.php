@@ -37,14 +37,6 @@
                     </a>
                 </div>
                 
-                {{-- Przycisk testu API Publigo --}}
-                <div class="mt-2">
-                    <a href="{{ route('publigo.test-api') }}" 
-                       class="btn btn-info">
-                        <i class="bi bi-plug"></i> API Publigo - test
-                    </a>
-                </div>
-                
                 @if($filter === 'new')
                     <div class="mt-2">
                         <span class="badge bg-warning text-dark">

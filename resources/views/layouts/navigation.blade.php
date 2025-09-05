@@ -71,9 +71,9 @@
 
         <!-- Sprzedaż -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('sales.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#sales-collapse"
-                    aria-expanded="{{ request()->routeIs('sales.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#cart3"></use>
                 </svg>
@@ -82,24 +82,24 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('sales.*') ? 'show' : '' }}" id="sales-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') ? 'show' : '' }}" id="sales-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia</a></li>
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Przetworzone</a></li>
+                    <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia FORM</a></li>
+                    <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Zakupy NE.pl</a></li>
                 </ul>
             </div>
         </li>
 
         <!-- Baza Certgen -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('education.*') || request()->routeIs('certgen.webhook_data.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#certgen-collapse"
-                    aria-expanded="{{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('education.*') || request()->routeIs('certgen.webhook_data.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white"><use xlink:href="#grid"></use></svg>
                 Baza certgen
                 <svg class="bi pe-none ms-auto" width="16" height="16"><use xlink:href="#chevron-right"></use></svg>
             </button>
-            <div class="collapse {{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'show' : '' }}" id="certgen-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('education.*') || request()->routeIs('certgen.webhook_data.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'show' : '' }}" id="certgen-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('education.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Webinary TIK BD:Certgen</a></li>
                     <li>
@@ -113,7 +113,6 @@
                         </a>
                     </li> 
                     <li><a href="{{ route('certgen.webhook_data.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Dane dla webhook</a></li>
-                    <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Zakupy</a></li>
                 </ul>
             </div>
         </li>

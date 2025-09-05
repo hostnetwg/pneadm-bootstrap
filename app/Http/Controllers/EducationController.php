@@ -26,21 +26,21 @@ class EducationController extends Controller
             $query->where('type', $type);
         }
     
-        // wykonanie zapytania z wybranymi polami
-        $educations = $query->get(['id', 'lp', 'title', 'zagadnienia', 'data', 'type']);
+        // wykonanie zapytania z paginacją co 25 rekordów
+        $educations = $query->select(['id', 'lp', 'title', 'zagadnienia', 'data', 'type'])->paginate(25);
 
-    // Pobierz liczbę uczestników dla każdego kursu z tabeli students
-    $educations = $educations->map(function($education) {
-        $participantsCount = DB::connection('mysql_certgen')
-            ->table('students')
-            ->where('id_education', $education->id)
-            ->count();
+        // Pobierz liczbę uczestników dla każdego kursu z tabeli students
+        $educations->getCollection()->transform(function($education) {
+            $participantsCount = DB::connection('mysql_certgen')
+                ->table('students')
+                ->where('id_education', $education->id)
+                ->count();
 
-        // Dodaj liczbę uczestników do każdego rekordu
-        $education->participants_count = $participantsCount;
+            // Dodaj liczbę uczestników do każdego rekordu
+            $education->participants_count = $participantsCount;
 
-        return $education;
-    });        
+            return $education;
+        });        
     
         // zwrócenie danych do widoku razem z aktualnym filtrem
         return view('education.index', compact('educations', 'type'));

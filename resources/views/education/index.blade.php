@@ -68,6 +68,11 @@
                     @endforeach
                 </tbody>
             </table>
+            
+            {{-- Paginacja --}}
+            <div class="d-flex justify-content-center mt-4">
+                {{ $educations->appends(['type' => request('type')])->links() }}
+            </div>
         </div>
     </div>
 </x-app-layout>
