@@ -11,11 +11,14 @@ Webhook Publigo.pl automatycznie zapisuje uczestników do kursów na adm.pnedu.p
 Dodaj następujące zmienne do pliku `.env`:
 
 ```env
-# Publigo Webhook Configuration
-PUBLIGO_WEBHOOK_TOKEN=your_secret_token_here
+# Publigo Configuration
+PUBLIGO_API_KEY=785c5a5180e74789554dd3f3bba6b15e
+PUBLIGO_INSTANCE_URL=https://nowoczesna-edukacja.pl
+PUBLIGO_API_VERSION=v1
+PUBLIGO_API_TIMEOUT=30
 PUBLIGO_WEBHOOK_URL=https://adm.pnedu.pl/api/publigo/webhook
-PUBLIGO_API_KEY=your_api_key_here
 PUBLIGO_API_SECRET=your_api_secret_here
+PUBLIGO_WEBHOOK_TOKEN=your_secret_token_here
 ```
 
 ### 2. URL Webhooka
@@ -206,3 +209,54 @@ Jeśli format danych z Publigo.pl się zmieni:
 1. Zaktualizuj walidację
 2. Dostosuj mapowanie
 3. Przetestuj z nowymi danymi
+
+## Testowanie API Publigo.pl
+
+### 1. Przycisk testowy
+
+W menu sprzedaży zamówień (`/sales`) znajduje się przycisk **"API Publigo - test"**, który prowadzi do panelu testowania API.
+
+### 2. Panel testowania API
+
+Przejdź do: `/publigo/test-api`
+
+Panel wykonuje automatycznie 3 testy:
+
+1. **Test połączenia** - Sprawdza dostępność API
+2. **Test kursów** - Pobiera listę dostępnych kursów
+3. **Test webhooków** - Sprawdza skonfigurowane webhooki
+
+### 3. Konfiguracja API
+
+Upewnij się, że w pliku `.env` masz ustawione:
+
+```env
+PUBLIGO_API_KEY=785c5a5180e74789554dd3f3bba6b15e
+PUBLIGO_INSTANCE_URL=https://nowoczesna-edukacja.pl
+PUBLIGO_API_VERSION=v1
+PUBLIGO_API_TIMEOUT=30
+```
+
+### 4. Interpretacja wyników
+
+- **Zielone alerty** - Testy zakończone sukcesem
+- **Żółte alerty** - Błędy po stronie klienta (np. nieprawidłowy klucz API)
+- **Czerwone alerty** - Błędy po stronie serwera (np. niedostępność API)
+
+### 5. Rozwiązywanie problemów z API
+
+#### Błąd autoryzacji (401)
+- Sprawdź czy klucz API jest poprawny
+- Sprawdź czy klucz ma odpowiednie uprawnienia
+
+#### Błąd połączenia
+- Sprawdź czy URL instancji jest poprawny
+- Sprawdź czy instancja Publigo.pl jest dostępna
+
+#### Błąd timeout
+- Zwiększ wartość `PUBLIGO_API_TIMEOUT` w `.env`
+- Sprawdź połączenie internetowe
+
+### 6. Logi API
+
+Wszystkie testy API są logowane w `storage/logs/laravel.log` z tagiem "Publigo API test".

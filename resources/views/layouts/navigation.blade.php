@@ -59,7 +59,7 @@
                 </ul>
             </div>
         </li>
-
+        <li class="border-top my-3"></li>
         <!-- Marketing i reklama -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('marketing.*') ? '' : 'collapsed' }}"
@@ -109,6 +109,11 @@
                     <li>
                         <a href="{{ route('clickmeeting.trainings.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                            ClickMeeting - Szkolenia
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('publigo.products.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Produkty Publigo
                         </a>
                     </li>
                     <li>

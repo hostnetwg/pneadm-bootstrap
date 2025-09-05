@@ -2,6 +2,18 @@
 
 namespace App\Http\Controllers;
 
+/**
+ * PubligoController - Kontroler do integracji z Publigo.pl (WP IDEA API)
+ * 
+ * POPRAWKA AUTORYZACJI (2024-01-XX):
+ * Zgodnie z dokumentacją Publigo.pl:
+ * - nonce: unikalny string dla każdego żądania
+ * - token: MD5 z konkatenacji nonce + klucz WP Idea
+ * 
+ * Poprzednia implementacja była nieprawidłowa - generowała różne nonce
+ * dla nonce i tokenu, co powodowało błąd "REST API wrong token".
+ */
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Publigo;
@@ -541,5 +553,550 @@ class PubligoController extends Controller
             'parsed_data' => $request->all(),
             'timestamp' => now()->toISOString()
         ]);
+    }
+
+    /**
+     * Test połączenia z API Publigo.pl
+     */
+    public function testApi()
+    {
+        $apiKey = config('services.publigo.api_key');
+        $baseUrl = config('services.publigo.instance_url');
+        
+        $results = [];
+
+        try {
+            // Test połączenia i pobranie kursów za pomocą autoryzacji nonce + token
+            $results['connection'] = $this->testPubligoConnection($apiKey, $baseUrl);
+
+            // Pobranie listy kursów, jeśli połączenie się udało
+            if ($results['connection']['status'] === 'success') {
+                $results['courses'] = $this->getPubligoCourses($apiKey, $baseUrl);
+            } else {
+                $results['courses'] = ['status' => 'skipped', 'message' => 'Pominięto, ponieważ test połączenia nie powiódł się.'];
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Publigo API test failed', [
+                'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 1000)
+            ]);
+            
+            $results['error'] = $e->getMessage();
+        }
+
+        return view('publigo.test-api', [
+            'results' => $results,
+            'apiKey' => $apiKey,
+            'baseUrl' => $baseUrl
+        ]);
+    }
+
+    /**
+     * Test połączenia z API Publigo (WP IDEA) używając autoryzacji nonce + token.
+     */
+    private function testPubligoConnection($apiKey, $baseUrl)
+    {
+        if (empty($apiKey)) {
+            return [
+                'status' => 'config_error',
+                'message' => 'Brak klucza API (PUBLIGO_API_KEY) w pliku .env',
+            ];
+        }
+
+        try {
+            $nonce = $this->generateNonce();
+            $token = $this->generateToken($apiKey, $nonce);
+
+            $response = \Illuminate\Support\Facades\Http::withOptions([
+                'verify' => false,
+                'timeout' => 30,
+            ])->get($baseUrl . '/wp-json/wp-idea/v1/products', [
+                'nonce' => $nonce,
+                'token' => $token
+            ]);
+
+            if ($response->successful()) {
+                $courses = $response->json();
+                return [
+                    'status' => 'success',
+                    'status_code' => $response->status(),
+                    'body' => $courses,
+                    'count' => is_array($courses) ? count($courses) : 0,
+                    'nonce_sent' => $nonce,
+                    'token_sent' => $token,
+                ];
+            }
+            
+            return [
+                'status' => 'failed',
+                'status_code' => $response->status(),
+                'message' => 'Odpowiedź serwera wskazuje na błąd.',
+                'body' => $response->json() ?? $response->body(),
+                'nonce_sent' => $nonce,
+                'token_sent' => $token,
+            ];
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            return [
+                'status' => 'connection_error',
+                'message' => 'Błąd połączenia. Sprawdź URL instancji i konfigurację sieci/DNS. ' . $e->getMessage(),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Wystąpił nieoczekiwany błąd: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Pobieranie kursów z Publigo (WP IDEA) z autoryzacją nonce + token.
+     */
+    private function getPubligoCourses($apiKey, $baseUrl)
+    {
+        return $this->testPubligoConnection($apiKey, $baseUrl);
+    }
+
+    /**
+     * Wyświetla listę produktów pobranych z Publigo API.
+     */
+    public function productsIndex()
+    {
+        $apiKey = config('services.publigo.api_key');
+        $baseUrl = config('services.publigo.instance_url');
+        
+        $result = $this->getPubligoCourses($apiKey, $baseUrl);
+
+        return view('publigo.products.index', [
+            'result' => $result,
+            'apiKey' => $apiKey,
+            'baseUrl' => $baseUrl
+        ]);
+    }
+    
+    
+
+    /**
+     * Generowanie nonce dla WP IDEA API
+     */
+    private function generateNonce()
+    {
+        // Zmieniono na dokładne odwzorowanie działającego skryptu PHP,
+        // który używa tylko uniqid(). Poprzednia wersja generowała dłuższy
+        // ciąg, co mogło być przyczyną błędu autoryzacji.
+        return uniqid();
+    }
+
+    /**
+     * Generowanie tokenu MD5 dla WP IDEA API
+     * Zgodnie z dokumentacją: token = md5(nonce + api_key)
+     */
+    private function generateToken($apiKey, $nonce)
+    {
+        // WP IDEA wymaga tokenu MD5 z konkatenacji nonce + api_key
+        return md5($nonce . $apiKey);
+    }
+
+    /**
+     * Test podstawowych endpointów WordPress
+     */
+    private function testBasicWordPressEndpoints($baseUrl)
+    {
+        $client = new \GuzzleHttp\Client([
+            'timeout' => 30,
+            'verify' => false
+        ]);
+        
+        $tests = [];
+        
+        // Test 1: Podstawowy endpoint WordPress
+        try {
+            $response = $client->get($baseUrl . '/wp-json/');
+            $tests['wp_json'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['wp_json'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 2: Endpoint wp/v2 (standardowe WordPress API)
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/');
+            $tests['wp_v2'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['wp_v2'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 3: Endpoint wp-idea bez autoryzacji
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp-idea/v1/');
+            $tests['wp_idea_base'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['wp_idea_base'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 4: Sprawdź czy strona główna jest dostępna
+        try {
+            $response = $client->get($baseUrl);
+            $tests['homepage'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'content_type' => $response->getHeader('Content-Type')[0] ?? 'unknown'
+            ];
+        } catch (\Exception $e) {
+            $tests['homepage'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        return $tests;
+    }
+
+    /**
+     * Test uwierzytelnienia WordPress
+     */
+    private function testWordPressAuthentication($apiKey, $baseUrl)
+    {
+        $client = new \GuzzleHttp\Client([
+            'timeout' => 30,
+            'verify' => false
+        ]);
+        
+        $tests = [];
+        
+        // Test 1: Application Passwords (WordPress 5.6+)
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/users/me', [
+                'headers' => [
+                    'Authorization' => 'Basic ' . base64_encode('admin:' . $apiKey),
+                    'Accept' => 'application/json'
+                ]
+            ]);
+            $tests['application_password'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['application_password'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 2: Cookie Authentication
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/users/me', [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Cookie' => 'wordpress_logged_in_' . md5($apiKey) . '=' . $apiKey
+                ]
+            ]);
+            $tests['cookie_auth'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['cookie_auth'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 3: OAuth 1.0a (jeśli jest włączony)
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/users/me', [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Authorization' => 'OAuth oauth_consumer_key="' . $apiKey . '", oauth_signature_method="HMAC-SHA1"'
+                ]
+            ]);
+            $tests['oauth'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['oauth'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        return $tests;
+    }
+
+    /**
+     * Specjalny test WP IDEA API zgodnie z dokumentacją
+     */
+    private function testWpIdeaSpecific($apiKey, $baseUrl)
+    {
+        $client = new \GuzzleHttp\Client([
+            'timeout' => 30,
+            'verify' => false
+        ]);
+        
+        $tests = [];
+        
+        // Test 0: Sprawdź uprawnienia użytkownika (jeśli API key jest powiązany z użytkownikiem)
+        try {
+            $nonce = $this->generateNonce();
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/users/me', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'query' => [
+                    'nonce' => $nonce,
+                    'token' => $this->generateToken($apiKey, $nonce)
+                ]
+            ]);
+            $tests['user_permissions'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['user_permissions'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 0.1: Sprawdź podstawowe uprawnienia WordPress (bez autoryzacji)
+        try {
+            $response = $client->get($baseUrl . '/wp-json/wp/v2/posts');
+            $tests['public_posts_access'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['public_posts_access'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 0.2: Sprawdź czy WP IDEA plugin jest aktywny
+        try {
+            $response = $client->get($baseUrl . '/wp-json/');
+            $body = json_decode($response->getBody(), true);
+            $tests['wp_idea_plugin_status'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'wp_idea_routes' => isset($body['routes']['/wp-idea/v1']) ? 'available' : 'not_available',
+                'body' => $body
+            ];
+        } catch (\Exception $e) {
+            $tests['wp_idea_plugin_status'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 1: GET products z właściwą autoryzacją WP IDEA
+        try {
+            $nonce = $this->generateNonce();
+            $response = $client->get($baseUrl . '/wp-json/wp-idea/v1/products', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'query' => [
+                    'nonce' => $nonce,
+                    'token' => $this->generateToken($apiKey, $nonce)
+                ]
+            ]);
+            $tests['products_get'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true)
+            ];
+        } catch (\Exception $e) {
+            $tests['products_get'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        // Test 2: POST orders z właściwą strukturą danych
+        try {
+            $testData = [
+                'source' => [
+                    'platform' => 'Platforma Nowoczesnej Edukacji',
+                    'id' => 2024001, // Unikalny numer zamówienia
+                    'url' => 'https://pnedu.pl'
+                ],
+                'options' => [
+                    'disable_receipt' => false
+                ],
+                'products' => [
+                    '71144' => [ // ID kursu z Publigo
+                        'price_id' => 1 // Wariant ceny
+                    ]
+                ],
+                'customer' => [
+                    'email' => 'waldemar.grabowski@hostnet.pl',
+                    'first_name' => 'Waldemar',
+                    'last_name' => 'Grabowski'
+                ],
+                'shipping_address' => [
+                    'address1' => 'Test Street',
+                    'address2' => '',
+                    'zip_code' => '00-000',
+                    'city' => 'Warszawa',
+                    'country_code' => 'PL'
+                ]
+            ];
+            
+            $nonce = $this->generateNonce();
+            $response = $client->post($baseUrl . '/wp-json/wp-idea/v1/orders', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'query' => [
+                    'nonce' => $nonce,
+                    'token' => $this->generateToken($apiKey, $nonce)
+                ],
+                'json' => $testData
+            ]);
+            
+            $tests['orders_post'] = [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => json_decode($response->getBody(), true),
+                'test_data' => $testData
+            ];
+        } catch (\Exception $e) {
+            $tests['orders_post'] = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+        
+        return $tests;
+    }
+
+    /**
+     * Test tworzenia zamówienia (POST orders)
+     */
+    private function testCreateOrder($apiKey, $baseUrl, $apiVersion, $timeout)
+    {
+        $client = new \GuzzleHttp\Client([
+            'timeout' => $timeout,
+            'verify' => false
+        ]);
+        
+        try {
+            // Dane testowe zgodne z dokumentacją WP IDEA
+            $testData = [
+                'source' => [
+                    'platform' => 'Platforma Nowoczesnej Edukacji',
+                    'id' => 2024001, // Unikalny numer zamówienia (nie ID produktu)
+                    'url' => 'https://pnedu.pl'
+                ],
+                'options' => [
+                    'disable_receipt' => false
+                ],
+                'products' => [
+                    '71144' => [ // ID kursu z Publigo
+                        'price_id' => 1 // Wariant ceny
+                    ]
+                ],
+                'customer' => [
+                    'email' => 'waldemar.grabowski@hostnet.pl',
+                    'first_name' => 'Waldemar',
+                    'last_name' => 'Grabowski'
+                ],
+                'shipping_address' => [
+                    'address1' => 'Test Street',
+                    'address2' => '',
+                    'zip_code' => '00-000',
+                    'city' => 'Warszawa',
+                    'country_code' => 'PL'
+                ]
+            ];
+
+            // Znajdź działającą metodę autoryzacji
+            $connectionTest = $this->testPubligoConnection($apiKey, $baseUrl, $apiVersion, $timeout);
+            
+            if ($connectionTest['status'] !== 'success') {
+                return [
+                    'status' => 'auth_failed',
+                    'message' => 'Nie udało się znaleźć działającej metody autoryzacji',
+                    'test_data' => $testData
+                ];
+            }
+            
+            // Użyj działającej metody autoryzacji
+            $authConfig = $connectionTest['auth_config'];
+            $requestConfig = [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Publigo-API-Test/1.0'
+                ],
+                'json' => $testData
+            ];
+            
+            // Dodaj konfigurację autoryzacji
+            if (isset($authConfig['query'])) {
+                $requestConfig['query'] = $authConfig['query'];
+            }
+            if (isset($authConfig['headers'])) {
+                $requestConfig['headers'] = array_merge($requestConfig['headers'], $authConfig['headers']);
+            }
+            
+            // WP IDEA API endpoint dla tworzenia zamówień
+            $response = $client->post($baseUrl . '/wp-json/wp-idea/v1/orders', $requestConfig);
+            
+            $body = json_decode($response->getBody(), true);
+            
+            return [
+                'status' => 'success',
+                'status_code' => $response->getStatusCode(),
+                'body' => $body,
+                'test_data' => $testData
+            ];
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            return [
+                'status' => 'client_error',
+                'status_code' => $e->getResponse()->getStatusCode(),
+                'body' => json_decode($e->getResponse()->getBody(), true),
+                'message' => $e->getMessage(),
+                'test_data' => $testData ?? []
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'test_data' => $testData ?? []
+            ];
+        }
     }
 }

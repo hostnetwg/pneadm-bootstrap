@@ -53,6 +53,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/publigo/webhooks', [PubligoController::class, 'webhooks'])->name('publigo.webhooks');
     Route::get('/publigo/webhooks/logs', [PubligoController::class, 'webhookLogs'])->name('publigo.webhooks.logs');
     Route::post('/publigo/test-webhook', [PubligoController::class, 'testWebhook'])->name('publigo.test-webhook');
+    Route::get('/publigo/test-api', [PubligoController::class, 'testApi'])->name('publigo.test-api');
+    Route::get('/publigo/products', [PubligoController::class, 'productsIndex'])->name('publigo.products.index');
     
     Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
     
