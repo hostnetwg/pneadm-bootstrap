@@ -12,13 +12,11 @@
             </svg>
         </button>
     </div>
-    <ul class="list-unstyled ps-0">
+    <ul class="list-unstyled ps-0" id="menuAccordion">
 
         <!-- Dashboard -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('dashboard') ? '' : 'collapsed' }}"
-                    data-bs-toggle="collapse" data-bs-target="#dashboard-collapse"
-                    aria-expanded="{{ request()->routeIs('dashboard') ? 'true' : 'false' }}">
+            <a href="{{ route('dashboard') }}" class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#home"></use>
                 </svg>
@@ -26,20 +24,12 @@
                 <svg class="bi pe-none ms-auto" width="16" height="16">
                     <use xlink:href="#chevron-right"></use>
                 </svg>
-            </button>
-            <div class="collapse {{ request()->routeIs('dashboard') ? 'show' : '' }}" id="dashboard-collapse">
-                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li>
-                        <a href="{{ route('dashboard') }}" class="link-light d-inline-flex text-decoration-none rounded"
-                           onclick="event.stopPropagation();">Przegląd</a>
-                    </li>
-                </ul>
-            </div>
+            </a>
         </li>
 
         <!-- Szkolenia -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') || request()->routeIs('education.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#courses-collapse"
                     aria-expanded="{{ request()->routeIs('courses.*') || request()->routeIs('participants.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
@@ -50,78 +40,32 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') ? 'show' : '' }}" id="courses-collapse">
+            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Harmonogram szkoleń</a></li>
-                    <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zaświadczenia</a></li>
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Uczestnicy</a></li>
-                </ul>
+                    <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>                </ul>
             </div>
         </li>
+
         <li class="border-top my-3"></li>
+
         <!-- Marketing i reklama -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('marketing.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#marketing-collapse"
                     aria-expanded="{{ request()->routeIs('marketing.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#table"></use>
+                    <use xlink:href="#bullseye"></use>
                 </svg>
                 Marketing i reklama
                 <svg class="bi pe-none ms-auto" width="16" height="16">
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('marketing.*') ? 'show' : '' }}" id="marketing-collapse">
+            <div class="collapse {{ request()->routeIs('marketing.*') ? 'show' : '' }}" id="marketing-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Działania marketingowe</a></li>
                 </ul>
-            </div>
-        </li>
-
-        <!-- Archiwum -->
-        <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('archiwum.*') ? '' : 'collapsed' }}"
-                    data-bs-toggle="collapse" data-bs-target="#archiwum-collapse"
-                    aria-expanded="{{ request()->routeIs('archiwum.*') ? 'true' : 'false' }}">
-                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#table"></use>
-                </svg>
-                Archiwum i import
-                <svg class="bi pe-none ms-auto" width="16" height="16">
-                    <use xlink:href="#chevron-right"></use>
-                </svg>
-            </button>
-            <div class="collapse {{ request()->routeIs('education.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') || request()->routeIs('clickmeeting.trainings.*') || request()->routeIs('publigo.*') ? 'show' : '' }}" id="archiwum-collapse">
-                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="{{ route('education.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Webinary TIK BD:Certgen</a></li>
-                    <li>
-                        <a href="{{ route('archiwum.certgen_szkolenia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           NODN - Lista szkoleń
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('archiwum.certgen_publigo.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           Certgen - PUBLIGO
-                        </a>
-                    </li> 
-                    <li>
-                        <a href="{{ route('clickmeeting.trainings.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           ClickMeeting - Szkolenia
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('publigo.products.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           Produkty Publigo
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('publigo.webhooks') }}" class="link-light d-inline-flex text-decoration-none rounded">
-                           Publigo - Webhooki
-                        </a>
-                    </li>                     
-                </ul>             
             </div>
         </li>
 
@@ -131,14 +75,14 @@
                     data-bs-toggle="collapse" data-bs-target="#sales-collapse"
                     aria-expanded="{{ request()->routeIs('sales.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#speedometer2"></use>
+                    <use xlink:href="#cart3"></use>
                 </svg>
                 Sprzedaż
                 <svg class="bi pe-none ms-auto" width="16" height="16">
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('sales.*') ? 'show' : '' }}" id="sales-collapse">
+            <div class="collapse {{ request()->routeIs('sales.*') ? 'show' : '' }}" id="sales-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia</a></li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Przetworzone</a></li>
@@ -148,27 +92,83 @@
 
         <!-- Baza Certgen -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('certgen.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#certgen-collapse"
-                    aria-expanded="{{ request()->routeIs('certgen.*') ? 'true' : 'false' }}">
-                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#table"></use>
-                </svg>
-                Baza Certgen
-                <svg class="bi pe-none ms-auto" width="16" height="16">
-                    <use xlink:href="#chevron-right"></use>
-                </svg>
+                    aria-expanded="{{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white"><use xlink:href="#grid"></use></svg>
+                Baza certgen
+                <svg class="bi pe-none ms-auto" width="16" height="16"><use xlink:href="#chevron-right"></use></svg>
             </button>
-            <div class="collapse {{ request()->routeIs('certgen.*') ? 'show' : '' }}" id="certgen-collapse">
+            <div class="collapse {{ request()->routeIs('education.*') || request()->routeIs('certgen.*') || request()->routeIs('archiwum.certgen_szkolenia.*') || request()->routeIs('archiwum.certgen_publigo.*') ? 'show' : '' }}" id="certgen-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="{{ route('certgen.webhook_data.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Dane dla webhook</a></li>
-                    <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zakupy</a></li>
+                    <li><a href="{{ route('education.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Webinary TIK BD:Certgen</a></li>
+                    <li>
+                        <a href="{{ route('archiwum.certgen_szkolenia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           NODN - Lista szkoleń
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('archiwum.certgen_publigo.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Archiwum Szkoleń PUBLIGO
+                        </a>
+                    </li> 
+                    <li><a href="{{ route('certgen.webhook_data.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Dane dla webhook</a></li>
+                    <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Zakupy</a></li>
+                </ul>
+            </div>
+        </li>
+        <li class="border-top my-3"></li>
+        <!-- Publigo NE.pl -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('publigo.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#publigo-ne-collapse"
+                    aria-expanded="{{ request()->routeIs('publigo.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white"><use xlink:href="#cloud-arrow-down"></use></svg>
+                Publigo NE.pl
+                <svg class="bi pe-none ms-auto" width="16" height="16"><use xlink:href="#chevron-right"></use></svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('publigo.*') ? 'show' : '' }}" id="publigo-ne-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('publigo.products.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Produkty (API)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('publigo.webhooks') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Webhooki
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('publigo.test-api') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Test API
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+
+        <!-- ClickMeeting -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('clickmeeting.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#clickmeeting-collapse"
+                    aria-expanded="{{ request()->routeIs('clickmeeting.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white"><use xlink:href="#camera-video"></use></svg>
+                ClickMeeting
+                <svg class="bi pe-none ms-auto" width="16" height="16"><use xlink:href="#chevron-right"></use></svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('clickmeeting.*') ? 'show' : '' }}" id="clickmeeting-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('clickmeeting.trainings.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Szkolenia
+                        </a>
+                    </li>
                 </ul>
             </div>
         </li>
 
         <li class="border-top my-3"></li>
-
         <!-- Konto -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.edit') ? '' : 'collapsed' }}"
@@ -182,7 +182,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('profile.edit') ? 'show' : '' }}" id="account-collapse">
+            <div class="collapse {{ request()->routeIs('profile.edit') ? 'show' : '' }}" id="account-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li>
                         <a href="{{ route('profile.edit') }}"
