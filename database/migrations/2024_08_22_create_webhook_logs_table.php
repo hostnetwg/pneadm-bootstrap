@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('webhook_logs', function (Blueprint $table) {
+        if (!Schema::hasTable('webhook_logs')) {
+            Schema::create('webhook_logs', function (Blueprint $table) {
             $table->id();
             $table->string('source')->default('publigo'); // publigo, test, etc.
             $table->string('endpoint'); // /api/publigo/webhook, /api/publigo/webhook-test
@@ -28,7 +29,8 @@ return new class extends Migration
             
             $table->index(['source', 'created_at']);
             $table->index(['endpoint', 'created_at']);
-        });
+            });
+        }
     }
 
     /**

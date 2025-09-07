@@ -1,131 +1,176 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            Logi Webhooków Publigo
+            <i class="bi bi-clock-history me-2"></i>Logi Webhooków Publigo
         </h2>
     </x-slot>
-<div class="container mx-auto px-4 py-8">
-    <div class="mb-8">
-        <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Logi Webhooków Publigo</h1>
-                <p class="text-gray-600">Historia wszystkich webhooków z Publigo.pl</p>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">
+                        <i class="bi bi-clock-history text-primary me-2"></i>Logi Webhooków
+                    </h1>
+                    <p class="text-muted mb-0">Historia wszystkich webhooków z Publigo.pl</p>
+                </div>
+                <div>
+                    <a href="{{ route('publigo.webhooks') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left me-1"></i>Powrót do zarządzania
+                    </a>
+                </div>
             </div>
-            <a href="{{ route('publigo.webhooks') }}" 
-               class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                ← Powrót do zarządzania
-            </a>
         </div>
     </div>
 
     <!-- Filtry -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Filtry</h2>
-        
-        <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Typ Logu</label>
-                <select name="type" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                    <option value="">Wszystkie</option>
-                    <option value="received" {{ request('type') === 'received' ? 'selected' : '' }}>Otrzymane</option>
-                    <option value="error" {{ request('type') === 'error' ? 'selected' : '' }}>Błędy</option>
-                    <option value="success" {{ request('type') === 'success' ? 'selected' : '' }}>Sukces</option>
-                </select>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Data od</label>
-                <input type="date" 
-                       name="date_from" 
-                       value="{{ request('date_from') }}" 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Data do</label>
-                <input type="date" 
-                       name="date_to" 
-                       value="{{ request('date_to') }}" 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
-            </div>
-            
-            <div class="md:col-span-3">
-                <button type="submit" 
-                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                    Filtruj
-                </button>
-                <a href="{{ route('publigo.webhooks.logs') }}" 
-                   class="ml-2 px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
-                    Wyczyść
-                </a>
-            </div>
-        </form>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-funnel me-2"></i>Filtry
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold">Typ Logu</label>
+                        <select name="type" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="received" {{ request('type') === 'received' ? 'selected' : '' }}>Otrzymane</option>
+                            <option value="error" {{ request('type') === 'error' ? 'selected' : '' }}>Błędy</option>
+                            <option value="success" {{ request('type') === 'success' ? 'selected' : '' }}>Sukces</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold">Data od</label>
+                        <input type="date" 
+                               name="date_from" 
+                               value="{{ request('date_from') }}" 
+                               class="form-control">
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold">Data do</label>
+                        <input type="date" 
+                               name="date_to" 
+                               value="{{ request('date_to') }}" 
+                               class="form-control">
+                    </div>
+                    
+                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-search me-1"></i>Filtruj
+                        </button>
+                        <a href="{{ route('publigo.webhooks.logs') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-1"></i>Wyczyść
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Logi -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Logi Webhooków</h2>
-            <div class="text-sm text-gray-500">
-                Znaleziono {{ $logs->count() }} logów
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-ul me-2"></i>Logi Webhooków
+                </h5>
+                <div class="badge bg-light text-dark">
+                    {{ $logs->count() }} logów
+                </div>
             </div>
         </div>
-        
-        @if($logs->count() > 0)
-            <div class="space-y-4">
-                @foreach($logs as $log)
-                    <div class="p-4 border border-gray-200 rounded-lg">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="text-sm text-gray-500">{{ $log->created_at->format('Y-m-d H:i:s') }}</div>
-                            <div class="flex items-center space-x-2">
-                                <div class="text-xs">
-                                    @if($log->success)
-                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Sukces</span>
-                                    @else
-                                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded">Błąd</span>
-                                    @endif
-                                </div>
-                                <span class="text-xs text-gray-500">{{ $log->endpoint }}</span>
-                                @if($log->status_code)
-                                    <span class="text-xs text-gray-500">HTTP {{ $log->status_code }}</span>
+        <div class="card-body p-0">
+            @if($logs->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th>Endpoint</th>
+                                <th>IP</th>
+                                <th>Metoda</th>
+                                <th>Źródło</th>
+                                <th class="text-center">Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($logs as $log)
+                                <tr>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ $log->created_at->format('d.m.Y H:i:s') }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        @if($log->success)
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>Sukces
+                                            </span>
+                                        @else
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle me-1"></i>Błąd
+                                            </span>
+                                        @endif
+                                        @if($log->status_code)
+                                            <br><small class="text-muted">HTTP {{ $log->status_code }}</small>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <code class="small">{{ $log->endpoint }}</code>
+                                    </td>
+                                    <td>
+                                        <small>{{ $log->ip_address ?? 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ $log->method }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ $log->source }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <button onclick="showLogDetails({{ $log->id }})" 
+                                                class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-eye me-1"></i>Szczegóły
+                                        </button>
+                                    </td>
+                                </tr>
+                                @if($log->error_message)
+                                    <tr class="table-danger">
+                                        <td colspan="7">
+                                            <div class="p-2">
+                                                <strong class="text-danger">Błąd:</strong>
+                                                <span class="text-danger">{{ $log->error_message }}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endif
-                            </div>
-                        </div>
-                        
-                        <div class="text-gray-900 text-sm mb-2">
-                            <strong>IP:</strong> {{ $log->ip_address ?? 'N/A' }} | 
-                            <strong>Metoda:</strong> {{ $log->method }} |
-                            <strong>Źródło:</strong> {{ $log->source }}
-                        </div>
-                        
-                        @if($log->error_message)
-                            <div class="text-red-600 text-sm mb-2">
-                                <strong>Błąd:</strong> {{ $log->error_message }}
-                            </div>
-                        @endif
-                        
-                        <div class="text-xs text-gray-500">
-                            <button onclick="showLogDetails({{ $log->id }})" 
-                                    class="text-blue-600 hover:text-blue-900">
-                                Pokaż szczegóły
-                            </button>
-                        </div>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                
+                @if($logs instanceof \Illuminate\Pagination\LengthAwarePaginator)
+                    <div class="card-footer">
+                        {{ $logs->links() }}
                     </div>
-                @endforeach
-            </div>
-            
-            @if($logs instanceof \Illuminate\Pagination\LengthAwarePaginator)
-                <div class="mt-6">
-                    {{ $logs->links() }}
+                @endif
+            @else
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <h5 class="text-muted mt-3">Brak logów webhooków</h5>
+                    <p class="text-muted">Nie znaleziono żadnych logów spełniających kryteria wyszukiwania.</p>
                 </div>
             @endif
-        @else
-            <div class="text-center py-12">
-                <div class="text-gray-400 text-6xl mb-4">📋</div>
-                <p class="text-gray-500 text-lg mb-2">Brak logów webhooków</p>
-                <p class="text-gray-400">Nie znaleziono żadnych logów spełniających kryteria wyszukiwania.</p>
-            </div>
-        @endif
+        </div>
+    </div>
+        </div>
     </div>
 </div>
 
@@ -135,6 +180,12 @@ setInterval(function() {
     if (document.visibilityState === 'visible') {
         location.reload();
     }
-    }, 30000);
+}, 30000);
+
+// Funkcja do pokazywania szczegółów logu (placeholder)
+function showLogDetails(logId) {
+    // TODO: Implementować modal z szczegółami logu
+    alert('Szczegóły logu ID: ' + logId + '\n\nTa funkcja będzie zaimplementowana w przyszłości.');
+}
 </script>
 </x-app-layout>

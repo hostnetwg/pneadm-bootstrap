@@ -21,6 +21,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role_id',
+        'is_active',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     /**
@@ -43,6 +47,68 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Relacja z rolą
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Sprawdź czy użytkownik ma daną rolę
+     */
+    public function hasRole($role)
+    {
+        if (is_string($role)) {
+            return $this->role && $this->role->name === $role;
+        }
+        
+        return $this->role && $this->role->id === $role;
+    }
+
+    /**
+     * Sprawdź czy użytkownik ma dane uprawnienie
+     */
+    public function hasPermission($permission)
+    {
+        return $this->role && $this->role->hasPermission($permission);
+    }
+
+    /**
+     * Sprawdź czy użytkownik ma poziom uprawnień wyższy lub równy
+     */
+    public function hasLevel($level)
+    {
+        return $this->role && $this->role->level >= $level;
+    }
+
+    /**
+     * Sprawdź czy użytkownik jest Super Admin
+     */
+    public function isSuperAdmin()
+    {
+        return $this->hasRole('super_admin');
+    }
+
+    /**
+     * Sprawdź czy użytkownik jest Admin
+     */
+    public function isAdmin()
+    {
+        return $this->hasRole('admin') || $this->isSuperAdmin();
+    }
+
+    /**
+     * Sprawdź czy użytkownik jest aktywny
+     */
+    public function isActive()
+    {
+        return $this->is_active;
     }
 }

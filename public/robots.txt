@@ -1,2 +1,5 @@
 User-agent: *
-Disallow:
+Disallow: /
+
+# Zabezpieczenie przed indeksowaniem całej aplikacji
+# Strona wewnętrzna firmy - nie do publicznego użytku

@@ -1,164 +1,221 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            Zarządzanie Webhookami Publigo
+            <i class="bi bi-webhook me-2"></i>Zarządzanie Webhookami Publigo
         </h2>
     </x-slot>
-<div class="container mx-auto px-4 py-8">
-    <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-4">Zarządzanie Webhookami Publigo</h1>
-        <p class="text-gray-600">Konfiguracja i monitorowanie webhooków z Publigo.pl</p>
-        <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div class="flex items-center">
-                <svg class="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                </svg>
-                <p class="text-blue-800 text-sm">
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">
+                        <i class="bi bi-webhook text-primary me-2"></i>Webhooki Publigo
+                    </h1>
+                    <p class="text-muted mb-0">Konfiguracja i monitorowanie integracji z Publigo.pl</p>
+                </div>
+                <div>
+                    <a href="{{ route('publigo.webhooks.logs') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-list-ul me-1"></i>Wszystkie logi
+                    </a>
+                </div>
+            </div>
+            <div class="alert alert-info d-flex align-items-center mb-4">
+                <i class="bi bi-info-circle me-2"></i>
+                <div>
                     <strong>Uwaga:</strong> Webhook obsługuje tylko kursy z <code>source_id_old = "certgen_Publigo"</code>. 
                     Kursy bez tego ustawienia nie będą automatycznie zapisywać uczestników.
-                </p>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Konfiguracja Webhooka -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Konfiguracja Webhooka</h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">URL Webhooka</label>
-                <div class="flex">
-                    <input type="text" 
-                           value="{{ $webhookUrl }}" 
-                           readonly 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-gray-900">
-                    <button onclick="copyToClipboard('{{ $webhookUrl }}')" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700">
-                        Kopiuj
-                    </button>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-gear me-2"></i>Konfiguracja Webhooka
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">URL Webhooka</label>
+                    <div class="input-group">
+                        <input type="text" 
+                               value="{{ $webhookUrl }}" 
+                               readonly 
+                               class="form-control bg-light">
+                        <button onclick="copyToClipboard('{{ $webhookUrl }}')" 
+                                class="btn btn-primary" type="button">
+                            <i class="bi bi-clipboard me-1"></i>Kopiuj
+                        </button>
+                    </div>
+                    <div class="form-text">Skopiuj ten URL i wklej w panelu Publigo.pl</div>
                 </div>
-                <p class="text-sm text-gray-500 mt-1">Skopiuj ten URL i wklej w panelu Publigo.pl</p>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Klucz API (do weryfikacji podpisu)</label>
-                <div class="flex">
-                    <input type="password" 
-                           value="{{ config('services.publigo.api_key') ? '***' . substr(config('services.publigo.api_key'), -4) : 'Nie skonfigurowano' }}" 
-                           readonly 
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-gray-900">
-                    <button onclick="togglePasswordVisibility(this)" 
-                            class="px-4 py-2 bg-gray-600 text-white rounded-r-md hover:bg-gray-700">
-                        Pokaż
-                    </button>
+                
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">Klucz API</label>
+                    <div class="input-group">
+                        <input type="password" 
+                               value="{{ config('services.publigo.api_key') ? '***' . substr(config('services.publigo.api_key'), -4) : 'Nie skonfigurowano' }}" 
+                               readonly 
+                               class="form-control bg-light">
+                        <button onclick="togglePasswordVisibility(this)" 
+                                class="btn btn-outline-secondary" type="button">
+                            <i class="bi bi-eye me-1"></i>Pokaż
+                        </button>
+                    </div>
+                    <div class="form-text">Klucz licencyjny do weryfikacji podpisu HMAC-SHA256</div>
+                    <small class="text-muted">Publigo używa nagłówka <code>x-wpidea-signature</code></small>
                 </div>
-                <p class="text-sm text-gray-500 mt-1">Klucz licencyjny do weryfikacji podpisu HMAC-SHA256</p>
-                <p class="text-xs text-gray-400 mt-1">Publigo używa nagłówka <code>x-wpidea-signature</code></p>
             </div>
         </div>
     </div>
 
     <!-- Test Webhooka -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Test Webhooka</h2>
-        
-        <form action="{{ route('publigo.test-webhook') }}" method="POST" class="space-y-4">
-            @csrf
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">ID Kursu</label>
-                    <select name="course_id" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                        <option value="">Wybierz kurs</option>
-                        @foreach($courses as $course)
-                            <option value="{{ $course->id_old ?? $course->id }}">
-                                {{ $course->title }} ({{ $course->start_date ? $course->start_date->format('Y-m-d') : 'Brak daty' }}) - ID: {{ $course->id_old ?? $course->id }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @if($courses->count() === 0)
-                        <p class="text-red-600 text-sm mt-1">Brak kursów z source_id_old = "certgen_Publigo"</p>
-                    @endif
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-play-circle me-2"></i>Test Webhooka
+            </h5>
+        </div>
+        <div class="card-body">
+            <form action="{{ route('publigo.test-webhook') }}" method="POST">
+                @csrf
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">ID Kursu</label>
+                        <select name="course_id" required class="form-select">
+                            <option value="">Wybierz kurs</option>
+                            @foreach($courses as $course)
+                                <option value="{{ $course->id_old ?? $course->id }}">
+                                    {{ $course->title }} ({{ $course->start_date ? $course->start_date->format('Y-m-d') : 'Brak daty' }}) - ID: {{ $course->id_old ?? $course->id }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if($courses->count() === 0)
+                            <div class="form-text text-danger">Brak kursów z source_id_old = "certgen_Publigo"</div>
+                        @endif
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Email Testowy</label>
+                        <input type="email" 
+                               name="email" 
+                               value="test@example.com" 
+                               required 
+                               class="form-control">
+                    </div>
                 </div>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Testowy</label>
-                    <input type="email" 
-                           name="email" 
-                           value="test@example.com" 
-                           required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Imię</label>
-                    <input type="text" 
-                           name="first_name" 
-                           value="Jan" 
-                           required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Imię</label>
+                        <input type="text" 
+                               name="first_name" 
+                               value="Jan" 
+                               required 
+                               class="form-control">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Nazwisko</label>
+                        <input type="text" 
+                               name="last_name" 
+                               value="Kowalski" 
+                               required 
+                               class="form-control">
+                    </div>
                 </div>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Nazwisko</label>
-                    <input type="text" 
-                           name="last_name" 
-                           value="Kowalski" 
-                           required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send me-1"></i>Wyślij Testowy Webhook
+                    </button>
                 </div>
-            </div>
-            
-            <button type="submit" 
-                    class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                Wyślij Testowy Webhook
-            </button>
-        </form>
+            </form>
+        </div>
     </div>
 
     <!-- Ostatnie Logi -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Ostatnie Logi Webhooków</h2>
-            <a href="{{ route('publigo.webhooks.logs') }}" 
-               class="text-blue-600 hover:text-blue-800 text-sm">
-                Zobacz wszystkie logi →
-            </a>
-        </div>
-        
-        @if($recentLogs->count() > 0)
-            <div class="space-y-2 max-h-96 overflow-y-auto">
-                @foreach($recentLogs as $log)
-                    <div class="p-3 bg-gray-50 rounded-md text-sm">
-                        <div class="text-gray-500 text-xs mb-1">{{ $log['timestamp'] }}</div>
-                        <div class="text-gray-900">{{ $log['message'] }}</div>
-                    </div>
-                @endforeach
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Ostatnie Logi Webhooków
+                </h5>
+                <a href="{{ route('publigo.webhooks.logs') }}" 
+                   class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-list-ul me-1"></i>Wszystkie logi
+                </a>
             </div>
-        @else
-            <p class="text-gray-500 text-center py-8">Brak logów webhooków</p>
-        @endif
+        </div>
+        <div class="card-body">
+            @if($recentLogs->count() > 0)
+                <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                    @foreach($recentLogs as $log)
+                        <div class="list-group-item border-0 px-0">
+                            <div class="d-flex w-100 justify-content-between">
+                                <small class="text-muted">{{ $log['timestamp'] }}</small>
+                            </div>
+                            <p class="mb-1 small">{{ $log['message'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-4">
+                    <i class="bi bi-inbox display-4 text-muted"></i>
+                    <p class="text-muted mt-2">Brak logów webhooków</p>
+                </div>
+            @endif
+        </div>
+    </div>
+        </div>
     </div>
 </div>
 
 <script>
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(function() {
-        alert('URL skopiowany do schowka!');
+        // Pokaż toast notification zamiast alert
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed top-0 end-0 m-3';
+        toast.style.zIndex = '9999';
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi bi-check-circle me-2"></i>URL skopiowany do schowka!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        // Usuń toast po 3 sekundach
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
     });
 }
 
 function togglePasswordVisibility(button) {
     const input = button.previousElementSibling;
+    const icon = button.querySelector('i');
+    
     if (input.type === 'password') {
         input.type = 'text';
-        button.textContent = 'Ukryj';
+        icon.className = 'bi bi-eye-slash me-1';
+        button.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Ukryj';
     } else {
         input.type = 'password';
-        button.textContent = 'Pokaż';
+        icon.className = 'bi bi-eye me-1';
+        button.innerHTML = '<i class="bi bi-eye me-1"></i>Pokaż';
     }
-    }
+}
 </script>
 </x-app-layout>

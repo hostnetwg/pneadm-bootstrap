@@ -14,7 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'publigo.webhook' => \App\Http\Middleware\PubligoWebhookMiddleware::class,
+            'noindex' => \App\Http\Middleware\NoIndexMiddleware::class,
         ]);
+        
+        // Dodaj middleware globalnie do wszystkich tras web
+        // $middleware->web(append: [
+        //     \App\Http\Middleware\NoIndexMiddleware::class,
+        // ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -1,3 +1,48 @@
+# Zabezpieczenia dla aplikacji wewnętrznej firmy
+
+# Zabezpieczenie przed indeksowaniem
+Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+
+# Zabezpieczenia bezpieczeństwa
+Header always set X-Frame-Options "DENY"
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "no-referrer"
+Header always set X-Permitted-Cross-Domain-Policies "none"
+
+# HTTPS (jeśli dostępne)
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+# Content Security Policy
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'"
+
+# Ukryj informacje o serwerze
+ServerTokens Prod
+Header unset Server
+Header unset X-Powered-By
+
+# Zabezpieczenie przed hotlinking
+RewriteEngine On
+RewriteCond %{HTTP_REFERER} !^$
+RewriteCond %{HTTP_REFERER} !^https?://(www\.)?yourdomain\.com [NC]
+RewriteRule \.(jpg|jpeg|png|gif|css|js)$ - [F]
+
+# Blokuj dostęp do plików konfiguracyjnych
+<FilesMatch "\.(env|log|ini|conf|sql|bak|backup|old|tmp)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Blokuj dostęp do katalogów systemowych
+RedirectMatch 403 ^/storage/
+RedirectMatch 403 ^/bootstrap/
+RedirectMatch 403 ^/config/
+RedirectMatch 403 ^/database/
+RedirectMatch 403 ^/resources/
+RedirectMatch 403 ^/routes/
+RedirectMatch 403 ^/app/
+RedirectMatch 403 ^/vendor/
+
+# Standardowe reguły Laravel
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

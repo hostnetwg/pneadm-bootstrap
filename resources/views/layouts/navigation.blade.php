@@ -49,25 +49,6 @@
 
         <li class="border-top my-3"></li>
 
-        <!-- Marketing i reklama -->
-        <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('marketing.*') ? '' : 'collapsed' }}"
-                    data-bs-toggle="collapse" data-bs-target="#marketing-collapse"
-                    aria-expanded="{{ request()->routeIs('marketing.*') ? 'true' : 'false' }}">
-                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
-                    <use xlink:href="#bullseye"></use>
-                </svg>
-                Marketing i reklama
-                <svg class="bi pe-none ms-auto" width="16" height="16">
-                    <use xlink:href="#chevron-right"></use>
-                </svg>
-            </button>
-            <div class="collapse {{ request()->routeIs('marketing.*') ? 'show' : '' }}" id="marketing-collapse" data-bs-parent="#menuAccordion">
-                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Działania marketingowe</a></li>
-                </ul>
-            </div>
-        </li>
 
         <!-- Sprzedaż -->
         <li class="mb-1">
@@ -86,6 +67,25 @@
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia FORM</a></li>
                     <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Zakupy NE.pl</a></li>
+                </ul>
+            </div>
+        </li>
+        <!-- Marketing i reklama -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('marketing.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#marketing-collapse"
+                    aria-expanded="{{ request()->routeIs('marketing.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#bullseye"></use>
+                </svg>
+                Marketing i reklama
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('marketing.*') ? 'show' : '' }}" id="marketing-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Działania marketingowe</a></li>
                 </ul>
             </div>
         </li>
@@ -168,6 +168,27 @@
         </li>
 
         <li class="border-top my-3"></li>
+        
+        <!-- Admin -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#admin-collapse"
+                    aria-expanded="{{ request()->routeIs('admin.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#gear"></use>
+                </svg>
+                Admin
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('admin.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li><a href="{{ route('admin.users.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Użytkownicy</a></li>
+                </ul>
+            </div>
+        </li>
+
         <!-- Konto -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.edit') ? '' : 'collapsed' }}"

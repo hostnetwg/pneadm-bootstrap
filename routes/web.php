@@ -12,6 +12,7 @@ use App\Http\Controllers\SalesController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\UsersController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,11 @@ Route::get('/', function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Admin Panel
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('users', UsersController::class);
+    });
 
 
 /**/
