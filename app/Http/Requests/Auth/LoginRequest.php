@@ -49,6 +49,23 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Sprawdź czy użytkownik jest aktywny
+        $user = Auth::user();
+        if (!$user->is_active) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Twoje konto zostało dezaktywowane. Skontaktuj się z administratorem.',
+            ]);
+        }
+
+        // Zaktualizuj informacje o ostatnim logowaniu
+        $user->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $this->ip(),
+        ]);
+
         RateLimiter::clear($this->throttleKey());
     }
 

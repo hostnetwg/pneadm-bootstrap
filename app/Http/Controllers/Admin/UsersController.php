@@ -55,6 +55,7 @@ class UsersController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role_id' => ['required', 'exists:roles,id'],
+            'is_active' => ['boolean'],
         ]);
 
         // Sprawdź czy można przypisać daną rolę
@@ -65,11 +66,19 @@ class UsersController extends Controller
                 ->withInput();
         }
 
+        // Sprawdź czy nie próbuje się ustawić statusu nieaktywnego dla superadministratora
+        if ($selectedRole->name === 'super_admin' && !$request->boolean('is_active')) {
+            return redirect()->back()
+                ->with('error', 'Nie można ustawić statusu nieaktywnego dla Super Administratora.')
+                ->withInput();
+        }
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id,
+            'is_active' => $request->boolean('is_active'),
         ]);
 
         return redirect()->route('admin.users.show', $user)
@@ -124,17 +133,34 @@ class UsersController extends Controller
             abort(403, 'Nie możesz edytować użytkownika o równym lub wyższym poziomie uprawnień.');
         }
 
+        // Sprawdź czy użytkownik nie próbuje zmienić własnego statusu
+        if ($user->id === auth()->id() && $request->boolean('is_active') !== $user->is_active) {
+            return redirect()->back()
+                ->with('error', 'Nie możesz zmienić własnego statusu aktywności.')
+                ->withInput();
+        }
+
+        // Sprawdź czy nie próbuje się ustawić statusu nieaktywnego dla superadministratora
+        $selectedRole = Role::findOrFail($request->role_id);
+        if ($selectedRole->name === 'super_admin' && !$request->boolean('is_active')) {
+            return redirect()->back()
+                ->with('error', 'Nie można ustawić statusu nieaktywnego dla Super Administratora.')
+                ->withInput();
+        }
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'role_id' => ['required', 'exists:roles,id'],
+            'is_active' => ['boolean'],
         ]);
 
         $updateData = [
             'name' => $request->name,
             'email' => $request->email,
             'role_id' => $request->role_id,
+            'is_active' => $request->boolean('is_active'),
         ];
 
         if ($request->filled('password')) {
@@ -185,5 +211,39 @@ class UsersController extends Controller
 
         return redirect()->route('admin.users.index')
             ->with('success', 'Użytkownik został usunięty pomyślnie.');
+    }
+
+    /**
+     * Toggle user active status
+     */
+    public function toggleStatus(User $user)
+    {
+        // Sprawdź uprawnienia
+        if (!auth()->user()->hasPermission('users.edit')) {
+            abort(403, 'Brak uprawnień do edycji użytkowników.');
+        }
+
+        // Sprawdź czy można edytować tego użytkownika
+        if ($user->role && $user->role->level >= auth()->user()->role->level && $user->id !== auth()->id()) {
+            abort(403, 'Nie możesz edytować użytkownika o równym lub wyższym poziomie uprawnień.');
+        }
+
+        // Zabezpieczenie przed dezaktywacją samego siebie
+        if ($user->id === auth()->id()) {
+            return redirect()->back()
+                ->with('error', 'Nie możesz dezaktywować własnego konta.');
+        }
+
+        // Sprawdź czy użytkownik ma status większy niż 1 (manager, admin, super_admin)
+        if ($user->role && $user->role->level > 1) {
+            $user->update(['is_active' => !$user->is_active]);
+            
+            $status = $user->is_active ? 'aktywowany' : 'dezaktywowany';
+            return redirect()->back()
+                ->with('success', "Użytkownik {$user->name} został {$status} pomyślnie.");
+        }
+
+        return redirect()->back()
+            ->with('error', 'Można dezaktywować tylko użytkowników o statusie wyższym niż podstawowy użytkownik.');
     }
 }

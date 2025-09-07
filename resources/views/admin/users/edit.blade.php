@@ -128,6 +128,47 @@
                                             @enderror
                                         </div>
                                     </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="is_active" class="form-label">
+                                                <i class="bi bi-toggle-on me-1"></i>
+                                                Status konta
+                                            </label>
+                                            @if($user->role && $user->role->name === 'super_admin')
+                                                <div class="form-control-plaintext">
+                                                    <span class="badge bg-success fs-6">
+                                                        <i class="bi bi-check-circle me-1"></i>
+                                                        Aktywny (Super Admin)
+                                                    </span>
+                                                    <input type="hidden" name="is_active" value="1">
+                                                    <div class="form-text text-muted">Super Administrator zawsze musi być aktywny</div>
+                                                </div>
+                                            @elseif($user->id === auth()->id())
+                                                <div class="form-control-plaintext">
+                                                    <span class="badge bg-{{ $user->is_active ? 'success' : 'danger' }} fs-6">
+                                                        <i class="bi bi-{{ $user->is_active ? 'check' : 'x' }}-circle me-1"></i>
+                                                        {{ $user->is_active ? 'Aktywny' : 'Nieaktywny' }}
+                                                    </span>
+                                                    <input type="hidden" name="is_active" value="{{ $user->is_active ? '1' : '0' }}">
+                                                    <div class="form-text text-muted">Nie możesz zmienić własnego statusu</div>
+                                                </div>
+                                            @else
+                                                <select class="form-select @error('is_active') is-invalid @enderror" 
+                                                        id="is_active" name="is_active">
+                                                    <option value="1" {{ old('is_active', $user->is_active) == '1' ? 'selected' : '' }}>
+                                                        <i class="bi bi-check-circle text-success"></i> Aktywny
+                                                    </option>
+                                                    <option value="0" {{ old('is_active', $user->is_active) == '0' ? 'selected' : '' }}>
+                                                        <i class="bi bi-x-circle text-danger"></i> Nieaktywny
+                                                    </option>
+                                                </select>
+                                                @error('is_active')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                                <div class="form-text">Nieaktywni użytkownicy nie mogą się logować</div>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Informacje o koncie -->
@@ -150,6 +191,9 @@
                                                     <strong>Ostatnie logowanie:</strong> 
                                                     @if($user->last_login_at)
                                                         {{ $user->last_login_at->format('d.m.Y H:i') }}
+                                                        @if($user->last_login_ip)
+                                                            <br><strong>IP:</strong> {{ $user->last_login_ip }}
+                                                        @endif
                                                     @else
                                                         Nigdy
                                                     @endif

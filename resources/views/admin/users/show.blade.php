@@ -71,7 +71,7 @@
                             </div>
 
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label fw-bold">Rola:</label>
                                         <p class="form-control-plaintext">
@@ -92,7 +92,27 @@
                                         </p>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Status konta:</label>
+                                        <p class="form-control-plaintext">
+                                            @if($user->is_active)
+                                                <span class="badge bg-success fs-6">
+                                                    <i class="bi bi-check-circle me-1"></i>
+                                                    Aktywny
+                                                </span>
+                                                <br><small class="text-muted">Może się logować</small>
+                                            @else
+                                                <span class="badge bg-danger fs-6">
+                                                    <i class="bi bi-x-circle me-1"></i>
+                                                    Nieaktywny
+                                                </span>
+                                                <br><small class="text-muted">Nie może się logować</small>
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label fw-bold">Poziom uprawnień:</label>
                                         <p class="form-control-plaintext">

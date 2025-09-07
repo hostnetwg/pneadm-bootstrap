@@ -53,8 +53,9 @@
                                         <th>Nazwa</th>
                                         <th>Email</th>
                                         <th>Rola</th>
-                                        <th>Data utworzenia</th>
-                                        <th>Ostatnia aktualizacja</th>
+                                        <th>Status</th>
+                                        <th>Ostatnie logowanie</th>
+                                        <th>Ostatnia modyfikacja</th>
                                         <th class="text-center">Akcje</th>
                                     </tr>
                                 </thead>
@@ -89,9 +90,38 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <small class="text-muted">
-                                                {{ $user->created_at->format('d.m.Y H:i') }}
-                                            </small>
+                                            @if($user->is_active)
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle me-1"></i>
+                                                    Aktywny
+                                                </span>
+                                            @else
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-x-circle me-1"></i>
+                                                    Nieaktywny
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($user->last_login_at)
+                                                <div class="d-flex flex-column">
+                                                    <small class="text-dark fw-medium">
+                                                        <i class="bi bi-calendar-check me-1"></i>
+                                                        {{ $user->last_login_at->format('d.m.Y H:i') }}
+                                                    </small>
+                                                    @if($user->last_login_ip)
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-globe me-1"></i>
+                                                            {{ $user->last_login_ip }}
+                                                        </small>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <small class="text-muted">
+                                                    <i class="bi bi-dash-circle me-1"></i>
+                                                    Nigdy
+                                                </small>
+                                            @endif
                                         </td>
                                         <td>
                                             <small class="text-muted">

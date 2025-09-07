@@ -12,21 +12,46 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Najpierw dodaj kolumny bez klucza obcego
+        // Najpierw dodaj kolumny bez klucza obcego (sprawdź czy już nie istnieją)
         Schema::table('users', function (Blueprint $table) {
-            $table->unsignedBigInteger('role_id')->default(4); // Domyślnie rola "user"
-            $table->boolean('is_active')->default(true);
-            $table->timestamp('last_login_at')->nullable();
-            $table->string('last_login_ip')->nullable();
+            if (!Schema::hasColumn('users', 'role_id')) {
+                $table->unsignedBigInteger('role_id')->default(4); // Domyślnie rola "user"
+            }
+            if (!Schema::hasColumn('users', 'is_active')) {
+                $table->boolean('is_active')->default(true);
+            }
+            if (!Schema::hasColumn('users', 'last_login_at')) {
+                $table->timestamp('last_login_at')->nullable();
+            }
+            if (!Schema::hasColumn('users', 'last_login_ip')) {
+                $table->string('last_login_ip')->nullable();
+            }
         });
 
         // Uruchom seeder z rolami
-        $this->call(RolePermissionSeeder::class);
+        $seeder = new \Database\Seeders\RolePermissionSeeder();
+        $seeder->run();
 
-        // Teraz dodaj klucz obcy
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreign('role_id')->references('id')->on('roles')->onDelete('restrict');
-        });
+        // Teraz dodaj klucz obcy (sprawdź czy już nie istnieje)
+        if (!Schema::hasColumn('users', 'role_id') || !$this->foreignKeyExists('users', 'users_role_id_foreign')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->foreign('role_id')->references('id')->on('roles')->onDelete('restrict');
+            });
+        }
+    }
+
+    private function foreignKeyExists($table, $keyName)
+    {
+        $foreignKeys = Schema::getConnection()
+            ->getDoctrineSchemaManager()
+            ->listTableForeignKeys($table);
+        
+        foreach ($foreignKeys as $foreignKey) {
+            if ($foreignKey->getName() === $keyName) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

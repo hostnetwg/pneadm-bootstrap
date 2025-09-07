@@ -20,12 +20,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Admin Panel
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UsersController::class);
+        Route::patch('users/{user}/toggle-status', [UsersController::class, 'toggleStatus'])->name('users.toggle-status');
     });
 
 
@@ -80,12 +81,12 @@ Route::middleware(['auth'])->group(function () {
     });
     
     // ClickMeeting – lista zaplanowanych szkoleń
-    Route::middleware(['auth', 'verified'])          // lub inny zestaw middleware
+    Route::middleware(['auth', 'verified', 'check.user.status'])          // lub inny zestaw middleware
         ->get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
         ->name('clickmeeting.trainings.index');
 
     // Sprzedaż - zamówienia
-    Route::middleware(['auth', 'verified'])
+    Route::middleware(['auth', 'verified', 'check.user.status'])
     ->prefix('sales')
     ->name('sales.')
     ->group(function () {

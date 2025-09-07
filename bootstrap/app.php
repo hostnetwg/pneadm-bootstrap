@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'publigo.webhook' => \App\Http\Middleware\PubligoWebhookMiddleware::class,
             'noindex' => \App\Http\Middleware\NoIndexMiddleware::class,
+            'check.user.status' => \App\Http\Middleware\CheckUserStatus::class,
         ]);
         
         // Dodaj middleware globalnie do wszystkich tras web
