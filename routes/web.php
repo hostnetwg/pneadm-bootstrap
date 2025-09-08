@@ -13,6 +13,7 @@ use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\SendyController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -84,6 +85,18 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::middleware(['auth', 'verified', 'check.user.status'])          // lub inny zestaw middleware
         ->get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
         ->name('clickmeeting.trainings.index');
+
+    // Sendy - listy mailingowe
+    Route::prefix('sendy')->name('sendy.')->group(function () {
+        Route::get('/', [SendyController::class, 'index'])->name('index');
+        Route::get('/{listId}', [SendyController::class, 'show'])->name('show');
+        Route::get('/api/refresh', [SendyController::class, 'refresh'])->name('refresh');
+        Route::get('/api/test-connection', [SendyController::class, 'testConnection'])->name('test-connection');
+        Route::post('/api/subscribe', [SendyController::class, 'subscribe'])->name('subscribe');
+        Route::post('/api/unsubscribe', [SendyController::class, 'unsubscribe'])->name('unsubscribe');
+        Route::post('/api/delete-subscriber', [SendyController::class, 'deleteSubscriber'])->name('delete-subscriber');
+        Route::post('/api/check-status', [SendyController::class, 'checkSubscriptionStatus'])->name('check-status');
+    });
 
     // Sprzedaż - zamówienia
     Route::middleware(['auth', 'verified', 'check.user.status'])
