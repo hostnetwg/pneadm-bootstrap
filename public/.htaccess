@@ -12,18 +12,21 @@ Header always set X-Permitted-Cross-Domain-Policies "none"
 # HTTPS (jeśli dostępne)
 Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-# Content Security Policy
-Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'"
+# Content Security Policy - POPRAWIONE dla grafik
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.bunny.net https://cdnjs.cloudflare.com; img-src 'self' data: https: http:; connect-src 'self'"
 
 # Ukryj informacje o serwerze
 ServerTokens Prod
 Header unset Server
 Header unset X-Powered-By
 
-# Zabezpieczenie przed hotlinking
+# Zabezpieczenie przed hotlinking - POPRAWIONE
 RewriteEngine On
 RewriteCond %{HTTP_REFERER} !^$
-RewriteCond %{HTTP_REFERER} !^https?://(www\.)?yourdomain\.com [NC]
+RewriteCond %{HTTP_REFERER} !^https?://(www\.)?adm\.pnedu\.pl [NC]
+RewriteCond %{HTTP_REFERER} !^https?://(www\.)?pnedu\.pl [NC]
+RewriteCond %{HTTP_REFERER} !^https?://localhost [NC]
+RewriteCond %{HTTP_REFERER} !^https?://127\.0\.0\.1 [NC]
 RewriteRule \.(jpg|jpeg|png|gif|css|js)$ - [F]
 
 # Blokuj dostęp do plików konfiguracyjnych
@@ -32,8 +35,10 @@ RewriteRule \.(jpg|jpeg|png|gif|css|js)$ - [F]
     Deny from all
 </FilesMatch>
 
-# Blokuj dostęp do katalogów systemowych
-RedirectMatch 403 ^/storage/
+# Blokuj dostęp do katalogów systemowych - POPRAWIONE
+RedirectMatch 403 ^/storage/logs/
+RedirectMatch 403 ^/storage/framework/
+RedirectMatch 403 ^/storage/app/private/
 RedirectMatch 403 ^/bootstrap/
 RedirectMatch 403 ^/config/
 RedirectMatch 403 ^/database/
@@ -41,6 +46,13 @@ RedirectMatch 403 ^/resources/
 RedirectMatch 403 ^/routes/
 RedirectMatch 403 ^/app/
 RedirectMatch 403 ^/vendor/
+
+# Pozwól na dostęp do publicznych plików storage
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} ^/storage/app/public/
+    RewriteRule ^storage/app/public/(.*)$ /storage/app/public/$1 [L]
+</IfModule>
 
 # Standardowe reguły Laravel
 <IfModule mod_rewrite.c>
