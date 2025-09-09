@@ -65,11 +65,20 @@ class User extends Authenticatable
      */
     public function hasRole($role)
     {
-        if (is_string($role)) {
-            return $this->role && $this->role->name === $role;
+        // Sprawdź czy role jest załadowane i czy to obiekt
+        if (!$this->relationLoaded('role')) {
+            $this->load('role');
         }
         
-        return $this->role && $this->role->id === $role;
+        if (!$this->role || !is_object($this->role)) {
+            return false;
+        }
+        
+        if (is_string($role)) {
+            return $this->role->name === $role;
+        }
+        
+        return $this->role->id === $role;
     }
 
     /**
@@ -77,7 +86,12 @@ class User extends Authenticatable
      */
     public function hasPermission($permission)
     {
-        return $this->role && $this->role->hasPermission($permission);
+        // Sprawdź czy role jest załadowane i czy to obiekt
+        if (!$this->relationLoaded('role')) {
+            $this->load('role');
+        }
+        
+        return $this->role && is_object($this->role) && method_exists($this->role, 'hasPermission') && $this->role->hasPermission($permission);
     }
 
     /**
@@ -85,7 +99,12 @@ class User extends Authenticatable
      */
     public function hasLevel($level)
     {
-        return $this->role && $this->role->level >= $level;
+        // Sprawdź czy role jest załadowane i czy to obiekt
+        if (!$this->relationLoaded('role')) {
+            $this->load('role');
+        }
+        
+        return $this->role && is_object($this->role) && isset($this->role->level) && $this->role->level >= $level;
     }
 
     /**

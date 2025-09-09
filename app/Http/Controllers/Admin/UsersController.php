@@ -17,8 +17,9 @@ class UsersController extends Controller
      */
     public function index()
     {
-        // Sprawdź uprawnienia
-        if (!auth()->user()->hasPermission('users.view')) {
+        // Sprawdź uprawnienia - załaduj relację role
+        $user = auth()->user();
+        if (!$user->hasPermission('users.view')) {
             abort(403, 'Brak uprawnień do przeglądania użytkowników.');
         }
 

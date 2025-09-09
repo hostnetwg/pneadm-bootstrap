@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\RolePermissionSeeder;
 
 return new class extends Migration
 {
@@ -12,36 +11,34 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Najpierw dodaj kolumny bez klucza obcego (sprawdź czy już nie istnieją)
+        // Sprawdź i dodaj kolumny do tabeli users
         Schema::table('users', function (Blueprint $table) {
-            if (!Schema::hasColumn('users', 'role_id')) {
-                $table->unsignedBigInteger('role_id')->default(4); // Domyślnie rola "user"
+            // Dodaj remember_token jeśli nie istnieje
+            if (!Schema::hasColumn('users', 'remember_token')) {
+                $table->rememberToken();
             }
+            
+            // Dodaj role_id jeśli nie istnieje
+            if (!Schema::hasColumn('users', 'role_id')) {
+                $table->unsignedBigInteger('role_id')->default(1);
+            }
+            
+            // Dodaj is_active jeśli nie istnieje
             if (!Schema::hasColumn('users', 'is_active')) {
                 $table->boolean('is_active')->default(true);
             }
+            
+            // Dodaj last_login_at jeśli nie istnieje
             if (!Schema::hasColumn('users', 'last_login_at')) {
                 $table->timestamp('last_login_at')->nullable();
             }
+            
+            // Dodaj last_login_ip jeśli nie istnieje
             if (!Schema::hasColumn('users', 'last_login_ip')) {
                 $table->string('last_login_ip')->nullable();
             }
         });
-
-        // Uruchom seeder z rolami
-        $seeder = new \Database\Seeders\RolePermissionSeeder();
-        $seeder->run();
-
-        // Teraz dodaj klucz obcy (bez sprawdzania - Laravel obsłuży duplikaty)
-        try {
-            Schema::table('users', function (Blueprint $table) {
-                $table->foreign('role_id')->references('id')->on('roles')->onDelete('restrict');
-            });
-        } catch (\Exception $e) {
-            // Klucz obcy już istnieje, kontynuuj
-        }
     }
-
 
     /**
      * Reverse the migrations.
@@ -49,8 +46,13 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
-            $table->dropColumn(['role_id', 'is_active', 'last_login_at', 'last_login_ip']);
+            $table->dropColumn([
+                'remember_token',
+                'role_id', 
+                'is_active', 
+                'last_login_at', 
+                'last_login_ip'
+            ]);
         });
     }
 };
