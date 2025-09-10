@@ -240,11 +240,23 @@ class PubligoController extends Controller
             $registeredParticipants = [];
 
             // Przetwarzaj każdy produkt w zamówieniu
+            // Zgodnie z dokumentacją Publigo:
+            // - url_params zawiera product_id, details, external_id
+            // - items zawiera id, name, price_id, quantity, itd.
             $itemsToProcess = !empty($items) ? $items : $urlParams;
             
             foreach ($itemsToProcess as $item) {
-                $productId = $item['id'] ?? $item['product_id'] ?? null;
+                // Dla url_params: product_id, external_id
+                // Dla items: id (to jest cart_item_id)
+                $productId = $item['product_id'] ?? $item['id'] ?? null;
                 $externalId = $item['external_id'] ?? null;
+
+                \Log::info('Processing webhook item', [
+                    'item' => $item,
+                    'product_id' => $productId,
+                    'external_id' => $externalId,
+                    'order_id' => $orderId
+                ]);
 
                 // Znajdź kurs na podstawie product_id lub external_id z Publigo
                 // Tylko kursy z source_id_old = "certgen_Publigo"
