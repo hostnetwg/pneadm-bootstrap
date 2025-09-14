@@ -12,9 +12,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class, // Dodajemy nasz nowy seeder
-            InstructorSeeder::class, // Dodajemy nasz nowy seeder
-            UserSeeder::class,
+            RolePermissionSeeder::class, // Najpierw role i uprawnienia
+            UserSeeder::class, // Potem użytkownicy
+            InstructorSeeder::class, // Instruktorzy
             // CourseSeeder::class,    
             // ParticipantSeeder::class, // Nowy seeder uczestników
         ]);

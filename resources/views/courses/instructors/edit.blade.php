@@ -49,18 +49,32 @@
                 <div class="mb-3">
                     <label for="photo" class="form-label">Zdjęcie</label>
                     <input type="file" name="photo" class="form-control" id="photo">
+                    
                     @if ($instructor->photo)
-                        <img src="{{ asset('storage/' . $instructor->photo) }}" alt="Zdjęcie" width="100" class="mt-2">
+                        <div class="mt-2">
+                            <img src="{{ asset('storage/' . $instructor->photo) }}" alt="Zdjęcie instruktora" class="img-thumbnail" style="max-width: 200px;">
+                            
+                            <div class="form-check mt-2">
+                                <input type="checkbox" class="form-check-input" id="remove_photo" name="remove_photo">
+                                <label class="form-check-label" for="remove_photo">Usuń zdjęcie instruktora</label>
+                            </div>
+                        </div>
                     @endif
                 </div>
 
                 <div class="mb-3">
                     <label for="signature" class="form-label">Podpis (grafika)</label>
                     <input type="file" name="signature" class="form-control" id="signature">
+                    
                     @if ($instructor->signature)
                         <div class="mt-2">
                             <p>Aktualny podpis:</p>
-                            <img src="{{ asset('storage/' . $instructor->signature) }}" alt="Podpis instruktora" width="100">
+                            <img src="{{ asset('storage/' . $instructor->signature) }}" alt="Podpis instruktora" class="img-thumbnail" style="max-width: 200px;">
+                            
+                            <div class="form-check mt-2">
+                                <input type="checkbox" class="form-check-input" id="remove_signature" name="remove_signature">
+                                <label class="form-check-label" for="remove_signature">Usuń podpis instruktora</label>
+                            </div>
                         </div>
                     @else
                         <p class="text-muted">Brak podpisu</p>
