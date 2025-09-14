@@ -81,7 +81,25 @@ class InstructorsController extends Controller
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',            
             'is_active' => 'nullable|string',
+            'remove_photo' => 'nullable|string',
+            'remove_signature' => 'nullable|string',
         ]);
+    
+        // ✅ Usunięcie zdjęcia, jeśli użytkownik zaznaczył "Usuń zdjęcie"
+        if ($request->has('remove_photo')) {
+            if ($instructor->photo && \Storage::disk('public')->exists($instructor->photo)) {
+                \Storage::disk('public')->delete($instructor->photo);
+            }
+            $instructor->photo = null; // Usunięcie ścieżki pliku w bazie danych
+        }
+        
+        // ✅ Usunięcie podpisu, jeśli użytkownik zaznaczył "Usuń podpis"
+        if ($request->has('remove_signature')) {
+            if ($instructor->signature && \Storage::disk('public')->exists($instructor->signature)) {
+                \Storage::disk('public')->delete($instructor->signature);
+            }
+            $instructor->signature = null; // Usunięcie ścieżki pliku w bazie danych
+        }
     
         if ($request->hasFile('photo')) {
             // Usunięcie poprzedniego zdjęcia, jeśli istnieje
