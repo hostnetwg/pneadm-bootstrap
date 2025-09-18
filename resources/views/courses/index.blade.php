@@ -15,14 +15,33 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
-                <form action="{{ route('courses.import') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2" id="csvImportForm">
-                    @csrf
-                    <input type="file" name="csv_file" class="form-control d-none" accept=".csv" id="csvFileInput">
-                    <button type="button" class="btn btn-secondary" id="importCsvButton">Importuj listę kursów CSV</button>
-                </form>
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Opcje paginacji -->
+                    <form method="GET" action="{{ route('courses.index') }}" class="d-flex align-items-center gap-2">
+                        @foreach(request()->query() as $key => $value)
+                            @if($key !== 'per_page')
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endif
+                        @endforeach
+                        <label for="per_page" class="form-label mb-0 fw-bold">Wyświetl:</label>
+                        <select name="per_page" class="form-select" style="width: auto;" onchange="this.form.submit()">
+                            <option value="25" {{ request('per_page', 10) == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ request('per_page', 10) == 50 ? 'selected' : '' }}>50</option>
+                            <option value="100" {{ request('per_page', 10) == 100 ? 'selected' : '' }}>100</option>
+                            <option value="200" {{ request('per_page', 10) == 200 ? 'selected' : '' }}>200</option>
+                            <option value="all" {{ request('per_page', 10) == 'all' ? 'selected' : '' }}>Wszystkie</option>
+                        </select>
+                    </form>
+                    <form action="{{ route('courses.import') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2" id="csvImportForm">
+                        @csrf
+                        <input type="file" name="csv_file" class="form-control d-none" accept=".csv" id="csvFileInput">
+                        <button type="button" class="btn btn-secondary" id="importCsvButton">Importuj listę kursów CSV</button>
+                    </form>
+                </div>
             </div>
 
             <form method="GET" action="{{ route('courses.index') }}" class="mb-4 p-3 bg-light rounded shadow-sm">
+                <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
                 <div class="row g-3 align-items-end">
             
                     <!-- Filtr: Termin -->
@@ -34,9 +53,20 @@
                             <option value="past" {{ request()->get('date_filter') === 'past' ? 'selected' : '' }}>Archiwalne</option>
                         </select>                                                                                         
                     </div>
+
+                    <!-- Filtr: Zakres dat -->
+                    <div class="col-md-2">
+                        <label for="date_from" class="form-label fw-bold">Data od</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ request('date_from') }}">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label for="date_to" class="form-label fw-bold">Data do</label>
+                        <input type="date" name="date_to" class="form-control" value="{{ request('date_to') }}">
+                    </div>
             
                     <!-- Filtr: Płatność -->
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                         <label for="is_paid" class="form-label fw-bold">Płatność</label>
                         <select name="is_paid" class="form-select">
                             <option value="">Wszystkie</option>
@@ -46,7 +76,7 @@
                     </div>
             
                     <!-- Filtr: Rodzaj kursu -->
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                         <label for="type" class="form-label fw-bold">Rodzaj</label>
                         <select name="type" class="form-select">
                             <option value="">Wszystkie</option>
@@ -56,7 +86,7 @@
                     </div>
             
                     <!-- Filtr: Kategoria -->
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                         <label for="category" class="form-label fw-bold">Kategoria</label>
                         <select name="category" class="form-select">
                             <option value="">Wszystkie</option>
@@ -76,7 +106,7 @@
                     </div> 
 --}}            
                     <!-- Filtr: Instruktor -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="instructor_id" class="form-label fw-bold">Instruktor</label>
                         <select name="instructor_id" class="form-select">
                             <option value="">Wszyscy</option>
@@ -89,7 +119,7 @@
                     </div>
             
                     <!-- Przycisk filtrowania i resetu -->
-                    <div class="col-md-3 d-flex gap-2">
+                    <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtruj</button>
                         <a href="{{ route('courses.index') }}" class="btn btn-secondary flex-grow-1"><i class="fas fa-sync-alt"></i> Resetuj</a>
                     </div>
@@ -97,7 +127,19 @@
                 </div>
             </form>
             
-                        
+            <!-- Informacja o liczbie rekordów -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="text-muted">
+                    <strong>Wyświetlane rekordy:</strong> {{ $filteredCount }}/{{ $totalCount }}
+                    @if($filteredCount != $totalCount)
+                        <span class="text-info">(po zastosowaniu filtrów)</span>
+                    @endif
+                </div>
+                <div class="text-muted small">
+                    Strona {{ $courses->currentPage() }} z {{ $courses->lastPage() }}
+                </div>
+            </div>
+            
             <table class="table table-striped table-hover table-responsive">
                 <thead class="table-dark">
                     <tr>

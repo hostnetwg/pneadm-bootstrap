@@ -24,41 +24,67 @@ class CoursesController extends Controller
          // Pobieranie listy instruktorów do widoku
          $instructors = Instructor::orderBy('last_name')->get();
      
-         // Pobieranie wartości filtra "date_filter"
-         $dateFilter = $request->query('date_filter', 'upcoming');
-     
-         // Pobieranie wartości filtrów
-         $filters = [
-             'is_paid' => $request->input('is_paid'),
-             'type' => $request->input('type'),
-             'category' => $request->input('category'),
-             'is_active' => $request->input('is_active'),
-             'date_filter' => $dateFilter,
-             'instructor_id' => $request->input('instructor_id'),
-         ];
+        // Pobieranie wartości filtra "date_filter"
+        $dateFilter = $request->query('date_filter', 'upcoming');
+        
+        // Pobieranie opcji paginacji
+        $perPage = $request->query('per_page', 10);
+        if ($perPage === 'all') {
+            $perPage = 999999; // Bardzo duża liczba, żeby wyświetlić wszystkie
+        } else {
+            $perPage = (int) $perPage;
+        }
+    
+        // Pobieranie wartości filtrów
+        $filters = [
+            'is_paid' => $request->input('is_paid'),
+            'type' => $request->input('type'),
+            'category' => $request->input('category'),
+            'is_active' => $request->input('is_active'),
+            'date_filter' => $dateFilter,
+            'instructor_id' => $request->input('instructor_id'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+            'per_page' => $request->input('per_page', 10),
+        ];
      
          // Określenie domyślnego sortowania
          $sortColumn = $request->query('sort', 'start_date');
          $sortDirection = $request->query('direction', ($dateFilter === 'upcoming' ? 'asc' : 'desc'));
      
-         // Filtracja kursów według daty
-         if ($dateFilter === 'upcoming') {
-             $query->where('end_date', '>=', now());
-         } elseif ($dateFilter === 'past') {
-             $query->where('end_date', '<', now());
-         }
+        // Filtracja kursów według daty
+        if ($dateFilter === 'upcoming') {
+            $query->where('end_date', '>=', now());
+        } elseif ($dateFilter === 'past') {
+            $query->where('end_date', '<', now());
+        }
+
+        // Filtracja według zakresu dat
+        if ($request->filled('date_from')) {
+            $query->where('start_date', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->where('end_date', '<=', $request->input('date_to'));
+        }
      
-         // Filtracja według pozostałych pól
-         foreach ($filters as $key => $value) {
-             if (!is_null($value) && $value !== '' && $key !== 'date_filter') { // Pomijamy filtr terminu, bo już jest przetwarzany powyżej
-                 $query->where($key, $value);
-             }
-         }
-     
-         // Pobranie wyników z dynamicznym sortowaniem i paginacją
-         $courses = $query->orderBy($sortColumn, $sortDirection)->paginate(10)->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
-     
-         return view('courses.index', compact('courses', 'instructors', 'filters'));
+        // Filtracja według pozostałych pól
+        foreach ($filters as $key => $value) {
+            if (!is_null($value) && $value !== '' && !in_array($key, ['date_filter', 'date_from', 'date_to', 'per_page'])) { // Pomijamy filtry dat i paginacji, bo już są przetwarzane powyżej
+                $query->where($key, $value);
+            }
+        }
+        
+        // Liczenie rekordów przed paginacją
+        $filteredCount = $query->count();
+        
+        // Liczenie wszystkich aktywnych rekordów w bazie
+        $totalCount = Course::where('is_active', true)->count();
+    
+        // Pobranie wyników z dynamicznym sortowaniem i paginacją
+        $courses = $query->orderBy($sortColumn, $sortDirection)->paginate($perPage)->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
+    
+        return view('courses.index', compact('courses', 'instructors', 'filters', 'filteredCount', 'totalCount'));
      }
              
 
