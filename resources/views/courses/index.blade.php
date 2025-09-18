@@ -32,11 +32,6 @@
                             <option value="all" {{ request('per_page', 10) == 'all' ? 'selected' : '' }}>Wszystkie</option>
                         </select>
                     </form>
-                    <form action="{{ route('courses.import') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2" id="csvImportForm">
-                        @csrf
-                        <input type="file" name="csv_file" class="form-control d-none" accept=".csv" id="csvFileInput">
-                        <button type="button" class="btn btn-secondary" id="importCsvButton">Importuj listę kursów CSV</button>
-                    </form>
                 </div>
             </div>
 
@@ -236,15 +231,4 @@
 
         </div>
     </div>
-    <script>
-        document.getElementById('importCsvButton').addEventListener('click', function() {
-            document.getElementById('csvFileInput').click();
-        });
-
-        document.getElementById('csvFileInput').addEventListener('change', function() {
-            if (this.files.length > 0) {
-                document.getElementById('csvImportForm').submit();
-            }
-        });
-    </script>    
 </x-app-layout>
