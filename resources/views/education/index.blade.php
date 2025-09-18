@@ -60,7 +60,7 @@
                             <td>{{ $item->type }}</td>
                             <td>{{ $item->participants_count }}</td>                            
                             <td>
-                                <a href="{{ route('education.exportParticipants', ['id' => $item->id]) }}" class="btn btn-sm btn-primary">
+                                <a href="{{ route('education.exportParticipants', array_merge(['id' => $item->id], request()->only(['page', 'type']))) }}" class="btn btn-sm btn-primary">
                                     Eksportuj uczestników
                                 </a>
                             </td>                            

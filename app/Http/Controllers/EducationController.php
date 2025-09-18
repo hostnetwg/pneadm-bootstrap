@@ -46,7 +46,7 @@ class EducationController extends Controller
         return view('education.index', compact('educations', 'type'));
     }
 
-    public function exportParticipants($id)
+    public function exportParticipants(Request $request, $id)
     {
         // Pobieramy kurs z bazy źródłowej
         $education = Education::on('mysql_certgen')->findOrFail($id);
@@ -58,7 +58,9 @@ class EducationController extends Controller
             ->first();
     
         if (!$course) {
-            return redirect()->route('education.index')->with('error', 'Kurs nie został znaleziony w bazie docelowej.');
+            // Zachowujemy parametry paginacji i filtrów
+            $queryParams = $request->only(['page', 'type']);
+            return redirect()->route('education.index', $queryParams)->with('error', 'Kurs nie został znaleziony w bazie docelowej.');
         }
     
         $students = DB::connection('mysql_certgen')->table('students')
@@ -110,7 +112,9 @@ class EducationController extends Controller
             $message = "Zaimportowano wszystkich uczestników ({$importedCount}) dla kursu '{$education->title}'.";
         }
     
-        return redirect()->route('education.index')->with('success', $message);
+        // Zachowujemy parametry paginacji i filtrów
+        $queryParams = $request->only(['page', 'type']);
+        return redirect()->route('education.index', $queryParams)->with('success', $message);
     }
     
     public function exportToCourses(Request $request)
