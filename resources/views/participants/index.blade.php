@@ -36,6 +36,15 @@
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
                         <i class="fas fa-file-csv me-1"></i> Importuj z CSV
                     </button>
+                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników bez certyfikatów?')">
+                        <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
+                    </a>
+                    <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">
+                        <i class="fas fa-trash me-1"></i> Usuń zaświadczenia
+                    </a>
+                    <a href="{{ route('certificates.download-list', $course) }}" class="btn btn-info">
+                        <i class="fas fa-file-pdf me-1"></i> Pobierz listę zaświadczeń w PDF
+                    </a>
                 </div>
             </div>
             <div class="col-md-4 text-end">

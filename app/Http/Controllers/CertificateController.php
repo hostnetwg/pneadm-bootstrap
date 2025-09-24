@@ -144,6 +144,125 @@ class CertificateController extends Controller
     
         return redirect()->back()->with('success', 'Certyfikat został usunięty.');
     }
+
+    public function bulkGenerate(Course $course)
+    {
+        // Pobranie wszystkich uczestników kursu, którzy nie mają jeszcze certyfikatu
+        $participantsWithoutCertificates = $course->participants()
+            ->whereDoesntHave('certificate')
+            ->orderBy('order')
+            ->get();
+
+        if ($participantsWithoutCertificates->isEmpty()) {
+            return redirect()->back()->with('info', 'Wszyscy uczestnicy mają już wygenerowane zaświadczenia.');
+        }
+
+        // Pobranie ostatniego certyfikatu dla danego kursu
+        $lastCertificate = Certificate::where('course_id', $course->id)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Określenie kolejnego numeru certyfikatu dla kursu
+        $nextCertificateNumber = $lastCertificate 
+            ? intval(explode('/', $lastCertificate->certificate_number)[0]) + 1 
+            : 1;
+
+        // Pobranie schematu numeracji lub użycie domyślnego
+        $format = $course->certificate_format ?? "{nr}/{course_id}/{year}";
+
+        $generatedCount = 0;
+
+        foreach ($participantsWithoutCertificates as $participant) {
+            // Generowanie numeru certyfikatu według wzoru
+            $certificateNumber = str_replace(
+                ['{nr}', '{year}', '{course_id}'], 
+                [$nextCertificateNumber, date('Y'), $course->id], 
+                $format
+            );
+
+            // Zapis numeru certyfikatu w bazie danych
+            Certificate::create([
+                'participant_id' => $participant->id,
+                'course_id' => $course->id,
+                'certificate_number' => $certificateNumber,
+                'generated_at' => now()
+            ]);
+
+            $nextCertificateNumber++;
+            $generatedCount++;
+        }
+
+        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników bez certyfikatów.");
+    }
+
+    public function downloadList(Course $course)
+    {
+        // Pobranie wszystkich uczestników kursu z ich certyfikatami
+        $participants = $course->participants()
+            ->with('certificate')
+            ->orderBy('order')
+            ->get();
+
+        // Pobranie instruktora
+        $instructor = $course->instructor;
+
+        // Generowanie PDF
+        $pdf = Pdf::loadView('certificates.list', [
+            'course' => $course,
+            'participants' => $participants,
+            'instructor' => $instructor,
+        ])->setPaper('A4', 'portrait')
+          ->setOptions([
+              'defaultFont' => 'DejaVu Sans',
+              'isHtml5ParserEnabled' => true, 
+              'isRemoteEnabled' => true
+          ]);
+
+        // Nazwa pliku w formacie: YYYY-MM-DD_HH_MM_Tytuł_szkolenia_Trener.pdf
+        $courseDate = $course->start_date ? \Carbon\Carbon::parse($course->start_date)->format('Y-m-d_H_i') : date('Y-m-d_H_i');
+        $instructorName = $instructor ? $instructor->first_name . '_' . $instructor->last_name : 'Brak_trenera';
+        
+        // Zamiana polskich znaków na odpowiedniki bez ogonków
+        $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
+                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
+        
+        $courseTitle = strtr($course->title, $polishChars);
+        $instructorName = strtr($instructorName, $polishChars);
+        
+        $fileName = $courseDate . '_' . $courseTitle . '_' . $instructorName . '.pdf';
+        $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName); // Usunięcie znaków specjalnych
+
+        return $pdf->download($fileName);
+    }
+
+    public function bulkDelete(Course $course)
+    {
+        // Pobranie wszystkich certyfikatów dla danego kursu
+        $certificates = Certificate::where('course_id', $course->id)->get();
+
+        if ($certificates->isEmpty()) {
+            return redirect()->back()->with('info', 'Brak zaświadczeń do usunięcia dla tego szkolenia.');
+        }
+
+        $deletedCount = 0;
+
+        foreach ($certificates as $certificate) {
+            // Sprawdzenie, czy certyfikat ma powiązany plik PDF
+            if ($certificate->file_path) {
+                $filePath = storage_path("app/public/" . str_replace("storage/", "", $certificate->file_path));
+                
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+            }
+            
+            // Usunięcie certyfikatu z bazy danych
+            $certificate->delete();
+            $deletedCount++;
+        }
+
+        return redirect()->back()->with('success', "Usunięto {$deletedCount} zaświadczeń dla szkolenia '{$course->title}'.");
+    }
     
     
 
