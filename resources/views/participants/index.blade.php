@@ -27,6 +27,9 @@
                     <a href="{{ route('courses.index') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i> Powrót do listy szkoleń
                     </a>
+                    <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit me-1"></i> Powrót do kursu
+                    </a>
                     <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
                     </a>
@@ -36,9 +39,28 @@
                 </div>
             </div>
             <div class="col-md-4 text-end">
-                <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-outline-info">
-                    <i class="fas fa-sort-alpha-down me-1"></i> Sortuj alfabetycznie
-                </a>
+                <div class="d-flex align-items-center gap-2 justify-content-end">
+                    <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-outline-info">
+                        <i class="fas fa-sort-alpha-down me-1"></i> Sortuj alfabetycznie
+                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="per_page" class="form-label mb-0 fw-bold">Wyświetl:</label>
+                        <form method="GET" action="{{ route('participants.index', $course) }}" class="d-flex align-items-center">
+                            @foreach(request()->query() as $key => $value)
+                                @if($key !== 'per_page')
+                                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                @endif
+                            @endforeach
+                            <select name="per_page" class="form-select" style="width: auto;" onchange="this.form.submit()">
+                                <option value="50" {{ request('per_page', 50) == 50 ? 'selected' : '' }}>50</option>
+                                <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
+                                <option value="200" {{ request('per_page') == 200 ? 'selected' : '' }}>200</option>
+                                <option value="500" {{ request('per_page') == 500 ? 'selected' : '' }}>500</option>
+                                <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>Wszyscy</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>        
 

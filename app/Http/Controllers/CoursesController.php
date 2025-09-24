@@ -207,7 +207,7 @@ class CoursesController extends Controller
     
     public function edit($id)
     {
-        $course = Course::with(['location', 'onlineDetails'])->findOrFail($id);
+        $course = Course::with(['location', 'onlineDetails', 'participants'])->findOrFail($id);
         $instructors = Instructor::all();
         
         return view('courses.edit', compact('course', 'instructors'));

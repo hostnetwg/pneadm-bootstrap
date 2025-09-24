@@ -34,7 +34,22 @@ class ParticipantController extends Controller
         }
     
         // Pobranie uczestników według zapisanej kolejności
-        $participants = $query->orderBy('order')->paginate(10);
+        $perPage = $request->get('per_page', 50);
+        
+        // Obsługa opcji "wszyscy" - jeśli per_page to 'all', pobierz wszystkie rekordy
+        if ($perPage === 'all') {
+            $participants = $query->orderBy('order')->get();
+            // Konwersja kolekcji na paginator dla kompatybilności z widokiem
+            $participants = new \Illuminate\Pagination\LengthAwarePaginator(
+                $participants,
+                $participants->count(),
+                $participants->count(),
+                1,
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+        } else {
+            $participants = $query->orderBy('order')->paginate($perPage);
+        }
     
         return view('participants.index', compact('participants', 'course'));
     }

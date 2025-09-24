@@ -190,6 +190,9 @@
 
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                 <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
+                <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">
+                    <i class="fas fa-users me-1"></i> Uczestnicy ({{ $course->participants->count() }})
+                </a>
             </form>
         </div>
     </div>
