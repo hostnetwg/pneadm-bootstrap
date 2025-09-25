@@ -27,8 +27,8 @@
                     <a href="{{ route('courses.index') }}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i> Powrót do listy szkoleń
                     </a>
-                    <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-outline-primary">
-                        <i class="fas fa-edit me-1"></i> Powrót do kursu
+                    <a href="{{ route('courses.show', $course->id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-eye me-1"></i> Powrót do kursu
                     </a>
                     <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
@@ -42,8 +42,8 @@
                     <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">
                         <i class="fas fa-trash me-1"></i> Usuń zaświadczenia
                     </a>
-                    <a href="{{ route('certificates.download-list', $course) }}" class="btn btn-info">
-                        <i class="fas fa-file-pdf me-1"></i> Pobierz listę zaświadczeń w PDF
+                    <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
+                        <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
                     </a>
                 </div>
             </div>
@@ -90,7 +90,48 @@
             </div>
         @endif
 
-        <table class="table table-striped">
+        <!-- Wyszukiwarka -->
+        <div class="mb-4">
+            <form method="GET" action="{{ route('participants.index', $course) }}" class="mb-3">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" 
+                                   name="search" 
+                                   class="form-control" 
+                                   placeholder="Szukaj po imieniu, nazwisku, email lub miejscu urodzenia..."
+                                   value="{{ request('search') }}"
+                                   autocomplete="off">
+                            @if(request('search'))
+                                <a href="{{ route('participants.index', $course) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i>
+                                </a>
+                            @endif
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i> Szukaj
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            @if(request('search'))
+                <div class="alert alert-info d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Wyniki wyszukiwania dla: <strong>"{{ request('search') }}"</strong> 
+                    (znaleziono: {{ $participants->total() }} {{ $participants->total() == 1 ? 'uczestnik' : ($participants->total() < 5 ? 'uczestników' : 'uczestników') }})</span>
+                    <a href="{{ route('participants.index', $course) }}" class="btn btn-sm btn-outline-secondary ms-auto">
+                        <i class="fas fa-times me-1"></i> Wyczyść
+                    </a>
+                </div>
+            @endif
+        </div>
+
+        @if($participants->count() > 0)
+            <table class="table table-striped">
             <thead class="table-dark">
                 <tr>
                     <th>#</th>
@@ -154,21 +195,40 @@
                             @endif
                         </td>                         
                         <td>
-                            <a href="{{ route('participants.edit', [$course, $participant]) }}" class="btn btn-warning btn-sm">Edytuj</a>
-                            <form action="{{ route('participants.destroy', [$course, $participant]) }}" method="POST" style="display:inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć uczestnika?')">Usuń</button>
-                            </form>
+                            <div class="d-flex flex-column gap-1">
+                                <a href="{{ route('participants.edit', [$course, $participant]) }}" class="btn btn-info btn-sm" style="min-width: 80px;">Podgląd</a>
+                                <form action="{{ route('participants.destroy', [$course, $participant]) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm" style="min-width: 80px;" onclick="return confirm('Usunąć uczestnika?')">Usuń</button>
+                                </form>
+                            </div>
                         </td>                       
                     </tr>
                 @endforeach
             </tbody>
-        </table>
+            </table>
+        @else
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                @if(request('search'))
+                    <h4 class="text-muted">Brak wyników wyszukiwania</h4>
+                    <p class="text-muted">Nie znaleziono uczestników pasujących do frazy: <strong>"{{ request('search') }}"</strong></p>
+                    <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">
+                        <i class="fas fa-list me-1"></i> Pokaż wszystkich uczestników
+                    </a>
+                @else
+                    <h4 class="text-muted">Brak uczestników</h4>
+                    <p class="text-muted">Ten kurs nie ma jeszcze żadnych uczestników.</p>
+                @endif
+            </div>
+        @endif
 
-        <div class="mt-3">
-            {{ $participants->links() }}
-        </div>
+        @if($participants->count() > 0)
+            <div class="mt-3">
+                {{ $participants->appends(request()->query())->links() }}
+            </div>
+        @endif
     </div>
 
     <!-- Modal Import CSV -->

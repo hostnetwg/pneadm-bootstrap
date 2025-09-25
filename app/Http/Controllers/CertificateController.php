@@ -8,6 +8,7 @@ use App\Models\Participant;
 use App\Models\Course;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class CertificateController extends Controller
@@ -195,45 +196,7 @@ class CertificateController extends Controller
         return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników bez certyfikatów.");
     }
 
-    public function downloadList(Course $course)
-    {
-        // Pobranie wszystkich uczestników kursu z ich certyfikatami
-        $participants = $course->participants()
-            ->with('certificate')
-            ->orderBy('order')
-            ->get();
 
-        // Pobranie instruktora
-        $instructor = $course->instructor;
-
-        // Generowanie PDF
-        $pdf = Pdf::loadView('certificates.list', [
-            'course' => $course,
-            'participants' => $participants,
-            'instructor' => $instructor,
-        ])->setPaper('A4', 'portrait')
-          ->setOptions([
-              'defaultFont' => 'DejaVu Sans',
-              'isHtml5ParserEnabled' => true, 
-              'isRemoteEnabled' => true
-          ]);
-
-        // Nazwa pliku w formacie: YYYY-MM-DD_HH_MM_Tytuł_szkolenia_Trener.pdf
-        $courseDate = $course->start_date ? \Carbon\Carbon::parse($course->start_date)->format('Y-m-d_H_i') : date('Y-m-d_H_i');
-        $instructorName = $instructor ? $instructor->first_name . '_' . $instructor->last_name : 'Brak_trenera';
-        
-        // Zamiana polskich znaków na odpowiedniki bez ogonków
-        $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
-                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
-        
-        $courseTitle = strtr($course->title, $polishChars);
-        $instructorName = strtr($instructorName, $polishChars);
-        
-        $fileName = $courseDate . '_' . $courseTitle . '_' . $instructorName . '.pdf';
-        $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName); // Usunięcie znaków specjalnych
-
-        return $pdf->download($fileName);
-    }
 
     public function bulkDelete(Course $course)
     {

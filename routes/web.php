@@ -114,6 +114,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
     Route::get('/courses/pdf', [CoursesController::class, 'generatePdf'])->name('courses.pdf');
+    Route::get('/courses/{id}', [CoursesController::class, 'show'])->name('courses.show');
     Route::get('/courses/create', [CoursesController::class, 'create'])->name('courses.create');
     Route::post('/courses', [CoursesController::class, 'store'])->name('courses.store');
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->name('courses.destroy');
@@ -128,13 +129,13 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/{participant}/edit', [ParticipantController::class, 'edit'])->name('participants.edit'); // Edycja uczestnika
         Route::put('/{participant}', [ParticipantController::class, 'update'])->name('participants.update'); // Aktualizacja
         Route::delete('/{participant}', [ParticipantController::class, 'destroy'])->name('participants.destroy'); // Usuwanie
+        Route::get('/download-pdf', [ParticipantController::class, 'downloadParticipantsList'])->name('participants.download-pdf'); // Pobieranie listy PDF
     });
 
     Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])->name('certificates.generate');
     Route::delete('/certificates/{certificate}', [CertificateController::class, 'destroy'])->name('certificates.destroy');
     Route::get('/courses/{course}/certificates/bulk-generate', [CertificateController::class, 'bulkGenerate'])->name('certificates.bulk-generate');
     Route::get('/courses/{course}/certificates/bulk-delete', [CertificateController::class, 'bulkDelete'])->name('certificates.bulk-delete');
-    Route::get('/courses/{course}/certificates/download-list', [CertificateController::class, 'downloadList'])->name('certificates.download-list');
 
 
     Route::get('participants/{participant}/certificate', [CertificateController::class, 'store'])->name('certificates.store');

@@ -196,6 +196,17 @@ class CoursesController extends Controller
     }
 
     /**
+     * Wyświetlanie szczegółów kursu
+     */
+    public function show($id)
+    {
+        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants'])
+                        ->findOrFail($id);
+        
+        return view('courses.show', compact('course'));
+    }
+
+    /**
      * Formularz dodawania nowego kursu
      */
     public function create()

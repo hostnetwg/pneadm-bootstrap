@@ -6,6 +6,8 @@ use App\Models\Participant;
 use App\Models\Course;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
 
 class ParticipantController extends Controller
 {
@@ -15,6 +17,17 @@ class ParticipantController extends Controller
     public function index(Request $request, Course $course)
     {
         $query = Participant::where('course_id', $course->id);
+        
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('first_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+            });
+        }
     
         if ($request->query('sort') === 'asc') {
             // Pobranie posortowanych uczestników
@@ -249,6 +262,63 @@ class ParticipantController extends Controller
         $participant->delete();
 
         return redirect()->route('participants.index', $course)->with('success', 'Uczestnik usunięty.');
+    }
+
+    /**
+     * Generowanie PDF z listą uczestników
+     */
+    public function downloadParticipantsList(Request $request, Course $course)
+    {
+        $query = Participant::where('course_id', $course->id);
+        
+        // Obsługa wyszukiwania (jeśli jest aktywne)
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('first_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        // Pobranie uczestników z ich certyfikatami i instruktorem kursu
+        $participants = $query->with('certificate')->orderBy('order')->get();
+        $course->load('instructor');
+
+        // Generowanie PDF
+        $pdf = Pdf::loadView('participants.pdf-list', [
+            'course' => $course,
+            'participants' => $participants,
+            'searchTerm' => $request->get('search'),
+            'totalCount' => $participants->count()
+        ])->setPaper('A4', 'portrait')
+          ->setOptions([
+              'defaultFont' => 'DejaVu Sans',
+              'isHtml5ParserEnabled' => true,
+              'isRemoteEnabled' => false,
+              'isPhpEnabled' => true,
+              'defaultPaperSize' => 'a4',
+              'defaultPaperOrientation' => 'portrait',
+              'enable_font_subsetting' => true,
+              'dpi' => 150,
+              'isFontSubsettingEnabled' => true,
+          ]);
+
+        // Nazwa pliku
+        $courseDate = $course->start_date ? Carbon::parse($course->start_date)->format('Y-m-d_H_i') : date('Y-m-d_H_i');
+        
+        // Zamiana polskich znaków na odpowiedniki bez ogonków
+        $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
+                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
+        
+        $courseTitle = strtr($course->title, $polishChars);
+        $searchInfo = $request->filled('search') ? "_WYSZUKIWANIE_" . Str::slug($request->get('search')) : "";
+        
+        $fileName = $courseDate . '_Lista_uczestnikow_' . $courseTitle . $searchInfo . '.pdf';
+        $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
+
+        return $pdf->download($fileName);
     }
 }
 

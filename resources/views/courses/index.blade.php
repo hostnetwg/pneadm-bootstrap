@@ -225,6 +225,7 @@
                         </td>
                         <td class="align-middle">
                             <div class="d-flex flex-column gap-1">
+                                <a href="{{ route('courses.show', $course->id) }}" class="btn btn-primary btn-sm">Podgląd</a>
                                 <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-warning btn-sm">Edytuj</a>
                                 <form action="{{ route('courses.destroy', $course->id) }}" method="POST">
                                     @csrf
