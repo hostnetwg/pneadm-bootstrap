@@ -76,6 +76,27 @@ class CoursesController extends Controller
             }
         }
         
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('title', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('instructor', function($instructorQuery) use ($searchTerm) {
+                      $instructorQuery->where('first_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('title', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('location', function($locationQuery) use ($searchTerm) {
+                      $locationQuery->where('location_name', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('address', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('post_office', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('onlineDetails', function($onlineQuery) use ($searchTerm) {
+                      $onlineQuery->where('platform', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
+        }
+        
         // Liczenie rekordów przed paginacją
         $filteredCount = $query->count();
         
@@ -135,6 +156,27 @@ class CoursesController extends Controller
             if (!is_null($value) && $value !== '' && !in_array($key, ['date_filter', 'date_from', 'date_to'])) {
                 $query->where($key, $value);
             }
+        }
+        
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('title', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('instructor', function($instructorQuery) use ($searchTerm) {
+                      $instructorQuery->where('first_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('title', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('location', function($locationQuery) use ($searchTerm) {
+                      $locationQuery->where('location_name', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('address', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('post_office', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('onlineDetails', function($onlineQuery) use ($searchTerm) {
+                      $onlineQuery->where('platform', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
         }
 
         // Pobranie wszystkich kursów bez paginacji (dla PDF)

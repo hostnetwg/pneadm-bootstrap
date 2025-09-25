@@ -43,6 +43,27 @@
                 <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
                 <div class="row g-3 align-items-end">
             
+                    <!-- Wyszukiwarka -->
+                    <div class="col-md-3">
+                        <label for="search" class="form-label fw-bold">Wyszukaj</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" 
+                                   name="search" 
+                                   class="form-control" 
+                                   placeholder="Tytuł, instruktor, lokalizacja..."
+                                   value="{{ request('search') }}"
+                                   autocomplete="off">
+                            @if(request('search'))
+                                <a href="{{ route('courses.index', array_filter(request()->except('search'))) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i>
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+            
                     <!-- Filtr: Termin -->
                     <div class="col-md-2">
                         <label for="date_filter" class="form-label fw-bold">Termin</label>
@@ -126,11 +147,23 @@
                 </div>
             </form>
             
+            <!-- Informacja o wynikach wyszukiwania -->
+            @if(request('search'))
+                <div class="alert alert-info d-flex align-items-center mb-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>Wyniki wyszukiwania dla: <strong>"{{ request('search') }}"</strong> 
+                    (znaleziono: {{ $filteredCount }} {{ $filteredCount == 1 ? 'szkolenie' : ($filteredCount < 5 ? 'szkolenia' : 'szkoleń') }})</span>
+                    <a href="{{ route('courses.index', array_filter(request()->except('search'))) }}" class="btn btn-sm btn-outline-secondary ms-auto">
+                        <i class="fas fa-times me-1"></i> Wyczyść wyszukiwanie
+                    </a>
+                </div>
+            @endif
+            
             <!-- Informacja o liczbie rekordów -->
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div class="text-muted">
                     <strong>Wyświetlane rekordy:</strong> {{ $filteredCount }}/{{ $totalCount }}
-                    @if($filteredCount != $totalCount)
+                    @if($filteredCount != $totalCount && !request('search'))
                         <span class="text-info">(po zastosowaniu filtrów)</span>
                     @endif
                 </div>
@@ -139,8 +172,9 @@
                 </div>
             </div>
             
-            <table class="table table-striped table-hover table-responsive">
-                <thead class="table-dark">
+            @if($courses->count() > 0)
+                <table class="table table-striped table-hover table-responsive">
+                    <thead class="table-dark">
                     <tr>
                         <th class="text-center" style="width: 5%;">#id</th>
                         <th style="width: 8%;">
@@ -237,14 +271,32 @@
                         </td>
                     </tr>@endforeach
                 </tbody>
-            </table>
+                </table>
+            @else
+                <div class="text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    @if(request('search'))
+                        <h4 class="text-muted">Brak wyników wyszukiwania</h4>
+                        <p class="text-muted">Nie znaleziono szkoleń pasujących do frazy: <strong>"{{ request('search') }}"</strong></p>
+                        <a href="{{ route('courses.index', array_filter(request()->except('search'))) }}" class="btn btn-primary">
+                            <i class="fas fa-list me-1"></i> Pokaż wszystkie szkolenia
+                        </a>
+                    @else
+                        <h4 class="text-muted">Brak szkoleń</h4>
+                        <p class="text-muted">Nie ma szkoleń spełniających wybrane kryteria.</p>
+                        <a href="{{ route('courses.index') }}" class="btn btn-primary">
+                            <i class="fas fa-list me-1"></i> Pokaż wszystkie szkolenia
+                        </a>
+                    @endif
+                </div>
+            @endif
 
-
-            <div class="mt-3">
-                {{-- {{ $courses->links() }} --}}
-                {{ $courses->appends(request()->query())->links() }}
-
-            </div>
+            @if($courses->count() > 0)
+                <div class="mt-3">
+                    {{-- {{ $courses->links() }} --}}
+                    {{ $courses->appends(request()->query())->links() }}
+                </div>
+            @endif
 
         </div>
     </div>
