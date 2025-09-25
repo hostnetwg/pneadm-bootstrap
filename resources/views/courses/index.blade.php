@@ -16,6 +16,10 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
                 <div class="d-flex align-items-center gap-3">
+                    <!-- Button do generowania PDF -->
+                    <a href="{{ route('courses.pdf', request()->query()) }}" class="btn btn-success" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Wygeneruj listę kursów PDF
+                    </a>
                     <!-- Opcje paginacji -->
                     <form method="GET" action="{{ route('courses.index') }}" class="d-flex align-items-center gap-2">
                         @foreach(request()->query() as $key => $value)

@@ -113,6 +113,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 /**/
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
+    Route::get('/courses/pdf', [CoursesController::class, 'generatePdf'])->name('courses.pdf');
     Route::get('/courses/create', [CoursesController::class, 'create'])->name('courses.create');
     Route::post('/courses', [CoursesController::class, 'store'])->name('courses.store');
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->name('courses.destroy');

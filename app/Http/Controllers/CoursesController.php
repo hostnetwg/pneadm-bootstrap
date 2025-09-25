@@ -10,6 +10,7 @@ use App\Models\CourseOnlineDetails;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class CoursesController extends Controller
 {
@@ -86,7 +87,110 @@ class CoursesController extends Controller
     
         return view('courses.index', compact('courses', 'instructors', 'filters', 'filteredCount', 'totalCount'));
      }
-             
+
+    /**
+     * Generowanie PDF z listą kursów
+     */
+    public function generatePdf(Request $request)
+    {
+        $query = Course::query();
+        
+        // Pobieranie wartości filtra "date_filter"
+        $dateFilter = $request->query('date_filter', 'upcoming');
+        
+        // Pobieranie wartości filtrów
+        $filters = [
+            'is_paid' => $request->input('is_paid'),
+            'type' => $request->input('type'),
+            'category' => $request->input('category'),
+            'is_active' => $request->input('is_active'),
+            'date_filter' => $dateFilter,
+            'instructor_id' => $request->input('instructor_id'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+        ];
+
+        // Określenie domyślnego sortowania
+        $sortColumn = $request->query('sort', 'start_date');
+        $sortDirection = $request->query('direction', ($dateFilter === 'upcoming' ? 'asc' : 'desc'));
+
+        // Filtracja kursów według daty
+        if ($dateFilter === 'upcoming') {
+            $query->where('end_date', '>=', now());
+        } elseif ($dateFilter === 'past') {
+            $query->where('end_date', '<', now());
+        }
+
+        // Filtracja według zakresu dat
+        if ($request->filled('date_from')) {
+            $query->where('start_date', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->where('end_date', '<=', $request->input('date_to'));
+        }
+
+        // Filtracja według pozostałych pól
+        foreach ($filters as $key => $value) {
+            if (!is_null($value) && $value !== '' && !in_array($key, ['date_filter', 'date_from', 'date_to'])) {
+                $query->where($key, $value);
+            }
+        }
+
+        // Pobranie wszystkich kursów bez paginacji (dla PDF)
+        $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants'])
+                        ->orderBy($sortColumn, $sortDirection)
+                        ->get();
+
+        // Przygotowanie informacji o zastosowanych filtrach
+        $appliedFilters = [];
+        
+        if ($request->filled('date_filter') && $request->input('date_filter') !== 'all') {
+            $appliedFilters['termin'] = $request->input('date_filter') === 'upcoming' ? 'Nadchodzące' : 'Archiwalne';
+        }
+        
+        if ($request->filled('date_from')) {
+            $appliedFilters['data od'] = $request->input('date_from');
+        }
+        
+        if ($request->filled('date_to')) {
+            $appliedFilters['data do'] = $request->input('date_to');
+        }
+        
+        if ($request->filled('is_paid')) {
+            $appliedFilters['płatność'] = $request->input('is_paid') == '1' ? 'Płatne' : 'Bezpłatne';
+        }
+        
+        if ($request->filled('type')) {
+            $appliedFilters['rodzaj'] = ucfirst($request->input('type'));
+        }
+        
+        if ($request->filled('category')) {
+            $appliedFilters['kategoria'] = $request->input('category') === 'open' ? 'Otwarte' : 'Zamknięte';
+        }
+        
+        if ($request->filled('instructor_id')) {
+            $instructor = Instructor::find($request->input('instructor_id'));
+            if ($instructor) {
+                $appliedFilters['instruktor'] = $instructor->first_name . ' ' . $instructor->last_name;
+            }
+        }
+
+        // Generowanie PDF
+        $pdf = Pdf::loadView('courses.pdf', [
+            'courses' => $courses,
+            'appliedFilters' => $appliedFilters
+        ])->setPaper('A4', 'landscape')
+          ->setOptions([
+              'defaultFont' => 'DejaVu Sans',
+              'isHtml5ParserEnabled' => true,
+              'isRemoteEnabled' => true
+          ]);
+
+        $filename = 'lista_szkolen_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
 
     /**
      * Formularz dodawania nowego kursu
