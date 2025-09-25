@@ -272,8 +272,9 @@
                         <td class="align-middle">
                             {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
                         </td>
-                        <td class="text-center align-middle" title="Liczba uczestników">
-                            <span class="badge bg-info">{{ $course->participants->count() }}</span>
+                        <td class="text-center align-middle" title="Liczba uczestników / Zaświadczeń">
+                            <span class="badge bg-info">{{ $course->participants->count() }}</span><br>
+                            <span class="badge bg-warning">{{ $course->certificates->count() }}</span>
                         </td>
                         <td class="align-middle">
                             <div class="d-flex flex-column gap-1">

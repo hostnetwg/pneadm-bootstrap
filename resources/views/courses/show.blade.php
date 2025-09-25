@@ -13,11 +13,34 @@
                 </div>
             @endif
 
-            <!-- Przycisk powrotu -->
-            <div class="mb-4">
-                <a href="{{ url()->previous() }}" class="btn btn-secondary">
+            <!-- Nawigacja -->
+            <div class="mb-4 d-flex justify-content-end align-items-center gap-2">
+                <!-- Przycisk Powrót do listy -->
+                <a href="{{ route('courses.index') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Powrót do listy
                 </a>
+
+                <!-- Przycisk Poprzednie -->
+                @if($previousCourse)
+                    <a href="{{ route('courses.show', $previousCourse->id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-chevron-left"></i> Poprzednie
+                    </a>
+                @else
+                    <button class="btn btn-outline-secondary" disabled>
+                        <i class="fas fa-chevron-left"></i> Poprzednie
+                    </button>
+                @endif
+
+                <!-- Przycisk Następne -->
+                @if($nextCourse)
+                    <a href="{{ route('courses.show', $nextCourse->id) }}" class="btn btn-outline-primary">
+                        Następne <i class="fas fa-chevron-right"></i>
+                    </a>
+                @else
+                    <button class="btn btn-outline-secondary" disabled>
+                        Następne <i class="fas fa-chevron-right"></i>
+                    </button>
+                @endif
             </div>
 
             <div class="row">

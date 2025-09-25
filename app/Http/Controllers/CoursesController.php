@@ -112,7 +112,10 @@ class CoursesController extends Controller
         $totalCount = Course::where('is_active', true)->count();
     
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
-        $courses = $query->orderBy($sortColumn, $sortDirection)->paginate($perPage)->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
+        $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates'])
+                        ->orderBy($sortColumn, $sortDirection)
+                        ->paginate($perPage)
+                        ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
     
         return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
      }
@@ -253,7 +256,17 @@ class CoursesController extends Controller
         $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants'])
                         ->findOrFail($id);
         
-        return view('courses.show', compact('course'));
+        // Pobranie poprzedniego szkolenia (według daty, pokazuj również nieaktywne)
+        $previousCourse = Course::where('start_date', '<', $course->start_date)
+                               ->orderBy('start_date', 'desc')
+                               ->first();
+        
+        // Pobranie następnego szkolenia (według daty, pokazuj również nieaktywne)
+        $nextCourse = Course::where('start_date', '>', $course->start_date)
+                           ->orderBy('start_date', 'asc')
+                           ->first();
+        
+        return view('courses.show', compact('course', 'previousCourse', 'nextCourse'));
     }
 
     /**
