@@ -125,6 +125,19 @@
                         </select>
                     </div> 
 --}}            
+                    <!-- Filtr: Source ID Old -->
+                    <div class="col-md-2">
+                        <label for="source_id_old" class="form-label fw-bold">Źródło</label>
+                        <select name="source_id_old" class="form-select">
+                            <option value="">Wszystkie</option>
+                            @foreach($sourceIdOldOptions as $option)
+                                <option value="{{ $option }}" {{ request('source_id_old') == $option ? 'selected' : '' }}>
+                                    {{ $option }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
                     <!-- Filtr: Instruktor -->
                     <div class="col-md-2">
                         <label for="instructor_id" class="form-label fw-bold">Instruktor</label>
@@ -177,6 +190,7 @@
                     <thead class="table-dark">
                     <tr>
                         <th class="text-center" style="width: 5%;">#id</th>
+                        <th class="text-center" style="width: 6%;">id_old</th>
                         <th style="width: 8%;">
                             <a href="{{ route('courses.index', array_merge(request()->query(), ['sort' => 'start_date', 'direction' => request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-light text-decoration-none">
                                 Data
@@ -207,6 +221,10 @@
                     @foreach ($courses as $course)
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
                         <td class="text-center align-middle">{{ $course->id }}</td>
+                        <td class="text-center align-middle small">
+                            {{ $course->id_old ?? '-' }}<br>
+                            <small class="text-muted">{{ $course->source_id_old ?? '-' }}</small>
+                        </td>
                         <td class="align-middle">
                             @if ($course->start_date && $course->end_date)
                                 {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>

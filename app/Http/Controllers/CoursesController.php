@@ -22,9 +22,16 @@ class CoursesController extends Controller
      {
          $query = Course::query();
      
-         // Pobieranie listy instruktorów do widoku
-         $instructors = Instructor::orderBy('last_name')->get();
-     
+        // Pobieranie listy instruktorów do widoku
+        $instructors = Instructor::orderBy('last_name')->get();
+        
+        // Pobieranie opcji dla source_id_old
+        $sourceIdOldOptions = Course::whereNotNull('source_id_old')
+                                  ->where('source_id_old', '!=', '')
+                                  ->distinct()
+                                  ->orderBy('source_id_old')
+                                  ->pluck('source_id_old');
+    
         // Pobieranie wartości filtra "date_filter"
         $dateFilter = $request->query('date_filter', 'upcoming');
         
@@ -44,6 +51,7 @@ class CoursesController extends Controller
             'is_active' => $request->input('is_active'),
             'date_filter' => $dateFilter,
             'instructor_id' => $request->input('instructor_id'),
+            'source_id_old' => $request->input('source_id_old'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'per_page' => $request->input('per_page', 10),
@@ -106,7 +114,7 @@ class CoursesController extends Controller
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
         $courses = $query->orderBy($sortColumn, $sortDirection)->paginate($perPage)->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
     
-        return view('courses.index', compact('courses', 'instructors', 'filters', 'filteredCount', 'totalCount'));
+        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
      }
 
     /**
