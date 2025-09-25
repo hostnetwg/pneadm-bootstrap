@@ -75,6 +75,11 @@
             color: #000;
         }
         
+        .course-lp {
+            text-align: center;
+            width: 30px;
+        }
+        
         .course-id {
             text-align: center;
             width: 40px;
@@ -200,6 +205,7 @@
     <table>
         <thead>
             <tr>
+                <th class="course-lp">L.p.</th>
                 <th class="course-id">ID</th>
                 <th class="course-date">Data</th>
                 <th class="course-title">Tytuł</th>
@@ -210,8 +216,9 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($courses as $course)
+            @foreach($courses as $index => $course)
                 <tr>
+                    <td class="course-lp">{{ $index + 1 }}</td>
                     <td class="course-id">{{ $course->id }}</td>
                     <td class="course-date">
                         @if ($course->start_date && $course->end_date)
