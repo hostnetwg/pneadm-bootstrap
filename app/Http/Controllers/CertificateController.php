@@ -33,11 +33,14 @@ class CertificateController extends Controller
     
         // Pobranie schematu numeracji lub użycie domyślnego
         $format = $course->certificate_format ?? "{nr}/{course_id}/{year}";
+        
+        // Pobranie roku z daty szkolenia
+        $courseYear = $course->start_date ? Carbon::parse($course->start_date)->format('Y') : date('Y');
     
         // Generowanie numeru certyfikatu według wzoru
         $certificateNumber = str_replace(
             ['{nr}', '{year}', '{course_id}'], 
-            [$nextCertificateNumber, date('Y'), $course->id], 
+            [$nextCertificateNumber, $courseYear, $course->id], 
             $format
         );
     
@@ -170,6 +173,9 @@ class CertificateController extends Controller
 
         // Pobranie schematu numeracji lub użycie domyślnego
         $format = $course->certificate_format ?? "{nr}/{course_id}/{year}";
+        
+        // Pobranie roku z daty szkolenia
+        $courseYear = $course->start_date ? Carbon::parse($course->start_date)->format('Y') : date('Y');
 
         $generatedCount = 0;
 
@@ -177,7 +183,7 @@ class CertificateController extends Controller
             // Generowanie numeru certyfikatu według wzoru
             $certificateNumber = str_replace(
                 ['{nr}', '{year}', '{course_id}'], 
-                [$nextCertificateNumber, date('Y'), $course->id], 
+                [$nextCertificateNumber, $courseYear, $course->id], 
                 $format
             );
 
