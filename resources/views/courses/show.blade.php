@@ -191,20 +191,6 @@
                 </div>
 
                 <div class="col-md-4">
-                    <!-- Obrazek kursu -->
-                    @if($course->image)
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">Obrazek kursu</h5>
-                            </div>
-                            <div class="card-body text-center">
-                                <img src="{{ asset('storage/' . $course->image) }}" 
-                                     alt="Obrazek kursu" 
-                                     class="img-fluid rounded">
-                            </div>
-                        </div>
-                    @endif
-
                     <!-- Statystyki -->
                     <div class="card mb-4">
                         <div class="card-header">
@@ -218,11 +204,25 @@
                                 </div>
                                 <div class="col-6">
                                     <h4 class="text-success">{{ $course->certificates->count() }}</h4>
-                                    <small class="text-muted">Certyfikaty</small>
+                                    <small class="text-muted">Zaświadczenia</small>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Obrazek kursu -->
+                    @if($course->image)
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Obrazek kursu</h5>
+                            </div>
+                            <div class="card-body text-center">
+                                <img src="{{ asset('storage/' . $course->image) }}" 
+                                     alt="Obrazek kursu" 
+                                     class="img-fluid rounded">
+                            </div>
+                        </div>
+                    @endif
 
                     <!-- Akcje -->
                     <div class="card">

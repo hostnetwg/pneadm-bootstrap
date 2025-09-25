@@ -36,7 +36,7 @@
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
                         <i class="fas fa-file-csv me-1"></i> Importuj z CSV
                     </button>
-                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników bez certyfikatów?')">
+                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników bez zaświadczeń?')">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
                     </a>
                     <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">
@@ -142,8 +142,8 @@
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
                     <th>Data wygaśnięcia dostępu</th>
-                    <th>Nr certyfikatu</th>                    
-                    <th>Certyfikat</th>
+                    <th>Nr zaświadczenia</th>                    
+                    <th>Zaświadczenie</th>
                     <th>Akcje</th>
                 </tr>
             </thead>
@@ -179,7 +179,7 @@
                                     {{ $participant->certificate->certificate_number }}
                                 </a>
                             @else
-                                Brak certyfikatu
+                                Brak zaświadczenia
                             @endif
                             </td>
                         </td>
@@ -188,7 +188,7 @@
                                 <form action="{{ route('certificates.destroy', $participant->certificate->id) }}" method="POST" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć certyfikat?')">Usuń</button>
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć zaświadczenie?')">Usuń</button>
                                 </form>
                             @else
                                 <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
