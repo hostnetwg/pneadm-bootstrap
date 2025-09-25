@@ -173,7 +173,19 @@
                     @foreach ($courses as $course)
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
                         <td class="text-center align-middle">{{ $course->id }}</td>
-                        <td class="align-middle">{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>                        
+                        <td class="align-middle">
+                            @if ($course->start_date && $course->end_date)
+                                {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>
+                                @php
+                                    $startDateTime = \Carbon\Carbon::parse($course->start_date);
+                                    $endDateTime = \Carbon\Carbon::parse($course->end_date);
+                                    $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
+                                @endphp
+                                <small class="text-muted">{{ $durationMinutes }} min</small>
+                            @else
+                                {{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}
+                            @endif
+                        </td>                        
                         <td class="text-center align-middle">
                             @if ($course->image)
                                 <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100" class="img-thumbnail">
@@ -185,12 +197,12 @@
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td class="align-middle">
                             <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
-                                {{ $course->is_paid ? 'Płatny' : 'Bezpłatny' }}
+                                {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}
                             </span> <br>
                             <span class="small">{{ ucfirst($course->type) }}</span> <br>
                             <span class="small">{{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}</span> <br>
                             <span class="badge {{ $course->is_active ? 'bg-success' : 'bg-danger' }}">
-                                {{ $course->is_active ? 'Aktywny' : 'Nieaktywny' }}
+                                {{ $course->is_active ? 'Aktywne' : 'Nieaktywne' }}
                             </span>                            
                         </td>
                         <td class="align-middle small">
@@ -206,7 +218,7 @@
                             @endif
                         </td>
                         <td class="align-middle">
-                            {{ $course->instructor ? $course->instructor->first_name . ' ' . $course->instructor->last_name : 'Brak instruktora' }}
+                            {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
                         </td>
                         <td class="text-center align-middle" title="Liczba uczestników">
                             <span class="badge bg-info">{{ $course->participants->count() }}</span>

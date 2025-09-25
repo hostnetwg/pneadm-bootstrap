@@ -7,36 +7,47 @@
     <style>
         body {
             font-family: "DejaVu Sans", sans-serif;
-            margin: 20px;
-            font-size: 12px;
+            margin: 15px;
+            font-size: 13px;
             line-height: 1.4;
+            color: #000;
         }
         
         .header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 15px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 12px;
+        }
+        
+        .header .organization {
+            font-size: 20px;
+            margin: 0;
+            font-weight: bold;
+            color: #000;
+            line-height: 1.2;
         }
         
         .header h1 {
-            font-size: 24px;
-            margin: 0;
+            font-size: 18px;
+            margin: 10px 0 0 0;
             font-weight: bold;
+            color: #000;
         }
         
         .header .subtitle {
-            font-size: 14px;
-            color: #666;
+            font-size: 15px;
+            color: #333;
             margin-top: 5px;
         }
         
         .filters-info {
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-left: 4px solid #007bff;
-            font-size: 11px;
+            margin-bottom: 18px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-left: 3px solid #000;
+            font-size: 12px;
+            color: #000;
         }
         
         table {
@@ -46,20 +57,22 @@
         }
         
         th, td {
-            border: 1px solid #ddd;
-            padding: 6px;
+            border: 1px solid #333;
+            padding: 8px;
             text-align: left;
             vertical-align: top;
         }
         
         th {
-            background-color: #f8f9fa;
+            background-color: #f5f5f5;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 11px;
+            color: #000;
         }
         
         td {
-            font-size: 10px;
+            font-size: 11px;
+            color: #000;
         }
         
         .course-id {
@@ -96,59 +109,59 @@
         
         .badge {
             display: inline-block;
-            padding: 2px 6px;
-            font-size: 8px;
-            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 9px;
             margin: 1px;
+            font-weight: bold;
         }
         
         .badge-paid {
-            background-color: #ffc107;
+            border: 1px solid #000;
             color: #000;
         }
         
         .badge-free {
-            background-color: #28a745;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-online {
-            background-color: #17a2b8;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-offline {
-            background-color: #6c757d;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-open {
-            background-color: #28a745;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-closed {
-            background-color: #dc3545;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-active {
-            background-color: #28a745;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .badge-inactive {
-            background-color: #dc3545;
-            color: #fff;
+            border: 1px solid #000;
+            color: #000;
         }
         
         .footer {
-            margin-top: 30px;
+            margin-top: 25px;
             text-align: center;
-            font-size: 10px;
-            color: #666;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
+            font-size: 11px;
+            color: #333;
+            border-top: 1px solid #000;
+            padding-top: 8px;
         }
         
         .page-break {
@@ -156,21 +169,19 @@
         }
         
         @page {
-            margin: 20mm;
-        }
-        
-        .page-number {
-            position: fixed;
-            bottom: 15mm;
-            right: 15mm;
-            font-family: "DejaVu Sans", sans-serif;
-            font-size: 10px;
-            color: #666;
+            margin: 15mm;
+            @bottom-right {
+                content: "Strona " counter(page) " z " counter(pages);
+                font-family: "DejaVu Sans", sans-serif;
+                font-size: 10px;
+                color: #666;
+            }
         }
     </style>
 </head>
 <body>
     <div class="header">
+        <div class="organization">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</div>
         <h1>Lista szkoleń</h1>
         <div class="subtitle">Wygenerowano: {{ now()->format('d.m.Y H:i') }}</div>
     </div>
@@ -202,11 +213,23 @@
             @foreach($courses as $course)
                 <tr>
                     <td class="course-id">{{ $course->id }}</td>
-                    <td class="course-date">{{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}</td>
+                    <td class="course-date">
+                        @if ($course->start_date && $course->end_date)
+                            {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>
+                            @php
+                                $startDateTime = \Carbon\Carbon::parse($course->start_date);
+                                $endDateTime = \Carbon\Carbon::parse($course->end_date);
+                                $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
+                            @endphp
+                            <small>{{ $durationMinutes }} min</small>
+                        @else
+                            {{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}
+                        @endif
+                    </td>
                     <td class="course-title">{{ $course->title }}</td>
                     <td class="course-type">
                         <span class="badge {{ $course->is_paid ? 'badge-paid' : 'badge-free' }}">
-                            {{ $course->is_paid ? 'Płatny' : 'Bezpłatny' }}
+                            {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}
                         </span><br>
                         <span class="badge {{ $course->type === 'online' ? 'badge-online' : 'badge-offline' }}">
                             {{ ucfirst($course->type) }}
@@ -221,18 +244,17 @@
                             {{ $course->location->address ?? 'Brak adresu' }}<br>
                             {{ $course->location->postal_code ?? '' }} {{ $course->location->post_office ?? '' }}
                         @elseif ($course->type === 'online' && $course->onlineDetails)
+                            <strong>Platforma:</strong> {{ $course->onlineDetails->platform ?? 'Nieznana' }}<br>
+                            <strong>Link:</strong> 
                             @if (strtolower($course->onlineDetails->platform ?? '') === 'youtube')
                                 {{ $course->onlineDetails->meeting_link ?? 'Brak linku' }}
-                            @else
-                                <strong>Platforma:</strong> {{ $course->onlineDetails->platform ?? 'Nieznana' }}<br>
-                                <strong>Link:</strong> {{ $course->onlineDetails->meeting_link ?? 'Brak linku' }}
                             @endif
                         @else
                             Brak danych
                         @endif
                     </td>
                     <td class="course-instructor">
-                        {{ $course->instructor ? $course->instructor->first_name . ' ' . $course->instructor->last_name : 'Brak instruktora' }}
+                        {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
                     </td>
                     <td class="course-participants">{{ $course->participants->count() }}</td>
                 </tr>
@@ -241,22 +263,12 @@
     </table>
     
     <div class="footer">
-        <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli Platforma Nowoczesnej Edukacji</strong><br>
-        ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>
-        - AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -
-    </div>
-    
-    <div class="page-number">
-        <script type="text/php">
-            if (isset($pdf)) {
-                $font = $fontMetrics->get_font("DejaVu Sans", "normal");
-                $size = 10;
-                $pageText = "Strona " . $PAGE_NUM . " z " . $PAGE_COUNT;
-                $y = $pdf->get_height() - 20;
-                $x = $pdf->get_width() - 50 - $fontMetrics->get_text_width($pageText, $font, $size);
-                $pdf->text($x, $y, $pageText, $font, $size);
-            }
-        </script>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli Platforma Nowoczesnej Edukacji</strong><br>
+                ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -184,7 +184,10 @@ class CoursesController extends Controller
           ->setOptions([
               'defaultFont' => 'DejaVu Sans',
               'isHtml5ParserEnabled' => true,
-              'isRemoteEnabled' => true
+              'isRemoteEnabled' => true,
+              'isPhpEnabled' => true,
+              'defaultPaperSize' => 'a4',
+              'defaultPaperOrientation' => 'landscape'
           ]);
 
         $filename = 'lista_szkolen_' . now()->format('Y-m-d_H-i-s') . '.pdf';
