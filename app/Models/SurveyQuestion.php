@@ -112,4 +112,82 @@ class SurveyQuestion extends Model
             'distribution' => $distribution
         ];
     }
+
+    /**
+     * Sprawdź czy pytanie jest częścią siatki
+     */
+    public function isPartOfGrid(): bool
+    {
+        // Sprawdź czy tekst pytania zawiera wzorce siatki
+        $text = $this->question_text;
+        
+        // Wzorce dla siatek ratingowych (1. Pytanie [tekst])
+        if (preg_match('/^\d+\.\s+Pytanie\s+\[.*\]$/', $text)) {
+            return true;
+        }
+        
+        // Wzorce dla siatek wielokrotnego wyboru (tekst [opcja])
+        if (preg_match('/^(.+?)\s+\[([^\]]+)\]$/', $text)) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Pobierz główny tekst siatki (bez numeru i opcji)
+     */
+    public function getGridMainText(): string
+    {
+        $text = $this->question_text;
+        
+        // Dla siatek ratingowych: "1. Pytanie [tekst]" -> "Pytanie"
+        if (preg_match('/^\d+\.\s+(.+?)\s+\[.*\]$/', $text, $matches)) {
+            return $matches[1];
+        }
+        
+        // Dla siatek wielokrotnego wyboru: "tekst [opcja]" -> "tekst"
+        if (preg_match('/^(.+?)\s+\[([^\]]+)\]$/', $text, $matches)) {
+            return trim($matches[1]);
+        }
+        
+        return $text;
+    }
+
+    /**
+     * Pobierz opcję z pytania siatki
+     */
+    public function getGridOption(): string
+    {
+        $text = $this->question_text;
+        
+        // Dla siatek ratingowych: "1. Pytanie [tekst]" -> "tekst"
+        if (preg_match('/^\d+\.\s+.+?\s+\[(.+)\]$/', $text, $matches)) {
+            return $matches[1];
+        }
+        
+        // Dla siatek wielokrotnego wyboru: "tekst [opcja]" -> "opcja"
+        if (preg_match('/^.+?\s+\[([^\]]+)\]$/', $text, $matches)) {
+            return $matches[1];
+        }
+        
+        return '';
+    }
+
+    /**
+     * Pobierz grupę pytań siatki dla tego pytania
+     */
+    public function getGridGroup(): \Illuminate\Database\Eloquent\Collection
+    {
+        if (!$this->isPartOfGrid()) {
+            return collect([$this]);
+        }
+
+        $mainText = $this->getGridMainText();
+        
+        return $this->survey->questions()
+            ->where('question_text', 'like', '%' . $mainText . '%')
+            ->orderBy('question_order')
+            ->get();
+    }
 }

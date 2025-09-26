@@ -126,4 +126,46 @@ class Survey extends Model
 
         return $stats;
     }
+
+    /**
+     * Grupuje pytania w siatki i zwraca jako kolekcję grup
+     */
+    public function getGroupedQuestions(): \Illuminate\Support\Collection
+    {
+        $questions = $this->questions()->orderBy('question_order')->get();
+        $grouped = collect();
+        $processed = collect();
+
+        foreach ($questions as $question) {
+            // Jeśli pytanie już zostało przetworzone, pomiń
+            if ($processed->contains($question->id)) {
+                continue;
+            }
+
+            if ($question->isPartOfGrid()) {
+                // Pobierz całą grupę siatki
+                $gridGroup = $question->getGridGroup();
+                $grouped->push([
+                    'type' => 'grid',
+                    'main_text' => $question->getGridMainText(),
+                    'question_type' => $question->question_type,
+                    'questions' => $gridGroup,
+                    'is_rating_grid' => $question->isRating(),
+                    'is_choice_grid' => $question->isMultipleChoice() || $question->isSingleChoice()
+                ]);
+                
+                // Oznacz wszystkie pytania z grupy jako przetworzone
+                $processed = $processed->merge($gridGroup->pluck('id'));
+            } else {
+                // Pojedyncze pytanie
+                $grouped->push([
+                    'type' => 'single',
+                    'question' => $question
+                ]);
+                $processed->push($question->id);
+            }
+        }
+
+        return $grouped;
+    }
 }

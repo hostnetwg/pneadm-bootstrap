@@ -96,8 +96,9 @@ class SurveyController extends Controller
         // Pobierz statystyki
         $stats = $survey->getResponseStats();
         $averageRating = $survey->getAverageRating();
+        $groupedQuestions = $survey->getGroupedQuestions();
         
-        return view('surveys.show', compact('survey', 'stats', 'averageRating'));
+        return view('surveys.show', compact('survey', 'stats', 'averageRating', 'groupedQuestions'));
     }
 
     /**
@@ -163,17 +164,58 @@ class SurveyController extends Controller
     }
 
     /**
+     * Pokaż formularz wyboru pytań do raportu
+     */
+    public function showReportForm(Survey $survey)
+    {
+        $survey->load(['course', 'instructor', 'questions']);
+        $groupedQuestions = $survey->getGroupedQuestions();
+        
+        return view('surveys.report-form', compact('survey', 'groupedQuestions'));
+    }
+
+    /**
      * Generuj raport PDF dla ankiety
      */
-    public function generateReport(Survey $survey)
+    public function generateReport(Request $request, Survey $survey)
     {
+        $request->validate([
+            'selected_questions' => 'required|array|min:1',
+            'selected_questions.*' => 'exists:survey_questions,id'
+        ]);
+
         $survey->load(['course', 'instructor', 'questions', 'responses']);
-        
+
+        // Filtruj pytania według wyboru użytkownika
+        $selectedQuestionIds = $request->input('selected_questions', []);
+        $selectedQuestions = $survey->questions->whereIn('id', $selectedQuestionIds);
+        $groupedQuestions = $survey->getGroupedQuestions();
+
         $stats = $survey->getResponseStats();
         $averageRating = $survey->getAverageRating();
+
+        // Generuj PDF
+        return $this->generatePdfReport($survey, $selectedQuestions, $stats, $averageRating, $groupedQuestions);
+    }
+
+    /**
+     * Generuj PDF raportu
+     */
+    private function generatePdfReport($survey, $selectedQuestions, $stats, $averageRating, $groupedQuestions)
+    {
+        // Użyj dompdf do generowania PDF
+        $html = view('surveys.report', compact('survey', 'stats', 'averageRating', 'selectedQuestions', 'groupedQuestions'))->render();
         
-        // Tutaj można dodać generowanie PDF
-        // Na razie zwrócimy widok
-        return view('surveys.report', compact('survey', 'stats', 'averageRating'));
+        $dompdf = new \Dompdf\Dompdf();
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        
+        $filename = 'raport_ankiety_' . $survey->id . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        
+        return $dompdf->stream($filename, [
+            'Attachment' => true,
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"'
+        ]);
     }
 }
