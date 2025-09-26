@@ -7,29 +7,12 @@
 
     <div class="px-3 py-3">
         <div class="container">
-            <!-- Breadcrumb -->
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('dashboard') }}">
-                            <i class="fas fa-home"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('surveys.index') }}">
-                            <i class="fas fa-clipboard-list"></i> Ankiety
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('surveys.show', $survey->id) }}">
-                            <i class="fas fa-eye"></i> {{ Str::limit($survey->title, 30) }}
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item active" aria-current="page">
-                        <i class="fas fa-file-pdf"></i> Generowanie raportu
-                    </li>
-                </ol>
-            </nav>
+            <!-- Przycisk powrotu -->
+            <div class="mb-4">
+                <a href="{{ route('surveys.show', $survey->id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Wróć
+                </a>
+            </div>
 
             @if(session('success'))
                 <div class="alert alert-success">
