@@ -253,7 +253,7 @@ class CoursesController extends Controller
      */
     public function show($id)
     {
-        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants'])
+        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys'])
                         ->findOrFail($id);
         
         // Pobranie poprzedniego szkolenia (według daty, pokazuj również nieaktywne)

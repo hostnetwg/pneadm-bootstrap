@@ -63,5 +63,13 @@ class Course extends Model
     {
         return $this->hasMany(Certificate::class);
     }
+
+    /**
+     * Relacja do ankiet
+     */
+    public function surveys()
+    {
+        return $this->hasMany(Survey::class);
+    }
         
 }

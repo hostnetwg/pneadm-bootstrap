@@ -198,13 +198,17 @@
                         </div>
                         <div class="card-body">
                             <div class="row text-center">
-                                <div class="col-6">
+                                <div class="col-4">
                                     <h4 class="text-primary">{{ $course->participants->count() }}</h4>
                                     <small class="text-muted">Uczestnicy</small>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-4">
                                     <h4 class="text-success">{{ $course->certificates->count() }}</h4>
                                     <small class="text-muted">Zaświadczenia</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-warning">{{ $course->surveys->count() }}</h4>
+                                    <small class="text-muted">Ankiety</small>
                                 </div>
                             </div>
                         </div>
@@ -224,6 +228,53 @@
                         </div>
                     @endif
 
+                    <!-- Ankiety -->
+                    @if($course->surveys->count() > 0)
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-clipboard-list"></i> Ankiety ({{ $course->surveys->count() }})
+                                </h5>
+                                <a href="{{ route('surveys.course', $course->id) }}" class="btn btn-sm btn-outline-primary">
+                                    Zobacz wszystkie
+                                </a>
+                            </div>
+                            <div class="card-body">
+                                @foreach($course->surveys->take(3) as $survey)
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <div>
+                                            <h6 class="mb-1">
+                                                <a href="{{ route('surveys.show', $survey->id) }}" class="text-decoration-none">
+                                                    {{ Str::limit($survey->title, 40) }}
+                                                </a>
+                                            </h6>
+                                            <small class="text-muted">
+                                                {{ $survey->total_responses }} odpowiedzi | 
+                                                {{ $survey->imported_at->format('d.m.Y') }}
+                                                @if($survey->getAverageRating() > 0)
+                                                    | Średnia: {{ $survey->getAverageRating() }}
+                                                @endif
+                                            </small>
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ route('surveys.show', $survey->id) }}" class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ route('surveys.report', $survey->id) }}" class="btn btn-outline-success">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                                @if($course->surveys->count() > 3)
+                                    <div class="text-center mt-2">
+                                        <small class="text-muted">... i {{ $course->surveys->count() - 3 }} więcej</small>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Akcje -->
                     <div class="card">
                         <div class="card-header">
@@ -236,6 +287,9 @@
                                 </a>
                                 <a href="{{ route('participants.index', $course->id) }}" class="btn btn-info text-white">
                                     <i class="fas fa-users"></i> Uczestnicy ({{ $course->participants->count() }})
+                                </a>
+                                <a href="{{ route('surveys.import', $course->id) }}" class="btn btn-success">
+                                    <i class="fas fa-file-import"></i> Importuj ankietę
                                 </a>
                                 <form action="{{ route('courses.destroy', $course->id) }}" method="POST" class="d-grid">
                                     @csrf

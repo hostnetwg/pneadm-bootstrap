@@ -12,8 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('participants', function (Blueprint $table) {
-            $table->timestamp('access_expires_at')->nullable()->after('order');
-            $table->index('access_expires_at'); // Indeks dla szybkiego wyszukiwania
+            if (!Schema::hasColumn('participants', 'access_expires_at')) {
+                $table->timestamp('access_expires_at')->nullable()->after('order');
+                $table->index('access_expires_at'); // Indeks dla szybkiego wyszukiwania
+            }
         });
     }
 

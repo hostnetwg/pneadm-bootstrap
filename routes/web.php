@@ -14,6 +14,8 @@ use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\SendyController;
+use App\Http\Controllers\SurveyController;
+use App\Http\Controllers\SurveyImportController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -148,7 +150,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::put('/instructors/{id}', [InstructorsController::class, 'update'])->name('courses.instructors.update');
     Route::delete('/instructors/{id}', [InstructorsController::class, 'destroy'])->name('courses.instructors.destroy');
 
-
+    // Ankiety
+    Route::resource('surveys', SurveyController::class);
+    Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');
+    Route::get('/surveys/{survey}/report', [SurveyController::class, 'generateReport'])->name('surveys.report');
+    
+    // Import ankiet
+    Route::get('/courses/{course}/surveys/import', [SurveyImportController::class, 'showImportForm'])->name('surveys.import');
+    Route::post('/courses/{course}/surveys/import', [SurveyImportController::class, 'import'])->name('surveys.import.store');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
