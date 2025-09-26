@@ -172,6 +172,76 @@ class SurveyImportController extends Controller
             return 'multiple_choice';
         }
 
+        // Sprawdź czy to pytanie jednokrotnego wyboru
+        // Analizuj unikalne odpowiedzi - jeśli jest mało unikalnych wartości, to prawdopodobnie single_choice
+        $uniqueAnswers = array_unique(array_filter($sampleAnswers, function($answer) {
+            return !empty(trim($answer));
+        }));
+        
+        if (count($uniqueAnswers) <= 15 && count($uniqueAnswers) >= 2) {
+            // Sprawdź czy odpowiedzi wyglądają jak opcje wyboru
+            $choicePatterns = [
+                '/^(tak|nie)$/i',
+                '/^(bardzo dobry|dobry|średni|słaby|bardzo słaby)$/i',
+                '/^(zdecydowanie tak|raczej tak|nie mam zdania|raczej nie|zdecydowanie nie)$/i',
+                '/^(zawsze|często|czasami|rzadko|nigdy)$/i',
+                '/^(bardzo zadowolony|zadowolony|neutralny|niezadowolony|bardzo niezadowolony)$/i',
+                '/^(portal|facebook|instagram|linkedin|twitter|youtube|tiktok)$/i',
+                '/^(dyrekcja|szkoła|nauczyciel|kolega|koleżanka|przełożony|szef)$/i',
+                '/^(e-mail|mail|wiadomość|newsletter|strona internetowa|www)$/i',
+                '/^(radio|telewizja|gazeta|czasopismo|ulotka|plakat)$/i',
+                '/^(inne|inny|inna|inne źródło|inne miejsce)$/i'
+            ];
+            
+            $matchesChoicePattern = false;
+            foreach ($choicePatterns as $pattern) {
+                $matches = 0;
+                foreach ($uniqueAnswers as $answer) {
+                    if (preg_match($pattern, trim($answer))) {
+                        $matches++;
+                    }
+                }
+                if ($matches >= count($uniqueAnswers) * 0.6) {
+                    $matchesChoicePattern = true;
+                    break;
+                }
+            }
+            
+            // Sprawdź czy to może być single_choice na podstawie charakterystyk odpowiedzi
+            if (!$matchesChoicePattern) {
+                // Sprawdź czy odpowiedzi są krótkie i mają podobną strukturę
+                $shortAnswers = array_filter($uniqueAnswers, function($answer) {
+                    return strlen(trim($answer)) <= 50;
+                });
+                
+                // Sprawdź czy większość odpowiedzi to pojedyncze słowa lub krótkie frazy
+                $singleWordAnswers = array_filter($uniqueAnswers, function($answer) {
+                    return str_word_count(trim($answer)) <= 3;
+                });
+                
+                // Sprawdź czy odpowiedzi zawierają typowe słowa kluczowe dla opcji wyboru
+                $choiceKeywords = ['portal', 'facebook', 'instagram', 'dyrekcja', 'szkoła', 'e-mail', 'mail', 'wiadomość', 'radio', 'telewizja', 'gazeta', 'ulotka', 'inne', 'inny', 'inna'];
+                $hasChoiceKeywords = false;
+                foreach ($uniqueAnswers as $answer) {
+                    foreach ($choiceKeywords as $keyword) {
+                        if (stripos($answer, $keyword) !== false) {
+                            $hasChoiceKeywords = true;
+                            break 2;
+                        }
+                    }
+                }
+                
+                // Jeśli spełnia kryteria single_choice
+                if (count($shortAnswers) >= count($uniqueAnswers) * 0.7 && 
+                    count($singleWordAnswers) >= count($uniqueAnswers) * 0.5 && 
+                    (count($uniqueAnswers) <= 10 || $hasChoiceKeywords)) {
+                    return 'single_choice';
+                }
+            } elseif ($matchesChoicePattern) {
+                return 'single_choice';
+            }
+        }
+
         // Sprawdź czy to pytanie z datą/czasem
         $dateAnswers = array_filter($sampleAnswers, function($answer) {
             return !empty($answer) && (strtotime($answer) !== false || preg_match('/\d{4}\/\d{2}\/\d{2}/', $answer));

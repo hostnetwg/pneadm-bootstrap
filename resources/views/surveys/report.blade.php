@@ -43,36 +43,58 @@
         
         .survey-info {
             margin-bottom: 12px;
-            padding: 6px;
+            padding: 8px;
             background-color: #f9f9f9;
             border-left: 2px solid #000;
             font-size: 9px;
         }
         
+        .info-line {
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+        
+        .info-line:last-child {
+            margin-bottom: 0;
+        }
+        
         .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
+            display: table;
+            width: 100%;
             margin-bottom: 15px;
+            border-collapse: separate;
+            border-spacing: 6px;
+        }
+        
+        .stats-row {
+            display: table-row;
         }
         
         .stat-card {
+            display: table-cell;
             text-align: center;
-            padding: 8px;
+            padding: 10px 8px;
             border: 1px solid #333;
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
+            width: 25%;
+            vertical-align: middle;
+            border-radius: 3px;
         }
         
         .stat-number {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
             color: #000;
+            line-height: 1.1;
+            margin-bottom: 2px;
         }
         
         .stat-label {
-            font-size: 8px;
+            font-size: 9px;
             color: #666;
-            margin-top: 2px;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .question-section {
@@ -133,8 +155,29 @@
         }
         
         .text-responses {
-            max-height: 120px;
-            overflow-y: auto;
+            margin-top: 8px;
+        }
+        
+        .text-responses-grid {
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+        }
+        
+        .text-responses-row {
+            display: table-row;
+        }
+        
+        .text-responses-column {
+            display: table-cell;
+            width: 33.33%;
+            vertical-align: top;
+            padding-right: 4px;
+        }
+        
+        .text-responses-column:last-child {
+            padding-right: 0;
         }
         
         .text-response {
@@ -143,6 +186,14 @@
             background-color: #f8f9fa;
             border-left: 1px solid #dee2e6;
             font-size: 8px;
+            line-height: 1.2;
+            page-break-inside: avoid;
+        }
+        
+        .text-response-number {
+            font-weight: bold;
+            color: #666;
+            margin-right: 3px;
         }
         
         .choice-stats {
@@ -203,31 +254,39 @@
     </div>
     
     <div class="survey-info">
-        <strong>Ankieta:</strong> {{ $survey->title }} | 
-        <strong>Szkolenie:</strong> {{ $survey->course->title }}
-        @if($survey->instructor)
-            | <strong>Instruktor:</strong> {{ $survey->instructor->getFullTitleNameAttribute() }}
-        @endif
-        | <strong>Data:</strong> {{ $survey->imported_at->format('d.m.Y') }} | 
-        <strong>Źródło:</strong> {{ $survey->source }}
+        <div class="info-line">
+            <strong>Ankieta:</strong> {{ $survey->title }}
+        </div>
+        <div class="info-line">
+            <strong>Szkolenie:</strong> {{ $survey->course->title }}
+        </div>
+        <div class="info-line">
+            @if($survey->instructor)
+                <strong>Trener:</strong> {{ $survey->instructor->getFullTitleNameAttribute() }} | 
+            @endif
+            <strong>Data:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y') : $survey->imported_at->format('d.m.Y') }} | 
+            <strong>Źródło:</strong> {{ $survey->source }}
+        </div>
     </div>
     
     <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number">{{ $survey->total_responses }}</div>
-            <div class="stat-label">Odpowiedzi</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ $survey->questions->count() }}</div>
-            <div class="stat-label">Pytań</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ $averageRating > 0 ? $averageRating : 'N/A' }}</div>
-            <div class="stat-label">Średnia ocena</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ $survey->imported_at->format('d.m.Y') }}</div>
-            <div class="stat-label">Data importu</div>
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-number">{{ $survey->total_responses }}</div>
+                <div class="stat-label">Odpowiedzi</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ $survey->questions->count() }}</div>
+                <div class="stat-label">Pytań</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ $averageRating > 0 ? $averageRating : 'N/A' }}</div>
+                <div class="stat-label">Średnia ocena</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ $survey->imported_at->format('d.m.Y') }}</div>
+                <div class="stat-label">Data importu</div>
+            </div>
         </div>
     </div>
     
@@ -381,15 +440,34 @@
                 
                 @if($question->isText() && $responses->count() > 0)
                     <div class="text-responses">
-                        <strong>Przykładowe odpowiedzi:</strong>
-                        @foreach($responses->take(3) as $response)
-                            <div class="text-response">{{ Str::limit($response, 150) }}</div>
-                        @endforeach
-                        @if($responses->count() > 3)
-                            <div style="text-align: center; font-style: italic; color: #666; font-size: 7px;">
-                                ... i {{ $responses->count() - 3 }} więcej odpowiedzi
+                        <strong>Wszystkie odpowiedzi ({{ $responses->count() }}):</strong>
+                        @php
+                            $responsesArray = $responses->toArray();
+                            $responsesPerColumn = ceil(count($responsesArray) / 3);
+                            $columns = [
+                                array_slice($responsesArray, 0, $responsesPerColumn),
+                                array_slice($responsesArray, $responsesPerColumn, $responsesPerColumn),
+                                array_slice($responsesArray, $responsesPerColumn * 2)
+                            ];
+                        @endphp
+                        
+                        <div class="text-responses-grid">
+                            <div class="text-responses-row">
+                                @foreach($columns as $columnIndex => $columnResponses)
+                                    <div class="text-responses-column">
+                                        @foreach($columnResponses as $index => $response)
+                                            @php
+                                                $responseNumber = $columnIndex * $responsesPerColumn + $index + 1;
+                                            @endphp
+                                            <div class="text-response">
+                                                <span class="text-response-number">{{ $responseNumber }}.</span>
+                                                {{ Str::limit($response, 120) }}
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endforeach
                             </div>
-                        @endif
+                        </div>
                     </div>
                 @elseif($question->isMultipleChoice() || $question->isSingleChoice() && $responses->count() > 0)
                     <div class="choice-stats">

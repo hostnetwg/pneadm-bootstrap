@@ -63,6 +63,81 @@ class SurveyQuestion extends Model
     }
 
     /**
+     * Aktualizuje typ pytania na podstawie analizy odpowiedzi
+     */
+    public function updateQuestionTypeFromResponses(): void
+    {
+        $responses = $this->getResponses();
+        if ($responses->isEmpty()) {
+            return;
+        }
+
+        $uniqueAnswers = $responses->unique()->filter()->values();
+        
+        // Sprawdź czy to może być single_choice
+        if ($uniqueAnswers->count() <= 15 && $uniqueAnswers->count() >= 2) {
+            // Sprawdź wzorce opcji wyboru
+            $choicePatterns = [
+                '/^(tak|nie)$/i',
+                '/^(bardzo dobry|dobry|średni|słaby|bardzo słaby)$/i',
+                '/^(zdecydowanie tak|raczej tak|nie mam zdania|raczej nie|zdecydowanie nie)$/i',
+                '/^(zawsze|często|czasami|rzadko|nigdy)$/i',
+                '/^(bardzo zadowolony|zadowolony|neutralny|niezadowolony|bardzo niezadowolony)$/i',
+                '/^(portal|facebook|instagram|linkedin|twitter|youtube|tiktok)$/i',
+                '/^(dyrekcja|szkoła|nauczyciel|kolega|koleżanka|przełożony|szef)$/i',
+                '/^(e-mail|mail|wiadomość|newsletter|strona internetowa|www)$/i',
+                '/^(radio|telewizja|gazeta|czasopismo|ulotka|plakat)$/i',
+                '/^(inne|inny|inna|inne źródło|inne miejsce)$/i'
+            ];
+            
+            $matchesChoicePattern = false;
+            foreach ($choicePatterns as $pattern) {
+                $matches = 0;
+                foreach ($uniqueAnswers as $answer) {
+                    if (preg_match($pattern, trim($answer))) {
+                        $matches++;
+                    }
+                }
+                if ($matches >= $uniqueAnswers->count() * 0.6) {
+                    $matchesChoicePattern = true;
+                    break;
+                }
+            }
+            
+            // Sprawdź charakterystyki odpowiedzi
+            if (!$matchesChoicePattern) {
+                $shortAnswers = $uniqueAnswers->filter(function($answer) {
+                    return strlen(trim($answer)) <= 50;
+                });
+                
+                $singleWordAnswers = $uniqueAnswers->filter(function($answer) {
+                    return str_word_count(trim($answer)) <= 3;
+                });
+                
+                $choiceKeywords = ['portal', 'facebook', 'instagram', 'dyrekcja', 'szkoła', 'e-mail', 'mail', 'wiadomość', 'radio', 'telewizja', 'gazeta', 'ulotka', 'inne', 'inny', 'inna'];
+                $hasChoiceKeywords = $uniqueAnswers->filter(function($answer) use ($choiceKeywords) {
+                    foreach ($choiceKeywords as $keyword) {
+                        if (stripos($answer, $keyword) !== false) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })->count() > 0;
+                
+                if ($shortAnswers->count() >= $uniqueAnswers->count() * 0.7 && 
+                    $singleWordAnswers->count() >= $uniqueAnswers->count() * 0.5 && 
+                    ($uniqueAnswers->count() <= 10 || $hasChoiceKeywords)) {
+                    $matchesChoicePattern = true;
+                }
+            }
+            
+            if ($matchesChoicePattern && $this->question_type !== 'single_choice') {
+                $this->update(['question_type' => 'single_choice']);
+            }
+        }
+    }
+
+    /**
      * Pobiera odpowiedzi dla tego pytania
      */
     public function getResponses()

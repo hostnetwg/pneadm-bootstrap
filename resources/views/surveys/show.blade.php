@@ -191,20 +191,32 @@
                                                                         <strong>{{ $question->getGridOption() }}</strong>
                                                                     </td>
                                                                     <td class="text-center">
-                                                                        <span class="badge bg-primary">{{ $ratingStats['average'] }}</span>
+                                                                        @if($question->isRating() && !empty($ratingStats['average']))
+                                                                            <span class="badge bg-primary">{{ $ratingStats['average'] }}</span>
+                                                                        @else
+                                                                            <span class="badge bg-secondary">-</span>
+                                                                        @endif
                                                                     </td>
                                                                     <td class="text-center">
-                                                                        <small class="text-muted">{{ $ratingStats['count'] }}</small>
+                                                                        @if($question->isRating() && !empty($ratingStats['count']))
+                                                                            <small class="text-muted">{{ $ratingStats['count'] }}</small>
+                                                                        @else
+                                                                            <small class="text-muted">{{ $question->getResponses()->count() }}</small>
+                                                                        @endif
                                                                     </td>
                                                                     <td>
-                                                                        <div class="d-flex align-items-center">
-                                                                            @for($i = 1; $i <= 5; $i++)
-                                                                                <div class="me-1 text-center" style="min-width: 20px;">
-                                                                                    <div class="small">{{ $i }}</div>
-                                                                                    <div class="badge bg-secondary">{{ $ratingStats['distribution'][$i] }}</div>
-                                                                                </div>
-                                                                            @endfor
-                                                                        </div>
+                                                                        @if($question->isRating() && !empty($ratingStats['distribution']))
+                                                                            <div class="d-flex align-items-center">
+                                                                                @for($i = 1; $i <= 5; $i++)
+                                                                                    <div class="me-1 text-center" style="min-width: 20px;">
+                                                                                        <div class="small">{{ $i }}</div>
+                                                                                        <div class="badge bg-secondary">{{ $ratingStats['distribution'][$i] ?? 0 }}</div>
+                                                                                    </div>
+                                                                                @endfor
+                                                                            </div>
+                                                                        @else
+                                                                            <small class="text-muted">Brak danych ratingowych</small>
+                                                                        @endif
                                                                     </td>
                                                                 </tr>
                                                             @endforeach
@@ -280,7 +292,7 @@
                                                 @php
                                                     $ratingStats = $question->getRatingStats();
                                                 @endphp
-                                                @if(!empty($ratingStats))
+                                                @if($question->isRating() && !empty($ratingStats) && isset($ratingStats['average']))
                                                     <div class="mt-2">
                                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                                             <span>Średnia: <strong>{{ $ratingStats['average'] }}</strong></span>
@@ -294,10 +306,10 @@
                                                                     <span class="me-2" style="width: 20px;">{{ $i }}</span>
                                                                     <div class="progress flex-grow-1 me-2" style="height: 20px;">
                                                                         <div class="progress-bar bg-primary" 
-                                                                             style="width: {{ $ratingStats['count'] > 0 ? ($ratingStats['distribution'][$i] / $ratingStats['count']) * 100 : 0 }}%">
+                                                                             style="width: {{ $ratingStats['count'] > 0 ? (($ratingStats['distribution'][$i] ?? 0) / $ratingStats['count']) * 100 : 0 }}%">
                                                                         </div>
                                                                     </div>
-                                                                    <span class="badge bg-secondary">{{ $ratingStats['distribution'][$i] }}</span>
+                                                                    <span class="badge bg-secondary">{{ $ratingStats['distribution'][$i] ?? 0 }}</span>
                                                                 </div>
                                                             @endfor
                                                         </div>
