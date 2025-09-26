@@ -200,26 +200,92 @@
             margin-bottom: 8px;
         }
         
-        .choice-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .grid-choice-container {
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 4px;
+        }
+        
+        .grid-choice-row {
+            display: table-row;
+        }
+        
+        .grid-choice-column {
+            display: table-cell;
+            width: 25%;
+            vertical-align: top;
+            padding-right: 4px;
+        }
+        
+        .grid-choice-column:last-child {
+            padding-right: 0;
+        }
+        
+        .grid-choice-item {
+            margin-bottom: 6px;
+            padding: 4px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 2px;
+            font-size: 8px;
+            page-break-inside: avoid;
+        }
+        
+        .grid-choice-title {
+            font-weight: bold;
+            color: #000;
             margin-bottom: 2px;
-            padding: 1px 0;
+        }
+        
+        .grid-choice-responses {
+            color: #666;
+            font-size: 7px;
+            margin-bottom: 2px;
+        }
+        
+        .grid-choice-answer {
+            color: #333;
+            line-height: 1.2;
+        }
+        
+        .choice-item {
+            margin-bottom: 4px;
+            padding: 2px 0;
         }
         
         .choice-text {
-            flex: 1;
             font-size: 8px;
+            margin-bottom: 2px;
+        }
+        
+        .choice-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .choice-bar {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 2px;
+            position: relative;
+            flex: 1;
+        }
+        
+        .choice-bar-fill {
+            height: 100%;
+            background-color: #007bff;
+            border-radius: 2px;
+            transition: width 0.3s ease;
         }
         
         .choice-count {
             font-weight: bold;
-            background-color: #000;
-            color: #fff;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 7px;
+            color: #000;
+            font-size: 8px;
+            min-width: 20px;
+            text-align: right;
         }
         
         .footer {
@@ -264,7 +330,8 @@
             @if($survey->instructor)
                 <strong>Trener:</strong> {{ $survey->instructor->getFullTitleNameAttribute() }} | 
             @endif
-            <strong>Data:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y') : $survey->imported_at->format('d.m.Y') }} | 
+            <strong>Data szkolenia:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y') : $survey->imported_at->format('d.m.Y') }} | 
+            <strong>Data importu:</strong> {{ $survey->imported_at->format('d.m.Y') }} | 
             <strong>Źródło:</strong> {{ $survey->source }}
         </div>
     </div>
@@ -276,36 +343,44 @@
                 <div class="stat-label">Odpowiedzi</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">{{ $survey->questions->count() }}</div>
+                <div class="stat-number">{{ $survey->getActualQuestionsCount() }}</div>
                 <div class="stat-label">Pytań</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">{{ $averageRating > 0 ? $averageRating : 'N/A' }}</div>
+                <div class="stat-number">{{ $averageRating > 0 ? $averageRating . '/5' : 'N/A' }}</div>
                 <div class="stat-label">Średnia ocena</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">{{ $survey->imported_at->format('d.m.Y') }}</div>
-                <div class="stat-label">Data importu</div>
+                <div class="stat-number">{{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y') : $survey->imported_at->format('d.m.Y') }}</div>
+                <div class="stat-label">Data szkolenia</div>
             </div>
         </div>
     </div>
     
     @foreach($groupedQuestions as $group)
         @if($group['type'] === 'grid')
-            <!-- Siatka pytań -->
-            <div class="question-section">
-                <div class="question-title">
-                    <i class="fas fa-table"></i> {{ $group['main_text'] }}
-                    <span class="badge bg-info ms-2">Siatka</span>
-                </div>
-                <div class="question-type">
-                    Typ: 
-                    @if($group['is_rating_grid'])
-                        Siatka ratingowa
-                    @elseif($group['is_choice_grid'])
-                        Siatka wielokrotnego wyboru
-                    @endif
-                </div>
+            @php
+                // Sprawdź czy przynajmniej jedno pytanie z siatki jest zaznaczone
+                $hasSelectedQuestions = $group['questions']->filter(function($question) use ($selectedQuestions) {
+                    return in_array($question->id, $selectedQuestions->pluck('id')->toArray());
+                })->count() > 0;
+            @endphp
+            
+            @if($hasSelectedQuestions)
+                <!-- Siatka pytań -->
+                <div class="question-section">
+                    <div class="question-title">
+                        <i class="fas fa-table"></i> {{ $group['main_text'] }}
+                        <span class="badge bg-info ms-2">Siatka</span>
+                    </div>
+                    <div class="question-type">
+                        Typ: 
+                        @if($group['is_rating_grid'])
+                            Siatka ratingowa
+                        @elseif($group['is_choice_grid'])
+                            Siatka wielokrotnego wyboru
+                        @endif
+                    </div>
                 
                 @if($group['is_rating_grid'])
                     <!-- Siatka ratingowa w PDF -->
@@ -344,41 +419,49 @@
                     </div>
                 @elseif($group['is_choice_grid'])
                     <!-- Siatka wielokrotnego wyboru w PDF -->
-                    <div class="row">
-                        @foreach($group['questions'] as $question)
-                            @if(in_array($question->id, $selectedQuestions->pluck('id')->toArray()))
-                                <div class="col-md-6 mb-3">
-                                    <div class="card border">
-                                        <div class="card-body p-3">
-                                            <h6 class="card-title text-primary mb-2">
-                                                <i class="fas fa-check-square"></i> {{ $question->getGridOption() }}
-                                            </h6>
+                    @php
+                        $selectedGridQuestions = $group['questions']->filter(function($question) use ($selectedQuestions) {
+                            return in_array($question->id, $selectedQuestions->pluck('id')->toArray());
+                        });
+                        $questionsCollection = $selectedGridQuestions->values();
+                        $questionsPerColumn = ceil($questionsCollection->count() / 4);
+                        $columns = [
+                            $questionsCollection->slice(0, $questionsPerColumn),
+                            $questionsCollection->slice($questionsPerColumn, $questionsPerColumn),
+                            $questionsCollection->slice($questionsPerColumn * 2, $questionsPerColumn),
+                            $questionsCollection->slice($questionsPerColumn * 3)
+                        ];
+                    @endphp
+                    
+                    <div class="grid-choice-container">
+                        <div class="grid-choice-row">
+                            @foreach($columns as $columnIndex => $columnQuestions)
+                                <div class="grid-choice-column">
+                                    @foreach($columnQuestions as $question)
+                                        <div class="grid-choice-item">
+                                            <div class="grid-choice-title">{{ $question->getGridOption() }}</div>
                                             @php
                                                 $responses = $question->getResponses();
                                                 $responseCounts = $responses->countBy();
                                                 $totalResponses = $responses->count();
                                             @endphp
-                                            <div class="mb-2">
-                                                <span class="badge bg-success">{{ $totalResponses }}</span> odpowiedzi
-                                            </div>
+                                            <div class="grid-choice-responses">{{ $totalResponses }} odpowiedzi</div>
                                             @if($totalResponses > 0)
-                                                <div class="choice-stats">
-                                                    @foreach($responseCounts->sortDesc()->take(5) as $response => $count)
-                                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                                            <small>{{ $response ?: 'Brak odpowiedzi' }}</small>
-                                                            <span class="badge bg-primary">{{ $count }}</span>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
+                                                @foreach($responseCounts->sortDesc() as $response => $count)
+                                                    <div class="grid-choice-answer">
+                                                        {{ Str::limit($response, 25) }} ({{ $count }})
+                                                    </div>
+                                                @endforeach
                                             @endif
                                         </div>
-                                    </div>
+                                    @endforeach
                                 </div>
-                            @endif
-                        @endforeach
+                            @endforeach
+                        </div>
                     </div>
                 @endif
-            </div>
+                </div>
+            @endif
         @else
             <!-- Pojedyncze pytanie -->
             @php $question = $group['question']; @endphp
@@ -471,17 +554,84 @@
                     </div>
                 @elseif($question->isMultipleChoice() || $question->isSingleChoice() && $responses->count() > 0)
                     <div class="choice-stats">
-                        <strong>Najczęstsze odpowiedzi:</strong>
                         @php
                             $responseCounts = $responses->countBy();
-                            $topResponses = $responseCounts->sortDesc()->take(8);
+                            $allResponses = $responseCounts->sortDesc();
+                            $totalResponses = $responses->count();
+                            
+                            // Sprawdź czy to pytanie o źródło informacji
+                            $isSourceQuestion = strpos($question->question_text, 'O szkoleniu dowiedziałam') !== false || 
+                                               strpos($question->question_text, 'O szkoleniu dowiedziałem') !== false;
                         @endphp
-                        @foreach($topResponses as $response => $count)
-                            <div class="choice-item">
-                                <div class="choice-text">{{ $response }}</div>
-                                <div class="choice-count">{{ $count }}</div>
-                            </div>
-                        @endforeach
+                        
+                        @if($isSourceQuestion)
+                            <strong>Główne źródła informacji:</strong>
+                            @php
+                                // Grupuj odpowiedzi na główne kategorie
+                                $facebookCount = 0;
+                                $emailCount = 0;
+                                $otherResponses = collect();
+                                
+                                foreach ($allResponses as $response => $count) {
+                                    if (stripos($response, 'facebook') !== false || stripos($response, 'portal') !== false) {
+                                        $facebookCount += $count;
+                                    } elseif (stripos($response, 'e-mail') !== false || stripos($response, 'mail') !== false || stripos($response, 'wiadomość') !== false) {
+                                        $emailCount += $count;
+                                    } else {
+                                        $otherResponses->put($response, $count);
+                                    }
+                                }
+                                
+                                $mainCategories = collect([
+                                    'portalu Facebook' => $facebookCount,
+                                    'wiadomości e-mail z ofertą' => $emailCount
+                                ])->filter(function($count) {
+                                    return $count > 0;
+                                });
+                            @endphp
+                            
+                            @foreach($mainCategories as $category => $count)
+                                <div class="choice-item">
+                                    <div class="choice-text">{{ $category }}</div>
+                                    <div class="choice-bar-container">
+                                        <div class="choice-bar">
+                                            <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
+                                        </div>
+                                        <div class="choice-count">{{ $count }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                            
+                            @if($otherResponses->count() > 0)
+                                <div style="margin-top: 8px;">
+                                    <strong>Inne źródła:</strong>
+                                    @foreach($otherResponses as $response => $count)
+                                        <div class="choice-item">
+                                            <div class="choice-text">{{ $response }}</div>
+                                            <div class="choice-bar-container">
+                                                <div class="choice-bar">
+                                                    <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
+                                                </div>
+                                                <div class="choice-count">{{ $count }}</div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @else
+                            <strong>Wszystkie odpowiedzi:</strong>
+                            @foreach($allResponses as $response => $count)
+                                <div class="choice-item">
+                                    <div class="choice-text">{{ $response }}</div>
+                                    <div class="choice-bar-container">
+                                        <div class="choice-bar">
+                                            <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
+                                        </div>
+                                        <div class="choice-count">{{ $count }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
                     </div>
                 @endif
             @endif

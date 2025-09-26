@@ -50,7 +50,7 @@
                                         </div>
                                         <div class="col-md-6">
                                             <strong>Odpowiedzi:</strong> {{ $survey->total_responses }}<br>
-                                            <strong>Pytania:</strong> {{ $survey->questions->count() }}
+                                            <strong>Pytania:</strong> {{ $survey->getActualQuestionsCount() }}
                                         </div>
                                     </div>
                                 </div>
@@ -148,7 +148,7 @@
                         <div class="card-body">
                             <div class="text-center mb-3">
                                 <div class="display-6 text-primary" id="selected-count">0</div>
-                                <small class="text-muted">z {{ $survey->questions->count() }} pytań</small>
+                                <small class="text-muted">z {{ $survey->getActualQuestionsCount() }} pytań</small>
                             </div>
                             
                             <div class="progress mb-3" style="height: 8px;">

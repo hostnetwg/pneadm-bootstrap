@@ -168,4 +168,12 @@ class Survey extends Model
 
         return $grouped;
     }
+
+    /**
+     * Zwraca rzeczywistą liczbę pytań (grup pytań)
+     */
+    public function getActualQuestionsCount(): int
+    {
+        return $this->getGroupedQuestions()->count();
+    }
 }

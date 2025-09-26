@@ -136,7 +136,7 @@
                                     <small class="text-muted">Odpowiedzi</small>
                                 </div>
                                 <div class="col-md-3">
-                                    <h3 class="text-success">{{ $survey->questions->count() }}</h3>
+                                    <h3 class="text-success">{{ $survey->getActualQuestionsCount() }}</h3>
                                     <small class="text-muted">Pytań</small>
                                 </div>
                                 <div class="col-md-3">
