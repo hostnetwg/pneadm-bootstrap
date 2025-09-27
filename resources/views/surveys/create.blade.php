@@ -39,8 +39,46 @@
                             </h5>
                         </div>
                         <div class="card-body">
-                            <form action="{{ route('surveys.store') }}" method="POST">
+                            <form action="{{ route('surveys.store') }}" method="POST" enctype="multipart/form-data">
                                 @csrf
+                                
+                                <!-- Sekcja wczytywania pliku -->
+                                <div class="mb-4">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-upload"></i> Automatyczne wyszukiwanie szkolenia na podstawie daty
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="survey_file" class="form-label">Wybierz plik ankiety</label>
+                                                <input type="file" class="form-control @error('survey_file') is-invalid @enderror" 
+                                                       id="survey_file" name="survey_file" accept=".csv,.xlsx,.xls">
+                                                <div class="form-text">
+                                                    Obsługiwane formaty: CSV, Excel (.xlsx, .xls). Nazwa pliku powinna zawierać datę w nawiasach, np. "Ankieta (2024-01-15).csv" lub "Raport (15.01.2024).xlsx"
+                                                    <br><strong>Uwaga:</strong> Pliki CSV zostaną automatycznie zaimportowane z danymi ankiety.
+                                                </div>
+                                                @error('survey_file')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                            
+                                            <div id="file-info" class="alert alert-info" style="display: none;">
+                                                <h6><i class="fas fa-info-circle"></i> Informacje z pliku:</h6>
+                                                <div id="parsed-info"></div>
+                                            </div>
+                                            
+                                            <div id="course-selection" class="mt-3" style="display: none;">
+                                                <h6><i class="fas fa-list"></i> Wybierz szkolenie:</h6>
+                                                <div id="courses-list"></div>
+                                                <button type="button" id="select-course-btn" class="btn btn-primary btn-sm mt-2" style="display: none;">
+                                                    <i class="fas fa-check"></i> Wybierz szkolenie
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <div class="mb-3">
                                     <label for="title" class="form-label">Tytuł ankiety <span class="text-danger">*</span></label>
@@ -150,4 +188,186 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('survey_file');
+            const fileInfo = document.getElementById('file-info');
+            const parsedInfo = document.getElementById('parsed-info');
+            const courseSelect = document.getElementById('course_id');
+            const instructorSelect = document.getElementById('instructor_id');
+            const titleInput = document.getElementById('title');
+            const courseSelection = document.getElementById('course-selection');
+            const coursesList = document.getElementById('courses-list');
+            const selectCourseBtn = document.getElementById('select-course-btn');
+
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    parseFileName(file.name);
+                } else {
+                    hideFileInfo();
+                }
+            });
+
+            function parseFileName(fileName) {
+                // Usuń rozszerzenie pliku
+                const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
+                
+                // Szukaj daty w nawiasach - format: (YYYY-MM-DD) lub (DD.MM.YYYY)
+                const datePattern = /\((\d{4}-\d{2}-\d{2})\)|\((\d{1,2}\.\d{1,2}\.\d{4})\)/;
+                const dateMatch = nameWithoutExtension.match(datePattern);
+                
+                let extractedDate = null;
+                
+                if (dateMatch) {
+                    // Wyciągnij datę
+                    extractedDate = dateMatch[1] || dateMatch[2];
+                    
+                    // Konwertuj datę DD.MM.YYYY na YYYY-MM-DD jeśli potrzeba
+                    if (extractedDate.includes('.')) {
+                        const parts = extractedDate.split('.');
+                        extractedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                    }
+                }
+                
+                // Wyświetl informacje (tylko datę)
+                showFileInfo(extractedDate);
+                
+                // Automatycznie wypełnij pola na podstawie daty
+                autoFillForm(extractedDate);
+            }
+
+            function showFileInfo(date) {
+                let infoHtml = '';
+                if (date) {
+                    infoHtml += `<strong>Data z pliku:</strong> ${date}<br>`;
+                    infoHtml += `<strong>Status:</strong> <span id="search-status">Wyszukuję szkolenie na podstawie daty...</span>`;
+                } else {
+                    infoHtml += `<strong>Status:</strong> <span class="text-warning">Nie znaleziono daty w nawiasach w nazwie pliku</span>`;
+                }
+                
+                parsedInfo.innerHTML = infoHtml;
+                fileInfo.style.display = 'block';
+            }
+
+            function hideFileInfo() {
+                fileInfo.style.display = 'none';
+                courseSelection.style.display = 'none';
+            }
+
+            function updateSearchStatus(message, isSuccess = false) {
+                const statusElement = document.getElementById('search-status');
+                if (statusElement) {
+                    statusElement.textContent = message;
+                    statusElement.className = isSuccess ? 'text-success' : 'text-warning';
+                }
+            }
+
+            function autoFillForm(date) {
+                // Wyszukaj szkolenie w bazie danych tylko na podstawie daty
+                if (date) {
+                    searchForCourseByDate(date);
+                }
+            }
+
+            function searchForCourseByDate(date) {
+                // Przygotuj dane do wysłania
+                const searchData = {
+                    date: date,
+                    _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                };
+
+                // Wyślij żądanie AJAX
+                fetch('{{ route("surveys.search-course") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': searchData._token
+                    },
+                    body: JSON.stringify(searchData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.single_course) {
+                            // Znaleziono jedno szkolenie - automatycznie je wybierz
+                            selectSingleCourse(data.course, data.instructor);
+                        } else if (data.multiple_courses) {
+                            // Znaleziono kilka szkoleń - pokaż listę do wyboru
+                            showCourseSelection(data.courses, data.message);
+                        }
+                    } else {
+                        // Nie znaleziono szkolenia
+                        updateSearchStatus(data.message || 'Nie znaleziono szkolenia na podaną datę');
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd wyszukiwania:', error);
+                    updateSearchStatus('Błąd podczas wyszukiwania szkolenia');
+                });
+            }
+
+            function selectSingleCourse(course, instructor) {
+                // Automatycznie wybierz pojedyncze szkolenie
+                courseSelect.value = course.id;
+                updateSearchStatus(`Znaleziono szkolenie: ${course.title}`, true);
+                
+                // Jeśli znaleziono instruktora, ustaw go
+                if (instructor) {
+                    instructorSelect.value = instructor.id;
+                }
+                
+                // Ustaw tytuł ankiety na podstawie znalezionego szkolenia
+                if (!titleInput.value) {
+                    titleInput.value = `Ankieta - ${course.title}`;
+                }
+                
+                // Wywołaj event change dla course select
+                courseSelect.dispatchEvent(new Event('change'));
+            }
+
+            function showCourseSelection(courses, message) {
+                // Pokaż listę szkoleń do wyboru
+                updateSearchStatus(message);
+                
+                let coursesHtml = '<div class="list-group">';
+                courses.forEach((course, index) => {
+                    const instructorInfo = course.instructor ? ` - ${course.instructor.name}` : '';
+                    const timeInfo = course.start_date ? ` (${course.start_date})` : '';
+                    
+                    coursesHtml += `
+                        <div class="list-group-item">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="selected_course" 
+                                       id="course_${course.id}" value="${course.id}">
+                                <label class="form-check-label" for="course_${course.id}">
+                                    <strong>${course.title}</strong>${instructorInfo}${timeInfo}
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                });
+                coursesHtml += '</div>';
+                
+                coursesList.innerHTML = coursesHtml;
+                courseSelection.style.display = 'block';
+                selectCourseBtn.style.display = 'inline-block';
+                
+                // Dodaj event listener do przycisku wyboru
+                selectCourseBtn.onclick = function() {
+                    const selectedCourseId = document.querySelector('input[name="selected_course"]:checked');
+                    if (selectedCourseId) {
+                        const selectedCourse = courses.find(c => c.id == selectedCourseId.value);
+                        if (selectedCourse) {
+                            selectSingleCourse(selectedCourse, selectedCourse.instructor);
+                            courseSelection.style.display = 'none';
+                        }
+                    } else {
+                        alert('Proszę wybrać szkolenie z listy.');
+                    }
+                };
+            }
+        });
+    </script>
 </x-app-layout>
