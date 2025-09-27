@@ -252,7 +252,12 @@ class SurveyController extends Controller
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
         
-        $filename = 'raport_ankiety_' . $survey->id . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        // Generuj nazwę pliku zgodnie z wymaganiami: Raport_ankiety_{course_id}_{course_date}_{import_datetime}
+        $courseId = $survey->course_id;
+        $courseDate = $survey->course->start_date ? $survey->course->start_date->format('Y-m-d') : 'brak-daty';
+        $importDateTime = $survey->imported_at->format('Y-m-d_H-i-s');
+        
+        $filename = "Raport_ankiety_{$courseId}_{$courseDate}_{$importDateTime}.pdf";
         
         return $dompdf->stream($filename, [
             'Attachment' => true,
