@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: "DejaVu Sans", sans-serif;
-            margin: 10mm;
+            margin: 5mm;
             font-size: 10px;
             line-height: 1.2;
             color: #000;
@@ -15,9 +15,9 @@
         
         .header {
             text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #000;
-            padding-bottom: 8px;
+            padding-bottom: 5px;
         }
         
         .header .organization {
@@ -42,8 +42,8 @@
         }
         
         .survey-info {
-            margin-bottom: 12px;
-            padding: 8px;
+            margin-bottom: 8px;
+            padding: 6px;
             background-color: #f9f9f9;
             border-left: 2px solid #000;
             font-size: 9px;
@@ -61,9 +61,9 @@
         .stats-grid {
             display: table;
             width: 100%;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             border-collapse: separate;
-            border-spacing: 6px;
+            border-spacing: 4px;
         }
         
         .stats-row {
@@ -73,7 +73,7 @@
         .stat-card {
             display: table-cell;
             text-align: center;
-            padding: 10px 8px;
+            padding: 6px 4px;
             border: 1px solid #333;
             background-color: #f8f9fa;
             width: 25%;
@@ -82,15 +82,15 @@
         }
         
         .stat-number {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             color: #000;
             line-height: 1.1;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         
         .stat-label {
-            font-size: 9px;
+            font-size: 8px;
             color: #666;
             font-weight: normal;
             text-transform: uppercase;
@@ -98,16 +98,18 @@
         }
         
         .question-section {
-            margin-bottom: 12px;
-            page-break-inside: avoid;
+            margin-bottom: 8px;
+            page-break-inside: auto;
+            orphans: 2;
+            widows: 2;
         }
         
         .question-title {
             font-size: 10px;
             font-weight: bold;
             color: #000;
-            margin-bottom: 6px;
-            padding: 4px;
+            margin-bottom: 4px;
+            padding: 3px;
             background-color: #e9ecef;
             border-left: 2px solid #000;
         }
@@ -115,11 +117,11 @@
         .question-type {
             font-size: 8px;
             color: #666;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
         
         .rating-stats {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         
         .rating-bar {
@@ -155,7 +157,7 @@
         }
         
         .text-responses {
-            margin-top: 8px;
+            margin-top: 4px;
         }
         
         .text-responses-grid {
@@ -187,7 +189,7 @@
             border-left: 1px solid #dee2e6;
             font-size: 8px;
             line-height: 1.2;
-            page-break-inside: avoid;
+            page-break-inside: auto;
         }
         
         .text-response-number {
@@ -197,14 +199,15 @@
         }
         
         .choice-stats {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         
         .grid-choice-container {
             display: table;
             width: 100%;
             border-collapse: separate;
-            border-spacing: 4px;
+            border-spacing: 2px;
+            margin-top: 4px;
         }
         
         .grid-choice-row {
@@ -223,25 +226,25 @@
         }
         
         .grid-choice-item {
-            margin-bottom: 6px;
-            padding: 4px;
+            margin-bottom: 4px;
+            padding: 3px;
             background-color: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 2px;
             font-size: 8px;
-            page-break-inside: avoid;
+            page-break-inside: auto;
         }
         
         .grid-choice-title {
             font-weight: bold;
             color: #000;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         
         .grid-choice-responses {
             color: #666;
             font-size: 7px;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         
         .grid-choice-answer {
@@ -251,7 +254,11 @@
         
         .choice-item {
             margin-bottom: 4px;
-            padding: 2px 0;
+            padding: 3px;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            font-size: 8px;
+            line-height: 1.2;
         }
         
         .choice-text {
@@ -259,33 +266,11 @@
             margin-bottom: 2px;
         }
         
-        .choice-bar-container {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .choice-bar {
-            height: 8px;
-            background-color: #e9ecef;
-            border-radius: 2px;
-            position: relative;
-            flex: 1;
-        }
-        
-        .choice-bar-fill {
-            height: 100%;
-            background-color: #007bff;
-            border-radius: 2px;
-            transition: width 0.3s ease;
-        }
-        
         .choice-count {
             font-weight: bold;
             color: #000;
             font-size: 8px;
-            min-width: 20px;
-            text-align: right;
+            float: right;
         }
         
         .footer {
@@ -515,7 +500,7 @@
                 @endphp
                 @if(!empty($ratingStats) && isset($ratingStats['average']))
                     <div class="rating-stats">
-                        <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="text-align: center; margin-bottom: 8px;">
                             <strong>Średnia: {{ $ratingStats['average'] }}</strong> | 
                             <strong>Odpowiedzi: {{ $ratingStats['count'] }}</strong>
                         </div>
@@ -535,7 +520,7 @@
                 @php
                     $responses = $question->getResponses();
                 @endphp
-                <div style="margin-bottom: 10px;">
+                <div style="margin-bottom: 6px;">
                     <strong>{{ $responses->count() }}</strong> odpowiedzi
                 </div>
                 
@@ -651,12 +636,7 @@
                             @foreach($mainCategories as $category => $count)
                                 <div class="choice-item">
                                     <div class="choice-text">{{ $category }}</div>
-                                    <div class="choice-bar-container">
-                                        <div class="choice-bar">
-                                            <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
-                                        </div>
-                                        <div class="choice-count">{{ $count }}</div>
-                                    </div>
+                                    <div class="choice-count">{{ $count }}</div>
                                 </div>
                             @endforeach
                             
@@ -666,31 +646,43 @@
                                     @foreach($otherResponses as $response => $count)
                                         <div class="choice-item">
                                             <div class="choice-text">{{ $response }}</div>
-                                            <div class="choice-bar-container">
-                                                <div class="choice-bar">
-                                                    <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
-                                                </div>
-                                                <div class="choice-count">{{ $count }}</div>
-                                            </div>
+                                            <div class="choice-count">{{ $count }}</div>
                                         </div>
                                     @endforeach
                                 </div>
                             @endif
                         @else
-                            <strong>Wszystkie odpowiedzi:</strong>
-                            @foreach($allResponses as $response => $count)
-                                <div class="choice-item">
-                                    <div class="choice-text">{{ $response }}</div>
-                                    <div class="choice-bar-container">
-                                        <div class="choice-bar">
-                                            <div class="choice-bar-fill" style="width: {{ ($count / $totalResponses) * 100 }}%"></div>
-                                        </div>
-                                        <div class="choice-count">{{ $count }}</div>
+                            <div class="text-responses">
+                                <strong>Wszystkie odpowiedzi ({{ $responses->count() }}):</strong>
+                                @php
+                                    $responsesArray = $responses->toArray();
+                                    $responsesPerColumn = ceil(count($responsesArray) / 3);
+                                    $columns = [
+                                        array_slice($responsesArray, 0, $responsesPerColumn),
+                                        array_slice($responsesArray, $responsesPerColumn, $responsesPerColumn),
+                                        array_slice($responsesArray, $responsesPerColumn * 2)
+                                    ];
+                                @endphp
+                                
+                                <div class="text-responses-grid">
+                                    <div class="text-responses-row">
+                                        @foreach($columns as $columnIndex => $columnResponses)
+                                            <div class="text-responses-column">
+                                                @foreach($columnResponses as $index => $response)
+                                                    @php
+                                                        $responseNumber = $columnIndex * $responsesPerColumn + $index + 1;
+                                                    @endphp
+                                                    <div class="text-response">
+                                                        <span class="text-response-number">{{ $responseNumber }}.</span>
+                                                        {{ Str::limit($response, 120) }}
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
                         @endif
-                    </div>
                     @endif
                 @endif
             @endif
