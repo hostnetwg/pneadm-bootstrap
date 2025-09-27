@@ -39,4 +39,20 @@ class Instructor extends Model
     {
         return trim("{$this->title} {$this->first_name} {$this->last_name}");
     }
+
+    /**
+     * Relacja do kursów prowadzonych przez instruktora
+     */
+    public function courses()
+    {
+        return $this->hasMany(Course::class, 'instructor_id');
+    }
+
+    /**
+     * Relacja do ankiet przypisanych do instruktora
+     */
+    public function surveys()
+    {
+        return $this->hasMany(Survey::class, 'instructor_id');
+    }
 }

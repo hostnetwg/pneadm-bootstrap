@@ -145,6 +145,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/instructors', [InstructorsController::class, 'index'])->name('courses.instructors.index');
     Route::post('/instructors', [InstructorsController::class, 'store'])->name('courses.instructors.store');
     Route::get('/instructors/create', [InstructorsController::class, 'create'])->name('courses.instructors.create');
+    Route::get('/instructors/{id}', [InstructorsController::class, 'show'])->name('courses.instructors.show');
     Route::get('/instructors/{id}/edit', [InstructorsController::class, 'edit'])->name('courses.instructors.edit');
     // Route::post('/instructors/{id}/update', [InstructorsController::class, 'update'])->name('courses.instructors.update');
     Route::put('/instructors/{id}', [InstructorsController::class, 'update'])->name('courses.instructors.update');

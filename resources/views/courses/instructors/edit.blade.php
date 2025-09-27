@@ -86,7 +86,10 @@
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
 
-                <button type="submit" class="btn btn-success">Zapisz zmiany</button>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success">Zapisz zmiany</button>
+                    <a href="{{ route('courses.instructors.index') }}" class="btn btn-secondary">Anuluj</a>
+                </div>
             </form>
         </div>
     </div>

@@ -121,7 +121,7 @@
                                             <small class="text-muted">Odpowiedzi</small>
                                         </div>
                                         <div class="col-3">
-                                            <div class="text-success fw-bold">{{ $survey->questions->count() }}</div>
+                                            <div class="text-success fw-bold">{{ $survey->getActualQuestionsCount() }}</div>
                                             <small class="text-muted">Pytań</small>
                                         </div>
                                         <div class="col-3">

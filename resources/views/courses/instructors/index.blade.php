@@ -58,13 +58,21 @@
                         <td>{{ $instructor->phone }}</td>
                         <td>{{ $instructor->is_active ? 'Tak' : 'Nie' }}</td>
                         <td>
-                            <a href="{{ route('courses.instructors.edit', $instructor->id) }}" class="btn btn-warning btn-sm">Edytuj</a>
-                            <!-- Formularz usuwania -->
-                            <form action="{{ route('courses.instructors.destroy', $instructor->id) }}" method="POST" style="display:inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Czy na pewno chcesz usunąć?')">Usuń</button>
-                            </form>
+                            <div class="btn-group" role="group">
+                                <a href="{{ route('courses.instructors.show', $instructor->id) }}" class="btn btn-info btn-sm" title="Podgląd">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ route('courses.instructors.edit', $instructor->id) }}" class="btn btn-warning btn-sm" title="Edytuj">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form action="{{ route('courses.instructors.destroy', $instructor->id) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Usuń" onclick="return confirm('Czy na pewno chcesz usunąć?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     @endforeach

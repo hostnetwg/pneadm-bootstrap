@@ -66,6 +66,12 @@ class InstructorsController extends Controller
         $instructor = Instructor::findOrFail($id);
         return view('courses.instructors.edit', compact('instructor'));
     }
+
+    public function show($id)
+    {
+        $instructor = Instructor::with(['surveys.course', 'surveys.questions'])->findOrFail($id);
+        return view('courses.instructors.show', compact('instructor'));
+    }
     
     public function update(Request $request, $id)
     {
