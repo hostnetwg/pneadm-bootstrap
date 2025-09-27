@@ -56,6 +56,33 @@
             overflow: hidden;
         }
         
+        /* Style dla lepszego oddzielenia pytań */
+        .question-separator {
+            margin: 2rem 0;
+            padding: 1rem 0;
+            border-top: 3px solid #e9ecef;
+            border-bottom: 1px solid #e9ecef;
+            background: linear-gradient(90deg, transparent 0%, #f8f9fa 50%, transparent 100%);
+        }
+        
+        .grid-question-section {
+            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+            border-left: 4px solid #0d6efd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.1);
+        }
+        
+        .single-question-section {
+            background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+            border-left: 4px solid #198754;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(25, 135, 84, 0.1);
+        }
+        
         .progress-mini .progress-bar {
             transition: width 0.3s ease;
         }
@@ -163,7 +190,7 @@
                                 @foreach($groupedQuestions as $group)
                                     @if($group['type'] === 'grid')
                                         <!-- Siatka pytań -->
-                                        <div class="mb-4 pb-3 border-bottom">
+                                        <div class="grid-question-section">
                                             <h6 class="text-primary mb-3">
                                                 <i class="fas fa-table"></i> {{ $group['main_text'] }}
                                                 <span class="badge bg-info ms-2">Siatka</span>
@@ -261,7 +288,7 @@
                                     @else
                                         <!-- Pojedyncze pytanie -->
                                         @php $question = $group['question']; @endphp
-                                        <div class="mb-4 pb-3 border-bottom">
+                                        <div class="single-question-section">
                                             <h6 class="text-primary">{{ $question->question_text }}</h6>
                                             <small class="text-muted">
                                                 Typ: 

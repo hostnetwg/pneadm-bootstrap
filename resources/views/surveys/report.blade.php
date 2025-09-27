@@ -406,10 +406,28 @@
                                         @endphp
                                         <tr>
                                             <td><strong>{{ $question->getGridOption() }}</strong></td>
-                                            <td class="text-center"><strong>{{ $ratingStats['average'] }}</strong></td>
-                                            <td class="text-center">{{ $ratingStats['count'] }}</td>
+                                            <td class="text-center">
+                                                @if($question->isRating() && !empty($ratingStats) && isset($ratingStats['average']))
+                                                    <strong>{{ $ratingStats['average'] }}</strong>
+                                                @else
+                                                    <strong>-</strong>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">
+                                                @if($question->isRating() && !empty($ratingStats) && isset($ratingStats['count']))
+                                                    {{ $ratingStats['count'] }}
+                                                @else
+                                                    {{ $question->getResponses()->count() }}
+                                                @endif
+                                            </td>
                                             @for($i = 1; $i <= 5; $i++)
-                                                <td class="text-center">{{ $ratingStats['distribution'][$i] }}</td>
+                                                <td class="text-center">
+                                                    @if($question->isRating() && !empty($ratingStats) && isset($ratingStats['distribution']))
+                                                        {{ $ratingStats['distribution'][$i] ?? 0 }}
+                                                    @else
+                                                        0
+                                                    @endif
+                                                </td>
                                             @endfor
                                         </tr>
                                     @endif
@@ -495,7 +513,7 @@
                 @php
                     $ratingStats = $question->getRatingStats();
                 @endphp
-                @if(!empty($ratingStats))
+                @if(!empty($ratingStats) && isset($ratingStats['average']))
                     <div class="rating-stats">
                         <div style="text-align: center; margin-bottom: 15px;">
                             <strong>Średnia: {{ $ratingStats['average'] }}</strong> | 
@@ -552,7 +570,47 @@
                             </div>
                         </div>
                     </div>
-                @elseif($question->isMultipleChoice() || $question->isSingleChoice() && $responses->count() > 0)
+                @elseif(($question->isMultipleChoice() || $question->isSingleChoice()) && $responses->count() > 0)
+                    @php
+                        // Sprawdź czy to pytanie "Inne uwagi i sugestie" - powinno być wyświetlane jak tekst
+                        $isCommentsQuestion = strpos($question->question_text, 'Inne uwagi i sugestie') !== false || 
+                                             strpos($question->question_text, 'uwagi i sugestie') !== false ||
+                                             strpos($question->question_text, 'inne uwagi') !== false;
+                    @endphp
+                    
+                    @if($isCommentsQuestion)
+                        <!-- Wyświetl jako tekst w 3 kolumnach -->
+                        <div class="text-responses">
+                            <strong>Wszystkie odpowiedzi ({{ $responses->count() }}):</strong>
+                            @php
+                                $responsesArray = $responses->toArray();
+                                $responsesPerColumn = ceil(count($responsesArray) / 3);
+                                $columns = [
+                                    array_slice($responsesArray, 0, $responsesPerColumn),
+                                    array_slice($responsesArray, $responsesPerColumn, $responsesPerColumn),
+                                    array_slice($responsesArray, $responsesPerColumn * 2)
+                                ];
+                            @endphp
+                            
+                            <div class="text-responses-grid">
+                                <div class="text-responses-row">
+                                    @foreach($columns as $columnIndex => $columnResponses)
+                                        <div class="text-responses-column">
+                                            @foreach($columnResponses as $index => $response)
+                                                @php
+                                                    $responseNumber = $columnIndex * $responsesPerColumn + $index + 1;
+                                                @endphp
+                                                <div class="text-response">
+                                                    <span class="text-response-number">{{ $responseNumber }}.</span>
+                                                    {{ Str::limit($response, 120) }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @else
                     <div class="choice-stats">
                         @php
                             $responseCounts = $responses->countBy();
@@ -633,6 +691,7 @@
                             @endforeach
                         @endif
                     </div>
+                    @endif
                 @endif
             @endif
                 </div>

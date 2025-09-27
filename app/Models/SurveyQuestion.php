@@ -206,6 +206,16 @@ class SurveyQuestion extends Model
             return true;
         }
         
+        // Sprawdź czy to pytanie o dni tygodnia (specjalny przypadek)
+        if (strpos($text, 'Które dni tygodnia') !== false && strpos($text, 'godziny rozpoczęcia') !== false) {
+            return true;
+        }
+        
+        // Sprawdź czy to pytanie o dni tygodnia (inne warianty)
+        if (strpos($text, 'dni tygodnia') !== false && strpos($text, 'godziny') !== false) {
+            return true;
+        }
+        
         return false;
     }
 
@@ -264,5 +274,29 @@ class SurveyQuestion extends Model
             ->where('question_text', 'like', '%' . $mainText . '%')
             ->orderBy('question_order')
             ->get();
+    }
+
+    /**
+     * Pobierz numer pytania z tekstu
+     */
+    public function getQuestionNumber(): ?string
+    {
+        // Sprawdź czy tekst pytania zaczyna się od numeru
+        if (preg_match('/^(\d+)\.\s*(.+)$/', $this->question_text, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Pobierz tekst pytania bez numeru
+     */
+    public function getQuestionTextWithoutNumber(): string
+    {
+        // Sprawdź czy tekst pytania zaczyna się od numeru
+        if (preg_match('/^\d+\.\s*(.+)$/', $this->question_text, $matches)) {
+            return $matches[1];
+        }
+        return $this->question_text;
     }
 }

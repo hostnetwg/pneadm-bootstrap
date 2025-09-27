@@ -70,24 +70,87 @@
 
                                 <!-- Lista pytań -->
                                 <div class="questions-list">
-                                    @foreach($survey->questions as $index => $question)
-                                        <div class="card mb-3 question-card">
-                                            <div class="card-body">
+                                    @foreach($groupedQuestions as $group)
+                                        @if($group['type'] === 'grid')
+                                            <!-- Siatka pytań -->
+                                            <div class="grid-question-section">
+                                                @php
+                                                    $mainTextNumber = null;
+                                                    if (preg_match('/^(\d+)\.\s*(.+)$/', $group['main_text'], $matches)) {
+                                                        $mainTextNumber = $matches[1];
+                                                        $mainTextWithoutNumber = $matches[2];
+                                                    } else {
+                                                        $mainTextWithoutNumber = $group['main_text'];
+                                                    }
+                                                @endphp
+                                                <h6 class="text-primary mb-3">
+                                                    @if($mainTextNumber)
+                                                        <span class="badge bg-secondary me-2">{{ $mainTextNumber }}</span>
+                                                    @endif
+                                                    <i class="fas fa-table"></i> {{ $mainTextWithoutNumber }}
+                                                    <span class="badge bg-info ms-2">Siatka pytań</span>
+                                                </h6>
+                                                
+                                                @foreach($group['questions'] as $question)
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input question-checkbox" 
+                                                               type="checkbox" 
+                                                               name="selected_questions[]" 
+                                                               value="{{ $question->id }}" 
+                                                               id="question_{{ $question->id }}"
+                                                               {{ !in_array($question->question_order, [10, 11, 12, 13, 14, 15, 16, 17]) ? 'checked' : '' }}
+                                                               data-question-id="{{ $question->id }}">
+                                                        <label class="form-check-label w-100" for="question_{{ $question->id }}">
+                                                            <div class="d-flex justify-content-between align-items-start">
+                                                                <div class="flex-grow-1">
+                                                                    <h6 class="mb-1">
+                                                                        <i class="fas fa-check-square"></i> {{ $question->getGridOption() }}
+                                                                    </h6>
+                                                                    <small class="text-muted">
+                                                                        Typ: 
+                                                                        @if($question->isRating())
+                                                                            <span class="badge bg-warning">Ocena (1-5)</span>
+                                                                        @elseif($question->isSingleChoice())
+                                                                            <span class="badge bg-success">Jednokrotny wybór</span>
+                                                                        @elseif($question->isMultipleChoice())
+                                                                            <span class="badge bg-primary">Wielokrotny wybór</span>
+                                                                        @endif
+                                                                    </small>
+                                                                </div>
+                                                                <div class="text-end">
+                                                                    <small class="text-muted">
+                                                                        {{ $question->getResponses()->count() }} odpowiedzi
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <!-- Pojedyncze pytanie -->
+                                            @php $question = $group['question']; @endphp
+                                            <div class="single-question-section">
                                                 <div class="form-check">
+                                                    @php
+                                                        $questionNumber = $question->getQuestionNumber();
+                                                        $questionTextWithoutNumber = $question->getQuestionTextWithoutNumber();
+                                                    @endphp
                                                     <input class="form-check-input question-checkbox" 
                                                            type="checkbox" 
                                                            name="selected_questions[]" 
                                                            value="{{ $question->id }}" 
                                                            id="question_{{ $question->id }}"
-                                                           {{ !in_array($index + 1, [10, 11, 12, 13, 14, 15, 16, 17]) ? 'checked' : '' }}
-                                                           data-question-id="{{ $question->id }}"
-                                                           data-question-number="{{ $index + 1 }}">
+                                                           {{ !in_array($question->question_order, [10, 11, 12, 13, 14, 15, 16, 17]) ? 'checked' : '' }}
+                                                           data-question-id="{{ $question->id }}">
                                                     <label class="form-check-label w-100" for="question_{{ $question->id }}">
                                                         <div class="d-flex justify-content-between align-items-start">
                                                             <div class="flex-grow-1">
                                                                 <h6 class="mb-1">
-                                                                    <span class="badge bg-secondary me-2">{{ $index + 1 }}</span>
-                                                                    {{ $question->question_text }}
+                                                                    @if($questionNumber)
+                                                                        <span class="badge bg-secondary me-2">{{ $questionNumber }}</span>
+                                                                    @endif
+                                                                    {{ $questionTextWithoutNumber }}
                                                                 </h6>
                                                                 <small class="text-muted">
                                                                     Typ: 
@@ -104,17 +167,14 @@
                                                             </div>
                                                             <div class="text-end">
                                                                 <small class="text-muted">
-                                                                    @php
-                                                                        $responses = $question->getResponses();
-                                                                    @endphp
-                                                                    {{ $responses->count() }} odpowiedzi
+                                                                    {{ $question->getResponses()->count() }} odpowiedzi
                                                                 </small>
                                                             </div>
                                                         </div>
                                                     </label>
                                                 </div>
                                             </div>
-                                        </div>
+                                        @endif
                                     @endforeach
                                 </div>
 
@@ -197,6 +257,37 @@
     </div>
 
     <style>
+        /* Style dla lepszego oddzielenia pytań */
+        .grid-question-section {
+            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+            border-left: 4px solid #0d6efd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .grid-question-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+        }
+        
+        .single-question-section {
+            background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+            border-left: 4px solid #198754;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(25, 135, 84, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .single-question-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 135, 84, 0.15);
+        }
+        
         .question-card {
             transition: all 0.3s ease;
             border: 2px solid transparent;
