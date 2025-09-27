@@ -729,6 +729,29 @@
                                     <td><strong>Przez:</strong></td>
                                     <td>{{ $survey->importedBy->name ?? 'Nieznany' }}</td>
                                 </tr>
+                                @if($survey->original_file_path)
+                                    <tr>
+                                        <td><strong>Plik CSV:</strong></td>
+                                        <td>
+                                            <small class="text-success">
+                                                <i class="fas fa-check-circle"></i> Zapisany
+                                            </small>
+                                            <br>
+                                            <small class="text-muted">
+                                                <i class="fas fa-file-csv"></i> {{ basename($survey->original_file_path) }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                @else
+                                    <tr>
+                                        <td><strong>Plik CSV:</strong></td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <i class="fas fa-times-circle"></i> Brak
+                                            </small>
+                                        </td>
+                                    </tr>
+                                @endif
                                 @if($survey->description)
                                     <tr>
                                         <td><strong>Opis:</strong></td>
@@ -754,6 +777,16 @@
                                 <a href="{{ route('surveys.edit', $survey->id) }}" class="btn btn-warning">
                                     <i class="fas fa-edit"></i> Edytuj ankietę
                                 </a>
+                                @if($survey->original_file_path)
+                                    <form action="{{ route('surveys.delete-original-file', $survey->id) }}" method="POST" 
+                                          onsubmit="return confirm('Czy na pewno chcesz usunąć oryginalny plik CSV? Ta operacja jest nieodwracalna.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-outline-danger w-100">
+                                            <i class="fas fa-file-csv"></i> Usuń plik CSV
+                                        </button>
+                                    </form>
+                                @endif
                                 <form action="{{ route('surveys.destroy', $survey->id) }}" method="POST" 
                                       onsubmit="return confirm('Czy na pewno chcesz usunąć tę ankietę?')">
                                     @csrf

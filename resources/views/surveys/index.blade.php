@@ -96,8 +96,19 @@
                                     @endif
 
                                     <p class="text-muted mb-2">
-                                        <i class="fas fa-calendar"></i> {{ $survey->imported_at->format('d.m.Y H:i') }}
+                                        <i class="fas fa-calendar"></i> 
+                                        @if($survey->course->start_date)
+                                            Szkolenie: {{ $survey->course->start_date->format('d.m.Y') }}
+                                        @else
+                                            Import: {{ $survey->imported_at->format('d.m.Y H:i') }}
+                                        @endif
                                     </p>
+                                    
+                                    @if($survey->course->start_date)
+                                        <p class="text-muted mb-2">
+                                            <i class="fas fa-upload"></i> Import: {{ $survey->imported_at->format('d.m.Y H:i') }}
+                                        </p>
+                                    @endif
 
                                     @if($survey->description)
                                         <p class="text-muted small mb-3">{{ Str::limit($survey->description, 100) }}</p>
@@ -105,21 +116,44 @@
 
                                     <!-- Statystyki -->
                                     <div class="row text-center mb-3">
-                                        <div class="col-4">
+                                        <div class="col-3">
                                             <div class="text-primary fw-bold">{{ $survey->total_responses }}</div>
                                             <small class="text-muted">Odpowiedzi</small>
                                         </div>
-                                        <div class="col-4">
+                                        <div class="col-3">
                                             <div class="text-success fw-bold">{{ $survey->questions->count() }}</div>
                                             <small class="text-muted">Pytań</small>
                                         </div>
-                                        <div class="col-4">
+                                        <div class="col-3">
                                             <div class="text-warning fw-bold">
                                                 {{ $survey->getAverageRating() > 0 ? $survey->getAverageRating() : 'N/A' }}
                                             </div>
                                             <small class="text-muted">Średnia</small>
                                         </div>
+                                        <div class="col-3">
+                                            @if($survey->original_file_path)
+                                                <div class="text-success fw-bold">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </div>
+                                                <small class="text-muted">CSV</small>
+                                            @else
+                                                <div class="text-muted fw-bold">
+                                                    <i class="fas fa-times-circle"></i>
+                                                </div>
+                                                <small class="text-muted">CSV</small>
+                                            @endif
+                                        </div>
                                     </div>
+
+                                    <!-- Informacja o pliku CSV -->
+                                    @if($survey->original_file_path)
+                                        <div class="alert alert-light py-2 mb-3">
+                                            <small class="text-muted">
+                                                <i class="fas fa-file-csv text-success"></i> 
+                                                <strong>Plik:</strong> {{ basename($survey->original_file_path) }}
+                                            </small>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="card-footer">
                                     <div class="d-grid gap-2">

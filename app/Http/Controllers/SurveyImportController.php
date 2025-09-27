@@ -36,6 +36,11 @@ class SurveyImportController extends Controller
         try {
             DB::beginTransaction();
 
+            // Zapisz plik CSV na serwerze z prefiksem ID szkolenia
+            $originalFileName = $request->file('csv_file')->getClientOriginalName();
+            $fileName = $course->id . '_' . $originalFileName;
+            $filePath = $request->file('csv_file')->storeAs('surveys/imports', $fileName, 'private');
+
             // Utwórz ankietę
             $survey = Survey::create([
                 'course_id' => $course->id,
@@ -45,7 +50,8 @@ class SurveyImportController extends Controller
                 'source' => 'Google Forms',
                 'imported_at' => now(),
                 'imported_by' => Auth::id(),
-                'total_responses' => 0
+                'total_responses' => 0,
+                'original_file_path' => $filePath
             ]);
 
             // Przetwórz plik CSV

@@ -218,4 +218,30 @@ class SurveyController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"'
         ]);
     }
+
+    /**
+     * Usuń oryginalny plik CSV ankiety
+     */
+    public function deleteOriginalFile(Survey $survey)
+    {
+        if (!$survey->original_file_path) {
+            return back()->with('error', 'Brak pliku do usunięcia.');
+        }
+
+        try {
+            // Usuń plik z dysku
+            if (\Storage::disk('private')->exists($survey->original_file_path)) {
+                \Storage::disk('private')->delete($survey->original_file_path);
+            }
+
+            // Usuń ścieżkę z bazy danych
+            $survey->update(['original_file_path' => null]);
+
+            return back()->with('success', 'Oryginalny plik CSV został usunięty.');
+
+        } catch (\Exception $e) {
+            \Log::error('Błąd usuwania pliku CSV: ' . $e->getMessage());
+            return back()->with('error', 'Wystąpił błąd podczas usuwania pliku.');
+        }
+    }
 }

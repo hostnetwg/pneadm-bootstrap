@@ -155,6 +155,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');
     Route::get('/surveys/{survey}/report/form', [SurveyController::class, 'showReportForm'])->name('surveys.report.form');
     Route::post('/surveys/{survey}/report', [SurveyController::class, 'generateReport'])->name('surveys.report');
+    Route::delete('/surveys/{survey}/original-file', [SurveyController::class, 'deleteOriginalFile'])->name('surveys.delete-original-file');
     
     // Import ankiet
     Route::get('/courses/{course}/surveys/import', [SurveyImportController::class, 'showImportForm'])->name('surveys.import');

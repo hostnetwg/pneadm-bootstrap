@@ -20,6 +20,7 @@ class Survey extends Model
         'imported_by',
         'source',
         'total_responses',
+        'original_file_path',
         'metadata'
     ];
 
