@@ -155,6 +155,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');
     Route::get('/surveys/{survey}/report/form', [SurveyController::class, 'showReportForm'])->name('surveys.report.form');
     Route::post('/surveys/{survey}/report', [SurveyController::class, 'generateReport'])->name('surveys.report');
+    Route::get('/surveys/{survey}/download-file', [SurveyController::class, 'downloadOriginalFile'])->name('surveys.download-file');
     Route::delete('/surveys/{survey}/original-file', [SurveyController::class, 'deleteOriginalFile'])->name('surveys.delete-original-file');
     Route::post('/surveys/search-course', [SurveyController::class, 'searchCourse'])->name('surveys.search-course');
     

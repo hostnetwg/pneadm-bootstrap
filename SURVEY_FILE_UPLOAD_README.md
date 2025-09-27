@@ -51,6 +51,12 @@ System automatycznie importuje dane z plików CSV:
 - **Obsługa timestampów**: Google Forms format z automatyczną konwersją
 - **Walidacja danych**: sprawdzanie poprawności formatu CSV
 
+### 6. Ujednolicony sposób zapisywania plików
+Niezależnie od metody importu (przez `/surveys/create` czy `/courses/{id}/surveys/import`), wszystkie pliki CSV są zapisywane w ten sam sposób:
+- **Katalog**: `storage/app/private/surveys/imports/`
+- **Nazwa pliku**: `{course_id}_{original_filename}`
+- **Przykład**: `375_Ankieta (2024-01-15).csv`
+
 ## Nowe funkcje
 
 ### Frontend (JavaScript)
@@ -64,6 +70,7 @@ System automatycznie importuje dane z plików CSV:
 - Walidacja danych wejściowych
 - Inteligentne wyszukiwanie szkolenia
 - Zwracanie sugestii podobnych szkoleń
+- **Ujednolicony sposób zapisywania plików**: Wszystkie pliki CSV są zapisywane w katalogu `surveys/imports` z nazwą `{course_id}_{original_filename}`
 
 ### Nowa trasa
 ```

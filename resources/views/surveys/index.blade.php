@@ -148,10 +148,32 @@
                                     <!-- Informacja o pliku CSV -->
                                     @if($survey->original_file_path)
                                         <div class="alert alert-light py-2 mb-3">
-                                            <small class="text-muted">
-                                                <i class="fas fa-file-csv text-success"></i> 
-                                                <strong>Plik:</strong> {{ basename($survey->original_file_path) }}
-                                            </small>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-file-csv text-success"></i> 
+                                                        <strong>Plik:</strong> {{ basename($survey->original_file_path) }}
+                                                    </small>
+                                                </div>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ route('surveys.download-file', $survey->id) }}" 
+                                                       class="btn btn-outline-success btn-sm" 
+                                                       title="Pobierz plik CSV">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <form action="{{ route('surveys.delete-original-file', $survey->id) }}" 
+                                                          method="POST" 
+                                                          onsubmit="return confirm('Czy na pewno chcesz usunąć plik CSV?')" 
+                                                          class="d-inline">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                                title="Usuń plik CSV">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
                                         </div>
                                     @endif
                                 </div>
@@ -161,7 +183,7 @@
                                             <i class="fas fa-eye"></i> Zobacz szczegóły
                                         </a>
                                         <div class="btn-group" role="group">
-                                            <a href="{{ route('surveys.report', $survey->id) }}" class="btn btn-outline-success btn-sm">
+                                            <a href="{{ route('surveys.report.form', $survey->id) }}" class="btn btn-outline-success btn-sm">
                                                 <i class="fas fa-file-pdf"></i>
                                             </a>
                                             <a href="{{ route('surveys.edit', $survey->id) }}" class="btn btn-outline-warning btn-sm">

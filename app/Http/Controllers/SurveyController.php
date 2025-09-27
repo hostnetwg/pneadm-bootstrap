@@ -90,11 +90,12 @@ class SurveyController extends Controller
                 'total_responses' => 0
             ];
 
-            // Jeśli przesłano plik, zapisz go
+            // Jeśli przesłano plik, zapisz go (używając tej samej logiki co SurveyImportController)
             if ($request->hasFile('survey_file')) {
                 $file = $request->file('survey_file');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $path = $file->storeAs('survey_files', $filename, 'private');
+                $originalFileName = $file->getClientOriginalName();
+                $fileName = $request->course_id . '_' . $originalFileName;
+                $path = $file->storeAs('surveys/imports', $fileName, 'private');
                 
                 $surveyData['original_file_path'] = $path;
             }
@@ -257,6 +258,28 @@ class SurveyController extends Controller
             'Attachment' => true,
             'Content-Disposition' => 'attachment; filename="' . $filename . '"'
         ]);
+    }
+
+    /**
+     * Pobierz oryginalny plik CSV ankiety
+     */
+    public function downloadOriginalFile(Survey $survey)
+    {
+        if (!$survey->original_file_path) {
+            return back()->with('error', 'Brak pliku do pobrania.');
+        }
+
+        try {
+            if (\Storage::disk('private')->exists($survey->original_file_path)) {
+                $filename = basename($survey->original_file_path);
+                return \Storage::disk('private')->download($survey->original_file_path, $filename);
+            } else {
+                return back()->with('error', 'Plik nie istnieje na serwerze.');
+            }
+        } catch (\Exception $e) {
+            \Log::error('Błąd pobierania pliku CSV: ' . $e->getMessage());
+            return back()->with('error', 'Wystąpił błąd podczas pobierania pliku.');
+        }
     }
 
     /**

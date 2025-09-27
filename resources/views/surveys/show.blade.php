@@ -733,13 +733,24 @@
                                     <tr>
                                         <td><strong>Plik CSV:</strong></td>
                                         <td>
-                                            <small class="text-success">
-                                                <i class="fas fa-check-circle"></i> Zapisany
-                                            </small>
-                                            <br>
-                                            <small class="text-muted">
-                                                <i class="fas fa-file-csv"></i> {{ basename($survey->original_file_path) }}
-                                            </small>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-success">
+                                                        <i class="fas fa-check-circle"></i> Zapisany
+                                                    </small>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-file-csv"></i> {{ basename($survey->original_file_path) }}
+                                                    </small>
+                                                </div>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ route('surveys.download-file', $survey->id) }}" 
+                                                       class="btn btn-outline-success btn-sm" 
+                                                       title="Pobierz plik CSV">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 @else
