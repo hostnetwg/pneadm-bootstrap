@@ -101,7 +101,7 @@
                         <select name="type" class="form-select">
                             <option value="">Wszystkie</option>
                             <option value="online" {{ request('type') == 'online' ? 'selected' : '' }}>Online</option>
-                            <option value="offline" {{ request('type') == 'offline' ? 'selected' : '' }}>Offline</option>
+                            <option value="offline" {{ request('type') == 'offline' ? 'selected' : '' }}>Stacjonarne</option>
                         </select>
                     </div>
             
@@ -251,7 +251,7 @@
                             <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
                                 {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}
                             </span> <br>
-                            <span class="small">{{ ucfirst($course->type) }}</span> <br>
+                            <span class="small">{{ $course->type === 'offline' ? 'Stacjonarne' : ucfirst($course->type) }}</span> <br>
                             <span class="small">{{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}</span> <br>
                             <span class="badge {{ $course->is_active ? 'bg-success' : 'bg-danger' }}">
                                 {{ $course->is_active ? 'Aktywne' : 'Nieaktywne' }}

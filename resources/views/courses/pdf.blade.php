@@ -239,7 +239,7 @@
                             {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}
                         </span><br>
                         <span class="badge {{ $course->type === 'online' ? 'badge-online' : 'badge-offline' }}">
-                            {{ ucfirst($course->type) }}
+                            {{ $course->type === 'offline' ? 'Stacjonarne' : ucfirst($course->type) }}
                         </span><br>
                         <span class="badge {{ $course->category === 'open' ? 'badge-open' : 'badge-closed' }}">
                             {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }}

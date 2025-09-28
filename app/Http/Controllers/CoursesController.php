@@ -215,7 +215,7 @@ class CoursesController extends Controller
         }
         
         if ($request->filled('type')) {
-            $appliedFilters['rodzaj'] = ucfirst($request->input('type'));
+            $appliedFilters['rodzaj'] = $request->input('type') === 'offline' ? 'Stacjonarne' : ucfirst($request->input('type'));
         }
         
         if ($request->filled('category')) {
