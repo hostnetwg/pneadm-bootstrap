@@ -127,6 +127,9 @@ class CoursesController extends Controller
     {
         $query = Course::query();
         
+        // Filtrowanie tylko aktywnych szkoleń
+        $query->where('is_active', 1);
+        
         // Pobieranie wartości filtra "date_filter"
         $dateFilter = $request->query('date_filter', 'upcoming');
         
