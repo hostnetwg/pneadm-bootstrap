@@ -48,7 +48,37 @@ class SurveyController extends Controller
         $courses = Course::orderBy('title')->get();
         $instructors = \App\Models\Instructor::orderBy('first_name')->get();
 
-        return view('surveys.index', compact('surveys', 'courses', 'instructors'));
+        // Obliczanie statystyk dla przefiltrowanych ankiet
+        $filteredSurveys = $query->with(['questions', 'responses'])->get();
+        
+        $statistics = [
+            'total_surveys' => $filteredSurveys->count(),
+            'total_responses' => $filteredSurveys->sum('total_responses'),
+            'total_questions' => $filteredSurveys->sum(function($survey) {
+                return $survey->getActualQuestionsCount();
+            }),
+            'average_rating' => 0,
+            'surveys_with_ratings' => 0,
+        ];
+
+        // Obliczanie średniej ocen ze wszystkich ankiet
+        $totalRating = 0;
+        $surveysWithRatings = 0;
+        
+        foreach ($filteredSurveys as $survey) {
+            $surveyRating = $survey->getAverageRating();
+            if ($surveyRating > 0) {
+                $totalRating += $surveyRating;
+                $surveysWithRatings++;
+            }
+        }
+        
+        if ($surveysWithRatings > 0) {
+            $statistics['average_rating'] = round($totalRating / $surveysWithRatings, 2);
+            $statistics['surveys_with_ratings'] = $surveysWithRatings;
+        }
+
+        return view('surveys.index', compact('surveys', 'courses', 'instructors', 'statistics'));
     }
 
     /**

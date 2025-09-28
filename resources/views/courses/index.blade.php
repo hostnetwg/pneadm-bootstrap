@@ -185,6 +185,113 @@
                 </div>
             </div>
             
+            <!-- Statystyki przefiltrowanych szkoleń -->
+            @if($filteredCount > 0)
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statystyki przefiltrowanych szkoleń</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-users"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-info">{{ $statistics['total_participants'] }}</div>
+                                                <small class="text-muted">Uczestników</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-certificate"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-success">{{ $statistics['total_certificates'] }}</div>
+                                                <small class="text-muted">Certyfikatów</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-laptop"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-warning">{{ $statistics['online_courses'] }}</div>
+                                                <small class="text-muted">Online</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-building"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-secondary">{{ $statistics['offline_courses'] }}</div>
+                                                <small class="text-muted">Stacjonarne</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-dollar-sign"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-danger">{{ $statistics['paid_courses'] }}</div>
+                                                <small class="text-muted">Płatne</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-gift"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-success">{{ $statistics['free_courses'] }}</div>
+                                                <small class="text-muted">Bezpłatne</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-unlock"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-primary">{{ $statistics['open_courses'] }}</div>
+                                                <small class="text-muted">Otwarte</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-lock"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">{{ $statistics['closed_courses'] }}</div>
+                                                <small class="text-muted">Zamknięte</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+            
             @if($courses->count() > 0)
                 <table class="table table-striped table-hover table-responsive">
                     <thead class="table-dark">

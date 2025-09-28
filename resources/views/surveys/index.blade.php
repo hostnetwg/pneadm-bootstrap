@@ -71,6 +71,78 @@
                 </div>
             </div>
 
+            <!-- Statystyki przefiltrowanych ankiet -->
+            @if($statistics['total_surveys'] > 0)
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statystyki przefiltrowanych ankiet</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-clipboard-list"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-info">{{ $statistics['total_surveys'] }}</div>
+                                                <small class="text-muted">Ankiet</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-comments"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-success">{{ $statistics['total_responses'] }}</div>
+                                                <small class="text-muted">Odpowiedzi</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-question-circle"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-warning">{{ $statistics['total_questions'] }}</div>
+                                                <small class="text-muted">Pytań</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-star"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-danger">
+                                                    @if($statistics['average_rating'] > 0)
+                                                        {{ $statistics['average_rating'] }}
+                                                    @else
+                                                        N/A
+                                                    @endif
+                                                </div>
+                                                <small class="text-muted">
+                                                    Średnia ocen
+                                                    @if($statistics['surveys_with_ratings'] > 0)
+                                                        ({{ $statistics['surveys_with_ratings'] }} ankiet)
+                                                    @endif
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Lista ankiet -->
             @if($surveys->count() > 0)
                 <div class="row">

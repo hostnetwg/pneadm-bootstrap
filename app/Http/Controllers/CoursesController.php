@@ -110,6 +110,24 @@ class CoursesController extends Controller
         
         // Liczenie wszystkich aktywnych rekordów w bazie
         $totalCount = Course::where('is_active', true)->count();
+        
+        // Obliczanie statystyk dla przefiltrowanych szkoleń
+        $filteredCourses = $query->with(['participants', 'certificates'])->get();
+        
+        $statistics = [
+            'total_participants' => $filteredCourses->sum(function($course) {
+                return $course->participants->count();
+            }),
+            'total_certificates' => $filteredCourses->sum(function($course) {
+                return $course->certificates->count();
+            }),
+            'online_courses' => $filteredCourses->where('type', 'online')->count(),
+            'offline_courses' => $filteredCourses->where('type', 'offline')->count(),
+            'paid_courses' => $filteredCourses->where('is_paid', true)->count(),
+            'free_courses' => $filteredCourses->where('is_paid', false)->count(),
+            'open_courses' => $filteredCourses->where('category', 'open')->count(),
+            'closed_courses' => $filteredCourses->where('category', 'closed')->count(),
+        ];
     
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
         $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates'])
@@ -117,7 +135,7 @@ class CoursesController extends Controller
                         ->paginate($perPage)
                         ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
     
-        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
+        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount', 'statistics'));
      }
 
     /**
