@@ -126,7 +126,42 @@
                 </div>
             @endif
 
-            <!-- Nawigacja -->
+            <!-- Nawigacja między ankietami -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        @if($previousSurvey)
+                            <a href="{{ route('surveys.show', $previousSurvey->id) }}" class="btn btn-outline-primary">
+                                <i class="fas fa-chevron-left"></i> Poprzednia
+                            </a>
+                        @else
+                            <button class="btn btn-outline-secondary" disabled>
+                                <i class="fas fa-chevron-left"></i> Poprzednia
+                            </button>
+                        @endif
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('surveys.index') }}" class="btn btn-secondary">
+                            <i class="fas fa-list"></i> Lista ankiet
+                        </a>
+                    </div>
+                    
+                    <div>
+                        @if($nextSurvey)
+                            <a href="{{ route('surveys.show', $nextSurvey->id) }}" class="btn btn-outline-primary">
+                                Następna <i class="fas fa-chevron-right"></i>
+                            </a>
+                        @else
+                            <button class="btn btn-outline-secondary" disabled>
+                                Następna <i class="fas fa-chevron-right"></i>
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nagłówek ankiety -->
             <div class="mb-4 d-flex justify-content-between align-items-center">
                 <div>
                     <h4>{{ $survey->title }}</h4>
@@ -138,9 +173,6 @@
                     </p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="{{ route('surveys.index') }}" class="btn btn-secondary">
-                        <i class="fas fa-list"></i> Wszystkie ankiety
-                    </a>
                     <a href="{{ route('courses.show', $survey->course_id) }}" class="btn btn-outline-primary">
                         <i class="fas fa-graduation-cap"></i> Szkolenie
                     </a>

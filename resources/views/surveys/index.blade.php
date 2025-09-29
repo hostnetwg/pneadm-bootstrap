@@ -19,9 +19,30 @@
                     <h4>Wszystkie ankiety</h4>
                     <p class="text-muted mb-0">Zarządzaj ankietami z wszystkich szkoleń</p>
                 </div>
-                <a href="{{ route('surveys.create') }}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Dodaj ankietę
-                </a>
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Opcje paginacji -->
+                    <form method="GET" action="{{ route('surveys.index') }}" class="d-flex align-items-center gap-2">
+                        @foreach(request()->query() as $key => $value)
+                            @if($key !== 'per_page')
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endif
+                        @endforeach
+                        <label for="per_page" class="form-label mb-0 small">Na stronie:</label>
+                        <select name="per_page" id="per_page" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                            <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15</option>
+                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                            <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
+                            <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>Wszystkie</option>
+                        </select>
+                    </form>
+                    <a href="{{ route('surveys.bulk-report', request()->query()) }}" class="btn btn-success" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Zbiorczy raport PDF
+                    </a>
+                    <a href="{{ route('surveys.create') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Dodaj ankietę
+                    </a>
+                </div>
             </div>
 
             <!-- Filtry -->
@@ -64,6 +85,29 @@
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-search"></i> Filtruj
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-3">
+                                <label for="date_from" class="form-label">Data od</label>
+                                <input type="date" class="form-control" id="date_from" name="date_from" 
+                                       value="{{ request('date_from') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="date_to" class="form-label">Data do</label>
+                                <input type="date" class="form-control" id="date_to" name="date_to" 
+                                       value="{{ request('date_to') }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> Filtruj
+                                    </button>
+                                    <a href="{{ route('surveys.index') }}" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Wyczyść filtry
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -277,6 +321,16 @@
                     @endforeach
                 </div>
 
+                <!-- Informacja o liczbie rekordów i paginacja -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="text-muted">
+                        <strong>Wyświetlane rekordy:</strong> {{ $surveys->count() }}/{{ $surveys->total() }}
+                        @if($surveys->hasPages())
+                            <span class="text-info">(strona {{ $surveys->currentPage() }} z {{ $surveys->lastPage() }})</span>
+                        @endif
+                    </div>
+                </div>
+                
                 <!-- Paginacja -->
                 <div class="d-flex justify-content-center">
                     {{ $surveys->links() }}

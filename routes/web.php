@@ -152,6 +152,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::delete('/instructors/{id}', [InstructorsController::class, 'destroy'])->name('courses.instructors.destroy');
 
     // Ankiety
+    Route::get('/surveys/bulk-report', [SurveyController::class, 'generateBulkReport'])->name('surveys.bulk-report');
     Route::resource('surveys', SurveyController::class);
     Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');
     Route::get('/surveys/{survey}/report/form', [SurveyController::class, 'showReportForm'])->name('surveys.report.form');

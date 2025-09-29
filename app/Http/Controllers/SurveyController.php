@@ -20,6 +20,14 @@ class SurveyController extends Controller
     {
         $query = Survey::with(['course', 'instructor', 'importedBy']);
 
+        // Pobieranie opcji paginacji
+        $perPage = $request->query('per_page', 15);
+        if ($perPage === 'all') {
+            $perPage = 999999; // Bardzo duża liczba, żeby wyświetlić wszystkie
+        } else {
+            $perPage = (int) $perPage;
+        }
+
         // Filtrowanie według kursu
         if ($request->filled('course_id')) {
             $query->where('course_id', $request->course_id);
@@ -28,6 +36,19 @@ class SurveyController extends Controller
         // Filtrowanie według instruktora
         if ($request->filled('instructor_id')) {
             $query->where('instructor_id', $request->instructor_id);
+        }
+
+        // Filtrowanie według daty szkolenia
+        if ($request->filled('date_from')) {
+            $query->whereHas('course', function($courseQuery) use ($request) {
+                $courseQuery->where('start_date', '>=', $request->input('date_from'));
+            });
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->whereHas('course', function($courseQuery) use ($request) {
+                $courseQuery->where('start_date', '<=', $request->input('date_to'));
+            });
         }
 
         // Wyszukiwanie
@@ -42,7 +63,11 @@ class SurveyController extends Controller
             });
         }
 
-        $surveys = $query->orderBy('imported_at', 'desc')->paginate(15);
+        $surveys = $query->join('courses', 'surveys.course_id', '=', 'courses.id')
+                        ->orderBy('courses.start_date', 'desc')
+                        ->orderBy('surveys.imported_at', 'desc')
+                        ->select('surveys.*')
+                        ->paginate($perPage)->appends($request->query());
 
         // Pobierz listę kursów i instruktorów dla filtrów
         $courses = Course::orderBy('title')->get();
@@ -79,6 +104,192 @@ class SurveyController extends Controller
         }
 
         return view('surveys.index', compact('surveys', 'courses', 'instructors', 'statistics'));
+    }
+
+    /**
+     * Generowanie zbiorczego raportu z przefiltrowanych ankiet
+     */
+    public function generateBulkReport(Request $request)
+    {
+        $query = Survey::with(['course', 'instructor', 'questions', 'responses']);
+
+        // Filtrowanie według kursu
+        if ($request->filled('course_id')) {
+            $query->where('course_id', $request->course_id);
+        }
+
+        // Filtrowanie według instruktora
+        if ($request->filled('instructor_id')) {
+            $query->where('instructor_id', $request->instructor_id);
+        }
+
+        // Filtrowanie według daty szkolenia
+        if ($request->filled('date_from')) {
+            $query->whereHas('course', function($courseQuery) use ($request) {
+                $courseQuery->where('start_date', '>=', $request->input('date_from'));
+            });
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->whereHas('course', function($courseQuery) use ($request) {
+                $courseQuery->where('start_date', '<=', $request->input('date_to'));
+            });
+        }
+
+        // Wyszukiwanie
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('title', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('description', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('course', function($courseQuery) use ($searchTerm) {
+                      $courseQuery->where('title', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        // Pobierz wszystkie przefiltrowane ankiety
+        $surveys = $query->get();
+
+        if ($surveys->isEmpty()) {
+            return redirect()->route('surveys.index')->with('error', 'Brak ankiet spełniających kryteria filtrowania.');
+        }
+
+        // Przygotowanie szczegółowych analiz odpowiedzi
+        $detailedAnalysis = $this->prepareDetailedAnalysis($surveys);
+
+        // Przygotowanie danych dla raportu
+        $reportData = [
+            'surveys' => $surveys,
+            'total_surveys' => $surveys->count(),
+            'total_responses' => $surveys->sum('total_responses'),
+            'filters_applied' => $request->only(['course_id', 'instructor_id', 'date_from', 'date_to', 'search']),
+            'generated_at' => now(),
+            'detailed_analysis' => $detailedAnalysis,
+        ];
+
+        // Generowanie PDF
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('surveys.bulk-report', $reportData)
+            ->setPaper('A4', 'portrait')
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'isPhpEnabled' => true,
+            ]);
+
+        $filename = 'zbiorczy_raport_ankiet_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Przygotowanie szczegółowej analizy odpowiedzi z ankiet
+     */
+    private function prepareDetailedAnalysis($surveys)
+    {
+        $analysis = [
+            'rating_questions' => [],
+            'open_questions' => [],
+            'choice_questions' => [],
+        ];
+
+        // Pytania do pominięcia w analizie
+        $excludedQuestions = [
+            'O szkoleniu dowiedziałam/em się z',
+            'Które dni tygodnia i godziny rozpoczęcia są dla Ciebie najbardziej dogodne na udział w szkoleniach online? (siatka pól wyboru)',
+        ];
+
+        foreach ($surveys as $survey) {
+            $questions = $survey->questions;
+            $responses = $survey->responses;
+
+            foreach ($questions as $question) {
+                $questionText = $question->question_text;
+                $questionType = $question->question_type;
+
+                // Pomijanie wykluczonych pytań
+                if (in_array($questionText, $excludedQuestions)) {
+                    continue;
+                }
+
+                // Zbieranie odpowiedzi dla tego pytania
+                $questionResponses = $responses->map(function ($response) use ($questionText) {
+                    return $response->response_data[$questionText] ?? null;
+                })->filter();
+
+                if ($questionResponses->isEmpty()) {
+                    continue;
+                }
+
+                // Pytania ratingowe (skala 1-5)
+                if ($questionType === 'rating') {
+                    $numericResponses = $questionResponses->map(function ($response) {
+                        return is_numeric($response) ? (float) $response : null;
+                    })->filter();
+
+                    if ($numericResponses->isNotEmpty()) {
+                        if (!isset($analysis['rating_questions'][$questionText])) {
+                            $analysis['rating_questions'][$questionText] = [
+                                'question' => $questionText,
+                                'responses' => [],
+                                'average' => 0,
+                                'count' => 0,
+                                'distribution' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0],
+                            ];
+                        }
+
+                        foreach ($numericResponses as $response) {
+                            $analysis['rating_questions'][$questionText]['responses'][] = $response;
+                            if (isset($analysis['rating_questions'][$questionText]['distribution'][$response])) {
+                                $analysis['rating_questions'][$questionText]['distribution'][$response]++;
+                            }
+                        }
+
+                        $analysis['rating_questions'][$questionText]['count'] += $numericResponses->count();
+                        $analysis['rating_questions'][$questionText]['average'] = 
+                            $analysis['rating_questions'][$questionText]['responses'] ? 
+                            round(array_sum($analysis['rating_questions'][$questionText]['responses']) / count($analysis['rating_questions'][$questionText]['responses']), 2) : 0;
+                    }
+                }
+                // Pytania otwarte
+                elseif (in_array($questionType, ['text', 'textarea'])) {
+                    if (!isset($analysis['open_questions'][$questionText])) {
+                        $analysis['open_questions'][$questionText] = [
+                            'question' => $questionText,
+                            'responses' => [],
+                        ];
+                    }
+
+                    foreach ($questionResponses as $response) {
+                        if (!empty(trim($response))) {
+                            $analysis['open_questions'][$questionText]['responses'][] = $response;
+                        }
+                    }
+                }
+                // Pytania wyboru (single/multiple choice)
+                elseif (in_array($questionType, ['single_choice', 'multiple_choice'])) {
+                    if (!isset($analysis['choice_questions'][$questionText])) {
+                        $analysis['choice_questions'][$questionText] = [
+                            'question' => $questionText,
+                            'responses' => [],
+                            'distribution' => [],
+                        ];
+                    }
+
+                    foreach ($questionResponses as $response) {
+                        $analysis['choice_questions'][$questionText]['responses'][] = $response;
+                        
+                        if (!isset($analysis['choice_questions'][$questionText]['distribution'][$response])) {
+                            $analysis['choice_questions'][$questionText]['distribution'][$response] = 0;
+                        }
+                        $analysis['choice_questions'][$questionText]['distribution'][$response]++;
+                    }
+                }
+            }
+        }
+
+        return $analysis;
     }
 
     /**
@@ -169,7 +380,35 @@ class SurveyController extends Controller
         $averageRating = $survey->getAverageRating();
         $groupedQuestions = $survey->getGroupedQuestions();
         
-        return view('surveys.show', compact('survey', 'stats', 'averageRating', 'groupedQuestions'));
+        // Pobranie poprzedniej ankiety (według tej samej logiki co lista ankiet)
+        $previousSurvey = Survey::join('courses', 'surveys.course_id', '=', 'courses.id')
+                               ->where(function($query) use ($survey) {
+                                   $query->where('courses.start_date', '<', $survey->course->start_date)
+                                         ->orWhere(function($subQuery) use ($survey) {
+                                             $subQuery->where('courses.start_date', '=', $survey->course->start_date)
+                                                     ->where('surveys.imported_at', '<', $survey->imported_at);
+                                         });
+                               })
+                               ->orderBy('courses.start_date', 'desc')
+                               ->orderBy('surveys.imported_at', 'desc')
+                               ->select('surveys.*')
+                               ->first();
+        
+        // Pobranie następnej ankiety (według tej samej logiki co lista ankiet)
+        $nextSurvey = Survey::join('courses', 'surveys.course_id', '=', 'courses.id')
+                           ->where(function($query) use ($survey) {
+                               $query->where('courses.start_date', '>', $survey->course->start_date)
+                                     ->orWhere(function($subQuery) use ($survey) {
+                                         $subQuery->where('courses.start_date', '=', $survey->course->start_date)
+                                                 ->where('surveys.imported_at', '>', $survey->imported_at);
+                                     });
+                           })
+                           ->orderBy('courses.start_date', 'asc')
+                           ->orderBy('surveys.imported_at', 'asc')
+                           ->select('surveys.*')
+                           ->first();
+        
+        return view('surveys.show', compact('survey', 'stats', 'averageRating', 'groupedQuestions', 'previousSurvey', 'nextSurvey'));
     }
 
     /**
