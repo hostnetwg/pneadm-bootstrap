@@ -917,24 +917,41 @@ class SurveyController extends Controller
 
     /**
      * Oblicza NPS ze skali 1-5 dla przefiltrowanych ankiet
+     * NPS jest obliczany tylko z odpowiedzi na pytanie o polecanie szkolenia
      */
     private function calculateNPS($surveys): array
     {
-        $allResponses = [];
+        $npsResponses = [];
+        
+        // Wzorce pytania NPS
+        $npsQuestionPatterns = [
+            '/czy.*poleci.*szkolenie.*innym/i',
+            '/poleci.*szkolenie.*innym/i',
+            '/poleci.*innym.*osobom/i',
+            '/czy.*poleci.*innym/i',
+            '/poleci.*innym/i'
+        ];
         
         foreach ($surveys as $survey) {
-            // Pobierz wszystkie odpowiedzi ratingowe z tej ankiety
             foreach ($survey->responses as $response) {
-                $ratingAnswers = $response->getRatingAnswers();
-                foreach ($ratingAnswers as $questionText => $rating) {
-                    if (is_numeric($rating) && $rating >= 1 && $rating <= 5) {
-                        $allResponses[] = (int) $rating;
+                foreach ($response->response_data as $questionText => $answer) {
+                    // Sprawdź czy to pytanie NPS
+                    $isNpsQuestion = false;
+                    foreach ($npsQuestionPatterns as $pattern) {
+                        if (preg_match($pattern, $questionText)) {
+                            $isNpsQuestion = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($isNpsQuestion && is_numeric($answer) && $answer >= 1 && $answer <= 5) {
+                        $npsResponses[] = (int) $answer;
                     }
                 }
             }
         }
         
-        if (empty($allResponses)) {
+        if (empty($npsResponses)) {
             return [
                 'nps' => 0,
                 'promoters' => 0,
@@ -944,12 +961,12 @@ class SurveyController extends Controller
             ];
         }
         
-        $totalResponses = count($allResponses);
+        $totalResponses = count($npsResponses);
         $promoters = 0; // 4-5
         $detractors = 0; // 1-2
         $passives = 0; // 3
         
-        foreach ($allResponses as $rating) {
+        foreach ($npsResponses as $rating) {
             if ($rating >= 4) {
                 $promoters++;
             } elseif ($rating <= 2) {
