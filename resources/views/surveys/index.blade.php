@@ -124,8 +124,9 @@
                                 <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statystyki przefiltrowanych ankiet</h6>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3 col-sm-6 mb-3">
+                                <!-- Pierwszy rząd statystyk -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4 col-sm-6 mb-3">
                                         <div class="d-flex align-items-center">
                                             <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
                                                 <i class="fas fa-clipboard-list"></i>
@@ -136,7 +137,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="col-md-4 col-sm-6 mb-3">
                                         <div class="d-flex align-items-center">
                                             <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
                                                 <i class="fas fa-comments"></i>
@@ -147,7 +148,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="col-md-4 col-sm-6 mb-3">
                                         <div class="d-flex align-items-center">
                                             <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
                                                 <i class="fas fa-question-circle"></i>
@@ -158,7 +159,11 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3 col-sm-6 mb-3">
+                                </div>
+                                
+                                <!-- Drugi rząd statystyk -->
+                                <div class="row">
+                                    <div class="col-md-4 col-sm-6 mb-3">
                                         <div class="d-flex align-items-center">
                                             <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
                                                 <i class="fas fa-star"></i>
@@ -175,6 +180,50 @@
                                                     Średnia ocen
                                                     @if($statistics['surveys_with_ratings'] > 0)
                                                         ({{ $statistics['surveys_with_ratings'] }} ankiet)
+                                                    @endif
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-chart-line"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-primary">
+                                                    @if($statistics['nps_total_responses'] > 0)
+                                                        {{ $statistics['nps'] }}
+                                                    @else
+                                                        N/A
+                                                    @endif
+                                                </div>
+                                                <small class="text-muted">
+                                                    NPS
+                                                    @if($statistics['nps_total_responses'] > 0)
+                                                        ({{ $statistics['nps_total_responses'] }} ocen)
+                                                    @endif
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-users"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-secondary">
+                                                    @if($statistics['nps_total_responses'] > 0)
+                                                        {{ $statistics['nps_promoters'] }}/{{ $statistics['nps_detractors'] }}
+                                                    @else
+                                                        N/A
+                                                    @endif
+                                                </div>
+                                                <small class="text-muted">
+                                                    Promoters/Detractors
+                                                    @if($statistics['nps_total_responses'] > 0)
+                                                        ({{ $statistics['nps_passives'] }} neutralnych)
                                                     @endif
                                                 </small>
                                             </div>

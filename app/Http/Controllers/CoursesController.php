@@ -270,6 +270,140 @@ class CoursesController extends Controller
     }
 
     /**
+     * Generowanie statystyk szkoleń w PDF
+     */
+    public function generateCourseStatistics(Request $request)
+    {
+        $query = Course::query();
+        
+        // Filtrowanie tylko aktywnych szkoleń
+        $query->where('is_active', 1);
+        
+        // Pobieranie wartości filtra "date_filter"
+        $dateFilter = $request->query('date_filter', 'upcoming');
+        
+        // Pobieranie wartości filtrów
+        $filters = [
+            'is_paid' => $request->input('is_paid'),
+            'type' => $request->input('type'),
+            'category' => $request->input('category'),
+            'is_active' => $request->input('is_active'),
+            'date_filter' => $dateFilter,
+            'instructor_id' => $request->input('instructor_id'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+        ];
+
+        // Filtracja kursów według daty
+        if ($dateFilter === 'upcoming') {
+            $query->where('end_date', '>=', now());
+        } elseif ($dateFilter === 'past') {
+            $query->where('end_date', '<', now());
+        }
+
+        // Filtracja według zakresu dat
+        if ($request->filled('date_from')) {
+            $query->where('start_date', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->where('end_date', '<=', $request->input('date_to'));
+        }
+     
+        // Filtracja według pozostałych pól
+        foreach ($filters as $key => $value) {
+            if (!is_null($value) && $value !== '' && !in_array($key, ['date_filter', 'date_from', 'date_to'])) {
+                $query->where($key, $value);
+            }
+        }
+        
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('title', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('instructor', function($instructorQuery) use ($searchTerm) {
+                      $instructorQuery->where('first_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                                     ->orWhere('title', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('location', function($locationQuery) use ($searchTerm) {
+                      $locationQuery->where('location_name', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('address', 'LIKE', "%{$searchTerm}%")
+                                   ->orWhere('post_office', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('onlineDetails', function($onlineQuery) use ($searchTerm) {
+                      $onlineQuery->where('platform', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        // Pobierz wszystkie przefiltrowane kursy
+        $courses = $query->with(['participants', 'certificates', 'instructor'])->get();
+
+        if ($courses->isEmpty()) {
+            return redirect()->route('courses.index')->with('error', 'Brak szkoleń spełniających kryteria filtrowania.');
+        }
+
+        // Obliczanie statystyk
+        $paidCourses = $courses->where('is_paid', true);
+        $freeCourses = $courses->where('is_paid', false);
+        
+        // Obliczanie godzin szkoleń
+        $totalHoursPaid = $paidCourses->sum(function($course) {
+            return $course->start_date->diffInMinutes($course->end_date) / 60;
+        });
+        
+        $totalHoursFree = $freeCourses->sum(function($course) {
+            return $course->start_date->diffInMinutes($course->end_date) / 60;
+        });
+        
+        $statistics = [
+            'total_courses' => $courses->count(),
+            'paid_courses' => $paidCourses->count(),
+            'free_courses' => $freeCourses->count(),
+            'online_courses' => $courses->where('type', 'online')->count(),
+            'offline_courses' => $courses->where('type', 'offline')->count(),
+            'total_participants' => $courses->sum(function($course) {
+                return $course->participants->count();
+            }),
+            'total_hours_paid' => round($totalHoursPaid, 2),
+            'total_hours_free' => round($totalHoursFree, 2),
+            'certificates_paid_courses' => $paidCourses->sum(function($course) {
+                return $course->certificates->count();
+            }),
+            'certificates_free_courses' => $freeCourses->sum(function($course) {
+                return $course->certificates->count();
+            }),
+            'total_certificates' => $courses->sum(function($course) {
+                return $course->certificates->count();
+            }),
+        ];
+
+        // Przygotowanie danych dla raportu
+        $reportData = [
+            'courses' => $courses,
+            'statistics' => $statistics,
+            'filters_applied' => $request->only(['search', 'is_paid', 'type', 'category', 'instructor_id', 'date_from', 'date_to', 'date_filter']),
+            'generated_at' => now(),
+        ];
+
+        // Generowanie PDF
+        $pdf = Pdf::loadView('courses.statistics', $reportData)
+            ->setPaper('A4', 'portrait')
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'isPhpEnabled' => true,
+            ]);
+
+        $filename = 'statystyki_szkolen_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    /**
      * Wyświetlanie szczegółów kursu
      */
     public function show($id)

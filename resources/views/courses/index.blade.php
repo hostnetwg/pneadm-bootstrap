@@ -20,6 +20,10 @@
                     <a href="{{ route('courses.pdf', request()->query()) }}" class="btn btn-success" target="_blank">
                         <i class="fas fa-file-pdf"></i> Wygeneruj listę kursów PDF
                     </a>
+                    <!-- Button do generowania statystyk -->
+                    <a href="{{ route('courses.statistics', request()->query()) }}" class="btn btn-info" target="_blank">
+                        <i class="fas fa-chart-bar"></i> Wygeneruj statystyki szkoleń
+                    </a>
                     <!-- Opcje paginacji -->
                     <form method="GET" action="{{ route('courses.index') }}" class="d-flex align-items-center gap-2">
                         @foreach(request()->query() as $key => $value)

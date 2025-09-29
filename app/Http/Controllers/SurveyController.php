@@ -103,6 +103,14 @@ class SurveyController extends Controller
             $statistics['surveys_with_ratings'] = $surveysWithRatings;
         }
 
+        // Obliczanie NPS ze skali 1-5
+        $npsData = $this->calculateNPS($filteredSurveys);
+        $statistics['nps'] = $npsData['nps'];
+        $statistics['nps_promoters'] = $npsData['promoters'];
+        $statistics['nps_detractors'] = $npsData['detractors'];
+        $statistics['nps_passives'] = $npsData['passives'];
+        $statistics['nps_total_responses'] = $npsData['total_responses'];
+
         return view('surveys.index', compact('surveys', 'courses', 'instructors', 'statistics'));
     }
 
@@ -905,5 +913,62 @@ class SurveyController extends Controller
     private function cleanAnswer(string $answer): string
     {
         return trim($answer);
+    }
+
+    /**
+     * Oblicza NPS ze skali 1-5 dla przefiltrowanych ankiet
+     */
+    private function calculateNPS($surveys): array
+    {
+        $allResponses = [];
+        
+        foreach ($surveys as $survey) {
+            // Pobierz wszystkie odpowiedzi ratingowe z tej ankiety
+            foreach ($survey->responses as $response) {
+                $ratingAnswers = $response->getRatingAnswers();
+                foreach ($ratingAnswers as $questionText => $rating) {
+                    if (is_numeric($rating) && $rating >= 1 && $rating <= 5) {
+                        $allResponses[] = (int) $rating;
+                    }
+                }
+            }
+        }
+        
+        if (empty($allResponses)) {
+            return [
+                'nps' => 0,
+                'promoters' => 0,
+                'detractors' => 0,
+                'passives' => 0,
+                'total_responses' => 0
+            ];
+        }
+        
+        $totalResponses = count($allResponses);
+        $promoters = 0; // 4-5
+        $detractors = 0; // 1-2
+        $passives = 0; // 3
+        
+        foreach ($allResponses as $rating) {
+            if ($rating >= 4) {
+                $promoters++;
+            } elseif ($rating <= 2) {
+                $detractors++;
+            } else {
+                $passives++;
+            }
+        }
+        
+        $promotersPercent = ($promoters / $totalResponses) * 100;
+        $detractorsPercent = ($detractors / $totalResponses) * 100;
+        $nps = round($promotersPercent - $detractorsPercent, 1);
+        
+        return [
+            'nps' => $nps,
+            'promoters' => $promoters,
+            'detractors' => $detractors,
+            'passives' => $passives,
+            'total_responses' => $totalResponses
+        ];
     }
 }
