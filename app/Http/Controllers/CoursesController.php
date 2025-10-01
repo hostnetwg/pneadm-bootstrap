@@ -108,26 +108,8 @@ class CoursesController extends Controller
         // Liczenie rekordów przed paginacją
         $filteredCount = $query->count();
         
-        // Liczenie wszystkich aktywnych rekordów w bazie
-        $totalCount = Course::where('is_active', true)->count();
-        
-        // Obliczanie statystyk dla przefiltrowanych szkoleń
-        $filteredCourses = $query->with(['participants', 'certificates'])->get();
-        
-        $statistics = [
-            'total_participants' => $filteredCourses->sum(function($course) {
-                return $course->participants->count();
-            }),
-            'total_certificates' => $filteredCourses->sum(function($course) {
-                return $course->certificates->count();
-            }),
-            'online_courses' => $filteredCourses->where('type', 'online')->count(),
-            'offline_courses' => $filteredCourses->where('type', 'offline')->count(),
-            'paid_courses' => $filteredCourses->where('is_paid', true)->count(),
-            'free_courses' => $filteredCourses->where('is_paid', false)->count(),
-            'open_courses' => $filteredCourses->where('category', 'open')->count(),
-            'closed_courses' => $filteredCourses->where('category', 'closed')->count(),
-        ];
+        // Liczenie wszystkich rekordów w bazie (bez filtrów)
+        $totalCount = Course::count();
     
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
         $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates'])
@@ -135,7 +117,7 @@ class CoursesController extends Controller
                         ->paginate($perPage)
                         ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
     
-        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount', 'statistics'));
+        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
      }
 
     /**
@@ -143,7 +125,11 @@ class CoursesController extends Controller
      */
     public function generatePdf(Request $request)
     {
-        $query = Course::query();
+        try {
+            // Zwiększenie limitu czasu dla tej operacji
+            set_time_limit(120); // 2 minuty
+            \Log::info("PDF - START: generatePdf wywołana");
+            $query = Course::query();
         
         // Filtrowanie tylko aktywnych szkoleń
         $query->where('is_active', 1);
@@ -211,6 +197,33 @@ class CoursesController extends Controller
             });
         }
 
+        // Sprawdzenie liczby kursów przed generowaniem PDF
+        \Log::info("PDF - Sprawdzanie liczby kursów...");
+        $totalCourses = $query->count();
+        \Log::info("PDF - Liczba kursów: {$totalCourses}");
+        
+        if ($totalCourses === 0) {
+            \Log::info("PDF - BŁĄD: Brak kursów");
+            return redirect()->route('courses.index')->with('error', 'Brak szkoleń spełniających kryteria filtrowania.');
+        }
+        
+        // Prosta walidacja - jeśli za dużo kursów, blokuj
+        if ($totalCourses > 1000) {
+            \Log::info("PDF - BLOKADA: Za dużo kursów ({$totalCourses})");
+            return redirect()->route('courses.index')->with('error', 
+                '<strong><i class="fas fa-exclamation-triangle me-2"></i>Zbyt duża liczba szkoleń do przetworzenia!</strong><br><br>' .
+                '<div class="mt-2">' .
+                '📊 <strong>Liczba szkoleń:</strong> ' . $totalCourses . '<br>' .
+                '⚠️ <strong>Limit:</strong> maksymalnie 1000 szkoleń<br><br>' .
+                '<strong>Rozwiązanie:</strong> Proszę zastosować bardziej szczegółowe filtry:<br>' .
+                '• <strong>Zakres dat</strong> (np. jeden rok lub kwartał)<br>' .
+                '• <strong>Instruktor</strong> (konkretna osoba)<br>' .
+                '• <strong>Typ szkolenia</strong> (online/stacjonarne)<br>' .
+                '• <strong>Kategoria</strong> (otwarte/zamknięte)' .
+                '</div>'
+            );
+        }
+        
         // Pobranie wszystkich kursów bez paginacji (dla PDF)
         $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants'])
                         ->orderBy($sortColumn, $sortDirection)
@@ -267,6 +280,14 @@ class CoursesController extends Controller
         $filename = 'lista_szkolen_' . now()->format('Y-m-d_H-i-s') . '.pdf';
         
         return $pdf->download($filename);
+        
+        } catch (\Exception $e) {
+            \Log::error("PDF - BŁĄD: " . $e->getMessage());
+            \Log::error("PDF - Stack trace: " . $e->getTraceAsString());
+            return redirect()->route('courses.index')->with('error', 
+                'Wystąpił błąd podczas generowania PDF: ' . $e->getMessage()
+            );
+        }
     }
 
     /**
@@ -274,7 +295,11 @@ class CoursesController extends Controller
      */
     public function generateCourseStatistics(Request $request)
     {
-        $query = Course::query();
+        try {
+            // Zwiększenie limitu czasu dla tej operacji
+            set_time_limit(120); // 2 minuty
+            \Log::info("Statystyki - START: generateCourseStatistics wywołana");
+            $query = Course::query();
         
         // Filtrowanie tylko aktywnych szkoleń
         $query->where('is_active', 1);
@@ -338,47 +363,147 @@ class CoursesController extends Controller
             });
         }
 
-        // Pobierz wszystkie przefiltrowane kursy
-        $courses = $query->with(['participants', 'certificates', 'instructor'])->get();
-
-        if ($courses->isEmpty()) {
+        // Sprawdzenie, czy są jakieś kursy
+        \Log::info("Statystyki - Sprawdzanie liczby kursów...");
+        $totalCourses = $query->count();
+        \Log::info("Statystyki - Liczba kursów: {$totalCourses}");
+        
+        if ($totalCourses === 0) {
+            \Log::info("Statystyki - BŁĄD: Brak kursów");
             return redirect()->route('courses.index')->with('error', 'Brak szkoleń spełniających kryteria filtrowania.');
         }
+        
+        // Prosta walidacja - jeśli za dużo kursów, blokuj
+        if ($totalCourses > 1000) {
+            \Log::info("Statystyki - BLOKADA: Za dużo kursów ({$totalCourses})");
+            return redirect()->route('courses.index')->with('error', 
+                '<strong><i class="fas fa-exclamation-triangle me-2"></i>Zbyt duża liczba szkoleń do przetworzenia!</strong><br><br>' .
+                '<div class="mt-2">' .
+                '📊 <strong>Liczba szkoleń:</strong> ' . $totalCourses . '<br>' .
+                '⚠️ <strong>Limit:</strong> maksymalnie 1000 szkoleń<br><br>' .
+                '<strong>Rozwiązanie:</strong> Proszę zastosować bardziej szczegółowe filtry:<br>' .
+                '• <strong>Zakres dat</strong> (np. jeden rok lub kwartał)<br>' .
+                '• <strong>Instruktor</strong> (konkretna osoba)<br>' .
+                '• <strong>Typ szkolenia</strong> (online/stacjonarne)<br>' .
+                '• <strong>Kategoria</strong> (otwarte/zamknięte)' .
+                '</div>'
+            );
+        }
+        
+        // Inteligentne wykrywanie przekroczenia czasu - pomiar próbki i ekstrapolacja
+        $maxExecutionTime = 25; // Margines bezpieczeństwa (30s limit PHP - 5s zapas)
+        $sampleSize = min(20, $totalCourses); // Zwiększona próbka dla lepszej dokładności
+        
+        // Pomiar czasu ładowania próbki z pełnymi relacjami
+        $startTime = microtime(true);
+        $sampleCourses = (clone $query)
+            ->with(['instructor', 'participants', 'certificates'])
+            ->limit($sampleSize)
+            ->get();
+        $sampleLoadTime = microtime(true) - $startTime;
+        
+        // Ekstrapolacja czasu dla wszystkich kursów
+        $estimatedTimePerCourse = $sampleLoadTime / $sampleSize;
+        $estimatedTotalTime = $estimatedTimePerCourse * $totalCourses;
+        
+        // Dodatkowy czas na generowanie PDF (zwiększone oszacowanie: 0.05s na kurs)
+        $estimatedPdfTime = $totalCourses * 0.05;
+        $totalEstimatedTime = $estimatedTotalTime + $estimatedPdfTime;
+        
+        // Debug - loguj informacje
+        \Log::info("Statystyki - Debug:", [
+            'total_courses' => $totalCourses,
+            'sample_size' => $sampleSize,
+            'sample_load_time' => round($sampleLoadTime, 3),
+            'estimated_time_per_course' => round($estimatedTimePerCourse, 3),
+            'estimated_total_time' => round($estimatedTotalTime, 3),
+            'estimated_pdf_time' => round($estimatedPdfTime, 3),
+            'total_estimated_time' => round($totalEstimatedTime, 3),
+            'max_execution_time' => $maxExecutionTime
+        ]);
+        
+        // Jeśli szacowany czas przekracza limit - zatrzymaj i poinformuj
+        if ($totalEstimatedTime > $maxExecutionTime) {
+            $estimatedSeconds = round($totalEstimatedTime, 1);
+            \Log::info("Statystyki - BLOKADA: Szacowany czas {$estimatedSeconds}s przekracza limit {$maxExecutionTime}s");
+            return redirect()->route('courses.index')->with('error', 
+                '<strong><i class="fas fa-clock me-2"></i>Szacowany czas generowania raportu przekracza dostępny limit!</strong><br><br>' .
+                '<div class="mt-2">' .
+                '📊 <strong>Liczba szkoleń:</strong> ' . $totalCourses . '<br>' .
+                '⏱️ <strong>Szacowany czas:</strong> ~' . $estimatedSeconds . ' sekund (limit: 30s)<br><br>' .
+                '<strong>Rozwiązanie:</strong> Proszę zastosować bardziej szczegółowe filtry:<br>' .
+                '• <strong>Zakres dat</strong> (np. jeden rok lub kwartał)<br>' .
+                '• <strong>Instruktor</strong> (konkretna osoba)<br>' .
+                '• <strong>Typ szkolenia</strong> (online/stacjonarne)<br>' .
+                '• <strong>Kategoria</strong> (otwarte/zamknięte)' .
+                '</div>'
+            );
+        }
+        
+        // Ostrzeżenie dla średnich zbiorów (50-80% limitu czasu)
+        if ($totalEstimatedTime > ($maxExecutionTime * 0.5)) {
+            $estimatedSeconds = round($totalEstimatedTime, 1);
+            session()->flash('warning', 
+                '<strong><i class="fas fa-info-circle me-2"></i>Uwaga:</strong> ' .
+                'Generowanie raportu dla <strong>' . $totalCourses . ' szkoleń</strong> może potrwać około <strong>' . $estimatedSeconds . ' sekund</strong>. ' .
+                'Dla szybszego działania rozważ użycie bardziej szczegółowych filtrów.'
+            );
+        }
 
-        // Obliczanie statystyk
-        $paidCourses = $courses->where('is_paid', true);
-        $freeCourses = $courses->where('is_paid', false);
+        // Obliczanie statystyk używając SQL agregacji (znacznie szybsze)
+        $statistics = [
+            'total_courses' => $totalCourses,
+            'paid_courses' => (clone $query)->where('is_paid', true)->count(),
+            'free_courses' => (clone $query)->where('is_paid', false)->count(),
+            'online_courses' => (clone $query)->where('type', 'online')->count(),
+            'offline_courses' => (clone $query)->where('type', 'offline')->count(),
+            'open_courses' => (clone $query)->where('category', 'open')->count(),
+            'closed_courses' => (clone $query)->where('category', 'closed')->count(),
+            'total_participants' => DB::table('participants')
+                ->whereIn('course_id', (clone $query)->pluck('id'))
+                ->count(),
+            'total_certificates' => DB::table('certificates')
+                ->whereIn('course_id', (clone $query)->pluck('id'))
+                ->count(),
+        ];
         
         // Obliczanie godzin szkoleń
-        $totalHoursPaid = $paidCourses->sum(function($course) {
+        $paidCoursesData = (clone $query)->where('is_paid', true)
+            ->select('start_date', 'end_date')
+            ->get();
+        
+        $freeCoursesData = (clone $query)->where('is_paid', false)
+            ->select('start_date', 'end_date')
+            ->get();
+        
+        $totalHoursPaid = $paidCoursesData->sum(function($course) {
             return $course->start_date->diffInMinutes($course->end_date) / 60;
         });
         
-        $totalHoursFree = $freeCourses->sum(function($course) {
+        $totalHoursFree = $freeCoursesData->sum(function($course) {
             return $course->start_date->diffInMinutes($course->end_date) / 60;
         });
         
-        $statistics = [
-            'total_courses' => $courses->count(),
-            'paid_courses' => $paidCourses->count(),
-            'free_courses' => $freeCourses->count(),
-            'online_courses' => $courses->where('type', 'online')->count(),
-            'offline_courses' => $courses->where('type', 'offline')->count(),
-            'total_participants' => $courses->sum(function($course) {
-                return $course->participants->count();
-            }),
-            'total_hours_paid' => round($totalHoursPaid, 2),
-            'total_hours_free' => round($totalHoursFree, 2),
-            'certificates_paid_courses' => $paidCourses->sum(function($course) {
-                return $course->certificates->count();
-            }),
-            'certificates_free_courses' => $freeCourses->sum(function($course) {
-                return $course->certificates->count();
-            }),
-            'total_certificates' => $courses->sum(function($course) {
-                return $course->certificates->count();
-            }),
-        ];
+        $statistics['total_hours_paid'] = round($totalHoursPaid, 2);
+        $statistics['total_hours_free'] = round($totalHoursFree, 2);
+        
+        // Certyfikaty dla płatnych i bezpłatnych kursów
+        $paidCourseIds = (clone $query)->where('is_paid', true)->pluck('id');
+        $freeCourseIds = (clone $query)->where('is_paid', false)->pluck('id');
+        
+        $statistics['certificates_paid_courses'] = DB::table('certificates')
+            ->whereIn('course_id', $paidCourseIds)
+            ->count();
+            
+        $statistics['certificates_free_courses'] = DB::table('certificates')
+            ->whereIn('course_id', $freeCourseIds)
+            ->count();
+        
+        // Pobierz wszystkie przefiltrowane kursy dla szczegółowej listy w PDF
+        $courses = (clone $query)
+            ->with(['instructor', 'participants', 'certificates'])
+            ->orderBy('start_date', 'desc')
+            ->get();
 
         // Przygotowanie danych dla raportu
         $reportData = [
@@ -401,6 +526,14 @@ class CoursesController extends Controller
         $filename = 'statystyki_szkolen_' . now()->format('Y-m-d_H-i-s') . '.pdf';
         
         return $pdf->download($filename);
+        
+        } catch (\Exception $e) {
+            \Log::error("Statystyki - BŁĄD: " . $e->getMessage());
+            \Log::error("Statystyki - Stack trace: " . $e->getTraceAsString());
+            return redirect()->route('courses.index')->with('error', 
+                'Wystąpił błąd podczas generowania statystyk: ' . $e->getMessage()
+            );
+        }
     }
 
     /**

@@ -177,4 +177,75 @@ class Survey extends Model
     {
         return $this->getGroupedQuestions()->count();
     }
+
+    /**
+     * Oblicza NPS dla tej ankiety
+     */
+    public function getNPS(): array
+    {
+        $npsResponses = [];
+        
+        // Wzorce pytania NPS
+        $npsQuestionPatterns = [
+            '/czy.*poleci.*szkolenie.*innym/i',
+            '/poleci.*szkolenie.*innym/i',
+            '/poleci.*innym.*osobom/i',
+            '/czy.*poleci.*innym/i',
+            '/poleci.*innym/i'
+        ];
+        
+        foreach ($this->responses as $response) {
+            foreach ($response->response_data as $questionText => $answer) {
+                // Sprawdź czy to pytanie NPS
+                $isNpsQuestion = false;
+                foreach ($npsQuestionPatterns as $pattern) {
+                    if (preg_match($pattern, $questionText)) {
+                        $isNpsQuestion = true;
+                        break;
+                    }
+                }
+                
+                if ($isNpsQuestion && is_numeric($answer) && $answer >= 1 && $answer <= 5) {
+                    $npsResponses[] = (int) $answer;
+                }
+            }
+        }
+        
+        if (empty($npsResponses)) {
+            return [
+                'nps' => 0,
+                'promoters' => 0,
+                'detractors' => 0,
+                'passives' => 0,
+                'total_responses' => 0
+            ];
+        }
+        
+        $totalResponses = count($npsResponses);
+        $promoters = 0; // 4-5
+        $detractors = 0; // 1-2
+        $passives = 0; // 3
+        
+        foreach ($npsResponses as $rating) {
+            if ($rating >= 4) {
+                $promoters++;
+            } elseif ($rating <= 2) {
+                $detractors++;
+            } else {
+                $passives++;
+            }
+        }
+        
+        $promotersPercent = ($promoters / $totalResponses) * 100;
+        $detractorsPercent = ($detractors / $totalResponses) * 100;
+        $nps = round($promotersPercent - $detractorsPercent, 1);
+        
+        return [
+            'nps' => $nps,
+            'promoters' => $promoters,
+            'detractors' => $detractors,
+            'passives' => $passives,
+            'total_responses' => $totalResponses
+        ];
+    }
 }

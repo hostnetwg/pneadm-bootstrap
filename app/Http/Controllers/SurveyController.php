@@ -166,11 +166,38 @@ class SurveyController extends Controller
         // Przygotowanie szczegółowych analiz odpowiedzi
         $detailedAnalysis = $this->prepareDetailedAnalysis($surveys);
 
+        // Obliczanie globalnych statystyk
+        $totalSurveys = $surveys->count();
+        $totalResponses = $surveys->sum('total_responses');
+        
+        // Obliczanie średniej ocen ze wszystkich ankiet
+        $totalRating = 0;
+        $surveysWithRatings = 0;
+        
+        foreach ($surveys as $survey) {
+            $surveyRating = $survey->getAverageRating();
+            if ($surveyRating > 0) {
+                $totalRating += $surveyRating;
+                $surveysWithRatings++;
+            }
+        }
+        
+        $averageRating = $surveysWithRatings > 0 ? round($totalRating / $surveysWithRatings, 2) : 0;
+
+        // Obliczanie NPS dla zbiorczego raportu
+        $npsData = $this->calculateNPS($surveys);
+
         // Przygotowanie danych dla raportu
         $reportData = [
             'surveys' => $surveys,
-            'total_surveys' => $surveys->count(),
-            'total_responses' => $surveys->sum('total_responses'),
+            'total_surveys' => $totalSurveys,
+            'total_responses' => $totalResponses,
+            'average_rating' => $averageRating,
+            'nps' => $npsData['nps'],
+            'nps_promoters' => $npsData['promoters'],
+            'nps_detractors' => $npsData['detractors'],
+            'nps_passives' => $npsData['passives'],
+            'nps_total_responses' => $npsData['total_responses'],
             'filters_applied' => $request->only(['course_id', 'instructor_id', 'date_from', 'date_to', 'search']),
             'generated_at' => now(),
             'detailed_analysis' => $detailedAnalysis,

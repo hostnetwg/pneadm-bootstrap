@@ -115,6 +115,16 @@
             border-top: 1px solid #eee;
         }
         
+        .survey-stats-compact {
+            font-size: 12px;
+            color: #000;
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #007bff;
+            border-radius: 3px;
+        }
+        
         .stat-item {
             text-align: center;
         }
@@ -283,8 +293,12 @@
             <span><strong>{{ $total_responses }}</strong></span>
         </div>
         <div class="stats-row">
-            <span>Średnia odpowiedzi na ankietę:</span>
-            <span><strong>{{ $total_surveys > 0 ? round($total_responses / $total_surveys, 1) : 0 }}</strong></span>
+            <span>Średnia ocena:</span>
+            <span><strong>{{ $average_rating > 0 ? $average_rating : 'N/A' }}</strong></span>
+        </div>
+        <div class="stats-row">
+            <span>NPS:</span>
+            <span><strong>{{ $nps_total_responses > 0 ? $nps : 'N/A' }}</strong></span>
         </div>
     </div>
     
@@ -300,14 +314,11 @@
                 </div>
                 @if($survey->instructor)
                     <div class="detail-row">
-                        <strong>Instruktor:</strong> {{ $survey->instructor->getFullTitleNameAttribute() }}
+                        <strong>Trener:</strong> {{ $survey->instructor->getFullTitleNameAttribute() }}
                     </div>
                 @endif
                 <div class="detail-row">
                     <strong>Data szkolenia:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y H:i') : 'Brak daty' }}
-                </div>
-                <div class="detail-row">
-                    <strong>Data importu ankiety:</strong> {{ $survey->imported_at->format('d.m.Y H:i') }}
                 </div>
                 @if($survey->description)
                     <div class="detail-row">
@@ -316,29 +327,15 @@
                 @endif
             </div>
             
-            <div class="survey-stats">
-                <div class="stat-item">
-                    <div class="stat-value">{{ $survey->total_responses }}</div>
-                    <div class="stat-label">Odpowiedzi</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{{ $survey->getActualQuestionsCount() }}</div>
-                    <div class="stat-label">Pytań</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">
-                        @if($survey->getAverageRating() > 0)
-                            {{ $survey->getAverageRating() }}
-                        @else
-                            N/A
-                        @endif
-                    </div>
-                    <div class="stat-label">Średnia ocen</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{{ $survey->source }}</div>
-                    <div class="stat-label">Źródło</div>
-                </div>
+            @php
+                $surveyNPS = $survey->getNPS();
+            @endphp
+            
+            <div class="survey-stats-compact">
+                <strong>Liczba pytań:</strong> {{ $survey->getActualQuestionsCount() }}; 
+                <strong>Liczba odpowiedzi:</strong> {{ $survey->total_responses }}; 
+                <strong>Średnia ocen:</strong> {{ $survey->getAverageRating() > 0 ? $survey->getAverageRating() : 'N/A' }}; 
+                <strong>NPS:</strong> {{ $surveyNPS['total_responses'] > 0 ? $surveyNPS['nps'] : 'N/A' }}
             </div>
         </div>
     @endforeach
