@@ -264,14 +264,12 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 8px;
-            border: 1px solid #ddd;
         }
         
         .responses-table td {
             width: 33.33%;
             vertical-align: top;
             padding: 4px;
-            border: 1px solid #ddd;
             font-size: 8px;
             line-height: 1.2;
         }
