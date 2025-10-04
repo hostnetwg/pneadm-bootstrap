@@ -40,14 +40,16 @@ class SurveyController extends Controller
 
         // Filtrowanie według daty szkolenia
         if ($request->filled('date_from')) {
-            $query->whereHas('course', function($courseQuery) use ($request) {
-                $courseQuery->where('start_date', '>=', $request->input('date_from'));
+            $dateFrom = $request->input('date_from') . ' 00:00:00';
+            $query->whereHas('course', function($courseQuery) use ($dateFrom) {
+                $courseQuery->where('start_date', '>=', $dateFrom);
             });
         }
         
         if ($request->filled('date_to')) {
-            $query->whereHas('course', function($courseQuery) use ($request) {
-                $courseQuery->where('start_date', '<=', $request->input('date_to'));
+            $dateTo = $request->input('date_to') . ' 23:59:59';
+            $query->whereHas('course', function($courseQuery) use ($dateTo) {
+                $courseQuery->where('start_date', '<=', $dateTo);
             });
         }
 
@@ -133,14 +135,16 @@ class SurveyController extends Controller
 
         // Filtrowanie według daty szkolenia
         if ($request->filled('date_from')) {
-            $query->whereHas('course', function($courseQuery) use ($request) {
-                $courseQuery->where('start_date', '>=', $request->input('date_from'));
+            $dateFrom = $request->input('date_from') . ' 00:00:00';
+            $query->whereHas('course', function($courseQuery) use ($dateFrom) {
+                $courseQuery->where('start_date', '>=', $dateFrom);
             });
         }
         
         if ($request->filled('date_to')) {
-            $query->whereHas('course', function($courseQuery) use ($request) {
-                $courseQuery->where('start_date', '<=', $request->input('date_to'));
+            $dateTo = $request->input('date_to') . ' 23:59:59';
+            $query->whereHas('course', function($courseQuery) use ($dateTo) {
+                $courseQuery->where('start_date', '<=', $dateTo);
             });
         }
 

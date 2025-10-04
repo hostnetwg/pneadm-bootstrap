@@ -70,11 +70,13 @@ class CoursesController extends Controller
 
         // Filtracja według zakresu dat
         if ($request->filled('date_from')) {
-            $query->where('start_date', '>=', $request->input('date_from'));
+            $dateFrom = $request->input('date_from') . ' 00:00:00';
+            $query->where('start_date', '>=', $dateFrom);
         }
         
         if ($request->filled('date_to')) {
-            $query->where('end_date', '<=', $request->input('date_to'));
+            $dateTo = $request->input('date_to') . ' 23:59:59';
+            $query->where('end_date', '<=', $dateTo);
         }
      
         // Filtracja według pozostałych pól
@@ -162,11 +164,13 @@ class CoursesController extends Controller
 
         // Filtracja według zakresu dat
         if ($request->filled('date_from')) {
-            $query->where('start_date', '>=', $request->input('date_from'));
+            $dateFrom = $request->input('date_from') . ' 00:00:00';
+            $query->where('start_date', '>=', $dateFrom);
         }
         
         if ($request->filled('date_to')) {
-            $query->where('end_date', '<=', $request->input('date_to'));
+            $dateTo = $request->input('date_to') . ' 23:59:59';
+            $query->where('end_date', '<=', $dateTo);
         }
 
         // Filtracja według pozostałych pól
@@ -328,11 +332,13 @@ class CoursesController extends Controller
 
         // Filtracja według zakresu dat
         if ($request->filled('date_from')) {
-            $query->where('start_date', '>=', $request->input('date_from'));
+            $dateFrom = $request->input('date_from') . ' 00:00:00';
+            $query->where('start_date', '>=', $dateFrom);
         }
         
         if ($request->filled('date_to')) {
-            $query->where('end_date', '<=', $request->input('date_to'));
+            $dateTo = $request->input('date_to') . ' 23:59:59';
+            $query->where('end_date', '<=', $dateTo);
         }
      
         // Filtracja według pozostałych pól
