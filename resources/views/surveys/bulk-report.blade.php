@@ -342,7 +342,7 @@
     
     <!-- Szczegółowe analizy odpowiedzi -->
     @if(!empty($detailed_analysis['rating_questions']) || !empty($detailed_analysis['open_questions']) || !empty($detailed_analysis['choice_questions']))
-        <div class="page-break"></div>
+        <div style="margin-top: 30px;"></div>
         
         <!-- Pytania ratingowe (skala 1-5) -->
         @if(!empty($detailed_analysis['rating_questions']))
