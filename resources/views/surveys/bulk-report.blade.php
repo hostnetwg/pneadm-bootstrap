@@ -172,20 +172,92 @@
             margin-bottom: 10px;
         }
         
-        .rating-distribution {
-            display: flex;
-            justify-content: space-between;
+        /* Style dla tabeli rozkładu odpowiedzi */
+        .rating-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
             font-size: 11px;
         }
         
-        .rating-bar {
+        .rating-table th,
+        .rating-table td {
+            border: 1px solid #ddd;
+            padding: 5px;
             text-align: center;
-            margin: 0 2px;
         }
         
-        .rating-bar-value {
+        .rating-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .rating-table td {
+            background-color: #fff;
+            color: #555;
+            font-weight: bold;
+        }
+        
+        /* Style dla siatki jednokrotnego wyboru */
+        .grid-question {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        
+        .grid-question h4 {
+            font-size: 14px;
+            margin: 0 0 15px 0;
+            color: #000;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+        
+        .grid-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        
+        .grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        
+        .grid-table th,
+        .grid-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+        }
+        
+        .grid-table th {
+            background-color: #f0f8ff;
             font-weight: bold;
             color: #000;
+        }
+        
+        .grid-table .question-cell {
+            text-align: left;
+            font-size: 10px;
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+        
+        .grid-table .rating-cell {
+            background-color: #f9f9f9;
+            font-weight: bold;
+        }
+        
+        .grid-table .total-cell {
+            background-color: #e8f4fd;
+            font-weight: bold;
         }
         
         .open-responses {
@@ -349,21 +421,71 @@
             <div class="analysis-section">
                 <h3>Pytania ratingowe (skala 1-5) - Średnie wyniki</h3>
                 @foreach($detailed_analysis['rating_questions'] as $question)
-                    <div class="rating-question">
-                        <h4>{{ $question['question'] }}</h4>
-                        <div class="rating-stats">
-                            <div><strong>Średnia:</strong> {{ $question['average'] }}</div>
-                            <div><strong>Liczba odpowiedzi:</strong> {{ $question['count'] }}</div>
+                    @if(isset($question['type']) && $question['type'] === 'grid')
+                        <!-- Siatka jednokrotnego wyboru -->
+                        <div class="grid-question">
+                            <h4>{{ $question['question'] }}</h4>
+                            <div class="grid-stats">
+                                <div><strong>Średnia ogólna:</strong> {{ $question['average'] }}</div>
+                                <div><strong>Łączna liczba odpowiedzi:</strong> {{ $question['count'] }}</div>
+                            </div>
+                            <table class="grid-table">
+                                <thead>
+                                    <tr>
+                                        <th class="question-cell">Podpytanie</th>
+                                        <th>5</th>
+                                        <th>4</th>
+                                        <th>3</th>
+                                        <th>2</th>
+                                        <th>1</th>
+                                        <th class="total-cell">Łącznie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @php
+                                        // Dla siatki, musimy wyodrębnić poszczególne podpytania
+                                        // Na razie pokażemy ogólny rozkład
+                                        $totalResponses = $question['count'];
+                                        $distribution = $question['distribution'];
+                                    @endphp
+                                    <tr>
+                                        <td class="question-cell">Wszystkie podpytania łącznie</td>
+                                        <td class="rating-cell">{{ $distribution[5] ?? 0 }}</td>
+                                        <td class="rating-cell">{{ $distribution[4] ?? 0 }}</td>
+                                        <td class="rating-cell">{{ $distribution[3] ?? 0 }}</td>
+                                        <td class="rating-cell">{{ $distribution[2] ?? 0 }}</td>
+                                        <td class="rating-cell">{{ $distribution[1] ?? 0 }}</td>
+                                        <td class="total-cell">{{ $totalResponses }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                        <div class="rating-distribution">
-                            @for($i = 1; $i <= 5; $i++)
-                                <div class="rating-bar">
-                                    <div class="rating-bar-value">{{ $i }}</div>
-                                    <div>{{ $question['distribution'][$i] ?? 0 }}</div>
-                                </div>
-                            @endfor
+                    @else
+                        <!-- Pojedyncze pytanie ratingowe -->
+                        <div class="rating-question">
+                            <h4>{{ $question['question'] }}</h4>
+                            <div class="rating-stats">
+                                <div><strong>Średnia:</strong> {{ $question['average'] }}</div>
+                                <div><strong>Liczba odpowiedzi:</strong> {{ $question['count'] }}</div>
+                            </div>
+                            <table class="rating-table">
+                                <thead>
+                                    <tr>
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <th>{{ $i }}</th>
+                                        @endfor
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        @for($i = 1; $i <= 5; $i++)
+                                            <td>{{ $question['distribution'][$i] ?? 0 }}</td>
+                                        @endfor
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
+                    @endif
                 @endforeach
             </div>
         @endif

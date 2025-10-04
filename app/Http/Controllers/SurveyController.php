@@ -261,7 +261,7 @@ class SurveyController extends Controller
                     continue;
                 }
 
-                // Pytania ratingowe (skala 1-5)
+                // Pytania ratingowe (skala 1-5) - pojedyncze pytania
                 if ($questionType === 'rating') {
                     $numericResponses = $questionResponses->map(function ($response) {
                         return is_numeric($response) ? (float) $response : null;
@@ -275,6 +275,38 @@ class SurveyController extends Controller
                                 'average' => 0,
                                 'count' => 0,
                                 'distribution' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0],
+                                'type' => 'single'
+                            ];
+                        }
+
+                        foreach ($numericResponses as $response) {
+                            $analysis['rating_questions'][$questionText]['responses'][] = $response;
+                            if (isset($analysis['rating_questions'][$questionText]['distribution'][$response])) {
+                                $analysis['rating_questions'][$questionText]['distribution'][$response]++;
+                            }
+                        }
+
+                        $analysis['rating_questions'][$questionText]['count'] += $numericResponses->count();
+                        $analysis['rating_questions'][$questionText]['average'] = 
+                            $analysis['rating_questions'][$questionText]['responses'] ? 
+                            round(array_sum($analysis['rating_questions'][$questionText]['responses']) / count($analysis['rating_questions'][$questionText]['responses']), 2) : 0;
+                    }
+                }
+                // Pytania ratingowe (skala 1-5) - siatka jednokrotnego wyboru
+                elseif ($questionType === 'rating6') {
+                    $numericResponses = $questionResponses->map(function ($response) {
+                        return is_numeric($response) ? (float) $response : null;
+                    })->filter();
+
+                    if ($numericResponses->isNotEmpty()) {
+                        if (!isset($analysis['rating_questions'][$questionText])) {
+                            $analysis['rating_questions'][$questionText] = [
+                                'question' => $questionText,
+                                'responses' => [],
+                                'average' => 0,
+                                'count' => 0,
+                                'distribution' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0],
+                                'type' => 'grid'
                             ];
                         }
 
@@ -834,7 +866,12 @@ class SurveyController extends Controller
         });
 
         if (count($numericAnswers) >= count($sampleAnswers) * 0.8) {
-            return 'rating';
+            // Sprawdź czy to siatka (6 podpytań) czy pojedyncze pytanie
+            // Jeśli nagłówek zawiera "Pytanie" i jest to pierwsze pytanie, prawdopodobnie siatka
+            if (strpos($header, 'Pytanie') !== false && strpos($header, '1.') !== false) {
+                return 'rating6'; // siatka jednokrotnego wyboru
+            }
+            return 'rating'; // pojedyncze pytanie
         }
 
         // Sprawdź czy to pytanie z opcjami (zawiera nawiasy kwadratowe)
