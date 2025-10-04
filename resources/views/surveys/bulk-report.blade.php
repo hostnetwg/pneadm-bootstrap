@@ -260,23 +260,35 @@
             font-weight: bold;
         }
         
-        .open-responses {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
+        .responses-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            border: 1px solid #ddd;
         }
         
-        .open-response-column {
-            flex: 1;
-            min-width: 200px;
-            font-size: 10px;
+        .responses-table td {
+            width: 33.33%;
+            vertical-align: top;
+            padding: 4px;
+            border: 1px solid #ddd;
+            font-size: 8px;
+            line-height: 1.2;
         }
         
-        .open-response-item {
-            margin-bottom: 8px;
-            padding: 5px;
-            border-left: 2px solid #ccc;
-            background-color: #f9f9f9;
+        .text-response {
+            margin-bottom: 4px;
+            padding: 3px;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            page-break-inside: auto;
+            page-break-before: auto;
+        }
+        
+        .text-response-number {
+            font-weight: bold;
+            color: #666;
+            margin-right: 3px;
         }
         
         .choice-question {
@@ -495,23 +507,49 @@
             <div class="analysis-section">
                 <h3>Pytania otwarte - Wszystkie odpowiedzi</h3>
                 @foreach($detailed_analysis['open_questions'] as $question)
-                    <div style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 20px; page-break-inside: avoid;">
                         <h4 style="font-size: 14px; margin-bottom: 10px; color: #000;">{{ $question['question'] }}</h4>
-                        <div class="open-responses">
+                        <div class="text-responses" style="page-break-after: avoid;">
+                            <strong>Wszystkie odpowiedzi ({{ count($question['responses']) }}):</strong>
                             @php
-                                $responses = $question['responses'];
-                                $chunkSize = ceil(count($responses) / 3);
-                                $chunks = array_chunk($responses, $chunkSize);
+                                $responsesArray = $question['responses'];
+                                $totalResponses = count($responsesArray);
+                                $rows = [];
+                                
+                                // Create rows of 3 responses each
+                                for ($i = 0; $i < $totalResponses; $i += 3) {
+                                    $row = [];
+                                    for ($j = 0; $j < 3; $j++) {
+                                        $index = $i + $j;
+                                        if ($index < $totalResponses) {
+                                            $row[] = [
+                                                'number' => $index + 1,
+                                                'text' => $responsesArray[$index]
+                                            ];
+                                        } else {
+                                            $row[] = null; // Empty cell
+                                        }
+                                    }
+                                    $rows[] = $row;
+                                }
                             @endphp
-                            @foreach($chunks as $chunk)
-                                <div class="open-response-column">
-                                    @foreach($chunk as $response)
-                                        <div class="open-response-item">
-                                            {{ $response }}
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endforeach
+                            
+                            <table class="responses-table">
+                                @foreach($rows as $row)
+                                    <tr>
+                                        @foreach($row as $response)
+                                            <td>
+                                                @if($response)
+                                                    <div class="text-response">
+                                                        <span class="text-response-number">{{ $response['number'] }}.</span>
+                                                        {{ Str::limit($response['text'], 120) }}
+                                                    </div>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </table>
                         </div>
                     </div>
                 @endforeach
