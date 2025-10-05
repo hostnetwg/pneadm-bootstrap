@@ -109,6 +109,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/{id}', [SalesController::class, 'show'])->name('show');
         Route::put('/{id}', [SalesController::class, 'update'])->name('update');
         Route::post('/{id}/process', [SalesController::class, 'markAsProcessed'])->name('process');
+        Route::post('/{id}/publigo', [SalesController::class, 'createPubligoOrder'])->name('publigo.create');
+        Route::post('/{id}/publigo/reset', [SalesController::class, 'resetPubligoStatus'])->name('publigo.reset');
     });
 
 

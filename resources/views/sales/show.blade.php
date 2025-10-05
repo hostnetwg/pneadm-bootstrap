@@ -156,6 +156,45 @@ nowoczesna-edukacja.pl </div>
                             @endif
                         </div>
                     </div>
+
+                    {{-- Button Dodaj zamówienie PUBLIGO --}}
+                    @if(!empty($zamowienie->idProdPubligo) && !empty($zamowienie->price_idProdPubligo) && $zamowienie->publigo_sent != 1)
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-primary" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
+                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
+                            </button>
+                            <div id="publigoResult" class="mt-2"></div>
+                        </div>
+                    @elseif($zamowienie->publigo_sent == 1)
+                        <div class="mb-3">
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> 
+                                <strong>Zamówienie zostało wysłane do Publigo</strong>
+                                <small class="d-block text-muted mt-1">
+                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? \Carbon\Carbon::parse($zamowienie->publigo_sent_at)->format('d.m.Y H:i') : 'Nieznana' }}
+                                </small>
+                                
+                                {{-- Przycisk resetowania dla administratorów --}}
+                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-outline-warning btn-sm" id="resetPubligoBtn" onclick="resetPubligoStatus({{ $zamowienie->id }})">
+                                            <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                                        </button>
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="bi bi-info-circle"></i> Użyj gdy zamówienie zostało usunięte z Publigo
+                                        </small>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> 
+                                Brak danych produktu Publigo - zamówienie nie może być przesłane
+                            </small>
+                        </div>
+                    @endif
                 </div>
 
                 {{-- Prawa kolumna: Faktura - kompaktowe --}}
@@ -401,6 +440,176 @@ nowoczesna-edukacja.pl `;
             }
             
             document.body.removeChild(textArea);
+        }
+
+        // Funkcja do tworzenia zamówienia w Publigo
+        function createPubligoOrder(orderId) {
+            const button = document.getElementById('publigoOrderBtn');
+            const resultDiv = document.getElementById('publigoResult');
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            
+            // Wyczyść poprzednie komunikaty
+            resultDiv.innerHTML = '';
+            
+            // Wysłanie zapytania AJAX
+            fetch(`/sales/${orderId}/publigo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Sukces
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Sukces!</strong> ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showPubligoDetails()">
+                                <i class="bi bi-info-circle"></i> Pokaż szczegóły
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.publigoResponseData = data;
+                } else {
+                    // Błąd
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${data.error}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        ${data.publigo_response ? `
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showPubligoDetails()">
+                                    <i class="bi bi-info-circle"></i> Pokaż szczegóły błędu
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.publigoResponseData = data;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Błąd połączenia:</strong> Wystąpił błąd podczas komunikacji z serwerem.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO';
+            });
+        }
+
+        // Funkcja do wyświetlania szczegółów odpowiedzi Publigo
+        function showPubligoDetails() {
+            if (!window.publigoResponseData) return;
+            
+            const data = window.publigoResponseData;
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-info-circle"></i> Szczegóły odpowiedzi Publigo
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-send"></i> Wysłane dane:</h6>
+                                    <pre class="bg-light p-2 rounded" style="font-size: 12px;">${JSON.stringify(data.order_data, null, 2)}</pre>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-reply"></i> Odpowiedź Publigo:</h6>
+                                    <pre class="bg-light p-2 rounded" style="font-size: 12px;">${JSON.stringify(data.publigo_response, null, 2)}</pre>
+                                </div>
+                            </div>
+                            ${data.http_code ? `
+                                <div class="mt-3">
+                                    <h6><i class="bi bi-code"></i> Kod HTTP:</h6>
+                                    <span class="badge ${data.http_code === 200 ? 'bg-success' : 'bg-danger'}">${data.http_code}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Usuń modal z DOM po zamknięciu
+            modal.addEventListener('hidden.bs.modal', function () {
+                document.body.removeChild(modal);
+            });
+        }
+
+        // Funkcja do resetowania statusu Publigo (tylko dla administratorów)
+        function resetPubligoStatus(orderId) {
+            if (!confirm('Czy na pewno chcesz zresetować status Publigo dla tego zamówienia?\n\nTo pozwoli na ponowne wysłanie zamówienia do Publigo.')) {
+                return;
+            }
+
+            const button = document.getElementById('resetPubligoBtn');
+            const resultDiv = document.getElementById('publigoResult');
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
+            
+            // Wysłanie zapytania AJAX
+            fetch(`/sales/${orderId}/publigo/reset`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Sukces - przeładowanie strony aby pokazać przycisk "Dodaj zamówienie PUBLIGO"
+                    location.reload();
+                } else {
+                    // Błąd
+                    alert('Błąd: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Wystąpił błąd podczas resetowania statusu.');
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo';
+            });
         }
     </script>
 </x-app-layout>

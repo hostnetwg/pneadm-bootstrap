@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Exception;
+use App\Services\PubligoApiService;
 
 class SalesController extends Controller
 {
@@ -167,6 +168,153 @@ class SalesController extends Controller
                 
                 return redirect()->route('sales.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
             }
+        }
+    }
+
+    /**
+     * Tworzy zamówienie w Publigo API na podstawie zamówienia z bazy
+     */
+    public function createPubligoOrder(Request $request, $id)
+    {
+        try {
+            // Pobranie zamówienia z bazy
+            $zamowienie = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', $id)
+                ->first();
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // Sprawdzenie czy zamówienie ma dane Publigo
+            if (empty($zamowienie->idProdPubligo) || empty($zamowienie->price_idProdPubligo)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.'
+                ], 400);
+            }
+
+            // Sprawdzenie czy zamówienie już zostało wysłane do Publigo
+            if ($zamowienie->publigo_sent == 1) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'To zamówienie zostało już wysłane do Publigo.',
+                    'sent_at' => $zamowienie->publigo_sent_at ? \Carbon\Carbon::parse($zamowienie->publigo_sent_at)->format('d.m.Y H:i') : 'Nieznana data'
+                ], 400);
+            }
+
+            // Sprawdzenie czy ma wszystkie wymagane dane
+            $requiredFields = ['konto_email', 'konto_imie_nazwisko', 'odb_adres', 'odb_kod', 'odb_poczta'];
+            $missingFields = [];
+            
+            foreach ($requiredFields as $field) {
+                if (empty($zamowienie->$field)) {
+                    $missingFields[] = $field;
+                }
+            }
+
+            if (!empty($missingFields)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak wymaganych danych: ' . implode(', ', $missingFields)
+                ], 400);
+            }
+
+            // Przygotowanie i wysłanie zamówienia do Publigo
+            $publigoService = new PubligoApiService();
+            $orderData = $publigoService->prepareOrderData($zamowienie);
+            $result = $publigoService->createOrder($orderData);
+
+            // Zwrócenie odpowiedzi
+            if ($result['success']) {
+                // Aktualizacja statusu zamówienia po udanym wysłaniu
+                DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                    ->where('id', $id)
+                    ->update([
+                        'publigo_sent' => 1,
+                        'publigo_sent_at' => now()
+                    ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => $result['message'],
+                    'order_data' => $orderData,
+                    'publigo_response' => $result['response'],
+                    'sent_at' => now()->format('d.m.Y H:i')
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'],
+                    'order_data' => $orderData,
+                    'publigo_response' => $result['response'],
+                    'http_code' => $result['http_code']
+                ]);
+            }
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Resetuje status Publigo dla zamówienia (tylko dla administratorów)
+     */
+    public function resetPubligoStatus(Request $request, $id)
+    {
+        // Sprawdzenie uprawnień - tylko admin i super_admin
+        if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('super_admin')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Brak uprawnień do resetowania statusu Publigo.'
+            ], 403);
+        }
+
+        try {
+            // Pobranie zamówienia z bazy
+            $zamowienie = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', $id)
+                ->first();
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // Resetowanie statusu Publigo
+            $updated = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', $id)
+                ->update([
+                    'publigo_sent' => 0,
+                    'publigo_sent_at' => null
+                ]);
+
+            if ($updated) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Status Publigo został zresetowany. Zamówienie może być ponownie wysłane.',
+                    'reset_at' => now()->format('d.m.Y H:i')
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie udało się zresetować statusu Publigo.'
+                ], 500);
+            }
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas resetowania: ' . $e->getMessage()
+            ], 500);
         }
     }
 }
