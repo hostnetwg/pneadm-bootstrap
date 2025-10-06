@@ -118,6 +118,31 @@ class CoursesController extends Controller
                         ->orderBy($sortColumn, $sortDirection)
                         ->paginate($perPage)
                         ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
+
+        // Dodanie liczby zamówień bez numeru faktury i ze statusem niezakończonym
+        $courses->getCollection()->transform(function($course) {
+            $ordersCount = 0;
+            
+            // Sprawdź czy kurs ma source_id_old = "certgen_Publigo" i id_old
+            if ($course->source_id_old === 'certgen_Publigo' && $course->id_old) {
+                $ordersCount = DB::connection('mysql_certgen')
+                    ->table('zamowienia_FORM')
+                    ->where('idProdPubligo', $course->id_old)
+                    ->where(function($query) {
+                        $query->whereNull('nr_fakury')
+                              ->orWhere('nr_fakury', '')
+                              ->orWhere('nr_fakury', '0');
+                    })
+                    ->where(function($query) {
+                        $query->whereNull('status_zakonczone')
+                              ->orWhere('status_zakonczone', 0);
+                    })
+                    ->count();
+            }
+            
+            $course->orders_count = $ordersCount;
+            return $course;
+        });
     
         return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
      }

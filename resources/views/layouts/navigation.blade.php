@@ -191,6 +191,26 @@
 
         <li class="border-top my-3"></li>
         
+        <!-- Ustawienia -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('settings.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#settings-collapse"
+                    aria-expanded="{{ request()->routeIs('settings.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#sliders"></use>
+                </svg>
+                Ustawienia
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('settings.*') ? 'show' : '' }}" id="settings-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>
+                </ul>
+            </div>
+        </li>
+        
         <!-- Admin -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') ? '' : 'collapsed' }}"
