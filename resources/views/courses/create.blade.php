@@ -21,6 +21,66 @@
                     <textarea name="description" id="description" class="form-control"></textarea>
                 </div>
 
+                <!-- Sekcja opisu oferty -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Opis oferty dla klientów</h5>
+                        <small class="text-muted">Pełny opis oferty wyświetlany na stronie pnedu.pl</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="offer_summary" class="form-label">Krótkie podsumowanie oferty</label>
+                            <textarea name="offer_summary" class="form-control" id="offer_summary" rows="2" placeholder="Krótki opis oferty (max 500 znaków)"></textarea>
+                            <div class="form-text">Krótkie podsumowanie wyświetlane w liście szkoleń</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="offer_description_html" class="form-label">Pełny opis oferty (HTML)</label>
+                            <div class="btn-toolbar mb-2" role="toolbar">
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('bold')" title="Pogrubienie">
+                                        <i class="fas fa-bold"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('italic')" title="Kursywa">
+                                        <i class="fas fa-italic"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('underline')" title="Podkreślenie">
+                                        <i class="fas fa-underline"></i>
+                                    </button>
+                                </div>
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertTag('h3')" title="Nagłówek 3">
+                                        H3
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertTag('h4')" title="Nagłówek 4">
+                                        H4
+                                    </button>
+                                </div>
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertList('ul')" title="Lista punktowana">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertList('ol')" title="Lista numerowana">
+                                        <i class="fas fa-list-ol"></i>
+                                    </button>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertLink()" title="Link">
+                                        <i class="fas fa-link"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="previewHtml()" title="Podgląd">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea name="offer_description_html" class="form-control" id="offer_description_html" rows="10" placeholder="Wpisz pełny opis oferty z formatowaniem HTML..."></textarea>
+                            <div class="form-text">
+                                Możesz używać podstawowych tagów HTML: &lt;strong&gt;, &lt;em&gt;, &lt;h3&gt;, &lt;h4&gt;, &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;, &lt;a&gt;, &lt;p&gt;, &lt;br&gt;
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row row mb-3">
                     <div class="col-md-3">
                         <label for="start_date" class="form-label">Data rozpoczęcia</label>
@@ -167,6 +227,102 @@
             const type = document.getElementById('type').value;
             document.getElementById('onlineFields').style.display = (type === 'online') ? 'flex' : 'none';
             document.getElementById('offlineFields').style.display = (type === 'offline') ? 'block' : 'none';
+        }
+
+        // Funkcje edytora HTML
+        function formatText(command) {
+            const textarea = document.getElementById('offer_description_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            let formattedText = '';
+            switch(command) {
+                case 'bold':
+                    formattedText = `<strong>${selectedText || 'pogrubiony tekst'}</strong>`;
+                    break;
+                case 'italic':
+                    formattedText = `<em>${selectedText || 'tekst kursywą'}</em>`;
+                    break;
+                case 'underline':
+                    formattedText = `<u>${selectedText || 'podkreślony tekst'}</u>`;
+                    break;
+            }
+            
+            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertTag(tag) {
+            const textarea = document.getElementById('offer_description_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            const formattedText = `<${tag}>${selectedText || 'nagłówek'}</${tag}>`;
+            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertList(type) {
+            const textarea = document.getElementById('offer_description_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            
+            const listHtml = `<${type}>
+    <li>Pierwszy punkt</li>
+    <li>Drugi punkt</li>
+    <li>Trzeci punkt</li>
+</${type}>`;
+            
+            textarea.value = textarea.value.substring(0, start) + listHtml + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertLink() {
+            const textarea = document.getElementById('offer_description_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            const url = prompt('Podaj URL:', 'https://');
+            if (url) {
+                const linkText = selectedText || 'tekst linku';
+                const linkHtml = `<a href="${url}">${linkText}</a>`;
+                textarea.value = textarea.value.substring(0, start) + linkHtml + textarea.value.substring(end);
+                textarea.focus();
+            }
+        }
+
+        function previewHtml() {
+            const textarea = document.getElementById('offer_description_html');
+            const htmlContent = textarea.value;
+            
+            if (!htmlContent.trim()) {
+                alert('Brak treści do podglądu');
+                return;
+            }
+            
+            const newWindow = window.open('', '_blank', 'width=800,height=600');
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Podgląd opisu oferty</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+                        h3, h4 { color: #333; margin-top: 20px; }
+                        ul, ol { margin-left: 20px; }
+                        a { color: #007bff; text-decoration: none; }
+                        a:hover { text-decoration: underline; }
+                    </style>
+                </head>
+                <body>
+                    ${htmlContent}
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
         }
 
         // Wywołanie funkcji przy załadowaniu strony, aby ukryć/pokazać odpowiednie pola

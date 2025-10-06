@@ -605,6 +605,8 @@ class CoursesController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'offer_summary' => 'nullable|string|max:500',
+            'offer_description_html' => 'nullable|string|max:10000',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'is_paid' => 'required|boolean',
@@ -617,6 +619,13 @@ class CoursesController extends Controller
             'source_id_old' => 'nullable|string|max:255',
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //    
+        
+        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        if (!empty($validated['offer_description_html'])) {
+            $validated['offer_description_html'] = strip_tags($validated['offer_description_html'], 
+                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+        }
+        
         try {
             DB::beginTransaction();
     
@@ -739,6 +748,8 @@ class CoursesController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'offer_summary' => 'nullable|string|max:500',
+            'offer_description_html' => 'nullable|string|max:10000',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'is_paid' => 'required|boolean',
@@ -755,6 +766,12 @@ class CoursesController extends Controller
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //        
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
+        
+        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        if (!empty($validated['offer_description_html'])) {
+            $validated['offer_description_html'] = strip_tags($validated['offer_description_html'], 
+                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+        }
     
         // ✅ Tworzymy folder `courses/images`, jeśli nie istnieje
         $storageDirectory = storage_path('app/public/courses/images');

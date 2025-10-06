@@ -58,6 +58,18 @@
                                 <p class="text-muted">{{ $course->description }}</p>
                             @endif
 
+                            @if($course->offer_summary)
+                                <h5>Podsumowanie oferty</h5>
+                                <p class="text-info">{{ $course->offer_summary }}</p>
+                            @endif
+
+                            @if($course->offer_description_html)
+                                <h5>Pełny opis oferty</h5>
+                                <div class="border rounded p-3 bg-light">
+                                    {!! $course->offer_description_html !!}
+                                </div>
+                            @endif
+
                             <div class="row">
                                 <div class="col-md-6">
                                     <h5>Podstawowe informacje</h5>
