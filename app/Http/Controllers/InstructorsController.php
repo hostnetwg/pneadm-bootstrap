@@ -26,7 +26,7 @@ class InstructorsController extends Controller
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email',
             'phone' => 'nullable|string|max:20',
-            'bio' => 'nullable|string|max:500',
+            'bio' => 'nullable|string|max:1000',
             'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
@@ -95,7 +95,7 @@ class InstructorsController extends Controller
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email,' . $id,
             'phone' => 'nullable|string|max:20',
-            'bio' => 'nullable|string|max:500',
+            'bio' => 'nullable|string|max:1000',
             'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',            
