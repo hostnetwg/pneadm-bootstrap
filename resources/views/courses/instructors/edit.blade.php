@@ -19,13 +19,22 @@
                         <label for="title" class="form-label">Tytuł naukowy</label>
                         <input type="text" name="title" class="form-control" id="title" value="{{ $instructor->title }}" placeholder="">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="first_name" class="form-label">Imię</label>
                         <input type="text" name="first_name" class="form-control" id="first_name" value="{{ $instructor->first_name }}" required>
                     </div>
-                    <div class="col-md-5">
+                    <div class="col-md-3">
                         <label for="last_name" class="form-label">Nazwisko</label>
                         <input type="text" name="last_name" class="form-control" id="last_name" value="{{ $instructor->last_name }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="gender" class="form-label">Płeć</label>
+                        <select name="gender" class="form-control" id="gender">
+                            <option value="">Wybierz płeć</option>
+                            @foreach(\App\Models\Instructor::getGenderOptions() as $value => $label)
+                                <option value="{{ $value }}" {{ $instructor->gender === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 

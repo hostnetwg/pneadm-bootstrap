@@ -109,6 +109,10 @@
                                             <td>{{ $instructor->last_name }}</td>
                                         </tr>
                                         <tr>
+                                            <td><strong><i class="fas fa-venus-mars text-primary"></i> Płeć:</strong></td>
+                                            <td>{{ $instructor->gender_label }}</td>
+                                        </tr>
+                                        <tr>
                                             <td><strong><i class="fas fa-envelope text-primary"></i> Email:</strong></td>
                                             <td>
                                                 <a href="mailto:{{ $instructor->email }}" class="text-decoration-none">

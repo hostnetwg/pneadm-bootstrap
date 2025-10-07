@@ -34,6 +34,7 @@
                         <th>Tytuł</th>                        
                         <th>Imię</th>
                         <th>Nazwisko</th>
+                        <th>Płeć</th>
                         <th>Email</th>
                         <th>Telefon</th>
                         <th>Aktywny</th>
@@ -54,6 +55,7 @@
                         <td>{{ $instructor->title }}</td>                        
                         <td>{{ $instructor->first_name }}</td>
                         <td>{{ $instructor->last_name }}</td>
+                        <td>{{ $instructor->gender_label }}</td>
                         <td>{{ $instructor->email }}</td>
                         <td>{{ $instructor->phone }}</td>
                         <td>{{ $instructor->is_active ? 'Tak' : 'Nie' }}</td>

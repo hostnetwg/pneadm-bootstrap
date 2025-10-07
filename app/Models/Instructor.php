@@ -15,6 +15,7 @@ class Instructor extends Model
         'title',          // Tytuł naukowy, np. "dr", "mgr"
         'first_name',     // Imię instruktora
         'last_name',      // Nazwisko instruktora
+        'gender',         // Płeć: male, female, other, prefer_not_to_say
         'email',          // Email kontaktowy
         'phone',          // Numer telefonu
         'bio',            // Krótki opis instruktora
@@ -38,6 +39,33 @@ class Instructor extends Model
     public function getFullTitleNameAttribute()
     {
         return trim("{$this->title} {$this->first_name} {$this->last_name}");
+    }
+
+    /**
+     * Zwraca polską nazwę płci.
+     */
+    public function getGenderLabelAttribute()
+    {
+        return match($this->gender) {
+            'male' => 'Mężczyzna',
+            'female' => 'Kobieta',
+            'other' => 'Inna',
+            'prefer_not_to_say' => 'Nie chcę określać',
+            default => 'Nie określono'
+        };
+    }
+
+    /**
+     * Zwraca wszystkie dostępne opcje płci.
+     */
+    public static function getGenderOptions()
+    {
+        return [
+            'male' => 'Mężczyzna',
+            'female' => 'Kobieta',
+            'other' => 'Inna',
+            'prefer_not_to_say' => 'Nie chcę określać'
+        ];
     }
 
     /**

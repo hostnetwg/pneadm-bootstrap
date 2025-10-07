@@ -23,6 +23,7 @@ class InstructorsController extends Controller
             'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
+            'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email',
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string',
@@ -44,6 +45,7 @@ class InstructorsController extends Controller
             'title' => $request->input('title'),            
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
+            'gender' => $request->input('gender'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
             'bio' => $request->input('bio'),
@@ -81,6 +83,7 @@ class InstructorsController extends Controller
             'title' => 'nullable|string|max:50', // Dodano walidację tytułu            
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
+            'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email,' . $id,
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string',
@@ -132,6 +135,7 @@ class InstructorsController extends Controller
         $instructor->title = $request->input('title');
         $instructor->first_name = $request->input('first_name');
         $instructor->last_name = $request->input('last_name');
+        $instructor->gender = $request->input('gender');
         $instructor->email = $request->input('email');
         $instructor->phone = $request->input('phone');
         $instructor->bio = $request->input('bio');
