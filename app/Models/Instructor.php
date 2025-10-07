@@ -19,6 +19,7 @@ class Instructor extends Model
         'email',          // Email kontaktowy
         'phone',          // Numer telefonu
         'bio',            // Krótki opis instruktora
+        'bio_html',       // Pełna biografia w HTML
         'photo',          // Ścieżka do zdjęcia
         'signature',      // Ścieżka do podpisu instruktora
         'is_active',      // Czy instruktor jest aktywny

@@ -157,7 +157,7 @@
                     </div>
 
                     <!-- Biografia -->
-                    @if($instructor->bio)
+                    @if($instructor->bio || $instructor->bio_html)
                         <div class="card mb-4">
                             <div class="card-header bg-success text-white">
                                 <h5 class="mb-0">
@@ -165,9 +165,15 @@
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <div class="bio-content">
-                                    {!! nl2br(e($instructor->bio)) !!}
-                                </div>
+                                @if($instructor->bio_html)
+                                    <div class="bio-html-content">
+                                        {!! $instructor->bio_html !!}
+                                    </div>
+                                @elseif($instructor->bio)
+                                    <div class="bio-content">
+                                        {!! nl2br(e($instructor->bio)) !!}
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endif

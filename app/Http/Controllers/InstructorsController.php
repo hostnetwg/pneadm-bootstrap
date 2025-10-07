@@ -26,7 +26,8 @@ class InstructorsController extends Controller
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email',
             'phone' => 'nullable|string|max:20',
-            'bio' => 'nullable|string',
+            'bio' => 'nullable|string|max:500',
+            'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
         ]);
@@ -39,7 +40,14 @@ class InstructorsController extends Controller
         $signaturePath = null;
         if ($request->hasFile('signature')) {
             $signaturePath = $request->file('signature')->store('instructors', 'public');
-        }        
+        }
+
+        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        $bioHtml = $request->input('bio_html');
+        if (!empty($bioHtml)) {
+            $bioHtml = strip_tags($bioHtml, 
+                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+        }
         
         Instructor::create([
             'title' => $request->input('title'),            
@@ -49,6 +57,7 @@ class InstructorsController extends Controller
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
             'bio' => $request->input('bio'),
+            'bio_html' => $bioHtml,
             'photo' => $photoPath,
             'signature' => $signaturePath,            
             'is_active' => $request->has('is_active'),
@@ -86,7 +95,8 @@ class InstructorsController extends Controller
             'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
             'email' => 'required|email|unique:instructors,email,' . $id,
             'phone' => 'nullable|string|max:20',
-            'bio' => 'nullable|string',
+            'bio' => 'nullable|string|max:500',
+            'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'signature' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',            
             'is_active' => 'nullable|string',
@@ -132,6 +142,13 @@ class InstructorsController extends Controller
             $instructor->signature = $signaturePath;
         }        
     
+        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        $bioHtml = $request->input('bio_html');
+        if (!empty($bioHtml)) {
+            $bioHtml = strip_tags($bioHtml, 
+                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+        }
+
         $instructor->title = $request->input('title');
         $instructor->first_name = $request->input('first_name');
         $instructor->last_name = $request->input('last_name');
@@ -139,6 +156,7 @@ class InstructorsController extends Controller
         $instructor->email = $request->input('email');
         $instructor->phone = $request->input('phone');
         $instructor->bio = $request->input('bio');
+        $instructor->bio_html = $bioHtml;
         $instructor->is_active = $request->has('is_active');
     
         $instructor->save();

@@ -61,8 +61,67 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="bio" class="form-label">Biografia</label>
-                    <textarea name="bio" class="form-control" id="bio" rows="3"></textarea>
+                    <label for="bio" class="form-label">Krótka biografia</label>
+                    <textarea name="bio" class="form-control" id="bio" rows="3" placeholder="Krótki opis instruktora (max 500 znaków)"></textarea>
+                </div>
+
+                <!-- Sekcja pełnej biografii HTML -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Pełna biografia instruktora (HTML)</h5>
+                        <small class="text-muted">Sformatowana biografia wyświetlana w ofercie szkolenia</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="bio_html" class="form-label">Pełna biografia w HTML</label>
+                            
+                            <!-- Toolbar dla edytora HTML -->
+                            <div class="btn-toolbar mb-2" role="toolbar">
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('bold')" title="Pogrubienie">
+                                        <strong>B</strong>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('italic')" title="Kursywa">
+                                        <em>I</em>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatText('underline')" title="Podkreślenie">
+                                        <u>U</u>
+                                    </button>
+                                </div>
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertTag('h3')" title="Nagłówek 3">
+                                        H3
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertTag('h4')" title="Nagłówek 4">
+                                        H4
+                                    </button>
+                                </div>
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertList('ul')" title="Lista punktowana">
+                                        • Lista
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertList('ol')" title="Lista numerowana">
+                                        1. Lista
+                                    </button>
+                                </div>
+                                <div class="btn-group me-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertLink()" title="Wstaw link">
+                                        🔗 Link
+                                    </button>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-info btn-sm" onclick="previewHtml('bio_html')" title="Podgląd HTML">
+                                        👁️ Podgląd
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <textarea name="bio_html" id="bio_html" class="form-control" rows="10" placeholder="Wpisz pełną biografię instruktora z formatowaniem HTML..."></textarea>
+                            <small class="form-text text-muted">
+                                Możesz używać podstawowych tagów HTML: &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;h3&gt;, &lt;h4&gt;, &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;, &lt;a&gt;
+                            </small>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -84,4 +143,111 @@
             </form>
         </div>
     </div>
+
+    <script>
+        // Funkcje dla edytora HTML
+        function formatText(command) {
+            const textarea = document.getElementById('bio_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            let formattedText = '';
+            switch(command) {
+                case 'bold':
+                    formattedText = `<strong>${selectedText}</strong>`;
+                    break;
+                case 'italic':
+                    formattedText = `<em>${selectedText}</em>`;
+                    break;
+                case 'underline':
+                    formattedText = `<u>${selectedText}</u>`;
+                    break;
+            }
+            
+            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertTag(tag) {
+            const textarea = document.getElementById('bio_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            let formattedText = '';
+            if (selectedText) {
+                formattedText = `<${tag}>${selectedText}</${tag}>`;
+            } else {
+                formattedText = `<${tag}></${tag}>`;
+            }
+            
+            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertList(type) {
+            const textarea = document.getElementById('bio_html');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            
+            let formattedText = '';
+            if (selectedText) {
+                const lines = selectedText.split('\n').filter(line => line.trim());
+                const listItems = lines.map(line => `    <li>${line.trim()}</li>`).join('\n');
+                formattedText = `<${type}>\n${listItems}\n</${type}>`;
+            } else {
+                formattedText = `<${type}>\n    <li></li>\n</${type}>`;
+            }
+            
+            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.focus();
+        }
+
+        function insertLink() {
+            const url = prompt('Wprowadź URL:');
+            if (url) {
+                const text = prompt('Wprowadź tekst linku (opcjonalnie):') || url;
+                const textarea = document.getElementById('bio_html');
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                
+                const linkHtml = `<a href="${url}">${text}</a>`;
+                textarea.value = textarea.value.substring(0, start) + linkHtml + textarea.value.substring(end);
+                textarea.focus();
+            }
+        }
+
+        function previewHtml(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            const htmlContent = textarea.value;
+            
+            if (!htmlContent.trim()) {
+                alert('Brak treści do podglądu');
+                return;
+            }
+            
+            const newWindow = window.open('', '_blank', 'width=800,height=600');
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Podgląd HTML</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+                        h3, h4 { color: #333; margin-top: 20px; }
+                        ul, ol { margin: 10px 0; padding-left: 30px; }
+                        a { color: #007bff; text-decoration: none; }
+                        a:hover { text-decoration: underline; }
+                    </style>
+                </head>
+                <body>
+                    ${htmlContent}
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
+        }
+    </script>
 </x-app-layout>
