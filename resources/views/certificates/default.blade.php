@@ -41,18 +41,22 @@
         }
         .instructor-section {
             position: absolute;
-            bottom: 180px;
+            top: 820px;
             right: 15px;
             width: calc(50% - 15px);
             text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+        }
+        .instructor-section p {
+            margin: 0;
+            position: relative;
             z-index: 10;
         }
-        .signature-section {
-            position: absolute;
-            bottom: 85px;
-            right: 30px;
-            width: calc(50% - 15px);
-            text-align: right;
+        .instructor-section .signature-img {
+            position: relative;
             z-index: 1;
         }
         .footer {
@@ -120,7 +124,7 @@
     </div>
 
     <div class="instructor-section">
-        <p style="margin: 0;">
+        <p>
             @php
                 // Określanie tytułu na podstawie płci
                 $title = match($instructor->gender ?? 'prefer_not_to_say') {
@@ -133,9 +137,7 @@
             {{ $title }}<br>
             <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span>
         </p>
-    </div>
-
-    <div class="signature-section">
+        
         @if(!empty($instructor->signature))
             @php
                 // Obsługa ścieżki do grafiki podpisu
@@ -153,7 +155,7 @@
                 }
             @endphp
             @if($signatureSrc)
-                <img src="{{ $signatureSrc }}" alt="Podpis" style="max-width: 200px; max-height: 100px; width: auto; height: auto;">
+                <img src="{{ $signatureSrc }}" alt="Podpis" class="signature-img" style="max-width: 200px; max-height: 80px; width: auto; height: auto;">
             @endif
         @endif
     </div>

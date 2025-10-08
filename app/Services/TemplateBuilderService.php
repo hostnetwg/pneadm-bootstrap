@@ -109,18 +109,22 @@ class TemplateBuilderService
         $styles .= "        }\n";
         $styles .= "        .instructor-section {\n";
         $styles .= "            position: absolute;\n";
-        $styles .= "            bottom: 180px;\n";
+        $styles .= "            top: 550px;\n";
         $styles .= "            right: 15px;\n";
         $styles .= "            width: calc(50% - 15px);\n";
         $styles .= "            text-align: right;\n";
+        $styles .= "            display: flex;\n";
+        $styles .= "            flex-direction: column;\n";
+        $styles .= "            align-items: flex-end;\n";
+        $styles .= "            gap: 3px;\n";
+        $styles .= "        }\n";
+        $styles .= "        .instructor-section p {\n";
+        $styles .= "            margin: 0;\n";
+        $styles .= "            position: relative;\n";
         $styles .= "            z-index: 10;\n";
         $styles .= "        }\n";
-        $styles .= "        .signature-section {\n";
-        $styles .= "            position: absolute;\n";
-        $styles .= "            bottom: 80px;\n";
-        $styles .= "            right: 15px;\n";
-        $styles .= "            width: calc(50% - 15px);\n";
-        $styles .= "            text-align: right;\n";
+        $styles .= "        .instructor-section .signature-img {\n";
+        $styles .= "            position: relative;\n";
         $styles .= "            z-index: 1;\n";
         $styles .= "        }\n";
         $styles .= "        .footer {\n";
@@ -255,7 +259,7 @@ class TemplateBuilderService
         $html .= "    </div>\n\n";
         
         $html .= "    <div class=\"instructor-section\">\n";
-        $html .= "        <p style=\"margin: 0;\">\n";
+        $html .= "        <p>\n";
         $html .= "            @php\n";
         $html .= "                // Określanie tytułu na podstawie płci\n";
         $html .= "                \$title = match(\$instructor->gender ?? 'prefer_not_to_say') {\n";
@@ -268,9 +272,7 @@ class TemplateBuilderService
         $html .= "            {{ \$title }}<br>\n";
         $html .= "            <span class=\"bold\">{{ \$instructor->first_name }} {{ \$instructor->last_name }}</span>\n";
         $html .= "        </p>\n";
-        $html .= "    </div>\n\n";
-        
-        $html .= "    <div class=\"signature-section\">\n";
+        $html .= "        \n";
         $html .= "        @if(!empty(\$instructor->signature))\n";
         $html .= "            @php\n";
         $html .= "                // Obsługa ścieżki do grafiki podpisu\n";
@@ -288,7 +290,7 @@ class TemplateBuilderService
         $html .= "                }\n";
         $html .= "            @endphp\n";
         $html .= "            @if(\$signatureSrc)\n";
-        $html .= "                <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" style=\"max-width: 200px; max-height: 80px; width: auto; height: auto;\">\n";
+        $html .= "                <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" class=\"signature-img\" style=\"max-width: 200px; max-height: 80px; width: auto; height: auto;\">\n";
         $html .= "            @endif\n";
         $html .= "        @endif\n";
         $html .= "    </div>\n\n";
