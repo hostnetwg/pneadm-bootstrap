@@ -129,7 +129,7 @@
             <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span>
             
             @if(!empty($instructor->signature))
-                <div style="margin-top: 5px; margin-right: 15px;">
+                <div style="margin-top: 2px; margin-right: 15px;">
                     @php
                         // Obsługa ścieżki do grafiki podpisu
                         if ($isPdfMode ?? false) {
