@@ -36,6 +36,20 @@
             margin-top: 50px;
             text-align: right;
         }
+        .date-section {
+            position: absolute;
+            bottom: 140px;
+            left: 15px;
+            width: calc(50% - 15px);
+            text-align: left;
+        }
+        .instructor-section {
+            position: absolute;
+            bottom: 190px;
+            right: 15px;
+            width: calc(50% - 15px);
+            text-align: right;
+        }
         .footer {
             font-size: 10px;
             text-align: center;
@@ -95,29 +109,14 @@
         }
     @endphp
 
-    @php
-        // Dynamiczne dostosowanie marginesu na podstawie długości zakresu
-        $description = trim($course->description ?? '');
-        $itemCount = 0;
-        if (preg_match('/^\\d+\\.\\s*/m', $description)) {
-            $itemCount = preg_match_all('/^\\d+\\.\\s*/m', $description);
-        }
-        // Mniejszy margines dla długich zakresów
-        $marginTop = $itemCount > 4 ? '20px' : '50px';
-    @endphp
-    <div class="signature" style="margin-top: {{ $marginTop }};">
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td style="text-align: left; vertical-align: top; width: 50%;">
-                    <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.<br>
-                    Nr rejestru: {{ $certificateNumber }}</p>
-                </td>
-                <td style="text-align: right; vertical-align: top; width: 50%;">
-                    <p style="margin: 0;">prowadzący/a:<br>
-                    <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span></p>
-                </td>
-            </tr>
-        </table>
+    <div class="date-section">
+        <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.<br>
+        Nr rejestru: {{ $certificateNumber }}</p>
+    </div>
+
+    <div class="instructor-section">
+        <p style="margin: 0;">prowadzący/a:<br>
+        <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span></p>
     </div>
 
     <div class="footer">

@@ -104,6 +104,20 @@ class TemplateBuilderService
         $styles .= "            margin-top: 50px;\n";
         $styles .= "            text-align: right;\n";
         $styles .= "        }\n";
+        $styles .= "        .date-section {\n";
+        $styles .= "            position: absolute;\n";
+        $styles .= "            bottom: 140px;\n";
+        $styles .= "            left: 15px;\n";
+        $styles .= "            width: calc(50% - 15px);\n";
+        $styles .= "            text-align: left;\n";
+        $styles .= "        }\n";
+        $styles .= "        .instructor-section {\n";
+        $styles .= "            position: absolute;\n";
+        $styles .= "            bottom: 185px;\n";
+        $styles .= "            right: 15px;\n";
+        $styles .= "            width: calc(50% - 15px);\n";
+        $styles .= "            text-align: right;\n";
+        $styles .= "        }\n";
         $styles .= "        .footer {\n";
         $styles .= "            font-size: 10px;\n";
         $styles .= "            text-align: center;\n";
@@ -230,29 +244,14 @@ class TemplateBuilderService
      */
     private function buildInstructorSignatureBlock($config)
     {
-        $html = "    @php\n";
-        $html .= "        // Dynamiczne dostosowanie marginesu na podstawie długości zakresu\n";
-        $html .= "        \$description = trim(\$course->description ?? '');\n";
-        $html .= "        \$itemCount = 0;\n";
-        $html .= "        if (preg_match('/^\\\\d+\\\\.\\\\s*/m', \$description)) {\n";
-        $html .= "            \$itemCount = preg_match_all('/^\\\\d+\\\\.\\\\s*/m', \$description);\n";
-        $html .= "        }\n";
-        $html .= "        // Mniejszy margines dla długich zakresów\n";
-        $html .= "        \$marginTop = \$itemCount > 4 ? '20px' : '50px';\n";
-        $html .= "    @endphp\n";
-        $html .= "    <div class=\"signature\" style=\"margin-top: {{ \$marginTop }};\">\n";
-        $html .= "        <table style=\"width: 100%; border-collapse: collapse;\">\n";
-        $html .= "            <tr>\n";
-        $html .= "                <td style=\"text-align: left; vertical-align: top; width: 50%;\">\n";
-        $html .= "                    <p style=\"margin: 0;\">Data, {{ \\Carbon\\Carbon::parse(\$course->end_date)->format('d.m.Y') }}r.<br>\n";
-        $html .= "                    Nr rejestru: {{ \$certificateNumber }}</p>\n";
-        $html .= "                </td>\n";
-        $html .= "                <td style=\"text-align: right; vertical-align: top; width: 50%;\">\n";
-        $html .= "                    <p style=\"margin: 0;\">prowadzący/a:<br>\n";
-        $html .= "                    <span class=\"bold\">{{ \$instructor->first_name }} {{ \$instructor->last_name }}</span></p>\n";
-        $html .= "                </td>\n";
-        $html .= "            </tr>\n";
-        $html .= "        </table>\n";
+        $html = "    <div class=\"date-section\">\n";
+        $html .= "        <p style=\"margin: 0;\">Data, {{ \\Carbon\\Carbon::parse(\$course->end_date)->format('d.m.Y') }}r.<br>\n";
+        $html .= "        Nr rejestru: {{ \$certificateNumber }}</p>\n";
+        $html .= "    </div>\n\n";
+        
+        $html .= "    <div class=\"instructor-section\">\n";
+        $html .= "        <p style=\"margin: 0;\">prowadzący/a:<br>\n";
+        $html .= "        <span class=\"bold\">{{ \$instructor->first_name }} {{ \$instructor->last_name }}</span></p>\n";
         $html .= "    </div>\n\n";
         
         return $html;
