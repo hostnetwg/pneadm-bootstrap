@@ -856,7 +856,16 @@ class CoursesController extends Controller
             CourseLocation::where('course_id', $course->id)->delete();
         }
     
-        return redirect()->route('courses.index')->with('success', 'Szkolenie zaktualizowane!');
+        // Zachowaj parametry filtrów przekazane z formularza
+        $queryParams = [];
+        foreach ($request->all() as $key => $value) {
+            if (str_starts_with($key, 'filter_') && !empty($value)) {
+                $filterKey = str_replace('filter_', '', $key);
+                $queryParams[$filterKey] = $value;
+            }
+        }
+        
+        return redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
     }
     
 

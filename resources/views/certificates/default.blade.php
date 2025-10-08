@@ -45,13 +45,15 @@
             right: 15px;
             width: calc(50% - 15px);
             text-align: right;
+            z-index: 10;
         }
         .signature-section {
             position: absolute;
-            bottom: 80px;
-            right: 15px;
+            bottom: 85px;
+            right: 30px;
             width: calc(50% - 15px);
             text-align: right;
+            z-index: 1;
         }
         .footer {
             font-size: 10px;
@@ -151,7 +153,7 @@
                 }
             @endphp
             @if($signatureSrc)
-                <img src="{{ $signatureSrc }}" alt="Podpis" style="max-width: 150px; height: auto;">
+                <img src="{{ $signatureSrc }}" alt="Podpis" style="max-width: 200px; max-height: 100px; width: auto; height: auto;">
             @endif
         @endif
     </div>

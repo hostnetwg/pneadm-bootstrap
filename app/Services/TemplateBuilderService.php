@@ -113,6 +113,7 @@ class TemplateBuilderService
         $styles .= "            right: 15px;\n";
         $styles .= "            width: calc(50% - 15px);\n";
         $styles .= "            text-align: right;\n";
+        $styles .= "            z-index: 10;\n";
         $styles .= "        }\n";
         $styles .= "        .signature-section {\n";
         $styles .= "            position: absolute;\n";
@@ -120,6 +121,7 @@ class TemplateBuilderService
         $styles .= "            right: 15px;\n";
         $styles .= "            width: calc(50% - 15px);\n";
         $styles .= "            text-align: right;\n";
+        $styles .= "            z-index: 1;\n";
         $styles .= "        }\n";
         $styles .= "        .footer {\n";
         $styles .= "            font-size: 10px;\n";
@@ -286,7 +288,7 @@ class TemplateBuilderService
         $html .= "                }\n";
         $html .= "            @endphp\n";
         $html .= "            @if(\$signatureSrc)\n";
-        $html .= "                <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" style=\"max-width: 150px; height: auto;\">\n";
+        $html .= "                <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" style=\"max-width: 200px; max-height: 80px; width: auto; height: auto;\">\n";
         $html .= "            @endif\n";
         $html .= "        @endif\n";
         $html .= "    </div>\n\n";

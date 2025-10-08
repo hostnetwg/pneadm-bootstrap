@@ -20,6 +20,13 @@
             <form action="{{ route('courses.update', $course->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
+                
+                <!-- Zachowaj parametry filtrów -->
+                @foreach(request()->query() as $key => $value)
+                    @if(!in_array($key, ['page']))
+                        <input type="hidden" name="filter_{{ $key }}" value="{{ $value }}">
+                    @endif
+                @endforeach
 
                 <div class="mb-3">
                     <label for="title" class="form-label">Tytuł</label>
@@ -266,7 +273,7 @@
                 </div>
 
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
-                <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
+                <a href="{{ route('courses.index', request()->query()) }}" class="btn btn-secondary">Anuluj</a>
                 <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">
                     <i class="fas fa-users me-1"></i> Uczestnicy ({{ $course->participants->count() }})
                 </a>
