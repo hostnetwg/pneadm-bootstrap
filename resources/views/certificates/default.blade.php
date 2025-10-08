@@ -32,20 +32,23 @@
         .bold {
             font-weight: bold;
         }
-        .signature {
-            margin-top: 50px;
-            text-align: right;
-        }
         .date-section {
             position: absolute;
-            bottom: 140px;
+            bottom: 180px;
             left: 15px;
             width: calc(50% - 15px);
             text-align: left;
         }
         .instructor-section {
             position: absolute;
-            bottom: 90px;
+            bottom: 180px;
+            right: 15px;
+            width: calc(50% - 15px);
+            text-align: right;
+        }
+        .signature-section {
+            position: absolute;
+            bottom: 80px;
             right: 15px;
             width: calc(50% - 15px);
             text-align: right;
@@ -127,30 +130,30 @@
             @endphp
             {{ $title }}<br>
             <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span>
-            
-            @if(!empty($instructor->signature))
-                <div style="margin-top: 2px; margin-right: 15px;">
-                    @php
-                        // Obsługa ścieżki do grafiki podpisu
-                        if ($isPdfMode ?? false) {
-                            // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie
-                            $signatureFile = storage_path('app/public/' . $instructor->signature);
-                            if (file_exists($signatureFile)) {
-                                $signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($signatureFile));
-                            } else {
-                                $signatureSrc = null;
-                            }
-                        } else {
-                            // Dla HTML używamy asset()
-                            $signatureSrc = asset('storage/' . $instructor->signature);
-                        }
-                    @endphp
-                    @if($signatureSrc)
-                        <img src="{{ $signatureSrc }}" alt="Podpis" style="max-width: 100px; height: auto;">
-                    @endif
-                </div>
-            @endif
         </p>
+    </div>
+
+    <div class="signature-section">
+        @if(!empty($instructor->signature))
+            @php
+                // Obsługa ścieżki do grafiki podpisu
+                if ($isPdfMode ?? false) {
+                    // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie
+                    $signatureFile = storage_path('app/public/' . $instructor->signature);
+                    if (file_exists($signatureFile)) {
+                        $signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($signatureFile));
+                    } else {
+                        $signatureSrc = null;
+                    }
+                } else {
+                    // Dla HTML używamy asset()
+                    $signatureSrc = asset('storage/' . $instructor->signature);
+                }
+            @endphp
+            @if($signatureSrc)
+                <img src="{{ $signatureSrc }}" alt="Podpis" style="max-width: 150px; height: auto;">
+            @endif
+        @endif
     </div>
 
     <div class="footer">
