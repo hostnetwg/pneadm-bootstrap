@@ -208,7 +208,9 @@ class CertificateTemplateController extends Controller
 
         $instructor = (object) [
             'first_name' => 'Anna',
-            'last_name' => 'Nowak'
+            'last_name' => 'Nowak',
+            'gender' => 'female',
+            'signature' => 'instructors/L320ili8mrep3FLUQSqQvNkDpYuMLpWAqBesHfFv.jpg' // Przykładowy instruktor z podpisem
         ];
 
         $course = (object) [
