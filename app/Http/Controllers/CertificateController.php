@@ -98,15 +98,24 @@ class CertificateController extends Controller
         // Obliczanie czasu trwania w minutach
         $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
 
-
+        // Określenie szablonu do użycia
+        $templateView = 'certificates.default'; // Domyślny szablon
+        
+        // Jeśli kurs ma przypisany szablon, użyj go
+        if ($course->certificateTemplate && $course->certificateTemplate->bladeFileExists()) {
+            $templateView = $course->certificateTemplate->blade_path;
+        }
     
         // Tworzenie widoku PDF z przekazaniem wszystkich danych
-        $pdf = Pdf::loadView('certificates.template', [
+        $isPdfMode = true; // Generujemy PDF, nie podgląd HTML
+        
+        $pdf = Pdf::loadView($templateView, [
             'participant' => $participant,
             'certificateNumber' => $certificateNumber,
             'course' => $course,
             'instructor' => $instructor,
             'durationMinutes' => $durationMinutes,
+            'isPdfMode' => $isPdfMode,
         ])->setPaper('A4', 'portrait')
           ->setOptions([
               'defaultFont' => 'DejaVu Sans', // Obsługa polskich znaków

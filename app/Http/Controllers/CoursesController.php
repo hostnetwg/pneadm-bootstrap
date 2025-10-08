@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Instructor;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
+use App\Models\CertificateTemplate;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
@@ -595,7 +596,13 @@ class CoursesController extends Controller
     {
         // Pobranie listy instruktorów do formularza
         $instructors = Instructor::all();
-        return view('courses.create', compact('instructors'));
+        
+        // Pobranie listy aktywnych szablonów certyfikatów
+        $certificateTemplates = CertificateTemplate::where('is_active', true)
+                                                   ->orderBy('name')
+                                                   ->get();
+        
+        return view('courses.create', compact('instructors', 'certificateTemplates'));
     }
 
     public function store(Request $request)
@@ -615,6 +622,7 @@ class CoursesController extends Controller
             'instructor_id' => 'nullable|exists:instructors,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'certificate_format' => 'nullable|string|max:255',
+            'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
         ]);
@@ -719,7 +727,12 @@ class CoursesController extends Controller
         $course = Course::with(['location', 'onlineDetails', 'participants'])->findOrFail($id);
         $instructors = Instructor::all();
         
-        return view('courses.edit', compact('course', 'instructors'));
+        // Pobranie listy aktywnych szablonów certyfikatów
+        $certificateTemplates = CertificateTemplate::where('is_active', true)
+                                                   ->orderBy('name')
+                                                   ->get();
+        
+        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates'));
     }
     
     public function destroy($id)
@@ -759,6 +772,7 @@ class CoursesController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string',
             'certificate_format' => 'nullable|string|max:255',
+            'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
         ]);

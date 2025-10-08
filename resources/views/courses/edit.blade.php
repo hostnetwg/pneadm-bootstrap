@@ -222,7 +222,24 @@
                     <small class="form-text text-muted">
                         Możesz używać zmiennych: <code>{nr}</code>, <code>{course_id}</code>, <code>{year}</code>.
                     </small>
-                </div>                
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="certificate_template_id">Szablon certyfikatu</label>
+                    <select name="certificate_template_id" id="certificate_template_id" class="form-control">
+                        <option value="">Domyślny szablon</option>
+                        @foreach($certificateTemplates as $template)
+                            <option value="{{ $template->id }}" 
+                                {{ old('certificate_template_id', $course->certificate_template_id) == $template->id ? 'selected' : '' }}>
+                                {{ $template->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="form-text text-muted">
+                        Wybierz szablon wyglądu certyfikatu dla tego kursu.
+                        <a href="{{ route('admin.certificate-templates.index') }}" target="_blank">Zarządzaj szablonami</a>
+                    </small>
+                </div>
 
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>

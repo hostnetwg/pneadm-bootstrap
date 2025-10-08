@@ -192,6 +192,22 @@
                     </small>
                 </div>
 
+                <div class="form-group mb-3">
+                    <label for="certificate_template_id">Szablon certyfikatu</label>
+                    <select name="certificate_template_id" id="certificate_template_id" class="form-control">
+                        <option value="">Domyślny szablon</option>
+                        @foreach($certificateTemplates as $template)
+                            <option value="{{ $template->id }}" {{ old('certificate_template_id') == $template->id ? 'selected' : '' }}>
+                                {{ $template->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="form-text text-muted">
+                        Wybierz szablon wyglądu certyfikatu dla tego kursu.
+                        <a href="{{ route('admin.certificate-templates.index') }}" target="_blank">Zarządzaj szablonami</a>
+                    </small>
+                </div>
+
                 <!-- Pola dla integracji ze starym systemem -->
                 <div class="row mb-3">
                     <div class="col-md-6">

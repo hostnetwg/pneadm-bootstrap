@@ -227,6 +227,7 @@
             <div class="collapse {{ request()->routeIs('admin.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('admin.users.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Użytkownicy</a></li>
+                    <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>
                 </ul>
             </div>
         </li>

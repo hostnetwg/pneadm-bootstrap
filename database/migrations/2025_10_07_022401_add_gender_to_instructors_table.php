@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('instructors', function (Blueprint $table) {
-            //
+            $table->enum('gender', ['male', 'female', 'other', 'prefer_not_to_say'])->nullable()->after('last_name');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('instructors', function (Blueprint $table) {
-            //
+            $table->dropColumn('gender');
         });
     }
 };

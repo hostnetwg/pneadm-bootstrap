@@ -23,6 +23,7 @@ class Course extends Model
         'image',
         'is_active',
         'certificate_format',
+        'certificate_template_id',
         'access_duration_days',
         'access_notes',
         'id_old',
@@ -72,6 +73,14 @@ class Course extends Model
     public function surveys()
     {
         return $this->hasMany(Survey::class);
+    }
+
+    /**
+     * Relacja do szablonu certyfikatu
+     */
+    public function certificateTemplate()
+    {
+        return $this->belongsTo(CertificateTemplate::class, 'certificate_template_id');
     }
         
 }

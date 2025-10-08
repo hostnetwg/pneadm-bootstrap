@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('courses', function (Blueprint $table) {
-            //
+            $table->longText('offer_description_html')->nullable()->after('description');
+            $table->string('offer_summary', 500)->nullable()->after('offer_description_html');
         });
     }
 
@@ -22,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('courses', function (Blueprint $table) {
-            //
+            $table->dropColumn(['offer_description_html', 'offer_summary']);
         });
     }
 };

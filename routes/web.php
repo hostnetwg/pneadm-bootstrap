@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
@@ -30,6 +31,13 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UsersController::class);
         Route::patch('users/{user}/toggle-status', [UsersController::class, 'toggleStatus'])->name('users.toggle-status');
+        
+        // Zarządzanie szablonami certyfikatów
+        Route::resource('certificate-templates', CertificateTemplateController::class);
+        Route::get('certificate-templates/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');
+        Route::post('certificate-templates/{certificateTemplate}/clone', [CertificateTemplateController::class, 'clone'])->name('certificate-templates.clone');
+        Route::post('certificate-templates/upload-logo', [CertificateTemplateController::class, 'uploadLogo'])->name('certificate-templates.upload-logo');
+        Route::delete('certificate-templates/delete-logo', [CertificateTemplateController::class, 'deleteLogo'])->name('certificate-templates.delete-logo');
     });
 
 
