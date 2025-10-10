@@ -489,7 +489,7 @@
 
             document.getElementById('upload-progress').style.display = 'block';
 
-            fetch('{{ route('admin.certificate-templates.upload-logo') }}', {
+            fetch('/api/admin/certificate-templates/upload-logo', {
                 method: 'POST',
                 body: formData
             })
@@ -522,7 +522,7 @@
                     return;
                 }
 
-                fetch('{{ route('admin.certificate-templates.delete-logo') }}', {
+                fetch('/api/admin/certificate-templates/delete-logo', {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',

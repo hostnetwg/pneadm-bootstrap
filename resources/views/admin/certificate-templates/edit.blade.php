@@ -313,7 +313,7 @@
     </div>
 
     <!-- Modal galerii logo -->
-    <div class="modal fade" id="logoGalleryModal" tabindex="-1">
+    <div class="modal fade" id="logoGalleryModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -412,7 +412,7 @@
     </style>
     
     <script>
-        console.log('=== SKRYPT ROZPOCZĘTY ===');
+        // console.log('=== SKRYPT ROZPOCZĘTY ===');
         
         // Globalne zmienne i funkcje (muszą być poza DOMContentLoaded dla onclick)
         let blockCounter = {{ count($certificateTemplate->config['blocks'] ?? []) }};
@@ -420,19 +420,33 @@
         let currentLogoField = null;
         let sortable = null;
         
-        console.log('Zmienne zainicjalizowane - blockCounter:', blockCounter);
+        // console.log('Zmienne zainicjalizowane - blockCounter:', blockCounter);
         
         // Funkcja globalna dla onclick w HTML
         window.openLogoGallery = function(fieldName) {
-            console.log('openLogoGallery wywołana dla:', fieldName);
+            // console.log('openLogoGallery wywołana dla:', fieldName);
             currentLogoField = fieldName;
-            const modal = new bootstrap.Modal(document.getElementById('logoGalleryModal'));
+            const modalElement = document.getElementById('logoGalleryModal');
+            const modal = new bootstrap.Modal(modalElement);
+            
+            // Usuń aria-hidden gdy modal się otwiera
+            modalElement.addEventListener('shown.bs.modal', function() {
+                modalElement.removeAttribute('aria-hidden');
+                modalElement.setAttribute('aria-modal', 'true');
+            });
+            
+            // Przywróć aria-hidden gdy modal się zamyka
+            modalElement.addEventListener('hidden.bs.modal', function() {
+                modalElement.setAttribute('aria-hidden', 'true');
+                modalElement.removeAttribute('aria-modal');
+            });
+            
             modal.show();
         };
 
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== DOM LOADED ===');
-            console.log('Available blocks:', availableBlocks);
+            // console.log('=== DOM LOADED ===');
+            // console.log('Available blocks:', availableBlocks);
 
             // Inicjalizacja Sortable dla drag & drop bloków
             initializeSortable();
@@ -608,7 +622,7 @@
 
             document.getElementById('upload-progress').style.display = 'block';
 
-            fetch('{{ route('admin.certificate-templates.upload-logo') }}', {
+            fetch('/api/admin/certificate-templates/upload-logo', {
                 method: 'POST',
                 body: formData
             })
@@ -641,7 +655,7 @@
                     return;
                 }
 
-                fetch('{{ route('admin.certificate-templates.delete-logo') }}', {
+                fetch('/api/admin/certificate-templates/delete-logo', {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -751,7 +765,7 @@
                 }
             });
             
-            console.log('Sortable zainicjalizowany dla', blockItems.length, 'bloków');
+            // console.log('Sortable zainicjalizowany dla', blockItems.length, 'bloków');
         }
 
         // Funkcja aktualizująca pole 'order' dla wszystkich bloków
@@ -763,17 +777,17 @@
                 const orderInput = blockItem.querySelector('.block-order-input');
                 if (orderInput) {
                     orderInput.value = index;
-                    console.log('Blok', blockItem.dataset.blockId, 'ma teraz order:', index);
+                    // console.log('Blok', blockItem.dataset.blockId, 'ma teraz order:', index);
                 }
             });
         }
 
         // openLogoGallery jest już zdefiniowana globalnie na górze skryptu
             
-        console.log('=== INICJALIZACJA ZAKOŃCZONA ===');
+        // console.log('=== INICJALIZACJA ZAKOŃCZONA ===');
         }); // Koniec DOMContentLoaded
         
-        console.log('=== SKRYPT ZAKOŃCZONY (poza DOMContentLoaded) ===');
+        // console.log('=== SKRYPT ZAKOŃCZONY (poza DOMContentLoaded) ===');
     </script>
     @endpush
 </x-app-layout>

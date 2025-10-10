@@ -36,8 +36,6 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::resource('certificate-templates', CertificateTemplateController::class);
         Route::get('certificate-templates/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');
         Route::post('certificate-templates/{certificateTemplate}/clone', [CertificateTemplateController::class, 'clone'])->name('certificate-templates.clone');
-        Route::post('certificate-templates/upload-logo', [CertificateTemplateController::class, 'uploadLogo'])->name('certificate-templates.upload-logo');
-        Route::delete('certificate-templates/delete-logo', [CertificateTemplateController::class, 'deleteLogo'])->name('certificate-templates.delete-logo');
     });
 
 
