@@ -13,11 +13,8 @@
             padding: 10px 20px;
             height: 100%;
         }
-        @page {
-            size: A4 landscape;
-        }
         .certificate-title {
-            font-size: 36px;
+            font-size: 46px;
             font-weight: bold;
             color: #000000;
         }
@@ -31,7 +28,7 @@
             word-break: normal;
             white-space: normal;
             hyphens: none;
-            font-size: 30px;
+            font-size: 26px;
             font-weight: bold;
             line-height: 1.1;
             margin-left: 45px;
@@ -42,14 +39,14 @@
         }
         .date-section {
             position: absolute;
-            top: 580px;
+            bottom: 180px;
             left: 60px;
             width: calc(50% - 60px);
             text-align: left;
         }
         .instructor-section {
             position: absolute;
-            top: 580px;
+            top: 820px;
             right: 60px;
             width: calc(50% - 60px);
             text-align: right;
@@ -84,17 +81,53 @@
     </style>
 </head>
 <body>
-    <h1 class="certificate-title">ZAŚWIADCZENIE O UKOŃCZENIU SZKOLENIA</h1>
+    <h1 class="certificate-title">ZAŚWIADCZENIE</h1>
     <p>Pan/i</p>
     <h2>{{ $participant->first_name }} {{ $participant->last_name }}</h2>
 
-    <p>ukończył/a szkolenie</p>
+    @if (!empty($participant->birth_date) && !empty($participant->birth_place))
+        <p>urodzony/a: {{ \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') }}r. w miejscowości {{ $participant->birth_place }}</p>
+    @else
+        <p>&nbsp;</p>
+    @endif
+
+    <p>uczestniczył/a w bezpłatnym webinarze z cyklu<br>
+<span style="font-size: 24px;"><strong>TIK w pracy NAUCZYCIELA</strong></span></p>
     <p>zorganizowane w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r. w wymiarze {{ $durationMinutes }} minut, przez</p>
 
     <p class="bold">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</p>
 
-    <h3>TEMAT SZKOLENIA</h3>
+    <h3>Temat i zakres webinaru:</h3>
     <h2 class="course-title">{{ $course->title }}</h2>
+
+    @php
+        $description = trim($course->description ?? '');
+        if (!empty($description)) {
+            // Dynamiczne dostosowanie rozmiaru czcionki na podstawie długości zakresu
+            $itemCount = 0;
+            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                $itemCount = preg_match_all('/^\\d+\\.\\s*/m', $description);
+            }
+            // Ustaw rozmiar czcionki na podstawie liczby punktów
+            $fontSize = $itemCount > 4 ? '13px' : '16px';
+            $marginBottom = $itemCount > 4 ? '2px' : '5px';
+            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką
+                $items = preg_split('/\\n(?=\\d+\\.)/', $description);
+                echo '<ol style="text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . $fontSize . ';">';
+                foreach ($items as $item) {
+                    $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
+                    if ($cleanItem) {
+                        echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+                    }
+                }
+                echo '</ol>';
+            } else {
+                // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką
+                echo '<p style="text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+            }
+        }
+    @endphp
 
     <div class="date-section">
         <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.<br>

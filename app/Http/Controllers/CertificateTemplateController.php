@@ -62,8 +62,17 @@ class CertificateTemplateController extends Controller
         }
 
         // Przygotowanie konfiguracji
+        $blocks = $request->input('blocks', []);
+        
+        // Sortuj bloki według pola 'order' przed zapisem
+        uasort($blocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
         $config = [
-            'blocks' => $request->input('blocks', []),
+            'blocks' => $blocks,
             'settings' => [
                 'font_family' => $request->input('font_family', 'DejaVu Sans'),
                 'orientation' => $request->input('orientation', 'portrait'),
@@ -131,8 +140,17 @@ class CertificateTemplateController extends Controller
         ]);
 
         // Przygotowanie konfiguracji
+        $blocks = $request->input('blocks', []);
+        
+        // Sortuj bloki według pola 'order' przed zapisem
+        uasort($blocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
         $config = [
-            'blocks' => $request->input('blocks', []),
+            'blocks' => $blocks,
             'settings' => [
                 'font_family' => $request->input('font_family', 'DejaVu Sans'),
                 'orientation' => $request->input('orientation', 'portrait'),

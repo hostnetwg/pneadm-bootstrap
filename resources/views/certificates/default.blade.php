@@ -14,9 +14,9 @@
             height: 100%;
         }
         .certificate-title {
-            font-size: 38px;
+            font-size: 48px;
             font-weight: bold;
-            color: #000000;
+            color: #b71515;
         }
         h3 {
             margin-bottom: 5px;
@@ -25,9 +25,14 @@
             margin-top: 5px;
         }
         .course-title {
-            word-break: keep-all;
-            font-size: 32px;
+            word-break: normal;
+            white-space: normal;
+            hyphens: none;
+            font-size: 22px;
             font-weight: bold;
+            line-height: 1.1;
+            margin-left: 45px;
+            margin-right: 45px;
         }
         .bold {
             font-weight: bold;
@@ -35,15 +40,15 @@
         .date-section {
             position: absolute;
             bottom: 180px;
-            left: 15px;
-            width: calc(50% - 15px);
+            left: 60px;
+            width: calc(50% - 60px);
             text-align: left;
         }
         .instructor-section {
             position: absolute;
             top: 820px;
-            right: 15px;
-            width: calc(50% - 15px);
+            right: 60px;
+            width: calc(50% - 60px);
             text-align: right;
             display: flex;
             flex-direction: column;
@@ -55,9 +60,15 @@
             position: relative;
             z-index: 10;
         }
+        .instructor-section .signature-container {
+            width: 100%;
+        }
         .instructor-section .signature-img {
             position: relative;
             z-index: 1;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         .footer {
             font-size: 10px;
@@ -99,11 +110,10 @@
             // Ustaw rozmiar czcionki na podstawie liczby punktów
             $fontSize = $itemCount > 4 ? '13px' : '16px';
             $marginBottom = $itemCount > 4 ? '2px' : '5px';
-            echo '<p>Zakres:</p>';
             if (preg_match('/^\\d+\\.\\s*/m', $description)) {
                 // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką
                 $items = preg_split('/\\n(?=\\d+\\.)/', $description);
-                echo '<ol style="text-align: left; margin-left: 0px; font-size: ' . $fontSize . ';">';
+                echo '<ol style="text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . $fontSize . ';">';
                 foreach ($items as $item) {
                     $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
                     if ($cleanItem) {
@@ -113,7 +123,7 @@
                 echo '</ol>';
             } else {
                 // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką
-                echo '<p style="text-align: left; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+                echo '<p style="text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
             }
         }
     @endphp
@@ -138,26 +148,28 @@
             <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span>
         </p>
         
-        @if(!empty($instructor->signature))
-            @php
-                // Obsługa ścieżki do grafiki podpisu
-                if ($isPdfMode ?? false) {
-                    // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie
-                    $signatureFile = storage_path('app/public/' . $instructor->signature);
-                    if (file_exists($signatureFile)) {
-                        $signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($signatureFile));
+        <div class="signature-container">
+            @if(!empty($instructor->signature))
+                @php
+                    // Obsługa ścieżki do grafiki podpisu
+                    if ($isPdfMode ?? false) {
+                        // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie
+                        $signatureFile = storage_path('app/public/' . $instructor->signature);
+                        if (file_exists($signatureFile)) {
+                            $signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($signatureFile));
+                        } else {
+                            $signatureSrc = null;
+                        }
                     } else {
-                        $signatureSrc = null;
+                        // Dla HTML używamy asset()
+                        $signatureSrc = asset('storage/' . $instructor->signature);
                     }
-                } else {
-                    // Dla HTML używamy asset()
-                    $signatureSrc = asset('storage/' . $instructor->signature);
-                }
-            @endphp
-            @if($signatureSrc)
-                <img src="{{ $signatureSrc }}" alt="Podpis" class="signature-img" style="max-width: 200px; max-height: 80px; width: auto; height: auto;">
+                @endphp
+                @if($signatureSrc)
+                    <img src="{{ $signatureSrc }}" alt="Podpis" class="signature-img" style="max-width: 200px; max-height: 80px; width: auto; height: auto;">
+                @endif
             @endif
-        @endif
+        </div>
     </div>
 
     <div class="footer">

@@ -93,39 +93,74 @@ class TemplateBuilderService
         $styles .= "            margin-top: 5px;\n";
         $styles .= "        }\n";
         $styles .= "        .course-title {\n";
-        $styles .= "            word-break: keep-all;\n";
+        $styles .= "            word-break: normal;\n";
+        $styles .= "            white-space: normal;\n";
+        $styles .= "            hyphens: none;\n";
         $styles .= "            font-size: " . ($settings['course_title_size'] ?? '32') . "px;\n";
         $styles .= "            font-weight: bold;\n";
+        $styles .= "            line-height: 1.1;\n";
+        $styles .= "            margin-left: 45px;\n";
+        $styles .= "            margin-right: 45px;\n";
         $styles .= "        }\n";
         $styles .= "        .bold {\n";
         $styles .= "            font-weight: bold;\n";
         $styles .= "        }\n";
-        $styles .= "        .date-section {\n";
-        $styles .= "            position: absolute;\n";
-        $styles .= "            bottom: 180px;\n";
-        $styles .= "            left: 15px;\n";
-        $styles .= "            width: calc(50% - 15px);\n";
-        $styles .= "            text-align: left;\n";
-        $styles .= "        }\n";
-        $styles .= "        .instructor-section {\n";
-        $styles .= "            position: absolute;\n";
-        $styles .= "            top: 550px;\n";
-        $styles .= "            right: 15px;\n";
-        $styles .= "            width: calc(50% - 15px);\n";
-        $styles .= "            text-align: right;\n";
-        $styles .= "            display: flex;\n";
-        $styles .= "            flex-direction: column;\n";
-        $styles .= "            align-items: flex-end;\n";
-        $styles .= "            gap: 3px;\n";
-        $styles .= "        }\n";
+        // Pozycjonowanie sekcji w zależności od orientacji
+        if ($orientation === 'landscape') {
+            // Dla landscape - oba elementy na tej samej wysokości
+            $styles .= "        .date-section {\n";
+            $styles .= "            position: absolute;\n";
+            $styles .= "            top: 580px;\n";
+            $styles .= "            left: 60px;\n";
+            $styles .= "            width: calc(50% - 60px);\n";
+            $styles .= "            text-align: left;\n";
+            $styles .= "        }\n";
+            $styles .= "        .instructor-section {\n";
+            $styles .= "            position: absolute;\n";
+            $styles .= "            top: 580px;\n";
+            $styles .= "            right: 60px;\n";
+            $styles .= "            width: calc(50% - 60px);\n";
+            $styles .= "            text-align: right;\n";
+            $styles .= "            display: flex;\n";
+            $styles .= "            flex-direction: column;\n";
+            $styles .= "            align-items: flex-end;\n";
+            $styles .= "            gap: 3px;\n";
+            $styles .= "        }\n";
+        } else {
+            // Dla portrait - domyślne pozycjonowanie
+            $styles .= "        .date-section {\n";
+            $styles .= "            position: absolute;\n";
+            $styles .= "            bottom: 180px;\n";
+            $styles .= "            left: 60px;\n";
+            $styles .= "            width: calc(50% - 60px);\n";
+            $styles .= "            text-align: left;\n";
+            $styles .= "        }\n";
+            $styles .= "        .instructor-section {\n";
+            $styles .= "            position: absolute;\n";
+            $styles .= "            top: 820px;\n";
+            $styles .= "            right: 60px;\n";
+            $styles .= "            width: calc(50% - 60px);\n";
+            $styles .= "            text-align: right;\n";
+            $styles .= "            display: flex;\n";
+            $styles .= "            flex-direction: column;\n";
+            $styles .= "            align-items: flex-end;\n";
+            $styles .= "            gap: 3px;\n";
+            $styles .= "        }\n";
+        }
         $styles .= "        .instructor-section p {\n";
         $styles .= "            margin: 0;\n";
         $styles .= "            position: relative;\n";
         $styles .= "            z-index: 10;\n";
         $styles .= "        }\n";
+        $styles .= "        .instructor-section .signature-container {\n";
+        $styles .= "            width: 100%;\n";
+        $styles .= "        }\n";
         $styles .= "        .instructor-section .signature-img {\n";
         $styles .= "            position: relative;\n";
         $styles .= "            z-index: 1;\n";
+        $styles .= "            display: block;\n";
+        $styles .= "            margin-left: auto;\n";
+        $styles .= "            margin-right: auto;\n";
         $styles .= "        }\n";
         $styles .= "        .footer {\n";
         $styles .= "            font-size: 10px;\n";
@@ -200,7 +235,9 @@ class TemplateBuilderService
      */
     private function buildCourseInfoBlock($config)
     {
-        $html = "    <p>ukończył/a szkolenie</p>\n";
+        $completionText = $config['completion_text'] ?? 'ukończył/a szkolenie';
+        // Nie używamy htmlspecialchars, aby umożliwić HTML
+        $html = "    <p>" . $completionText . "</p>\n";
         $html .= "    <p>zorganizowane w dniu {{ \\Carbon\\Carbon::parse(\$course->start_date)->format('d.m.Y') }}r. ";
         
         if (!empty($config['show_duration'])) {
@@ -209,7 +246,9 @@ class TemplateBuilderService
         
         $html .= "przez</p>\n\n";
         $html .= "    <p class=\"bold\">" . ($config['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji') . "</p>\n\n";
-        $html .= "    <h3>TEMAT SZKOLENIA</h3>\n";
+        
+        $subjectLabel = $config['subject_label'] ?? 'TEMAT SZKOLENIA';
+        $html .= "    <h3>" . $subjectLabel . "</h3>\n";
         $html .= "    <h2 class=\"course-title\">{{ \$course->title }}</h2>\n\n";
         
         if (!empty($config['show_description'])) {
@@ -225,11 +264,10 @@ class TemplateBuilderService
             $html .= "            // Ustaw rozmiar czcionki na podstawie liczby punktów\n";
             $html .= "            \$fontSize = \$itemCount > 4 ? '13px' : '16px';\n";
             $html .= "            \$marginBottom = \$itemCount > 4 ? '2px' : '5px';\n";
-            $html .= "            echo '<p>Zakres:</p>';\n";
             $html .= "            if (preg_match('/^\\\\d+\\\\.\\\\s*/m', \$description)) {\n";
             $html .= "                // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką\n";
             $html .= "                \$items = preg_split('/\\\\n(?=\\\\d+\\\\.)/', \$description);\n";
-            $html .= "                echo '<ol style=\"text-align: left; margin-left: 0px; font-size: ' . \$fontSize . ';\">';\n";
+            $html .= "                echo '<ol style=\"text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . \$fontSize . ';\">';\n";
             $html .= "                foreach (\$items as \$item) {\n";
             $html .= "                    \$cleanItem = preg_replace('/^\\\\d+\\\\.\\\\s*/', '', trim(\$item));\n";
             $html .= "                    if (\$cleanItem) {\n";
@@ -239,7 +277,7 @@ class TemplateBuilderService
             $html .= "                echo '</ol>';\n";
             $html .= "            } else {\n";
             $html .= "                // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką\n";
-            $html .= "                echo '<p style=\"text-align: left; font-size: ' . \$fontSize . ';\">' . htmlspecialchars(\$description) . '</p>';\n";
+            $html .= "                echo '<p style=\"text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . \$fontSize . ';\">' . htmlspecialchars(\$description) . '</p>';\n";
             $html .= "            }\n";
             $html .= "        }\n";
             $html .= "    @endphp\n\n";
@@ -273,26 +311,28 @@ class TemplateBuilderService
         $html .= "            <span class=\"bold\">{{ \$instructor->first_name }} {{ \$instructor->last_name }}</span>\n";
         $html .= "        </p>\n";
         $html .= "        \n";
-        $html .= "        @if(!empty(\$instructor->signature))\n";
-        $html .= "            @php\n";
-        $html .= "                // Obsługa ścieżki do grafiki podpisu\n";
-        $html .= "                if (\$isPdfMode ?? false) {\n";
-        $html .= "                    // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie\n";
-        $html .= "                    \$signatureFile = storage_path('app/public/' . \$instructor->signature);\n";
-        $html .= "                    if (file_exists(\$signatureFile)) {\n";
-        $html .= "                        \$signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents(\$signatureFile));\n";
+        $html .= "        <div class=\"signature-container\">\n";
+        $html .= "            @if(!empty(\$instructor->signature))\n";
+        $html .= "                @php\n";
+        $html .= "                    // Obsługa ścieżki do grafiki podpisu\n";
+        $html .= "                    if (\$isPdfMode ?? false) {\n";
+        $html .= "                        // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie\n";
+        $html .= "                        \$signatureFile = storage_path('app/public/' . \$instructor->signature);\n";
+        $html .= "                        if (file_exists(\$signatureFile)) {\n";
+        $html .= "                            \$signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents(\$signatureFile));\n";
+        $html .= "                        } else {\n";
+        $html .= "                            \$signatureSrc = null;\n";
+        $html .= "                        }\n";
         $html .= "                    } else {\n";
-        $html .= "                        \$signatureSrc = null;\n";
+        $html .= "                        // Dla HTML używamy asset()\n";
+        $html .= "                        \$signatureSrc = asset('storage/' . \$instructor->signature);\n";
         $html .= "                    }\n";
-        $html .= "                } else {\n";
-        $html .= "                    // Dla HTML używamy asset()\n";
-        $html .= "                    \$signatureSrc = asset('storage/' . \$instructor->signature);\n";
-        $html .= "                }\n";
-        $html .= "            @endphp\n";
-        $html .= "            @if(\$signatureSrc)\n";
-        $html .= "                <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" class=\"signature-img\" style=\"max-width: 200px; max-height: 80px; width: auto; height: auto;\">\n";
+        $html .= "                @endphp\n";
+        $html .= "                @if(\$signatureSrc)\n";
+        $html .= "                    <img src=\"{{ \$signatureSrc }}\" alt=\"Podpis\" class=\"signature-img\" style=\"max-width: 200px; max-height: 80px; width: auto; height: auto;\">\n";
+        $html .= "                @endif\n";
         $html .= "            @endif\n";
-        $html .= "        @endif\n";
+        $html .= "        </div>\n";
         $html .= "    </div>\n\n";
         
         return $html;
@@ -370,6 +410,8 @@ class TemplateBuilderService
                 'name' => 'Informacje o kursie',
                 'description' => 'Temat szkolenia, organizator, czas trwania',
                 'fields' => [
+                    'completion_text' => ['type' => 'textarea', 'label' => 'Tekst ukończenia (obsługuje HTML, np. "ukończył/a szkolenie z cyklu <h3>TIK w pracy NAUCZYCIELA</h3>")', 'default' => 'ukończył/a szkolenie'],
+                    'subject_label' => ['type' => 'textarea', 'label' => 'Etykieta tematu (obsługuje HTML, np. "TEMAT SZKOLENIA", "TEMAT WEBINARU")', 'default' => 'TEMAT SZKOLENIA'],
                     'show_duration' => ['type' => 'checkbox', 'label' => 'Pokaż czas trwania', 'default' => true],
                     'show_description' => ['type' => 'checkbox', 'label' => 'Pokaż zakres szkolenia', 'default' => true],
                     'organizer_name' => ['type' => 'textarea', 'label' => 'Nazwa organizatora', 'default' => 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji']

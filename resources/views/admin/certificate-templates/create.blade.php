@@ -116,13 +116,14 @@
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="bi bi-grid-3x3 me-2"></i>Bloki Szablonu
+                                <small class="text-muted ms-2">(przeciągnij, aby zmienić kolejność)</small>
                             </div>
                             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addBlockModal">
                                 <i class="bi bi-plus-circle me-1"></i>Dodaj Blok
                             </button>
                         </div>
                         <div class="card-body">
-                            <div id="blocks-container" class="mb-3">
+                            <div id="blocks-container" class="mb-3 sortable-blocks">
                                 <div class="alert alert-info">
                                     <i class="bi bi-info-circle me-2"></i>
                                     Dodaj bloki do szablonu klikając "Dodaj Blok" powyżej.
@@ -134,7 +135,7 @@
 
                 <div class="col-md-4">
                     <!-- Akcje -->
-                    <div class="card mb-4 position-sticky" style="top: 20px;">
+                    <div class="card mb-4 position-sticky" style="top: 20px; z-index: 1030;">
                         <div class="card-header">
                             <i class="bi bi-lightning me-2"></i>Akcje
                         </div>
@@ -263,6 +264,40 @@
     </div>
 
     @push('scripts')
+    <!-- SortableJS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <style>
+        .sortable-blocks .block-item {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .sortable-blocks .block-item.sortable-chosen {
+            opacity: 0.5;
+        }
+        
+        .sortable-blocks .block-item.sortable-ghost {
+            opacity: 0.3;
+            background-color: #f0f0f0;
+        }
+        
+        .sortable-blocks .block-item.sortable-drag {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        
+        .drag-handle:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .drag-handle .bi-grip-vertical {
+            cursor: grab;
+        }
+        
+        .drag-handle.dragging .bi-grip-vertical {
+            cursor: grabbing;
+        }
+    </style>
+    
     <script>
         console.log('=== SKRYPT CREATE ROZPOCZĘTY ===');
         
@@ -270,6 +305,7 @@
         let blockCounter = 0;
         const availableBlocks = @json($availableBlocks);
         let currentLogoField = null;
+        let sortable = null;
         
         console.log('Zmienne zainicjalizowane - availableBlocks:', availableBlocks);
         
@@ -283,6 +319,9 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('=== DOM LOADED (CREATE) ===');
+            
+            // Inicjalizacja Sortable dla drag & drop bloków
+            initializeSortable();
             
             // Delegacja eventów dla usuwania bloków
             document.addEventListener('click', function(e) {
@@ -302,6 +341,17 @@
                                     Dodaj bloki do szablonu klikając "Dodaj Blok" powyżej.
                                 </div>
                             `;
+                            // Zniszcz Sortable, bo nie ma bloków
+                            if (sortable) {
+                                sortable.destroy();
+                                sortable = null;
+                            }
+                        } else {
+                            // Reinicjalizuj Sortable po usunięciu bloku
+                            if (sortable) {
+                                sortable.destroy();
+                            }
+                            initializeSortable();
                         }
                         console.log('Blok usunięty');
                     }
@@ -324,7 +374,7 @@
             
             let html = `
                 <div class="card mb-3 block-item" data-block-id="${blockId}">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center drag-handle" style="cursor: move;">
                         <div>
                             <i class="bi bi-grip-vertical me-2"></i>
                             <strong>${name}</strong>
@@ -335,6 +385,7 @@
                     </div>
                     <div class="card-body">
                         <input type="hidden" name="blocks[${blockId}][type]" value="${type}">
+                        <input type="hidden" name="blocks[${blockId}][order]" value="999" class="block-order-input">
             `;
 
             // Dodawanie pól konfiguracji bloku
@@ -358,7 +409,14 @@
             container.insertAdjacentHTML('beforeend', html);
             console.log('Blok dodany:', blockId);
             
-            // Nie dodajemy event listenera tutaj - delegacja eventów obsługuje to globalnie
+            // Reinicjalizuj Sortable po dodaniu nowego bloku
+            if (sortable) {
+                sortable.destroy();
+            }
+            initializeSortable();
+            
+            // Aktualizuj kolejność wszystkich bloków (nowy blok dostanie poprawny order)
+            updateBlockOrder();
         }
 
         function renderField(blockId, fieldName, config) {
@@ -539,6 +597,57 @@
             }
             
             gallery.insertAdjacentHTML('beforeend', html);
+        }
+
+        // Funkcja inicjalizująca Sortable
+        function initializeSortable() {
+            const blocksContainer = document.getElementById('blocks-container');
+            
+            if (!blocksContainer) {
+                console.log('Brak kontenera bloków');
+                return;
+            }
+            
+            // Sprawdź czy są jakieś bloki do sortowania
+            const blockItems = blocksContainer.querySelectorAll('.block-item');
+            if (blockItems.length === 0) {
+                console.log('Brak bloków do sortowania');
+                return;
+            }
+            
+            sortable = new Sortable(blocksContainer, {
+                animation: 150,
+                handle: '.drag-handle',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                onStart: function(evt) {
+                    evt.item.querySelector('.drag-handle').classList.add('dragging');
+                },
+                onEnd: function(evt) {
+                    evt.item.querySelector('.drag-handle').classList.remove('dragging');
+                    console.log('Blok przeniesiony z pozycji', evt.oldIndex, 'na pozycję', evt.newIndex);
+                    
+                    // Aktualizuj kolejność wszystkich bloków
+                    updateBlockOrder();
+                }
+            });
+            
+            console.log('Sortable zainicjalizowany dla', blockItems.length, 'bloków');
+        }
+
+        // Funkcja aktualizująca pole 'order' dla wszystkich bloków
+        function updateBlockOrder() {
+            const blocksContainer = document.getElementById('blocks-container');
+            const blockItems = blocksContainer.querySelectorAll('.block-item');
+            
+            blockItems.forEach((blockItem, index) => {
+                const orderInput = blockItem.querySelector('.block-order-input');
+                if (orderInput) {
+                    orderInput.value = index;
+                    console.log('Blok', blockItem.dataset.blockId, 'ma teraz order:', index);
+                }
+            });
         }
 
         // openLogoGallery jest już zdefiniowana globalnie na górze skryptu

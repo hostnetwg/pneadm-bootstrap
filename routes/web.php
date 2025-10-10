@@ -127,12 +127,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
     Route::get('/courses/pdf', [CoursesController::class, 'generatePdf'])->name('courses.pdf');
     Route::get('/courses/statistics', [CoursesController::class, 'generateCourseStatistics'])->name('courses.statistics');
-    Route::get('/courses/{id}', [CoursesController::class, 'show'])->name('courses.show');
+    // Ustawiamy create PRZED trasami z parametrem {id}, aby uniknąć kolizji z /courses/{id}
     Route::get('/courses/create', [CoursesController::class, 'create'])->name('courses.create');
     Route::post('/courses', [CoursesController::class, 'store'])->name('courses.store');
-    Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->name('courses.destroy');
-    Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->name('courses.edit');
-    Route::put('/courses/{id}', [CoursesController::class, 'update'])->name('courses.update');
+    // Trasy z parametrem {id} ograniczamy do wartości numerycznych
+    Route::get('/courses/{id}', [CoursesController::class, 'show'])->whereNumber('id')->name('courses.show');
+    Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
+    Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
+    Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');
 
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników
