@@ -1,0 +1,3 @@
+# Tymczasowe wyłączenie OPcache dla debugowania
+# USUŃ PO ROZWIĄZANIU PROBLEMU!
+php_value opcache.enable 0
