@@ -247,6 +247,8 @@ nowoczesna-edukacja.pl </div>
                             <form action="{{ route('sales.update', $zamowienie->id) }}" method="POST">
                                 @csrf
                                 @method('PUT')
+                                {{-- Ukryte pole informujące że formularz jest ze strony szczegółów --}}
+                                <input type="hidden" name="from_show_page" value="1">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <label for="nr_fakury" class="form-label small">

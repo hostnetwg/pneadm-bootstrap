@@ -134,14 +134,18 @@ class SalesController extends Controller
                 ->where('id', $id)
                 ->update($data);
             
-            // Sprawdzamy, skąd użytkownik przyszedł (porównujemy ścieżki, nie pełne URL)
-            $referer = $request->header('referer');
-            $isFromShowPage = false;
+            // Sprawdzamy, skąd użytkownik przyszedł
+            // Najpierw sprawdzamy ukryte pole z formularza (najbardziej niezawodne)
+            $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             
-            if ($referer) {
-                $refererPath = parse_url($referer, PHP_URL_PATH);
-                $showPagePath = '/sales/' . $id;
-                $isFromShowPage = $refererPath === $showPagePath;
+            // Jeśli nie ma ukrytego pola, sprawdzamy referer (fallback dla starszych formularzy)
+            if (!$isFromShowPage) {
+                $referer = $request->header('referer');
+                if ($referer) {
+                    $refererPath = parse_url($referer, PHP_URL_PATH);
+                    $showPagePath = '/sales/' . $id;
+                    $isFromShowPage = $refererPath === $showPagePath;
+                }
             }
             
             if ($isFromShowPage) {
@@ -158,14 +162,18 @@ class SalesController extends Controller
                 return redirect()->route('sales.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
             }
         } catch (Exception $e) {
-            // W przypadku błędu, sprawdzamy skąd użytkownik przyszedł (porównujemy ścieżki, nie pełne URL)
-            $referer = $request->header('referer');
-            $isFromShowPage = false;
+            // W przypadku błędu, sprawdzamy skąd użytkownik przyszedł
+            // Najpierw sprawdzamy ukryte pole z formularza (najbardziej niezawodne)
+            $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             
-            if ($referer) {
-                $refererPath = parse_url($referer, PHP_URL_PATH);
-                $showPagePath = '/sales/' . $id;
-                $isFromShowPage = $refererPath === $showPagePath;
+            // Jeśli nie ma ukrytego pola, sprawdzamy referer (fallback dla starszych formularzy)
+            if (!$isFromShowPage) {
+                $referer = $request->header('referer');
+                if ($referer) {
+                    $refererPath = parse_url($referer, PHP_URL_PATH);
+                    $showPagePath = '/sales/' . $id;
+                    $isFromShowPage = $refererPath === $showPagePath;
+                }
             }
             
             if ($isFromShowPage) {
