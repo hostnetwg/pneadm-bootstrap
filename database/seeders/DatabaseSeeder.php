@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class, // Najpierw role i uprawnienia
             UserSeeder::class, // Potem użytkownicy
             InstructorSeeder::class, // Instruktorzy
+            CertificateTemplateSeeder::class, // Szablony zaświadczeń
             // CourseSeeder::class,    
             // ParticipantSeeder::class, // Nowy seeder uczestników
         ]);
