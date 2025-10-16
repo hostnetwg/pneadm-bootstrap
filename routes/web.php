@@ -119,6 +119,22 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/publigo/reset', [SalesController::class, 'resetPubligoStatus'])->name('publigo.reset');
     });
 
+    // Tymczasowy route do czyszczenia OPcache (USUŃ PO UŻYCIU!)
+    Route::middleware(['auth'])->get('/dev/clear-opcache', function () {
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+            return response()->json([
+                'success' => true,
+                'message' => 'OPcache został wyczyszczony!',
+                'time' => now()->toDateTimeString()
+            ]);
+        }
+        return response()->json([
+            'success' => false,
+            'message' => 'OPcache nie jest dostępny'
+        ]);
+    });
+
 
 /**/
 
