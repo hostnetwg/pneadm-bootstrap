@@ -134,9 +134,15 @@ class SalesController extends Controller
                 ->where('id', $id)
                 ->update($data);
             
-            // Sprawdzamy, skąd użytkownik przyszedł
+            // Sprawdzamy, skąd użytkownik przyszedł (porównujemy ścieżki, nie pełne URL)
             $referer = $request->header('referer');
-            $isFromShowPage = $referer && str_contains($referer, route('sales.show', $id));
+            $isFromShowPage = false;
+            
+            if ($referer) {
+                $refererPath = parse_url($referer, PHP_URL_PATH);
+                $showPagePath = '/sales/' . $id;
+                $isFromShowPage = $refererPath === $showPagePath;
+            }
             
             if ($isFromShowPage) {
                 // Jeśli użytkownik był na stronie szczegółów, wracamy tam
@@ -152,9 +158,15 @@ class SalesController extends Controller
                 return redirect()->route('sales.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
             }
         } catch (Exception $e) {
-            // W przypadku błędu, sprawdzamy skąd użytkownik przyszedł
+            // W przypadku błędu, sprawdzamy skąd użytkownik przyszedł (porównujemy ścieżki, nie pełne URL)
             $referer = $request->header('referer');
-            $isFromShowPage = $referer && str_contains($referer, route('sales.show', $id));
+            $isFromShowPage = false;
+            
+            if ($referer) {
+                $refererPath = parse_url($referer, PHP_URL_PATH);
+                $showPagePath = '/sales/' . $id;
+                $isFromShowPage = $refererPath === $showPagePath;
+            }
             
             if ($isFromShowPage) {
                 return redirect()->route('sales.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
