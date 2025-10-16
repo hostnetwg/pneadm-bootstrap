@@ -120,7 +120,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     });
 
     // Tymczasowy route do czyszczenia OPcache (USUŃ PO UŻYCIU!)
-    Route::middleware(['auth'])->get('/dev/clear-opcache', function () {
+    Route::get('/dev/clear-opcache', function () {
         if (function_exists('opcache_reset')) {
             opcache_reset();
             return response()->json([
