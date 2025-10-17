@@ -2,7 +2,7 @@
     {{-- ======================  Nagłówek strony  ====================== --}}
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            {{ __('Szczegóły zamówienia') }} <span class="text-success">(CERTGEN)</span>
+            {{ __('Szczegóły zamówienia') }} <span class="text-danger">(PNEADM)</span>
         </h2>
     </x-slot>
 
@@ -13,7 +13,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item">
-                        <a href="{{ route('sales.index') }}">Zamówienia</a>
+                        <a href="{{ route('form-orders.index') }}">Zamówienia</a>
                     </li>
                     <li class="breadcrumb-item active" aria-current="page">
                         Zamówienie #{{ $zamowienie->id }}
@@ -23,18 +23,18 @@
 
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="@if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) text-danger @elseif($zamowienie->status_zakonczone == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                <h2 class="@if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
                 <div class="btn-group" role="group">
-                    <a href="{{ $prevOrder ? route('sales.show', $prevOrder->id) : '#' }}" 
+                    <a href="{{ $prevOrder ? route('form-orders.show', $prevOrder->id) : '#' }}" 
                        class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                        title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
                        @if(!$prevOrder) onclick="return false;" @endif>
                         <i class="bi bi-chevron-left"></i> Poprzednie
                     </a>
-                    <a href="{{ route('sales.index') }}" class="btn btn-outline-primary">
+                    <a href="{{ route('form-orders.index') }}" class="btn btn-outline-primary">
                         <i class="bi bi-list"></i> Lista
                     </a>
-                    <a href="{{ $nextOrder ? route('sales.show', $nextOrder->id) : '#' }}" 
+                    <a href="{{ $nextOrder ? route('form-orders.show', $nextOrder->id) : '#' }}" 
                        class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                        title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
                        @if(!$nextOrder) onclick="return false;" @endif>
@@ -61,7 +61,7 @@
             @endif
 
             {{-- Status zamówienia --}}
-            @if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0)
+            @if($zamowienie->is_new)
                 <div class="text-center mb-3">
                     <small class="text-danger fw-bold">ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!</small>
                 </div>
@@ -71,10 +71,10 @@
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white py-3">
                     <h5 class="mb-0">
-                        <i class="bi bi-calendar-event"></i> {{ $zamowienie->produkt_nazwa ?? '—' }}
-                        @if($zamowienie->produkt_cena)
+                        <i class="bi bi-calendar-event"></i> {{ $zamowienie->product_name ?? '—' }}
+                        @if($zamowienie->product_price)
                             <span class="badge bg-success ms-2 fs-6">
-                                {{ number_format($zamowienie->produkt_cena, 2) }} PLN
+                                {{ number_format($zamowienie->product_price, 2) }} PLN
                             </span>
                         @endif
                     </h5>
@@ -96,18 +96,18 @@
                             {{-- NABYWCA --}}
                             <div class="mb-2">
                                 <div class="border rounded p-2 bg-light" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>NABYWCA:</strong>
-{{ $zamowienie->nab_nazwa ?? '—' }}
-{{ $zamowienie->nab_adres ?? '—' }}
-{{ $zamowienie->nab_kod ?? '—' }} {{ $zamowienie->nab_poczta ?? '—' }}
-@if($zamowienie->nab_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip) }}@endif</div>
+{{ $zamowienie->buyer_name ?? '—' }}
+{{ $zamowienie->buyer_address ?? '—' }}
+{{ $zamowienie->buyer_postal_code ?? '—' }} {{ $zamowienie->buyer_city ?? '—' }}
+@if($zamowienie->buyer_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip) }}@endif</div>
                             </div>
 
                             {{-- ODBIORCA --}}
                             <div class="mb-2">
                                 <div class="border rounded p-2 bg-light" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>ODBIORCA:</strong>
-{{ $zamowienie->odb_nazwa ?? '—' }}
-{{ $zamowienie->odb_adres ?? '—' }}
-{{ $zamowienie->odb_kod ?? '—' }} {{ $zamowienie->odb_poczta ?? '—' }}
+{{ $zamowienie->recipient_name ?? '—' }}
+{{ $zamowienie->recipient_address ?? '—' }}
+{{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}
 nowoczesna-edukacja.pl </div>
                             </div>
 
@@ -116,7 +116,7 @@ nowoczesna-edukacja.pl </div>
                                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyOdbiorcaData()">
                                     <i class="bi bi-clipboard"></i> ODBIORCA
                                 </button>
-                                @if($zamowienie->nab_nip)
+                                @if($zamowienie->buyer_nip)
                                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyNipNabywcy()">
                                         <i class="bi bi-clipboard"></i> NIP NABYWCY
                                     </button>
@@ -134,19 +134,19 @@ nowoczesna-edukacja.pl </div>
                         </div>
                         <div class="card-body py-2">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong>{{ $zamowienie->konto_imie_nazwisko ?? '—' }}</strong>
+                                <strong>{{ $zamowienie->participant_name ?? '—' }}</strong>
                                 <button type="button" class="btn btn-outline-success btn-sm" onclick="copyUczestnikData()">
                                     <i class="bi bi-clipboard"></i> Uczestnik
                                 </button>
                             </div>
-                            @if($zamowienie->konto_email)
+                            @if($zamowienie->participant_email)
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>
                                         <i class="bi bi-envelope"></i> 
-                                        <a href="mailto:{{ $zamowienie->konto_email }}" 
-                                           class="text-decoration-none @if($zamowienie->konto_email == $zamowienie->zam_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->konto_email == $zamowienie->zam_email) title="Ten sam email co do faktury" @endif>
-                                            {{ $zamowienie->konto_email }}
+                                        <a href="mailto:{{ $zamowienie->participant_email }}" 
+                                           class="text-decoration-none @if($zamowienie->participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->participant_email == $zamowienie->orderer_email) title="Ten sam email co do faktury" @endif>
+                                            {{ $zamowienie->participant_email }}
                                         </a>
                                     </small>
                                     <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika()">
@@ -158,7 +158,7 @@ nowoczesna-edukacja.pl </div>
                     </div>
 
                     {{-- Button Dodaj zamówienie PUBLIGO --}}
-                    @if(!empty($zamowienie->idProdPubligo) && !empty($zamowienie->price_idProdPubligo) && $zamowienie->publigo_sent != 1)
+                    @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
                         <div class="mb-3">
                             <button type="button" class="btn btn-primary" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
                                 <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
@@ -171,7 +171,7 @@ nowoczesna-edukacja.pl </div>
                                 <i class="bi bi-check-circle"></i> 
                                 <strong>Zamówienie zostało wysłane do Publigo</strong>
                                 <small class="d-block text-muted mt-1">
-                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? \Carbon\Carbon::parse($zamowienie->publigo_sent_at)->format('d.m.Y H:i') : 'Nieznana' }}
+                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
                                 </small>
                                 
                                 {{-- Przycisk resetowania dla administratorów --}}
@@ -206,15 +206,15 @@ nowoczesna-edukacja.pl </div>
                             </h6>
                         </div>
                         <div class="card-body py-2">
-                            @if($zamowienie->zam_email)
+                            @if($zamowienie->orderer_email)
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>
                                         <strong>Fakturę przesłać na:</strong>
                                         <br>
-                                        <a href="mailto:{{ $zamowienie->zam_email }}" 
-                                           class="text-decoration-none @if($zamowienie->konto_email == $zamowienie->zam_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->konto_email == $zamowienie->zam_email) title="Ten sam email co uczestnika" @endif>
-                                            <i class="bi bi-envelope"></i> {{ $zamowienie->zam_email }}
+                                        <a href="mailto:{{ $zamowienie->orderer_email }}" 
+                                           class="text-decoration-none @if($zamowienie->participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->participant_email == $zamowienie->orderer_email) title="Ten sam email co uczestnika" @endif>
+                                            <i class="bi bi-envelope"></i> {{ $zamowienie->orderer_email }}
                                         </a>
                                     </small>
                                     <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury()">
@@ -222,14 +222,14 @@ nowoczesna-edukacja.pl </div>
                                     </button>
                                 </div>
                             @endif
-                            @if($zamowienie->zam_tel)
+                            @if($zamowienie->orderer_phone)
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <small>
                                         <i class="bi bi-telephone"></i> 
                                         <strong>tel.</strong> 
-                                        <a href="tel:{{ $zamowienie->zam_tel }}" class="text-decoration-none">
+                                        <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
                                             @php
-                                                $phone = preg_replace('/[^0-9]/', '', $zamowienie->zam_tel);
+                                                $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
                                                 if (strlen($phone) == 9) {
                                                     echo substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
                                                 } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
@@ -244,43 +244,43 @@ nowoczesna-edukacja.pl </div>
                             @endif
                             
                             {{-- Formularz edycji - kompaktowy --}}
-                            <form action="{{ route('sales.update', $zamowienie->id) }}" method="POST">
+                            <form action="{{ route('form-orders.update', $zamowienie->id) }}" method="POST">
                                 @csrf
                                 @method('PUT')
                                 {{-- Ukryte pole informujące że formularz jest ze strony szczegółów --}}
                                 <input type="hidden" name="from_show_page" value="1">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <label for="nr_fakury" class="form-label small">
+                                        <label for="invoice_number" class="form-label small">
                                             <strong>Numer faktury:</strong>
                                         </label>
-                                        <input type="text" class="form-control form-control-sm @if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) border-danger bg-danger bg-opacity-10 @endif" 
-                                               id="nr_fakury" name="nr_fakury" 
-                                               value="{{ $zamowienie->nr_fakury }}" 
+                                        <input type="text" class="form-control form-control-sm @if($zamowienie->is_new) border-danger bg-danger bg-opacity-10 @endif" 
+                                               id="invoice_number" name="invoice_number" 
+                                               value="{{ $zamowienie->invoice_number }}" 
                                                placeholder="Wprowadź numer faktury"
-                                               @if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) 
+                                               @if($zamowienie->is_new) 
                                                style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);" 
                                                @endif>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="status_zakonczone" class="form-label small">
+                                        <label for="status_completed" class="form-label small">
                                             <strong>Status:</strong>
                                         </label>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="status_zakonczone" name="status_zakonczone" value="1" 
-                                                   {{ $zamowienie->status_zakonczone == 1 ? 'checked' : '' }}>
-                                            <label class="form-check-label small" for="status_zakonczone">
+                                            <input class="form-check-input" type="checkbox" id="status_completed" name="status_completed" value="1" 
+                                                   {{ $zamowienie->status_completed == 1 ? 'checked' : '' }}>
+                                            <label class="form-check-label small" for="status_completed">
                                                 Zakończone
                                             </label>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="mt-2">
-                                    <label for="notatki" class="form-label small">
+                                    <label for="notes" class="form-label small">
                                         <strong>Notatki:</strong>
                                     </label>
-                                    <textarea class="form-control form-control-sm" id="notatki" name="notatki" rows="1" 
-                                              placeholder="Dodaj notatki">{{ $zamowienie->notatki }}</textarea>
+                                    <textarea class="form-control form-control-sm" id="notes" name="notes" rows="1" 
+                                              placeholder="Dodaj notatki">{{ $zamowienie->notes }}</textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-sm mt-2">
                                     <i class="bi bi-save"></i> Zapisz
@@ -288,7 +288,7 @@ nowoczesna-edukacja.pl </div>
                             </form>
 
                             {{-- INFORMACJE O FAKTURZE - kompaktowe --}}
-                            @if($zamowienie->faktura_uwagi || $zamowienie->faktura_odroczenie)
+                            @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
                                 <div class="card mt-3">
                                     <div class="card-header bg-warning text-dark py-2">
                                         <h6 class="mb-0">
@@ -296,18 +296,18 @@ nowoczesna-edukacja.pl </div>
                                         </h6>
                                     </div>
                                     <div class="card-body py-2">
-                                        @if($zamowienie->faktura_uwagi)
+                                        @if($zamowienie->invoice_notes)
                                             <div class="mb-1">
                                                 <small class="text-danger">
-                                                    <strong>Uwagi:</strong> {{ $zamowienie->faktura_uwagi }}
+                                                    <strong>Uwagi:</strong> {{ $zamowienie->invoice_notes }}
                                                 </small>
                                             </div>
                                         @endif
-                                        @if($zamowienie->faktura_odroczenie)
+                                        @if($zamowienie->invoice_payment_delay)
                                             <div class="mb-1">
                                                 <small class="text-danger">
                                                     <strong>Odroczenie:</strong> 
-                                                    <span class="badge bg-danger">{{ $zamowienie->faktura_odroczenie }} dni</span>
+                                                    <span class="badge bg-danger">{{ $zamowienie->invoice_payment_delay }} dni</span>
                                                 </small>
                                             </div>
                                         @endif
@@ -316,7 +316,7 @@ nowoczesna-edukacja.pl </div>
                             @endif
 
                             {{-- DODATKOWE INFORMACJE - kompaktowe --}}
-                            @if($zamowienie->data_zamowienia || $zamowienie->ip || $zamowienie->fb)
+                            @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->fb_source)
                                 <div class="card mt-3">
                                     <div class="card-header bg-info text-white py-2">
                                         <h6 class="mb-0">
@@ -324,24 +324,24 @@ nowoczesna-edukacja.pl </div>
                                         </h6>
                                     </div>
                                     <div class="card-body py-2">
-                                        @if($zamowienie->data_zamowienia)
+                                        @if($zamowienie->order_date)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>Data zamówienia:</strong> {{ \Carbon\Carbon::parse($zamowienie->data_zamowienia)->format('d.m.Y H:i') }}
+                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
                                                 </small>
                                             </div>
                                         @endif
-                                        @if($zamowienie->ip)
+                                        @if($zamowienie->ip_address)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>IP:</strong> {{ $zamowienie->ip }}
+                                                    <strong>IP:</strong> {{ $zamowienie->ip_address }}
                                                 </small>
                                             </div>
                                         @endif
-                                        @if($zamowienie->fb)
+                                        @if($zamowienie->fb_source)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>FB:</strong> {{ $zamowienie->fb }}
+                                                    <strong>FB:</strong> {{ $zamowienie->fb_source }}
                                                 </small>
                                             </div>
                                         @endif
@@ -362,30 +362,30 @@ nowoczesna-edukacja.pl </div>
     <script>
         function copyOdbiorcaData() {
             const odbiorcaData = `ODBIORCA:
-{{ $zamowienie->odb_nazwa ?? '—' }}
-{{ $zamowienie->odb_adres ?? '—' }}
-{{ $zamowienie->odb_kod ?? '—' }} {{ $zamowienie->odb_poczta ?? '—' }}
+{{ $zamowienie->recipient_name ?? '—' }}
+{{ $zamowienie->recipient_address ?? '—' }}
+{{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}
 nowoczesna-edukacja.pl `;
             copyToClipboard(odbiorcaData, 'copyOdbiorcaData');
         }
 
         function copyNipNabywcy() {
-            const nipData = `{{ preg_replace('/[^0-9]/', '', $zamowienie->nab_nip) }}`;
+            const nipData = `{{ preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip) }}`;
             copyToClipboard(nipData, 'copyNipNabywcy');
         }
 
         function copyUczestnikData() {
-            const uczestnikData = `{{ $zamowienie->konto_imie_nazwisko ?? '—' }}`;
+            const uczestnikData = `{{ $zamowienie->participant_name ?? '—' }}`;
             copyToClipboard(uczestnikData, 'copyUczestnikData');
         }
 
         function copyEmailUczestnika() {
-            const emailData = `{{ $zamowienie->konto_email ?? '—' }}`;
+            const emailData = `{{ $zamowienie->participant_email ?? '—' }}`;
             copyToClipboard(emailData, 'copyEmailUczestnika');
         }
 
         function copyEmailFaktury() {
-            const emailData = `{{ $zamowienie->zam_email ?? '—' }}`;
+            const emailData = `{{ $zamowienie->orderer_email ?? '—' }}`;
             copyToClipboard(emailData, 'copyEmailFaktury');
         }
 
@@ -457,7 +457,7 @@ nowoczesna-edukacja.pl `;
             resultDiv.innerHTML = '';
             
             // Wysłanie zapytania AJAX
-            fetch(`/sales/${orderId}/publigo`, {
+            fetch(`/form-orders/${orderId}/publigo/create`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -586,7 +586,7 @@ nowoczesna-edukacja.pl `;
             button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
             
             // Wysłanie zapytania AJAX
-            fetch(`/sales/${orderId}/publigo/reset`, {
+            fetch(`/form-orders/${orderId}/publigo/reset`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -615,4 +615,5 @@ nowoczesna-edukacja.pl `;
         }
     </script>
 </x-app-layout>
+
 

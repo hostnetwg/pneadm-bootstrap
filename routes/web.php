@@ -10,6 +10,7 @@ use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\DashboardController;
@@ -119,6 +120,17 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/publigo/reset', [SalesController::class, 'resetPubligoStatus'])->name('publigo.reset');
     });
 
+    // Form Orders - nowa tabela w bazie pneadm
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+    ->prefix('form-orders')
+    ->name('form-orders.')
+    ->group(function () {
+        Route::get('/', [FormOrdersController::class, 'index'])->name('index');
+        Route::get('/{id}', [FormOrdersController::class, 'show'])->name('show');
+        Route::put('/{id}', [FormOrdersController::class, 'update'])->name('update');
+        Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
+        Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
+    });
 
 
 /**/
