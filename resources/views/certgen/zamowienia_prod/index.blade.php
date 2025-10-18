@@ -71,16 +71,16 @@
             <div class="card">
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
+                        <table class="table table-hover align-middle table-sm">
                             <thead class="table-light">
                                 <tr>
-                                    <th>ID</th>
-                                    <th>ID Publigo</th>
-                                    <th>Nazwa produktu</th>
-                                    <th>Promocja</th>
-                                    <th>Status</th>
-                                    <th>ID Ceny</th>
-                                    <th>Akcje</th>
+                                    <th style="width: 5%;">ID</th>
+                                    <th style="width: 8%;">ID Publigo</th>
+                                    <th style="width: 35%;">Nazwa produktu</th>
+                                    <th style="width: 15%;">Promocja</th>
+                                    <th style="width: 10%;">Status</th>
+                                    <th style="width: 8%;">ID Ceny</th>
+                                    <th style="width: 19%;">Akcje</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -89,7 +89,7 @@
                                         <td><strong>#{{ $zamowienie->id }}</strong></td>
                                         <td>
                                             @if($zamowienie->idProdPubligo)
-                                                <code>{{ $zamowienie->idProdPubligo }}</code>
+                                                <small><code>{{ $zamowienie->idProdPubligo }}</code></small>
                                             @else
                                                 <span class="text-muted">—</span>
                                             @endif
@@ -100,47 +100,47 @@
                                                    target="_blank" 
                                                    rel="noopener noreferrer"
                                                    class="text-decoration-none"
-                                                   title="Otwórz formularz zamówienia w nowej zakładce">
-                                                    <small>{{ Str::limit($zamowienie->nazwa ?? '—', 60) }}</small>
+                                                   title="{{ $zamowienie->nazwa }} - Otwórz formularz zamówienia w nowej zakładce">
+                                                    <small>{{ Str::limit($zamowienie->nazwa ?? '—', 50) }}</small>
                                                     <i class="bi bi-box-arrow-up-right ms-1"></i>
                                                 </a>
                                             @else
-                                                <small class="text-muted">{{ Str::limit($zamowienie->nazwa ?? '—', 60) }}</small>
-                                                <small class="text-danger">(brak ID Publigo)</small>
+                                                <small class="text-muted">{{ Str::limit($zamowienie->nazwa ?? '—', 50) }}</small>
+                                                <small class="text-danger d-block">(brak ID Publigo)</small>
                                             @endif
                                         </td>
-                                        <td>
+                                        <td style="word-wrap: break-word; white-space: normal;">
                                             @if($zamowienie->promocja)
-                                                <span class="badge bg-warning text-dark">{{ $zamowienie->promocja }}</span>
+                                                <small><span class="badge bg-warning text-dark">{{ $zamowienie->promocja }}</span></small>
                                             @else
                                                 <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if($zamowienie->status)
-                                                <span class="badge bg-{{ $zamowienie->status == 1 ? 'success' : 'secondary' }}">
+                                                <small><span class="badge bg-{{ $zamowienie->status == 1 ? 'success' : 'secondary' }}">
                                                     {{ $zamowienie->status == 1 ? 'Aktywny' : 'Nieaktywny' }}
-                                                </span>
+                                                </span></small>
                                             @else
                                                 <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td>
                                             @if($zamowienie->price_id_ProdPubligo)
-                                                <code>{{ $zamowienie->price_id_ProdPubligo }}</code>
+                                                <small><code>{{ $zamowienie->price_id_ProdPubligo }}</code></small>
                                             @else
                                                 <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
+                                            <div class="btn-group btn-group-sm" role="group">
                                                 <a href="{{ route('certgen.zamowienia_prod.show', $zamowienie->id) }}" 
-                                                   class="btn btn-sm btn-primary"
+                                                   class="btn btn-primary"
                                                    title="Szczegóły">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
                                                 <a href="{{ route('certgen.zamowienia_prod.edit', $zamowienie->id) }}" 
-                                                   class="btn btn-sm btn-warning"
+                                                   class="btn btn-warning"
                                                    title="Edytuj">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
@@ -151,7 +151,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" 
-                                                            class="btn btn-sm btn-danger"
+                                                            class="btn btn-danger"
                                                             title="Usuń">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
