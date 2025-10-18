@@ -161,7 +161,7 @@
                                         </h5>
                                         @if($zamowienie->order_date)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') }}
+                                                <i class="bi bi-calendar-event"></i> {{ date('d.m.Y H:i', strtotime($zamowienie->order_date)) }}
                                             </small>
                                         @endif
                                     </div>
