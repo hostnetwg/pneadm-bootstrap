@@ -1,0 +1,187 @@
+# Cursor AI Rules - pneadm-bootstrap Project
+
+## Development Environment
+- **OS**: Windows WSL2 (Linux kernel 6.6.87.2-microsoft-standard-WSL2)
+- **Containerization**: Docker + Laravel Sail
+- **All Laravel/PHP/Artisan commands MUST be prefixed with `./vendor/bin/sail` or `sail` (if alias is set)**
+
+## Tech Stack
+- **Framework**: Laravel 11.31+ (PHP 8.2+)
+- **Runtime**: PHP 8.4 (Docker container)
+- **Frontend Framework**: Bootstrap 5.3.3
+- **Build Tool**: Vite 6.0
+- **JavaScript Framework**: Alpine.js 3.4.2
+- **Database**: MySQL 8.0
+- **Cache/Queue**: Redis Alpine
+- **Mail Testing**: Mailpit
+- **Database Management**: phpMyAdmin
+
+## Port Configuration
+- Application (Laravel): `http://localhost:8083`
+- Vite Dev Server: `http://localhost:5173`
+- MySQL: `localhost:3307` (internal: 3306)
+- Redis: `localhost:6380` (internal: 6379)
+- phpMyAdmin: `http://localhost:8084`
+- Mailpit Web UI: `http://localhost:8026`
+- Mailpit SMTP: `localhost:1027`
+
+## Critical Command Rules
+
+### ✅ ALWAYS Use Sail Prefix
+When running PHP/Laravel/Artisan commands, ALWAYS prefix with `sail`:
+
+**Correct Examples:**
+```bash
+sail artisan migrate
+sail artisan make:controller UserController
+sail composer require package/name
+sail php artisan queue:work
+sail artisan db:seed
+sail artisan test
+sail npm install
+sail npm run dev
+sail npm run build
+```
+
+**Incorrect Examples (NEVER use these in WSL/Docker environment):**
+```bash
+php artisan migrate          # ❌ WRONG - bypasses Docker
+artisan migrate              # ❌ WRONG - won't work
+composer require package     # ❌ WRONG - uses host composer
+npm install                  # ❌ WRONG - uses host npm
+```
+
+### Docker/Sail Management
+```bash
+sail up -d                   # Start containers in background
+sail down                    # Stop containers
+sail restart                 # Restart containers
+sail shell                   # Access container bash
+sail mysql                   # Access MySQL CLI
+sail redis                   # Access Redis CLI
+sail logs                    # View container logs
+sail ps                      # List running containers
+```
+
+### Development Workflow
+```bash
+sail up -d                   # Start environment
+sail artisan migrate         # Run migrations
+sail npm install             # Install frontend dependencies
+sail npm run dev             # Start Vite dev server
+sail artisan queue:work      # Start queue worker
+sail artisan test            # Run tests
+```
+
+## Project Structure Notes
+- **Bootstrap CSS Framework**: Used for frontend styling (not to be confused with Laravel bootstrap directory)
+- **Vite**: Asset bundling and HMR for CSS/JS
+- **Alpine.js**: Lightweight JavaScript framework for interactivity
+- **Laravel Breeze**: Authentication scaffolding (installed)
+
+## Database
+- MySQL 8.0 running in Docker container
+- Default timezone: UTC (+00:00)
+- Access via phpMyAdmin at `http://localhost:8084`
+- Connection from host: `localhost:3307`
+- Connection from container: `mysql:3306`
+
+## Additional Packages
+- **barryvdh/laravel-dompdf**: PDF generation (v3.1+)
+- **guzzlehttp/guzzle**: HTTP client (v7.9+)
+- **laravel/tinker**: REPL for Laravel (v2.9+)
+
+## Code Style & Best Practices
+- Follow PSR-12 coding standards
+- Use Laravel Pint for code formatting: `sail pint`
+- Run tests before committing: `sail artisan test`
+- Use type hints in PHP 8.2+ style
+- Prefer named arguments for clarity
+
+## File Permissions
+When creating files/directories that need to be writable by the web server:
+```bash
+sail shell
+chmod -R 775 storage bootstrap/cache
+chown -R sail:sail storage bootstrap/cache
+```
+
+## Common Tasks
+
+### Creating New Resources
+```bash
+sail artisan make:model ModelName -mcr    # Model + migration + controller + resource
+sail artisan make:controller ControllerName
+sail artisan make:migration create_table_name
+sail artisan make:seeder SeederName
+sail artisan make:request RequestName
+sail artisan make:middleware MiddlewareName
+```
+
+### Database Operations
+```bash
+sail artisan migrate                      # Run migrations
+sail artisan migrate:fresh --seed        # Fresh database with seeds
+sail artisan db:seed                     # Run seeders
+sail artisan migrate:rollback            # Rollback last migration
+sail artisan migrate:status              # Check migration status
+```
+
+### Cache & Optimization
+```bash
+sail artisan cache:clear                 # Clear application cache
+sail artisan config:clear                # Clear config cache
+sail artisan route:clear                 # Clear route cache
+sail artisan view:clear                  # Clear compiled views
+sail artisan optimize                    # Optimize the framework
+sail artisan optimize:clear              # Clear all optimization caches
+```
+
+### Frontend Build
+```bash
+sail npm install                         # Install dependencies
+sail npm run dev                         # Development mode with HMR
+sail npm run build                       # Production build
+```
+
+## Environment Variables
+Check `docker-compose.yml` for service-specific environment variables.
+Application environment variables should be in `.env` file (not tracked in git).
+
+## Testing
+```bash
+sail artisan test                        # Run all tests
+sail artisan test --parallel             # Run tests in parallel
+sail artisan test --filter TestName      # Run specific test
+```
+
+## Debugging
+- **Xdebug**: Available in Sail container (configure SAIL_XDEBUG_MODE in .env)
+- **Laravel Pail**: Real-time log monitoring: `sail artisan pail`
+- **Log Files**: `storage/logs/laravel.log`
+
+## Important Reminders
+1. **NEVER** run Laravel commands directly without `sail` prefix
+2. **ALWAYS** use `sail` for PHP, Composer, NPM, and Artisan commands
+3. **Database connections** from host use port 3307, not 3306
+4. **Vite dev server** must be running for frontend hot reload: `sail npm run dev`
+5. **Queue workers** need to be restarted after code changes: `sail artisan queue:restart`
+
+## Bootstrap Framework Notes
+- Bootstrap 5.3.3 is used for UI components
+- Bootstrap CSS/JS is imported in `resources/js/app.js` and `resources/css/app.css`
+- No jQuery dependency (Bootstrap 5 is vanilla JS)
+- Popper.js included for tooltips/popovers
+
+## When Suggesting Code
+- Assume Laravel Sail environment
+- Include full `sail` commands in examples
+- Consider Bootstrap 5 conventions for frontend
+- Use Laravel 11 syntax (avoid deprecated methods)
+- Prefer modern PHP 8.2+ features (readonly properties, enums, etc.)
+
+## Git Workflow
+- This project uses standard Git
+- Don't commit `.env`, `node_modules/`, `vendor/`
+- Run `sail pint` before committing to format code
+

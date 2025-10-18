@@ -1,0 +1,207 @@
+═══════════════════════════════════════════════════════════════
+   AI CONTEXT FILES - DOCUMENTATION INDEX
+   pneadm-bootstrap Project
+═══════════════════════════════════════════════════════════════
+
+📁 PROJECT ROOT FILES
+───────────────────────────────────────────────────────────────
+
+📄 .cursorrules (6.5 KB)
+   ├─ Purpose: Main configuration for Cursor AI
+   ├─ Contains: Development environment rules, command guidelines
+   ├─ For: AI assistants (primary configuration)
+   └─ Update: When project conventions or environment changes
+
+📄 SAIL_CHEATSHEET.md (7.2 KB)
+   ├─ Purpose: Quick reference for all Sail commands
+   ├─ Contains: Common commands, troubleshooting, daily workflow
+   ├─ For: Developers (quick lookups)
+   └─ Update: When new patterns or commands are discovered
+
+📄 setup-sail-alias.sh (1.8 KB, executable)
+   ├─ Purpose: Setup sail alias in shell
+   ├─ Usage: ./setup-sail-alias.sh
+   ├─ For: New developers, initial setup
+   └─ Update: When alias configuration needs change
+
+📁 .ai/ DIRECTORY
+───────────────────────────────────────────────────────────────
+
+📄 README.md (4.1 KB)
+   ├─ Purpose: Index and overview of all AI documentation
+   ├─ Contains: File descriptions, usage tips, project structure
+   ├─ For: Navigation, understanding documentation structure
+   └─ Update: When new files are added to .ai/ directory
+
+📄 DEV_ENVIRONMENT.md (9.8 KB)
+   ├─ Purpose: Comprehensive environment documentation
+   ├─ Contains: Full system architecture, Docker services, all configs
+   ├─ For: Deep understanding, complex troubleshooting
+   └─ Update: When environment setup changes (ports, services, etc.)
+
+📄 QUICK_START.md (4.3 KB)
+   ├─ Purpose: Fast onboarding and daily reference
+   ├─ Contains: Setup steps, daily workflow, command cheatsheet
+   ├─ For: Quick lookups, new developers, daily use
+   └─ Update: When common workflows change
+
+📄 ENVIRONMENT_VARIABLES.md (12.4 KB)
+   ├─ Purpose: Complete guide to all .env variables
+   ├─ Contains: Variable explanations, configurations, security
+   ├─ For: Configuration, troubleshooting env issues
+   └─ Update: When new environment variables are added
+
+📄 FILES_INDEX.txt (this file)
+   ├─ Purpose: Visual index of all documentation files
+   ├─ Contains: File tree, sizes, purposes, relationships
+   ├─ For: Quick overview, understanding documentation
+   └─ Update: When documentation structure changes
+
+═══════════════════════════════════════════════════════════════
+   FILE RELATIONSHIPS & USAGE GUIDE
+═══════════════════════════════════════════════════════════════
+
+NEW DEVELOPER ONBOARDING
+─────────────────────────
+1. Start with: .ai/QUICK_START.md
+2. Run: ./setup-sail-alias.sh
+3. Reference: SAIL_CHEATSHEET.md (keep it open!)
+4. Deep dive: .ai/DEV_ENVIRONMENT.md (when needed)
+
+AI ASSISTANT CONFIGURATION
+───────────────────────────
+Primary: .cursorrules (automatically read by Cursor AI)
+Context: .ai/DEV_ENVIRONMENT.md
+         .ai/ENVIRONMENT_VARIABLES.md
+         .ai/QUICK_START.md
+
+DAILY DEVELOPMENT
+─────────────────
+Quick ref: SAIL_CHEATSHEET.md
+For vars: .ai/ENVIRONMENT_VARIABLES.md
+For help: .ai/QUICK_START.md
+
+TROUBLESHOOTING
+───────────────
+Commands: SAIL_CHEATSHEET.md → Common Issues section
+Environment: .ai/DEV_ENVIRONMENT.md → Troubleshooting section
+Config: .ai/ENVIRONMENT_VARIABLES.md → Common Issues section
+
+UPDATING DOCUMENTATION
+──────────────────────
+When adding services:
+  └─ Update: docker-compose.yml, .ai/DEV_ENVIRONMENT.md, .cursorrules
+
+When adding env vars:
+  └─ Update: .env.example, .ai/ENVIRONMENT_VARIABLES.md
+
+When changing workflows:
+  └─ Update: .ai/QUICK_START.md, SAIL_CHEATSHEET.md
+
+When adding AI rules:
+  └─ Update: .cursorrules
+
+═══════════════════════════════════════════════════════════════
+   FILE SIZE SUMMARY
+═══════════════════════════════════════════════════════════════
+
+.cursorrules ............................ 6.5 KB
+.ai/README.md ........................... 4.1 KB
+.ai/DEV_ENVIRONMENT.md .................. 9.8 KB
+.ai/QUICK_START.md ...................... 4.3 KB
+.ai/ENVIRONMENT_VARIABLES.md ........... 12.4 KB
+.ai/FILES_INDEX.txt ..................... 4.2 KB
+SAIL_CHEATSHEET.md ...................... 7.2 KB
+setup-sail-alias.sh ..................... 1.8 KB
+                                          ─────────
+TOTAL DOCUMENTATION SIZE ............... ~50.3 KB
+
+═══════════════════════════════════════════════════════════════
+   CRITICAL INFORMATION FOR AI ASSISTANTS
+═══════════════════════════════════════════════════════════════
+
+⚠️  ALWAYS use 'sail' prefix for commands
+    Example: sail artisan migrate (NOT: php artisan migrate)
+
+🐳  Project runs in Docker via Laravel Sail on Windows WSL2
+
+🔌  Database port: 3307 (host), 3306 (container)
+    Always use 'mysql' as DB_HOST in .env
+
+🎨  Frontend: Bootstrap 5.3.3 (not Tailwind)
+
+⚡  Laravel version: 11.31+ (use modern syntax)
+
+📦  Build tool: Vite 6.0 (not Mix)
+
+🧪  PHP version: 8.4 (in container)
+
+═══════════════════════════════════════════════════════════════
+   DOCUMENTATION HIERARCHY
+═══════════════════════════════════════════════════════════════
+
+.cursorrules (ROOT CONFIG)
+├── Read by: Cursor AI automatically
+└── Defines: All AI behavior rules
+
+.ai/ (DETAILED CONTEXT)
+├── README.md (Navigation Hub)
+│   └── Links to all other docs
+├── DEV_ENVIRONMENT.md (Technical Deep Dive)
+│   └── System architecture
+├── QUICK_START.md (Onboarding)
+│   └── Fast setup
+├── ENVIRONMENT_VARIABLES.md (Configuration)
+│   └── All .env variables
+└── FILES_INDEX.txt (This File)
+    └── Documentation map
+
+SAIL_CHEATSHEET.md (Developer Tool)
+└── Command reference for daily use
+
+setup-sail-alias.sh (Setup Script)
+└── One-time shell configuration
+
+═══════════════════════════════════════════════════════════════
+   BEST PRACTICES
+═══════════════════════════════════════════════════════════════
+
+✅ DO:
+  • Keep documentation in sync with code
+  • Update .env.example when adding variables
+  • Document new services in DEV_ENVIRONMENT.md
+  • Add new patterns to SAIL_CHEATSHEET.md
+  • Update .cursorrules for new AI conventions
+
+❌ DON'T:
+  • Commit .env files (only .env.example)
+  • Document sensitive information
+  • Create duplicate documentation
+  • Skip updating related files
+  • Ignore inconsistencies across docs
+
+═══════════════════════════════════════════════════════════════
+   QUICK ACCESS
+═══════════════════════════════════════════════════════════════
+
+View this file:
+  cat .ai/FILES_INDEX.txt
+
+List all AI docs:
+  ls -lh .ai/
+
+Search documentation:
+  grep -r "keyword" .ai/
+
+Edit .cursorrules:
+  nano .cursorrules
+
+Quick command lookup:
+  cat SAIL_CHEATSHEET.md | grep -A 2 "keyword"
+
+═══════════════════════════════════════════════════════════════
+   LAST UPDATED: October 2025
+   PROJECT: pneadm-bootstrap
+   ENVIRONMENT: Windows WSL2 + Docker + Laravel Sail
+═══════════════════════════════════════════════════════════════
+

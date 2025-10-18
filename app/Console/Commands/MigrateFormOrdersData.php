@@ -124,13 +124,14 @@ class MigrateFormOrdersData extends Command
                             $carbonDate = \Carbon\Carbon::parse($date);
                             // Sprawdź czy rok jest w rozsądnym zakresie
                             if ($carbonDate->year < 1970 || $carbonDate->year > 2100) return null;
-                            return $carbonDate;
+                            return $carbonDate->format('Y-m-d H:i:s');
                         } catch (\Exception $e) {
                             return null;
                         }
                     };
                     
-                    FormOrder::create([
+                    // Używamy Query Builder zamiast Eloquent, aby mieć pełną kontrolę nad timestampami
+                    DB::connection('mysql')->table('form_orders')->insert([
                         // Zachowanie oryginalnego ID
                         'id' => $oldOrder->id,
                         
@@ -193,9 +194,9 @@ class MigrateFormOrdersData extends Command
                         'ip_address' => $oldOrder->ip ?? null,
                         'fb_source' => $oldOrder->fb ?? null,
                         
-                        // Timestamps (zachowujemy oryginalne jeśli istnieją)
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        // Timestamps (zachowujemy oryginalne z data_zamowienia)
+                        'created_at' => $validateDate($oldOrder->data_zamowienia) ?? now()->format('Y-m-d H:i:s'),
+                        'updated_at' => $validateDate($oldOrder->data_update) ?? $validateDate($oldOrder->data_zamowienia) ?? now()->format('Y-m-d H:i:s'),
                     ]);
                     
                     $migrated++;
