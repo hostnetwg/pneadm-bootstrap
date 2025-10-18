@@ -13,6 +13,7 @@ use App\Http\Controllers\SalesController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
+use App\Http\Controllers\ZamowieniaProdController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\SendyController;
@@ -76,6 +77,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     
     // Baza Certgen - dane dla webhook
     Route::prefix('certgen')->name('certgen.')->group(function () {
+        // Formularze zamówień z tabeli zamowienia_PROD
+        Route::get('/zamowienia-prod', [ZamowieniaProdController::class, 'index'])->name('zamowienia_prod.index');
+        Route::get('/zamowienia-prod/create', [ZamowieniaProdController::class, 'create'])->name('zamowienia_prod.create');
+        Route::post('/zamowienia-prod', [ZamowieniaProdController::class, 'store'])->name('zamowienia_prod.store');
+        Route::get('/zamowienia-prod/{id}', [ZamowieniaProdController::class, 'show'])->name('zamowienia_prod.show');
+        
         Route::get('/webhook-data', [WebhookPubligoController::class, 'index'])->name('webhook_data.index');
         Route::get('/webhook-data/create', [WebhookPubligoController::class, 'create'])->name('webhook_data.create');
         Route::post('/webhook-data', [WebhookPubligoController::class, 'store'])->name('webhook_data.store');
