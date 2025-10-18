@@ -161,7 +161,7 @@
                                         </h5>
                                         @if($zamowienie->order_date)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ date('d.m.Y H:i', strtotime($zamowienie->order_date)) }}
+                                                <i class="bi bi-calendar-event"></i> {{ substr($zamowienie->order_date, 8, 2) }}.{{ substr($zamowienie->order_date, 5, 2) }}.{{ substr($zamowienie->order_date, 0, 4) }} {{ substr($zamowienie->order_date, 11, 5) }}
                                             </small>
                                         @endif
                                     </div>
