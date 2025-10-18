@@ -101,10 +101,13 @@ class FormOrder extends Model
 
     /**
      * Rzutowanie typów dla atrybutów
+     * 
+     * UWAGA: order_date NIE jest rzutowane na datetime, aby uniknąć automatycznej
+     * konwersji strefy czasowej. Data w bazie jest już w polskiej strefie czasowej.
      */
     protected $casts = [
         'ptw' => 'integer',
-        'order_date' => 'datetime',
+        // 'order_date' => 'datetime', // Celowo zakomentowane - data już jest w polskiej strefie
         'product_id' => 'integer',
         'product_price' => 'decimal:2',
         'publigo_product_id' => 'integer',

@@ -327,7 +327,7 @@ nowoczesna-edukacja.pl </div>
                                         @if($zamowienie->order_date)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
+                                                    <strong>Data zamówienia:</strong> {{ \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') }}
                                                 </small>
                                             </div>
                                         @endif

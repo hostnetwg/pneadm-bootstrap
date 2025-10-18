@@ -101,7 +101,7 @@
                     <div class="card bg-info text-white">
                         <div class="card-body">
                             <h5 class="card-title">Dzisiaj</h5>
-                            <h3 class="card-text">{{ \App\Models\FormOrder::where('order_date', '>=', \Carbon\Carbon::today())->count() }}</h3>
+                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', '>=', \Carbon\Carbon::today()->format('Y-m-d'))->count() }}</h3>
                         </div>
                     </div>
                 </div>
@@ -161,7 +161,7 @@
                                         </h5>
                                         @if($zamowienie->order_date)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
+                                                <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') }}
                                             </small>
                                         @endif
                                     </div>
