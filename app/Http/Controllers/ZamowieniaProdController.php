@@ -136,4 +136,124 @@ class ZamowieniaProdController extends Controller
                 ->with('error', 'Wystąpił błąd podczas dodawania produktu: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Wyświetla formularz edycji produktu.
+     */
+    public function edit($id)
+    {
+        $zamowienie = DB::connection('mysql_certgen')->table('zamowienia_PROD')
+            ->where('id', $id)
+            ->first();
+
+        if (!$zamowienie) {
+            abort(404, 'Produkt nie został znaleziony.');
+        }
+
+        // Pobierz warianty cenowe
+        $warianty = DB::connection('mysql_certgen')
+            ->table('zamowienia_PROD_warianty')
+            ->where('id_PROD', $id)
+            ->orderBy('lp')
+            ->get();
+
+        return view('certgen.zamowienia_prod.edit', compact('zamowienie', 'warianty'));
+    }
+
+    /**
+     * Aktualizuje produkt wraz z wariantami cenowymi.
+     */
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'nazwa' => 'required|string|max:500',
+            'idProdPubligo' => 'nullable|integer',
+            'price_id_ProdPubligo' => 'nullable|integer',
+            'status' => 'required|boolean',
+            'promocja' => 'nullable|string|max:255',
+            'warianty' => 'nullable|array',
+            'warianty.*.lp' => 'required|integer',
+            'warianty.*.opis' => 'required|string|max:255',
+            'warianty.*.cena' => 'required|numeric|min:0',
+            'warianty.*.cena_prom' => 'nullable|numeric|min:0',
+            'warianty.*.data_p_start' => 'nullable|date',
+            'warianty.*.data_p_end' => 'nullable|date|after_or_equal:warianty.*.data_p_start',
+            'warianty.*.status' => 'required|boolean',
+        ]);
+
+        try {
+            // Aktualizuj produkt
+            DB::connection('mysql_certgen')->table('zamowienia_PROD')
+                ->where('id', $id)
+                ->update([
+                    'idProdPubligo' => $request->idProdPubligo,
+                    'price_id_ProdPubligo' => $request->price_id_ProdPubligo,
+                    'status' => $request->status,
+                    'nazwa' => $request->nazwa,
+                    'promocja' => $request->promocja,
+                ]);
+
+            // Usuń stare warianty
+            DB::connection('mysql_certgen')
+                ->table('zamowienia_PROD_warianty')
+                ->where('id_PROD', $id)
+                ->delete();
+
+            // Dodaj nowe warianty
+            if ($request->has('warianty') && is_array($request->warianty)) {
+                foreach ($request->warianty as $wariant) {
+                    DB::connection('mysql_certgen')->table('zamowienia_PROD_warianty')->insert([
+                        'id_PROD' => $id,
+                        'lp' => $wariant['lp'],
+                        'opis' => $wariant['opis'],
+                        'cena' => $wariant['cena'],
+                        'cena_prom' => $wariant['cena_prom'] ?? null,
+                        'data_p_start' => $wariant['data_p_start'] ?? null,
+                        'data_p_end' => $wariant['data_p_end'] ?? null,
+                        'status' => $wariant['status'],
+                    ]);
+                }
+            }
+
+            return redirect()->route('certgen.zamowienia_prod.show', $id)
+                ->with('success', 'Produkt został zaktualizowany pomyślnie!');
+
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Wystąpił błąd podczas aktualizacji produktu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Usuwa produkt wraz z wariantami cenowymi.
+     */
+    public function destroy($id)
+    {
+        try {
+            // Usuń warianty cenowe
+            DB::connection('mysql_certgen')
+                ->table('zamowienia_PROD_warianty')
+                ->where('id_PROD', $id)
+                ->delete();
+
+            // Usuń produkt
+            $deleted = DB::connection('mysql_certgen')
+                ->table('zamowienia_PROD')
+                ->where('id', $id)
+                ->delete();
+
+            if ($deleted) {
+                return redirect()->route('certgen.zamowienia_prod.index')
+                    ->with('success', 'Produkt został usunięty pomyślnie!');
+            } else {
+                return redirect()->route('certgen.zamowienia_prod.index')
+                    ->with('error', 'Nie udało się usunąć produktu.');
+            }
+
+        } catch (\Exception $e) {
+            return redirect()->route('certgen.zamowienia_prod.index')
+                ->with('error', 'Wystąpił błąd podczas usuwania produktu: ' . $e->getMessage());
+        }
+    }
 }

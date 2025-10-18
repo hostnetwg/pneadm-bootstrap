@@ -4,7 +4,20 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Szczegóły produktu formularza #{{ $zamowienie->id }}
             </h2>
-            <div>
+            <div class="d-flex gap-2">
+                <a href="{{ route('certgen.zamowienia_prod.edit', $zamowienie->id) }}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i> Edytuj
+                </a>
+                <form action="{{ route('certgen.zamowienia_prod.destroy', $zamowienie->id) }}" 
+                      method="POST" 
+                      class="d-inline"
+                      onsubmit="return confirm('Czy na pewno chcesz usunąć ten produkt wraz z wszystkimi wariantami cenowymi?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Usuń
+                    </button>
+                </form>
                 <a href="{{ route('certgen.zamowienia_prod.index') }}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Powrót do listy
                 </a>

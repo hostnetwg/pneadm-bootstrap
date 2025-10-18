@@ -82,6 +82,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/zamowienia-prod/create', [ZamowieniaProdController::class, 'create'])->name('zamowienia_prod.create');
         Route::post('/zamowienia-prod', [ZamowieniaProdController::class, 'store'])->name('zamowienia_prod.store');
         Route::get('/zamowienia-prod/{id}', [ZamowieniaProdController::class, 'show'])->name('zamowienia_prod.show');
+        Route::get('/zamowienia-prod/{id}/edit', [ZamowieniaProdController::class, 'edit'])->name('zamowienia_prod.edit');
+        Route::put('/zamowienia-prod/{id}', [ZamowieniaProdController::class, 'update'])->name('zamowienia_prod.update');
+        Route::delete('/zamowienia-prod/{id}', [ZamowieniaProdController::class, 'destroy'])->name('zamowienia_prod.destroy');
         
         Route::get('/webhook-data', [WebhookPubligoController::class, 'index'])->name('webhook_data.index');
         Route::get('/webhook-data/create', [WebhookPubligoController::class, 'create'])->name('webhook_data.create');

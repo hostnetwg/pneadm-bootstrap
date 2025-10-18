@@ -121,10 +121,30 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <a href="{{ route('certgen.zamowienia_prod.show', $zamowienie->id) }}" 
-                                               class="btn btn-sm btn-primary">
-                                                <i class="bi bi-eye"></i> Szczegóły
-                                            </a>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ route('certgen.zamowienia_prod.show', $zamowienie->id) }}" 
+                                                   class="btn btn-sm btn-primary"
+                                                   title="Szczegóły">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{{ route('certgen.zamowienia_prod.edit', $zamowienie->id) }}" 
+                                                   class="btn btn-sm btn-warning"
+                                                   title="Edytuj">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <form action="{{ route('certgen.zamowienia_prod.destroy', $zamowienie->id) }}" 
+                                                      method="POST" 
+                                                      class="d-inline"
+                                                      onsubmit="return confirm('Czy na pewno chcesz usunąć ten produkt wraz z wszystkimi wariantami cenowymi?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" 
+                                                            class="btn btn-sm btn-danger"
+                                                            title="Usuń">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
