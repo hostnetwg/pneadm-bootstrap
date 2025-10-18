@@ -21,3 +21,8 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Temporary/working SQL files
+*_production.sql
+*.sql.backup*
+*.sql.OLD
