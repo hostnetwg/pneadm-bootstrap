@@ -143,6 +143,23 @@
                 </div>
                 <div class="card-body">
                     <h4>{{ $zamowienie->nazwa ?? 'Brak nazwy' }}</h4>
+                    
+                    @if($zamowienie->idProdPubligo)
+                        <div class="mt-3">
+                            <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $zamowienie->idProdPubligo }}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="btn btn-success">
+                                <i class="bi bi-box-arrow-up-right me-2"></i>
+                                Otwórz formularz zamówienia w nowej zakładce
+                            </a>
+                        </div>
+                    @else
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> 
+                            Brak ID Publigo - formularz zamówienia nie jest dostępny
+                        </div>
+                    @endif
                 </div>
             </div>
 

@@ -95,7 +95,19 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <small>{{ Str::limit($zamowienie->nazwa ?? '—', 60) }}</small>
+                                            @if($zamowienie->idProdPubligo)
+                                                <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $zamowienie->idProdPubligo }}" 
+                                                   target="_blank" 
+                                                   rel="noopener noreferrer"
+                                                   class="text-decoration-none"
+                                                   title="Otwórz formularz zamówienia w nowej zakładce">
+                                                    <small>{{ Str::limit($zamowienie->nazwa ?? '—', 60) }}</small>
+                                                    <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                                </a>
+                                            @else
+                                                <small class="text-muted">{{ Str::limit($zamowienie->nazwa ?? '—', 60) }}</small>
+                                                <small class="text-danger">(brak ID Publigo)</small>
+                                            @endif
                                         </td>
                                         <td>
                                             @if($zamowienie->promocja)
