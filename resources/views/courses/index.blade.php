@@ -239,7 +239,17 @@
                     <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
                         <td class="text-center align-middle">{{ $course->id }}</td>
                         <td class="text-center align-middle small">
-                            {{ $course->id_old ?? '-' }}<br>
+                            {{ $course->id_old ?? '-' }}
+                            @if($course->source_id_old === 'certgen_Publigo' && $course->id_old)
+                                <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $course->id_old }}" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   title="Otwórz formularz zamówienia (idP={{ $course->id_old }})"
+                                   class="text-success">
+                                    <i class="bi bi-file-earmark-text-fill"></i>
+                                </a>
+                            @endif
+                            <br>
                             <small class="text-muted">{{ $course->source_id_old ?? '-' }}</small>
                         </td>
                         <td class="align-middle">
@@ -300,6 +310,15 @@
                         </td>
                         <td class="align-middle">
                             <div class="d-flex flex-column gap-1">
+                                @if($course->source_id_old === 'certgen_Publigo' && $course->id_old)
+                                    <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $course->id_old }}" 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       class="btn btn-success btn-sm"
+                                       title="Otwórz formularz zamówienia">
+                                        <i class="bi bi-file-earmark-text"></i> Formularz
+                                    </a>
+                                @endif
                                 <a href="{{ route('courses.show', $course->id) }}" class="btn btn-primary btn-sm">Podgląd</a>
                                 <a href="{{ route('courses.edit', array_merge(['id' => $course->id], request()->query())) }}" class="btn btn-warning btn-sm">Edytuj</a>
                                 <form action="{{ route('courses.destroy', $course->id) }}" method="POST">
