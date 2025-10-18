@@ -251,7 +251,7 @@
     <div class="main-statistics">
         <h3>Podsumowanie statystyk:</h3>
         <p><strong>Łączna liczba szkoleń:</strong> {{ $statistics['total_courses'] }} ({{ $statistics['paid_courses'] }} płatnych, {{ $statistics['free_courses'] }} bezpłatnych)</p>
-        <p><strong>Typy szkoleń:</strong> {{ $statistics['online_courses'] }} online, {{ $statistics['offline_courses'] }} stacjonarnych</p>
+        <p><strong>Typy szkoleń:</strong> {{ $statistics['online_courses'] }} online, {{ $statistics['offline_courses'] }} stacjonarnych, {{ $statistics['open_courses'] }} otwartych, {{ $statistics['closed_courses'] }} zamkniętych</p>
         <p><strong>Łączna liczba uczestników:</strong> {{ $statistics['total_participants'] }}</p>
         <p><strong>Godziny szkoleń:</strong> {{ $statistics['total_hours_paid'] }}h (płatne), {{ $statistics['total_hours_free'] }}h (bezpłatne)</p>
         <p><strong>Zaświadczenia:</strong> {{ $statistics['total_certificates'] }} ({{ $statistics['certificates_paid_courses'] }} z szkoleń płatnych, {{ $statistics['certificates_free_courses'] }} z szkoleń bezpłatnych)</p>
@@ -267,6 +267,7 @@
                     <div>
                         <strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }} |
                         <strong>Typ:</strong> {{ $course->type === 'offline' ? 'Stacjonarne' : ucfirst($course->type) }} |
+                        <strong>Kategoria:</strong> {{ $course->category === 'open' ? 'Otwarte' : 'Zamknięte' }} |
                         <strong>Płatność:</strong> {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}
                     </div>
                     <div>
