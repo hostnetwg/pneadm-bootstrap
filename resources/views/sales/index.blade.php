@@ -59,7 +59,7 @@
                                    id="search" 
                                    name="search" 
                                    value="{{ $search }}" 
-                                   placeholder="Imię, email, produkt, numer faktury, notatki, ID...">
+                                   placeholder="Imię, email, produkt, numer faktury, notatki, ID, Publigo ID...">
                         </div>
                         <div class="col-md-3">
                             <label for="per_page" class="form-label">Rekordów na stronę:</label>
@@ -145,6 +145,9 @@
                                     <div>
                                         <h5 class="mb-1">
                                             <span class="badge bg-dark fs-6">ID: #{{ $zamowienie->id }}</span>
+                                            @if($zamowienie->idProdPubligo)
+                                                <span class="badge bg-info fs-6 ms-2">Publigo ID: #{{ $zamowienie->idProdPubligo }}</span>
+                                            @endif
                                             @if($isNew)
                                                 <span class="badge bg-warning text-dark ms-2">
                                                     <i class="bi bi-exclamation-triangle"></i> NOWE

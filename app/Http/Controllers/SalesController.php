@@ -43,7 +43,8 @@ class SalesController extends Controller
                   ->orWhere('produkt_nazwa', 'LIKE', "%{$search}%")
                   ->orWhere('nr_fakury', 'LIKE', "%{$search}%")
                   ->orWhere('notatki', 'LIKE', "%{$search}%")
-                  ->orWhere('id', 'LIKE', "%{$search}%");
+                  ->orWhere('id', 'LIKE', "%{$search}%")
+                  ->orWhere('idProdPubligo', 'LIKE', "%{$search}%"); // Dodano wyszukiwanie po Publigo ID
             });
         }
         
