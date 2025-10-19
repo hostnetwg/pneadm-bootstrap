@@ -26,3 +26,4 @@ yarn-error.log
 *_production.sql
 *.sql.backup*
 *.sql.OLD
+backup_*.sql
