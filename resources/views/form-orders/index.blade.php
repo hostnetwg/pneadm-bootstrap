@@ -193,12 +193,17 @@
                                 </div>
 
                                 {{-- Telefon --}}
-                                @if($zamowienie->orderer_phone)
+                                @if($zamowienie->orderer_phone || $zamowienie->orderer_name) {{-- Sprawdzamy oba, bo może być tylko nazwa --}}
                                     <div class="mb-3">
                                         <h6 class="text-dark fw-bold mb-1">
                                             <i class="bi bi-telephone"></i> KONTAKT
+                                            @if($zamowienie->orderer_name)
+                                                <span class="text-muted"> - {{ $zamowienie->orderer_name }}</span>
+                                            @endif
                                         </h6>
-                                        <div class="text-dark">tel. {{ $zamowienie->orderer_phone }}</div>
+                                        @if($zamowienie->orderer_phone)
+                                            <div class="text-dark">tel. {{ $zamowienie->orderer_phone }}</div>
+                                        @endif
                                     </div>
                                 @endif
 

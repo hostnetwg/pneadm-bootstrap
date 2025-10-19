@@ -222,23 +222,29 @@ nowoczesna-edukacja.pl </div>
                                     </button>
                                 </div>
                             @endif
-                            @if($zamowienie->orderer_phone)
+                            @if($zamowienie->orderer_phone || $zamowienie->orderer_name)
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <small>
                                         <i class="bi bi-telephone"></i> 
-                                        <strong>tel.</strong> 
-                                        <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
-                                            @php
-                                                $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
-                                                if (strlen($phone) == 9) {
-                                                    echo substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
-                                                } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
-                                                    echo substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
-                                                } else {
-                                                    echo $phone;
-                                                }
-                                            @endphp
-                                        </a>
+                                        <strong>KONTAKT</strong>
+                                        @if($zamowienie->orderer_name)
+                                            <span class="text-muted"> - {{ $zamowienie->orderer_name }}</span>
+                                        @endif
+                                        @if($zamowienie->orderer_phone)
+                                            <br><strong>tel.</strong> 
+                                            <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
+                                                @php
+                                                    $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
+                                                    if (strlen($phone) == 9) {
+                                                        echo substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
+                                                    } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
+                                                        echo substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
+                                                    } else {
+                                                        echo $phone;
+                                                    }
+                                                @endphp
+                                            </a>
+                                        @endif
                                     </small>
                                 </div>
                             @endif
