@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Zamowienia;
+use App\Models\FormOrder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -14,6 +15,7 @@ class DashboardController extends Controller
         try {
             // Dzisiejsze daty
             $today = Carbon::today();
+            $yesterday = Carbon::yesterday();
             $startOfMonth = Carbon::now()->startOfMonth();
             $endOfMonth = Carbon::now()->endOfMonth();
             $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
@@ -24,47 +26,49 @@ class DashboardController extends Controller
             $todayOrdersCount = $todayOrders->count();
             $todayOrdersValue = $todayOrders->sum('produkt_cena');
 
-            // Statystyki dzisiejsze - formularze zamówień - używamy data_zamowienia
-            $todayForms = DB::connection('mysql_certgen')
-                ->table('zamowienia_FORM')
-                ->whereDate('data_zamowienia', $today)
-                ->get();
+            // Statystyki dzisiejsze - formularze zamówień - używamy order_date z pneadm:form_orders
+            $todayForms = FormOrder::whereDate('order_date', $today)->get();
             $todayFormsCount = $todayForms->count();
+            $todayFormsValue = $todayForms->sum('product_price');
+
+            // Statystyki wczoraj - zamowienia (Publigo) - używamy data_wplaty
+            $yesterdayOrders = Zamowienia::whereDate('data_wplaty', $yesterday)->get();
+            $yesterdayOrdersCount = $yesterdayOrders->count();
+            $yesterdayOrdersValue = $yesterdayOrders->sum('produkt_cena');
+
+            // Statystyki wczoraj - formularze zamówień - używamy order_date z pneadm:form_orders
+            $yesterdayForms = FormOrder::whereDate('order_date', $yesterday)->get();
+            $yesterdayFormsCount = $yesterdayForms->count();
+            $yesterdayFormsValue = $yesterdayForms->sum('product_price');
 
             // Statystyki miesięczne - zamowienia (Publigo) - używamy data_wplaty
             $monthlyOrders = Zamowienia::whereBetween('data_wplaty', [$startOfMonth, $endOfMonth])->get();
             $monthlyOrdersCount = $monthlyOrders->count();
             $monthlyOrdersValue = $monthlyOrders->sum('produkt_cena');
 
-            // Statystyki miesięczne - formularze zamówień - używamy data_zamowienia
-            $monthlyForms = DB::connection('mysql_certgen')
-                ->table('zamowienia_FORM')
-                ->whereBetween('data_zamowienia', [$startOfMonth, $endOfMonth])
-                ->get();
+            // Statystyki miesięczne - formularze zamówień - używamy order_date z pneadm:form_orders
+            $monthlyForms = FormOrder::whereBetween('order_date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])->get();
             $monthlyFormsCount = $monthlyForms->count();
+            $monthlyFormsValue = $monthlyForms->sum('product_price');
 
             // Statystyki z poprzedniego miesiąca dla porównania - używamy data_wplaty
             $lastMonthOrders = Zamowienia::whereBetween('data_wplaty', [$startOfLastMonth, $endOfLastMonth])->get();
             $lastMonthOrdersCount = $lastMonthOrders->count();
             $lastMonthOrdersValue = $lastMonthOrders->sum('produkt_cena');
 
-            $lastMonthForms = DB::connection('mysql_certgen')
-                ->table('zamowienia_FORM')
-                ->whereBetween('data_zamowienia', [$startOfLastMonth, $endOfLastMonth])
-                ->get();
+            $lastMonthForms = FormOrder::whereBetween('order_date', [$startOfLastMonth->format('Y-m-d'), $endOfLastMonth->format('Y-m-d')])->get();
             $lastMonthFormsCount = $lastMonthForms->count();
+            $lastMonthFormsValue = $lastMonthForms->sum('product_price');
 
-            // Zamówienia oczekujące na przetworzenie (bez nr_faktury)
-            $pendingForms = DB::connection('mysql_certgen')
-                ->table('zamowienia_FORM')
-                ->where(function($q) {
-                    $q->whereNull('nr_fakury')
-                      ->orWhere('nr_fakury', '')
-                      ->orWhere('nr_fakury', '0');
+            // Zamówienia oczekujące na przetworzenie (bez nr_faktury) - używamy nowej tabeli form_orders
+            $pendingForms = FormOrder::where(function($q) {
+                    $q->whereNull('invoice_number')
+                      ->orWhere('invoice_number', '')
+                      ->orWhere('invoice_number', '0');
                 })
                 ->where(function($q) {
-                    $q->whereNull('status_zakonczone')
-                      ->orWhere('status_zakonczone', '!=', 1);
+                    $q->whereNull('status_completed')
+                      ->orWhere('status_completed', '!=', 1);
                 })
                 ->count();
 
@@ -90,15 +94,21 @@ class DashboardController extends Controller
             // Obliczenie trendów (procentowa zmiana)
             $ordersTrend = $this->calculateTrend($monthlyOrdersCount, $lastMonthOrdersCount);
             $formsTrend = $this->calculateTrend($monthlyFormsCount, $lastMonthFormsCount);
-            $valueTrend = $this->calculateTrend($monthlyOrdersValue, $lastMonthOrdersValue);
+            $valueTrend = $this->calculateTrend($monthlyOrdersValue + $monthlyFormsValue, $lastMonthOrdersValue + $lastMonthFormsValue);
 
             return view('dashboard', compact(
                 'todayOrdersCount',
                 'todayOrdersValue',
                 'todayFormsCount',
+                'todayFormsValue',
+                'yesterdayOrdersCount',
+                'yesterdayOrdersValue',
+                'yesterdayFormsCount',
+                'yesterdayFormsValue',
                 'monthlyOrdersCount',
                 'monthlyOrdersValue',
                 'monthlyFormsCount',
+                'monthlyFormsValue',
                 'pendingForms',
                 'onlinePayments',
                 'invoicePayments',
@@ -114,9 +124,15 @@ class DashboardController extends Controller
                 'todayOrdersCount' => 0,
                 'todayOrdersValue' => 0,
                 'todayFormsCount' => 0,
+                'todayFormsValue' => 0,
+                'yesterdayOrdersCount' => 0,
+                'yesterdayOrdersValue' => 0,
+                'yesterdayFormsCount' => 0,
+                'yesterdayFormsValue' => 0,
                 'monthlyOrdersCount' => 0,
                 'monthlyOrdersValue' => 0,
                 'monthlyFormsCount' => 0,
+                'monthlyFormsValue' => 0,
                 'pendingForms' => 0,
                 'onlinePayments' => collect(),
                 'invoicePayments' => collect(),

@@ -22,7 +22,7 @@
                         Dzisiejsze zamówienia
                     </h4>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-md-2 mb-3">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
@@ -37,12 +37,27 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-md-2 mb-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Wczoraj Publigo</h6>
+                                    <h3 class="mb-0">{{ $yesterdayOrdersCount }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-calendar-minus fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-3">
                     <div class="card bg-info text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <div>
-                                    <h6 class="card-title">Formularze zamówień</h6>
+                                    <h6 class="card-title">Formularze dzisiaj</h6>
                                     <h3 class="mb-0">{{ $todayFormsCount }}</h3>
                                 </div>
                                 <div class="align-self-center">
@@ -52,13 +67,28 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-md-2 mb-3">
+                    <div class="card bg-dark text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Formularze wczoraj</h6>
+                                    <h3 class="mb-0">{{ $yesterdayFormsCount }}</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-calendar-minus fs-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-3">
                     <div class="card bg-success text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <div>
                                     <h6 class="card-title">Wartość dzisiaj</h6>
-                                    <h3 class="mb-0">{{ number_format($todayOrdersValue, 0, ',', ' ') }} zł</h3>
+                                    <h3 class="mb-0">{{ number_format($todayOrdersValue + $todayFormsValue, 0, ',', ' ') }} zł</h3>
                                 </div>
                                 <div class="align-self-center">
                                     <i class="bi bi-currency-dollar fs-1"></i>
@@ -67,7 +97,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-md-2 mb-3">
                     <div class="card bg-warning text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">

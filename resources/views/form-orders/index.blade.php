@@ -89,7 +89,7 @@
 
             {{-- Statystyki --}}
             <div class="row mb-4">
-                <div class="col-md-3">
+                <div class="col-md-2 col-lg-2">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
                             <h5 class="card-title">Wszystkie zamówienia</h5>
@@ -97,15 +97,23 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                <div class="col-md-2 col-lg-2">
+                    <div class="card bg-secondary text-white">
                         <div class="card-body">
-                            <h5 class="card-title">Dzisiaj</h5>
-                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', '>=', \Carbon\Carbon::today()->format('Y-m-d'))->count() }}</h3>
+                            <h5 class="card-title">Wczoraj</h5>
+                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', \Carbon\Carbon::yesterday()->format('Y-m-d'))->new()->count() }}</h3>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2 col-lg-2">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Dzisiaj</h5>
+                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', \Carbon\Carbon::today()->format('Y-m-d'))->new()->count() }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-lg-2">
                     <div class="card bg-success text-white">
                         <div class="card-body">
                             <h5 class="card-title">Wartość sprzedaży</h5>
@@ -113,7 +121,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2 col-lg-2">
                     <div class="card bg-warning text-dark">
                         <div class="card-body">
                             <h5 class="card-title">Średnia cena</h5>
