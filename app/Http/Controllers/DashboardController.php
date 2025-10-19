@@ -26,8 +26,13 @@ class DashboardController extends Controller
             $todayOrdersCount = $todayOrders->count();
             $todayOrdersValue = $todayOrders->sum('produkt_cena');
 
-            // Statystyki dzisiejsze - formularze zamówień - używamy order_date z pneadm:form_orders
-            $todayForms = FormOrder::whereDate('order_date', $today)->get();
+            // Statystyki dzisiejsze - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
+            $todayForms = FormOrder::whereDate('order_date', $today)
+                ->where(function($q) {
+                    $q->whereNull('status_completed')
+                      ->orWhere('status_completed', '!=', 1);
+                })
+                ->get();
             $todayFormsCount = $todayForms->count();
             $todayFormsValue = $todayForms->sum('product_price');
 
@@ -36,8 +41,13 @@ class DashboardController extends Controller
             $yesterdayOrdersCount = $yesterdayOrders->count();
             $yesterdayOrdersValue = $yesterdayOrders->sum('produkt_cena');
 
-            // Statystyki wczoraj - formularze zamówień - używamy order_date z pneadm:form_orders
-            $yesterdayForms = FormOrder::whereDate('order_date', $yesterday)->get();
+            // Statystyki wczoraj - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
+            $yesterdayForms = FormOrder::whereDate('order_date', $yesterday)
+                ->where(function($q) {
+                    $q->whereNull('status_completed')
+                      ->orWhere('status_completed', '!=', 1);
+                })
+                ->get();
             $yesterdayFormsCount = $yesterdayForms->count();
             $yesterdayFormsValue = $yesterdayForms->sum('product_price');
 
@@ -46,8 +56,13 @@ class DashboardController extends Controller
             $monthlyOrdersCount = $monthlyOrders->count();
             $monthlyOrdersValue = $monthlyOrders->sum('produkt_cena');
 
-            // Statystyki miesięczne - formularze zamówień - używamy order_date z pneadm:form_orders
-            $monthlyForms = FormOrder::whereBetween('order_date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])->get();
+            // Statystyki miesięczne - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
+            $monthlyForms = FormOrder::whereBetween('order_date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
+                ->where(function($q) {
+                    $q->whereNull('status_completed')
+                      ->orWhere('status_completed', '!=', 1);
+                })
+                ->get();
             $monthlyFormsCount = $monthlyForms->count();
             $monthlyFormsValue = $monthlyForms->sum('product_price');
 
@@ -56,7 +71,12 @@ class DashboardController extends Controller
             $lastMonthOrdersCount = $lastMonthOrders->count();
             $lastMonthOrdersValue = $lastMonthOrders->sum('produkt_cena');
 
-            $lastMonthForms = FormOrder::whereBetween('order_date', [$startOfLastMonth->format('Y-m-d'), $endOfLastMonth->format('Y-m-d')])->get();
+            $lastMonthForms = FormOrder::whereBetween('order_date', [$startOfLastMonth->format('Y-m-d'), $endOfLastMonth->format('Y-m-d')])
+                ->where(function($q) {
+                    $q->whereNull('status_completed')
+                      ->orWhere('status_completed', '!=', 1);
+                })
+                ->get();
             $lastMonthFormsCount = $lastMonthForms->count();
             $lastMonthFormsValue = $lastMonthForms->sum('product_price');
 
