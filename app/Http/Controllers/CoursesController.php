@@ -126,17 +126,18 @@ class CoursesController extends Controller
             
             // Sprawdź czy kurs ma source_id_old = "certgen_Publigo" i id_old
             if ($course->source_id_old === 'certgen_Publigo' && $course->id_old) {
-                $ordersCount = DB::connection('mysql_certgen')
-                    ->table('zamowienia_FORM')
-                    ->where('idProdPubligo', $course->id_old)
+                // Nowe zapytanie do tabeli form_orders w bazie pneadm
+                $ordersCount = DB::connection('mysql') // Używamy głównego połączenia
+                    ->table('form_orders')
+                    ->where('publigo_product_id', $course->id_old)
                     ->where(function($query) {
-                        $query->whereNull('nr_fakury')
-                              ->orWhere('nr_fakury', '')
-                              ->orWhere('nr_fakury', '0');
+                        $query->whereNull('invoice_number')
+                              ->orWhere('invoice_number', '')
+                              ->orWhere('invoice_number', '0');
                     })
                     ->where(function($query) {
-                        $query->whereNull('status_zakonczone')
-                              ->orWhere('status_zakonczone', 0);
+                        $query->whereNull('status_completed')
+                              ->orWhere('status_completed', 0);
                     })
                     ->count();
             }
