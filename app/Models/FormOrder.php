@@ -282,4 +282,29 @@ class FormOrder extends Model
         }
         return preg_replace('/[^0-9]/', '', $this->recipient_nip);
     }
+
+    /**
+     * Relacja do uczestników (nowa tabela form_order_participants)
+     */
+    public function participants()
+    {
+        return $this->hasMany(FormOrderParticipant::class, 'form_order_id');
+    }
+
+    /**
+     * Accessor - główny uczestnik (z nowej tabeli)
+     */
+    public function primaryParticipant()
+    {
+        return $this->hasOne(FormOrderParticipant::class, 'form_order_id')
+                    ->where('is_primary', 1);
+    }
+
+    /**
+     * Accessor - liczba uczestników (z nowej tabeli)
+     */
+    public function getParticipantsCountAttribute(): int
+    {
+        return $this->participants()->count();
+    }
 }
