@@ -210,7 +210,30 @@
                                             @endif
                                         </h6>
                                         @if($zamowienie->orderer_phone)
-                                            <div class="text-dark">tel. {{ $zamowienie->orderer_phone }}</div>
+                                            <div class="text-dark">
+                                                <strong>tel.</strong> 
+                                                <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
+                                                    @php
+                                                        $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
+                                                        if (strlen($phone) == 9) {
+                                                            // Polskie numery 9-cyfrowe
+                                                            echo '+48 ' . substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
+                                                        } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
+                                                            // Polskie numery z prefiksem 48
+                                                            echo '+' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
+                                                        } elseif (strlen($phone) >= 10 && strlen($phone) <= 15) {
+                                                            // Numery międzynarodowe - dodaj + i formatuj z odstępami
+                                                            $formatted = '+' . $phone;
+                                                            // Dodaj spacje co 3 cyfry od końca (ale zachowaj prefiks kraju)
+                                                            $formatted = preg_replace('/(\d{3})(?=\d)/', '$1 ', $formatted);
+                                                            echo $formatted;
+                                                        } else {
+                                                            // Fallback - wyświetl oryginalny numer
+                                                            echo $zamowienie->orderer_phone;
+                                                        }
+                                                    @endphp
+                                                </a>
+                                            </div>
                                         @endif
                                     </div>
                                 @endif
