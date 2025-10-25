@@ -24,17 +24,24 @@
                 </div>
             @endif
 
-            {{-- Przyciski filtrów --}}
+            {{-- Przyciski akcji i filtrów --}}
             <div class="mb-3">
-                <div class="btn-group" role="group">
-                    <a href="{{ route('form-orders.index') }}" 
-                       class="btn {{ $filter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
-                        <i class="bi bi-list"></i> Wszystkie
-                    </a>
-                    <a href="{{ route('form-orders.index', ['filter' => 'new']) }}" 
-                       class="btn {{ $filter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
-                        <i class="bi bi-exclamation-triangle"></i> NOWE
-                    </a>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="btn-group" role="group">
+                        <a href="{{ route('form-orders.index') }}" 
+                           class="btn {{ $filter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
+                            <i class="bi bi-list"></i> Wszystkie
+                        </a>
+                        <a href="{{ route('form-orders.index', ['filter' => 'new']) }}" 
+                           class="btn {{ $filter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
+                            <i class="bi bi-exclamation-triangle"></i> NOWE
+                        </a>
+                    </div>
+                    <div>
+                        <a href="{{ route('form-orders.create') }}" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> Dodaj nowe zamówienie
+                        </a>
+                    </div>
                 </div>
                 
                 @if($filter === 'new')
@@ -154,7 +161,7 @@
                                         <h5 class="mb-1">
                                             <span class="badge bg-dark fs-6">ID: #{{ $zamowienie->id }}</span>
                                             @if($zamowienie->publigo_product_id)
-                                                <span class="badge bg-info fs-6 ms-2">Publigo ID: #{{ $zamowienie->publigo_product_id }}</span>
+                                                <span class="badge bg-info fs-6 ms-2">Produkt Publigo ID: #{{ $zamowienie->publigo_product_id }}</span>
                                             @endif
                                             @if($isNew)
                                                 <span class="badge bg-warning text-dark ms-2">
@@ -402,12 +409,74 @@
                                                           placeholder="Dodaj notatki...">{{ $zamowienie->notes }}</textarea>
                                             </div>
                                         </div>
-                                        <div class="mt-3">
+                                        <div class="mt-3 d-flex justify-content-between">
                                             <button type="submit" class="btn btn-sm btn-primary">
                                                 <i class="bi bi-check-circle"></i> Zapisz zmiany
                                             </button>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ route('form-orders.edit', $zamowienie->id) }}" 
+                                                   class="btn btn-sm btn-outline-warning" 
+                                                   title="Edytuj zamówienie">
+                                                    <i class="bi bi-pencil"></i> Edytuj
+                                                </a>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger" 
+                                                        title="Usuń zamówienie"
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#deleteModal{{ $zamowienie->id }}">
+                                                    <i class="bi bi-trash"></i> USUŃ
+                                                </button>
+                                            </div>
                                         </div>
                                     </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Modal potwierdzenia usunięcia --}}
+                        <div class="modal fade" id="deleteModal{{ $zamowienie->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $zamowienie->id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title" id="deleteModalLabel{{ $zamowienie->id }}">
+                                            <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                                        </h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Czy na pewno chcesz usunąć zamówienie <strong>#{{ $zamowienie->id }}</strong>?</p>
+                                        <div class="bg-light p-3 rounded">
+                                            <h6 class="mb-2">Szczegóły zamówienia:</h6>
+                                            <ul class="mb-0">
+                                                <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
+                                                <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                                                <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') : '—' }}</li>
+                                            </ul>
+                                        </div>
+                                        <p class="text-muted mt-3">
+                                            <i class="bi bi-info-circle"></i>
+                                            Zamówienie zostanie przeniesione do kosza (soft delete) i będzie można je przywrócić.
+                                        </p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <i class="bi bi-x-circle"></i> Anuluj
+                                        </button>
+                                        <form action="{{ route('form-orders.destroy', $zamowienie->id) }}" 
+                                              method="POST" 
+                                              class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <input type="hidden" name="per_page" value="{{ $perPage }}">
+                                            <input type="hidden" name="search" value="{{ $search }}">
+                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                            <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="bi bi-trash"></i> Usuń zamówienie
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         </div>

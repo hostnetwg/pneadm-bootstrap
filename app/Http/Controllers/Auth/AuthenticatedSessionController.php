@@ -36,6 +36,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // Zaloguj wylogowanie przed wylogowaniem użytkownika
+        if (Auth::check()) {
+            \App\Models\ActivityLog::logLogout(Auth::id(), 'Użytkownik wylogował się z systemu');
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

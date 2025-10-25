@@ -215,9 +215,9 @@
         
         <!-- Admin -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#admin-collapse"
-                    aria-expanded="{{ request()->routeIs('admin.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#gear"></use>
                 </svg>
@@ -226,10 +226,16 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('admin.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('admin.users.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Użytkownicy</a></li>
                     <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>
+                    <li><a href="{{ route('activity-logs.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                        <i class="bi bi-activity me-1"></i>Logi aktywności
+                    </a></li>
+                    <li><a href="{{ route('trash.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                        <i class="bi bi-trash3 me-1"></i>Kosz systemowy
+                    </a></li>
                 </ul>
             </div>
         </li>

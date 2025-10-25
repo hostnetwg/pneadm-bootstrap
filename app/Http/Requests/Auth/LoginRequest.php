@@ -66,6 +66,9 @@ class LoginRequest extends FormRequest
             'last_login_ip' => $this->ip(),
         ]);
 
+        // Zaloguj akcję logowania
+        \App\Models\ActivityLog::logLogin($user->id, 'Użytkownik zalogował się do systemu');
+
         RateLimiter::clear($this->throttleKey());
     }
 

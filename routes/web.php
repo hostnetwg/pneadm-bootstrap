@@ -19,6 +19,8 @@ use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\SendyController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
+use App\Http\Controllers\TrashController;
+use App\Http\Controllers\ActivityLogController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -136,8 +138,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     ->name('form-orders.')
     ->group(function () {
         Route::get('/', [FormOrdersController::class, 'index'])->name('index');
+        Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
+        Route::post('/', [FormOrdersController::class, 'store'])->name('store');
         Route::get('/{id}', [FormOrdersController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [FormOrdersController::class, 'edit'])->name('edit');
         Route::put('/{id}', [FormOrdersController::class, 'update'])->name('update');
+        Route::delete('/{id}', [FormOrdersController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
         Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
     });
@@ -202,6 +208,25 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Kosz (Soft Delete Management)
+    Route::prefix('trash')->name('trash.')->group(function () {
+        Route::get('/', [TrashController::class, 'index'])->name('index');
+        Route::post('/restore/{table}/{id}', [TrashController::class, 'restore'])->name('restore');
+        Route::delete('/force-delete/{table}/{id}', [TrashController::class, 'forceDelete'])->name('force-delete');
+        Route::delete('/empty-table/{table}', [TrashController::class, 'emptyTable'])->name('empty-table');
+        Route::delete('/empty-all', [TrashController::class, 'emptyAll'])->name('empty-all');
+    });
+
+    // Logi aktywności (Activity Logs)
+    Route::prefix('activity-logs')->name('activity-logs.')->group(function () {
+        Route::get('/', [ActivityLogController::class, 'index'])->name('index');
+        Route::get('/statistics', [ActivityLogController::class, 'statistics'])->name('statistics');
+        Route::get('/export', [ActivityLogController::class, 'export'])->name('export');
+        Route::get('/user/{userId}', [ActivityLogController::class, 'userLogs'])->name('user-logs');
+        Route::get('/model/{modelType}/{modelId}', [ActivityLogController::class, 'modelLogs'])->name('model-logs');
+        Route::get('/{id}', [ActivityLogController::class, 'show'])->name('show');
+    });
 });
 
 require __DIR__.'/auth.php';

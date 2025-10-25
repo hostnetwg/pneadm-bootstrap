@@ -33,7 +33,10 @@ class PubligoApiService
             $url = $this->apiUrl . '?nonce=' . urlencode($nonce) . '&token=' . urlencode($token);
 
             // Wysłanie zapytania POST
-            $response = Http::withHeaders([
+            $response = Http::withOptions([
+                'verify' => false, // Wyłączenie weryfikacji SSL dla Publigo API
+                'timeout' => config('services.publigo.timeout', 30),
+            ])->withHeaders([
                 'Content-Type' => 'application/json',
             ])->post($url, $orderData);
 
@@ -80,9 +83,23 @@ class PubligoApiService
                 ];
             }
 
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Publigo API Connection Exception', [
+                'message' => $e->getMessage(),
+                'url' => $this->apiUrl,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Błąd połączenia z Publigo API: ' . $e->getMessage(),
+                'response' => null,
+                'http_code' => 0
+            ];
         } catch (Exception $e) {
             Log::error('Publigo API Exception', [
                 'message' => $e->getMessage(),
+                'url' => $this->apiUrl,
                 'trace' => $e->getTraceAsString()
             ]);
 

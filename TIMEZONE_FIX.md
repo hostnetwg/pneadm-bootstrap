@@ -110,3 +110,5 @@ echo "Nowa:  {$new->created_at}\n";
 **Nasza tabela używa `DATETIME`**, więc problem nie jest w typie kolumny, tylko w różnicy stref czasowych między MySQL a Laravel podczas eksportu/importu.
 
 
+
+
