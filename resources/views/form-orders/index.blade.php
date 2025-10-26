@@ -179,7 +179,7 @@
                                         </h5>
                                         @if($zamowienie->order_date)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') }}
+                                                <i class="bi bi-calendar-event"></i> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
                                             </small>
                                         @endif
                                     </div>
@@ -451,7 +451,7 @@
                                                 <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                                                 <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                                                 <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') : '—' }}</li>
+                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
                                             </ul>
                                         </div>
                                         <p class="text-muted mt-3">
