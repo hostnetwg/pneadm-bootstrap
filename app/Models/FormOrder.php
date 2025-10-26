@@ -308,4 +308,12 @@ class FormOrder extends Model
     {
         return $this->participants()->count();
     }
+
+    /**
+     * Relacja do kampanii marketingowej
+     */
+    public function marketingCampaign()
+    {
+        return $this->belongsTo(MarketingCampaign::class, 'fb_source', 'campaign_code');
+    }
 }

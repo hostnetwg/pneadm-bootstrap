@@ -380,7 +380,14 @@ nowoczesna-edukacja.pl </div>
                                         @if($zamowienie->fb_source)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>FB:</strong> {{ $zamowienie->fb_source }}
+                                                    <strong>Źródło pozyskania:</strong> 
+                                                    <span class="badge ms-1" 
+                                                          style="background-color: {{ $zamowienie->marketingCampaign && $zamowienie->marketingCampaign->sourceType ? $zamowienie->marketingCampaign->sourceType->color : '#28a745' }}; color: white;"
+                                                          title="{{ $zamowienie->marketingCampaign ? $zamowienie->marketingCampaign->name . ' (' . ($zamowienie->marketingCampaign->sourceType->name ?? 'Nieznany typ') . ')' : 'Źródło: ' . $zamowienie->fb_source }}"
+                                                          data-bs-toggle="tooltip" 
+                                                          data-bs-placement="top">
+                                                        {{ $zamowienie->fb_source }}
+                                                    </span>
                                                 </small>
                                             </div>
                                         @endif
@@ -652,6 +659,14 @@ nowoczesna-edukacja.pl `;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo';
             });
         }
+
+        // Inicjalizacja tooltipów Bootstrap
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
     </script>
 </x-app-layout>
 

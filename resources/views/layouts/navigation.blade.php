@@ -86,9 +86,10 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('marketing.*') ? 'show' : '' }}" id="marketing-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('marketing-campaigns.*') || request()->routeIs('marketing-source-types.*') ? 'show' : '' }}" id="marketing-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Działania marketingowe</a></li>
+                    <li><a href="{{ route('marketing-campaigns.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('marketing-campaigns.*') ? 'active' : '' }}">Źródła pozyskania</a></li>
+                    <li><a href="{{ route('marketing-source-types.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('marketing-source-types.*') ? 'active' : '' }}">Typy źródeł</a></li>
                 </ul>
             </div>
         </li>
