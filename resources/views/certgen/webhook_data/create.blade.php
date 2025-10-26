@@ -83,7 +83,10 @@
                                        id="clickmeeting" 
                                        name="clickmeeting" 
                                        value="{{ old('clickmeeting') }}"
+                                       min="0"
+                                       max="2147483647"
                                        placeholder="ID spotkania ClickMeeting">
+                                <div class="form-text">Dodatnia liczba całkowita</div>
                                 @error('clickmeeting')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -106,12 +109,17 @@
                         <!-- Instruktor -->
                         <div class="mb-3">
                             <label for="instruktor" class="form-label">Instruktor</label>
-                            <input type="text" 
-                                   class="form-control @error('instruktor') is-invalid @enderror" 
-                                   id="instruktor" 
-                                   name="instruktor" 
-                                   value="{{ old('instruktor') }}"
-                                   placeholder="Imię i nazwisko instruktora">
+                            <select class="form-select @error('instruktor') is-invalid @enderror" 
+                                    id="instruktor" 
+                                    name="instruktor">
+                                <option value="">Wybierz instruktora</option>
+                                @foreach($instructors as $instructor)
+                                    <option value="{{ $instructor->full_name }}" 
+                                            {{ old('instruktor') == $instructor->full_name ? 'selected' : '' }}>
+                                        {{ $instructor->full_title_name }}
+                                    </option>
+                                @endforeach
+                            </select>
                             @error('instruktor')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

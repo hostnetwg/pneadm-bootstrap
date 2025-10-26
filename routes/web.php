@@ -11,6 +11,8 @@ use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\FormOrdersController;
+use App\Http\Controllers\MarketingCampaignController;
+use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\ZamowieniaProdController;
@@ -146,6 +148,34 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::delete('/{id}', [FormOrdersController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
         Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
+    });
+
+    // Marketing Campaigns - źródła pozyskania
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+    ->prefix('marketing-campaigns')
+    ->name('marketing-campaigns.')
+    ->group(function () {
+        Route::get('/', [MarketingCampaignController::class, 'index'])->name('index');
+        Route::get('/create', [MarketingCampaignController::class, 'create'])->name('create');
+        Route::post('/', [MarketingCampaignController::class, 'store'])->name('store');
+        Route::get('/{marketingCampaign}', [MarketingCampaignController::class, 'show'])->name('show');
+        Route::get('/{marketingCampaign}/edit', [MarketingCampaignController::class, 'edit'])->name('edit');
+        Route::put('/{marketingCampaign}', [MarketingCampaignController::class, 'update'])->name('update');
+        Route::delete('/{marketingCampaign}', [MarketingCampaignController::class, 'destroy'])->name('destroy');
+    });
+
+    // Marketing Source Types - zarządzanie typami źródeł
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+    ->prefix('marketing-source-types')
+    ->name('marketing-source-types.')
+    ->group(function () {
+        Route::get('/', [MarketingSourceTypeController::class, 'index'])->name('index');
+        Route::get('/create', [MarketingSourceTypeController::class, 'create'])->name('create');
+        Route::post('/', [MarketingSourceTypeController::class, 'store'])->name('store');
+        Route::get('/{marketingSourceType}', [MarketingSourceTypeController::class, 'show'])->name('show');
+        Route::get('/{marketingSourceType}/edit', [MarketingSourceTypeController::class, 'edit'])->name('edit');
+        Route::put('/{marketingSourceType}', [MarketingSourceTypeController::class, 'update'])->name('update');
+        Route::delete('/{marketingSourceType}', [MarketingSourceTypeController::class, 'destroy'])->name('destroy');
     });
 
 

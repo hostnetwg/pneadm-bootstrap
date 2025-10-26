@@ -310,15 +310,6 @@
                         </td>
                         <td class="align-middle">
                             <div class="d-flex flex-column gap-1">
-                                @if($course->source_id_old === 'certgen_Publigo' && $course->id_old)
-                                    <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $course->id_old }}" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer"
-                                       class="btn btn-success btn-sm"
-                                       title="Otwórz formularz zamówienia">
-                                        <i class="bi bi-file-earmark-text"></i> Formularz
-                                    </a>
-                                @endif
                                 <a href="{{ route('courses.show', $course->id) }}" class="btn btn-primary btn-sm">Podgląd</a>
                                 <a href="{{ route('courses.edit', array_merge(['id' => $course->id], request()->query())) }}" class="btn btn-warning btn-sm">Edytuj</a>
                                 <form action="{{ route('courses.destroy', $course->id) }}" method="POST">

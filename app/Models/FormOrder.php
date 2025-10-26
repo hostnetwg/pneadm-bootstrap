@@ -104,12 +104,11 @@ class FormOrder extends Model
     /**
      * Rzutowanie typów dla atrybutów
      * 
-     * UWAGA: order_date NIE jest rzutowane na datetime, aby uniknąć automatycznej
-     * konwersji strefy czasowej. Data w bazie jest już w polskiej strefie czasowej.
+     * order_date jest rzutowane na datetime bez konwersji strefy czasowej
      */
     protected $casts = [
         'ptw' => 'integer',
-        // 'order_date' => 'datetime', // Celowo zakomentowane - data już jest w polskiej strefie
+        'order_date' => 'datetime',
         'product_id' => 'integer',
         'product_price' => 'decimal:2',
         'publigo_product_id' => 'integer',
@@ -308,5 +307,13 @@ class FormOrder extends Model
     public function getParticipantsCountAttribute(): int
     {
         return $this->participants()->count();
+    }
+
+    /**
+     * Relacja do kampanii marketingowej
+     */
+    public function marketingCampaign()
+    {
+        return $this->belongsTo(MarketingCampaign::class, 'fb_source', 'campaign_code');
     }
 }

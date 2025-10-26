@@ -163,6 +163,15 @@
                                             @if($zamowienie->publigo_product_id)
                                                 <span class="badge bg-info fs-6 ms-2">Produkt Publigo ID: #{{ $zamowienie->publigo_product_id }}</span>
                                             @endif
+                                            @if($zamowienie->fb_source)
+                                                <span class="badge fs-6 ms-2" 
+                                                      style="background-color: {{ $zamowienie->marketingCampaign && $zamowienie->marketingCampaign->sourceType ? $zamowienie->marketingCampaign->sourceType->color : '#28a745' }}; color: white;"
+                                                      title="{{ $zamowienie->marketingCampaign ? $zamowienie->marketingCampaign->name . ' (' . ($zamowienie->marketingCampaign->sourceType->name ?? 'Nieznany typ') . ')' : 'Źródło: ' . $zamowienie->fb_source }}"
+                                                      data-bs-toggle="tooltip" 
+                                                      data-bs-placement="top">
+                                                    Źródło: {{ $zamowienie->fb_source }}
+                                                </span>
+                                            @endif
                                             @if($isNew)
                                                 <span class="badge bg-warning text-dark ms-2">
                                                     <i class="bi bi-exclamation-triangle"></i> NOWE
@@ -179,7 +188,7 @@
                                         </h5>
                                         @if($zamowienie->order_date)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') }}
+                                                <i class="bi bi-calendar-event"></i> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
                                             </small>
                                         @endif
                                     </div>
@@ -451,7 +460,7 @@
                                                 <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                                                 <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                                                 <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? \Carbon\Carbon::parse($zamowienie->order_date)->format('d.m.Y H:i') : '—' }}</li>
+                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
                                             </ul>
                                         </div>
                                         <p class="text-muted mt-3">
@@ -596,6 +605,14 @@ nowoczesna-edukacja.pl `;
                 copyToClipboard(email, button);
             }
         @endforeach
+
+        // Inicjalizacja tooltipów Bootstrap
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
     </script>
 
 </x-app-layout>

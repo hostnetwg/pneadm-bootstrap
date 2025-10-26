@@ -43,7 +43,7 @@ class FormOrdersController extends Controller
         
         // Pobieramy dane z paginacją lub wszystkie rekordy
         if ($perPage === 'all') {
-            $zamowienia = $query->orderByDesc('id')->get();
+            $zamowienia = $query->with('marketingCampaign.sourceType')->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -53,7 +53,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with('marketingCampaign.sourceType')->orderByDesc('id')->paginate($perPage);
         }
 
         return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter'));
@@ -183,7 +183,7 @@ class FormOrdersController extends Controller
      */
     public function show($id)
     {
-        $zamowienie = FormOrder::find($id);
+        $zamowienie = FormOrder::with('marketingCampaign.sourceType')->find($id);
 
         if (!$zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');

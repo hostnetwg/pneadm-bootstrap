@@ -354,8 +354,18 @@
         let endDateInput = document.querySelector('input[name="end_date"]');
 
         function validateDates() {
+            // Sprawdź czy oba pola są wypełnione
+            if (!startDateInput.value || !endDateInput.value) {
+                return;
+            }
+
             let startDate = new Date(startDateInput.value);
             let endDate = new Date(endDateInput.value);
+
+            // Sprawdź czy daty są poprawne
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                return;
+            }
 
             if (endDate <= startDate) {
                 alert("Data zakończenia musi być późniejsza niż data rozpoczęcia!");
@@ -363,6 +373,8 @@
             }
         }
 
-        endDateInput.addEventListener("change", validateDates);
+        // Użyj blur zamiast change - walidacja uruchomi się gdy użytkownik opuści pole
+        endDateInput.addEventListener("blur", validateDates);
+        startDateInput.addEventListener("blur", validateDates);
     });
 </script>

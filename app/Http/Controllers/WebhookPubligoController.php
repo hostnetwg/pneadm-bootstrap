@@ -33,12 +33,27 @@ class WebhookPubligoController extends Controller
 
     public function create()
     {
-        return view('certgen.webhook_data.create');
+        $instructors = \App\Models\Instructor::where('is_active', true)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+        
+        return view('certgen.webhook_data.create', compact('instructors'));
     }
 
     public function store(Request $request)
     {
         try {
+            // Sprawdź wartość clickmeeting przed walidacją
+            if ($request->has('clickmeeting') && $request->clickmeeting !== null && $request->clickmeeting !== '') {
+                $clickmeetingValue = (int) $request->clickmeeting;
+                if ($clickmeetingValue < 0 || $clickmeetingValue > 2147483647) {
+                    return redirect()->route('certgen.webhook_data.create')
+                        ->with('error', 'Wartość ClickMeeting musi być dodatnią liczbą całkowitą.')
+                        ->withInput();
+                }
+            }
+
             $validated = $request->validate([
                 'id_produktu' => 'nullable|integer',
                 'data' => 'nullable|date',
@@ -47,6 +62,11 @@ class WebhookPubligoController extends Controller
                 'temat' => 'nullable|string',
                 'instruktor' => 'nullable|string|max:255',
             ]);
+
+            // Ustaw domyślną wartość dla temat jeśli jest null
+            if (empty($validated['temat'])) {
+                $validated['temat'] = '';
+            }
 
             WebhookPubligo::create($validated);
 
@@ -73,7 +93,12 @@ class WebhookPubligoController extends Controller
     {
         try {
             $webhookRecord = WebhookPubligo::findOrFail($id);
-            return view('certgen.webhook_data.edit', compact('webhookRecord'));
+            $instructors = \App\Models\Instructor::where('is_active', true)
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get();
+            
+            return view('certgen.webhook_data.edit', compact('webhookRecord', 'instructors'));
         } catch (\Exception $e) {
             return redirect()->route('certgen.webhook_data.index')
                 ->with('error', 'Rekord nie został znaleziony lub wystąpił błąd: ' . $e->getMessage());
@@ -85,6 +110,16 @@ class WebhookPubligoController extends Controller
         try {
             $webhookRecord = WebhookPubligo::findOrFail($id);
             
+            // Sprawdź wartość clickmeeting przed walidacją
+            if ($request->has('clickmeeting') && $request->clickmeeting !== null && $request->clickmeeting !== '') {
+                $clickmeetingValue = (int) $request->clickmeeting;
+                if ($clickmeetingValue < 0 || $clickmeetingValue > 2147483647) {
+                    return redirect()->route('certgen.webhook_data.edit', $id)
+                        ->with('error', 'Wartość ClickMeeting musi być dodatnią liczbą całkowitą.')
+                        ->withInput();
+                }
+            }
+            
             $validated = $request->validate([
                 'id_produktu' => 'nullable|integer',
                 'data' => 'nullable|date',
@@ -93,6 +128,11 @@ class WebhookPubligoController extends Controller
                 'temat' => 'nullable|string',
                 'instruktor' => 'nullable|string|max:255',
             ]);
+
+            // Ustaw domyślną wartość dla temat jeśli jest null
+            if (empty($validated['temat'])) {
+                $validated['temat'] = '';
+            }
 
             $webhookRecord->update($validated);
 
