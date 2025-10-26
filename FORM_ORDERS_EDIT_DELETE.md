@@ -359,3 +359,4 @@ Lista/Szczegóły → [Klik "Usuń"] → Potwierdzenie
 Wszystkie funkcjonalności są w pełni działające i gotowe do testowania w środowisku produkcyjnym.
 
 
+

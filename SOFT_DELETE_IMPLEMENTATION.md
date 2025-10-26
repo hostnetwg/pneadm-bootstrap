@@ -254,3 +254,4 @@ System Soft Delete Fazy 1 został **pomyślnie wdrożony** i jest gotowy do uży
 **System jest w pełni funkcjonalny i bezpieczny!** 🚀
 
 
+
