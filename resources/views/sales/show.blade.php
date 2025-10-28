@@ -24,22 +24,35 @@
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="@if((!$zamowienie->nr_fakury || $zamowienie->nr_fakury == '' || $zamowienie->nr_fakury == '0') && $zamowienie->status_zakonczone == 0) text-danger @elseif($zamowienie->status_zakonczone == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
-                <div class="btn-group" role="group">
-                    <a href="{{ $prevOrder ? route('sales.show', $prevOrder->id) : '#' }}" 
-                       class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
-                       title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
-                       @if(!$prevOrder) onclick="return false;" @endif>
-                        <i class="bi bi-chevron-left"></i> Poprzednie
-                    </a>
-                    <a href="{{ route('sales.index') }}" class="btn btn-outline-primary">
-                        <i class="bi bi-list"></i> Lista
-                    </a>
-                    <a href="{{ $nextOrder ? route('sales.show', $nextOrder->id) : '#' }}" 
-                       class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
-                       title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
-                       @if(!$nextOrder) onclick="return false;" @endif>
-                        Następne <i class="bi bi-chevron-right"></i>
-                    </a>
+                <div class="d-flex align-items-center gap-3">
+                    {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterNewOnly" 
+                               {{ request('filter_new') ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterNewOnly">
+                            <i class="bi bi-funnel"></i> Tylko niewprowadzone
+                        </label>
+                    </div>
+                    
+                    <div class="btn-group" role="group">
+                        <a href="{{ $prevOrder ? route('sales.show', array_merge(['id' => $prevOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
+                           class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
+                           title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
+                           @if(!$prevOrder) onclick="return false;" @endif
+                           id="prevOrderBtn">
+                            <i class="bi bi-chevron-left"></i> Poprzednie
+                        </a>
+                        <a href="{{ route('sales.index') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-list"></i> Lista
+                        </a>
+                        <a href="{{ $nextOrder ? route('sales.show', array_merge(['id' => $nextOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
+                           class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
+                           title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
+                           @if(!$nextOrder) onclick="return false;" @endif
+                           id="nextOrderBtn">
+                            Następne <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -353,13 +366,86 @@ nowoczesna-edukacja.pl </div>
                 </div>
             </div>
 
-
+            {{-- Przyciski akcji na dole po prawej stronie --}}
+            <div class="d-flex justify-content-end mt-4">
+                <div class="btn-group" role="group">
+                    <a href="{{ route('sales.index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Powrót do listy
+                    </a>
+                    <button type="button" class="btn btn-warning" onclick="scrollToEditForm()">
+                        <i class="bi bi-pencil"></i> Edytuj zamówienie
+                    </button>
+                </div>
+            </div>
 
         </div>
     </div>
 
     {{-- JavaScript do kopiowania danych --}}
     <script>
+        // Funkcja do przewijania do formularza edycji
+        function scrollToEditForm() {
+            const editForm = document.querySelector('form[action*="sales.update"]');
+            if (editForm) {
+                editForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Podświetl formularz
+                editForm.style.border = '2px solid #ffc107';
+                editForm.style.borderRadius = '8px';
+                setTimeout(() => {
+                    editForm.style.border = '';
+                    editForm.style.borderRadius = '';
+                }, 3000);
+            }
+        }
+
+        // Obsługa checkboxa filtrowania
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterCheckbox = document.getElementById('filterNewOnly');
+            const prevOrderBtn = document.getElementById('prevOrderBtn');
+            const nextOrderBtn = document.getElementById('nextOrderBtn');
+            
+            // Przechowujemy oryginalne linki
+            const originalPrevHref = prevOrderBtn.href;
+            const originalNextHref = nextOrderBtn.href;
+            
+            filterCheckbox.addEventListener('change', function() {
+                const currentOrderId = {{ $zamowienie->id }};
+                const filterNew = this.checked ? '1' : '';
+                
+                // Aktualizujemy linki nawigacyjne
+                if (filterNew) {
+                    // Dodajemy parametr filter_new=1
+                    const prevUrl = new URL(originalPrevHref);
+                    const nextUrl = new URL(originalNextHref);
+                    
+                    prevUrl.searchParams.set('filter_new', '1');
+                    nextUrl.searchParams.set('filter_new', '1');
+                    
+                    prevOrderBtn.href = prevUrl.toString();
+                    nextOrderBtn.href = nextUrl.toString();
+                } else {
+                    // Usuwamy parametr filter_new
+                    const prevUrl = new URL(originalPrevHref);
+                    const nextUrl = new URL(originalNextHref);
+                    
+                    prevUrl.searchParams.delete('filter_new');
+                    nextUrl.searchParams.delete('filter_new');
+                    
+                    prevOrderBtn.href = prevUrl.toString();
+                    nextOrderBtn.href = nextUrl.toString();
+                }
+                
+                // Przeładowujemy stronę z nowym filtrem
+                const currentUrl = new URL(window.location);
+                if (filterNew) {
+                    currentUrl.searchParams.set('filter_new', '1');
+                } else {
+                    currentUrl.searchParams.delete('filter_new');
+                }
+                window.location.href = currentUrl.toString();
+            });
+        });
+
         function copyOdbiorcaData() {
             const odbiorcaData = `ODBIORCA:
 {{ $zamowienie->odb_nazwa ?? '—' }}

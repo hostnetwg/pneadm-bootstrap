@@ -69,7 +69,7 @@ class SalesController extends Controller
     /**
      * Wyświetla szczegóły zamówienia.
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $zamowienie = DB::connection('mysql_certgen')->table('zamowienia_FORM')
             ->where('id', $id)
@@ -79,18 +79,56 @@ class SalesController extends Controller
             abort(404, 'Zamówienie nie zostało znalezione.');
         }
 
+        // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
+        $filterNew = $request->has('filter_new') && $request->input('filter_new') == '1';
+
         // Pobieramy poprzednie i następne zamówienie
-        $prevOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
-            ->where('id', '<', $id)
-            ->orderByDesc('id')
-            ->first();
+        if ($filterNew) {
+            // Filtrujemy tylko niewprowadzone zamówienia (bez numeru faktury i niezakończone)
+            $prevOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', '<', $id)
+                ->where(function($q) {
+                    $q->whereNull('nr_fakury')
+                      ->orWhere('nr_fakury', '')
+                      ->orWhere('nr_fakury', '0');
+                })
+                ->where(function($q) {
+                    $q->whereNull('status_zakonczone')
+                      ->orWhere('status_zakonczone', '!=', 1);
+                })
+                ->orderByDesc('id')
+                ->first();
 
-        $nextOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
-            ->where('id', '>', $id)
-            ->orderBy('id')
-            ->first();
+            $nextOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', '>', $id)
+                ->where(function($q) {
+                    $q->whereNull('nr_fakury')
+                      ->orWhere('nr_fakury', '')
+                      ->orWhere('nr_fakury', '0');
+                })
+                ->where(function($q) {
+                    $q->whereNull('status_zakonczone')
+                      ->orWhere('status_zakonczone', '!=', 1);
+                })
+                ->orderBy('id')
+                ->first();
+        } else {
+            // Standardowe pobieranie wszystkich zamówień
+            $prevOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', '<', $id)
+                ->orderByDesc('id')
+                ->first();
 
-        return view('sales.show', compact('zamowienie', 'prevOrder', 'nextOrder'));
+            $nextOrder = DB::connection('mysql_certgen')->table('zamowienia_FORM')
+                ->where('id', '>', $id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        // Debug: sprawdźmy czy zmienna jest ustawiona
+        \Log::info('FilterNew value: ' . ($filterNew ? 'true' : 'false'));
+        
+        return view('sales.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew'));
     }
 
     /**

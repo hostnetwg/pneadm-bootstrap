@@ -24,21 +24,32 @@
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="@if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
-                <div>
+                <div class="d-flex align-items-center gap-3">
+                    {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterNewOnly" 
+                               {{ request('filter_new') ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterNewOnly">
+                            <i class="bi bi-funnel"></i> Tylko niewprowadzone
+                        </label>
+                    </div>
+                    
                     <div class="btn-group me-2" role="group">
-                        <a href="{{ $prevOrder ? route('form-orders.show', $prevOrder->id) : '#' }}" 
+                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
                            class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
-                           @if(!$prevOrder) onclick="return false;" @endif>
+                           @if(!$prevOrder) onclick="return false;" @endif
+                           id="prevOrderBtn">
                             <i class="bi bi-chevron-left"></i> Poprzednie
                         </a>
                         <a href="{{ route('form-orders.index') }}" class="btn btn-outline-primary">
                             <i class="bi bi-list"></i> Lista
                         </a>
-                        <a href="{{ $nextOrder ? route('form-orders.show', $nextOrder->id) : '#' }}" 
+                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
                            class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
-                           @if(!$nextOrder) onclick="return false;" @endif>
+                           @if(!$nextOrder) onclick="return false;" @endif
+                           id="nextOrderBtn">
                             Następne <i class="bi bi-chevron-right"></i>
                         </a>
                     </div>
@@ -659,6 +670,54 @@ nowoczesna-edukacja.pl `;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo';
             });
         }
+
+        // Obsługa checkboxa filtrowania
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterCheckbox = document.getElementById('filterNewOnly');
+            const prevOrderBtn = document.getElementById('prevOrderBtn');
+            const nextOrderBtn = document.getElementById('nextOrderBtn');
+            
+            // Przechowujemy oryginalne linki
+            const originalPrevHref = prevOrderBtn.href;
+            const originalNextHref = nextOrderBtn.href;
+            
+            filterCheckbox.addEventListener('change', function() {
+                const currentOrderId = {{ $zamowienie->id }};
+                const filterNew = this.checked ? '1' : '';
+                
+                // Aktualizujemy linki nawigacyjne
+                if (filterNew) {
+                    // Dodajemy parametr filter_new=1
+                    const prevUrl = new URL(originalPrevHref);
+                    const nextUrl = new URL(originalNextHref);
+                    
+                    prevUrl.searchParams.set('filter_new', '1');
+                    nextUrl.searchParams.set('filter_new', '1');
+                    
+                    prevOrderBtn.href = prevUrl.toString();
+                    nextOrderBtn.href = nextUrl.toString();
+                } else {
+                    // Usuwamy parametr filter_new
+                    const prevUrl = new URL(originalPrevHref);
+                    const nextUrl = new URL(originalNextHref);
+                    
+                    prevUrl.searchParams.delete('filter_new');
+                    nextUrl.searchParams.delete('filter_new');
+                    
+                    prevOrderBtn.href = prevUrl.toString();
+                    nextOrderBtn.href = nextUrl.toString();
+                }
+                
+                // Przeładowujemy stronę z nowym filtrem
+                const currentUrl = new URL(window.location);
+                if (filterNew) {
+                    currentUrl.searchParams.set('filter_new', '1');
+                } else {
+                    currentUrl.searchParams.delete('filter_new');
+                }
+                window.location.href = currentUrl.toString();
+            });
+        });
 
         // Inicjalizacja tooltipów Bootstrap
         document.addEventListener('DOMContentLoaded', function() {

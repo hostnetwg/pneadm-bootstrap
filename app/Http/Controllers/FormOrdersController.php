@@ -181,7 +181,7 @@ class FormOrdersController extends Controller
     /**
      * Wyświetla szczegóły zamówienia.
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $zamowienie = FormOrder::with('marketingCampaign.sourceType')->find($id);
 
@@ -189,16 +189,49 @@ class FormOrdersController extends Controller
             abort(404, 'Zamówienie nie zostało znalezione.');
         }
 
+        // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
+        $filterNew = $request->has('filter_new') && $request->input('filter_new') == '1';
+
         // Pobieramy poprzednie i następne zamówienie
-        $prevOrder = FormOrder::where('id', '<', $id)
-            ->orderByDesc('id')
-            ->first();
+        if ($filterNew) {
+            // Filtrujemy tylko niewprowadzone zamówienia (bez numeru faktury i niezakończone)
+            $prevOrder = FormOrder::where('id', '<', $id)
+                ->where(function($q) {
+                    $q->whereNull('invoice_number')
+                      ->orWhere('invoice_number', '')
+                      ->orWhere('invoice_number', '0');
+                })
+                ->where(function($q) {
+                    $q->where('status_completed', '!=', 1)
+                      ->orWhereNull('status_completed');
+                })
+                ->orderByDesc('id')
+                ->first();
 
-        $nextOrder = FormOrder::where('id', '>', $id)
-            ->orderBy('id')
-            ->first();
+            $nextOrder = FormOrder::where('id', '>', $id)
+                ->where(function($q) {
+                    $q->whereNull('invoice_number')
+                      ->orWhere('invoice_number', '')
+                      ->orWhere('invoice_number', '0');
+                })
+                ->where(function($q) {
+                    $q->where('status_completed', '!=', 1)
+                      ->orWhereNull('status_completed');
+                })
+                ->orderBy('id')
+                ->first();
+        } else {
+            // Standardowe pobieranie wszystkich zamówień
+            $prevOrder = FormOrder::where('id', '<', $id)
+                ->orderByDesc('id')
+                ->first();
 
-        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder'));
+            $nextOrder = FormOrder::where('id', '>', $id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew'));
     }
 
     /**
