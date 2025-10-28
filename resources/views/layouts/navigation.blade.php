@@ -54,9 +54,9 @@
 
         <!-- Sprzedaż -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('certgen.zamowienia.*') || request()->routeIs('form-orders.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#sales-collapse"
-                    aria-expanded="{{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('certgen.zamowienia.*') || request()->routeIs('form-orders.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#cart3"></use>
                 </svg>
@@ -65,10 +65,9 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('sales.*') || request()->routeIs('certgen.zamowienia.*') || request()->routeIs('form-orders.*') ? 'show' : '' }}" id="sales-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('certgen.zamowienia.*') || request()->routeIs('form-orders.*') ? 'show' : '' }}" id="sales-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('form-orders.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia FORM (pneadm)</a></li>
-                    <li><a href="{{ route('sales.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Zamówienia FORM (certgen)</a></li>
                     <li><a href="{{ route('certgen.zamowienia.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Zakupy NE.pl</a></li>
                 </ul>
             </div>

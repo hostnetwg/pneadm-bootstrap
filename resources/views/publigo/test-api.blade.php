@@ -125,7 +125,7 @@
                         <a href="{{ route('publigo.test-api') }}" class="btn btn-primary">
                             <i class="bi bi-arrow-clockwise"></i> Odśwież test
                         </a>
-                        <a href="{{ route('sales.index') }}" class="btn btn-outline-secondary">
+                        <a href="{{ route('form-orders.index') }}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left"></i> Powrót do zamówień
                         </a>
                         <a href="{{ route('publigo.webhooks') }}" class="btn btn-outline-info">

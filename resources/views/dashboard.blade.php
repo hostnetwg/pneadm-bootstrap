@@ -264,13 +264,13 @@
                     </a>
                 </div>
                 <div class="col-md-3 mb-2">
-                    <a href="{{ route('sales.index') }}" class="btn btn-outline-info w-100">
+                    <a href="{{ route('form-orders.index') }}" class="btn btn-outline-info w-100">
                         <i class="bi bi-file-text me-2"></i>
                         Formularze zamówień
                     </a>
                 </div>
                 <div class="col-md-3 mb-2">
-                    <a href="{{ route('sales.index', ['filter' => 'new']) }}" class="btn btn-outline-warning w-100">
+                    <a href="{{ route('form-orders.index', ['filter' => 'new']) }}" class="btn btn-outline-warning w-100">
                         <i class="bi bi-clock me-2"></i>
                         Oczekujące zamówienia
                     </a>

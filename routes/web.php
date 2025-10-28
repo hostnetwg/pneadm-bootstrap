@@ -9,7 +9,6 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
-use App\Http\Controllers\SalesController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\MarketingCampaignController;
 use App\Http\Controllers\MarketingSourceTypeController;
@@ -122,18 +121,6 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/api/check-status', [SendyController::class, 'checkSubscriptionStatus'])->name('check-status');
     });
 
-    // Sprzedaż - zamówienia
-    Route::middleware(['auth', 'verified', 'check.user.status'])
-    ->prefix('sales')
-    ->name('sales.')
-    ->group(function () {
-        Route::get('/', [SalesController::class, 'index'])->name('index');
-        Route::get('/{id}', [SalesController::class, 'show'])->name('show');
-        Route::put('/{id}', [SalesController::class, 'update'])->name('update');
-        Route::post('/{id}/process', [SalesController::class, 'markAsProcessed'])->name('process');
-        Route::post('/{id}/publigo', [SalesController::class, 'createPubligoOrder'])->name('publigo.create');
-        Route::post('/{id}/publigo/reset', [SalesController::class, 'resetPubligoStatus'])->name('publigo.reset');
-    });
 
     // Form Orders - nowa tabela w bazie pneadm
     Route::middleware(['auth', 'verified', 'check.user.status'])
