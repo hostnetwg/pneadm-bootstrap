@@ -296,6 +296,13 @@ nowoczesna-edukacja.pl </div>
                                 @method('PUT')
                                 {{-- Ukryte pole informujące że formularz jest ze strony szczegółów --}}
                                 <input type="hidden" name="from_show_page" value="1">
+                                {{-- Przekazujemy parametry filtrów --}}
+                                @if(request('filter_new'))
+                                    <input type="hidden" name="filter_new" value="{{ request('filter_new') }}">
+                                @endif
+                                @if(request('course_id'))
+                                    <input type="hidden" name="course_id" value="{{ request('course_id') }}">
+                                @endif
                                 <div class="row">
                                     <div class="col-md-6">
                                         <label for="invoice_number" class="form-label small">

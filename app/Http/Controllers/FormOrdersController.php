@@ -328,7 +328,12 @@ class FormOrdersController extends Controller
             if ($isFromEditPage) {
                 return redirect()->route('form-orders.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
             } elseif ($isFromShowPage) {
-                return redirect()->route('form-orders.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
+                // Zachowujemy parametry filtrów przy przekierowaniu
+                $redirectParams = [];
+                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
+                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
+                
+                return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
             } else {
                 // Wracamy do listy z zachowaniem parametrów
                 $redirectParams = [];
