@@ -130,6 +130,7 @@ class CoursesController extends Controller
                 $ordersCount = DB::connection('mysql') // Używamy głównego połączenia
                     ->table('form_orders')
                     ->where('publigo_product_id', $course->id_old)
+                    ->whereNull('deleted_at') // Wykluczamy zamówienia w koszu (soft delete)
                     ->where(function($query) {
                         $query->whereNull('invoice_number')
                               ->orWhere('invoice_number', '')
