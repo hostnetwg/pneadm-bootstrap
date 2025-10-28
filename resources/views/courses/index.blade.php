@@ -303,7 +303,11 @@
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants->count() }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
                             @if($course->orders_count > 0)
-                                <span class="badge bg-danger" title="Liczba nie wprowadzonych zamówień">{{ $course->orders_count }}</span>
+                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'search' => $course->id_old]) }}" 
+                                   class="badge bg-danger text-decoration-none" 
+                                   title="Kliknij, aby zobaczyć nie wprowadzone zamówienia dla tego szkolenia">
+                                    {{ $course->orders_count }}
+                                </a>
                             @else
                                 <span class="badge bg-secondary" title="Liczba nie wprowadzonych zamówień">0</span>
                             @endif
