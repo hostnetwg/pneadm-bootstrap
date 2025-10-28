@@ -191,35 +191,45 @@ class FormOrdersController extends Controller
 
         // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
         $filterNew = $request->has('filter_new') && $request->input('filter_new') == '1';
+        
+        // Sprawdzamy czy mamy filtrować po ID szkolenia
+        $courseId = $request->input('course_id');
 
         // Pobieramy poprzednie i następne zamówienie
-        if ($filterNew) {
-            // Filtrujemy tylko niewprowadzone zamówienia (bez numeru faktury i niezakończone)
-            $prevOrder = FormOrder::where('id', '<', $id)
-                ->where(function($q) {
+        if ($filterNew || $courseId) {
+            // Filtrujemy zamówienia
+            $prevQuery = FormOrder::where('id', '<', $id);
+            $nextQuery = FormOrder::where('id', '>', $id);
+            
+            // Dodajemy filtr dla niewprowadzonych zamówień
+            if ($filterNew) {
+                $prevQuery->where(function($q) {
                     $q->whereNull('invoice_number')
                       ->orWhere('invoice_number', '')
                       ->orWhere('invoice_number', '0');
-                })
-                ->where(function($q) {
+                })->where(function($q) {
                     $q->where('status_completed', '!=', 1)
                       ->orWhereNull('status_completed');
-                })
-                ->orderByDesc('id')
-                ->first();
-
-            $nextOrder = FormOrder::where('id', '>', $id)
-                ->where(function($q) {
+                });
+                
+                $nextQuery->where(function($q) {
                     $q->whereNull('invoice_number')
                       ->orWhere('invoice_number', '')
                       ->orWhere('invoice_number', '0');
-                })
-                ->where(function($q) {
+                })->where(function($q) {
                     $q->where('status_completed', '!=', 1)
                       ->orWhereNull('status_completed');
-                })
-                ->orderBy('id')
-                ->first();
+                });
+            }
+            
+            // Dodajemy filtr po ID szkolenia
+            if ($courseId) {
+                $prevQuery->where('publigo_product_id', $courseId);
+                $nextQuery->where('publigo_product_id', $courseId);
+            }
+            
+            $prevOrder = $prevQuery->orderByDesc('id')->first();
+            $nextOrder = $nextQuery->orderBy('id')->first();
         } else {
             // Standardowe pobieranie wszystkich zamówień
             $prevOrder = FormOrder::where('id', '<', $id)

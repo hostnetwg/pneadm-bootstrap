@@ -34,8 +34,21 @@
                         </label>
                     </div>
                     
+                    {{-- Pole input do filtrowania po ID szkolenia --}}
+                    <div class="input-group" style="width: 200px;">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" 
+                               class="form-control form-control-sm" 
+                               id="courseIdFilter" 
+                               placeholder="ID szkolenia Publigo"
+                               value="{{ request('course_id') }}"
+                               title="Wprowadź ID szkolenia (id_old) do filtrowania">
+                    </div>
+                    
                     <div class="btn-group me-2" role="group">
-                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
+                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
                            class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
                            @if(!$prevOrder) onclick="return false;" @endif
@@ -45,23 +58,13 @@
                         <a href="{{ route('form-orders.index') }}" class="btn btn-outline-primary">
                             <i class="bi bi-list"></i> Lista
                         </a>
-                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], request('filter_new') ? ['filter_new' => '1'] : [])) : '#' }}" 
+                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
                            class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
                            @if(!$nextOrder) onclick="return false;" @endif
                            id="nextOrderBtn">
                             Następne <i class="bi bi-chevron-right"></i>
                         </a>
-                    </div>
-                    <div class="btn-group" role="group">
-                        <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="btn btn-warning">
-                            <i class="bi bi-pencil"></i> Edytuj
-                        </a>
-                        <button type="button" class="btn btn-danger" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#deleteModal">
-                            <i class="bi bi-trash"></i> Usuń
-                        </button>
                     </div>
                 </div>
             </div>
@@ -99,6 +102,11 @@
                         @if($zamowienie->product_price)
                             <span class="badge bg-success ms-2 fs-6">
                                 {{ number_format($zamowienie->product_price, 2) }} PLN
+                            </span>
+                        @endif
+                        @if($zamowienie->publigo_product_id)
+                            <span class="badge bg-info ms-2 fs-6">
+                                Produkt Publigo ID: #{{ $zamowienie->publigo_product_id }}
                             </span>
                         @endif
                     </h5>
@@ -399,7 +407,19 @@ nowoczesna-edukacja.pl </div>
                 </div>
             </div>
 
-
+            {{-- Przyciski akcji na dole strony --}}
+            <div class="d-flex justify-content-end mt-4 mb-4">
+                <div class="btn-group" role="group">
+                    <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="btn btn-warning">
+                        <i class="bi bi-pencil"></i> Edytuj
+                    </a>
+                    <button type="button" class="btn btn-danger" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#deleteModal">
+                        <i class="bi bi-trash"></i> Usuń
+                    </button>
+                </div>
+            </div>
 
         </div>
     </div>
@@ -660,9 +680,10 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // Obsługa checkboxa filtrowania
+        // Obsługa checkboxa filtrowania i pola ID szkolenia
         document.addEventListener('DOMContentLoaded', function() {
             const filterCheckbox = document.getElementById('filterNewOnly');
+            const courseIdInput = document.getElementById('courseIdFilter');
             const prevOrderBtn = document.getElementById('prevOrderBtn');
             const nextOrderBtn = document.getElementById('nextOrderBtn');
             
@@ -704,6 +725,21 @@ nowoczesna-edukacja.pl `;
                 } else {
                     currentUrl.searchParams.delete('filter_new');
                 }
+                window.location.href = currentUrl.toString();
+            });
+            
+            // Obsługa pola ID szkolenia
+            courseIdInput.addEventListener('input', function() {
+                const courseId = this.value.trim();
+                const currentUrl = new URL(window.location);
+                
+                if (courseId) {
+                    currentUrl.searchParams.set('course_id', courseId);
+                } else {
+                    currentUrl.searchParams.delete('course_id');
+                }
+                
+                // Przeładowujemy stronę z nowym filtrem
                 window.location.href = currentUrl.toString();
             });
         });
