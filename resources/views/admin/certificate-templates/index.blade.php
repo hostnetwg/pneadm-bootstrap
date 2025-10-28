@@ -99,18 +99,13 @@
                                                 <i class="bi bi-files"></i>
                                             </button>
                                         </form>
-                                        <form action="{{ route('admin.certificate-templates.destroy', $template) }}" 
-                                              method="POST" 
-                                              class="d-inline"
-                                              onsubmit="return confirm('Czy na pewno chcesz usunąć ten szablon?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" 
-                                                    class="btn btn-sm btn-danger"
-                                                    title="Usuń">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-danger"
+                                                title="Usuń"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteModal{{ $template->id }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -138,5 +133,53 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale potwierdzenia usunięcia szablonów --}}
+    @foreach ($templates as $template)
+    <div class="modal fade" id="deleteModal{{ $template->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $template->id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel{{ $template->id }}">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć szablon <strong>#{{ $template->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły szablonu:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Nazwa:</strong> {{ $template->name }}</li>
+                            <li><strong>Slug:</strong> {{ $template->slug }}</li>
+                            <li><strong>Opis:</strong> {{ $template->description ? Str::limit($template->description, 100) : 'Brak' }}</li>
+                            <li><strong>Status:</strong> {{ $template->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                            <li><strong>Plik szablonu:</strong> {{ $template->bladeFileExists() ? 'Istnieje' : 'Brak pliku' }}</li>
+                            <li><strong>Data utworzenia:</strong> {{ $template->created_at->format('d.m.Y H:i') }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Szablon zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('admin.certificate-templates.destroy', $template) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń szablon
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endforeach
 </x-app-layout>
 

@@ -8,16 +8,11 @@
                 <a href="{{ route('certgen.zamowienia_prod.edit', $zamowienie->id) }}" class="btn btn-warning">
                     <i class="bi bi-pencil"></i> Edytuj
                 </a>
-                <form action="{{ route('certgen.zamowienia_prod.destroy', $zamowienie->id) }}" 
-                      method="POST" 
-                      class="d-inline"
-                      onsubmit="return confirm('Czy na pewno chcesz usunąć ten produkt wraz z wszystkimi wariantami cenowymi?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Usuń
-                    </button>
-                </form>
+                <button type="button" class="btn btn-danger" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#deleteModal">
+                    <i class="bi bi-trash"></i> Usuń
+                </button>
                 <a href="{{ route('certgen.zamowienia_prod.index') }}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Powrót do listy
                 </a>
@@ -262,6 +257,51 @@
                 </a>
             </div>
 
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć produkt <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły produktu:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Nazwa:</strong> {{ $zamowienie->nazwa ?? 'Brak' }}</li>
+                            <li><strong>ID Publigo:</strong> {{ $zamowienie->idProdPubligo ?? 'Brak' }}</li>
+                            <li><strong>ID Ceny Publigo:</strong> {{ $zamowienie->price_id_ProdPubligo ?? 'Brak' }}</li>
+                            <li><strong>Promocja:</strong> {{ $zamowienie->promocja ?? 'Brak' }}</li>
+                            <li><strong>Status:</strong> {{ $zamowienie->status ? 'Aktywny' : 'Nieaktywny' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Produkt zostanie usunięty wraz z wszystkimi wariantami cenowymi. Ta operacja jest nieodwracalna!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('certgen.zamowienia_prod.destroy', $zamowienie->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń produkt
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

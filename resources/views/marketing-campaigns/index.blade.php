@@ -180,13 +180,11 @@
                                             <a href="{{ route('marketing-campaigns.edit', $campaign) }}" class="btn btn-sm btn-outline-warning">
                                                 <i class="bi bi-pencil"></i> Edytuj
                                             </a>
-                                            <form action="{{ route('marketing-campaigns.destroy', $campaign) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Czy na pewno chcesz usunąć tę kampanię?')">
-                                                    <i class="bi bi-trash"></i> Usuń
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#deleteModal{{ $campaign->id }}">
+                                                <i class="bi bi-trash"></i> Usuń
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -218,6 +216,53 @@
                     </a>
                 </div>
             @endif
+
+            {{-- Modale potwierdzenia usunięcia kampanii --}}
+            @foreach ($campaigns as $campaign)
+<div class="modal fade" id="deleteModal{{ $campaign->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $campaign->id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel{{ $campaign->id }}">
+                    <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz usunąć kampanię <strong>#{{ $campaign->id }}</strong>?</p>
+                <div class="bg-light p-3 rounded">
+                    <h6 class="mb-2">Szczegóły kampanii:</h6>
+                    <ul class="mb-0">
+                        <li><strong>Nazwa:</strong> {{ $campaign->name }}</li>
+                        <li><strong>Typ źródła:</strong> {{ $campaign->sourceType->name ?? 'Brak' }}</li>
+                        <li><strong>Opis:</strong> {{ $campaign->description ? Str::limit($campaign->description, 100) : 'Brak' }}</li>
+                        <li><strong>Status:</strong> {{ $campaign->is_active ? 'Aktywna' : 'Nieaktywna' }}</li>
+                        <li><strong>Data utworzenia:</strong> {{ $campaign->created_at ? $campaign->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                    </ul>
+                </div>
+                <p class="text-muted mt-3">
+                    <i class="bi bi-info-circle"></i>
+                    Kampania zostanie przeniesiona do kosza (soft delete) i będzie można ją przywrócić.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Anuluj
+                </button>
+                <form action="{{ route('marketing-campaigns.destroy', $campaign) }}" 
+                      method="POST" 
+                      class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Usuń kampanię
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    </div>
+    @endforeach
         </div>
     </div>
 </x-app-layout>

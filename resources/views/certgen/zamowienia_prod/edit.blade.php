@@ -132,8 +132,10 @@
                         <div id="wariantyContainer">
                             {{-- Warianty będą dodawane tutaj przez JavaScript --}}
                         </div>
-                        <div class="text-muted small mt-2">
-                            <i class="bi bi-info-circle"></i> Możesz dodać wiele wariantów cenowych dla tego produktu
+                        <div class="alert alert-info alert-sm mt-3">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Informacja:</strong> Wszystkie zmiany w wariantach cenowych zostaną zapisane po kliknięciu przycisku "Zapisz zmiany". 
+                            Usunięte warianty zostaną trwale usunięte z bazy danych.
                         </div>
                     </div>
                 </div>
@@ -324,5 +326,6 @@
         });
     </script>
     @endpush
+
 </x-app-layout>
 

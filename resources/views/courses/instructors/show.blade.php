@@ -22,14 +22,11 @@
                     <a href="{{ route('courses.instructors.edit', $instructor->id) }}" class="btn btn-warning">
                         <i class="fas fa-edit"></i> Edytuj
                     </a>
-                    <form action="{{ route('courses.instructors.destroy', $instructor->id) }}" method="POST" 
-                          onsubmit="return confirm('Czy na pewno chcesz usunąć tego instruktora?')" class="d-inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-trash"></i> Usuń
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-danger" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#deleteModal">
+                        <i class="fas fa-trash"></i> Usuń
+                    </button>
                 </div>
             </div>
 
@@ -330,6 +327,52 @@
                             @endif
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć instruktora <strong>#{{ $instructor->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły instruktora:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Imię i nazwisko:</strong> {{ $instructor->getFullTitleNameAttribute() }}</li>
+                            <li><strong>Email:</strong> {{ $instructor->email }}</li>
+                            <li><strong>Telefon:</strong> {{ $instructor->phone ?? 'Brak' }}</li>
+                            <li><strong>Płeć:</strong> {{ $instructor->gender_label }}</li>
+                            <li><strong>Status:</strong> {{ $instructor->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                            <li><strong>Liczba szkoleń:</strong> {{ $instructor->courses()->count() }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Instruktor zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('courses.instructors.destroy', $instructor->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń instruktora
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

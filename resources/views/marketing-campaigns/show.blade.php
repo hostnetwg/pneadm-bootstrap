@@ -16,6 +16,11 @@
                                 <a href="{{ route('marketing-campaigns.edit', $marketingCampaign) }}" class="btn btn-warning btn-sm">
                                     <i class="bi bi-pencil"></i> Edytuj
                                 </a>
+                                <button type="button" class="btn btn-danger btn-sm" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal">
+                                    <i class="bi bi-trash"></i> Usuń
+                                </button>
                                 <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="bi bi-arrow-left"></i> Powrót
                                 </a>
@@ -175,6 +180,52 @@
                     </div>
                 </div>
             @endif
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć kampanię <strong>#{{ $marketingCampaign->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły kampanii:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Kod kampanii:</strong> {{ $marketingCampaign->campaign_code }}</li>
+                            <li><strong>Nazwa:</strong> {{ $marketingCampaign->name }}</li>
+                            <li><strong>Typ źródła:</strong> {{ $marketingCampaign->sourceType->name ?? 'Brak' }}</li>
+                            <li><strong>Opis:</strong> {{ $marketingCampaign->description ? Str::limit($marketingCampaign->description, 100) : 'Brak' }}</li>
+                            <li><strong>Status:</strong> {{ $marketingCampaign->is_active ? 'Aktywna' : 'Nieaktywna' }}</li>
+                            <li><strong>Data utworzenia:</strong> {{ $marketingCampaign->created_at ? $marketingCampaign->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Kampania zostanie przeniesiona do kosza (soft delete) i będzie można ją przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('marketing-campaigns.destroy', $marketingCampaign) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń kampanię
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

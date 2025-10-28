@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fs-4 fw-semibold text-dark">
-            {{ __('Profile') }}
+            Profil
         </h2>
     </x-slot>
 
@@ -24,10 +24,18 @@
                     </div>
                 </div>
 
-                <div class="col-lg-6">
+                <!-- Informacja o usuwaniu konta -->
+                <div class="col-12">
                     <div class="card shadow-sm">
                         <div class="card-body">
-                            @include('profile.partials.delete-user-form')
+                            <h5 class="card-title text-muted">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Usuwanie konta
+                            </h5>
+                            <p class="card-text text-muted mb-0">
+                                Jeśli chcesz usunąć swoje konto, skontaktuj się z administratorem systemu. 
+                                Usuwanie konta wymaga uprawnień administratora ze względów bezpieczeństwa.
+                            </p>
                         </div>
                     </div>
                 </div>

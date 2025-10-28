@@ -1,11 +1,11 @@
 <section class="mb-4">
     <header>
         <h2 class="fs-4 fw-medium text-dark">
-            {{ __('Profile Information') }}
+            Informacje o profilu
         </h2>
 
         <p class="mt-2 text-muted small">
-            {{ __("Update your account's profile information and email address.") }}
+            Zaktualizuj informacje o swoim profilu i adresie email.
         </p>
     </header>
 
@@ -19,7 +19,7 @@
 
         <!-- Name -->
         <div class="mb-3">
-            <label for="name" class="form-label">{{ __('Name') }}</label>
+            <label for="name" class="form-label">Imię i nazwisko</label>
             <input
                 id="name"
                 name="name"
@@ -39,7 +39,7 @@
 
         <!-- Email -->
         <div class="mb-3">
-            <label for="email" class="form-label">{{ __('Email') }}</label>
+            <label for="email" class="form-label">Email</label>
             <input
                 id="email"
                 name="email"
@@ -58,19 +58,19 @@
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div class="mt-2">
                     <p class="text-muted small">
-                        {{ __('Your email address is unverified.') }}
+                        Twój adres email nie został zweryfikowany.
 
                         <button
                             form="send-verification"
                             class="btn btn-link p-0 align-baseline text-decoration-none"
                         >
-                            {{ __('Click here to re-send the verification email.') }}
+                            Kliknij tutaj, aby ponownie wysłać email weryfikacyjny.
                         </button>
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
                         <p class="text-success small mt-2">
-                            {{ __('A new verification link has been sent to your email address.') }}
+                            Nowy link weryfikacyjny został wysłany na Twój adres email.
                         </p>
                     @endif
                 </div>
@@ -80,7 +80,7 @@
         <!-- Save Button -->
         <div class="d-flex align-items-center gap-3">
             <button type="submit" class="btn btn-primary">
-                {{ __('Save') }}
+                Zapisz
             </button>
 
             @if (session('status') === 'profile-updated')
@@ -91,7 +91,7 @@
                     x-init="setTimeout(() => show = false, 2000)"
                     class="text-muted small"
                 >
-                    {{ __('Saved.') }}
+                    Zapisano.
                 </p>
             @endif
         </div>

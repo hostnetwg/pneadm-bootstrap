@@ -57,26 +57,15 @@
                         <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="btn btn-warning">
                             <i class="bi bi-pencil"></i> Edytuj
                         </a>
-                        <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                        <button type="button" class="btn btn-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteModal">
                             <i class="bi bi-trash"></i> Usuń
                         </button>
                     </div>
                 </div>
             </div>
 
-            {{-- Formularz usuwania (ukryty) --}}
-            <form id="deleteForm" action="{{ route('form-orders.destroy', $zamowienie->id) }}" method="POST" style="display: none;">
-                @csrf
-                @method('DELETE')
-            </form>
-
-            <script>
-                function confirmDelete() {
-                    if (confirm('Czy na pewno chcesz usunąć to zamówienie? Zostanie przeniesione do kosza.')) {
-                        document.getElementById('deleteForm').submit();
-                    }
-                }
-            </script>
 
             {{-- Komunikaty --}}
             @if(session('success'))
@@ -727,6 +716,52 @@ nowoczesna-edukacja.pl `;
             });
         });
     </script>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć zamówienie <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły zamówienia:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
+                            <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
+                            <li><strong>Numer faktury:</strong> {{ $zamowienie->invoice_number ?: 'Brak' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Zamówienie zostanie przeniesione do kosza (soft delete) i będzie można je przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('form-orders.destroy', $zamowienie->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń zamówienie
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </x-app-layout>
 
 

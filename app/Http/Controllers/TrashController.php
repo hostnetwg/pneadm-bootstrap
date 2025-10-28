@@ -12,6 +12,7 @@ use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
+use App\Models\CertificateTemplate;
 
 class TrashController extends Controller
 {
@@ -89,6 +90,11 @@ class TrashController extends Controller
                 'model' => CourseOnlineDetails::class,
                 'display_fields' => ['platform', 'meeting_link'],
                 'label' => 'Szczegóły kursów online'
+            ],
+            'certificate_templates' => [
+                'model' => CertificateTemplate::class,
+                'display_fields' => ['name', 'slug', 'description'],
+                'label' => 'Szablony certyfikatów'
             ]
         ];
 
@@ -219,6 +225,7 @@ class TrashController extends Controller
                 'form_order_participants' => FormOrderParticipant::class,
                 'course_locations' => CourseLocation::class,
                 'course_online_details' => CourseOnlineDetails::class,
+                'certificate_templates' => CertificateTemplate::class,
             ];
 
             foreach ($tables as $tableName => $modelClass) {
@@ -248,6 +255,7 @@ class TrashController extends Controller
             'form_order_participants' => FormOrderParticipant::class,
             'course_locations' => CourseLocation::class,
             'course_online_details' => CourseOnlineDetails::class,
+            'certificate_templates' => CertificateTemplate::class,
         ];
 
         return $modelMap[$table] ?? null;

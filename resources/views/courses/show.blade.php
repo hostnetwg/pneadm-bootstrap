@@ -303,18 +303,59 @@
                                 <a href="{{ route('surveys.import', $course->id) }}" class="btn btn-success">
                                     <i class="fas fa-file-import"></i> Importuj ankietę
                                 </a>
-                                <form action="{{ route('courses.destroy', $course->id) }}" method="POST" class="d-grid">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" 
-                                            class="btn btn-danger" 
-                                            onclick="return confirm('Czy na pewno chcesz usunąć to szkolenie?')">
-                                        <i class="fas fa-trash"></i> Usuń szkolenie
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal">
+                                    <i class="fas fa-trash"></i> Usuń szkolenie
+                                </button>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć szkolenie <strong>#{{ $course->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły szkolenia:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Tytuł:</strong> {{ $course->title }}</li>
+                            <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
+                            <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
+                            <li><strong>Uczestnicy:</strong> {{ $course->participants->count() }}</li>
+                            <li><strong>Zaświadczenia:</strong> {{ $course->certificates->count() }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Szkolenie zostanie przeniesione do kosza (soft delete) i będzie można je przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('courses.destroy', $course->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń szkolenie
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

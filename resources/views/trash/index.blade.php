@@ -146,7 +146,8 @@
                 @if($table === 'all')
                     <button type="button" 
                             class="btn btn-danger btn-sm"
-                            onclick="confirmEmptyAll()">
+                            data-bs-toggle="modal" 
+                            data-bs-target="#emptyAllModal">
                         <i class="bi bi-trash3"></i> Opróżnij cały kosz
                     </button>
                 @endif
@@ -303,28 +304,75 @@
         }
 
         function confirmEmptyAll() {
-            if (confirm('Czy na pewno chcesz opróżnić cały kosz?\n\nTa operacja jest nieodwracalna i usunie WSZYSTKIE usunięte rekordy!')) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/trash/empty-all';
-                
-                const csrfToken = document.createElement('input');
-                csrfToken.type = 'hidden';
-                csrfToken.name = '_token';
-                csrfToken.value = '{{ csrf_token() }}';
-                
-                const methodField = document.createElement('input');
-                methodField.type = 'hidden';
-                methodField.name = '_method';
-                methodField.value = 'DELETE';
-                
-                form.appendChild(csrfToken);
-                form.appendChild(methodField);
-                document.body.appendChild(form);
-                form.submit();
-            }
+            // Zamykamy modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('emptyAllModal'));
+            modal.hide();
+            
+            // Wykonujemy akcję opróżnienia kosza
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/trash/empty-all';
+            
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = '_token';
+            csrfToken.value = '{{ csrf_token() }}';
+            
+            const methodField = document.createElement('input');
+            methodField.type = 'hidden';
+            methodField.name = '_method';
+            methodField.value = 'DELETE';
+            
+            form.appendChild(csrfToken);
+            form.appendChild(methodField);
+            document.body.appendChild(form);
+            form.submit();
         }
     </script>
+
+    {{-- Modal potwierdzenia opróżnienia całego kosza --}}
+    <div class="modal fade" id="emptyAllModal" tabindex="-1" aria-labelledby="emptyAllModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="emptyAllModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie opróżnienia kosza
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Czy na pewno chcesz opróżnić <strong>cały kosz systemowy</strong>?</p>
+                    
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Ta operacja usunie trwale:</h6>
+                        <ul class="mb-0">
+                            @foreach($tableDefinitions as $tableName => $definition)
+                                @php
+                                    $count = $definition['model']::onlyTrashed()->count();
+                                @endphp
+                                @if($count > 0)
+                                    <li><strong>{{ $definition['label'] }}:</strong> {{ $count }} rekordów</li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Uwaga!</strong> Ta operacja jest nieodwracalna. Wszystkie usunięte rekordy zostaną trwale usunięte z bazy danych.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="confirmEmptyAll()">
+                        <i class="bi bi-trash3"></i> Opróżnij cały kosz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </x-app-layout>
 
 

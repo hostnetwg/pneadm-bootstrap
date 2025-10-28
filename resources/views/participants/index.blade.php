@@ -185,11 +185,11 @@
                         </td>
                         <td>
                             @if ($participant->certificate)
-                                <form action="{{ route('certificates.destroy', $participant->certificate->id) }}" method="POST" style="display:inline;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Usunąć zaświadczenie?')">Usuń</button>
-                                </form>
+                                <button type="button" class="btn btn-danger btn-sm" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteCertificateModal{{ $participant->certificate->id }}">
+                                    <i class="bi bi-trash"></i> Usuń
+                                </button>
                             @else
                                 <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
                             @endif
@@ -197,11 +197,11 @@
                         <td>
                             <div class="d-flex flex-column gap-1">
                                 <a href="{{ route('participants.edit', [$course, $participant]) }}" class="btn btn-info btn-sm" style="min-width: 80px;">Podgląd</a>
-                                <form action="{{ route('participants.destroy', [$course, $participant]) }}" method="POST" style="display:inline;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm" style="min-width: 80px;" onclick="return confirm('Usunąć uczestnika?')">Usuń</button>
-                                </form>
+                                <button type="button" class="btn btn-danger btn-sm" style="min-width: 80px;" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal{{ $participant->id }}">
+                                    <i class="bi bi-trash"></i> Usuń
+                                </button>
                             </div>
                         </td>                       
                     </tr>
@@ -229,6 +229,103 @@
                 {{ $participants->appends(request()->query())->links() }}
             </div>
         @endif
+
+        {{-- Modale potwierdzenia usunięcia uczestników --}}
+        @foreach ($participants as $participant)
+        <div class="modal fade" id="deleteModal{{ $participant->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $participant->id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteModalLabel{{ $participant->id }}">
+                            <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć uczestnika <strong>#{{ $participant->id }}</strong>?</p>
+                        <div class="bg-light p-3 rounded">
+                            <h6 class="mb-2">Szczegóły uczestnika:</h6>
+                            <ul class="mb-0">
+                                <li><strong>Imię i nazwisko:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
+                                <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
+                                <li><strong>Data urodzenia:</strong> {{ $participant->birth_date ?? 'Brak' }}</li>
+                                <li><strong>Miejsce urodzenia:</strong> {{ $participant->birth_place ?? 'Brak' }}</li>
+                                <li><strong>Szkolenie:</strong> {{ $course->title }}</li>
+                                <li><strong>Data wygaśnięcia dostępu:</strong> {{ $participant->access_expires_at ? $participant->access_expires_at->format('d.m.Y H:i') : 'Bezterminowy' }}</li>
+                            </ul>
+                        </div>
+                        <p class="text-muted mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            Uczestnik zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('participants.destroy', [$course, $participant]) }}" 
+                              method="POST" 
+                              class="d-inline">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Usuń uczestnika
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endforeach
+
+        {{-- Modale potwierdzenia usunięcia zaświadczeń --}}
+        @foreach ($participants as $participant)
+            @if ($participant->certificate)
+            <div class="modal fade" id="deleteCertificateModal{{ $participant->certificate->id }}" tabindex="-1" aria-labelledby="deleteCertificateModalLabel{{ $participant->certificate->id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="deleteCertificateModalLabel{{ $participant->certificate->id }}">
+                                <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia zaświadczenia
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Czy na pewno chcesz usunąć zaświadczenie <strong>#{{ $participant->certificate->id }}</strong>?</p>
+                            <div class="bg-light p-3 rounded">
+                                <h6 class="mb-2">Szczegóły zaświadczenia:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Numer zaświadczenia:</strong> {{ $participant->certificate->certificate_number ?? 'Brak numeru' }}</li>
+                                    <li><strong>Uczestnik:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
+                                    <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
+                                    <li><strong>Szkolenie:</strong> {{ $course->title }}</li>
+                                    <li><strong>Data wygenerowania:</strong> {{ $participant->certificate->created_at ? $participant->certificate->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                                </ul>
+                            </div>
+                            <p class="text-muted mt-3">
+                                <i class="bi bi-info-circle"></i>
+                                Zaświadczenie zostanie trwale usunięte z systemu. Ta operacja jest nieodwracalna!
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle"></i> Anuluj
+                            </button>
+                            <form action="{{ route('certificates.destroy', $participant->certificate->id) }}" 
+                                  method="POST" 
+                                  class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-trash"></i> Usuń zaświadczenie
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+        @endforeach
     </div>
 
     <!-- Modal Import CSV -->

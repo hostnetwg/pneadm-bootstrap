@@ -1,11 +1,11 @@
 <section class="mb-4">
     <header>
         <h2 class="fs-4 fw-medium text-dark">
-            {{ __('Update Password') }}
+            Zmiana hasła
         </h2>
 
         <p class="mt-2 text-muted small">
-            {{ __('Ensure your account is using a long, random password to stay secure.') }}
+            Upewnij się, że Twoje konto używa długiego, losowego hasła, aby pozostać bezpiecznym.
         </p>
     </header>
 
@@ -15,7 +15,7 @@
 
         <!-- Current Password -->
         <div class="mb-3">
-            <label for="update_password_current_password" class="form-label">{{ __('Current Password') }}</label>
+            <label for="update_password_current_password" class="form-label">Obecne hasło</label>
             <input
                 id="update_password_current_password"
                 name="current_password"
@@ -32,7 +32,7 @@
 
         <!-- New Password -->
         <div class="mb-3">
-            <label for="update_password_password" class="form-label">{{ __('New Password') }}</label>
+            <label for="update_password_password" class="form-label">Nowe hasło</label>
             <input
                 id="update_password_password"
                 name="password"
@@ -49,7 +49,7 @@
 
         <!-- Confirm Password -->
         <div class="mb-3">
-            <label for="update_password_password_confirmation" class="form-label">{{ __('Confirm Password') }}</label>
+            <label for="update_password_password_confirmation" class="form-label">Potwierdź hasło</label>
             <input
                 id="update_password_password_confirmation"
                 name="password_confirmation"
@@ -67,7 +67,7 @@
         <!-- Save Button -->
         <div class="d-flex align-items-center gap-3">
             <button type="submit" class="btn btn-primary">
-                {{ __('Save') }}
+                Zapisz
             </button>
 
             @if (session('status') === 'password-updated')
@@ -78,7 +78,7 @@
                     x-init="setTimeout(() => show = false, 2000)"
                     class="text-success small"
                 >
-                    {{ __('Saved.') }}
+                    Zapisano.
                 </p>
             @endif
         </div>

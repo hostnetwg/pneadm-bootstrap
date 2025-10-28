@@ -75,13 +75,11 @@
                                             <a href="{{ route('marketing-source-types.edit', $sourceType) }}" class="btn btn-sm btn-outline-warning">
                                                 <i class="bi bi-pencil"></i> Edytuj
                                             </a>
-                                            <form action="{{ route('marketing-source-types.destroy', $sourceType) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Czy na pewno chcesz usunąć ten typ źródła?')">
-                                                    <i class="bi bi-trash"></i> Usuń
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#deleteModal{{ $sourceType->id }}">
+                                                <i class="bi bi-trash"></i> Usuń
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -103,6 +101,57 @@
                     </a>
                 </div>
             @endif
+
+            {{-- Modale potwierdzenia usunięcia typów źródeł --}}
+            @foreach ($sourceTypes as $sourceType)
+            <div class="modal fade" id="deleteModal{{ $sourceType->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $sourceType->id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="deleteModalLabel{{ $sourceType->id }}">
+                                <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Czy na pewno chcesz usunąć typ źródła <strong>#{{ $sourceType->id }}</strong>?</p>
+                            <div class="bg-light p-3 rounded">
+                                <h6 class="mb-2">Szczegóły typu źródła:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Nazwa:</strong> {{ $sourceType->name }}</li>
+                                    <li><strong>Kolor:</strong> 
+                                        <span class="badge" style="background-color: {{ $sourceType->color }}; color: white;">
+                                            {{ $sourceType->color }}
+                                        </span>
+                                    </li>
+                                    <li><strong>Opis:</strong> {{ $sourceType->description ? Str::limit($sourceType->description, 100) : 'Brak' }}</li>
+                                    <li><strong>Status:</strong> {{ $sourceType->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                                    <li><strong>Data utworzenia:</strong> {{ $sourceType->created_at ? $sourceType->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                                </ul>
+                            </div>
+                            <p class="text-muted mt-3">
+                                <i class="bi bi-info-circle"></i>
+                                Typ źródła zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle"></i> Anuluj
+                            </button>
+                            <form action="{{ route('marketing-source-types.destroy', $sourceType) }}" 
+                                  method="POST" 
+                                  class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-trash"></i> Usuń typ źródła
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
         </div>
     </div>
 </x-app-layout>

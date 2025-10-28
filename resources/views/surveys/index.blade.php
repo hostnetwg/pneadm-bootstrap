@@ -326,17 +326,12 @@
                                                        title="Pobierz plik CSV">
                                                         <i class="fas fa-download"></i>
                                                     </a>
-                                                    <form action="{{ route('surveys.delete-original-file', $survey->id) }}" 
-                                                          method="POST" 
-                                                          onsubmit="return confirm('Czy na pewno chcesz usunąć plik CSV?')" 
-                                                          class="d-inline">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm" 
-                                                                title="Usuń plik CSV">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </form>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                            title="Usuń plik CSV"
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#deleteFileModal{{ $survey->id }}">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -354,14 +349,11 @@
                                             <a href="{{ route('surveys.edit', $survey->id) }}" class="btn btn-outline-warning btn-sm">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <form action="{{ route('surveys.destroy', $survey->id) }}" method="POST" 
-                                                  onsubmit="return confirm('Czy na pewno chcesz usunąć tę ankietę?')" class="d-inline">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-outline-danger btn-sm">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-danger btn-sm"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#deleteSurveyModal{{ $survey->id }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -394,6 +386,102 @@
                     </a>
                 </div>
             @endif
+
+            {{-- Modale potwierdzenia usunięcia --}}
+            @foreach ($surveys as $survey)
+                {{-- Modal usunięcia pliku CSV --}}
+                @if($survey->original_file_path)
+                <div class="modal fade" id="deleteFileModal{{ $survey->id }}" tabindex="-1" aria-labelledby="deleteFileModalLabel{{ $survey->id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="deleteFileModalLabel{{ $survey->id }}">
+                                    <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia pliku CSV
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Czy na pewno chcesz usunąć plik CSV dla ankiety <strong>#{{ $survey->id }}</strong>?</p>
+                                <div class="bg-light p-3 rounded">
+                                    <h6 class="mb-2">Szczegóły pliku:</h6>
+                                    <ul class="mb-0">
+                                        <li><strong>Nazwa pliku:</strong> {{ basename($survey->original_file_path) }}</li>
+                                        <li><strong>Ankieta:</strong> {{ $survey->title }}</li>
+                                        <li><strong>Szkolenie:</strong> {{ $survey->course->title ?? 'Brak' }}</li>
+                                        <li><strong>Data importu:</strong> {{ $survey->imported_at ? $survey->imported_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                                        <li><strong>Liczba odpowiedzi:</strong> {{ $survey->total_responses }}</li>
+                                    </ul>
+                                </div>
+                                <p class="text-muted mt-3">
+                                    <i class="bi bi-info-circle"></i>
+                                    Plik CSV zostanie trwale usunięty z systemu. Ta operacja jest nieodwracalna!
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle"></i> Anuluj
+                                </button>
+                                <form action="{{ route('surveys.delete-original-file', $survey->id) }}" 
+                                      method="POST" 
+                                      class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-trash"></i> Usuń plik CSV
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Modal usunięcia ankiety --}}
+                <div class="modal fade" id="deleteSurveyModal{{ $survey->id }}" tabindex="-1" aria-labelledby="deleteSurveyModalLabel{{ $survey->id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="deleteSurveyModalLabel{{ $survey->id }}">
+                                    <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia ankiety
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Czy na pewno chcesz usunąć ankietę <strong>#{{ $survey->id }}</strong>?</p>
+                                <div class="bg-light p-3 rounded">
+                                    <h6 class="mb-2">Szczegóły ankiety:</h6>
+                                    <ul class="mb-0">
+                                        <li><strong>Tytuł:</strong> {{ $survey->title }}</li>
+                                        <li><strong>Szkolenie:</strong> {{ $survey->course->title ?? 'Brak' }}</li>
+                                        <li><strong>Instruktor:</strong> {{ $survey->course->instructor->getFullTitleNameAttribute() ?? 'Brak' }}</li>
+                                        <li><strong>Data szkolenia:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y H:i') : 'Brak' }}</li>
+                                        <li><strong>Liczba odpowiedzi:</strong> {{ $survey->total_responses }}</li>
+                                        <li><strong>Data importu:</strong> {{ $survey->imported_at ? $survey->imported_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                                    </ul>
+                                </div>
+                                <p class="text-muted mt-3">
+                                    <i class="bi bi-info-circle"></i>
+                                    Ankieta zostanie przeniesiona do kosza (soft delete) i będzie można ją przywrócić.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle"></i> Anuluj
+                                </button>
+                                <form action="{{ route('surveys.destroy', $survey->id) }}" 
+                                      method="POST" 
+                                      class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-trash"></i> Usuń ankietę
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
     </div>
 </x-app-layout>

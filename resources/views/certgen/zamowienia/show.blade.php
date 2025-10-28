@@ -10,15 +10,11 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3>Zakup ID: {{ $zamowienie->id }}</h3>
                 <div>
-                    <form action="{{ route('certgen.zamowienia.destroy', $zamowienie->id) }}" 
-                          method="POST" class="d-inline"
-                          onsubmit="return confirm('Czy na pewno chcesz usunąć ten zakup?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-danger">
-                            🗑️ Usuń
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-danger" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#deleteModal">
+                        🗑️ Usuń
+                    </button>
                 </div>
             </div>
 
@@ -130,6 +126,54 @@
                             </table>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć zakup <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły zakupu:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Imię:</strong> {{ $zamowienie->imie ?? 'Brak' }}</li>
+                            <li><strong>Nazwisko:</strong> {{ $zamowienie->nazwisko ?? 'Brak' }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->email ?? 'Brak' }}</li>
+                            <li><strong>Produkt:</strong> {{ $zamowienie->produkt_nazwa ?? 'Brak' }}</li>
+                            <li><strong>Cena:</strong> {{ $zamowienie->produkt_cena ? number_format($zamowienie->produkt_cena, 2) . ' zł' : 'Brak' }}</li>
+                            <li><strong>Data wpłaty:</strong> {{ $zamowienie->data_wplaty ? \Carbon\Carbon::parse($zamowienie->data_wplaty)->format('d.m.Y H:i') : 'Brak' }}</li>
+                            <li><strong>Adres:</strong> {{ $zamowienie->adres ?? 'Brak' }}</li>
+                            <li><strong>Poczta:</strong> {{ $zamowienie->poczta ?? 'Brak' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Zakup zostanie trwale usunięty z systemu. Ta operacja jest nieodwracalna!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('certgen.zamowienia.destroy', $zamowienie->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń zakup
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

@@ -142,15 +142,11 @@
                                                    class="btn btn-sm btn-info" title="Szczegóły">
                                                     👁️
                                                 </a>
-                                                <form action="{{ route('certgen.zamowienia.destroy', $zamowienie->id) }}" 
-                                                      method="POST" class="d-inline"
-                                                      onsubmit="return confirm('Czy na pewno chcesz usunąć ten zakup?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Usuń">
-                                                        🗑️
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-danger" title="Usuń"
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#deleteModal{{ $zamowienie->id }}">
+                                                    🗑️
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -177,4 +173,53 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale potwierdzenia usunięcia zamówień --}}
+    @foreach ($zamowienia as $zamowienie)
+    <div class="modal fade" id="deleteModal{{ $zamowienie->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $zamowienie->id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel{{ $zamowienie->id }}">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć zakup <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły zakupu:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Imię:</strong> {{ $zamowienie->imie }}</li>
+                            <li><strong>Nazwisko:</strong> {{ $zamowienie->nazwisko }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->email }}</li>
+                            <li><strong>Produkt:</strong> {{ $zamowienie->produkt_nazwa }}</li>
+                            <li><strong>Cena:</strong> {{ number_format($zamowienie->produkt_cena, 2) }} zł</li>
+                            <li><strong>Data wpłaty:</strong> {{ $zamowienie->data_wplaty ? $zamowienie->data_wplaty->format('d.m.Y H:i') : 'Brak' }}</li>
+                            <li><strong>Status:</strong> {{ $zamowienie->status ?? 'Nieznany' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Zakup zostanie trwale usunięty z systemu. Ta operacja jest nieodwracalna!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('certgen.zamowienia.destroy', $zamowienie->id) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń zakup
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endforeach
 </x-app-layout>

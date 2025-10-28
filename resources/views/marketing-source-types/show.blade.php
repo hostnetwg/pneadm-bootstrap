@@ -16,6 +16,11 @@
                                 <a href="{{ route('marketing-source-types.edit', $marketingSourceType) }}" class="btn btn-warning btn-sm">
                                     <i class="bi bi-pencil"></i> Edytuj
                                 </a>
+                                <button type="button" class="btn btn-danger btn-sm" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal">
+                                    <i class="bi bi-trash"></i> Usuń
+                                </button>
                                 <a href="{{ route('marketing-source-types.index') }}" class="btn btn-secondary btn-sm">
                                     <i class="bi bi-arrow-left"></i> Powrót
                                 </a>
@@ -119,6 +124,56 @@
                             @endif
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia usunięcia --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć typ źródła <strong>#{{ $marketingSourceType->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły typu źródła:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Nazwa:</strong> {{ $marketingSourceType->name }}</li>
+                            <li><strong>Slug:</strong> {{ $marketingSourceType->slug }}</li>
+                            <li><strong>Kolor:</strong> 
+                                <span class="badge" style="background-color: {{ $marketingSourceType->color }}; color: white;">
+                                    {{ $marketingSourceType->color }}
+                                </span>
+                            </li>
+                            <li><strong>Opis:</strong> {{ $marketingSourceType->description ? Str::limit($marketingSourceType->description, 100) : 'Brak' }}</li>
+                            <li><strong>Status:</strong> {{ $marketingSourceType->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                            <li><strong>Data utworzenia:</strong> {{ $marketingSourceType->created_at ? $marketingSourceType->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Typ źródła zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <form action="{{ route('marketing-source-types.destroy', $marketingSourceType) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń typ źródła
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

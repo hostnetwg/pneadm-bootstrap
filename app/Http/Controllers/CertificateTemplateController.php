@@ -184,7 +184,7 @@ class CertificateTemplateController extends Controller
     }
 
     /**
-     * Usuwa szablon
+     * Usuwa szablon (soft delete)
      */
     public function destroy(CertificateTemplate $certificateTemplate)
     {
@@ -197,18 +197,27 @@ class CertificateTemplateController extends Controller
 
         $name = $certificateTemplate->name;
         
-        // Usunięcie pliku blade
-        $bladePath = resource_path("views/certificates/{$certificateTemplate->slug}.blade.php");
-        if (File::exists($bladePath)) {
-            File::delete($bladePath);
-        }
-
-        // Usunięcie z bazy
+        // Soft delete - nie usuwamy pliku blade, tylko oznaczamy jako usunięty
         $certificateTemplate->delete();
 
         return redirect()
             ->route('admin.certificate-templates.index')
-            ->with('success', "Szablon \"{$name}\" został usunięty.");
+            ->with('success', "Szablon \"{$name}\" został przeniesiony do kosza.");
+    }
+
+    /**
+     * Przywraca usunięty szablon
+     */
+    public function restore($id)
+    {
+        $certificateTemplate = CertificateTemplate::onlyTrashed()->findOrFail($id);
+        $name = $certificateTemplate->name;
+        
+        $certificateTemplate->restore();
+
+        return redirect()
+            ->route('admin.certificate-templates.index')
+            ->with('success', "Szablon \"{$name}\" został przywrócony z kosza.");
     }
 
     /**

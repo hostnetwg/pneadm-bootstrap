@@ -312,17 +312,65 @@
                             <div class="d-flex flex-column gap-1">
                                 <a href="{{ route('courses.show', $course->id) }}" class="btn btn-primary btn-sm">Podgląd</a>
                                 <a href="{{ route('courses.edit', array_merge(['id' => $course->id], request()->query())) }}" class="btn btn-warning btn-sm">Edytuj</a>
-                                <form action="{{ route('courses.destroy', $course->id) }}" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Czy na pewno chcesz usunąć?')">Usuń</button>
-                                </form>
+                                <button type="button" class="btn btn-danger btn-sm w-100" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal{{ $course->id }}">
+                                    <i class="bi bi-trash"></i> Usuń
+                                </button>
                                 <a href="{{ route('participants.index', $course->id) }}" class="btn btn-info btn-sm text-white">Uczestnicy</a>
                             </div>
                         </td>
-                    </tr>@endforeach
+                    </tr>
+                    @endforeach
                 </tbody>
-                </table>
+            </table>
+            
+            {{-- Modale potwierdzenia usunięcia --}}
+            @foreach ($courses as $course)
+            <div class="modal fade" id="deleteModal{{ $course->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $course->id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="deleteModalLabel{{ $course->id }}">
+                                <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Czy na pewno chcesz usunąć szkolenie <strong>#{{ $course->id }}</strong>?</p>
+                            <div class="bg-light p-3 rounded">
+                                <h6 class="mb-2">Szczegóły szkolenia:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Tytuł:</strong> {{ $course->title }}</li>
+                                    <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
+                                    <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
+                                    <li><strong>Uczestnicy:</strong> {{ $course->participants->count() }}</li>
+                                    <li><strong>Zaświadczenia:</strong> {{ $course->certificates->count() }}</li>
+                                </ul>
+                            </div>
+                            <p class="text-muted mt-3">
+                                <i class="bi bi-info-circle"></i>
+                                Szkolenie zostanie przeniesione do kosza (soft delete) i będzie można je przywrócić.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle"></i> Anuluj
+                            </button>
+                            <form action="{{ route('courses.destroy', $course->id) }}" 
+                                  method="POST" 
+                                  class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-trash"></i> Usuń szkolenie
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
             @else
                 <div class="text-center py-5">
                     <i class="fas fa-search fa-3x text-muted mb-3"></i>
