@@ -198,7 +198,7 @@
                                                 </span>
                                             @elseif($hasInvoice)
                                                 <span class="badge bg-success ms-2" title="Numer faktury: {{ $zamowienie->invoice_number }}">
-                                                    <i class="bi bi-receipt"></i> FAKTURA #{{ $zamowienie->invoice_number }}
+                                                    <i class="bi bi-receipt"></i> FAKTURA {{ $zamowienie->invoice_number }}
                                                 </span>
                                             @endif
                                         </h5>
