@@ -56,7 +56,49 @@ class FormOrdersController extends Controller
             $zamowienia = $query->with('marketingCampaign.sourceType')->orderByDesc('id')->paginate($perPage);
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter'));
+        // Pobierz informacje o duplikatach dla wyświetlanych zamówień
+        $duplicateInfo = [];
+        $duplicateGroups = FormOrder::duplicates()->get();
+        foreach ($duplicateGroups as $group) {
+            $orderIds = explode(',', $group->order_ids);
+            foreach ($orderIds as $orderId) {
+                $duplicateInfo[$orderId] = [
+                    'count' => $group->duplicate_count,
+                    'is_duplicate' => true,
+                    'group_email' => $group->participant_email,
+                    'group_product_id' => $group->publigo_product_id
+                ];
+            }
+        }
+
+        // Policz grupy wymagające interwencji (needs-action + multiple-invoices)
+        $urgentDuplicatesCount = 0;
+        foreach ($duplicateGroups as $duplicate) {
+            $orderIds = array_map('trim', explode(',', $duplicate->order_ids));
+            $orders = FormOrder::whereIn('id', $orderIds)->get();
+            
+            $activeCount = 0;
+            $mainCount = 0;
+            
+            foreach ($orders as $order) {
+                if ($order->has_invoice) {
+                    $mainCount++;
+                } else if (!$order->is_completed) {
+                    $activeCount++;
+                }
+            }
+            
+            // Wymaga akcji = więcej niż 1 aktywne LUB ma fakturę ale są jeszcze aktywne duplikaty
+            $needsAction = ($activeCount > 1) || ($mainCount > 0 && $activeCount > 0);
+            // Za dużo faktur = więcej niż 1 zamówienie z fakturą w grupie
+            $hasMultipleInvoices = ($mainCount > 1);
+            
+            if ($needsAction || $hasMultipleInvoices) {
+                $urgentDuplicatesCount++;
+            }
+        }
+
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter', 'duplicateInfo', 'urgentDuplicatesCount'));
     }
 
     /**
@@ -564,6 +606,266 @@ class FormOrdersController extends Controller
         } catch (Exception $e) {
             return redirect()->back()
                 ->with('error', 'Wystąpił błąd podczas usuwania zamówienia: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Wyświetla listę duplikatów zamówień
+     */
+    public function duplicates(Request $request)
+    {
+        // Liczba rekordów na stronę
+        $perPage = $request->get('per_page', 25);
+        
+        // Pobierz grupy duplikatów
+        $duplicateGroups = FormOrder::duplicates()->get();
+        
+        // Przygotuj dane do wyświetlenia
+        $duplicates = collect();
+        foreach ($duplicateGroups as $group) {
+            $orderIds = explode(',', $group->order_ids);
+            $orders = FormOrder::whereIn('id', $orderIds)
+                ->with('marketingCampaign.sourceType')
+                ->get()
+                ->sortByDesc('priority'); // Sortuj według priorytetu (najważniejsze pierwsze)
+            
+            $duplicates->push([
+                'email' => $group->participant_email,
+                'product_id' => $group->publigo_product_id,
+                'count' => $group->duplicate_count,
+                'orders' => $orders,
+                'recommended_order' => $orders->first(), // Najwyższy priorytet
+                'oldest_order' => $orders->sortBy('id')->first(),
+                'newest_order' => $orders->sortBy('id')->last(),
+            ]);
+        }
+        
+        // Paginacja dla grup duplikatów
+        $currentPage = $request->get('page', 1);
+        $perPage = min($perPage, 50); // Maksymalnie 50 grup na stronę
+        $offset = ($currentPage - 1) * $perPage;
+        $paginatedDuplicates = $duplicates->slice($offset, $perPage);
+        
+        // Tworzenie obiektu paginacji
+        $duplicatesPaginated = new \Illuminate\Pagination\LengthAwarePaginator(
+            $paginatedDuplicates,
+            $duplicates->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => request()->url(),
+                'pageName' => 'page'
+            ]
+        );
+        
+        // Statystyki
+        $totalDuplicates = $duplicates->sum('count');
+        $totalGroups = $duplicates->count();
+        $totalOrders = $duplicates->sum(function($group) {
+            return $group['count'];
+        });
+        
+        return view('form-orders.duplicates', compact(
+            'duplicatesPaginated', 
+            'perPage', 
+            'totalDuplicates', 
+            'totalGroups', 
+            'totalOrders'
+        ));
+    }
+
+    /**
+     * Usuwa duplikat (soft delete)
+     */
+    public function destroyDuplicate(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::findOrFail($id);
+            
+            // Sprawdź czy to rzeczywiście duplikat
+            $duplicates = FormOrder::findDuplicatesFor($id)->get();
+            if ($duplicates->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'To zamówienie nie ma duplikatów.'
+                ], 400);
+            }
+            
+            // Soft delete
+            $zamowienie->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Duplikat został usunięty.',
+                'remaining_duplicates' => $duplicates->count(),
+                'email' => $zamowienie->participant_email,
+                'product_id' => $zamowienie->publigo_product_id
+            ]);
+            
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas usuwania duplikatu: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Usuwa wszystkie duplikaty dla konkretnej grupy (oprócz najstarszego)
+     */
+    public function destroyAllDuplicatesForGroup(Request $request, $email, $productId)
+    {
+        try {
+            // Znajdź wszystkie zamówienia w grupie duplikatów
+            $orders = FormOrder::where('participant_email', $email)
+                ->where('publigo_product_id', $productId)
+                ->orderBy('id')
+                ->get();
+            
+            if ($orders->count() < 2) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie znaleziono duplikatów dla tej grupy.'
+                ], 400);
+            }
+            
+            // Zostaw najstarsze zamówienie, usuń resztę
+            $oldestOrder = $orders->first();
+            $duplicatesToDelete = $orders->skip(1);
+            
+            $deletedCount = 0;
+            foreach ($duplicatesToDelete as $duplicate) {
+                $duplicate->delete();
+                $deletedCount++;
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Usunięto {$deletedCount} duplikatów. Zachowano najstarsze zamówienie #{$oldestOrder->id}.",
+                'kept_order_id' => $oldestOrder->id
+            ]);
+            
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas usuwania duplikatów: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Usuwa wszystkie duplikaty oprócz wybranego zamówienia
+     */
+    public function destroyDuplicatesKeepSelected(Request $request, $email, $productId, $keepOrderId)
+    {
+        try {
+            // Znajdź wszystkie zamówienia w grupie duplikatów
+            $orders = FormOrder::where('participant_email', $email)
+                ->where('publigo_product_id', $productId)
+                ->get();
+            
+            if ($orders->count() < 2) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie znaleziono duplikatów dla tej grupy.'
+                ], 400);
+            }
+            
+            // Znajdź zamówienie do zachowania
+            $keepOrder = $orders->where('id', $keepOrderId)->first();
+            if (!$keepOrder) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie znaleziono zamówienia do zachowania.'
+                ], 400);
+            }
+            
+            // Usuń wszystkie oprócz wybranego
+            $duplicatesToDelete = $orders->where('id', '!=', $keepOrderId);
+            
+            $deletedCount = 0;
+            foreach ($duplicatesToDelete as $duplicate) {
+                $duplicate->delete();
+                $deletedCount++;
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Usunięto {$deletedCount} duplikatów. Zachowano zamówienie #{$keepOrder->id}.",
+                'kept_order_id' => $keepOrder->id
+            ]);
+            
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas usuwania duplikatów: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Oznacz duplikat jako zakończony
+     */
+    public function markAsCompleted(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::findOrFail($id);
+            
+            // Sprawdź czy to rzeczywiście duplikat
+            $duplicates = FormOrder::findDuplicatesFor($id)->get();
+            if ($duplicates->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'To zamówienie nie ma duplikatów.'
+                ], 400);
+            }
+            
+            // Oznacz jako zakończone
+            $zamowienie->status_completed = 1;
+            
+            // Dodaj notatkę jeśli podana
+            $notes = $request->input('notes');
+            if ($notes) {
+                $zamowienie->notes = $notes;
+            }
+            
+            $zamowienie->save();
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Zamówienie #{$id} zostało oznaczone jako zakończone (duplikat)."
+            ]);
+            
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas oznaczania jako zakończone: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Aktualizuj notatkę zamówienia
+     */
+    public function updateNotes(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::findOrFail($id);
+            
+            $notes = $request->input('notes');
+            $zamowienie->notes = $notes;
+            $zamowienie->save();
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Notatka dla zamówienia #{$id} została zaktualizowana."
+            ]);
+            
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas zapisywania notatki: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

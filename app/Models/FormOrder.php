@@ -187,6 +187,51 @@ class FormOrder extends Model
     }
 
     /**
+     * Scope - wykrywanie duplikatów (ten sam email + to samo szkolenie)
+     */
+    public function scopeDuplicates($query)
+    {
+        return $query->select('participant_email', 'publigo_product_id')
+                     ->selectRaw('COUNT(*) as duplicate_count')
+                     ->selectRaw('GROUP_CONCAT(id ORDER BY id) as order_ids')
+                     ->whereNotNull('participant_email')
+                     ->whereNotNull('publigo_product_id')
+                     ->groupBy('participant_email', 'publigo_product_id')
+                     ->having('duplicate_count', '>', 1);
+    }
+
+    /**
+     * Scope - pobierz zamówienia które są duplikatami (mają duplikaty)
+     */
+    public function scopeWithDuplicates($query)
+    {
+        $duplicateGroups = self::duplicates()->get();
+        $orderIds = [];
+        
+        foreach ($duplicateGroups as $group) {
+            $ids = explode(',', $group->order_ids);
+            $orderIds = array_merge($orderIds, $ids);
+        }
+        
+        return $query->whereIn('id', $orderIds);
+    }
+
+    /**
+     * Scope - znajdź duplikaty dla konkretnego zamówienia
+     */
+    public function scopeFindDuplicatesFor($query, $orderId)
+    {
+        $order = self::find($orderId);
+        if (!$order || !$order->participant_email || !$order->publigo_product_id) {
+            return $query->where('id', -1); // Pusty wynik
+        }
+        
+        return $query->where('participant_email', $order->participant_email)
+                     ->where('publigo_product_id', $order->publigo_product_id)
+                     ->where('id', '!=', $orderId);
+    }
+
+    /**
      * Accessor - czy zamówienie jest nowe (bez faktury i niezakończone)
      */
     public function getIsNewAttribute(): bool
@@ -307,6 +352,109 @@ class FormOrder extends Model
     public function getParticipantsCountAttribute(): int
     {
         return $this->participants()->count();
+    }
+
+    /**
+     * Accessor - priorytet zamówienia (im wyższy, tym ważniejsze)
+     * Używane do określenia które zamówienie zachować w grupie duplikatów
+     */
+    public function getPriorityAttribute(): int
+    {
+        $priority = 0;
+        
+        // NAJWYŻSZY PRIORYTET - ma fakturę (zawsze zachowaj)
+        if ($this->has_invoice) {
+            $priority += 10000000;
+        }
+        
+        // WYSOKI PRIORYTET - nie jest zakończone (aktywne) - wyższy niż zakończone bez faktury
+        if (!$this->is_completed) {
+            $priority += 5000000;
+        }
+        
+        // NISKI PRIORYTET - jest zakończone (ale bez faktury) - najniższy priorytet
+        if ($this->is_completed) {
+            $priority += 1000000;
+        }
+        
+        // BARDZO NISKI PRIORYTET - ma notatkę "duplikat"
+        if (stripos($this->notes ?? '', 'duplikat') !== false) {
+            $priority -= 10000000;
+        }
+        
+        // PRIORYTET CHRONOLOGICZNY - zależy od statusu przetworzenia
+        if ($this->has_invoice) {
+            // Dla zamówień z fakturą - starsze mają wyższy priorytet
+            $priority += (1000000 - $this->id);
+        } elseif ($this->is_completed) {
+            // Dla zakończonych zamówień - starsze mają wyższy priorytet (ale niski)
+            $priority += (100000 - $this->id);
+        } else {
+            // Dla aktywnych zamówień - NOWSZE mają wyższy priorytet
+            // (klient mógł poprawić dane w kolejnym formularzu)
+            $priority += $this->id; // Im wyższe ID, tym wyższy priorytet
+        }
+        
+        return $priority;
+    }
+
+    /**
+     * Accessor - czy zamówienie jest zakończone
+     */
+    public function getIsCompletedAttribute(): bool
+    {
+        return $this->status_completed == 1;
+    }
+
+    /**
+     * Accessor - czy zamówienie jest oznaczone jako duplikat w notatkach
+     */
+    public function getIsMarkedAsDuplicateAttribute(): bool
+    {
+        return stripos($this->notes ?? '', 'duplikat') !== false;
+    }
+
+    /**
+     * Accessor - opis powodu priorytetu (dla wyświetlania w UI)
+     */
+    public function getPriorityReasonAttribute(): string
+    {
+        $reasons = [];
+        
+        if ($this->has_invoice) {
+            $reasons[] = "✅ Ma fakturę (najwyższy priorytet)";
+        } elseif (!$this->is_completed) {
+            $reasons[] = "✅ Aktywne zamówienie (wymaga przetworzenia)";
+        } elseif ($this->is_marked_as_duplicate) {
+            $reasons[] = "❌ Oznaczone jako duplikat";
+        } else {
+            $reasons[] = "⚠️ Zakończone bez faktury (najniższy priorytet)";
+        }
+        
+        // Dodaj informację o wieku zamówienia i logice chronologicznej
+        if ($this->created_at) {
+            $daysOld = $this->created_at->diffInDays(now());
+            if ($daysOld == 0) {
+                $reasons[] = "🕐 Zamówienie z dzisiaj";
+            } elseif ($daysOld == 1) {
+                $reasons[] = "🕐 Zamówienie z wczoraj";
+            } elseif ($daysOld < 7) {
+                $reasons[] = "🕐 Zamówienie sprzed {$daysOld} dni";
+            } else {
+                $reasons[] = "🕐 Zamówienie sprzed {$daysOld} dni";
+            }
+        }
+        
+        // Dodaj informację o logice chronologicznej
+        if ($this->has_invoice) {
+            $reasons[] = "📅 Starsze zamówienie (z fakturą)";
+        } elseif ($this->is_completed) {
+            $reasons[] = "📅 Starsze zamówienie (zakończone)";
+        } else {
+            $reasons[] = "🆕 Najnowsze zamówienie (może mieć poprawione dane)";
+        }
+        
+        return implode("\n", $reasons);
     }
 
     /**

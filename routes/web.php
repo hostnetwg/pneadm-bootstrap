@@ -130,10 +130,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/', [FormOrdersController::class, 'index'])->name('index');
         Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
         Route::post('/', [FormOrdersController::class, 'store'])->name('store');
+        Route::get('/duplicates', [FormOrdersController::class, 'duplicates'])->name('duplicates');
         Route::get('/{id}', [FormOrdersController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [FormOrdersController::class, 'edit'])->name('edit');
         Route::put('/{id}', [FormOrdersController::class, 'update'])->name('update');
         Route::delete('/{id}', [FormOrdersController::class, 'destroy'])->name('destroy');
+        Route::delete('/duplicates/{id}', [FormOrdersController::class, 'destroyDuplicate'])->name('duplicates.destroy');
+        Route::delete('/duplicates/group/{email}/{productId}', [FormOrdersController::class, 'destroyAllDuplicatesForGroup'])->name('duplicates.destroy-group');
+        Route::delete('/duplicates/group/{email}/{productId}/keep/{keepOrderId}', [FormOrdersController::class, 'destroyDuplicatesKeepSelected'])->name('duplicates.keep-selected');
+        Route::post('/duplicates/{id}/mark-completed', [FormOrdersController::class, 'markAsCompleted'])->name('duplicates.mark-completed');
+        Route::post('/duplicates/{id}/update-notes', [FormOrdersController::class, 'updateNotes'])->name('duplicates.update-notes');
         Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
         Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
     });

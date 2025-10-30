@@ -36,6 +36,13 @@
                            class="btn {{ $filter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
                             <i class="bi bi-exclamation-triangle"></i> NOWE
                         </a>
+                        <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
+                           class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif">
+                            <i class="bi bi-files"></i> DUPLIKATY 
+                            @if($urgentDuplicatesCount > 0)
+                                <span class="badge bg-white text-danger fw-bold">({{ $urgentDuplicatesCount }})</span>
+                            @endif
+                        </a>
                     </div>
                     <div>
                         <a href="{{ route('form-orders.create') }}" class="btn btn-success">
@@ -152,9 +159,11 @@
                             $isNew = $zamowienie->is_new;
                             $isCompleted = $zamowienie->status_completed == 1;
                             $hasInvoice = $zamowienie->has_invoice;
+                            $isDuplicate = isset($duplicateInfo[$zamowienie->id]) && $duplicateInfo[$zamowienie->id]['is_duplicate'];
+                            $duplicateCount = $isDuplicate ? $duplicateInfo[$zamowienie->id]['count'] : 0;
                         @endphp
                         
-                        <div class="card shadow-sm mb-4 @if($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
+                        <div class="card shadow-sm mb-4 @if($isDuplicate) border-danger @elseif($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
                             <div class="card-header bg-light">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -172,7 +181,14 @@
                                                     Źródło: {{ $zamowienie->fb_source }}
                                                 </span>
                                             @endif
-                                            @if($isNew)
+                                            @if($isDuplicate)
+                                                <span class="badge bg-danger ms-2" 
+                                                      title="Duplikat: {{ $duplicateCount }} zamówień dla tego samego emaila i szkolenia"
+                                                      data-bs-toggle="tooltip" 
+                                                      data-bs-placement="top">
+                                                    <i class="bi bi-files"></i> DUPLIKAT ({{ $duplicateCount }})
+                                                </span>
+                                            @elseif($isNew)
                                                 <span class="badge bg-warning text-dark ms-2">
                                                     <i class="bi bi-exclamation-triangle"></i> NOWE
                                                 </span>
@@ -181,8 +197,8 @@
                                                     <i class="bi bi-check-circle"></i> ZAKOŃCZONE
                                                 </span>
                                             @elseif($hasInvoice)
-                                                <span class="badge bg-success ms-2">
-                                                    <i class="bi bi-receipt"></i> FAKTURA
+                                                <span class="badge bg-success ms-2" title="Numer faktury: {{ $zamowienie->invoice_number }}">
+                                                    <i class="bi bi-receipt"></i> FAKTURA #{{ $zamowienie->invoice_number }}
                                                 </span>
                                             @endif
                                         </h5>
@@ -198,6 +214,13 @@
                                            title="Szczegóły zamówienia">
                                             <i class="bi bi-eye"></i> Szczegóły
                                         </a>
+                                        @if($isDuplicate)
+                                            <a href="{{ route('form-orders.duplicates') }}" 
+                                               class="btn btn-sm btn-outline-danger ms-1" 
+                                               title="Zobacz duplikaty">
+                                                <i class="bi bi-files"></i> Duplikaty
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
