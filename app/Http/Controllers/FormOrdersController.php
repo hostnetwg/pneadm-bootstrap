@@ -623,7 +623,7 @@ class FormOrdersController extends Controller
             // ZAWSZE na końcu dodaj identyfikator zamówienia (bez "---")
             // Dzięki temu każda faktura pro-forma będzie miała powiązanie z zamówieniem
             if (!empty(trim($uwagi))) {
-                $uwagi .= "\n\npnedu.pl #{$zamowienie->id}";
+                $uwagi .= "\npnedu.pl #{$zamowienie->id}";
             } else {
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
             }
@@ -947,7 +947,7 @@ class FormOrdersController extends Controller
             
             // ZAWSZE na końcu dodaj identyfikator zamówienia
             if (!empty(trim($uwagi))) {
-                $uwagi .= "\n\npnedu.pl #{$zamowienie->id}";
+                $uwagi .= "\npnedu.pl #{$zamowienie->id}";
             } else {
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
             }
