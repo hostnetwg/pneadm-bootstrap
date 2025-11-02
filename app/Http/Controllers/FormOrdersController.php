@@ -953,28 +953,44 @@ class FormOrdersController extends Controller
             }
 
             // Przygotowanie danych kontrahenta
+            // KLUCZOWE ZMIANY na podstawie działającego kodu PHP:
+            // 1. Kraj: "Polska" (nie "PL"!)
+            // 2. Dodane: PrefiksUE, OsobaFizyczna, Email
+            // 3. NIP jako null jeśli pusty (nie pomijamy pola)
             $kontrahent = [
                 'Nazwa' => $zamowienie->buyer_name,
-                'Kraj' => 'PL'
+                'NIP' => null,
+                'Ulica' => '',
+                'KodPocztowy' => '',
+                'Miejscowosc' => '',
+                'Kraj' => 'Polska', // WAŻNE: "Polska", nie "PL"!
+                'PrefiksUE' => 'PL',
+                'OsobaFizyczna' => false,
+                'Email' => null,
             ];
             
-            if (!empty($zamowienie->buyer_address)) {
-                $kontrahent['Ulica'] = $zamowienie->buyer_address;
-            }
-            
-            if (!empty($zamowienie->buyer_postal_code)) {
-                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
-            }
-            
-            if (!empty($zamowienie->buyer_city)) {
-                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
-            }
-            
+            // NIP
             if (!empty($zamowienie->buyer_nip)) {
                 $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
                 if (!empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
+            }
+            
+            // Adres
+            if (!empty($zamowienie->buyer_address)) {
+                $kontrahent['Ulica'] = $zamowienie->buyer_address;
+            }
+            if (!empty($zamowienie->buyer_postal_code)) {
+                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
+            }
+            if (!empty($zamowienie->buyer_city)) {
+                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
+            }
+            
+            // Email
+            if (!empty($zamowienie->buyer_email)) {
+                $kontrahent['Email'] = strtolower(trim($zamowienie->buyer_email));
             }
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
@@ -988,32 +1004,40 @@ class FormOrdersController extends Controller
             // Zgodnie z dokumentacją API iFirma dla nievatowców:
             // https://api.ifirma.pl/wystawianie-faktury-sprzedazy-krajowej-dla-nievatowca/
             
-            // WAŻNE: Wymuszamy float explicite - round() może zwrócić integer!
-            // JSON_PRESERVE_ZERO_FRACTION działa tylko jeśli wartość jest float w PHP
+            // Przygotowanie pozycji faktury
+            // WAŻNE: Na podstawie działającego kodu PHP kolejność pól jest kluczowa!
+            // Kolejność z działającego kodu:
+            // 1. PodstawaPrawna (jeśli VAT exempt)
+            // 2. StawkaVat (null jeśli VAT exempt)
+            // 3. Ilosc
+            // 4. CenaJednostkowa
+            // 5. NazwaPelna
+            // 6. Jednostka
+            // 7. TypStawkiVat (na końcu!)
+            
             $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
             
-            $pozycja = [
-                'NazwaPelna' => $zamowienie->product_name,
-                'Ilosc' => (float) 1.0,  // Wymuszenie float
-                'CenaJednostkowa' => $cenaJednostkowa,  // Wymuszenie float
-                'Jednostka' => 'sztuk',
-            ];
+            $pozycja = [];
             
-            // Dla zwolnionych z VAT: całkowicie usuwamy StawkaVat (jak w działającej PRO-FORMA!)
-            // W działającej PRO-FORMA używamy unset(), nie null!
+            // Dla zwolnionych z VAT: NAJPIERW PodstawaPrawna, POTEM StawkaVat = null
             if ($vatExempt) {
-                // NIE dodajemy StawkaVat w ogóle - tak jak w działającej PRO-FORMA!
-                $pozycja['TypStawkiVat'] = 'ZW';
                 $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
-                // UWAGA: NIE dodajemy StawkaRyczaltu dla nievatowców - jest automatycznie z konta!
+                $pozycja['StawkaVat'] = null; // EXPLICITE null (nie brak pola!)
             } else {
-                // VAT-owiec na ryczałcie: StawkaVat + StawkaRyczaltu (zgodnie z dokumentacją)
                 $pozycja['StawkaVat'] = 0.23;
-                $pozycja['TypStawkiVat'] = 'PRC';
                 if ($isLumpSum) {
                     $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
                 }
             }
+            
+            // Pozostałe pola w dokładnej kolejności jak w działającym kodzie
+            $pozycja['Ilosc'] = (float) 1.0;
+            $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
+            $pozycja['NazwaPelna'] = $zamowienie->product_name;
+            $pozycja['Jednostka'] = 'sztuk';
+            
+            // TypStawkiVat NA KOŃCU!
+            $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
             
 
             // Przygotowanie danych faktury krajowej dla iFirma
@@ -1024,22 +1048,27 @@ class FormOrdersController extends Controller
             // - BRAK pola TypFakturyKrajowej (to pole jest TYLKO dla pro-forma!)
             // - RodzajPodpisuOdbiorcy może być opcjonalne
             
-            // Dla nievatowców: LiczOd powinno być "BRT" (brutto), nie "NET"
-            // Zgodnie z dokumentacją: https://api.ifirma.pl/wystawianie-faktury-sprzedazy-krajowej-dla-nievatowca/
-            $liczOd = $vatExempt ? 'BRT' : 'NET';
+            // Przygotowanie danych faktury - DOKŁADNA KOLEJNOŚĆ z działającego kodu PHP!
+            // WAŻNE: Na podstawie działającego kodu:
+            // - LiczOd: 'BRT' dla nievatowców (nie 'NET'!)
+            // - RodzajPodpisuOdbiorcy: 'BPO' (nie 'BWO'!)
+            // - Kolejność pól jest ważna!
             
             $invoiceData = [
-                'Zaplacono' => 0.0, // Kwota zapłacona (0 = nieopłacona)
-                'ZaplaconoNaDokumencie' => 0.0, // WYMAGANE - kwota zapłacono na dokumencie
-                'LiczOd' => $liczOd, // BRT dla nievatowców, NET dla VAT-owców
+                'Zaplacono' => 0.00, // PIERWSZA - dokładnie 0.00
+                'ZaplaconoNaDokumencie' => 0.00, // DRUGA - dokładnie 0.00
+                'LiczOd' => 'BRT', // TRZECIA - BRT dla nievatowców!
+                'NumerKontaBankowego' => null,
                 'DataWystawienia' => now()->format('Y-m-d'),
+                'MiejsceWystawienia' => 'Bieżuń',
                 'DataSprzedazy' => now()->format('Y-m-d'),
-                'FormatDatySprzedazy' => 'DZN', // WYMAGANE - DZN (dzienny) lub MSC (miesięczny)
-                'SposobZaplaty' => 'PRZ', // PRZ = przelew
-                'RodzajPodpisuOdbiorcy' => 'BWO', // WYMAGANE - BWO (bez podpisu odbiorcy i wystawcy)
-                'NumerZamowienia' => (string)$zamowienie->id,
+                'FormatDatySprzedazy' => 'DZN',
+                'SposobZaplaty' => 'PRZ',
+                'RodzajPodpisuOdbiorcy' => 'BPO', // WAŻNE: BPO, nie BWO!
+                'WidocznyNumerBdo' => false,
+                'Numer' => null,
+                'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
-                'Pozycje' => [$pozycja]
             ];
             
             // Termin płatności - ODROCZONA PŁATNOŚĆ zgodnie z invoice_payment_delay
