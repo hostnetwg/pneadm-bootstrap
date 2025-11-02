@@ -23,6 +23,7 @@ use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\UserPreferencesController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +33,12 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // User Preferences API
+    Route::prefix('api/user')->name('api.user.')->group(function () {
+        Route::get('preferences', [UserPreferencesController::class, 'get'])->name('preferences.get');
+        Route::post('preferences', [UserPreferencesController::class, 'update'])->name('preferences.update');
+    });
 
     // Admin Panel
     Route::prefix('admin')->name('admin.')->group(function () {

@@ -1116,6 +1116,83 @@ nowoczesna-edukacja.pl `;
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
         });
+
+        // Funkcja do zapamiętywania stanu checkboxów e-mail w bazie danych (per użytkownik)
+        async function initializeEmailCheckboxes() {
+            const proformaCheckbox = document.getElementById('sendEmailCheckboxProforma');
+            const invoiceCheckbox = document.getElementById('sendEmailCheckboxInvoice');
+            
+            // Klucze preferencji
+            const PROFORMA_KEY = 'ifirma_send_email_proforma';
+            const INVOICE_KEY = 'ifirma_send_email_invoice';
+            
+            // Funkcja do pobierania preferencji z serwera
+            async function loadPreferences() {
+                try {
+                    const response = await fetch('/api/user/preferences', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.preferences || {};
+                    }
+                } catch (error) {
+                    console.error('Error loading preferences:', error);
+                }
+                return {};
+            }
+            
+            // Funkcja do zapisywania preferencji na serwerze
+            async function savePreference(key, value) {
+                try {
+                    await fetch('/api/user/preferences', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({ key, value })
+                    });
+                } catch (error) {
+                    console.error('Error saving preference:', error);
+                }
+            }
+            
+            // Załaduj preferencje z serwera
+            const preferences = await loadPreferences();
+            
+            // Przywróć zapisany stan dla PRO-FORMA
+            if (proformaCheckbox) {
+                if (preferences[PROFORMA_KEY] !== undefined) {
+                    proformaCheckbox.checked = preferences[PROFORMA_KEY];
+                }
+                
+                // Zapisz stan przy każdej zmianie
+                proformaCheckbox.addEventListener('change', function() {
+                    savePreference(PROFORMA_KEY, this.checked);
+                });
+            }
+            
+            // Przywróć zapisany stan dla Faktury
+            if (invoiceCheckbox) {
+                if (preferences[INVOICE_KEY] !== undefined) {
+                    invoiceCheckbox.checked = preferences[INVOICE_KEY];
+                }
+                
+                // Zapisz stan przy każdej zmianie
+                invoiceCheckbox.addEventListener('change', function() {
+                    savePreference(INVOICE_KEY, this.checked);
+                });
+            }
+        }
+        
+        // Wywołaj inicjalizację po załadowaniu DOM
+        document.addEventListener('DOMContentLoaded', initializeEmailCheckboxes);
     </script>
 
     {{-- Modal potwierdzenia usunięcia --}}
