@@ -204,7 +204,7 @@ nowoczesna-edukacja.pl </div>
                                 <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
                             </button>
                             <div class="form-check" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma" checked>
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
@@ -220,7 +220,7 @@ nowoczesna-edukacja.pl </div>
                                 <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
                             </button>
                             <div class="form-check" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice" checked>
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
