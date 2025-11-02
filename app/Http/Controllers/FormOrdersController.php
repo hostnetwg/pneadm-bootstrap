@@ -979,49 +979,39 @@ class FormOrdersController extends Controller
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
+            $vatExempt = config('services.ifirma.vat_exempt', false);
             
-            // Przygotowanie pozycji faktury
-            if ($isLumpSum) {
-                // RYCZAŁTOWIEC - ostatnia próba: struktura IDENTYCZNA z przykładem z dokumentacji
-                // Przykład z dokumentacji:
-                // {
-                //   "StawkaVat": 0.23,
-                //   "StawkaRyczaltu": 0.03,
-                //   "Ilosc": 3,
-                //   "CenaJednostkowa": 47.14,
-                //   "NazwaPelna": "Neseser",
-                //   "Jednostka": "sztuk",
-                //   "PKWiU": "",
-                //   "TypStawkiVat": "PRC"
-                // }
-                // Dla ryczałtowca zwolnionego z VAT: StawkaVat = 0, TypStawkiVat = ZW
-                $lumpSumRate = (float) config('services.ifirma.lump_sum_rate', 0.085);
-                $pozycja = [
-                    'StawkaVat' => 0, // 0 zamiast 0.23 dla zwolnionych
-                    'StawkaRyczaltu' => $lumpSumRate,
-                    'Ilosc' => 1.0,
-                    'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
-                    'NazwaPelna' => $zamowienie->product_name,
-                    'Jednostka' => 'sztuk',
-                    'PKWiU' => '',
-                    'TypStawkiVat' => 'ZW', // ZW zamiast PRC dla zwolnionych
-                ];
+            // Przygotowanie pozycji faktury krajowej
+            // OBSERWACJA: W formularzu iFirma.pl (UI) NIE MA pola dla StawkaRyczaltu w pozycji faktury
+            // To sugeruje, że dla nievatowców na ryczałcie StawkaRyczaltu jest automatycznie
+            // pobierane z konfiguracji konta i NIE powinno być podawane explicite w pozycji!
+            // Zgodnie z dokumentacją API iFirma dla nievatowców:
+            // https://api.ifirma.pl/wystawianie-faktury-sprzedazy-krajowej-dla-nievatowca/
+            
+            // WAŻNE: Wymuszamy float explicite - round() może zwrócić integer!
+            // JSON_PRESERVE_ZERO_FRACTION działa tylko jeśli wartość jest float w PHP
+            $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
+            
+            $pozycja = [
+                'NazwaPelna' => $zamowienie->product_name,
+                'Ilosc' => (float) 1.0,  // Wymuszenie float
+                'CenaJednostkowa' => $cenaJednostkowa,  // Wymuszenie float
+                'Jednostka' => 'sztuk',
+            ];
+            
+            // Dla zwolnionych z VAT: całkowicie usuwamy StawkaVat (jak w działającej PRO-FORMA!)
+            // W działającej PRO-FORMA używamy unset(), nie null!
+            if ($vatExempt) {
+                // NIE dodajemy StawkaVat w ogóle - tak jak w działającej PRO-FORMA!
+                $pozycja['TypStawkiVat'] = 'ZW';
+                $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
+                // UWAGA: NIE dodajemy StawkaRyczaltu dla nievatowców - jest automatycznie z konta!
             } else {
-                // Nie-ryczałtowiec (zwykły VAT lub zwolniony)
-                $pozycja = [
-                    'NazwaPelna' => $zamowienie->product_name,
-                    'Ilosc' => 1.0,
-                    'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
-                    'Jednostka' => 'sztuk',
-                    'PKWiU' => '',
-                ];
-                
-                if (config('services.ifirma.vat_exempt')) {
-                    $pozycja['TypStawkiVat'] = 'ZW';
-                    $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
-                } else {
-                    $pozycja['StawkaVat'] = 0.23;
-                    $pozycja['TypStawkiVat'] = 'PRC';
+                // VAT-owiec na ryczałcie: StawkaVat + StawkaRyczaltu (zgodnie z dokumentacją)
+                $pozycja['StawkaVat'] = 0.23;
+                $pozycja['TypStawkiVat'] = 'PRC';
+                if ($isLumpSum) {
+                    $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
                 }
             }
             
@@ -1034,10 +1024,14 @@ class FormOrdersController extends Controller
             // - BRAK pola TypFakturyKrajowej (to pole jest TYLKO dla pro-forma!)
             // - RodzajPodpisuOdbiorcy może być opcjonalne
             
+            // Dla nievatowców: LiczOd powinno być "BRT" (brutto), nie "NET"
+            // Zgodnie z dokumentacją: https://api.ifirma.pl/wystawianie-faktury-sprzedazy-krajowej-dla-nievatowca/
+            $liczOd = $vatExempt ? 'BRT' : 'NET';
+            
             $invoiceData = [
                 'Zaplacono' => 0.0, // Kwota zapłacona (0 = nieopłacona)
                 'ZaplaconoNaDokumencie' => 0.0, // WYMAGANE - kwota zapłacono na dokumencie
-                'LiczOd' => 'NET',
+                'LiczOd' => $liczOd, // BRT dla nievatowców, NET dla VAT-owców
                 'DataWystawienia' => now()->format('Y-m-d'),
                 'DataSprzedazy' => now()->format('Y-m-d'),
                 'FormatDatySprzedazy' => 'DZN', // WYMAGANE - DZN (dzienny) lub MSC (miesięczny)
