@@ -11,7 +11,7 @@ class Zamowienia extends Model
 
     protected $table = 'zamowienia';
     protected $connection = 'mysql_certgen';
-    public $timestamps = true;
+    public $timestamps = false; // Wyłączamy automatyczne timestamps - tabela nie ma pól created_at/updated_at
 
     protected $fillable = [
         'id',
@@ -29,8 +29,6 @@ class Zamowienia extends Model
         'wysylka',
         'id_edu',
         'NR',
-        'created_at',
-        'updated_at'
     ];
 
     protected $casts = [
@@ -38,7 +36,5 @@ class Zamowienia extends Model
         'produkt_cena' => 'float',
         'wysylka' => 'integer',
         'id_edu' => 'integer',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime'
     ];
 }

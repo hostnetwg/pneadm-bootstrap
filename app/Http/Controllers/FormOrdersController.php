@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\FormOrder;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use App\Services\PubligoApiService;
+use App\Services\IfirmaApiService;
 
 class FormOrdersController extends Controller
 {
@@ -560,6 +562,665 @@ class FormOrdersController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Wystąpił błąd podczas resetowania: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Wystawia fakturę pro forma w iFirma.pl na podstawie zamówienia
+     */
+    public function createIfirmaProForma(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // Sprawdzenie czy zamówienie ma wymagane dane nabywcy
+            if (empty($zamowienie->buyer_name)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Sprawdzenie czy zamówienie ma produkt i cenę
+            if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Przygotowanie uwag do faktury
+            // Sprawdź, czy użytkownik przesłał niestandardowe uwagi (edytowane w formularzu)
+            $uwagi = $request->input('custom_remarks', '');
+            
+            if (empty(trim($uwagi))) {
+                // Jeśli nie ma niestandardowych uwag, generuj automatycznie dane odbiorcy
+                $recipientData = [];
+                if (!empty($zamowienie->recipient_name)) {
+                    $recipientData[] = $zamowienie->recipient_name;
+                }
+                if (!empty($zamowienie->recipient_address)) {
+                    $recipientData[] = $zamowienie->recipient_address;
+                }
+                if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
+                    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+                }
+
+                $uwagi = "ODBIORCA:\n";
+                if (!empty($recipientData)) {
+                    $uwagi .= implode("\n", $recipientData);
+                }
+            }
+            
+            // ZAWSZE na końcu dodaj identyfikator zamówienia (bez "---")
+            // Dzięki temu każda faktura pro-forma będzie miała powiązanie z zamówieniem
+            if (!empty(trim($uwagi))) {
+                $uwagi .= "\n\npnedu.pl #{$zamowienie->id}";
+            } else {
+                $uwagi = "pnedu.pl #{$zamowienie->id}";
+            }
+
+            // Przygotowanie danych kontrahenta - tylko pola z wartościami
+            $kontrahent = [
+                'Nazwa' => $zamowienie->buyer_name,
+                'Kraj' => 'PL'
+            ];
+            
+            // Dodajemy tylko pola, które mają wartości (nie wysyłamy pustych stringów)
+            if (!empty($zamowienie->buyer_address)) {
+                $kontrahent['Ulica'] = $zamowienie->buyer_address;
+            }
+            
+            if (!empty($zamowienie->buyer_postal_code)) {
+                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
+            }
+            
+            if (!empty($zamowienie->buyer_city)) {
+                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
+            }
+            
+            // NIP tylko jeśli jest podany (nie wysyłamy pustego string)
+            if (!empty($zamowienie->buyer_nip)) {
+                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
+                if (!empty($nip)) {
+                    $kontrahent['NIP'] = $nip;
+                }
+            }
+
+            // Przygotowanie pozycji faktury
+            // Zgodnie z dokumentacją API iFirma - pozycja powinna zawierać:
+            // - NazwaPelna (wymagane) - nazwa produktu/usługi
+            // - Ilosc (wymagane) - ilość jako float
+            // - CenaJednostkowa (wymagane) - cena jednostkowa netto
+            // - Jednostka (opcjonalne) - jednostka miary
+            // - StawkaVat (wymagane jeśli podatnik VAT) - stawka VAT jako float (0.23 dla 23%)
+            // - TypStawkiVat (wymagane) - typ stawki: 'PRC' dla procent, 'ZW' dla zwolnionego
+            // Przygotowanie pozycji faktury pro forma
+            // Zgodnie z dokumentacją API iFirma - próba z różnymi wariantami nazw pól
+            $pozycja = [
+                'NazwaPelna' => $zamowienie->product_name,
+                'Ilosc' => 1.0,
+                'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
+                'Jednostka' => 'sztuk',
+                'StawkaVat' => 0.23,
+                'TypStawkiVat' => 'PRC'
+            ];
+
+            // Jeśli konto jest zwolnione z VAT (nievatowiec) – dostosuj stawkę
+            if (config('services.ifirma.vat_exempt')) {
+                // Zgodnie z dokumentacją dla zwolnienia: TypStawkiVat = 'ZW', usuń/wyzeruj StawkaVat i dodaj podstawę prawną
+                unset($pozycja['StawkaVat']);
+                $pozycja['TypStawkiVat'] = 'ZW';
+                $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
+            }
+
+            // Przygotowanie danych faktury pro forma dla iFirma
+            // Zgodnie z dokumentacją API: https://api.ifirma.pl/wystawianie-faktury-proforma/
+            // Wymagane pola dla PRO FORMA (NIE są takie same jak dla zwykłej faktury!):
+            // - LiczOd (NET/BRT) - TAK
+            // - TypFakturyKrajowej (SPRZ/BUD/ZAL) - TAK
+            // - DataWystawienia - TAK
+            // - SposobZaplaty - TAK (wartości: GTK, POB, PRZ, KAR, PZA, CZK, KOM, BAR, DOT, PAL, ALG, P24, TPA, ELE)
+            // - RodzajPodpisuOdbiorcy (OUP/UPO/BPO/BWO) - TAK
+            // UWAGA: DataSprzedazy NIE jest używana w fakturach pro forma (tylko w zwykłych fakturach)!
+            
+            $invoiceData = [
+                'LiczOd' => 'NET',
+                'TypFakturyKrajowej' => 'SPRZ', // SPRZ = krajowa sprzedaż
+                'DataWystawienia' => now()->format('Y-m-d'),
+                // DataSprzedazy - NIE używamy dla pro forma (powoduje błąd walidacji)
+                'SposobZaplaty' => 'PRZ', // PRZ = przelew
+                'RodzajPodpisuOdbiorcy' => 'BWO', // brak podpisu odbiorcy i wystawcy
+                'NumerZamowienia' => (string)$zamowienie->id,
+                'Kontrahent' => $kontrahent,
+                'Pozycje' => [$pozycja]
+            ];
+            
+            // Termin płatności - opcjonalne
+            $invoiceData['TerminPlatnosci'] = now()->addDays(
+                !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14
+            )->format('Y-m-d');
+
+            // Uwagi - dodajemy tylko jeśli są (nie pusty string)
+            if (!empty(trim($uwagi ?? ''))) {
+                $invoiceData['Uwagi'] = trim($uwagi);
+            }
+
+            // Numer konta bankowego - dodajemy tylko jeśli jest skonfigurowany
+            $bankAccount = config('services.ifirma.bank_account', '');
+            if (!empty(trim($bankAccount))) {
+                $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
+            }
+
+            // Logowanie danych przed wysłaniem do API
+            Log::info('iFirma Pro Forma Request Data', [
+                'order_id' => $zamowienie->id,
+                'invoice_data' => $invoiceData,
+                'invoice_data_json' => json_encode($invoiceData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            ]);
+
+            // Wystawienie faktury pro forma przez API iFirma
+            $ifirmaService = new IfirmaApiService();
+            $result = $ifirmaService->createProFormaInvoice($invoiceData);
+
+            // Logowanie pełnej odpowiedzi dla debugowania
+            Log::info('iFirma Pro Forma Response', [
+                'order_id' => $zamowienie->id,
+                'status' => $result['status'] ?? 'unknown',
+                'status_code' => $result['status_code'] ?? null,
+                'message' => $result['message'] ?? null,
+                'full_response' => $result
+            ]);
+
+            // Zwrócenie odpowiedzi
+            if ($result['status'] === 'success') {
+                // Pobierz Identyfikator z odpowiedzi
+                $invoiceId = null;
+                if (isset($result['data']['response']['Identyfikator'])) {
+                    $invoiceId = $result['data']['response']['Identyfikator'];
+                } elseif (isset($result['data']['Identyfikator'])) {
+                    $invoiceId = $result['data']['Identyfikator'];
+                }
+
+                // Pobierz pełny numer faktury (np. "1/11/2025/ProForma") zamiast samego ID
+                $invoiceNumber = null;
+                $fullInvoiceData = null;
+                
+                if (!empty($invoiceId)) {
+                    try {
+                        // Pobierz szczegóły faktury z iFirma, aby uzyskać PelnyNumer
+                        $invoiceDetails = $ifirmaService->getProFormaInvoice($invoiceId);
+                        
+                        if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
+                            $fullInvoiceData = $invoiceDetails['data'];
+                            
+                            // Pełny numer faktury jest w polu "PelnyNumer"
+                            if (isset($fullInvoiceData['PelnyNumer'])) {
+                                $invoiceNumber = $fullInvoiceData['PelnyNumer'];
+                            } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
+                                $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
+                            }
+                        }
+                        
+                        Log::info('iFirma Pro Forma - szczegóły pobrane', [
+                            'invoice_id' => $invoiceId,
+                            'invoice_number' => $invoiceNumber,
+                            'details' => $fullInvoiceData
+                        ]);
+                    } catch (Exception $e) {
+                        Log::warning('Nie udało się pobrać pełnego numeru faktury', [
+                            'invoice_id' => $invoiceId,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Jeśli nie udało się pobrać, użyj Identyfikatora jako fallback
+                        $invoiceNumber = $invoiceId;
+                    }
+                }
+
+                // Aktualizacja numeru faktury w zamówieniu (jeśli nie istnieje)
+                if (!empty($invoiceNumber) && empty($zamowienie->invoice_number)) {
+                    $zamowienie->invoice_number = $invoiceNumber;
+                    $zamowienie->save();
+                }
+
+                // Wysyłka e-mailem (jeśli zaznaczono checkbox)
+                $sendEmail = $request->input('send_email', false);
+                $emailsSent = [];
+                $emailErrors = [];
+                
+                if ($sendEmail && !empty($invoiceId)) {
+                    // Zbierz unikalne adresy e-mail (małe litery, bez duplikatów)
+                    $emails = [];
+                    
+                    // E-mail zamawiającego
+                    if (!empty($zamowienie->orderer_email)) {
+                        $emails[] = strtolower(trim($zamowienie->orderer_email));
+                    }
+                    
+                    // E-mail uczestnika (jeśli różny od zamawiającego)
+                    if (!empty($zamowienie->participant_email)) {
+                        $participantEmail = strtolower(trim($zamowienie->participant_email));
+                        if (!in_array($participantEmail, $emails)) {
+                            $emails[] = $participantEmail;
+                        }
+                    }
+                    
+                    // Wysyłka do wszystkich adresów
+                    foreach ($emails as $email) {
+                        try {
+                            $sendResult = $ifirmaService->sendProFormaByEmail(
+                                $invoiceId, 
+                                $email, 
+                                $invoiceNumber, 
+                                $zamowienie->id
+                            );
+                            
+                            if ($sendResult['status'] === 'success') {
+                                $emailsSent[] = $email;
+                                Log::info('Faktura pro forma wysłana e-mailem', [
+                                    'invoice_id' => $invoiceId,
+                                    'email' => $email
+                                ]);
+                            } else {
+                                $emailErrors[] = [
+                                    'email' => $email,
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                ];
+                                Log::warning('Błąd wysyłki faktury pro forma', [
+                                    'invoice_id' => $invoiceId,
+                                    'email' => $email,
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                ]);
+                            }
+                        } catch (Exception $e) {
+                            $emailErrors[] = [
+                                'email' => $email,
+                                'error' => $e->getMessage()
+                            ];
+                            Log::error('Exception podczas wysyłki faktury pro forma', [
+                                'invoice_id' => $invoiceId,
+                                'email' => $email,
+                                'exception' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                }
+
+                // Przygotuj wiadomość dla użytkownika
+                $message = 'Faktura pro forma została pomyślnie wystawiona w iFirma.pl';
+                if (!empty($emailsSent)) {
+                    $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+                }
+                if (!empty($emailErrors)) {
+                    $message .= ' (Błędy wysyłki: ' . count($emailErrors) . ')';
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_id' => $invoiceId,
+                    'invoice_data' => $invoiceData,
+                    'ifirma_response' => $result['data'] ?? $result['raw_response'] ?? null,
+                    'emails_sent' => $emailsSent,
+                    'email_errors' => $emailErrors,
+                    'created_at' => now()->format('d.m.Y H:i')
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['message'] ?? 'Nie udało się wystawić faktury pro forma',
+                    'invoice_data' => $invoiceData,
+                    'ifirma_response' => $result['raw_response'] ?? null,
+                    'status_code' => $result['status_code'] ?? null
+                ], 500);
+            }
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Wystawia fakturę krajową (nie pro-forma) w iFirma.pl na podstawie zamówienia
+     */
+    public function createIfirmaInvoice(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // Sprawdzenie czy zamówienie ma wymagane dane nabywcy
+            if (empty($zamowienie->buyer_name)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Sprawdzenie czy zamówienie ma produkt i cenę
+            if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Przygotowanie uwag do faktury
+            $uwagi = $request->input('custom_remarks', '');
+            
+            if (empty(trim($uwagi))) {
+                // Jeśli nie ma niestandardowych uwag, generuj automatycznie dane odbiorcy
+                $recipientData = [];
+                if (!empty($zamowienie->recipient_name)) {
+                    $recipientData[] = $zamowienie->recipient_name;
+                }
+                if (!empty($zamowienie->recipient_address)) {
+                    $recipientData[] = $zamowienie->recipient_address;
+                }
+                if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
+                    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+                }
+
+                $uwagi = "ODBIORCA:\n";
+                if (!empty($recipientData)) {
+                    $uwagi .= implode("\n", $recipientData);
+                }
+            }
+            
+            // ZAWSZE na końcu dodaj identyfikator zamówienia
+            if (!empty(trim($uwagi))) {
+                $uwagi .= "\n\npnedu.pl #{$zamowienie->id}";
+            } else {
+                $uwagi = "pnedu.pl #{$zamowienie->id}";
+            }
+
+            // Przygotowanie danych kontrahenta
+            $kontrahent = [
+                'Nazwa' => $zamowienie->buyer_name,
+                'Kraj' => 'PL'
+            ];
+            
+            if (!empty($zamowienie->buyer_address)) {
+                $kontrahent['Ulica'] = $zamowienie->buyer_address;
+            }
+            
+            if (!empty($zamowienie->buyer_postal_code)) {
+                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
+            }
+            
+            if (!empty($zamowienie->buyer_city)) {
+                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
+            }
+            
+            if (!empty($zamowienie->buyer_nip)) {
+                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
+                if (!empty($nip)) {
+                    $kontrahent['NIP'] = $nip;
+                }
+            }
+
+            // Sprawdzenie, czy konto jest na RYCZAŁCIE
+            $isLumpSum = config('services.ifirma.is_lump_sum', false);
+            
+            // Przygotowanie pozycji faktury
+            if ($isLumpSum) {
+                // RYCZAŁTOWIEC - ostatnia próba: struktura IDENTYCZNA z przykładem z dokumentacji
+                // Przykład z dokumentacji:
+                // {
+                //   "StawkaVat": 0.23,
+                //   "StawkaRyczaltu": 0.03,
+                //   "Ilosc": 3,
+                //   "CenaJednostkowa": 47.14,
+                //   "NazwaPelna": "Neseser",
+                //   "Jednostka": "sztuk",
+                //   "PKWiU": "",
+                //   "TypStawkiVat": "PRC"
+                // }
+                // Dla ryczałtowca zwolnionego z VAT: StawkaVat = 0, TypStawkiVat = ZW
+                $lumpSumRate = (float) config('services.ifirma.lump_sum_rate', 0.085);
+                $pozycja = [
+                    'StawkaVat' => 0, // 0 zamiast 0.23 dla zwolnionych
+                    'StawkaRyczaltu' => $lumpSumRate,
+                    'Ilosc' => 1.0,
+                    'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
+                    'NazwaPelna' => $zamowienie->product_name,
+                    'Jednostka' => 'sztuk',
+                    'PKWiU' => '',
+                    'TypStawkiVat' => 'ZW', // ZW zamiast PRC dla zwolnionych
+                ];
+            } else {
+                // Nie-ryczałtowiec (zwykły VAT lub zwolniony)
+                $pozycja = [
+                    'NazwaPelna' => $zamowienie->product_name,
+                    'Ilosc' => 1.0,
+                    'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
+                    'Jednostka' => 'sztuk',
+                    'PKWiU' => '',
+                ];
+                
+                if (config('services.ifirma.vat_exempt')) {
+                    $pozycja['TypStawkiVat'] = 'ZW';
+                    $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
+                } else {
+                    $pozycja['StawkaVat'] = 0.23;
+                    $pozycja['TypStawkiVat'] = 'PRC';
+                }
+            }
+            
+
+            // Przygotowanie danych faktury krajowej dla iFirma
+            // Zgodnie z dokumentacją: https://api.ifirma.pl/wystawianie-faktury-krajowej/
+            // RÓŻNICE vs PRO-FORMA:
+            // - Endpoint: fakturakraj.json (nie fakturaproformakraj.json)
+            // - DataSprzedazy jest WYMAGANA (w pro-forma jej nie ma)
+            // - BRAK pola TypFakturyKrajowej (to pole jest TYLKO dla pro-forma!)
+            // - RodzajPodpisuOdbiorcy może być opcjonalne
+            
+            $invoiceData = [
+                'Zaplacono' => 0.0, // Kwota zapłacona (0 = nieopłacona)
+                'ZaplaconoNaDokumencie' => 0.0, // WYMAGANE - kwota zapłacono na dokumencie
+                'LiczOd' => 'NET',
+                'DataWystawienia' => now()->format('Y-m-d'),
+                'DataSprzedazy' => now()->format('Y-m-d'),
+                'FormatDatySprzedazy' => 'DZN', // WYMAGANE - DZN (dzienny) lub MSC (miesięczny)
+                'SposobZaplaty' => 'PRZ', // PRZ = przelew
+                'RodzajPodpisuOdbiorcy' => 'BWO', // WYMAGANE - BWO (bez podpisu odbiorcy i wystawcy)
+                'NumerZamowienia' => (string)$zamowienie->id,
+                'Kontrahent' => $kontrahent,
+                'Pozycje' => [$pozycja]
+            ];
+            
+            // Termin płatności - ODROCZONA PŁATNOŚĆ zgodnie z invoice_payment_delay
+            $paymentDelay = !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14;
+            $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+
+            // Uwagi
+            if (!empty(trim($uwagi))) {
+                $invoiceData['Uwagi'] = trim($uwagi);
+            }
+
+            // Numer konta bankowego
+            $bankAccount = config('services.ifirma.bank_account', '');
+            if (!empty(trim($bankAccount))) {
+                $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
+            }
+
+            Log::info('iFirma Invoice Request Data', [
+                'order_id' => $zamowienie->id,
+                'invoice_data' => $invoiceData,
+                'payment_delay_days' => $paymentDelay
+            ]);
+
+            // Wystawienie faktury przez API iFirma
+            $ifirmaService = new IfirmaApiService();
+            $result = $ifirmaService->createInvoice($invoiceData);
+
+            Log::info('iFirma Invoice Response', [
+                'order_id' => $zamowienie->id,
+                'status' => $result['status'] ?? 'unknown',
+                'status_code' => $result['status_code'] ?? null,
+                'message' => $result['message'] ?? null,
+                'full_response' => $result
+            ]);
+
+            if ($result['status'] === 'success') {
+                // Pobierz Identyfikator z odpowiedzi
+                $invoiceId = null;
+                if (isset($result['data']['response']['Identyfikator'])) {
+                    $invoiceId = $result['data']['response']['Identyfikator'];
+                } elseif (isset($result['data']['Identyfikator'])) {
+                    $invoiceId = $result['data']['Identyfikator'];
+                }
+
+                // Pobierz pełny numer faktury
+                $invoiceNumber = null;
+                $fullInvoiceData = null;
+                
+                if (!empty($invoiceId)) {
+                    try {
+                        $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
+                        
+                        if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
+                            $fullInvoiceData = $invoiceDetails['data'];
+                            
+                            if (isset($fullInvoiceData['PelnyNumer'])) {
+                                $invoiceNumber = $fullInvoiceData['PelnyNumer'];
+                            } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
+                                $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
+                            }
+                        }
+                        
+                        Log::info('iFirma Invoice - szczegóły pobrane', [
+                            'invoice_id' => $invoiceId,
+                            'invoice_number' => $invoiceNumber,
+                            'details' => $fullInvoiceData
+                        ]);
+                    } catch (Exception $e) {
+                        Log::warning('Nie udało się pobrać pełnego numeru faktury', [
+                            'invoice_id' => $invoiceId,
+                            'error' => $e->getMessage()
+                        ]);
+                        $invoiceNumber = $invoiceId;
+                    }
+                }
+
+                // Aktualizacja numeru faktury w zamówieniu
+                if (!empty($invoiceNumber) && empty($zamowienie->invoice_number)) {
+                    $zamowienie->invoice_number = $invoiceNumber;
+                    $zamowienie->save();
+                }
+
+                // Wysyłka e-mailem (jeśli zaznaczono checkbox)
+                $sendEmail = $request->input('send_email', false);
+                $emailsSent = [];
+                $emailErrors = [];
+                
+                if ($sendEmail && !empty($invoiceId)) {
+                    $emails = [];
+                    
+                    if (!empty($zamowienie->orderer_email)) {
+                        $emails[] = strtolower(trim($zamowienie->orderer_email));
+                    }
+                    
+                    if (!empty($zamowienie->participant_email)) {
+                        $participantEmail = strtolower(trim($zamowienie->participant_email));
+                        if (!in_array($participantEmail, $emails)) {
+                            $emails[] = $participantEmail;
+                        }
+                    }
+                    
+                    foreach ($emails as $email) {
+                        try {
+                            $sendResult = $ifirmaService->sendInvoiceByEmail(
+                                $invoiceId, 
+                                $email, 
+                                $invoiceNumber, 
+                                $zamowienie->id,
+                                'invoice'
+                            );
+                            
+                            if ($sendResult['status'] === 'success') {
+                                $emailsSent[] = $email;
+                                Log::info('Faktura wysłana e-mailem', [
+                                    'invoice_id' => $invoiceId,
+                                    'email' => $email
+                                ]);
+                            } else {
+                                $emailErrors[] = [
+                                    'email' => $email,
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                ];
+                                Log::warning('Błąd wysyłki faktury', [
+                                    'invoice_id' => $invoiceId,
+                                    'email' => $email,
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                ]);
+                            }
+                        } catch (Exception $e) {
+                            $emailErrors[] = [
+                                'email' => $email,
+                                'error' => $e->getMessage()
+                            ];
+                            Log::error('Exception podczas wysyłki faktury', [
+                                'invoice_id' => $invoiceId,
+                                'email' => $email,
+                                'exception' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                }
+
+                $message = 'Faktura została pomyślnie wystawiona w iFirma.pl';
+                if (!empty($emailsSent)) {
+                    $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+                }
+                if (!empty($emailErrors)) {
+                    $message .= ' (Błędy wysyłki: ' . count($emailErrors) . ')';
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_id' => $invoiceId,
+                    'invoice_data' => $invoiceData,
+                    'ifirma_response' => $result['data'] ?? $result['raw_response'] ?? null,
+                    'emails_sent' => $emailsSent,
+                    'email_errors' => $emailErrors,
+                    'created_at' => now()->format('d.m.Y H:i')
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['message'] ?? 'Nie udało się wystawić faktury',
+                    'invoice_data' => $invoiceData,
+                    'ifirma_response' => $result['raw_response'] ?? null,
+                    'status_code' => $result['status_code'] ?? null
+                ], 500);
+            }
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
             ], 500);
         }
     }

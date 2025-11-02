@@ -189,16 +189,53 @@ nowoczesna-edukacja.pl </div>
                         </div>
                     </div>
 
-                    {{-- Button Dodaj zamówienie PUBLIGO --}}
-                    @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
-                        <div class="mb-3">
+                    {{-- Buttons PUBLIGO i iFirma --}}
+                    <div class="mb-3 d-flex gap-2 flex-wrap">
+                        {{-- Button Dodaj zamówienie PUBLIGO --}}
+                        @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
                             <button type="button" class="btn btn-primary" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
                                 <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
                             </button>
-                            <div id="publigoResult" class="mt-2"></div>
+                        @endif
+                        
+                        {{-- Button Wystaw PRO-FORMA iFirma --}}
+                        <div class="d-flex flex-column gap-1">
+                            <button type="button" class="btn btn-success" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
+                                <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
+                            </button>
+                            <div class="form-check" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma" checked>
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
                         </div>
-                    @elseif($zamowienie->publigo_sent == 1)
-                        <div class="mb-3">
+
+                        {{-- Button Wystaw Fakturę iFirma --}}
+                        <div class="d-flex flex-column gap-1">
+                            <button type="button" class="btn btn-primary" id="ifirmaInvoiceBtn" onclick="createIfirmaInvoice({{ $zamowienie->id }})">
+                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
+                            </button>
+                            <div class="form-check" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice" checked>
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="publigoResult" class="mt-2"></div>
+                    <div id="ifirmaResult" class="mt-2"></div>
+                    
+                    {{-- Informacja o statusie Publigo --}}
+                    @if($zamowienie->publigo_sent == 1)
+                        <div class="mb-3 mt-3">
                             <div class="alert alert-success">
                                 <i class="bi bi-check-circle"></i> 
                                 <strong>Zamówienie zostało wysłane do Publigo</strong>
@@ -219,11 +256,11 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             </div>
                         </div>
-                    @else
-                        <div class="mb-3">
+                    @elseif(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
+                        <div class="mb-3 mt-3">
                             <small class="text-muted">
                                 <i class="bi bi-info-circle"></i> 
-                                Brak danych produktu Publigo - zamówienie nie może być przesłane
+                                Brak danych produktu Publigo - zamówienie nie może być przesłane do Publigo
                             </small>
                         </div>
                     @endif
@@ -353,7 +390,7 @@ nowoczesna-edukacja.pl </div>
                                         @if($zamowienie->invoice_notes)
                                             <div class="mb-1">
                                                 <small class="text-danger">
-                                                    <strong>Uwagi:</strong> {{ $zamowienie->invoice_notes }}
+                                                    <strong>Uwagi od zamawiającego:</strong> {{ $zamowienie->invoice_notes }}
                                                 </small>
                                             </div>
                                         @endif
@@ -368,6 +405,48 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                 </div>
                             @endif
+                            
+                            {{-- UWAGI DO FAKTURY (edytowalne dla API iFirma) --}}
+                            <div class="card mt-3">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-pencil-square"></i> UWAGI DO FAKTURY (dla API iFirma)
+                                    </h6>
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="mb-2">
+                                        <label for="invoice_api_remarks" class="form-label small mb-1">
+                                            <strong>Uwagi, które pojawią się na fakturze:</strong>
+                                            <br>
+                                            <small class="text-muted">Możesz edytować ten tekst przed wystawieniem faktury</small>
+                                        </label>
+                                        <textarea class="form-control form-control-sm" 
+                                                  id="invoice_api_remarks" 
+                                                  rows="4" 
+                                                  placeholder="ODBIORCA:&#10;[dane odbiorcy]"
+                                                  style="font-family: monospace; font-size: 12px;">@php
+$recipientData = [];
+if (!empty($zamowienie->recipient_name)) $recipientData[] = $zamowienie->recipient_name;
+if (!empty($zamowienie->recipient_address)) $recipientData[] = $zamowienie->recipient_address;
+if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
+    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+}
+
+// Tylko dane odbiorcy - bez uwag od zamawiającego i bez pnedu.pl #ID (to dodaje backend)
+$remarks = "ODBIORCA:\n";
+if (!empty($recipientData)) {
+    $remarks .= implode("\n", $recipientData);
+}
+
+echo $remarks;
+@endphp</textarea>
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i> Ten tekst zostanie użyty jako "Uwagi" na fakturze. 
+                                            <strong>Na końcu automatycznie dodamy: "pnedu.pl #{{ $zamowienie->id }}"</strong>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
 
                             {{-- DODATKOWE INFORMACJE - kompaktowe --}}
                             @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->fb_source)
@@ -591,6 +670,285 @@ nowoczesna-edukacja.pl `;
                 // Przywrócenie stanu przycisku
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO';
+            });
+        }
+
+        // Funkcja do wystawiania faktury pro forma w iFirma
+        function createIfirmaProForma(orderId) {
+            const button = document.getElementById('ifirmaProFormaBtn');
+            const resultDiv = document.getElementById('ifirmaResult');
+            
+            // Pobierz edytowalne uwagi do faktury
+            const invoiceRemarksTextarea = document.getElementById('invoice_api_remarks');
+            const customRemarks = invoiceRemarksTextarea ? invoiceRemarksTextarea.value.trim() : '';
+            
+            // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
+            const sendEmailCheckbox = document.getElementById('sendEmailCheckboxProforma');
+            const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            
+            // Wyczyść poprzednie komunikaty
+            resultDiv.innerHTML = '';
+            
+            // Wysłanie zapytania AJAX z niestandardowymi uwagami i opcją wysyłki e-mail
+            fetch(`/form-orders/${orderId}/ifirma/proforma`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    custom_remarks: customRemarks,
+                    send_email: sendEmail
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Sukces
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Sukces!</strong> ${data.message}
+                            ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
+                                <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                    
+                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
+                    if (data.invoice_number) {
+                        const invoiceNumberInput = document.getElementById('invoice_number');
+                        if (invoiceNumberInput) {
+                            invoiceNumberInput.value = data.invoice_number;
+                            
+                            // Wizualny efekt - podświetlenie pola na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s';
+                            invoiceNumberInput.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                invoiceNumberInput.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                    }
+                    
+                    // NIE odświeżamy strony automatycznie - użytkownik może zobaczyć szczegóły
+                    // Jeśli użytkownik chce, może odświeżyć ręcznie
+                } else {
+                    // Błąd
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${data.error}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        ${data.ifirma_response ? `
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showIfirmaDetails()">
+                                    <i class="bi bi-info-circle"></i> Pokaż szczegóły błędu
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Błąd połączenia:</strong> Wystąpił błąd podczas komunikacji z serwerem.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma';
+            });
+        }
+
+        // Funkcja do wystawiania zwykłej faktury w iFirma
+        function createIfirmaInvoice(orderId) {
+            const button = document.getElementById('ifirmaInvoiceBtn');
+            const resultDiv = document.getElementById('ifirmaResult');
+            
+            // Pobierz edytowalne uwagi do faktury
+            const invoiceRemarksTextarea = document.getElementById('invoice_api_remarks');
+            const customRemarks = invoiceRemarksTextarea ? invoiceRemarksTextarea.value.trim() : '';
+            
+            // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
+            const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoice');
+            const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            
+            // Wyczyść poprzednie komunikaty
+            resultDiv.innerHTML = '';
+            
+            // Wysłanie zapytania AJAX z niestandardowymi uwagami i opcją wysyłki e-mail
+            fetch(`/form-orders/${orderId}/ifirma/invoice`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    custom_remarks: customRemarks,
+                    send_email: sendEmail
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Sukces
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Sukces!</strong> ${data.message}
+                            ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
+                                <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                    
+                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
+                    if (data.invoice_number) {
+                        const invoiceNumberInput = document.getElementById('invoice_number');
+                        if (invoiceNumberInput) {
+                            invoiceNumberInput.value = data.invoice_number;
+                            
+                            // Wizualny efekt - podświetlenie pola na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s';
+                            invoiceNumberInput.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                invoiceNumberInput.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                    }
+                    
+                } else {
+                    // Błąd
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${data.error}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        ${data.ifirma_response ? `
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showIfirmaDetails()">
+                                    <i class="bi bi-info-circle"></i> Pokaż szczegóły błędu
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Błąd połączenia:</strong> Wystąpił błąd podczas komunikacji z serwerem.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma';
+            });
+        }
+
+        // Funkcja do wyświetlania szczegółów odpowiedzi iFirma
+        function showIfirmaDetails() {
+            if (!window.ifirmaResponseData) return;
+            
+            const data = window.ifirmaResponseData;
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-info-circle"></i> Szczegóły odpowiedzi iFirma
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <h6><i class="bi bi-info-circle"></i> Informacje:</h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Status:</strong> <span class="badge ${data.success ? 'bg-success' : 'bg-danger'}">${data.success ? 'Sukces' : 'Błąd'}</span></li>
+                                    ${data.invoice_number ? `<li><strong>Numer faktury:</strong> <code>${data.invoice_number}</code></li>` : ''}
+                                    ${data.created_at ? `<li><strong>Utworzono:</strong> ${data.created_at}</li>` : ''}
+                                    ${data.status_code ? `<li><strong>Kod HTTP:</strong> <span class="badge ${data.status_code === 200 ? 'bg-success' : 'bg-danger'}">${data.status_code}</span></li>` : ''}
+                                </ul>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-send"></i> Wysłane dane do API:</h6>
+                                    <pre class="bg-light p-2 rounded" style="font-size: 11px; max-height: 400px; overflow-y: auto;">${JSON.stringify(data.invoice_data, null, 2)}</pre>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-reply"></i> Pełna odpowiedź z iFirma:</h6>
+                                    <pre class="bg-light p-2 rounded" style="font-size: 11px; max-height: 400px; overflow-y: auto;">${JSON.stringify(data.ifirma_response, null, 2)}</pre>
+                                </div>
+                            </div>
+                            ${data.error ? `
+                                <div class="alert alert-danger mt-3">
+                                    <strong>Błąd:</strong> ${data.error}
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Usuń modal z DOM po zamknięciu
+            modal.addEventListener('hidden.bs.modal', function () {
+                document.body.removeChild(modal);
             });
         }
 

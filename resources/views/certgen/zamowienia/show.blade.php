@@ -10,6 +10,10 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3>Zakup ID: {{ $zamowienie->id }}</h3>
                 <div>
+                    <a href="{{ route('certgen.zamowienia.edit', $zamowienie->id) }}" 
+                       class="btn btn-warning">
+                        ✏️ Edytuj
+                    </a>
                     <button type="button" class="btn btn-danger" 
                             data-bs-toggle="modal" 
                             data-bs-target="#deleteModal">
@@ -114,14 +118,6 @@
                                 <tr>
                                     <td><strong>NR:</strong></td>
                                     <td>{{ isset($zamowienie->NR) ? $zamowienie->NR : 'Brak' }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Utworzono:</strong></td>
-                                    <td>{{ isset($zamowienie->created_at) ? \Carbon\Carbon::parse($zamowienie->created_at)->format('d.m.Y H:i:s') : 'Brak' }}</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Zaktualizowano:</strong></td>
-                                    <td>{{ isset($zamowienie->updated_at) ? \Carbon\Carbon::parse($zamowienie->updated_at)->format('d.m.Y H:i:s') : 'Brak' }}</td>
                                 </tr>
                             </table>
                         </div>

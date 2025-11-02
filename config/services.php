@@ -47,4 +47,30 @@ return [
         'token' => env('CLICKMEETING_API_TOKEN'),
     ],
 
+    'ifirma' => [
+        'login' => env('IFIRMA_LOGIN', ''),
+        'base_url' => env('IFIRMA_BASE_URL', 'https://www.ifirma.pl'),
+        'api_endpoint' => env('IFIRMA_API_ENDPOINT', '/iapi'),
+        'keys' => [
+            'faktura' => env('IFIRMA_KEY_FAKTURA', ''),
+            'rachunek' => env('IFIRMA_KEY_RACHUNEK', ''),
+            'abonent' => env('IFIRMA_KEY_ABONENT', ''),
+            'wydatek' => env('IFIRMA_KEY_WYDATEK', ''),
+            'mobilny' => env('IFIRMA_KEY_MOBILNY', ''),
+        ],
+        'timeout' => env('IFIRMA_TIMEOUT', 30),
+        // Konfiguracja VAT
+        'vat_exempt' => env('IFIRMA_VAT_EXEMPT', false),
+        'vat_exemption_basis' => env('IFIRMA_VAT_EXEMPTION_BASIS', 'Art. 43 ust. 1 pkt 29 lit. b)'),
+        // Opcjonalnie: numer konta bankowego do umieszczenia na fakturze
+        'bank_account' => env('IFIRMA_BANK_ACCOUNT', ''),
+        // Adres e-mail nadawcy (WYMAGANY do wysyłki faktur) - musi być skonfigurowany w iFirma
+        'sender_email' => env('IFIRMA_SENDER_EMAIL', ''),
+        // Ryczałt - czy firma jest na ryczałcie
+        'is_lump_sum' => env('IFIRMA_IS_LUMP_SUM', false),
+        // Stawka ryczałtu (np. 0.085 = 8.5%)
+        // UWAGA: Dokumentacja iFirma podaje 0.85 zamiast 0.085 - testujemy wartość z dokumentacji
+        'lump_sum_rate' => env('IFIRMA_LUMP_SUM_RATE', 0.85),
+    ],
+
 ];

@@ -142,6 +142,10 @@
                                                    class="btn btn-sm btn-info" title="Szczegóły">
                                                     👁️
                                                 </a>
+                                                <a href="{{ route('certgen.zamowienia.edit', $zamowienie->id) }}" 
+                                                   class="btn btn-sm btn-warning" title="Edytuj">
+                                                    ✏️
+                                                </a>
                                                 <button type="button" class="btn btn-sm btn-danger" title="Usuń"
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#deleteModal{{ $zamowienie->id }}">

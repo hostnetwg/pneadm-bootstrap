@@ -52,6 +52,59 @@ class ZamowieniaController extends Controller
         }
     }
 
+    public function edit($id)
+    {
+        try {
+            $zamowienie = Zamowienia::findOrFail($id);
+            return view('certgen.zamowienia.edit', compact('zamowienie'));
+        } catch (\Exception $e) {
+            return redirect()->route('certgen.zamowienia.index')
+                ->with('error', 'Rekord nie został znaleziony lub wystąpił błąd: ' . $e->getMessage());
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $zamowienie = Zamowienia::findOrFail($id);
+            
+            $validated = $request->validate([
+                'id_zam' => 'nullable|string|max:255',
+                'data_wplaty' => 'nullable|date',
+                'imie' => 'nullable|string|max:255',
+                'nazwisko' => 'nullable|string|max:255',
+                'email' => 'nullable|email|max:255',
+                'kod' => 'nullable|string|max:255',
+                'poczta' => 'nullable|string|max:255',
+                'adres' => 'nullable|string|max:500',
+                'produkt_id' => 'nullable|string|max:255',
+                'produkt_nazwa' => 'nullable|string|max:500',
+                'produkt_cena' => 'nullable|numeric|min:0',
+                'wysylka' => 'nullable|integer',
+                'id_edu' => 'nullable|integer',
+                'NR' => 'nullable|string|max:255',
+            ]);
+
+            // Usuwamy tylko NULL i puste stringi, ale zachowujemy 0 i '0'
+            $dataToUpdate = array_filter($validated, function($value) {
+                return $value !== null && $value !== '';
+            });
+
+            $zamowienie->update($dataToUpdate);
+
+            return redirect()->route('certgen.zamowienia.show', $id)
+                ->with('success', 'Zakup został zaktualizowany.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('certgen.zamowienia.edit', $id)
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->route('certgen.zamowienia.edit', $id)
+                ->with('error', 'Wystąpił błąd podczas aktualizacji: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
     public function destroy($id)
     {
         try {

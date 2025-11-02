@@ -9,6 +9,7 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
+use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\MarketingCampaignController;
 use App\Http\Controllers\MarketingSourceTypeController;
@@ -77,6 +78,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/publigo/test-api', [PubligoController::class, 'testApi'])->name('publigo.test-api');
     Route::get('/publigo/products', [PubligoController::class, 'productsIndex'])->name('publigo.products.index');
     
+    // iFirma.pl - integracja z oprogramowaniem księgowym
+    Route::prefix('ifirma')->name('ifirma.')->group(function () {
+        Route::get('/test-connection', [IfirmaController::class, 'testConnection'])->name('test-connection');
+    });
+    
     Route::get('/import-publigo', [CoursesController::class, 'importFromPubligo'])->name('courses.importPubligo');      
     
     // Baza Certgen - dane dla webhook
@@ -101,6 +107,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         // Baza Certgen - zamówienia
         Route::get('/zamowienia', [ZamowieniaController::class, 'index'])->name('zamowienia.index');
         Route::get('/zamowienia/{id}', [ZamowieniaController::class, 'show'])->name('zamowienia.show');
+        Route::get('/zamowienia/{id}/edit', [ZamowieniaController::class, 'edit'])->name('zamowienia.edit');
+        Route::put('/zamowienia/{id}', [ZamowieniaController::class, 'update'])->name('zamowienia.update');
         Route::delete('/zamowienia/{id}', [ZamowieniaController::class, 'destroy'])->name('zamowienia.destroy');
     });
     
@@ -142,6 +150,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/duplicates/{id}/update-notes', [FormOrdersController::class, 'updateNotes'])->name('duplicates.update-notes');
         Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
         Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
+        Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
+        Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');
     });
 
     // Marketing Campaigns - źródła pozyskania
