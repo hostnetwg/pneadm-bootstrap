@@ -190,20 +190,20 @@ nowoczesna-edukacja.pl </div>
                     </div>
 
                     {{-- Buttons PUBLIGO i iFirma --}}
-                    <div class="mb-3 d-flex gap-2 flex-wrap">
+                    <div class="mb-3 d-flex flex-column gap-2">
                         {{-- Button Dodaj zamówienie PUBLIGO --}}
                         @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
-                            <button type="button" class="btn btn-primary" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
+                            <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
                                 <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
                             </button>
                         @endif
                         
                         {{-- Button Wystaw PRO-FORMA iFirma --}}
-                        <div class="d-flex flex-column gap-1">
-                            <button type="button" class="btn btn-success" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
+                        <div class="w-100">
+                            <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
                                 <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
                             </button>
-                            <div class="form-check" style="font-size: 0.875rem;">
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
                                 <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
@@ -215,11 +215,11 @@ nowoczesna-edukacja.pl </div>
                         </div>
 
                         {{-- Button Wystaw Fakturę iFirma --}}
-                        <div class="d-flex flex-column gap-1">
-                            <button type="button" class="btn btn-primary" id="ifirmaInvoiceBtn" onclick="createIfirmaInvoice({{ $zamowienie->id }})">
+                        <div class="w-100">
+                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn" onclick="createIfirmaInvoice({{ $zamowienie->id }})">
                                 <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
                             </button>
-                            <div class="form-check" style="font-size: 0.875rem;">
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
                                 <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
