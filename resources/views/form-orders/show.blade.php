@@ -239,7 +239,8 @@ nowoczesna-edukacja.pl </div>
 
                         {{-- Button Wystaw Fakturę iFirma --}}
                         <div class="w-100">
-                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn" onclick="createIfirmaInvoice({{ $zamowienie->id }})">
+                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn" 
+                                    onclick="checkAndCreateInvoice({{ $zamowienie->id }})">
                                 <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
                             </button>
                             <div class="form-check mt-1" style="font-size: 0.875rem;">
@@ -388,9 +389,7 @@ nowoczesna-edukacja.pl </div>
                                     <div class="card-body py-2">
                                         @if($zamowienie->invoice_notes)
                                             <div class="mb-1">
-                                                <small class="text-danger">
-                                                    <strong>Uwagi od zamawiającego:</strong> {{ $zamowienie->invoice_notes }}
-                                                </small>
+                                                <small class="text-danger" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
                                             </div>
                                         @endif
                                         @if($zamowienie->invoice_payment_delay)
@@ -728,23 +727,32 @@ nowoczesna-edukacja.pl `;
                     // Przechowanie danych do wyświetlenia szczegółów
                     window.ifirmaResponseData = data;
                     
-                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
+                    // Automatyczne wypełnienie pola "Notatki" numerem PRO-FORMA
+                    // PRO-FORMA zapisuje się w notes (Notatki), nie w invoice_number!
                     if (data.invoice_number) {
-                        const invoiceNumberInput = document.getElementById('invoice_number');
-                        if (invoiceNumberInput) {
-                            invoiceNumberInput.value = data.invoice_number;
+                        const notesTextarea = document.getElementById('notes');
+                        if (notesTextarea) {
+                            // Pobierz istniejące notatki
+                            const existingNotes = notesTextarea.value.trim();
                             
-                            // Wizualny efekt - podświetlenie pola na zielono na moment
-                            invoiceNumberInput.style.transition = 'background-color 0.3s';
-                            invoiceNumberInput.style.backgroundColor = '#d4edda';
-                            setTimeout(() => {
-                                invoiceNumberInput.style.backgroundColor = '';
-                            }, 2000);
+                            // Sprawdź czy numer PRO-FORMA już nie jest w notatkach
+                            if (existingNotes.indexOf(data.invoice_number) === -1) {
+                                // Dodaj numer PRO-FORMA na początku (na górze), spychając poprzednie wpisy w dół
+                                const proFormaNote = existingNotes 
+                                    ? `PRO-FORMA: ${data.invoice_number}\n${existingNotes}`
+                                    : `PRO-FORMA: ${data.invoice_number}`;
+                                
+                                notesTextarea.value = proFormaNote;
+                                
+                                // Wizualny efekt - podświetlenie pola na zielono na moment
+                                notesTextarea.style.transition = 'background-color 0.3s';
+                                notesTextarea.style.backgroundColor = '#d4edda';
+                                setTimeout(() => {
+                                    notesTextarea.style.backgroundColor = '';
+                                }, 2000);
+                            }
                         }
                     }
-                    
-                    // NIE odświeżamy strony automatycznie - użytkownik może zobaczyć szczegóły
-                    // Jeśli użytkownik chce, może odświeżyć ręcznie
                 } else {
                     // Błąd
                     resultDiv.innerHTML = `
@@ -781,6 +789,38 @@ nowoczesna-edukacja.pl `;
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma';
             });
+        }
+
+        // Funkcja sprawdzająca czy invoice_number jest wypełnione przed wystawieniem faktury
+        function checkAndCreateInvoice(orderId) {
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            const invoiceNumber = invoiceNumberInput ? invoiceNumberInput.value.trim() : '';
+            
+            // Jeśli numer faktury jest już wypełniony, pokaż modal ostrzeżenia
+            if (invoiceNumber) {
+                // Aktualizuj wyświetlany numer faktury w modalu (na wypadek, gdyby został zmieniony po załadowaniu strony)
+                const invoiceNumberDisplay = document.getElementById('currentInvoiceNumberDisplay');
+                if (invoiceNumberDisplay) {
+                    invoiceNumberDisplay.textContent = invoiceNumber;
+                }
+                
+                const modal = new bootstrap.Modal(document.getElementById('invoiceWarningModal'));
+                modal.show();
+            } else {
+                // Jeśli nie ma numeru, wystaw fakturę bezpośrednio
+                createIfirmaInvoice(orderId);
+            }
+        }
+
+        // Funkcja potwierdzająca wystawienie faktury (wywoływana z modala ostrzeżenia)
+        function confirmCreateIfirmaInvoice(orderId) {
+            // Zamknij modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('invoiceWarningModal'));
+            if (modal) {
+                modal.hide();
+            }
+            // Wywołaj funkcję wystawiania faktury
+            createIfirmaInvoice(orderId);
         }
 
         // Funkcja do wystawiania zwykłej faktury w iFirma
@@ -840,6 +880,7 @@ nowoczesna-edukacja.pl `;
                     window.ifirmaResponseData = data;
                     
                     // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
+                    // Tylko dla Faktury krajowej (nie PRO-FORMA) - Faktura zapisuje się w invoice_number
                     if (data.invoice_number) {
                         const invoiceNumberInput = document.getElementById('invoice_number');
                         if (invoiceNumberInput) {
@@ -1195,6 +1236,40 @@ nowoczesna-edukacja.pl `;
         // Wywołaj inicjalizację po załadowaniu DOM
         document.addEventListener('DOMContentLoaded', initializeEmailCheckboxes);
     </script>
+
+    {{-- Modal ostrzeżenia przed wystawieniem faktury gdy invoice_number jest już wypełnione --}}
+    <div class="modal fade" id="invoiceWarningModal" tabindex="-1" aria-labelledby="invoiceWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="invoiceWarningModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Uwaga - Numer faktury już istnieje
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Dla zamówienia <strong>#{{ $zamowienie->id }}</strong> w polu "Numer faktury" jest już wpisany numer:</p>
+                    <div class="bg-light p-3 rounded mb-3">
+                        <h6 class="mb-2"><strong>Obecny numer faktury:</strong></h6>
+                        <p class="mb-0 fs-5"><code id="currentInvoiceNumberDisplay">{{ $zamowienie->invoice_number }}</code></p>
+                    </div>
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> Wystawienie nowej faktury przez API iFirma spowoduje nadpisanie tego numeru nowym numerem z iFirma. 
+                        Upewnij się, że chcesz kontynuować.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning" id="invoiceWarningConfirmBtn" onclick="confirmCreateIfirmaInvoice({{ $zamowienie->id }})">
+                        <i class="bi bi-file-earmark-text"></i> Mimo to wystaw fakturę
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- Modal potwierdzenia resetowania statusu Publigo --}}
     <div class="modal fade" id="resetPubligoModal" tabindex="-1" aria-labelledby="resetPubligoModalLabel" aria-hidden="true">

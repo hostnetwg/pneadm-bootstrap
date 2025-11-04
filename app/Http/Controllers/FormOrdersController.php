@@ -785,10 +785,21 @@ class FormOrdersController extends Controller
                     }
                 }
 
-                // Aktualizacja numeru faktury w zamówieniu (jeśli nie istnieje)
-                if (!empty($invoiceNumber) && empty($zamowienie->invoice_number)) {
-                    $zamowienie->invoice_number = $invoiceNumber;
-                    $zamowienie->save();
+                // Aktualizacja numeru PRO-FORMA w polu notes (Notatki)
+                // PRO-FORMA zapisuje się w notes, nie w invoice_number!
+                if (!empty($invoiceNumber)) {
+                    // Dodaj numer PRO-FORMA na początku (na górze), spychając poprzednie wpisy w dół
+                    $existingNotes = !empty($zamowienie->notes) ? trim($zamowienie->notes) : '';
+                    $proFormaNote = "PRO-FORMA: {$invoiceNumber}";
+                    
+                    // Sprawdź czy numer PRO-FORMA już nie jest w notatkach
+                    if (strpos($zamowienie->notes ?? '', $invoiceNumber) === false) {
+                        // Nowy wpis na górze, poprzednie wpisy poniżej
+                        $zamowienie->notes = $existingNotes 
+                            ? "{$proFormaNote}\n{$existingNotes}"
+                            : $proFormaNote;
+                        $zamowienie->save();
+                    }
                 }
 
                 // Wysyłka e-mailem (jeśli zaznaczono checkbox)
@@ -1145,7 +1156,8 @@ class FormOrdersController extends Controller
                     }
                 }
 
-                // Aktualizacja numeru faktury w zamówieniu
+                // Aktualizacja numeru faktury w zamówieniu (pole invoice_number)
+                // Faktura krajowa zapisuje się w invoice_number (nie w invoice_notes!)
                 if (!empty($invoiceNumber) && empty($zamowienie->invoice_number)) {
                     $zamowienie->invoice_number = $invoiceNumber;
                     $zamowienie->save();
