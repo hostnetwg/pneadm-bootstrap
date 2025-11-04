@@ -186,18 +186,39 @@ nowoczesna-edukacja.pl </div>
                                     </button>
                                 </div>
                             @endif
+                            
+                            {{-- Button Dodaj zamówienie PUBLIGO --}}
+                            <div class="mt-3 pt-3 border-top">
+                                @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
+                                    <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
+                                        <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
+                                    </button>
+                                    <div id="publigoResult" class="mt-2"></div>
+                                @elseif($zamowienie->publigo_sent == 1)
+                                    {{-- Informacja o statusie Publigo --}}
+                                    <div class="alert alert-success mb-0">
+                                        <i class="bi bi-check-circle"></i> 
+                                        <strong>Zamówienie zostało wysłane do Publigo</strong>
+                                        <small class="d-block text-muted mt-1">
+                                            Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
+                                        </small>
+                                        
+                                        {{-- Przycisk resetowania dla administratorów --}}
+                                        @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="resetPubligoStatus({{ $zamowienie->id }})">
+                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
-                    {{-- Buttons PUBLIGO i iFirma --}}
+                    {{-- Buttons iFirma --}}
                     <div class="mb-3 d-flex flex-column gap-2">
-                        {{-- Button Dodaj zamówienie PUBLIGO --}}
-                        @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
-                            <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
-                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
-                            </button>
-                        @endif
-                        
                         {{-- Button Wystaw PRO-FORMA iFirma --}}
                         <div class="w-100">
                             <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
@@ -230,33 +251,9 @@ nowoczesna-edukacja.pl </div>
                             </div>
                         </div>
                     </div>
-                    <div id="publigoResult" class="mt-2"></div>
                     <div id="ifirmaResult" class="mt-2"></div>
                     
-                    {{-- Informacja o statusie Publigo --}}
-                    @if($zamowienie->publigo_sent == 1)
-                        <div class="mb-3 mt-3">
-                            <div class="alert alert-success">
-                                <i class="bi bi-check-circle"></i> 
-                                <strong>Zamówienie zostało wysłane do Publigo</strong>
-                                <small class="d-block text-muted mt-1">
-                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
-                                </small>
-                                
-                                {{-- Przycisk resetowania dla administratorów --}}
-                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
-                                    <div class="mt-2">
-                                        <button type="button" class="btn btn-outline-warning btn-sm" id="resetPubligoBtn" onclick="resetPubligoStatus({{ $zamowienie->id }})">
-                                            <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
-                                        </button>
-                                        <small class="text-muted d-block mt-1">
-                                            <i class="bi bi-info-circle"></i> Użyj gdy zamówienie zostało usunięte z Publigo
-                                        </small>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    @elseif(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
+                    @if(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
                         <div class="mb-3 mt-3">
                             <small class="text-muted">
                                 <i class="bi bi-info-circle"></i> 
