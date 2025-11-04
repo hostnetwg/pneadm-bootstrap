@@ -206,7 +206,9 @@ nowoczesna-edukacja.pl </div>
                                         {{-- Przycisk resetowania dla administratorów --}}
                                         @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
                                             <div class="mt-2">
-                                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="resetPubligoStatus({{ $zamowienie->id }})">
+                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#resetPubligoModal">
                                                     <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
                                                 </button>
                                             </div>
@@ -1002,14 +1004,10 @@ nowoczesna-edukacja.pl `;
 
         // Funkcja do resetowania statusu Publigo (tylko dla administratorów)
         function resetPubligoStatus(orderId) {
-            if (!confirm('Czy na pewno chcesz zresetować status Publigo dla tego zamówienia?\n\nTo pozwoli na ponowne wysłanie zamówienia do Publigo.')) {
-                return;
-            }
-
-            const button = document.getElementById('resetPubligoBtn');
+            const button = document.getElementById('resetPubligoConfirmBtn');
             const resultDiv = document.getElementById('publigoResult');
             
-            // Zmiana stanu przycisku
+            // Zmiana stanu przycisku w modalu
             button.disabled = true;
             button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
             
@@ -1024,19 +1022,25 @@ nowoczesna-edukacja.pl `;
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // Zamknij modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('resetPubligoModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
                     // Sukces - przeładowanie strony aby pokazać przycisk "Dodaj zamówienie PUBLIGO"
                     location.reload();
                 } else {
-                    // Błąd
+                    // Błąd - pokaż komunikat
                     alert('Błąd: ' + data.error);
+                    // Przywróć stan przycisku
+                    button.disabled = false;
+                    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('Wystąpił błąd podczas resetowania statusu.');
-            })
-            .finally(() => {
-                // Przywrócenie stanu przycisku
+                // Przywróć stan przycisku
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo';
             });
@@ -1191,6 +1195,47 @@ nowoczesna-edukacja.pl `;
         // Wywołaj inicjalizację po załadowaniu DOM
         document.addEventListener('DOMContentLoaded', initializeEmailCheckboxes);
     </script>
+
+    {{-- Modal potwierdzenia resetowania statusu Publigo --}}
+    <div class="modal fade" id="resetPubligoModal" tabindex="-1" aria-labelledby="resetPubligoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="resetPubligoModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Resetowanie statusu Publigo
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz zresetować status Publigo dla zamówienia <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły zamówienia:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            @if($zamowienie->publigo_sent_at)
+                                <li><strong>Data wysłania do Publigo:</strong> {{ $zamowienie->publigo_sent_at->format('d.m.Y H:i') }}</li>
+                            @endif
+                        </ul>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> Resetowanie statusu pozwoli na ponowne wysłanie zamówienia do Publigo przez API. 
+                        Użyj tej opcji tylko gdy zamówienie zostało usunięte z Publigo lub gdy trzeba je dodać ponownie.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning" id="resetPubligoConfirmBtn" onclick="resetPubligoStatus({{ $zamowienie->id }})">
+                        <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- Modal potwierdzenia usunięcia --}}
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
