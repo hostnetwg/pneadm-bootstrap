@@ -89,7 +89,7 @@
 
             {{-- Status zamówienia --}}
             @if($zamowienie->is_new)
-                <div class="text-center mb-3">
+                <div class="text-center mb-3" id="orderStatusAlert">
                     <small class="text-danger fw-bold">ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!</small>
                 </div>
             @endif
@@ -886,12 +886,36 @@ nowoczesna-edukacja.pl `;
                         if (invoiceNumberInput) {
                             invoiceNumberInput.value = data.invoice_number;
                             
-                            // Wizualny efekt - podświetlenie pola na zielono na moment
-                            invoiceNumberInput.style.transition = 'background-color 0.3s';
+                            // Zmień czerwone podświetlenie na zielone (trwale)
+                            // Usuń klasy czerwone
+                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+                            // Usuń czerwone style inline
+                            invoiceNumberInput.style.borderWidth = '';
+                            invoiceNumberInput.style.boxShadow = '';
+                            
+                            // Dodaj klasy zielone (Bootstrap)
+                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+                            // Dodaj zielony box-shadow
+                            invoiceNumberInput.style.borderWidth = '2px';
+                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
+                            
+                            // Dodatkowy wizualny efekt - podświetlenie tła na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
                             invoiceNumberInput.style.backgroundColor = '#d4edda';
                             setTimeout(() => {
                                 invoiceNumberInput.style.backgroundColor = '';
                             }, 2000);
+                        }
+                        
+                        // Zmień alert "ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!" na zielony komunikat
+                        const orderStatusAlert = document.getElementById('orderStatusAlert');
+                        if (orderStatusAlert) {
+                            const orderId = {{ $zamowienie->id }};
+                            orderStatusAlert.innerHTML = `
+                                <small class="text-success fw-bold">
+                                    <i class="bi bi-check-circle"></i> Dla zamówienia #${orderId} została wystawiona faktura nr <strong>${data.invoice_number}</strong>
+                                </small>
+                            `;
                         }
                     }
                     
@@ -1160,81 +1184,149 @@ nowoczesna-edukacja.pl `;
         });
 
         // Funkcja do zapamiętywania stanu checkboxów e-mail w bazie danych (per użytkownik)
-        async function initializeEmailCheckboxes() {
+        function initializeEmailCheckboxes() {
+            console.log('Initializing email checkboxes...');
+            
             const proformaCheckbox = document.getElementById('sendEmailCheckboxProforma');
             const invoiceCheckbox = document.getElementById('sendEmailCheckboxInvoice');
+            
+            // Sprawdź czy checkboxy istnieją
+            if (!proformaCheckbox && !invoiceCheckbox) {
+                console.warn('Email checkboxes not found on page');
+                return;
+            }
+            
+            console.log('Checkboxes found:', { proforma: !!proformaCheckbox, invoice: !!invoiceCheckbox });
             
             // Klucze preferencji
             const PROFORMA_KEY = 'ifirma_send_email_proforma';
             const INVOICE_KEY = 'ifirma_send_email_invoice';
             
             // Funkcja do pobierania preferencji z serwera
-            async function loadPreferences() {
-                try {
-                    const response = await fetch('/api/user/preferences', {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            function loadPreferences() {
+                return new Promise((resolve) => {
+                    try {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                        if (!csrfToken) {
+                            console.error('CSRF token not found');
+                            resolve({});
+                            return;
                         }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        return data.preferences || {};
+                        
+                        fetch('/api/user/preferences', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin'
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                return response.json();
+                            } else {
+                                console.error('Failed to load preferences:', response.status, response.statusText);
+                                return { preferences: {} };
+                            }
+                        })
+                        .then(data => {
+                            console.log('Preferences loaded:', data);
+                            resolve(data.preferences || {});
+                        })
+                        .catch(error => {
+                            console.error('Error loading preferences:', error);
+                            resolve({});
+                        });
+                    } catch (error) {
+                        console.error('Error in loadPreferences:', error);
+                        resolve({});
                     }
-                } catch (error) {
-                    console.error('Error loading preferences:', error);
-                }
-                return {};
+                });
             }
             
             // Funkcja do zapisywania preferencji na serwerze
-            async function savePreference(key, value) {
+            function savePreference(key, value) {
                 try {
-                    await fetch('/api/user/preferences', {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                    if (!csrfToken) {
+                        console.error('CSRF token not found');
+                        return;
+                    }
+                    
+                    console.log('Saving preference:', key, value);
+                    
+                    fetch('/api/user/preferences', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
+                            'X-Requested-With': 'XMLHttpRequest'
                         },
+                        credentials: 'same-origin',
                         body: JSON.stringify({ key, value })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            console.log('Preference saved successfully');
+                        } else {
+                            console.error('Failed to save preference:', response.status, response.statusText);
+                            return response.json().then(data => {
+                                console.error('Error details:', data);
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error saving preference:', error);
                     });
                 } catch (error) {
-                    console.error('Error saving preference:', error);
+                    console.error('Error in savePreference:', error);
                 }
             }
             
-            // Załaduj preferencje z serwera
-            const preferences = await loadPreferences();
-            
-            // Przywróć zapisany stan dla PRO-FORMA
-            if (proformaCheckbox) {
-                if (preferences[PROFORMA_KEY] !== undefined) {
-                    proformaCheckbox.checked = preferences[PROFORMA_KEY];
+            // Załaduj preferencje z serwera i ustaw checkboxy
+            loadPreferences().then(preferences => {
+                console.log('Setting checkbox states from preferences:', preferences);
+                
+                // Przywróć zapisany stan dla PRO-FORMA
+                if (proformaCheckbox) {
+                    if (preferences[PROFORMA_KEY] !== undefined) {
+                        proformaCheckbox.checked = preferences[PROFORMA_KEY];
+                        console.log('PRO-FORMA checkbox set to:', preferences[PROFORMA_KEY]);
+                    }
+                    
+                    // Zapisz stan przy każdej zmianie
+                    proformaCheckbox.addEventListener('change', function() {
+                        console.log('PRO-FORMA checkbox changed to:', this.checked);
+                        savePreference(PROFORMA_KEY, this.checked);
+                    });
                 }
                 
-                // Zapisz stan przy każdej zmianie
-                proformaCheckbox.addEventListener('change', function() {
-                    savePreference(PROFORMA_KEY, this.checked);
-                });
-            }
-            
-            // Przywróć zapisany stan dla Faktury
-            if (invoiceCheckbox) {
-                if (preferences[INVOICE_KEY] !== undefined) {
-                    invoiceCheckbox.checked = preferences[INVOICE_KEY];
+                // Przywróć zapisany stan dla Faktury
+                if (invoiceCheckbox) {
+                    if (preferences[INVOICE_KEY] !== undefined) {
+                        invoiceCheckbox.checked = preferences[INVOICE_KEY];
+                        console.log('Invoice checkbox set to:', preferences[INVOICE_KEY]);
+                    }
+                    
+                    // Zapisz stan przy każdej zmianie
+                    invoiceCheckbox.addEventListener('change', function() {
+                        console.log('Invoice checkbox changed to:', this.checked);
+                        savePreference(INVOICE_KEY, this.checked);
+                    });
                 }
-                
-                // Zapisz stan przy każdej zmianie
-                invoiceCheckbox.addEventListener('change', function() {
-                    savePreference(INVOICE_KEY, this.checked);
-                });
-            }
+            });
         }
         
         // Wywołaj inicjalizację po załadowaniu DOM
-        document.addEventListener('DOMContentLoaded', initializeEmailCheckboxes);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeEmailCheckboxes);
+        } else {
+            // DOM już załadowany, wywołaj od razu
+            initializeEmailCheckboxes();
+        }
     </script>
 
     {{-- Modal ostrzeżenia przed wystawieniem faktury gdy invoice_number jest już wypełnione --}}
