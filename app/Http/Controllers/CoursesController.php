@@ -115,7 +115,9 @@ class CoursesController extends Controller
         $totalCount = Course::count();
     
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
-        $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates'])
+        $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates', 'surveys' => function($query) {
+                            $query->orderBy('id', 'desc')->limit(1); // Pobierz tylko pierwszą ankietę dla każdego kursu
+                        }])
                         ->orderBy($sortColumn, $sortDirection)
                         ->paginate($perPage)
                         ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);

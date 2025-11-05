@@ -240,15 +240,27 @@
                         <td class="text-center align-middle">{{ $course->id }}</td>
                         <td class="text-center align-middle small">
                             {{ $course->id_old ?? '-' }}
-                            @if($course->source_id_old === 'certgen_Publigo' && $course->id_old)
-                                <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $course->id_old }}" 
-                                   target="_blank" 
-                                   rel="noopener noreferrer"
-                                   title="Otwórz formularz zamówienia (idP={{ $course->id_old }})"
-                                   class="text-success">
-                                    <i class="bi bi-file-earmark-text-fill"></i>
-                                </a>
-                            @endif
+                            <div class="d-flex justify-content-center gap-1 mt-1">
+                                @if($course->source_id_old === 'certgen_Publigo' && $course->id_old)
+                                    <a href="https://zdalna-lekcja.pl/zamowienia/formularz/?idP={{ $course->id_old }}" 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       title="Otwórz formularz zamówienia (idP={{ $course->id_old }})"
+                                       class="text-success">
+                                        <i class="bi bi-file-earmark-text-fill"></i>
+                                    </a>
+                                @endif
+                                @if($course->surveys->isNotEmpty())
+                                    @php
+                                        $firstSurvey = $course->surveys->first();
+                                    @endphp
+                                    <a href="{{ route('surveys.show', $firstSurvey->id) }}" 
+                                       title="Otwórz ankietę dla tego szkolenia"
+                                       class="text-info">
+                                        <i class="bi bi-clipboard-check-fill"></i>
+                                    </a>
+                                @endif
+                            </div>
                             <br>
                             <small class="text-muted">{{ $course->source_id_old ?? '-' }}</small>
                         </td>
