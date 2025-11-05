@@ -55,6 +55,14 @@
                         
                         {{-- Ukryte pole oznaczające pochodzenie --}}
                         <input type="hidden" name="from_edit_page" value="1">
+                        
+                        {{-- Przekazanie parametrów filtrów --}}
+                        @if(request('filter_new'))
+                            <input type="hidden" name="filter_new" value="{{ request('filter_new') }}">
+                        @endif
+                        @if(request('course_id'))
+                            <input type="hidden" name="course_id" value="{{ request('course_id') }}">
+                        @endif
 
                         {{-- Informacje o szkoleniu --}}
                         <div class="card mb-4">
@@ -387,7 +395,7 @@
 
                         {{-- Przyciski akcji --}}
                         <div class="d-flex justify-content-between">
-                            <a href="{{ route('form-orders.show', $zamowienie->id) }}" class="btn btn-secondary">
+                            <a href="{{ route('form-orders.show', array_merge(['id' => $zamowienie->id], array_filter(['filter_new' => request('filter_new'), 'course_id' => request('course_id')]))) }}" class="btn btn-secondary">
                                 <i class="bi bi-x-circle"></i> Anuluj
                             </a>
                             <button type="submit" class="btn btn-success btn-lg">

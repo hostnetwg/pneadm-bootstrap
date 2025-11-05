@@ -370,7 +370,12 @@ class FormOrdersController extends Controller
             
             // Przekierowanie w zależności od źródła
             if ($isFromEditPage) {
-                return redirect()->route('form-orders.show', $id)->with('success', 'Zamówienie zostało zaktualizowane.');
+                // Zachowujemy parametry filtrów przy przekierowaniu z formularza edycji
+                $redirectParams = [];
+                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
+                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
+                
+                return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
             } elseif ($isFromShowPage) {
                 // Zachowujemy parametry filtrów przy przekierowaniu
                 $redirectParams = [];
@@ -402,7 +407,12 @@ class FormOrdersController extends Controller
             }
             
             if ($isFromEditPage) {
-                return redirect()->route('form-orders.edit', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: ' . $e->getMessage());
+                // Zachowujemy parametry filtrów przy przekierowaniu z błędem
+                $redirectParams = [];
+                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
+                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
+                
+                return redirect()->route('form-orders.edit', array_merge(['id' => $id], $redirectParams))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: ' . $e->getMessage());
             } elseif ($isFromShowPage) {
                 return redirect()->route('form-orders.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
             } else {
@@ -1263,7 +1273,7 @@ class FormOrdersController extends Controller
     /**
      * Wyświetla formularz edycji zamówienia
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
         try {
             $zamowienie = FormOrder::findOrFail($id);
@@ -1273,6 +1283,7 @@ class FormOrdersController extends Controller
                 ->where('is_primary', true)
                 ->first();
             
+            // Parametry filtrów są przekazywane przez URL i będą dostępne w widoku przez request()
             return view('form-orders.edit', compact('zamowienie', 'participant'));
         } catch (Exception $e) {
             return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');

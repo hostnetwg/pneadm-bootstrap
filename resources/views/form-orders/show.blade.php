@@ -494,7 +494,7 @@ echo $remarks;
             {{-- Przyciski akcji na dole strony --}}
             <div class="d-flex justify-content-end mt-4 mb-4">
                 <div class="btn-group" role="group">
-                    <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="btn btn-warning">
+                    <a href="{{ route('form-orders.edit', array_merge(['id' => $zamowienie->id], array_filter(['filter_new' => request('filter_new'), 'course_id' => request('course_id')]))) }}" class="btn btn-warning">
                         <i class="bi bi-pencil"></i> Edytuj
                     </a>
                     <button type="button" class="btn btn-danger" 
