@@ -49,23 +49,12 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <form method="GET" action="{{ route('surveys.index') }}">
+                        <input type="hidden" name="per_page" value="{{ request('per_page', 15) }}">
                         <div class="row g-3">
                             <div class="col-md-3">
                                 <label for="search" class="form-label">Wyszukaj</label>
                                 <input type="text" class="form-control" id="search" name="search" 
                                        value="{{ request('search') }}" placeholder="Tytuł, opis, szkolenie...">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="course_id" class="form-label">Szkolenie</label>
-                                <select class="form-select" id="course_id" name="course_id">
-                                    <option value="">Wszystkie szkolenia</option>
-                                    @foreach($courses as $course)
-                                        <option value="{{ $course->id }}" 
-                                                {{ request('course_id') == $course->id ? 'selected' : '' }}>
-                                            {{ $course->title }}
-                                        </option>
-                                    @endforeach
-                                </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="instructor_id" class="form-label">Instruktor</label>
@@ -80,16 +69,6 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">&nbsp;</label>
-                                <div class="d-grid">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-search"></i> Filtruj
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-3 mt-2">
-                            <div class="col-md-3">
                                 <label for="date_from" class="form-label">Data od</label>
                                 <input type="date" class="form-control" id="date_from" name="date_from" 
                                        value="{{ request('date_from') }}">
@@ -99,8 +78,9 @@
                                 <input type="date" class="form-control" id="date_to" name="date_to" 
                                        value="{{ request('date_to') }}">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">&nbsp;</label>
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-search"></i> Filtruj

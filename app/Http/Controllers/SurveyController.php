@@ -33,9 +33,17 @@ class SurveyController extends Controller
             $query->where('course_id', $request->course_id);
         }
 
-        // Filtrowanie według instruktora
+        // Filtrowanie według instruktora (filtrujemy po instruktorze kursu lub instruktorze przypisanym bezpośrednio do ankiety)
+        // Używamy whereHas dla obu przypadków, aby uniknąć problemów z niejednoznacznymi kolumnami po JOIN
         if ($request->filled('instructor_id')) {
-            $query->where('instructor_id', $request->instructor_id);
+            $query->where(function($q) use ($request) {
+                // Instruktor przypisany bezpośrednio do ankiety
+                $q->where('surveys.instructor_id', $request->instructor_id)
+                // Instruktor przypisany do kursu
+                ->orWhereHas('course', function($courseQuery) use ($request) {
+                    $courseQuery->where('courses.instructor_id', $request->instructor_id);
+                });
+            });
         }
 
         // Filtrowanie według daty szkolenia
@@ -65,6 +73,7 @@ class SurveyController extends Controller
             });
         }
 
+        // JOIN z jawnym określeniem kolumn, aby uniknąć problemów z niejednoznacznymi kolumnami
         $surveys = $query->join('courses', 'surveys.course_id', '=', 'courses.id')
                         ->orderBy('courses.start_date', 'desc')
                         ->orderBy('surveys.imported_at', 'desc')
