@@ -34,7 +34,13 @@
                         </a>
                         <a href="{{ route('form-orders.index', ['filter' => 'new']) }}" 
                            class="btn {{ $filter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
-                            <i class="bi bi-exclamation-triangle"></i> NOWE
+                            <i class="bi bi-exclamation-triangle"></i> NOWE 
+                            <span class="badge bg-warning text-dark ms-1">{{ $newCount ?? 0 }}</span>
+                        </a>
+                        <a href="{{ route('form-orders.index', ['filter' => 'archival']) }}" 
+                           class="btn {{ $filter === 'archival' ? 'btn-success' : 'btn-outline-success' }}">
+                            <i class="bi bi-archive"></i> Archiwalne 
+                            <span class="badge bg-success text-white ms-1">{{ $archivalCount ?? 0 }}</span>
                         </a>
                         <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
                            class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif">
@@ -51,11 +57,29 @@
                     </div>
                 </div>
                 
+                @if($filter === '')
+                    <div class="mt-2">
+                        <span class="badge bg-primary text-white">
+                            <i class="bi bi-info-circle"></i> 
+                            Pokazuję wszystkie zamówienia
+                        </span>
+                    </div>
+                @endif
+                
                 @if($filter === 'new')
                     <div class="mt-2">
                         <span class="badge bg-warning text-dark">
                             <i class="bi bi-info-circle"></i> 
                             Pokazuję tylko niezakończone zamówienia bez numeru faktury
+                        </span>
+                    </div>
+                @endif
+                
+                @if($filter === 'archival')
+                    <div class="mt-2">
+                        <span class="badge bg-success text-white">
+                            <i class="bi bi-info-circle"></i> 
+                            Pokazuję nieprzetworzone zamówienia (bez numeru faktury i nieoznaczone jako zakończone) dla zakończonych szkoleń
                         </span>
                     </div>
                 @endif
@@ -102,45 +126,16 @@
             </div>
 
             {{-- Statystyki --}}
-            <div class="row mb-4">
-                <div class="col-md-2 col-lg-2">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Wszystkie zamówienia</h5>
-                            <h3 class="card-text">{{ $zamowienia->total() }}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 col-lg-2">
-                    <div class="card bg-secondary text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Wczoraj</h5>
-                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', \Carbon\Carbon::yesterday()->format('Y-m-d'))->new()->count() }}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 col-lg-2">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Dzisiaj</h5>
-                            <h3 class="card-text">{{ \App\Models\FormOrder::whereDate('order_date', \Carbon\Carbon::today()->format('Y-m-d'))->new()->count() }}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 col-lg-2">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Wartość sprzedaży</h5>
-                            <h3 class="card-text">{{ number_format(\App\Models\FormOrder::withInvoice()->sum('product_price'), 2) }} zł</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 col-lg-2">
-                    <div class="card bg-warning text-dark">
-                        <div class="card-body">
-                            <h5 class="card-title">Średnia cena</h5>
-                            <h3 class="card-text">{{ \App\Models\FormOrder::withInvoice()->avg('product_price') ? number_format(\App\Models\FormOrder::withInvoice()->avg('product_price'), 2) : '0.00' }} zł</h3>
-                        </div>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="text-center">
+                        <strong>Wszystkie zamówienia:</strong> {{ number_format($stats['total'], 0, ',', ' ') }} | 
+                        <strong>Nowe:</strong> {{ $stats['new'] }} | 
+                        <strong>Wczoraj:</strong> {{ $stats['yesterday'] }} | 
+                        <strong>Dzisiaj:</strong> {{ $stats['today'] }} | 
+                        <strong>Archiwalne:</strong> {{ $stats['archival'] }} | 
+                        <strong>Wartość sprzedaży:</strong> {{ number_format($stats['sales_value'], 0, ',', ' ') }} zł | 
+                        <strong>Średnia cena:</strong> {{ number_format($stats['avg_price'], 2, ',', ' ') }} zł
                     </div>
                 </div>
             </div>

@@ -30,6 +30,28 @@ class FormOrdersController extends Controller
             $query->new(); // Używamy scope z modelu
         }
         
+        // Dodajemy filtr dla archiwalnych zamówień (nieprzetworzone dla zakończonych szkoleń)
+        if ($filter === 'archival') {
+            $query->join('courses', function($join) {
+                $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
+                     ->where('courses.source_id_old', '=', 'certgen_Publigo');
+            })
+            ->where(function($q) {
+                // Bez numeru faktury
+                $q->whereNull('form_orders.invoice_number')
+                  ->orWhere('form_orders.invoice_number', '')
+                  ->orWhere('form_orders.invoice_number', '0');
+            })
+            ->where(function($q) {
+                // Nie ukończone (status_completed = 0 lub null)
+                $q->where('form_orders.status_completed', '=', 0)
+                  ->orWhereNull('form_orders.status_completed');
+            })
+            ->whereNotNull('form_orders.publigo_product_id')
+            ->where('courses.end_date', '<', \Carbon\Carbon::today())
+            ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
+        }
+        
         // Dodajemy wyszukiwanie jeśli podano frazę
         if (!empty($search)) {
             $query->where(function($q) use ($search) {
@@ -100,7 +122,47 @@ class FormOrdersController extends Controller
             }
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter', 'duplicateInfo', 'urgentDuplicatesCount'));
+        // Policz nieprzetworzone zamówienia dla zakończonych szkoleń (Archiwalne)
+        // Nieprzetworzone = bez numeru faktury (invoice_number) i nie ukończone (status_completed = 0 lub null)
+        $archivalCount = \DB::table('form_orders')
+            ->join('courses', function($join) {
+                $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
+                     ->where('courses.source_id_old', '=', 'certgen_Publigo');
+            })
+            ->where(function($q) {
+                // Bez numeru faktury
+                $q->whereNull('form_orders.invoice_number')
+                  ->orWhere('form_orders.invoice_number', '')
+                  ->orWhere('form_orders.invoice_number', '0');
+            })
+            ->where(function($q) {
+                // Nie ukończone (status_completed = 0 lub null)
+                $q->where('form_orders.status_completed', '=', 0)
+                  ->orWhereNull('form_orders.status_completed');
+            })
+            ->whereNotNull('form_orders.publigo_product_id')
+            ->where('courses.end_date', '<', \Carbon\Carbon::today())
+            ->whereNull('form_orders.deleted_at')
+            ->count();
+
+        // Policz wszystkie nieprzetworzone zamówienia (nowe + archiwalne)
+        // Nowe = niezakończone bez numeru faktury
+        $newOnlyCount = FormOrder::new()->count();
+        // Wszystkie nieprzetworzone = nowe + archiwalne
+        $newCount = $newOnlyCount + $archivalCount;
+
+        // Statystyki do wyświetlenia
+        $stats = [
+            'total' => FormOrder::count(),
+            'new' => $newCount,
+            'yesterday' => FormOrder::whereDate('order_date', Carbon::yesterday()->format('Y-m-d'))->new()->count(),
+            'today' => FormOrder::whereDate('order_date', Carbon::today()->format('Y-m-d'))->new()->count(),
+            'archival' => $archivalCount,
+            'sales_value' => FormOrder::withInvoice()->sum('product_price'),
+            'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
+        ];
+
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter', 'duplicateInfo', 'urgentDuplicatesCount', 'stats', 'newCount', 'archivalCount'));
     }
 
     /**
