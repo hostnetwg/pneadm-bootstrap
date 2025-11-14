@@ -25,9 +25,10 @@ class FormOrdersController extends Controller
         // Budujemy zapytanie używając modelu Eloquent
         $query = FormOrder::query();
         
-        // Dodajemy filtr dla nowych zamówień (bez numeru faktury i niezakończone)
+        // Dodajemy filtr dla wszystkich nieprzetworzonych zamówień (nowe + archiwalne)
+        // Nieprzetworzone = bez numeru faktury i nie ukończone
         if ($filter === 'new') {
-            $query->new(); // Używamy scope z modelu
+            $query->new(); // Używamy scope z modelu - pokazuje wszystkie nieprzetworzone
         }
         
         // Dodajemy filtr dla archiwalnych zamówień (nieprzetworzone dla zakończonych szkoleń)
@@ -145,11 +146,9 @@ class FormOrdersController extends Controller
             ->whereNull('form_orders.deleted_at')
             ->count();
 
-        // Policz wszystkie nieprzetworzone zamówienia (nowe + archiwalne)
-        // Nowe = niezakończone bez numeru faktury
-        $newOnlyCount = FormOrder::new()->count();
-        // Wszystkie nieprzetworzone = nowe + archiwalne
-        $newCount = $newOnlyCount + $archivalCount;
+        // Policz wszystkie nieprzetworzone zamówienia (bez numeru faktury i nie ukończone)
+        // To jest dokładnie to samo co pokazuje filtr "new"
+        $newCount = FormOrder::new()->count();
 
         // Statystyki do wyświetlenia
         $stats = [
