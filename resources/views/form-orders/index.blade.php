@@ -197,9 +197,17 @@
                                                 </span>
                                             @endif
                                         </h5>
-                                        @if($zamowienie->order_date)
+                                        @php
+                                            $orderDateRaw = $zamowienie->getRawOriginal('order_date');
+                                            $orderDateFormatted = $orderDateRaw
+                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                    ->setTimezone('UTC')
+                                                    ->format('d.m.Y H:i')
+                                                : null;
+                                        @endphp
+                                        @if($orderDateFormatted)
                                             <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
+                                                <i class="bi bi-calendar-event"></i> {{ $orderDateFormatted }}
                                             </small>
                                         @endif
                                     </div>
@@ -478,7 +486,15 @@
                                                 <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                                                 <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                                                 <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                                                <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
+                                                @php
+                                                    $orderDateRaw = $zamowienie->getRawOriginal('order_date');
+                                                    $orderDateFormatted = $orderDateRaw
+                                                        ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                            ->setTimezone('UTC')
+                                                            ->format('d.m.Y H:i')
+                                                        : null;
+                                                @endphp
+                                                <li><strong>Data:</strong> {{ $orderDateFormatted ?? '—' }}</li>
                                             </ul>
                                         </div>
                                         <p class="text-muted mt-3">

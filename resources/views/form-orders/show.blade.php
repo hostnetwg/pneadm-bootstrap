@@ -455,10 +455,18 @@ echo $remarks;
                                         </h6>
                                     </div>
                                     <div class="card-body py-2">
-                                        @if($zamowienie->order_date)
+                                        @php
+                                            $orderDateRaw = $zamowienie->getRawOriginal('order_date');
+                                            $orderDateFormatted = $orderDateRaw
+                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                    ->setTimezone('UTC')
+                                                    ->format('d.m.Y H:i')
+                                                : null;
+                                        @endphp
+                                        @if($orderDateFormatted)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
+                                                    <strong>Data zamówienia:</strong> {{ $orderDateFormatted }}
                                                 </small>
                                             </div>
                                         @endif
@@ -1422,7 +1430,15 @@ nowoczesna-edukacja.pl `;
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
+                            @php
+                                $orderDateRaw = $zamowienie->getRawOriginal('order_date');
+                                $orderDateFormatted = $orderDateRaw
+                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                        ->setTimezone('UTC')
+                                        ->format('d.m.Y H:i')
+                                    : null;
+                            @endphp
+                            <li><strong>Data:</strong> {{ $orderDateFormatted ?? '—' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
                             <li><strong>Numer faktury:</strong> {{ $zamowienie->invoice_number ?: 'Brak' }}</li>
                         </ul>

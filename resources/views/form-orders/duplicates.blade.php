@@ -306,7 +306,15 @@
                                                     <div class="row mt-2">
                                                         <div class="col-6">
                                                             <strong>Data:</strong><br>
-                                                            {{ $order->order_date ? $order->order_date->format('d.m.Y H:i') : '—' }}
+                                                        @php
+                                                            $orderDateRaw = $order->getRawOriginal('order_date');
+                                                            $orderDateFormatted = $orderDateRaw
+                                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                                    ->setTimezone('UTC')
+                                                                    ->format('d.m.Y H:i')
+                                                                : null;
+                                                        @endphp
+                                                        {{ $orderDateFormatted ?? '—' }}
                                                         </div>
                                                         <div class="col-6">
                                                             <strong>Status:</strong><br>

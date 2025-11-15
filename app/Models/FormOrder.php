@@ -103,13 +103,10 @@ class FormOrder extends Model
 
     /**
      * Rzutowanie typów dla atrybutów
-     * 
-     * order_date NIE jest castowane na datetime, bo dane w bazie są już w lokalnej strefie czasowej
-     * Używamy accessora do parsowania daty bez konwersji strefy czasowej
      */
     protected $casts = [
         'ptw' => 'integer',
-        // 'order_date' => 'datetime', // Wyłączone - używamy accessora
+        'order_date' => 'datetime',
         'product_id' => 'integer',
         'product_price' => 'decimal:2',
         'publigo_product_id' => 'integer',
@@ -122,30 +119,6 @@ class FormOrder extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
-    
-    /**
-     * Accessor - zwraca order_date bez konwersji strefy czasowej
-     * Ponieważ dane w bazie są już w strefie czasowej Europe/Warsaw (nie UTC),
-     * parsujemy surową wartość z bazy w lokalnej strefie czasowej
-     */
-    public function getOrderDateAttribute($value)
-    {
-        // Pobierz surową wartość z bazy danych (przed castem)
-        $rawValue = $this->attributes['order_date'] ?? null;
-        
-        if (!$rawValue) {
-            return null;
-        }
-        
-        // Parsuj surową wartość jako datę w strefie czasowej aplikacji (Europe/Warsaw)
-        // bez założenia, że jest w UTC
-        // Używamy createFromFormat, żeby uniknąć automatycznej konwersji przez Carbon
-        return \Carbon\Carbon::createFromFormat(
-            'Y-m-d H:i:s',
-            $rawValue,
-            config('app.timezone')
-        );
-    }
 
     /**
      * Atrybuty ukryte przy serializacji
