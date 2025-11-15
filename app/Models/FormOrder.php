@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\LogsActivity;
+use Carbon\Carbon;
 
 /**
  * Model FormOrder
@@ -106,7 +107,6 @@ class FormOrder extends Model
      */
     protected $casts = [
         'ptw' => 'integer',
-        'order_date' => 'datetime',
         'product_id' => 'integer',
         'product_price' => 'decimal:2',
         'publigo_product_id' => 'integer',
@@ -132,6 +132,38 @@ class FormOrder extends Model
         'publigo_sent' => 0,
         'status_completed' => 0,
     ];
+
+    /**
+     * Accessor - zwraca datę zamówienia dokładnie z bazy (bez konwersji UTC)
+     */
+    public function getOrderDateAttribute($value)
+    {
+        $rawValue = $this->attributes['order_date'] ?? $value;
+
+        if (!$rawValue) {
+            return null;
+        }
+
+        return Carbon::createFromFormat('Y-m-d H:i:s', $rawValue, config('app.timezone'));
+    }
+
+    /**
+     * Mutator - zapisuje datę w formacie zgodnym z bazą
+     */
+    public function setOrderDateAttribute($value): void
+    {
+        if ($value instanceof \DateTimeInterface) {
+            $this->attributes['order_date'] = $value->format('Y-m-d H:i:s');
+            return;
+        }
+
+        if (is_numeric($value)) {
+            $this->attributes['order_date'] = Carbon::createFromTimestamp($value)->format('Y-m-d H:i:s');
+            return;
+        }
+
+        $this->attributes['order_date'] = Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
 
     /**
      * Scope - tylko nowe zamówienia (bez faktury i niezakończone)
