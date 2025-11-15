@@ -135,21 +135,44 @@ class FormOrder extends Model
 
     /**
      * Accessor - zwraca datę zamówienia dokładnie z bazy (bez konwersji UTC)
-     * Używamy shiftTimezone() zamiast setTimezone() żeby nie konwertować czasu
+     * 
+     * Problem: Dane w bazie są w strefie czasowej Europe/Warsaw (nie UTC).
+     * Laravel Eloquent domyślnie traktuje daty z bazy jako UTC i konwertuje je.
+     * 
+     * Rozwiązanie: Parsujemy surową wartość z bazy jako datę w lokalnej strefie czasowej
+     * aplikacji (Europe/Warsaw), używając createFromFormat() z trzecim parametrem.
      */
     public function getOrderDateAttribute($value)
     {
-        $rawValue = $this->attributes['order_date'] ?? $value;
-
+        // Pobierz surową wartość z bazy danych (przed jakimkolwiek castem)
+        $rawValue = $this->attributes['order_date'] ?? null;
+        
         if (!$rawValue) {
             return null;
         }
-
-        // Parsuj datę bez strefy czasowej, potem ustaw strefę bez konwersji
-        $carbon = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawValue, 'UTC');
         
-        // shiftTimezone() zmienia tylko etykietę strefy czasowej bez zmiany czasu
-        return $carbon->shiftTimezone(config('app.timezone'));
+        // Parsuj surową wartość jako datę w lokalnej strefie czasowej aplikacji (Europe/Warsaw)
+        // Trzeci parametr 'Europe/Warsaw' mówi Carbon, że surowa wartość JEST już w tej strefie
+        // Nie ma konwersji - po prostu traktujemy string z bazy jako datę w Europe/Warsaw
+        try {
+            return \Carbon\Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                $rawValue,
+                config('app.timezone') // Europe/Warsaw
+            );
+        } catch (\Exception $e) {
+            // Jeśli format się nie zgadza, spróbuj parse (ale to może konwertować)
+            return \Carbon\Carbon::parse($rawValue)->setTimezone(config('app.timezone'));
+        }
+    }
+    
+    /**
+     * Zwraca surową wartość order_date z bazy (bez żadnej konwersji)
+     * Użyj tego jeśli potrzebujesz dokładnie tego co jest w bazie
+     */
+    public function getOrderDateRawAttribute()
+    {
+        return $this->attributes['order_date'] ?? null;
     }
 
     /**

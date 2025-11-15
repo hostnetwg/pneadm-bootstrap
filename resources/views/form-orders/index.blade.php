@@ -198,12 +198,20 @@
                                             @endif
                                         </h5>
                                         @php
+                                            // Pobierz surową wartość z bazy bez żadnej konwersji
                                             $orderDateRaw = $zamowienie->getRawOriginal('order_date');
-                                            $orderDateFormatted = $orderDateRaw
-                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                                    ->setTimezone('UTC')
-                                                    ->format('d.m.Y H:i')
-                                                : null;
+                                            if ($orderDateRaw) {
+                                                // Parsuj surową wartość jako datę w lokalnej strefie czasowej
+                                                // Używamy createFromFormat z lokalną strefą czasową jako domyślną
+                                                $orderDateCarbon = \Carbon\Carbon::createFromFormat(
+                                                    'Y-m-d H:i:s',
+                                                    $orderDateRaw,
+                                                    config('app.timezone')
+                                                );
+                                                $orderDateFormatted = $orderDateCarbon->format('d.m.Y H:i');
+                                            } else {
+                                                $orderDateFormatted = null;
+                                            }
                                         @endphp
                                         @if($orderDateFormatted)
                                             <small class="text-muted">

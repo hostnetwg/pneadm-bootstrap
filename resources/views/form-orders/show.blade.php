@@ -458,8 +458,7 @@ echo $remarks;
                                         @php
                                             $orderDateRaw = $zamowienie->getRawOriginal('order_date');
                                             $orderDateFormatted = $orderDateRaw
-                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                                    ->setTimezone('UTC')
+                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, config('app.timezone'))
                                                     ->format('d.m.Y H:i')
                                                 : null;
                                         @endphp
@@ -1433,10 +1432,9 @@ nowoczesna-edukacja.pl `;
                             @php
                                 $orderDateRaw = $zamowienie->getRawOriginal('order_date');
                                 $orderDateFormatted = $orderDateRaw
-                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                        ->setTimezone('UTC')
+                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, config('app.timezone'))
                                         ->format('d.m.Y H:i')
-                                    : null;
+                                    : '—';
                             @endphp
                             <li><strong>Data:</strong> {{ $orderDateFormatted ?? '—' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
