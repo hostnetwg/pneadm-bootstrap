@@ -135,6 +135,7 @@ class FormOrder extends Model
 
     /**
      * Accessor - zwraca datę zamówienia dokładnie z bazy (bez konwersji UTC)
+     * Używamy shiftTimezone() zamiast setTimezone() żeby nie konwertować czasu
      */
     public function getOrderDateAttribute($value)
     {
@@ -144,7 +145,11 @@ class FormOrder extends Model
             return null;
         }
 
-        return Carbon::createFromFormat('Y-m-d H:i:s', $rawValue, config('app.timezone'));
+        // Parsuj datę bez strefy czasowej, potem ustaw strefę bez konwersji
+        $carbon = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $rawValue, 'UTC');
+        
+        // shiftTimezone() zmienia tylko etykietę strefy czasowej bez zmiany czasu
+        return $carbon->shiftTimezone(config('app.timezone'));
     }
 
     /**
