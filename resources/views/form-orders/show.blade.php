@@ -458,7 +458,7 @@ echo $remarks;
                                         @if($zamowienie->order_date)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
+                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->setTimezone(config('app.timezone'))->format('d.m.Y H:i') }}
                                                 </small>
                                             </div>
                                         @endif
@@ -1422,7 +1422,7 @@ nowoczesna-edukacja.pl `;
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
+                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->setTimezone(config('app.timezone'))->format('d.m.Y H:i') : '—' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
                             <li><strong>Numer faktury:</strong> {{ $zamowienie->invoice_number ?: 'Brak' }}</li>
                         </ul>

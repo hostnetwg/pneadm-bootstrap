@@ -306,7 +306,7 @@
                                                     <div class="row mt-2">
                                                         <div class="col-6">
                                                             <strong>Data:</strong><br>
-                                                            {{ $order->order_date ? $order->order_date->format('d.m.Y H:i') : '—' }}
+                                                            {{ $order->order_date ? $order->order_date->setTimezone(config('app.timezone'))->format('d.m.Y H:i') : '—' }}
                                                         </div>
                                                         <div class="col-6">
                                                             <strong>Status:</strong><br>
