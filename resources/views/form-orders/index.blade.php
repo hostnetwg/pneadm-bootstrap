@@ -156,6 +156,7 @@
                             $hasInvoice = $zamowienie->has_invoice;
                             $isDuplicate = isset($duplicateInfo[$zamowienie->id]) && $duplicateInfo[$zamowienie->id]['is_duplicate'];
                             $duplicateCount = $isDuplicate ? $duplicateInfo[$zamowienie->id]['count'] : 0;
+                            $participantEmailSame = $zamowienie->participant_email && $zamowienie->orderer_email && strcasecmp($zamowienie->participant_email, $zamowienie->orderer_email) === 0;
                         @endphp
                         
                         <div class="card shadow-sm mb-4 @if($isDuplicate) border-danger @elseif($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
@@ -250,149 +251,224 @@
                                     @endif
                                 </div>
 
-                                {{-- Telefon --}}
-                                @if($zamowienie->orderer_phone || $zamowienie->orderer_name) {{-- Sprawdzamy oba, bo może być tylko nazwa --}}
-                                    <div class="mb-3">
-                                        <h6 class="text-dark fw-bold mb-1">
-                                            <i class="bi bi-telephone"></i> KONTAKT
-                                            @if($zamowienie->orderer_name)
-                                                <span class="text-muted"> - {{ $zamowienie->orderer_name }}</span>
-                                            @endif
-                                        </h6>
-                                        @if($zamowienie->orderer_phone)
-                                            <div class="text-dark">
-                                                <strong>tel.</strong> 
-                                                <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
-                                                    @php
-                                                        $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
-                                                        if (strlen($phone) == 9) {
-                                                            // Polskie numery 9-cyfrowe
-                                                            echo '+48 ' . substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
-                                                        } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
-                                                            // Polskie numery z prefiksem 48
-                                                            echo '+' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
-                                                        } elseif (strlen($phone) >= 10 && strlen($phone) <= 15) {
-                                                            // Numery międzynarodowe - dodaj + i formatuj z odstępami
-                                                            $formatted = '+' . $phone;
-                                                            // Dodaj spacje co 3 cyfry od końca (ale zachowaj prefiks kraju)
-                                                            $formatted = preg_replace('/(\d{3})(?=\d)/', '$1 ', $formatted);
-                                                            echo $formatted;
-                                                        } else {
-                                                            // Fallback - wyświetl oryginalny numer
-                                                            echo $zamowienie->orderer_phone;
-                                                        }
-                                                    @endphp
-                                                </a>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                <div class="row">
+                                {{-- NABYWCA | ODBIORCA --}}
+                                <div class="row g-3 align-items-stretch mb-4">
                                     {{-- NABYWCA --}}
-                                    <div class="col-md-6 mb-3">
-                                        <h6 class="text-primary fw-bold mb-2">
-                                            <i class="bi bi-building"></i> NABYWCA
-                                        </h6>
-                                        <div class="text-dark">
-                                            <div class="fw-semibold">{{ $zamowienie->buyer_name ?? '—' }}</div>
-                                            <div>{{ $zamowienie->buyer_address ?? '—' }}</div>
-                                            <div>{{ $zamowienie->buyer_postal_code ?? '—' }} {{ $zamowienie->buyer_city ?? '—' }}</div>
-                                            @if($zamowienie->buyer_nip)
-                                                <div class="text-primary fw-semibold">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip) }}</div>
-                                            @endif
-                                        </div>
-                                        <div class="mt-2">
-                                            @if($zamowienie->buyer_nip)
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyNipNabywcy_{{ $zamowienie->id }}(this)">
-                                                    <i class="bi bi-clipboard"></i> NIP
-                                                </button>
-                                            @endif
+                                    <div class="col-lg-6">
+                                        <div class="h-100 p-2">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="text-primary fw-bold mb-0">
+                                                    <i class="bi bi-building"></i> NABYWCA
+                                                </h6>
+                                                @if($zamowienie->buyer_nip)
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyNipNabywcy_{{ $zamowienie->id }}(this)">
+                                                        <i class="bi bi-clipboard"></i> NIP
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            <div class="text-dark">
+                                                <div class="fw-semibold">{{ $zamowienie->buyer_name ?? '—' }}</div>
+                                                <div>{{ $zamowienie->buyer_address ?? '—' }}</div>
+                                                <div>{{ $zamowienie->buyer_postal_code ?? '—' }} {{ $zamowienie->buyer_city ?? '—' }}</div>
+                                                @if($zamowienie->buyer_nip)
+                                                    <div class="text-primary fw-semibold">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip) }}</div>
+                                                @endif
+                                            </div>
                                         </div>
                                     </div>
 
                                     {{-- ODBIORCA --}}
-                                    <div class="col-md-6 mb-3">
-                                        <h6 class="text-success fw-bold mb-2">
-                                            <i class="bi bi-geo-alt"></i> ODBIORCA
-                                        </h6>
-                                        <div class="text-dark">
-                                            <div class="fw-semibold">{{ $zamowienie->recipient_name ?? '—' }}</div>
-                                            <div>{{ $zamowienie->recipient_address ?? '—' }}</div>
-                                            <div>{{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}</div>
-                                            <div class="text-primary fw-semibold">nowoczesna-edukacja.pl</div>
-                                        </div>
-                                        <div class="mt-2">
-                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyOdbiorcaData_{{ $zamowienie->id }}(this)">
-                                                <i class="bi bi-clipboard"></i> ODBIORCA
-                                            </button>
+                                    <div class="col-lg-6">
+                                        <div class="h-100 p-2">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="text-success fw-bold mb-0">
+                                                    <i class="bi bi-geo-alt"></i> ODBIORCA
+                                                </h6>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyOdbiorcaData_{{ $zamowienie->id }}(this)">
+                                                    <i class="bi bi-clipboard"></i> ODBIORCA
+                                                </button>
+                                            </div>
+                                            <div class="text-dark">
+                                                <div class="fw-semibold">{{ $zamowienie->recipient_name ?? '—' }}</div>
+                                                <div>{{ $zamowienie->recipient_address ?? '—' }}</div>
+                                                <div>{{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}</div>
+                                                <div class="text-primary fw-semibold">nowoczesna-edukacja.pl</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {{-- FAKTURA --}}
-                                <div class="mb-3">
-                                    <h6 class="text-info fw-bold mb-2">
-                                        <i class="bi bi-receipt"></i> FAKTURA
-                                    </h6>
-                                    
-                                    {{-- Informacje o fakturze --}}
-                                    @if($hasInvoice)
-                                        <div class="text-dark mb-1">
-                                            <span class="fw-semibold">Nr faktury:</span> {{ $zamowienie->invoice_number }}
+                                {{-- UCZESTNIK | FAKTURA + EDYCJA --}}
+                                <div class="row g-3 align-items-stretch mb-4">
+                                    {{-- UCZESTNIK + EDYCJA --}}
+                                    <div class="col-lg-6 d-flex flex-column gap-3">
+                                        <div class="p-3">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="text-dark fw-bold mb-0">
+                                                    <i class="bi bi-person"></i> UCZESTNIK
+                                                </h6>
+                                                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                                    <button type="button" class="btn btn-outline-info btn-sm" onclick="copyUczestnik_{{ $zamowienie->id }}(this)">
+                                                        <i class="bi bi-clipboard"></i> Uczestnik
+                                                    </button>
+                                                    @if($zamowienie->participant_email)
+                                                        <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika_{{ $zamowienie->id }}(this)">
+                                                            <i class="bi bi-clipboard"></i> Email uczestnika
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="text-dark">
+                                                <div class="fw-semibold">{{ $zamowienie->participant_name ?? '—' }}</div>
+                                                @if($zamowienie->participant_email)
+                                                    <a href="mailto:{{ $zamowienie->participant_email }}" 
+                                                       class="text-primary text-decoration-none @if($participantEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                                       @if($participantEmailSame) title="Ten sam email co do faktury" @endif>
+                                                        {{ $zamowienie->participant_email }}
+                                                    </a>
+                                                @endif
+                                            </div>
                                         </div>
-                                    @else
-                                        <div class="text-warning mb-1">
-                                            <i class="bi bi-clock"></i> Oczekuje na wystawienie faktury
-                                        </div>
-                                    @endif
-                                    @if($zamowienie->orderer_email)
-                                        <div class="text-dark">
-                                            <span class="fw-semibold">Email:</span> 
-                                            <a href="mailto:{{ $zamowienie->orderer_email }}" class="text-primary text-decoration-none">
-                                                {{ $zamowienie->orderer_email }}
-                                            </a>
-                                        </div>
-                                        <div class="mt-1">
-                                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury_{{ $zamowienie->id }}(this)">
-                                                <i class="bi bi-clipboard"></i> Email faktury
-                                            </button>
-                                        </div>
-                                    @endif
-                                    @if($zamowienie->invoice_notes)
-                                        <div class="text-danger mt-1">
-                                            <span class="fw-semibold">Uwagi:</span> {{ $zamowienie->invoice_notes }}
-                                        </div>
-                                    @endif
-                                    @if($zamowienie->invoice_payment_delay)
-                                        <div class="text-danger">
-                                            <span class="fw-semibold">Odroczenie:</span> {{ $zamowienie->invoice_payment_delay }} dni
-                                        </div>
-                                    @endif
-                                </div>
 
-                                {{-- UCZESTNIK --}}
-                                <div class="mb-3">
-                                    <h6 class="text-dark fw-bold mb-2">
-                                        <i class="bi bi-person"></i> UCZESTNIK
-                                    </h6>
-                                    <div class="text-dark">
-                                        <div class="fw-semibold">{{ $zamowienie->participant_name ?? '—' }}</div>
-                                        @if($zamowienie->participant_email)
-                                            <a href="mailto:{{ $zamowienie->participant_email }}" class="text-primary text-decoration-none">
-                                                {{ $zamowienie->participant_email }}
-                                            </a>
-                                        @endif
+                                        {{-- EDYCJA ZAMÓWIENIA --}}
+                                        <div class="p-3">
+                                            <h6 class="text-dark fw-bold mb-3">
+                                                <i class="bi bi-pencil"></i> EDYCJA ZAMÓWIENIA
+                                            </h6>
+                                            <form method="POST" action="{{ route('form-orders.update', $zamowienie->id) }}">
+                                                @csrf
+                                                @method('PUT')
+                                                <input type="hidden" name="per_page" value="{{ $perPage }}">
+                                                <input type="hidden" name="search" value="{{ $search }}">
+                                                <input type="hidden" name="filter" value="{{ $filter }}">
+                                                <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
+                                                <div class="row g-2">
+                                                    <div class="col-md-6">
+                                                        <label for="invoice_number_{{ $zamowienie->id }}" class="form-label small">Nr faktury:</label>
+                                                        <input type="text" 
+                                                               class="form-control form-control-sm @if($isNew) border-danger bg-danger bg-opacity-10 @endif"
+                                                               id="invoice_number_{{ $zamowienie->id }}" 
+                                                               name="invoice_number"
+                                                               value="{{ $zamowienie->invoice_number }}"
+                                                               placeholder="Wprowadź numer faktury"
+                                                               @if($isNew)
+                                                               style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);"
+                                                               @endif>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label small">Status:</label>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="status_completed_{{ $zamowienie->id }}" name="status_completed" value="1" {{ $zamowienie->status_completed == 1 ? 'checked' : '' }}>
+                                                            <label class="form-check-label small" for="status_completed_{{ $zamowienie->id }}">
+                                                                Zakończone
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row g-2 mt-2">
+                                                    <div class="col-12">
+                                                        <label for="notes_{{ $zamowienie->id }}" class="form-label small">Notatki:</label>
+                                                        <textarea class="form-control form-control-sm" 
+                                                                  id="notes_{{ $zamowienie->id }}" 
+                                                                  name="notes" 
+                                                                  rows="2" 
+                                                                  placeholder="Dodaj notatki...">{{ $zamowienie->notes }}</textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-3 d-flex justify-content-between flex-wrap gap-2">
+                                                    <button type="submit" class="btn btn-sm btn-primary">
+                                                        <i class="bi bi-check-circle"></i> Zapisz zmiany
+                                                    </button>
+                                                    <div class="btn-group" role="group">
+                                                        <a href="{{ route('form-orders.edit', $zamowienie->id) }}" 
+                                                           class="btn btn-sm btn-outline-warning" 
+                                                           title="Edytuj zamówienie">
+                                                            <i class="bi bi-pencil"></i> Edytuj
+                                                        </a>
+                                                        <button type="button" 
+                                                                class="btn btn-sm btn-outline-danger" 
+                                                                title="Usuń zamówienie"
+                                                                data-bs-toggle="modal" 
+                                                                data-bs-target="#deleteModal{{ $zamowienie->id }}">
+                                                            <i class="bi bi-trash"></i> USUŃ
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
                                     </div>
-                                    <div class="mt-2">
-                                        <button type="button" class="btn btn-outline-info btn-sm" onclick="copyUczestnik_{{ $zamowienie->id }}(this)">
-                                            <i class="bi bi-clipboard"></i> Uczestnik
-                                        </button>
-                                        @if($zamowienie->participant_email)
-                                            <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika_{{ $zamowienie->id }}(this)">
-                                                <i class="bi bi-clipboard"></i> Email uczestnika
-                                            </button>
-                                        @endif
+
+                                    {{-- FAKTURA --}}
+                                    <div class="col-lg-6">
+                                        <div class="h-100 p-3 position-relative">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="text-info fw-bold mb-0">
+                                                    <i class="bi bi-receipt"></i> FAKTURA
+                                                </h6>
+                                                @if($zamowienie->orderer_email)
+                                                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury_{{ $zamowienie->id }}(this)">
+                                                        <i class="bi bi-clipboard"></i> Email faktury
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            
+                                            {{-- Informacje o fakturze --}}
+                                            @if($hasInvoice)
+                                                <div class="text-dark mb-1">
+                                                    <span class="fw-semibold">Nr faktury:</span> {{ $zamowienie->invoice_number }}
+                                                </div>
+                                            @else
+                                                <div class="text-warning mb-1">
+                                                    <i class="bi bi-clock"></i> Oczekuje na wystawienie faktury
+                                                </div>
+                                            @endif
+
+                                            <div class="mb-2 text-dark">
+                                                <span class="fw-semibold d-block">Kontakt:</span>
+                                                @if($zamowienie->orderer_name)
+                                                    <span class="d-block text-muted">{{ $zamowienie->orderer_name }}</span>
+                                                @endif
+                                                @if($zamowienie->orderer_phone)
+                                                    <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
+                                                        @php
+                                                            $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
+                                                            if (strlen($phone) == 9) {
+                                                                echo '+48 ' . substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
+                                                            } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
+                                                                echo '+' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
+                                                            } elseif (strlen($phone) >= 10 && strlen($phone) <= 15) {
+                                                                $formatted = '+' . $phone;
+                                                                $formatted = preg_replace('/(\d{3})(?=\d)/', '$1 ', $formatted);
+                                                                echo $formatted;
+                                                            } else {
+                                                                echo $zamowienie->orderer_phone;
+                                                            }
+                                                        @endphp
+                                                    </a>
+                                                @endif
+                                            </div>
+
+                                            @if($zamowienie->orderer_email)
+                                                <div class="text-dark">
+                                                    <span class="fw-semibold">Email:</span> 
+                                                    <a href="mailto:{{ $zamowienie->orderer_email }}" 
+                                                       class="text-primary text-decoration-none @if($participantEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                                       @if($participantEmailSame) title="Ten sam email co uczestnika" @endif>
+                                                        {{ $zamowienie->orderer_email }}
+                                                    </a>
+                                                </div>
+                                            @endif
+                                            @if($zamowienie->invoice_notes)
+                                                <div class="text-danger mt-2">
+                                                    <span class="fw-semibold">Uwagi:</span> {{ $zamowienie->invoice_notes }}
+                                                </div>
+                                            @endif
+                                            @if($zamowienie->invoice_payment_delay)
+                                                <div class="text-danger">
+                                                    <span class="fw-semibold">Odroczenie:</span> {{ $zamowienie->invoice_payment_delay }} dni
+                                                </div>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
 
@@ -406,73 +482,6 @@
                                     </div>
                                 @endif
 
-                                {{-- Formularz edycji na końcu karty --}}
-                                <div class="mt-4 pt-3 border-top">
-                                    <h6 class="text-dark fw-bold mb-3">
-                                        <i class="bi bi-pencil"></i> EDYCJA ZAMÓWIENIA
-                                    </h6>
-                                    <form method="POST" action="{{ route('form-orders.update', $zamowienie->id) }}" class="mb-3">
-                                        @csrf
-                                        @method('PUT')
-                                        {{-- Ukryte pola dla zachowania parametrów URL --}}
-                                        <input type="hidden" name="per_page" value="{{ $perPage }}">
-                                        <input type="hidden" name="search" value="{{ $search }}">
-                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                        <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
-                                        <div class="row g-2">
-                                            <div class="col-md-6">
-                                                <label for="invoice_number_{{ $zamowienie->id }}" class="form-label small">Nr faktury:</label>
-                                                <input type="text" 
-                                                       class="form-control form-control-sm @if($isNew) border-danger bg-danger bg-opacity-10 @endif"
-                                                       id="invoice_number_{{ $zamowienie->id }}" 
-                                                       name="invoice_number"
-                                                       value="{{ $zamowienie->invoice_number }}"
-                                                       placeholder="Wprowadź numer faktury"
-                                                       @if($isNew)
-                                                       style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);"
-                                                       @endif>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label small">Status:</label>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="status_completed_{{ $zamowienie->id }}" name="status_completed" value="1" {{ $zamowienie->status_completed == 1 ? 'checked' : '' }}>
-                                                    <label class="form-check-label small" for="status_completed_{{ $zamowienie->id }}">
-                                                        Zakończone
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row g-2 mt-2">
-                                            <div class="col-12">
-                                                <label for="notes_{{ $zamowienie->id }}" class="form-label small">Notatki:</label>
-                                                <textarea class="form-control form-control-sm" 
-                                                          id="notes_{{ $zamowienie->id }}" 
-                                                          name="notes" 
-                                                          rows="2" 
-                                                          placeholder="Dodaj notatki...">{{ $zamowienie->notes }}</textarea>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3 d-flex justify-content-between">
-                                            <button type="submit" class="btn btn-sm btn-primary">
-                                                <i class="bi bi-check-circle"></i> Zapisz zmiany
-                                            </button>
-                                            <div class="btn-group" role="group">
-                                                <a href="{{ route('form-orders.edit', $zamowienie->id) }}" 
-                                                   class="btn btn-sm btn-outline-warning" 
-                                                   title="Edytuj zamówienie">
-                                                    <i class="bi bi-pencil"></i> Edytuj
-                                                </a>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-outline-danger" 
-                                                        title="Usuń zamówienie"
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#deleteModal{{ $zamowienie->id }}">
-                                                    <i class="bi bi-trash"></i> USUŃ
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
                             </div>
                         </div>
 
