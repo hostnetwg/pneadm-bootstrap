@@ -186,36 +186,36 @@ nowoczesna-edukacja.pl </div>
                                     </button>
                                 </div>
                             @endif
-                            
-                            {{-- Button Dodaj zamówienie PUBLIGO --}}
+
+                    {{-- Button Dodaj zamówienie PUBLIGO --}}
                             <div class="mt-3 pt-3 border-top">
-                                @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
+                    @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
                                     <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
-                                        <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
-                                    </button>
-                                    <div id="publigoResult" class="mt-2"></div>
-                                @elseif($zamowienie->publigo_sent == 1)
+                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
+                            </button>
+                            <div id="publigoResult" class="mt-2"></div>
+                    @elseif($zamowienie->publigo_sent == 1)
                                     {{-- Informacja o statusie Publigo --}}
                                     <div class="alert alert-success mb-0">
-                                        <i class="bi bi-check-circle"></i> 
-                                        <strong>Zamówienie zostało wysłane do Publigo</strong>
-                                        <small class="d-block text-muted mt-1">
-                                            Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
-                                        </small>
-                                        
-                                        {{-- Przycisk resetowania dla administratorów --}}
-                                        @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
-                                            <div class="mt-2">
+                                <i class="bi bi-check-circle"></i> 
+                                <strong>Zamówienie zostało wysłane do Publigo</strong>
+                                <small class="d-block text-muted mt-1">
+                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
+                                </small>
+                                
+                                {{-- Przycisk resetowania dla administratorów --}}
+                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
+                                    <div class="mt-2">
                                                 <button type="button" class="btn btn-sm btn-outline-danger" 
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#resetPubligoModal">
-                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
-                                                </button>
-                                            </div>
-                                        @endif
+                                            <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                                        </button>
                                     </div>
                                 @endif
                             </div>
+                                @endif
+                        </div>
                         </div>
                     </div>
 
@@ -458,7 +458,7 @@ echo $remarks;
                                         @if($zamowienie->order_date)
                                             <div class="mb-1">
                                                 <small>
-                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->setTimezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                                                    <strong>Data zamówienia:</strong> {{ $zamowienie->order_date->format('d.m.Y H:i') }}
                                                 </small>
                                             </div>
                                         @endif
@@ -1422,7 +1422,7 @@ nowoczesna-edukacja.pl `;
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
-                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->setTimezone(config('app.timezone'))->format('d.m.Y H:i') : '—' }}</li>
+                            <li><strong>Data:</strong> {{ $zamowienie->order_date ? $zamowienie->order_date->format('d.m.Y H:i') : '—' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
                             <li><strong>Numer faktury:</strong> {{ $zamowienie->invoice_number ?: 'Brak' }}</li>
                         </ul>

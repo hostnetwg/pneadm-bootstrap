@@ -6,8 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 use App\Models\FormOrder;
 use App\Observers\FormOrderObserver;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Database\Events\ConnectionEstablished;
+use Illuminate\Support\Facades\DB;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,11 +30,19 @@ class AppServiceProvider extends ServiceProvider
         
         // Wymuś ustawienie strefy czasowej MySQL na UTC przy każdym połączeniu
         // To rozwiązuje problem z różnymi strefami czasowymi między środowiskami
-        Event::listen(ConnectionEstablished::class, function (ConnectionEstablished $event) {
-            if ($event->connection->getDriverName() === 'mysql') {
-                // Ustaw strefę czasową sesji MySQL na UTC
-                // To zapewni, że MySQL zwraca daty w UTC, niezależnie od konfiguracji serwera
-                $event->connection->statement("SET time_zone = '+00:00'");
+        // Używamy DB::afterConnecting() zamiast event listenera, bo działa bardziej niezawodnie
+        DB::afterConnecting(function ($connection) {
+            if ($connection->getDriverName() === 'mysql') {
+                try {
+                    // Ustaw strefę czasową sesji MySQL na UTC
+                    // To zapewni, że MySQL zwraca daty w UTC, niezależnie od konfiguracji serwera
+                    $connection->statement("SET time_zone = '+00:00'");
+                } catch (\Exception $e) {
+                    // Ignoruj błędy - może być problem z uprawnieniami
+                    \Log::warning('Failed to set MySQL timezone to UTC', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
         });
     }
