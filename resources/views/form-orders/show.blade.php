@@ -798,25 +798,92 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // Funkcja sprawdzająca czy invoice_number jest wypełnione przed wystawieniem faktury
+        // Funkcja sprawdzająca czy invoice_number jest wypełnione w bazie danych przed wystawieniem faktury
         function checkAndCreateInvoice(orderId) {
+            const button = document.getElementById('ifirmaInvoiceBtn');
             const invoiceNumberInput = document.getElementById('invoice_number');
-            const invoiceNumber = invoiceNumberInput ? invoiceNumberInput.value.trim() : '';
             
-            // Jeśli numer faktury jest już wypełniony, pokaż modal ostrzeżenia
-            if (invoiceNumber) {
-                // Aktualizuj wyświetlany numer faktury w modalu (na wypadek, gdyby został zmieniony po załadowaniu strony)
-                const invoiceNumberDisplay = document.getElementById('currentInvoiceNumberDisplay');
-                if (invoiceNumberDisplay) {
-                    invoiceNumberDisplay.textContent = invoiceNumber;
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Sprawdzanie...';
+            
+            // Sprawdź status faktury w bazie danych (nie w formularzu!)
+            fetch(`/form-orders/${orderId}/ifirma/check-invoice`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 }
-                
-                const modal = new bootstrap.Modal(document.getElementById('invoiceWarningModal'));
-                modal.show();
-            } else {
-                // Jeśli nie ma numeru, wystaw fakturę bezpośrednio
-                createIfirmaInvoice(orderId);
-            }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.has_invoice && data.invoice_number) {
+                        // Faktura już istnieje w bazie - wypełnij pole formularza i pokaż modal
+                        if (invoiceNumberInput) {
+                            invoiceNumberInput.value = data.invoice_number;
+                            
+                            // Zmień podświetlenie na zielone
+                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+                            invoiceNumberInput.style.borderWidth = '';
+                            invoiceNumberInput.style.boxShadow = '';
+                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+                            invoiceNumberInput.style.borderWidth = '2px';
+                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
+                            
+                            // Wizualny efekt - podświetlenie tła na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
+                            invoiceNumberInput.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                invoiceNumberInput.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                        
+                        // Aktualizuj wyświetlany numer faktury w modalu
+                        const invoiceNumberDisplay = document.getElementById('currentInvoiceNumberDisplay');
+                        if (invoiceNumberDisplay) {
+                            invoiceNumberDisplay.textContent = data.invoice_number;
+                        }
+                        
+                        // Pokaż modal ostrzeżenia
+                        const modal = new bootstrap.Modal(document.getElementById('invoiceWarningModal'));
+                        modal.show();
+                    } else {
+                        // Nie ma faktury w bazie - wystaw fakturę bezpośrednio
+                        createIfirmaInvoice(orderId);
+                    }
+                } else {
+                    // Błąd podczas sprawdzania - pokaż komunikat
+                    const resultDiv = document.getElementById('ifirmaResult');
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Błąd:</strong> ${data.error || 'Nie udało się sprawdzić statusu faktury.'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const resultDiv = document.getElementById('ifirmaResult');
+                if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd połączenia:</strong> Wystąpił błąd podczas sprawdzania statusu faktury.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                }
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma';
+            });
         }
 
         // Funkcja potwierdzająca wystawienie faktury (wywoływana z modala ostrzeżenia)
@@ -826,12 +893,12 @@ nowoczesna-edukacja.pl `;
             if (modal) {
                 modal.hide();
             }
-            // Wywołaj funkcję wystawiania faktury
-            createIfirmaInvoice(orderId);
+            // Wywołaj funkcję wystawiania faktury z parametrem force=true
+            createIfirmaInvoice(orderId, true);
         }
 
         // Funkcja do wystawiania zwykłej faktury w iFirma
-        function createIfirmaInvoice(orderId) {
+        function createIfirmaInvoice(orderId, force = false) {
             const button = document.getElementById('ifirmaInvoiceBtn');
             const resultDiv = document.getElementById('ifirmaResult');
             
@@ -850,6 +917,17 @@ nowoczesna-edukacja.pl `;
             // Wyczyść poprzednie komunikaty
             resultDiv.innerHTML = '';
             
+            // Przygotuj dane do wysłania
+            const requestData = {
+                custom_remarks: customRemarks,
+                send_email: sendEmail
+            };
+            
+            // Dodaj parametr force tylko jeśli jest true
+            if (force) {
+                requestData.force = true;
+            }
+            
             // Wysłanie zapytania AJAX z niestandardowymi uwagami i opcją wysyłki e-mail
             fetch(`/form-orders/${orderId}/ifirma/invoice`, {
                 method: 'POST',
@@ -857,20 +935,33 @@ nowoczesna-edukacja.pl `;
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({
-                    custom_remarks: customRemarks,
-                    send_email: sendEmail
-                })
+                body: JSON.stringify(requestData)
             })
-            .then(response => response.json())
+            .then(response => {
+                // Sprawdź status odpowiedzi
+                if (response.status === 409) {
+                    // Konflikt - faktura już istnieje
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Faktura już została wystawiona');
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     // Sukces
+                    const alertClass = force ? 'alert-warning' : 'alert-success';
+                    const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
+                    const alertMessage = force 
+                        ? `<strong>Uwaga!</strong> Faktura została wystawiona mimo istniejącego numeru. ${data.message}`
+                        : `<strong>Sukces!</strong> ${data.message}`;
+                    
                     resultDiv.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <i class="bi bi-check-circle"></i>
-                            <strong>Sukces!</strong> ${data.message}
+                        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                            <i class="bi ${alertIcon}"></i>
+                            ${alertMessage}
                             ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
+                            ${data.existing_invoice_number && force ? `<br><small class="text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></small>` : ''}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                         <div class="mt-2 d-flex gap-2">
@@ -949,10 +1040,16 @@ nowoczesna-edukacja.pl `;
             })
             .catch(error => {
                 console.error('Error:', error);
+                
+                // Sprawdź czy to błąd 409 (konflikt - faktura już istnieje)
+                const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
+                const isConflict = errorMessage.includes('już została wystawiona') || errorMessage.includes('already');
+                
                 resultDiv.innerHTML = `
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Błąd połączenia:</strong> Wystąpił błąd podczas komunikacji z serwerem.
+                        <strong>Błąd:</strong> ${errorMessage}
+                        ${isConflict ? `<br><small class="text-muted">Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.</small>` : ''}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 `;

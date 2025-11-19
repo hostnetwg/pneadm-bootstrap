@@ -975,6 +975,40 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Sprawdza czy faktura już istnieje w bazie danych (przed wystawieniem)
+     */
+    public function checkInvoiceStatus($id)
+    {
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // Sprawdź pole invoice_number w bazie danych (nie w formularzu!)
+            $hasInvoice = $zamowienie->has_invoice;
+            $invoiceNumber = $zamowienie->invoice_number;
+
+            return response()->json([
+                'success' => true,
+                'has_invoice' => $hasInvoice,
+                'invoice_number' => $invoiceNumber ?: null,
+                'order_id' => $zamowienie->id
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas sprawdzania statusu faktury: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Wystawia fakturę krajową (nie pro-forma) w iFirma.pl na podstawie zamówienia
      */
     public function createIfirmaInvoice(Request $request, $id)
@@ -987,6 +1021,33 @@ class FormOrdersController extends Controller
                     'success' => false,
                     'error' => 'Zamówienie nie zostało znalezione.'
                 ], 404);
+            }
+
+            // ZAWSZE sprawdzamy bazę danych (nie formularz!)
+            $hasInvoice = $zamowienie->has_invoice;
+            $existingInvoiceNumber = $zamowienie->invoice_number;
+            $force = $request->input('force', false);
+
+            // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
+            if ($hasInvoice && !$force) {
+                // Logowanie próby ponownego wystawienia faktury
+                \App\Models\ActivityLog::logCustom(
+                    'Próba ponownego wystawienia faktury',
+                    "Próba wystawienia faktury dla zamówienia #{$zamowienie->id}, które ma już fakturę: {$existingInvoiceNumber}",
+                    [
+                        'model_type' => FormOrder::class,
+                        'model_id' => $zamowienie->id,
+                        'model_name' => "Zamówienie #{$zamowienie->id}",
+                        'old_values' => ['invoice_number' => $existingInvoiceNumber],
+                    ]
+                );
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Faktura dla tego zamówienia została już wystawiona.',
+                    'existing_invoice_number' => $existingInvoiceNumber,
+                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.'
+                ], 409); // 409 Conflict
             }
 
             // Sprawdzenie czy zamówienie ma wymagane dane nabywcy
@@ -1229,9 +1290,31 @@ class FormOrdersController extends Controller
 
                 // Aktualizacja numeru faktury w zamówieniu (pole invoice_number)
                 // Faktura krajowa zapisuje się w invoice_number (nie w invoice_notes!)
-                if (!empty($invoiceNumber) && empty($zamowienie->invoice_number)) {
-                    $zamowienie->invoice_number = $invoiceNumber;
-                    $zamowienie->save();
+                if (!empty($invoiceNumber)) {
+                    $oldInvoiceNumber = $zamowienie->invoice_number;
+                    
+                    // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
+                    if (empty($oldInvoiceNumber) || $force) {
+                        $zamowienie->invoice_number = $invoiceNumber;
+                        $zamowienie->save();
+
+                        // Logowanie operacji wystawienia faktury
+                        $logDescription = $force && !empty($oldInvoiceNumber)
+                            ? "Wystawiono nową fakturę {$invoiceNumber} dla zamówienia #{$zamowienie->id} (nadpisano poprzednią fakturę: {$oldInvoiceNumber})"
+                            : "Wystawiono fakturę {$invoiceNumber} dla zamówienia #{$zamowienie->id}";
+
+                        \App\Models\ActivityLog::logCustom(
+                            'Wystawienie faktury iFirma',
+                            $logDescription,
+                            [
+                                'model_type' => FormOrder::class,
+                                'model_id' => $zamowienie->id,
+                                'model_name' => "Zamówienie #{$zamowienie->id}",
+                                'old_values' => $oldInvoiceNumber ? ['invoice_number' => $oldInvoiceNumber] : null,
+                                'new_values' => ['invoice_number' => $invoiceNumber],
+                            ]
+                        );
+                    }
                 }
 
                 // Wysyłka e-mailem (jeśli zaznaczono checkbox)

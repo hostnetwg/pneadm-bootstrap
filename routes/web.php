@@ -157,6 +157,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/duplicates/{id}/update-notes', [FormOrdersController::class, 'updateNotes'])->name('duplicates.update-notes');
         Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
         Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
+        Route::get('/{id}/ifirma/check-invoice', [FormOrdersController::class, 'checkInvoiceStatus'])->name('ifirma.check-invoice');
         Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
         Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');
     });
