@@ -276,6 +276,23 @@
                             @else
                                 {{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}
                             @endif
+                            
+                            {{-- Warianty cenowe --}}
+                            @if($course->priceVariants && $course->priceVariants->count() > 0)
+                                <div class="mt-2 pt-2 border-top">
+                                    @foreach($course->priceVariants as $variant)
+                                        <div class="small">
+                                            <strong>{{ number_format($variant->getCurrentPrice(), 2, ',', ' ') }} PLN</strong>
+                                            @if($variant->isPromotionActive())
+                                                <span class="badge bg-success badge-sm" title="Promocja aktywna">PROM</span>
+                                            @endif
+                                            @if($variant->name)
+                                                <br><span class="text-muted">{{ Str::limit($variant->name, 25) }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </td>                        
                         <td class="text-center align-middle">
                             @if ($course->image)

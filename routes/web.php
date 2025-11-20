@@ -24,6 +24,7 @@ use App\Http\Controllers\SurveyImportController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\UserPreferencesController;
+use App\Http\Controllers\CoursePriceVariantController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -204,6 +205,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');
+    
+    // Warianty cenowe kursów
+    Route::prefix('courses/{courseId}/price-variants')->name('courses.price-variants.')->group(function () {
+        Route::get('/create', [CoursePriceVariantController::class, 'create'])->name('create');
+        Route::post('/', [CoursePriceVariantController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [CoursePriceVariantController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [CoursePriceVariantController::class, 'update'])->name('update');
+        Route::delete('/{id}', [CoursePriceVariantController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/restore', [CoursePriceVariantController::class, 'restore'])->name('restore');
+    });
 
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników

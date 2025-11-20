@@ -84,5 +84,21 @@ class Course extends Model
     {
         return $this->belongsTo(CertificateTemplate::class, 'certificate_template_id');
     }
+
+    /**
+     * Relacja do wariantów cenowych
+     */
+    public function priceVariants()
+    {
+        return $this->hasMany(CoursePriceVariant::class);
+    }
+
+    /**
+     * Relacja do aktywnych wariantów cenowych
+     */
+    public function activePriceVariants()
+    {
+        return $this->hasMany(CoursePriceVariant::class)->where('is_active', true);
+    }
         
 }

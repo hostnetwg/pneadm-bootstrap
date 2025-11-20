@@ -117,6 +117,8 @@ class CoursesController extends Controller
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
         $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates', 'surveys' => function($query) {
                             $query->orderBy('id', 'desc')->limit(1); // Pobierz tylko pierwszą ankietę dla każdego kursu
+                        }, 'priceVariants' => function($query) {
+                            $query->where('is_active', true); // Tylko aktywne warianty
                         }])
                         ->orderBy($sortColumn, $sortDirection)
                         ->paginate($perPage)
@@ -577,8 +579,14 @@ class CoursesController extends Controller
      */
     public function show($id)
     {
-        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys'])
+        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys', 'priceVariants'])
                         ->findOrFail($id);
+        
+        // Pobierz również usunięte warianty cenowe (dla przywracania)
+        $deletedVariants = \App\Models\CoursePriceVariant::withTrashed()
+            ->where('course_id', $course->id)
+            ->whereNotNull('deleted_at')
+            ->get();
         
         // Pobranie poprzedniego szkolenia (według daty, pokazuj również nieaktywne)
         $previousCourse = Course::where('start_date', '<', $course->start_date)
@@ -590,7 +598,7 @@ class CoursesController extends Controller
                            ->orderBy('start_date', 'asc')
                            ->first();
         
-        return view('courses.show', compact('course', 'previousCourse', 'nextCourse'));
+        return view('courses.show', compact('course', 'previousCourse', 'nextCourse', 'deletedVariants'));
     }
 
     /**

@@ -200,6 +200,137 @@
                             </div>
                         </div>
                     @endif
+
+                    <!-- Warianty cenowe -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tags"></i> Warianty cenowe
+                            </h5>
+                            <a href="{{ route('courses.price-variants.create', $course->id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus"></i> Dodaj wariant
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            @if($course->priceVariants->count() > 0)
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Nazwa</th>
+                                                <th>Cena</th>
+                                                <th>Promocja</th>
+                                                <th>Typ dostępu</th>
+                                                <th>Status</th>
+                                                <th>Akcje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($course->priceVariants as $variant)
+                                                <tr class="{{ !$variant->is_active ? 'table-secondary' : '' }}">
+                                                    <td>
+                                                        <strong>{{ $variant->name }}</strong>
+                                                        @if($variant->description)
+                                                            <br><small class="text-muted">{{ Str::limit($variant->description, 50) }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <strong>{{ number_format($variant->getCurrentPrice(), 2, ',', ' ') }} PLN</strong>
+                                                        @if($variant->isPromotionActive())
+                                                            <br><small class="text-success">
+                                                                <del>{{ number_format($variant->price, 2, ',', ' ') }} PLN</del>
+                                                                <span class="badge bg-success">PROMOCJA</span>
+                                                            </small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($variant->is_promotion)
+                                                            <span class="badge bg-info">{{ $variant->getPromotionTypeName() }}</span>
+                                                            @if($variant->promotion_type === 'time_limited' && $variant->promotion_start && $variant->promotion_end)
+                                                                <br><small class="text-muted">
+                                                                    {{ $variant->promotion_start->format('d.m.Y H:i') }} - 
+                                                                    {{ $variant->promotion_end->format('d.m.Y H:i') }}
+                                                                </small>
+                                                            @endif
+                                                        @else
+                                                            <span class="text-muted">Brak</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <small>{{ $variant->getAccessTypeName() }}</small>
+                                                    </td>
+                                                    <td>
+                                                        @if($variant->is_active)
+                                                            <span class="badge bg-success">Aktywny</span>
+                                                        @else
+                                                            <span class="badge bg-secondary">Nieaktywny</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <a href="{{ route('courses.price-variants.edit', [$course->id, $variant->id]) }}" 
+                                                               class="btn btn-outline-warning" 
+                                                               title="Edytuj">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <button type="button" 
+                                                                    class="btn btn-outline-danger" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#deleteVariantModal{{ $variant->id }}"
+                                                                    title="Usuń">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="text-muted mb-0">Brak wariantów cenowych. Kliknij "Dodaj wariant", aby utworzyć pierwszy.</p>
+                            @endif
+
+                            @if(isset($deletedVariants) && $deletedVariants->count() > 0)
+                                <div class="mt-4 pt-3 border-top">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="fas fa-trash"></i> Usunięte warianty (można przywrócić)
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-secondary">
+                                            <thead>
+                                                <tr>
+                                                    <th>Nazwa</th>
+                                                    <th>Cena</th>
+                                                    <th>Usunięto</th>
+                                                    <th>Akcje</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($deletedVariants as $deletedVariant)
+                                                    <tr>
+                                                        <td>{{ $deletedVariant->name }}</td>
+                                                        <td>{{ number_format($deletedVariant->price, 2, ',', ' ') }} PLN</td>
+                                                        <td>
+                                                            <small>{{ $deletedVariant->deleted_at->format('d.m.Y H:i') }}</small>
+                                                        </td>
+                                                        <td>
+                                                            <button type="button" 
+                                                                    class="btn btn-sm btn-outline-success" 
+                                                                    onclick="restoreVariant({{ $course->id }}, {{ $deletedVariant->id }})"
+                                                                    title="Przywróć z kosza">
+                                                                <i class="fas fa-undo"></i> Przywróć
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-4">
@@ -360,4 +491,123 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale usuwania wariantów cenowych --}}
+    @foreach($course->priceVariants as $variant)
+        <div class="modal fade" id="deleteVariantModal{{ $variant->id }}" tabindex="-1" aria-labelledby="deleteVariantModalLabel{{ $variant->id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteVariantModalLabel{{ $variant->id }}">
+                            <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć wariant cenowy <strong>"{{ $variant->name }}"</strong>?</p>
+                        <div class="bg-light p-3 rounded">
+                            <h6 class="mb-2">Szczegóły wariantu:</h6>
+                            <ul class="mb-0">
+                                <li><strong>Nazwa:</strong> {{ $variant->name }}</li>
+                                <li><strong>Cena:</strong> {{ number_format($variant->price, 2, ',', ' ') }} PLN</li>
+                                <li><strong>Status:</strong> {{ $variant->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                            </ul>
+                        </div>
+                        <p class="text-muted mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            Wariant cenowy zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić, o ile kurs istnieje w bazie danych.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('courses.price-variants.destroy', [$course->id, $variant->id]) }}" 
+                              method="POST" 
+                              class="d-inline"
+                              id="deleteVariantForm{{ $variant->id }}">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Usuń wariant
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endforeach
+
+    <script>
+        // Obsługa usuwania wariantów przez AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            @foreach($course->priceVariants as $variant)
+                const form{{ $variant->id }} = document.getElementById('deleteVariantForm{{ $variant->id }}');
+                if (form{{ $variant->id }}) {
+                    form{{ $variant->id }}.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        fetch(form{{ $variant->id }}.action, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                _method: 'DELETE'
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Zamknij modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('deleteVariantModal{{ $variant->id }}'));
+                                if (modal) {
+                                    modal.hide();
+                                }
+                                // Przeładuj stronę
+                                window.location.reload();
+                            } else {
+                                alert('Błąd: ' + (data.error || 'Nie udało się usunąć wariantu cenowego.'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Wystąpił błąd podczas usuwania wariantu cenowego.');
+                        });
+                    });
+                }
+            @endforeach
+        });
+
+        // Funkcja przywracania wariantu z kosza
+        function restoreVariant(courseId, variantId) {
+            if (!confirm('Czy na pewno chcesz przywrócić ten wariant cenowy z kosza?')) {
+                return;
+            }
+
+            fetch(`/courses/${courseId}/price-variants/${variantId}/restore`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Przeładuj stronę
+                    window.location.reload();
+                } else {
+                    alert('Błąd: ' + (data.error || 'Nie udało się przywrócić wariantu cenowego.'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Wystąpił błąd podczas przywracania wariantu cenowego.');
+            });
+        }
+    </script>
 </x-app-layout>
