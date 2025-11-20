@@ -22,7 +22,7 @@
             <!-- Nawigacja -->
             <div class="mb-4 d-flex justify-content-between align-items-center">
                 <div>
-                    <h4>Import ankiety dla: <strong>{{ $course->title }}</strong></h4>
+                    <h4>Import ankiety dla: <strong>{!! $course->title !!}</strong></h4>
                     <p class="text-muted mb-0">Zaimportuj wyniki ankiety z pliku CSV pobranego z Google Forms</p>
                 </div>
                 <a href="{{ route('courses.show', $course->id) }}" class="btn btn-secondary">

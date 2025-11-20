@@ -88,7 +88,7 @@
     <p class="bold">Platforma Nowoczesnej Edukacji</p>
 
     <h3>TEMAT SZKOLENIA</h3>
-    <h2 class="course-title">{{ $course->title }}</h2>
+    <h2 class="course-title">{!! $course->title !!}</h2>
 
     @php
         $description = trim($course->description ?? '');

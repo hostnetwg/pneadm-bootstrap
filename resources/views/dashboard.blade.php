@@ -230,7 +230,7 @@
                                         @foreach($popularProducts as $product)
                                         <tr>
                                             <td>
-                                                <strong>{{ $product['name'] }}</strong>
+                                                <strong>{!! $product['name'] !!}</strong>
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge bg-primary">{{ $product['count'] }}</span>

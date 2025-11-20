@@ -94,7 +94,7 @@
     <p class="bold">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</p>
 
     <h3>TEMAT SZKOLENIA</h3>
-    <h2 class="course-title">{{ $course->title }}</h2>
+    <h2 class="course-title">{!! $course->title !!}</h2>
 
     <div class="date-section">
         <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.<br>

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            Dodaj uczestnika do kursu - {{ $course->title }}
+            Dodaj uczestnika do kursu - {!! $course->title !!}
         </h2>
     </x-slot>
 

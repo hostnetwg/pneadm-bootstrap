@@ -91,7 +91,7 @@
                             <option value="">Wybierz kurs</option>
                             @foreach($courses as $course)
                                 <option value="{{ $course->id_old ?? $course->id }}">
-                                    {{ $course->title }} ({{ $course->start_date ? $course->start_date->format('Y-m-d') : 'Brak daty' }}) - ID: {{ $course->id_old ?? $course->id }}
+                                    {!! $course->title !!} ({{ $course->start_date ? $course->start_date->format('Y-m-d') : 'Brak daty' }}) - ID: {{ $course->id_old ?? $course->id }}
                                 </option>
                             @endforeach
                         </select>

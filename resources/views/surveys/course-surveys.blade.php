@@ -16,7 +16,7 @@
             <!-- Nawigacja -->
             <div class="mb-4 d-flex justify-content-between align-items-center">
                 <div>
-                    <h4>Ankiety dla: <strong>{{ $course->title }}</strong></h4>
+                    <h4>Ankiety dla: <strong>{!! $course->title !!}</strong></h4>
                     <p class="text-muted mb-0">Wszystkie ankiety przypisane do tego szkolenia</p>
                 </div>
                 <div class="d-flex gap-2">

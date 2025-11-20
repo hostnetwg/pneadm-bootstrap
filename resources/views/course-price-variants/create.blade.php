@@ -10,7 +10,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('courses.index') }}">Kursy</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('courses.show', $course->id) }}">{{ $course->title }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('courses.show', $course->id) }}">{!! $course->title !!}</a></li>
                     <li class="breadcrumb-item active" aria-current="page">Dodaj wariant cenowy</li>
                 </ol>
             </nav>

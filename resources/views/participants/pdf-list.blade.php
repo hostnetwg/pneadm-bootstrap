@@ -125,7 +125,7 @@
     </div>
     
     <div class="course-info">
-        <strong>Szkolenie:</strong> {{ $course->title }}<br>
+        <strong>Szkolenie:</strong> {!! $course->title !!}<br>
         <strong>Trener:</strong> 
         @if($course->instructor)
             {{ $course->instructor->getFullTitleNameAttribute() }}

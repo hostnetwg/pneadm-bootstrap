@@ -166,7 +166,7 @@
                 <div>
                     <h4>{{ $survey->title }}</h4>
                     <p class="text-muted mb-0">
-                        Szkolenie: <a href="{{ route('courses.show', $survey->course_id) }}">{{ $survey->course->title }}</a>
+                        Szkolenie: <a href="{{ route('courses.show', $survey->course_id) }}">{!! $survey->course->title !!}</a>
                         @if($survey->instructor)
                             | Instruktor: {{ $survey->instructor->getFullTitleNameAttribute() }}
                         @endif

@@ -230,7 +230,7 @@
                                     <p class="text-muted mb-2">
                                         <i class="fas fa-graduation-cap"></i> 
                                         <a href="{{ route('courses.show', $survey->course_id) }}" class="text-decoration-none">
-                                            {{ Str::limit($survey->course->title, 50) }}
+                                            {!! Str::limit($survey->course->title, 50) !!}
                                         </a>
                                     </p>
                                     
@@ -387,7 +387,7 @@
                                     <ul class="mb-0">
                                         <li><strong>Nazwa pliku:</strong> {{ basename($survey->original_file_path) }}</li>
                                         <li><strong>Ankieta:</strong> {{ $survey->title }}</li>
-                                        <li><strong>Szkolenie:</strong> {{ $survey->course->title ?? 'Brak' }}</li>
+                                        <li><strong>Szkolenie:</strong> {!! $survey->course->title ?? 'Brak' !!}</li>
                                         <li><strong>Data importu:</strong> {{ $survey->imported_at ? $survey->imported_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
                                         <li><strong>Liczba odpowiedzi:</strong> {{ $survey->total_responses }}</li>
                                     </ul>
@@ -432,7 +432,7 @@
                                     <h6 class="mb-2">Szczegóły ankiety:</h6>
                                     <ul class="mb-0">
                                         <li><strong>Tytuł:</strong> {{ $survey->title }}</li>
-                                        <li><strong>Szkolenie:</strong> {{ $survey->course->title ?? 'Brak' }}</li>
+                                        <li><strong>Szkolenie:</strong> {!! $survey->course->title ?? 'Brak' !!}</li>
                                         <li><strong>Instruktor:</strong> {{ $survey->course->instructor->getFullTitleNameAttribute() ?? 'Brak' }}</li>
                                         <li><strong>Data szkolenia:</strong> {{ $survey->course->start_date ? $survey->course->start_date->format('d.m.Y H:i') : 'Brak' }}</li>
                                         <li><strong>Liczba odpowiedzi:</strong> {{ $survey->total_responses }}</li>

@@ -101,7 +101,7 @@
                                 </tr>
                                 <tr>
                                     <td><strong>Nazwa Produktu:</strong></td>
-                                    <td>{{ isset($zamowienie->produkt_nazwa) ? $zamowienie->produkt_nazwa : 'Brak' }}</td>
+                                    <td>{!! isset($zamowienie->produkt_nazwa) ? $zamowienie->produkt_nazwa : 'Brak' !!}</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Cena Produktu:</strong></td>
@@ -145,7 +145,7 @@
                             <li><strong>Imię:</strong> {{ $zamowienie->imie ?? 'Brak' }}</li>
                             <li><strong>Nazwisko:</strong> {{ $zamowienie->nazwisko ?? 'Brak' }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->email ?? 'Brak' }}</li>
-                            <li><strong>Produkt:</strong> {{ $zamowienie->produkt_nazwa ?? 'Brak' }}</li>
+                            <li><strong>Produkt:</strong> {!! $zamowienie->produkt_nazwa ?? 'Brak' !!}</li>
                             <li><strong>Cena:</strong> {{ $zamowienie->produkt_cena ? number_format($zamowienie->produkt_cena, 2) . ' zł' : 'Brak' }}</li>
                             <li><strong>Data wpłaty:</strong> {{ $zamowienie->data_wplaty ? \Carbon\Carbon::parse($zamowienie->data_wplaty)->format('d.m.Y H:i') : 'Brak' }}</li>
                             <li><strong>Adres:</strong> {{ $zamowienie->adres ?? 'Brak' }}</li>

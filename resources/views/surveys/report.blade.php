@@ -309,7 +309,7 @@
             <strong>Ankieta:</strong> {{ $survey->title }}
         </div>
         <div class="info-line">
-            <strong>Szkolenie:</strong> {{ $survey->course->title }}
+            <strong>Szkolenie:</strong> {!! $survey->course->title !!}
         </div>
         <div class="info-line">
             @if($survey->instructor)

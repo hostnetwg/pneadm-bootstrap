@@ -74,7 +74,7 @@
                                         @foreach($courses as $course)
                                             <option value="{{ $course->id }}" 
                                                     {{ old('course_id', $survey->course_id) == $course->id ? 'selected' : '' }}>
-                                                {{ $course->title }} 
+                                                {!! $course->title !!} 
                                                 ({{ $course->start_date ? $course->start_date->format('d.m.Y') : 'Brak daty' }})
                                             </option>
                                         @endforeach

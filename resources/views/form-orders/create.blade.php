@@ -67,7 +67,7 @@
                                                         data-title="{{ $course->title }}"
                                                         data-description="{{ $course->description }}"
                                                         data-start-date="{{ $course->start_date->format('Y-m-d') }}">
-                                                    {{ $course->id_old }} - {{ $course->title }} 
+                                                    {{ $course->id_old }} - {!! $course->title !!} 
                                                     @if($course->start_date)
                                                         [{{ $course->start_date->format('Y-m-d') }}]
                                                     @endif

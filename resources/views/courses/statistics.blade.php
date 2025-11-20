@@ -262,7 +262,7 @@
         <h3>Lista szkoleń ({{ $courses->count() }})</h3>
         @foreach($courses as $course)
             <div class="course-item">
-                <div class="course-title">{{ $course->title }}</div>
+                <div class="course-title">{!! $course->title !!}</div>
                 <div class="course-details">
                     <div>
                         <strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }} |

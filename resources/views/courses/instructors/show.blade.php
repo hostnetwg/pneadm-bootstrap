@@ -237,7 +237,7 @@
                                                     <p class="text-muted mb-2">
                                                         <i class="fas fa-graduation-cap"></i> 
                                                         <a href="{{ route('courses.show', $survey->course_id) }}" class="text-decoration-none">
-                                                            {{ Str::limit($survey->course->title, 40) }}
+                                                            {!! Str::limit($survey->course->title, 40) !!}
                                                         </a>
                                                     </p>
                                                     

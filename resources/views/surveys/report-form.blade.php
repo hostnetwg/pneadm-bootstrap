@@ -46,7 +46,7 @@
                                     <div class="row">
                                         <div class="col-md-6">
                                             <strong>Ankieta:</strong> {{ $survey->title }}<br>
-                                            <strong>Szkolenie:</strong> {{ $survey->course->title }}<br>
+                                            <strong>Szkolenie:</strong> {!! $survey->course->title !!}<br>
                                         </div>
                                         <div class="col-md-6">
                                             <strong>Odpowiedzi:</strong> {{ $survey->total_responses }}<br>

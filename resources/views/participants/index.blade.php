@@ -6,7 +6,7 @@
                     <i class="fas fa-users me-2"></i>Lista uczestników
                 </h2>
                 <p class="text-muted mb-0">
-                    <strong>{{ $course->title }}</strong>
+                    <strong>{!! $course->title !!}</strong>
                     <span class="ms-2">
                         <i class="fas fa-calendar me-1"></i>
                         {{ date('d.m.Y H:i', strtotime($course->start_date)) }}
@@ -250,7 +250,7 @@
                                 <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
                                 <li><strong>Data urodzenia:</strong> {{ $participant->birth_date ?? 'Brak' }}</li>
                                 <li><strong>Miejsce urodzenia:</strong> {{ $participant->birth_place ?? 'Brak' }}</li>
-                                <li><strong>Szkolenie:</strong> {{ $course->title }}</li>
+                                <li><strong>Szkolenie:</strong> {!! $course->title !!}</li>
                                 <li><strong>Data wygaśnięcia dostępu:</strong> {{ $participant->access_expires_at ? $participant->access_expires_at->format('d.m.Y H:i') : 'Bezterminowy' }}</li>
                             </ul>
                         </div>
@@ -298,7 +298,7 @@
                                     <li><strong>Numer zaświadczenia:</strong> {{ $participant->certificate->certificate_number ?? 'Brak numeru' }}</li>
                                     <li><strong>Uczestnik:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
                                     <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
-                                    <li><strong>Szkolenie:</strong> {{ $course->title }}</li>
+                                    <li><strong>Szkolenie:</strong> {!! $course->title !!}</li>
                                     <li><strong>Data wygenerowania:</strong> {{ $participant->certificate->created_at ? $participant->certificate->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
                                 </ul>
                             </div>

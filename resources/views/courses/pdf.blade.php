@@ -233,7 +233,7 @@
                             {{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}
                         @endif
                     </td>
-                    <td class="course-title">{{ $course->title }}</td>
+                    <td class="course-title">{!! $course->title !!}</td>
                     <td class="course-type">
                         <span class="badge {{ $course->is_paid ? 'badge-paid' : 'badge-free' }}">
                             {{ $course->is_paid ? 'Płatne' : 'Bezpłatne' }}

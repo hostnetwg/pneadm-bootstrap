@@ -301,7 +301,7 @@
                                 <span></span>
                             @endif
                         </td>
-                        <td class="align-middle"><strong>{{ $course->title }}</strong></td>
+                        <td class="align-middle"><strong>{!! $course->title !!}</strong></td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td class="align-middle">
                             <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
@@ -374,7 +374,7 @@
                             <div class="bg-light p-3 rounded">
                                 <h6 class="mb-2">Szczegóły szkolenia:</h6>
                                 <ul class="mb-0">
-                                    <li><strong>Tytuł:</strong> {{ $course->title }}</li>
+                                    <li><strong>Tytuł:</strong> {!! $course->title !!}</li>
                                     <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
                                     <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
                                     <li><strong>Uczestnicy:</strong> {{ $course->participants->count() }}</li>

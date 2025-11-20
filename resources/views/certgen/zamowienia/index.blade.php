@@ -129,7 +129,7 @@
                                                 <div class="text-truncate" style="max-width: 250px;" 
                                                      title="ID: {{ isset($zamowienie->produkt_id) ? $zamowienie->produkt_id : 'Brak' }} | Nazwa: {{ isset($zamowienie->produkt_nazwa) ? $zamowienie->produkt_nazwa : 'Brak' }} | Cena: {{ isset($zamowienie->produkt_cena) ? number_format($zamowienie->produkt_cena, 2) . ' zł' : 'Brak' }}">
                                                     <strong>ID: {{ isset($zamowienie->produkt_id) ? $zamowienie->produkt_id : 'Brak' }}</strong><br>
-                                                    <small>{{ isset($zamowienie->produkt_nazwa) ? $zamowienie->produkt_nazwa : 'Brak nazwy' }}</small><br>
+                                                    <small>{!! isset($zamowienie->produkt_nazwa) ? $zamowienie->produkt_nazwa : 'Brak nazwy' !!}</small><br>
                                                     <span class="text-success">{{ isset($zamowienie->produkt_cena) ? number_format($zamowienie->produkt_cena, 2) . ' zł' : 'Brak ceny' }}</span>
                                                 </div>
                                             @else
@@ -197,7 +197,7 @@
                             <li><strong>Imię:</strong> {{ $zamowienie->imie }}</li>
                             <li><strong>Nazwisko:</strong> {{ $zamowienie->nazwisko }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->email }}</li>
-                            <li><strong>Produkt:</strong> {{ $zamowienie->produkt_nazwa }}</li>
+                            <li><strong>Produkt:</strong> {!! $zamowienie->produkt_nazwa !!}</li>
                             <li><strong>Cena:</strong> {{ number_format($zamowienie->produkt_cena, 2) }} zł</li>
                             <li><strong>Data wpłaty:</strong> {{ $zamowienie->data_wplaty ? $zamowienie->data_wplaty->format('d.m.Y H:i') : 'Brak' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->status ?? 'Nieznany' }}</li>

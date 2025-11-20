@@ -98,7 +98,7 @@
     <p class="bold">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</p>
 
     <h3>Temat i zakres webinaru:</h3>
-    <h2 class="course-title">{{ $course->title }}</h2>
+    <h2 class="course-title">{!! $course->title !!}</h2>
 
     @php
         $description = trim($course->description ?? '');

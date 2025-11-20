@@ -49,7 +49,7 @@
                     <div class="card mb-4">
                         <div class="card-header bg-primary text-white">
                             <h4 class="mb-0">
-                                <i class="fas fa-graduation-cap"></i> {{ $course->title }}
+                                <i class="fas fa-graduation-cap"></i> {!! $course->title !!}
                             </h4>
                         </div>
                         <div class="card-body">
@@ -462,7 +462,7 @@
                     <div class="bg-light p-3 rounded">
                         <h6 class="mb-2">Szczegóły szkolenia:</h6>
                         <ul class="mb-0">
-                            <li><strong>Tytuł:</strong> {{ $course->title }}</li>
+                            <li><strong>Tytuł:</strong> {!! $course->title !!}</li>
                             <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
                             <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
                             <li><strong>Uczestnicy:</strong> {{ $course->participants->count() }}</li>

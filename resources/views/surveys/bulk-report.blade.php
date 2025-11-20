@@ -356,7 +356,7 @@
                 Data do: {{ $filters_applied['date_to'] }}<br>
             @endif
             @if(isset($filters_applied['course_id']) && $filters_applied['course_id'])
-                Szkolenie: {{ \App\Models\Course::find($filters_applied['course_id'])->title ?? 'Nieznane' }}<br>
+                Szkolenie: {!! \App\Models\Course::find($filters_applied['course_id'])->title ?? 'Nieznane' !!}<br>
             @endif
             @if(isset($filters_applied['instructor_id']) && $filters_applied['instructor_id'])
                 Instruktor: {{ \App\Models\Instructor::find($filters_applied['instructor_id'])->getFullTitleNameAttribute() ?? 'Nieznany' }}<br>
@@ -392,7 +392,7 @@
             
             <div class="survey-details">
                 <div class="detail-row">
-                    <strong>Szkolenie:</strong> {{ $survey->course->title }}
+                    <strong>Szkolenie:</strong> {!! $survey->course->title !!}
                 </div>
                 @if($survey->instructor)
                     <div class="detail-row">
