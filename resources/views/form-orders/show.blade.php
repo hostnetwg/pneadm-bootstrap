@@ -6,8 +6,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
 
             {{-- Breadcrumb --}}
             <nav aria-label="breadcrumb" class="mb-4">

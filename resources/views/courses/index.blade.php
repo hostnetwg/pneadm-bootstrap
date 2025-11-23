@@ -5,8 +5,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             @if(session('success'))
                 <div class="alert alert-success">
                     {!! session('success') !!}
@@ -168,6 +168,19 @@
                         </select>
                     </div>
             
+                    <!-- Filtr: Seria -->
+                    <div class="col-md-2">
+                        <label for="course_series_id" class="form-label fw-bold">Seria</label>
+                        <select name="course_series_id" class="form-select">
+                            <option value="">Wszystkie</option>
+                            @foreach($series as $seria)
+                                <option value="{{ $seria->id }}" {{ request('course_series_id') == $seria->id ? 'selected' : '' }}>
+                                    {{ $seria->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
                     <!-- Przycisk filtrowania i resetu -->
                     <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtruj</button>
@@ -225,11 +238,11 @@
                             </a>
                         </th>                                              
                         <th class="text-center" style="width: 9%;">Obrazek</th>
-                        <th style="width: 17%;">Tytuł</th>
+                        <th style="width: 25%;">Tytuł</th>
                         {{-- <th>Opis</th> --}}
                         <th style="width: 10%;">Rodzaj</th>
                         <th style="width: 18%;">Lokalizacja / Dostęp</th>
-                        <th style="width: 10%;">Instruktor</th>
+                        <th style="width: 6%;">Instruktor</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>

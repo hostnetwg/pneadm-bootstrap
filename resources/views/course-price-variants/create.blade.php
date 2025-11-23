@@ -5,8 +5,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('courses.index') }}">Kursy</a></li>

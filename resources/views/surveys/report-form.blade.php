@@ -5,8 +5,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             <!-- Przycisk powrotu -->
             <div class="mb-4">
                 <a href="{{ route('surveys.show', $survey->id) }}" class="btn btn-outline-secondary">

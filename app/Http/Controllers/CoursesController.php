@@ -8,6 +8,7 @@ use App\Models\Instructor;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
 use App\Models\CertificateTemplate;
+use App\Models\CourseSeries;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
@@ -21,10 +22,16 @@ class CoursesController extends Controller
 
      public function index(Request $request)
      {
+         // Zwiększenie limitu czasu dla dużych zbiorów danych
+         set_time_limit(120); // 2 minuty
+         
          $query = Course::query();
      
         // Pobieranie listy instruktorów do widoku
         $instructors = Instructor::orderBy('last_name')->get();
+        
+        // Pobieranie listy serii do widoku
+        $series = CourseSeries::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
         
         // Pobieranie opcji dla source_id_old
         $sourceIdOldOptions = Course::whereNotNull('source_id_old')
@@ -38,8 +45,10 @@ class CoursesController extends Controller
         
         // Pobieranie opcji paginacji
         $perPage = $request->query('per_page', 10);
+        $isAll = false;
         if ($perPage === 'all') {
-            $perPage = 999999; // Bardzo duża liczba, żeby wyświetlić wszystkie
+            $perPage = 1000; // Limit dla "all"
+            $isAll = true;
         } else {
             $perPage = (int) $perPage;
         }
@@ -57,6 +66,15 @@ class CoursesController extends Controller
             'date_to' => $request->input('date_to'),
             'per_page' => $request->input('per_page', 10),
         ];
+        
+        // Filtracja według serii (relacja many-to-many) - użycie join dla lepszej wydajności
+        if ($request->filled('course_series_id')) {
+            $seriesId = $request->input('course_series_id');
+            $query->join('course_series_course', 'courses.id', '=', 'course_series_course.course_id')
+                  ->where('course_series_course.course_series_id', $seriesId)
+                  ->select('courses.*') // Wybierz tylko kolumny z tabeli courses, aby uniknąć konfliktów
+                  ->distinct(); // Unikaj duplikatów jeśli kurs jest w wielu seriach
+        }
      
          // Określenie domyślnego sortowania
          $sortColumn = $request->query('sort', 'start_date');
@@ -115,43 +133,92 @@ class CoursesController extends Controller
         $totalCount = Course::count();
     
         // Pobranie wyników z dynamicznym sortowaniem i paginacją
-        $courses = $query->with(['instructor', 'location', 'onlineDetails', 'participants', 'certificates', 'surveys' => function($query) {
-                            $query->orderBy('id', 'desc')->limit(1); // Pobierz tylko pierwszą ankietę dla każdego kursu
-                        }, 'priceVariants' => function($query) {
-                            $query->where('is_active', true); // Tylko aktywne warianty
-                        }])
+        // Ograniczony eager loading - dla "all" jeszcze bardziej ograniczony
+        $eagerLoads = [
+            'instructor:id,first_name,last_name,title',
+            'location:id,course_id,location_name,address,postal_code,post_office',
+            'onlineDetails:id,course_id,platform,meeting_link',
+        ];
+        
+        // Dla większych zbiorów danych, ograniczamy relacje które są używane tylko do liczenia
+        if (!$isAll || $filteredCount < 300) {
+            $eagerLoads['participants'] = function($query) {
+                $query->select('id', 'course_id');
+            };
+            $eagerLoads['certificates'] = function($query) {
+                $query->select('id', 'course_id');
+            };
+            $eagerLoads['surveys'] = function($query) {
+                $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
+            };
+            $eagerLoads['priceVariants'] = function($query) {
+                $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active');
+            };
+        }
+        
+        $courses = $query->with($eagerLoads)
                         ->orderBy($sortColumn, $sortDirection)
                         ->paginate($perPage)
                         ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
+        
+        // Dla większych zbiorów, ładuj relacje do liczenia osobno (lazy loading)
+        if ($isAll && $filteredCount >= 300) {
+            $courses->getCollection()->loadCount(['participants', 'certificates']);
+            $courses->getCollection()->load(['surveys' => function($query) {
+                $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
+            }]);
+            $courses->getCollection()->load(['priceVariants' => function($query) {
+                $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active');
+            }]);
+        }
 
         // Dodanie liczby zamówień bez numeru faktury i ze statusem niezakończonym
-        $courses->getCollection()->transform(function($course) {
-            $ordersCount = 0;
+        // Optymalizacja: pobierz wszystkie zamówienia jednym zapytaniem zamiast dla każdego kursu osobno
+        $courseIdsWithPubligo = $courses->getCollection()
+            ->filter(function($course) {
+                return $course->source_id_old === 'certgen_Publigo' && $course->id_old;
+            })
+            ->pluck('id_old', 'id')
+            ->toArray();
+        
+        if (!empty($courseIdsWithPubligo)) {
+            $ordersCounts = DB::connection('mysql')
+                ->table('form_orders')
+                ->whereIn('publigo_product_id', array_values($courseIdsWithPubligo))
+                ->whereNull('deleted_at')
+                ->where(function($query) {
+                    $query->whereNull('invoice_number')
+                          ->orWhere('invoice_number', '')
+                          ->orWhere('invoice_number', '0');
+                })
+                ->where(function($query) {
+                    $query->whereNull('status_completed')
+                          ->orWhere('status_completed', 0);
+                })
+                ->select('publigo_product_id', DB::raw('count(*) as count'))
+                ->groupBy('publigo_product_id')
+                ->pluck('count', 'publigo_product_id')
+                ->toArray();
             
-            // Sprawdź czy kurs ma source_id_old = "certgen_Publigo" i id_old
-            if ($course->source_id_old === 'certgen_Publigo' && $course->id_old) {
-                // Nowe zapytanie do tabeli form_orders w bazie pneadm
-                $ordersCount = DB::connection('mysql') // Używamy głównego połączenia
-                    ->table('form_orders')
-                    ->where('publigo_product_id', $course->id_old)
-                    ->whereNull('deleted_at') // Wykluczamy zamówienia w koszu (soft delete)
-                    ->where(function($query) {
-                        $query->whereNull('invoice_number')
-                              ->orWhere('invoice_number', '')
-                              ->orWhere('invoice_number', '0');
-                    })
-                    ->where(function($query) {
-                        $query->whereNull('status_completed')
-                              ->orWhere('status_completed', 0);
-                    })
-                    ->count();
-            }
-            
-            $course->orders_count = $ordersCount;
-            return $course;
-        });
+            // Przypisz liczniki do kursów
+            $courses->getCollection()->transform(function($course) use ($courseIdsWithPubligo, $ordersCounts) {
+                if (isset($courseIdsWithPubligo[$course->id])) {
+                    $idOld = $courseIdsWithPubligo[$course->id];
+                    $course->orders_count = $ordersCounts[$idOld] ?? 0;
+                } else {
+                    $course->orders_count = 0;
+                }
+                return $course;
+            });
+        } else {
+            // Jeśli nie ma kursów z Publigo, ustaw wszystkim 0
+            $courses->getCollection()->transform(function($course) {
+                $course->orders_count = 0;
+                return $course;
+            });
+        }
     
-        return view('courses.index', compact('courses', 'instructors', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
+        return view('courses.index', compact('courses', 'instructors', 'series', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
      }
 
     /**

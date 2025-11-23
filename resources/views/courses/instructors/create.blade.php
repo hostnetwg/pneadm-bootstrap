@@ -5,8 +5,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             <h1>Dodaj nowego instruktora</h1>
 
             <!-- Komunikat o błędach -->

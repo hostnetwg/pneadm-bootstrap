@@ -59,6 +59,18 @@ class Course extends Model
     {
         return $this->belongsTo(Instructor::class, 'instructor_id');
     }
+
+    /**
+     * Relacja Many-to-Many - kurs może należeć do wielu serii
+     * Sortowane po order_in_series w tabeli pivot
+     */
+    public function series()
+    {
+        return $this->belongsToMany(CourseSeries::class, 'course_series_course', 'course_id', 'course_series_id')
+                    ->withPivot('order_in_series')
+                    ->withTimestamps()
+                    ->orderByPivot('order_in_series');
+    }
         
     public function participants()
     {

@@ -7,8 +7,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             <!-- Nawigacja -->
             <div class="mb-4 d-flex justify-content-between align-items-center">
                 <div>

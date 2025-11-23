@@ -5,8 +5,8 @@
         </h2>
     </x-slot>
 
-    <div class="px-3 py-3">
-        <div class="container">
+    <div class="py-3">
+        <div class="container-fluid px-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3>Lista zakupów (tabela: zamowienia)</h3>
             </div>

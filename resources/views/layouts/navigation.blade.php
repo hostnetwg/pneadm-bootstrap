@@ -42,7 +42,8 @@
             </button>
             <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
-                    <li><a href="{{ route('courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Harmonogram szkoleń</a></li>
+                    <li><a href="{{ route('courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Lista szkoleń</a></li>
+                    <li><a href="{{ route('courses.series.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Serie szkoleń</a></li>
                     <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>
                     <li><a href="{{ route('surveys.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Ankiety</a></li>
                 </ul>

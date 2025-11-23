@@ -195,6 +195,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 /**/
 
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
+    Route::resource('courses/series', \App\Http\Controllers\CourseSeriesController::class)->names([
+        'index' => 'courses.series.index',
+        'create' => 'courses.series.create',
+        'store' => 'courses.series.store',
+        'show' => 'courses.series.show',
+        'edit' => 'courses.series.edit',
+        'update' => 'courses.series.update',
+        'destroy' => 'courses.series.destroy',
+    ]);
+    Route::put('/courses/series/{series}/update-courses', [\App\Http\Controllers\CourseSeriesController::class, 'updateCourses'])->name('courses.series.update-courses');
     Route::get('/courses/pdf', [CoursesController::class, 'generatePdf'])->name('courses.pdf');
     Route::get('/courses/statistics', [CoursesController::class, 'generateCourseStatistics'])->name('courses.statistics');
     // Ustawiamy create PRZED trasami z parametrem {id}, aby uniknąć kolizji z /courses/{id}
