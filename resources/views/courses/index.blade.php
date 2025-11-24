@@ -295,9 +295,12 @@
                                 <div class="mt-2 pt-2 border-top">
                                     @foreach($course->priceVariants as $variant)
                                         <div class="small">
-                                            <strong>{{ number_format($variant->getCurrentPrice(), 2, ',', ' ') }} PLN</strong>
-                                            @if($variant->isPromotionActive())
-                                                <span class="badge bg-success badge-sm" title="Promocja aktywna">PROM</span>
+                                            @if($variant->isPromotionActive() && $variant->promotion_price !== null)
+                                                {{-- Cena promocyjna w kolorze zielonym --}}
+                                                <strong class="text-success">{{ number_format($variant->promotion_price, 2, ',', ' ') }} PLN</strong>
+                                            @else
+                                                {{-- Cena zwykła na czarno --}}
+                                                <strong>{{ number_format($variant->price, 2, ',', ' ') }} PLN</strong>
                                             @endif
                                             @if($variant->name)
                                                 <br><span class="text-muted">{{ Str::limit($variant->name, 25) }}</span>
