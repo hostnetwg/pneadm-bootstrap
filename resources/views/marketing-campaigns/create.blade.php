@@ -21,11 +21,11 @@
                                     <label for="campaign_code" class="form-label">Kod kampanii <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control @error('campaign_code') is-invalid @enderror" 
                                            id="campaign_code" name="campaign_code" 
-                                           value="{{ old('campaign_code') }}" required>
+                                           value="{{ old('campaign_code', $nextCampaignCode ?? '') }}" required>
                                     @error('campaign_code')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
-                                    <div class="form-text">Unikalny kod kampanii (np. 537, fb_001)</div>
+                                    <div class="form-text">Unikalny kod kampanii (np. 537, fb_001). Automatycznie wypełniony następnym wolnym numerem.</div>
                                 </div>
 
                                 <div class="mb-3">

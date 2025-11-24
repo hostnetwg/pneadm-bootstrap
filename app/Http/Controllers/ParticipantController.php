@@ -4,13 +4,271 @@ namespace App\Http\Controllers;
 
 use App\Models\Participant;
 use App\Models\Course;
+use App\Models\ParticipantEmail;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class ParticipantController extends Controller
 {
+    /**
+     * Wyświetla listę wszystkich uczestników ze wszystkich kursów.
+     */
+    public function all(Request $request)
+    {
+        $query = Participant::with('course');
+        
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('first_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        // Filtr: Email
+        if ($request->filled('filter_email')) {
+            if ($request->get('filter_email') === 'has') {
+                $query->whereNotNull('email')->where('email', '!=', '');
+            } elseif ($request->get('filter_email') === 'missing') {
+                $query->where(function($q) {
+                    $q->whereNull('email')->orWhere('email', '');
+                });
+            }
+        }
+
+        // Filtr: Data urodzenia
+        if ($request->filled('filter_birth_date')) {
+            if ($request->get('filter_birth_date') === 'has') {
+                $query->whereNotNull('birth_date');
+            } elseif ($request->get('filter_birth_date') === 'missing') {
+                $query->whereNull('birth_date');
+            }
+        }
+
+        // Filtr: Miejsce urodzenia
+        if ($request->filled('filter_birth_place')) {
+            if ($request->get('filter_birth_place') === 'has') {
+                $query->whereNotNull('birth_place')->where('birth_place', '!=', '');
+            } elseif ($request->get('filter_birth_place') === 'missing') {
+                $query->where(function($q) {
+                    $q->whereNull('birth_place')->orWhere('birth_place', '');
+                });
+            }
+        }
+        
+        // Sortowanie
+        $sortBy = $request->get('sort_by', 'last_name');
+        $sortDirection = $request->get('sort_direction', 'asc');
+        
+        if ($sortBy === 'last_name') {
+            $query->orderByRaw("CONVERT(last_name USING utf8mb4) COLLATE utf8mb4_polish_ci {$sortDirection}");
+        } elseif ($sortBy === 'first_name') {
+            $query->orderByRaw("CONVERT(first_name USING utf8mb4) COLLATE utf8mb4_polish_ci {$sortDirection}");
+        } elseif ($sortBy === 'birth_place') {
+            $query->orderByRaw("CONVERT(birth_place USING utf8mb4) COLLATE utf8mb4_polish_ci {$sortDirection}");
+        } else {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+        
+        // Paginacja
+        $perPage = $request->get('per_page', 50);
+        
+        if ($perPage === 'all') {
+            $participants = $query->get();
+            $participants = new \Illuminate\Pagination\LengthAwarePaginator(
+                $participants,
+                $participants->count(),
+                $participants->count(),
+                1,
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+        } else {
+            $participants = $query->paginate($perPage)->withQueryString();
+        }
+        
+        // Eager load relacje dla modali
+        $participants->load(['course', 'certificate']);
+        
+        return view('participants.all', compact('participants'));
+    }
+
+    /**
+     * Wyświetla listę wszystkich unikalnych e-maili z tabeli participant_emails
+     */
+    public function emailsList(Request $request)
+    {
+        // Pobierz liczbę unikalnych kursów dla każdego e-maila
+        $coursesCount = DB::table('participants')
+            ->select('email', DB::raw('COUNT(DISTINCT course_id) as courses_count'))
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->groupBy('email')
+            ->pluck('courses_count', 'email')
+            ->toArray();
+
+        $query = ParticipantEmail::with('firstParticipant')
+            ->select('participant_emails.*')
+            ->selectRaw('COALESCE((
+                SELECT COUNT(DISTINCT course_id) 
+                FROM participants 
+                WHERE participants.email = participant_emails.email 
+                AND participants.deleted_at IS NULL
+            ), 0) as courses_count');
+        
+        // Obsługa wyszukiwania
+        if ($request->filled('search')) {
+            $searchTerm = $request->get('search');
+            $query->where('email', 'LIKE', "%{$searchTerm}%");
+        }
+
+        // Filtr: Status aktywności
+        if ($request->filled('filter_active')) {
+            if ($request->get('filter_active') === 'active') {
+                $query->where('is_active', true);
+            } elseif ($request->get('filter_active') === 'inactive') {
+                $query->where('is_active', false);
+            }
+        }
+
+        // Filtr: Weryfikacja
+        if ($request->filled('filter_verified')) {
+            if ($request->get('filter_verified') === 'verified') {
+                $query->where('is_verified', true);
+            } elseif ($request->get('filter_verified') === 'unverified') {
+                $query->where(function($q) {
+                    $q->where('is_verified', false)->orWhereNull('is_verified');
+                });
+            }
+        }
+
+        // Sortowanie
+        $sortBy = $request->get('sort_by', 'email');
+        $sortDirection = $request->get('sort_direction', 'asc');
+        
+        // Obsługa sortowania po courses_count
+        if ($sortBy === 'courses_count') {
+            $query->orderByRaw("courses_count {$sortDirection}");
+        } else {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+        
+        // Paginacja
+        $perPage = $request->get('per_page', 50);
+        
+        if ($perPage === 'all') {
+            $emails = $query->get();
+            $emails = new \Illuminate\Pagination\LengthAwarePaginator(
+                $emails,
+                $emails->count(),
+                $emails->count(),
+                1,
+                ['path' => request()->url(), 'pageName' => 'page']
+            );
+        } else {
+            $emails = $query->paginate($perPage)->withQueryString();
+        }
+        
+        return view('participants.emails-list', compact('emails'));
+    }
+
+    /**
+     * Zbiera unikalne adresy e-mail z tabeli participants i zapisuje je w participant_emails
+     */
+    public function collectEmails()
+    {
+        try {
+            // Zwiększ limit czasu wykonania do 5 minut
+            set_time_limit(300);
+            
+            // Pobierz wszystkie unikalne e-maile z uczestników (tylko niepuste) używając surowego zapytania SQL dla lepszej wydajności
+            $uniqueEmails = DB::table('participants')
+                ->select('email', DB::raw('MIN(id) as first_participant_id'), DB::raw('COUNT(*) as count'))
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->groupBy('email')
+                ->get();
+
+            if ($uniqueEmails->isEmpty()) {
+                return redirect()->route('participants.all')->with('info', 'Brak e-maili do zebrania.');
+            }
+
+            // Przygotuj dane do bulk upsert
+            $emailsToInsert = [];
+            $emailsToUpdate = [];
+            
+            // Pobierz istniejące e-maile w jednym zapytaniu
+            $existingEmails = ParticipantEmail::pluck('id', 'email')->toArray();
+
+            foreach ($uniqueEmails as $emailData) {
+                $email = $emailData->email;
+                $firstParticipantId = $emailData->first_participant_id;
+                $count = $emailData->count;
+
+                if (isset($existingEmails[$email])) {
+                    // Email istnieje - przygotuj do aktualizacji
+                    $emailsToUpdate[] = [
+                        'id' => $existingEmails[$email],
+                        'participants_count' => $count,
+                        'updated_at' => now(),
+                    ];
+                } else {
+                    // Nowy email - przygotuj do wstawienia
+                    $emailsToInsert[] = [
+                        'email' => $email,
+                        'first_participant_id' => $firstParticipantId,
+                        'participants_count' => $count,
+                        'is_active' => true,
+                        'is_verified' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+
+            $added = 0;
+            $updated = 0;
+
+            // Bulk insert nowych e-maili (w partiach po 500)
+            if (!empty($emailsToInsert)) {
+                foreach (array_chunk($emailsToInsert, 500) as $chunk) {
+                    DB::table('participant_emails')->insert($chunk);
+                    $added += count($chunk);
+                }
+            }
+
+            // Bulk update istniejących e-maili (w partiach po 500 dla wydajności)
+            if (!empty($emailsToUpdate)) {
+                foreach (array_chunk($emailsToUpdate, 500) as $chunk) {
+                    DB::transaction(function () use ($chunk, &$updated) {
+                        foreach ($chunk as $updateData) {
+                            DB::table('participant_emails')
+                                ->where('id', $updateData['id'])
+                                ->update([
+                                    'participants_count' => $updateData['participants_count'],
+                                    'updated_at' => now(),
+                                ]);
+                        }
+                        $updated += count($chunk);
+                    });
+                }
+            }
+
+            $message = "Zebrano bazę e-mail. Dodano: {$added}, zaktualizowano: {$updated}.";
+            return redirect()->route('participants.all')->with('success', $message);
+        } catch (\Exception $e) {
+            \Log::error('Błąd podczas zbierania e-maili: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return redirect()->route('participants.all')->with('error', 'Błąd podczas zbierania e-maili: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Wyświetla listę uczestników dla danego kursu.
      */

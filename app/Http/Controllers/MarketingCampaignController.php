@@ -36,7 +36,7 @@ class MarketingCampaignController extends Controller
         }
         
         // Sortowanie
-        $sortBy = $request->get('sort_by', 'campaign_code');
+        $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
         
         // Obsługa sortowania według relacji
@@ -66,7 +66,8 @@ class MarketingCampaignController extends Controller
     public function create()
     {
         $sourceTypes = MarketingSourceType::active()->ordered()->get();
-        return view('marketing-campaigns.create', compact('sourceTypes'));
+        $nextCampaignCode = $this->getNextCampaignCode();
+        return view('marketing-campaigns.create', compact('sourceTypes', 'nextCampaignCode'));
     }
 
     /**
@@ -75,17 +76,79 @@ class MarketingCampaignController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'campaign_code' => 'required|string|max:50|unique:marketing_campaigns',
+            'campaign_code' => 'required|string|max:50',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'source_type_id' => 'required|exists:marketing_source_types,id',
             'is_active' => 'boolean',
         ]);
 
-        MarketingCampaign::create($request->all());
+        // Sprawdź czy kod kampanii już istnieje
+        $campaignCode = $request->get('campaign_code');
+        
+        // Jeśli kod jest numeryczny i już istnieje, znajdź następny wolny numer
+        if (is_numeric($campaignCode) && MarketingCampaign::where('campaign_code', $campaignCode)->exists()) {
+            $campaignCode = $this->findNextAvailableNumericCode($campaignCode);
+        } else {
+            // Sprawdź unikalność dla kodów nie-numerycznych
+            if (MarketingCampaign::where('campaign_code', $campaignCode)->exists()) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['campaign_code' => 'Kod kampanii już istnieje.']);
+            }
+        }
+
+        $data = $request->all();
+        $data['campaign_code'] = $campaignCode;
+
+        MarketingCampaign::create($data);
 
         return redirect()->route('marketing-campaigns.index')
             ->with('success', 'Kampania marketingowa została utworzona.');
+    }
+
+    /**
+     * Znajdź następny wolny kod kampanii (największy numeryczny + 1)
+     */
+    private function getNextCampaignCode(): string
+    {
+        // Pobierz wszystkie kody kampanii
+        $allCodes = MarketingCampaign::pluck('campaign_code')->toArray();
+        
+        // Filtruj tylko numeryczne kody
+        $numericCodes = array_filter($allCodes, function($code) {
+            return is_numeric($code) && ctype_digit($code);
+        });
+        
+        if (empty($numericCodes)) {
+            // Jeśli nie ma numerycznych kodów, zacznij od 1
+            return '1';
+        }
+        
+        // Znajdź największy numeryczny kod
+        $maxCode = max(array_map('intval', $numericCodes));
+        
+        return (string)($maxCode + 1);
+    }
+
+    /**
+     * Znajdź następny dostępny numeryczny kod kampanii
+     */
+    private function findNextAvailableNumericCode(string $startCode): string
+    {
+        $code = (int)$startCode;
+        
+        // Szukaj wolnego numeru (maksymalnie 100 prób)
+        for ($i = 0; $i < 100; $i++) {
+            $testCode = (string)$code;
+            if (!MarketingCampaign::where('campaign_code', $testCode)->exists()) {
+                return $testCode;
+            }
+            $code++;
+        }
+
+        // Jeśli nie znaleziono w zakresie, użyj metody getNextCampaignCode
+        return $this->getNextCampaignCode();
     }
 
     /**

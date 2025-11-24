@@ -226,6 +226,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/restore', [CoursePriceVariantController::class, 'restore'])->name('restore');
     });
 
+    // Lista wszystkich uczestników
+    Route::get('/participants', [ParticipantController::class, 'all'])->name('participants.all');
+    Route::get('/participants/emails', [ParticipantController::class, 'emailsList'])->name('participants.emails-list');
+    Route::post('/participants/collect-emails', [ParticipantController::class, 'collectEmails'])->name('participants.collect-emails');
+    
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników
         Route::get('/create', [ParticipantController::class, 'create'])->name('participants.create'); // Formularz dodawania

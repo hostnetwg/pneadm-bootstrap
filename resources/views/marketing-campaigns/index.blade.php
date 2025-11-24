@@ -1,6 +1,6 @@
 @php
     // Zmienne pomocnicze dla sortowania
-    $currentSortBy = request('sort_by', 'campaign_code');
+    $currentSortBy = request('sort_by', 'created_at');
     $currentSortOrder = request('sort_order', 'desc');
 @endphp
 
@@ -92,6 +92,15 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>
+                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $currentSortBy == 'created_at' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
+                                       class="text-white text-decoration-none">
+                                        Data utworzenia
+                                        @if($currentSortBy == 'created_at')
+                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
+                                        @endif
+                                    </a>
+                                </th>
+                                <th>
                                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'campaign_code', 'sort_order' => $currentSortBy == 'campaign_code' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
                                        class="text-white text-decoration-none">
                                         Kod kampanii
@@ -142,6 +151,13 @@
                         <tbody>
                             @foreach($campaigns as $campaign)
                                 <tr>
+                                    <td>
+                                        @if($campaign->created_at)
+                                            {{ $campaign->created_at->format('d.m.Y H:i') }}
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
                                     <td><code>{{ $campaign->campaign_code }}</code></td>
                                     <td>{{ $campaign->name }}</td>
                                     <td>
