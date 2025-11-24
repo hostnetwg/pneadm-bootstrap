@@ -48,6 +48,22 @@ class MarketingSourceType extends Model
     }
 
     /**
+     * Relacja do zamówień formularza przez kampanie marketingowe
+     * MarketingSourceType -> MarketingCampaign -> FormOrder
+     */
+    public function formOrders()
+    {
+        return $this->hasManyThrough(
+            FormOrder::class,
+            MarketingCampaign::class,
+            'source_type_id', // Foreign key na MarketingCampaign
+            'fb_source',      // Foreign key na FormOrder
+            'id',             // Local key na MarketingSourceType
+            'campaign_code'   // Local key na MarketingCampaign
+        );
+    }
+
+    /**
      * Accessor - kolor z fallback
      */
     public function getColorAttribute($value)

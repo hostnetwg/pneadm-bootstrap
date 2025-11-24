@@ -38,6 +38,7 @@
                                 <th>Status</th>
                                 <th>Kolejność</th>
                                 <th>Kampanie</th>
+                                <th>Zamówienia</th>
                                 <th>Akcje</th>
                             </tr>
                         </thead>
@@ -66,6 +67,9 @@
                                     <td>{{ $sourceType->sort_order }}</td>
                                     <td>
                                         <span class="badge bg-primary">{{ $sourceType->marketingCampaigns->count() }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ $sourceType->form_orders_count ?? 0 }}</span>
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">

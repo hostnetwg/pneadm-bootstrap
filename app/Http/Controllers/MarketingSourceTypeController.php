@@ -13,7 +13,10 @@ class MarketingSourceTypeController extends Controller
      */
     public function index()
     {
-        $sourceTypes = MarketingSourceType::with('marketingCampaigns')->ordered()->paginate(20);
+        $sourceTypes = MarketingSourceType::with('marketingCampaigns')
+            ->withCount('formOrders')
+            ->ordered()
+            ->paginate(20);
         
         return view('marketing-source-types.index', compact('sourceTypes'));
     }
