@@ -34,7 +34,10 @@
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
                     </a>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
-                        <i class="fas fa-file-csv me-1"></i> Importuj z CSV
+                        <i class="fas fa-file-csv me-1"></i> Import uczestników z PUBLIGO CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCertificatesModal">
+                        <i class="fas fa-certificate me-1"></i> Import zaświadczeń z PUBLIGO CSV
                     </button>
                     <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników bez zaświadczeń?')">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
@@ -47,11 +50,34 @@
                     </a>
                 </div>
             </div>
+            @php
+                $currentCertSort = request('sort_certificate');
+                $certSortBaseQuery = request()->except('page', 'sort_certificate');
+            @endphp
             <div class="col-md-4 text-end">
                 <div class="d-flex align-items-center gap-2 justify-content-end">
                     <a href="{{ route('participants.index', ['course' => $course->id, 'sort' => 'asc']) }}" class="btn btn-outline-info">
                         <i class="fas fa-sort-alpha-down me-1"></i> Sortuj alfabetycznie
                     </a>
+                    <div class="btn-group" role="group" aria-label="Sortowanie numerów certyfikatów">
+                        <a href="{{ route('participants.index', array_merge(['course' => $course->id], $certSortBaseQuery, ['sort_certificate' => 'asc'])) }}"
+                           class="btn btn-outline-primary {{ $currentCertSort === 'asc' ? 'active' : '' }}"
+                           title="Rosnąco po numerze zaświadczenia">
+                            <i class="fas fa-sort-numeric-down"></i>
+                        </a>
+                        <a href="{{ route('participants.index', array_merge(['course' => $course->id], $certSortBaseQuery, ['sort_certificate' => 'desc'])) }}"
+                           class="btn btn-outline-primary {{ $currentCertSort === 'desc' ? 'active' : '' }}"
+                           title="Malejąco po numerze zaświadczenia">
+                            <i class="fas fa-sort-numeric-down-alt"></i>
+                        </a>
+                    </div>
+                    @if($currentCertSort)
+                        <a href="{{ route('participants.index', array_merge(['course' => $course->id], $certSortBaseQuery)) }}"
+                           class="btn btn-outline-secondary"
+                           title="Wyczyść sortowanie numerów">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    @endif
                     <div class="d-flex align-items-center gap-2">
                         <label for="per_page" class="form-label mb-0 fw-bold">Wyświetl:</label>
                         <form method="GET" action="{{ route('participants.index', $course) }}" class="d-flex align-items-center">
@@ -142,7 +168,24 @@
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
                     <th>Data wygaśnięcia dostępu</th>
-                    <th>Nr zaświadczenia</th>                    
+                    <th>
+                        @php
+                            $currentCertSortHeader = request('sort_certificate');
+                            $nextCertSortDirection = $currentCertSortHeader === 'asc' ? 'desc' : 'asc';
+                            $certSortToggleQuery = request()->except('page', 'sort_certificate');
+                        @endphp
+                        <a href="{{ route('participants.index', array_merge(['course' => $course->id], $certSortToggleQuery, ['sort_certificate' => $nextCertSortDirection])) }}"
+                           class="text-white text-decoration-none">
+                            Nr zaświadczenia
+                            @if($currentCertSortHeader === 'asc')
+                                <i class="fas fa-sort-numeric-down ms-1"></i>
+                            @elseif($currentCertSortHeader === 'desc')
+                                <i class="fas fa-sort-numeric-down-alt ms-1"></i>
+                            @else
+                                <i class="fas fa-sort ms-1 text-white-50"></i>
+                            @endif
+                        </a>
+                    </th>                    
                     <th>Zaświadczenie</th>
                     <th>Akcje</th>
                 </tr>
@@ -181,7 +224,6 @@
                             @else
                                 Brak zaświadczenia
                             @endif
-                            </td>
                         </td>
                         <td>
                             @if ($participant->certificate)
@@ -372,6 +414,56 @@
                         </button>
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-upload me-1"></i>Importuj
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Import Certificates CSV -->
+    <div class="modal fade" id="importCertificatesModal" tabindex="-1" aria-labelledby="importCertificatesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="importCertificatesModalLabel">
+                        <i class="fas fa-certificate me-2"></i>Import zaświadczeń z PUBLIGO CSV
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('certificates.import', $course) }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-4">
+                            <label for="certificates_csv" class="form-label fw-bold">
+                                <i class="fas fa-upload me-1"></i>Wybierz plik CSV z numerami zaświadczeń
+                            </label>
+                            <input type="file" class="form-control form-control-lg" id="certificates_csv" name="certificates_csv" accept=".csv" required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Plik powinien pochodzić z eksportu PUBLIGO i zawierać kolumny: <strong>Id</strong>, <strong>Kurs</strong>, <strong>Imię i nazwisko</strong>, <strong>Email</strong>, <strong>Numer certyfikatu</strong>, <strong>Data utworzenia</strong>.
+                            </div>
+                        </div>
+                        <div class="alert alert-warning border-0">
+                            <div class="d-flex">
+                                <i class="fas fa-lightbulb me-3 mt-1"></i>
+                                <div>
+                                    <strong>Co się wydarzy po imporcie?</strong>
+                                    <ul class="mb-0 mt-2 ps-3">
+                                        <li>System dopasuje zaświadczenia do uczestników po adresie e-mail.</li>
+                                        <li>Jeśli uczestnik nie istnieje na liście, zostanie utworzony automatycznie.</li>
+                                        <li>Numery certyfikatów zostaną zapisane dokładnie takie jak w pliku.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Anuluj
+                        </button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-file-import me-1"></i>Importuj zaświadczenia
                         </button>
                     </div>
                 </form>

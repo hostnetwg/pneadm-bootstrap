@@ -274,7 +274,7 @@ class ParticipantController extends Controller
      */
     public function index(Request $request, Course $course)
     {
-        $query = Participant::where('course_id', $course->id);
+        $query = Participant::with('certificate')->where('participants.course_id', $course->id);
         
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
@@ -304,12 +304,31 @@ class ParticipantController extends Controller
                 ->with('success', 'Lista uczestników została posortowana i zapisana.');
         }
     
-        // Pobranie uczestników według zapisanej kolejności
+        $sortCertificate = $request->get('sort_certificate');
+        $sortCertificate = in_array($sortCertificate, ['asc', 'desc']) ? $sortCertificate : null;
+
+        if ($sortCertificate) {
+            $numericExpr = "CAST(IFNULL(NULLIF(REGEXP_SUBSTR(certificates.certificate_number, '[0-9]+'), ''), '0') AS UNSIGNED)";
+            $direction = strtoupper($sortCertificate);
+
+            $query->leftJoin('certificates', function ($join) use ($course) {
+                $join->on('certificates.participant_id', '=', 'participants.id')
+                    ->where('certificates.course_id', $course->id);
+            })
+            ->select('participants.*')
+            ->orderByRaw("CASE WHEN certificates.certificate_number IS NULL OR certificates.certificate_number = '' THEN 1 ELSE 0 END")
+            ->orderByRaw("{$numericExpr} {$direction}")
+            ->orderBy('participants.order');
+        } else {
+            $query->orderBy('order');
+        }
+
+        // Pobranie uczestników z wybraną kolejnością
         $perPage = $request->get('per_page', 50);
         
         // Obsługa opcji "wszyscy" - jeśli per_page to 'all', pobierz wszystkie rekordy
         if ($perPage === 'all') {
-            $participants = $query->orderBy('order')->get();
+            $participants = $query->get();
             // Konwersja kolekcji na paginator dla kompatybilności z widokiem
             $participants = new \Illuminate\Pagination\LengthAwarePaginator(
                 $participants,
@@ -319,7 +338,7 @@ class ParticipantController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $participants = $query->orderBy('order')->paginate($perPage);
+            $participants = $query->paginate($perPage);
         }
     
         return view('participants.index', compact('participants', 'course'));
