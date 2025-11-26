@@ -25,7 +25,7 @@
         <div class="min-vh-100 d-flex flex-column justify-content-center align-items-center pt-4 bg-light">
             <div class="mb-4">
                 <a href="/">
-                    <x-application-logo class="d-block" style="width: 80px; height: 80px; color: #6c757d;" />
+                    <img src="{{ asset('images/logo.svg') }}" alt="{{ config('app.name', 'Laravel') }}" style="width: 120px; height: auto; max-width: 120px;" />
                 </a>
             </div>
 
