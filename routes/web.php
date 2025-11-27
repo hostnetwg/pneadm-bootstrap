@@ -220,6 +220,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');
+
+    // Nagrania wideo dla kursów
+    Route::prefix('courses/{course}/videos')->name('courses.videos.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CourseVideoController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\CourseVideoController::class, 'store'])->name('store');
+        Route::put('/{video}', [\App\Http\Controllers\CourseVideoController::class, 'update'])->name('update');
+        Route::delete('/{video}', [\App\Http\Controllers\CourseVideoController::class, 'destroy'])->name('destroy');
+    });
     
     // Warianty cenowe kursów
     Route::prefix('courses/{courseId}/price-variants')->name('courses.price-variants.')->group(function () {

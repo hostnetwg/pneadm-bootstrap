@@ -151,6 +151,9 @@ class CoursesController extends Controller
             $eagerLoads['surveys'] = function($query) {
                 $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
             };
+            $eagerLoads['videos'] = function($query) {
+                $query->select('id', 'course_id', 'video_url', 'platform', 'title', 'order')->orderBy('order');
+            };
             $eagerLoads['priceVariants'] = function($query) {
                 $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active', 'is_promotion', 'promotion_price', 'promotion_type', 'promotion_start', 'promotion_end');
             };
@@ -166,6 +169,9 @@ class CoursesController extends Controller
             $courses->getCollection()->loadCount(['participants', 'certificates']);
             $courses->getCollection()->load(['surveys' => function($query) {
                 $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
+            }]);
+            $courses->getCollection()->load(['videos' => function($query) {
+                $query->select('id', 'course_id', 'video_url', 'platform', 'title', 'order')->orderBy('order');
             }]);
             $courses->getCollection()->load(['priceVariants' => function($query) {
                 $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active', 'is_promotion', 'promotion_price', 'promotion_type', 'promotion_start', 'promotion_end');

@@ -112,5 +112,13 @@ class Course extends Model
     {
         return $this->hasMany(CoursePriceVariant::class)->where('is_active', true);
     }
+
+    /**
+     * Relacja do nagrań wideo
+     */
+    public function videos()
+    {
+        return $this->hasMany(CourseVideo::class)->orderBy('order');
+    }
         
 }
