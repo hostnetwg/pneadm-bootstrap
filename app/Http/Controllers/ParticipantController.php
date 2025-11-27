@@ -597,5 +597,51 @@ class ParticipantController extends Controller
 
         return $pdf->download($fileName);
     }
+
+    /**
+     * Generowanie PDF z rejestrem zaświadczeń
+     */
+    public function downloadCertificateRegistry(Request $request, Course $course)
+    {
+        // Filtrowanie uczestników z pełnymi danymi
+        $query = Participant::where('course_id', $course->id)
+            ->whereNotNull('first_name')->where('first_name', '!=', '')
+            ->whereNotNull('last_name')->where('last_name', '!=', '')
+            ->whereNotNull('birth_date')
+            ->whereNotNull('birth_place')->where('birth_place', '!=', '');
+
+        // Pobranie uczestników
+        $participants = $query->with('certificate')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+        
+        $course->load('instructor');
+
+        // Generowanie PDF
+        $pdf = Pdf::loadView('participants.pdf-registry', [
+            'course' => $course,
+            'participants' => $participants,
+        ])->setPaper('A4', 'landscape')
+          ->setOptions([
+              'defaultFont' => 'DejaVu Sans',
+              'isHtml5ParserEnabled' => true,
+              'isRemoteEnabled' => false,
+              'isPhpEnabled' => true,
+              'enable_font_subsetting' => true,
+          ]);
+
+        // Nazwa pliku
+        $courseDate = $course->start_date ? Carbon::parse($course->start_date)->format('Y-m-d') : date('Y-m-d');
+        
+        $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
+                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
+        
+        $courseTitle = strtr($course->title, $polishChars);
+        $fileName = 'Rejestr_zaswiadczen_' . $courseDate . '_' . $courseTitle . '.pdf';
+        $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
+
+        return $pdf->download($fileName);
+    }
 }
 

@@ -418,6 +418,60 @@
                         </div>
                     @endif
 
+                    <!-- Nagrania -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-video"></i> Nagrania ({{ $course->videos->count() }})
+                            </h5>
+                            <div>
+                                @if($course->videos->isNotEmpty())
+                                <button type="button" 
+                                        class="btn btn-sm btn-primary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#videoPlayerModal{{ $course->id }}">
+                                    <i class="fas fa-play"></i> Odtwórz
+                                </button>
+                                @endif
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-secondary ms-1" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#videoModal{{ $course->id }}"
+                                        title="Zarządzaj nagraniami">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="videosListPreview{{ $course->id }}">
+                            @if($course->videos->count() > 0)
+                                <ul class="list-group list-group-flush">
+                                    @foreach($course->videos->take(3) as $video)
+                                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                @if($video->platform === 'youtube')
+                                                    <i class="fab fa-youtube text-danger me-2"></i>
+                                                @else
+                                                    <i class="fab fa-vimeo text-info me-2"></i>
+                                                @endif
+                                                {{ Str::limit($video->title ?: 'Nagranie ' . $loop->iteration, 40) }}
+                                            </div>
+                                            <span class="badge bg-light text-dark border">Nr {{ $video->order }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                @if($course->videos->count() > 3)
+                                    <div class="text-center mt-2">
+                                        <small class="text-muted">... i {{ $course->videos->count() - 3 }} więcej</small>
+                                    </div>
+                                @endif
+                            @else
+                                <p class="text-muted mb-0">Brak nagrań. Kliknij ikonkę ustawień, aby dodać.</p>
+                            @endif
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Akcje -->
                     <div class="card">
                         <div class="card-header">
@@ -538,6 +592,147 @@
         </div>
     @endforeach
 
+    {{-- Modal zarządzania nagraniami --}}
+    <div class="modal fade" id="videoModal{{ $course->id }}" tabindex="-1" aria-labelledby="videoModalLabel{{ $course->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="videoModalLabel{{ $course->id }}">
+                        <i class="bi bi-camera-video me-2"></i>
+                        Nagrania - {{ $course->title }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Lista istniejących nagrań -->
+                    <div id="videosList{{ $course->id }}">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Ładowanie...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Formularz dodawania nowego nagrania -->
+                    <h6 class="mb-3">Dodaj nowe nagranie</h6>
+                    <form id="videoForm{{ $course->id }}" class="needs-validation" novalidate>
+                        @csrf
+                        <div class="mb-3">
+                            <label for="video_url{{ $course->id }}" class="form-label">URL nagrania <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="video_url{{ $course->id }}" name="video_url" required 
+                                   placeholder="https://www.youtube.com/watch?v=... lub https://vimeo.com/...">
+                            <div class="invalid-feedback">Proszę podać prawidłowy URL.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="platform{{ $course->id }}" class="form-label">Platforma <span class="text-danger">*</span></label>
+                            <select class="form-select" id="platform{{ $course->id }}" name="platform" required>
+                                <option value="">Wybierz platformę</option>
+                                <option value="youtube">YouTube</option>
+                                <option value="vimeo" selected>Vimeo</option>
+                            </select>
+                            <div class="invalid-feedback">Proszę wybrać platformę.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="title{{ $course->id }}" class="form-label">Tytuł (opcjonalnie)</label>
+                            <input type="text" class="form-control" id="title{{ $course->id }}" name="title" 
+                                   placeholder="Np. Nagranie z dnia 1">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="order{{ $course->id }}" class="form-label">Kolejność</label>
+                            <input type="number" class="form-control" id="order{{ $course->id }}" name="order" value="1" min="1">
+                            <small class="form-text text-muted">Niższa liczba = wyższa kolejność</small>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                Dodaj nagranie
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal odtwarzania nagrań --}}
+    @if(isset($course->videos) && $course->videos->isNotEmpty())
+    <div class="modal fade" id="videoPlayerModal{{ $course->id }}" tabindex="-1" aria-labelledby="videoPlayerModalLabel{{ $course->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="flex-grow-1">
+                        <h5 class="modal-title mb-1" id="videoPlayerModalLabel{{ $course->id }}">
+                            <i class="bi bi-display me-2"></i>
+                            Nagrania - {{ strip_tags(html_entity_decode($course->title, ENT_QUOTES | ENT_HTML5, 'UTF-8')) }}
+                        </h5>
+                        <div class="text-muted small">
+                            @if($course->start_date)
+                                <i class="bi bi-calendar-event me-1"></i>
+                                {{ $course->start_date->format('d.m.Y') }}
+                                @if($course->start_date->format('H:i') !== '00:00')
+                                    <i class="bi bi-clock me-1 ms-2"></i>
+                                    {{ $course->start_date->format('H:i') }}
+                                @endif
+                            @endif
+                            @if($course->instructor)
+                                <span class="ms-2">
+                                    <i class="bi bi-person me-1"></i>
+                                    {{ $course->instructor->first_name }} {{ $course->instructor->last_name }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        @foreach($course->videos ?? [] as $video)
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        @if($video->platform === 'youtube')
+                                            <i class="bi bi-youtube text-danger me-2"></i>
+                                        @else
+                                            <i class="bi bi-vimeo text-info me-2"></i>
+                                        @endif
+                                        {{ strip_tags(html_entity_decode($video->title ?: 'Nagranie ' . $loop->iteration, ENT_QUOTES | ENT_HTML5, 'UTF-8')) }}
+                                    </h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="ratio ratio-16x9">
+                                        <iframe 
+                                            data-src="{{ $video->getEmbedUrl() }}" 
+                                            src="" 
+                                            frameborder="0" 
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                            allowfullscreen
+                                            loading="lazy">
+                                        </iframe>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <script>
         // Obsługa usuwania wariantów przez AJAX
         document.addEventListener('DOMContentLoaded', function() {
@@ -579,7 +774,181 @@
                     });
                 }
             @endforeach
+
+            // ---------- Obsługa wideo ----------
+            const modal{{ $course->id }} = document.getElementById('videoModal{{ $course->id }}');
+            if (modal{{ $course->id }}) {
+                modal{{ $course->id }}.addEventListener('show.bs.modal', function() {
+                    loadVideos{{ $course->id }}();
+                });
+            }
+
+            // Obsługa modala z odtwarzaniem wideo - zatrzymywanie przy zamykaniu
+            @if(isset($course->videos) && $course->videos->isNotEmpty())
+            setupVideoPlayerModal{{ $course->id }}();
+            @endif
         });
+
+        // Funkcja ładowania nagrań
+        function loadVideos{{ $course->id }}() {
+            fetch('{{ route('courses.videos.index', $course->id) }}')
+                .then(response => response.json())
+                .then(data => {
+                    const videosList = document.getElementById('videosList{{ $course->id }}');
+                    const orderInput = document.getElementById('order{{ $course->id }}');
+
+                    if (data.success && data.videos.length > 0) {
+                        let html = '<div class="list-group mb-3">';
+                        
+                        // Ustaw sugerowaną kolejność (liczba nagrań + 1)
+                        if (orderInput) {
+                            orderInput.value = data.videos.length + 1;
+                        }
+
+                        data.videos.forEach(video => {
+                            const platformIcon = video.platform === 'youtube' ? 'bi-youtube text-danger' : 'bi-vimeo text-info';
+                            html += `
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <i class="bi ${platformIcon} me-2"></i>
+                                        <strong>${video.title || 'Brak tytułu'}</strong>
+                                        <br>
+                                        <small class="text-muted">${video.video_url}</small>
+                                        <span class="badge bg-light text-dark border ms-2">Nr ${video.order}</span>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVideo{{ $course->id }}(${video.id})">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        videosList.innerHTML = html;
+                    } else {
+                        videosList.innerHTML = '<p class="text-muted text-center">Brak nagrań. Dodaj pierwsze nagranie używając formularza poniżej.</p>';
+                        
+                        // Ustaw sugerowaną kolejność na 1, jeśli brak nagrań
+                        if (orderInput) {
+                            orderInput.value = 1;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    document.getElementById('videosList{{ $course->id }}').innerHTML = '<div class="alert alert-danger">Nie udało się załadować nagrań.</div>';
+                });
+        }
+
+        // Obsługa formularza dodawania nagrania
+        const form{{ $course->id }} = document.getElementById('videoForm{{ $course->id }}');
+        if (form{{ $course->id }}) {
+            form{{ $course->id }}.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!form{{ $course->id }}.checkValidity()) {
+                    form{{ $course->id }}.classList.add('was-validated');
+                    return;
+                }
+
+                const formData = new FormData(form{{ $course->id }});
+                
+                fetch('{{ route('courses.videos.store', $course->id) }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        form{{ $course->id }}.reset();
+                        form{{ $course->id }}.classList.remove('was-validated');
+                        loadVideos{{ $course->id }}();
+                        
+                        // Przeładuj stronę aby zaktualizować listę w widoku (prościej niż manipulować DOM w tym przypadku)
+                        // window.location.reload(); 
+                        // Zamiast przeładowywać, możemy po prostu wyświetlić komunikat, bo lista w modalu się odświeża.
+                        // Ale jeśli chcemy zaktualizować listę w widoku głównym, to refresh jest najpewniejszy.
+                        // Jednak użytkownik może chcieć dodać więcej nagrań.
+                        
+                        // Pokaż komunikat sukcesu
+                        const alert = document.createElement('div');
+                        alert.className = 'alert alert-success alert-dismissible fade show';
+                        alert.innerHTML = `
+                            ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        `;
+                        form{{ $course->id }}.parentElement.insertBefore(alert, form{{ $course->id }});
+                        setTimeout(() => {
+                             alert.remove();
+                             window.location.reload(); // Odśwież stronę po 1.5s aby pokazać zmiany w widoku
+                        }, 1500);
+                    } else {
+                        alert('Błąd: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    alert('Wystąpił błąd podczas dodawania nagrania.');
+                });
+            });
+        }
+
+        // Funkcja usuwania nagrania
+        window.deleteVideo{{ $course->id }} = function(videoId) {
+            if (!confirm('Czy na pewno chcesz usunąć to nagranie?')) {
+                return;
+            }
+
+            fetch('{{ route('courses.videos.destroy', [$course->id, ':videoId']) }}'.replace(':videoId', videoId), {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadVideos{{ $course->id }}();
+                    // Odśwież stronę po krótkim czasie
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    alert('Błąd: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                alert('Wystąpił błąd podczas usuwania nagrania.');
+            });
+        };
+
+        // Funkcja konfiguracji event listenerów dla modala odtwarzania
+        function setupVideoPlayerModal{{ $course->id }}() {
+            const videoPlayerModal{{ $course->id }} = document.getElementById('videoPlayerModal{{ $course->id }}');
+            if (videoPlayerModal{{ $course->id }}) {
+                // Przy otwieraniu modala - załaduj wideo
+                videoPlayerModal{{ $course->id }}.addEventListener('show.bs.modal', function() {
+                    const iframes = videoPlayerModal{{ $course->id }}.querySelectorAll('iframe[data-src]');
+                    iframes.forEach(iframe => {
+                        if (iframe.getAttribute('data-src') && !iframe.getAttribute('src')) {
+                            iframe.setAttribute('src', iframe.getAttribute('data-src'));
+                        }
+                    });
+                });
+
+                // Przy zamykaniu modala - zatrzymaj wideo
+                videoPlayerModal{{ $course->id }}.addEventListener('hide.bs.modal', function() {
+                    const iframes = videoPlayerModal{{ $course->id }}.querySelectorAll('iframe[data-src]');
+                    iframes.forEach(iframe => {
+                        iframe.setAttribute('src', '');
+                    });
+                });
+            }
+        }
 
         // Funkcja przywracania wariantu z kosza
         function restoreVariant(courseId, variantId) {

@@ -266,6 +266,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::put('/{participant}', [ParticipantController::class, 'update'])->name('participants.update'); // Aktualizacja
         Route::delete('/{participant}', [ParticipantController::class, 'destroy'])->name('participants.destroy'); // Usuwanie
         Route::get('/download-pdf', [ParticipantController::class, 'downloadParticipantsList'])->name('participants.download-pdf'); // Pobieranie listy PDF
+        Route::get('/download-registry', [ParticipantController::class, 'downloadCertificateRegistry'])->name('participants.download-registry'); // Pobieranie rejestru zaświadczeń
     });
 
     Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])->name('certificates.generate');

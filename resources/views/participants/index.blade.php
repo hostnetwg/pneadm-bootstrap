@@ -48,6 +48,9 @@
                     <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
                     </a>
+                    <a href="{{ route('participants.download-registry', $course) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-file-pdf me-1"></i> Pobierz rejestr zaświadczeń
+                    </a>
                 </div>
             </div>
             @php

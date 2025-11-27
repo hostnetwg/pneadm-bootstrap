@@ -652,8 +652,9 @@ class CoursesController extends Controller
      */
     public function show($id)
     {
-        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys', 'priceVariants'])
-                        ->findOrFail($id);
+        $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys', 'priceVariants', 'videos' => function($query) {
+            $query->orderBy('order');
+        }])->findOrFail($id);
         
         // Pobierz również usunięte warianty cenowe (dla przywracania)
         $deletedVariants = \App\Models\CoursePriceVariant::withTrashed()
