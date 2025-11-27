@@ -42,7 +42,11 @@ class CourseVideo extends Model
         } elseif ($this->platform === 'vimeo') {
             // Konwersja URL Vimeo na embed URL
             $videoId = $this->extractVimeoId($this->video_url);
-            return $videoId ? "https://player.vimeo.com/video/{$videoId}" : $this->video_url;
+            if ($videoId) {
+                // Dodaj parametry dla lepszej kompatybilności
+                return "https://player.vimeo.com/video/{$videoId}?badge=0&autopause=0&player_id=0&app_id=58479";
+            }
+            return $this->video_url;
         }
         
         return $this->video_url;

@@ -581,8 +581,9 @@
                                             data-src="{{ $video->getEmbedUrl() }}" 
                                             src="" 
                                             frameborder="0" 
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                            allowfullscreen>
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                            allowfullscreen
+                                            loading="lazy">
                                         </iframe>
                                     </div>
                                 </div>
@@ -838,8 +839,9 @@
                                                 data-src="${embedUrl}" 
                                                 src="" 
                                                 frameborder="0" 
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                allowfullscreen>
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                                allowfullscreen
+                                                loading="lazy">
                                             </iframe>
                                         </div>
                                     </div>

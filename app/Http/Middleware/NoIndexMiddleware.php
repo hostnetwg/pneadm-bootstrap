@@ -26,7 +26,7 @@ class NoIndexMiddleware
         
         // Dodatkowe nagłówki bezpieczeństwa
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'");
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; frame-src 'self' https://www.youtube.com https://player.vimeo.com; media-src 'self' https://www.youtube.com https://player.vimeo.com");
         
         return $response;
     }
