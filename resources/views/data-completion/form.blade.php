@@ -206,10 +206,15 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Formatowanie daty -->
+    <!-- Formatowanie i walidacja daty -->
     <script>
-        document.getElementById('birth_date').addEventListener('input', function(e) {
+        const birthDateInput = document.getElementById('birth_date');
+        const form = birthDateInput.closest('form');
+        
+        // Formatowanie podczas wpisywania
+        birthDateInput.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
+            
             if (value.length >= 2) {
                 value = value.substring(0, 2) + '-' + value.substring(2);
             }
@@ -217,7 +222,75 @@
                 value = value.substring(0, 5) + '-' + value.substring(5, 9);
             }
             e.target.value = value;
+            
+            validateDate(value);
         });
+
+        // Walidacja przed wysłaniem formularza
+        form.addEventListener('submit', function(e) {
+            const value = birthDateInput.value;
+            if (!validateDate(value, true)) {
+                e.preventDefault();
+            }
+        });
+
+        function validateDate(value, showError = false) {
+            const errorDiv = document.getElementById('js-date-error') || createErrorDiv();
+            errorDiv.style.display = 'none';
+            birthDateInput.classList.remove('is-invalid');
+
+            // Jeśli puste i nie wymuszamy błędu, to ok (walidacja html required zadziała)
+            if (!value && !showError) return true;
+
+            const parts = value.split('-');
+            
+            // Sprawdź format DD-MM-RRRR
+            if (value.length === 10) {
+                const day = parseInt(parts[0]);
+                const month = parseInt(parts[1]);
+                const year = parseInt(parts[2]);
+                
+                const currentYear = new Date().getFullYear();
+                const maxYear = currentYear - 18;
+
+                let error = '';
+
+                // Walidacja dni i miesięcy
+                if (day < 1 || day > 31) error = 'Dzień musi być z zakresu 1-31.';
+                else if (month < 1 || month > 12) error = 'Miesiąc musi być z zakresu 1-12.';
+                else if (year > maxYear) error = `Rok urodzenia musi być ${maxYear} lub wcześniejszy (wymagane 18 lat).`;
+                else if (year < 1900) error = 'Rok urodzenia jest nieprawidłowy.';
+                else {
+                    // Sprawdź poprawność daty (np. 30 luty)
+                    const dateObj = new Date(year, month - 1, day);
+                    if (dateObj.getDate() !== day || dateObj.getMonth() + 1 !== month || dateObj.getFullYear() !== year) {
+                        error = 'Podana data nie istnieje.';
+                    }
+                }
+
+                if (error) {
+                    errorDiv.textContent = error;
+                    errorDiv.style.display = 'block';
+                    birthDateInput.classList.add('is-invalid');
+                    return false;
+                }
+            } else if (showError) {
+                errorDiv.textContent = 'Wpisz pełną datę w formacie DD-MM-RRRR.';
+                errorDiv.style.display = 'block';
+                birthDateInput.classList.add('is-invalid');
+                return false;
+            }
+
+            return true;
+        }
+
+        function createErrorDiv() {
+            const div = document.createElement('div');
+            div.id = 'js-date-error';
+            div.className = 'invalid-feedback';
+            birthDateInput.parentNode.appendChild(div);
+            return div;
+        }
     </script>
 </body>
 </html>

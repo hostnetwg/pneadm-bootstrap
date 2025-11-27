@@ -80,9 +80,12 @@ class DataCompletionFormRequest extends FormRequest
                 $month = (int)$parts[1];
                 $year = (int)$parts[2];
 
+                $currentYear = now()->year;
+                $maxYear = $currentYear - 18;
+
                 // Walidacja sensowności daty
-                if ($year < 1900 || $year > now()->year) {
-                    $validator->errors()->add('birth_date', 'Rok urodzenia musi być między 1900 a ' . now()->year);
+                if ($year < 1900 || $year > $maxYear) {
+                    $validator->errors()->add('birth_date', 'Rok urodzenia musi być między 1900 a ' . $maxYear . ' (wymagane ukończone 18 lat).');
                 }
 
                 if ($month < 1 || $month > 12) {
@@ -98,10 +101,14 @@ class DataCompletionFormRequest extends FormRequest
                     $validator->errors()->add('birth_date', 'Nieprawidłowa data urodzenia.');
                 }
 
-                // Sprawdź czy data nie jest w przyszłości
-                $date = \Carbon\Carbon::createFromFormat('d-m-Y', $birthDate);
-                if ($date->isFuture()) {
-                    $validator->errors()->add('birth_date', 'Data urodzenia nie może być w przyszłości.');
+                // Dodatkowe sprawdzenie dokładnego wieku (co do dnia)
+                try {
+                    $date = \Carbon\Carbon::createFromFormat('d-m-Y', $birthDate);
+                    if ($date && $date->age < 18) {
+                         $validator->errors()->add('birth_date', 'Musisz mieć ukończone 18 lat.');
+                    }
+                } catch (\Exception $e) {
+                    // Ignoruj błędy parsowania, obsłużone wyżej przez checkdate
                 }
             }
         });
