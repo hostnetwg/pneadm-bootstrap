@@ -230,4 +230,32 @@ class DataCompletionController extends Controller
 
         return view('data-completion.conflicts', compact('conflicts', 'sourceTypes', 'filterSourceId'));
     }
+
+    /**
+     * Ujednolica dane uczestnika (konflikty)
+     */
+    public function unifyConflict(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'first_name' => 'required|string',
+            'last_name' => 'required|string',
+        ]);
+
+        try {
+            $updated = $this->service->unifyParticipantData(
+                $request->input('email'),
+                $request->input('first_name'),
+                $request->input('last_name')
+            );
+
+            return back()->with('success', "Pomyślnie ujednolicono dane dla {$updated} rekordów uczestnika: {$request->input('first_name')} {$request->input('last_name')}");
+        } catch (\Exception $e) {
+            Log::error('Błąd podczas ujednolicania konfliktu', [
+                'email' => $request->input('email'),
+                'error' => $e->getMessage(),
+            ]);
+            return back()->withErrors(['error' => 'Wystąpił błąd podczas aktualizacji danych: ' . $e->getMessage()]);
+        }
+    }
 }

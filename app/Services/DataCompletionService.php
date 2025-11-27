@@ -485,6 +485,38 @@ class DataCompletionService
     }
 
     /**
+     * Ujednolica dane uczestnika (imię i nazwisko) dla wszystkich rekordów z danym adresem e-mail.
+     */
+    public function unifyParticipantData(string $email, string $targetFirstName, string $targetLastName): int
+    {
+        // Normalizacja danych wejściowych
+        $email = strtolower(trim($email));
+        // Tutaj NIE używamy trim na imieniu/nazwisku, bo użytkownik może celowo chcieć zachować spację (choć to rzadkie),
+        // ale zazwyczaj chcemy jednak wyczyścić dane przy zapisie.
+        // W tym przypadku przyjmijmy dane dokładnie takie, jakie wybrał użytkownik (nawet jeśli mają spacje, 
+        // choć w widoku formularza wyślemy je bez zbędnych spacji z kodu PHP jeśli to możliwe, albo zrobimy trim tutaj).
+        // Zgodnie z logiką "czyszczenia", zróbmy jednak trim, żeby naprawić te "niewidoczne spacje".
+        
+        $targetFirstName = trim($targetFirstName);
+        $targetLastName = trim($targetLastName);
+
+        $updated = Participant::whereRaw('LOWER(TRIM(email)) = ?', [$email])
+            ->update([
+                'first_name' => $targetFirstName,
+                'last_name' => $targetLastName
+            ]);
+
+        Log::info('Ujednolicono dane uczestnika (konflikty)', [
+            'email' => $email,
+            'new_first_name' => $targetFirstName,
+            'new_last_name' => $targetLastName,
+            'updated_records' => $updated
+        ]);
+
+        return $updated;
+    }
+
+    /**
      * Pobiera listę konfliktów: adresy e-mail powiązane z różnymi imionami/nazwiskami.
      * Opcjonalnie filtruje po source_id_old kursu.
      */
@@ -530,7 +562,8 @@ class DataCompletionService
         return $details->groupBy('email')->map(function ($items) {
             return $items->map(function ($item) {
                 return [
-                    'name' => trim($item->first_name . ' ' . $item->last_name),
+                    'first_name' => $item->first_name,
+                    'last_name' => $item->last_name,
                     'count' => $item->count,
                 ];
             });

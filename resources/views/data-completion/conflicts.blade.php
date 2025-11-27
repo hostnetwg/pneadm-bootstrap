@@ -67,12 +67,31 @@
                                             <td>
                                                 <ul class="list-unstyled mb-0">
                                                     @foreach($names as $nameInfo)
-                                                        <li class="mb-1">
-                                                            <span class="badge bg-warning text-dark me-2">{{ $nameInfo['count'] }}</span>
-                                                            {{ $nameInfo['name'] }}
+                                                        <li class="mb-2 d-flex align-items-center">
+                                                            <span class="badge bg-warning text-dark me-2" title="Liczba wystąpień">{{ $nameInfo['count'] }}</span>
+                                                            
+                                                            <!-- Używamy pre-wrap i ramki, żeby pokazać spacje -->
+                                                            <div class="d-flex gap-1 align-items-center font-monospace small">
+                                                                <span class="bg-light border px-1 rounded" style="white-space: pre;" title="Imię (wraz ze spacjami)">{{ $nameInfo['first_name'] }}</span>
+                                                                <span class="bg-light border px-1 rounded" style="white-space: pre;" title="Nazwisko (wraz ze spacjami)">{{ $nameInfo['last_name'] }}</span>
+                                                            </div>
+                                                            
+                                                            <!-- Formularz ujednolicania -->
+                                                            <form action="{{ route('data-completion.unify-conflict') }}" method="POST" class="d-inline-block ms-3">
+                                                                @csrf
+                                                                <input type="hidden" name="email" value="{{ $email }}">
+                                                                <input type="hidden" name="first_name" value="{{ trim($nameInfo['first_name']) }}">
+                                                                <input type="hidden" name="last_name" value="{{ trim($nameInfo['last_name']) }}">
+                                                                <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;" onclick="return confirm('Czy na pewno chcesz ujednolicić WSZYSTKIE rekordy dla adresu {{ $email }} do: {{ trim($nameInfo['first_name']) }} {{ trim($nameInfo['last_name']) }}?')">
+                                                                    Ujednolić do
+                                                                </button>
+                                                            </form>
                                                         </li>
                                                     @endforeach
                                                 </ul>
+                                                <div class="text-muted mt-1" style="font-size: 0.7rem;">
+                                                    * Ramki pokazują dokładną zawartość pól (uwzględniając spacje).
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach

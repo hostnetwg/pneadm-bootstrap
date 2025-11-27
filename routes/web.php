@@ -248,6 +248,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/send-for-course/{courseId}', [\App\Http\Controllers\DataCompletionController::class, 'sendForCourse'])->name('send-for-course');
         Route::post('/refresh-bd-certgen-stats', [\App\Http\Controllers\DataCompletionController::class, 'refreshBDCertgenEducationStats'])->name('refresh-bd-certgen-stats');
         Route::get('/conflicts', [\App\Http\Controllers\DataCompletionController::class, 'conflicts'])->name('conflicts');
+        Route::post('/unify-conflict', [\App\Http\Controllers\DataCompletionController::class, 'unifyConflict'])->name('unify-conflict');
     });
 
     // Lista wszystkich uczestników
