@@ -496,7 +496,7 @@
                             <select class="form-select" id="platform{{ $course->id }}" name="platform" required>
                                 <option value="">Wybierz platformę</option>
                                 <option value="youtube">YouTube</option>
-                                <option value="vimeo">Vimeo</option>
+                                <option value="vimeo" selected>Vimeo</option>
                             </select>
                             <div class="invalid-feedback">Proszę wybrać platformę.</div>
                         </div>
@@ -509,7 +509,7 @@
 
                         <div class="mb-3">
                             <label for="order{{ $course->id }}" class="form-label">Kolejność</label>
-                            <input type="number" class="form-control" id="order{{ $course->id }}" name="order" value="0" min="0">
+                            <input type="number" class="form-control" id="order{{ $course->id }}" name="order" value="1" min="1">
                             <small class="form-text text-muted">Niższa liczba = wyższa kolejność</small>
                         </div>
 
@@ -619,8 +619,16 @@
                     .then(response => response.json())
                     .then(data => {
                         const videosList = document.getElementById('videosList{{ $course->id }}');
+                        const orderInput = document.getElementById('order{{ $course->id }}');
+
                         if (data.success && data.videos.length > 0) {
                             let html = '<div class="list-group mb-3">';
+                            
+                            // Ustaw sugerowaną kolejność (liczba nagrań + 1)
+                            if (orderInput) {
+                                orderInput.value = data.videos.length + 1;
+                            }
+
                             data.videos.forEach(video => {
                                 const platformIcon = video.platform === 'youtube' ? 'bi-youtube text-danger' : 'bi-vimeo text-info';
                                 html += `
@@ -630,6 +638,7 @@
                                             <strong>${video.title || 'Brak tytułu'}</strong>
                                             <br>
                                             <small class="text-muted">${video.video_url}</small>
+                                            <span class="badge bg-light text-dark border ms-2">Nr ${video.order}</span>
                                         </div>
                                         <div>
                                             <button class="btn btn-sm btn-outline-danger" onclick="deleteVideo{{ $course->id }}(${video.id})">
@@ -643,6 +652,11 @@
                             videosList.innerHTML = html;
                         } else {
                             videosList.innerHTML = '<p class="text-muted text-center">Brak nagrań. Dodaj pierwsze nagranie używając formularza poniżej.</p>';
+                            
+                            // Ustaw sugerowaną kolejność na 1, jeśli brak nagrań
+                            if (orderInput) {
+                                orderInput.value = 1;
+                            }
                         }
                     })
                     .catch(error => {
