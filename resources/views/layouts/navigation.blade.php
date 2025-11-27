@@ -88,6 +88,7 @@
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('data-completion.test') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('data-completion.test') ? 'active' : '' }}" onclick="event.stopPropagation();">Test</a></li>
                     <li><a href="{{ route('data-completion.collect') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('data-completion.collect') ? 'active' : '' }}" onclick="event.stopPropagation();">Zbierz</a></li>
+                    <li><a href="{{ route('data-completion.conflicts') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('data-completion.conflicts') ? 'active' : '' }}" onclick="event.stopPropagation();">Sprawdź konflikty</a></li>
                 </ul>
             </div>
         </li>

@@ -483,5 +483,57 @@ class DataCompletionService
             'course_stats' => $courseStats,
         ];
     }
-}
 
+    /**
+     * Pobiera listę konfliktów: adresy e-mail powiązane z różnymi imionami/nazwiskami.
+     * Opcjonalnie filtruje po source_id_old kursu.
+     */
+    public function getEmailConflicts(?string $sourceId = null)
+    {
+        // 1. Znajdź e-maile, które mają więcej niż jedną unikalną kombinację imienia i nazwiska
+        // Jeśli podano sourceId, musimy złączyć z tabelą courses
+        $query = DB::table('participants')
+            ->select('participants.email')
+            ->whereNotNull('participants.email')
+            ->where('participants.email', '!=', '');
+
+        if ($sourceId) {
+            $query->join('courses', 'participants.course_id', '=', 'courses.id')
+                  ->where('courses.source_id_old', $sourceId);
+        }
+
+        $conflictEmails = $query
+            ->groupBy('participants.email')
+            ->havingRaw('COUNT(DISTINCT participants.first_name, participants.last_name) > 1')
+            ->pluck('participants.email');
+
+        if ($conflictEmails->isEmpty()) {
+            return collect();
+        }
+
+        // 2. Pobierz szczegóły dla tych e-maili (jakie nazwiska tam występują)
+        $detailsQuery = DB::table('participants')
+            ->select('participants.email', 'participants.first_name', 'participants.last_name', DB::raw('count(*) as count'));
+
+        if ($sourceId) {
+            $detailsQuery->join('courses', 'participants.course_id', '=', 'courses.id')
+                         ->where('courses.source_id_old', $sourceId);
+        }
+
+        $details = $detailsQuery
+            ->whereIn('participants.email', $conflictEmails)
+            ->groupBy('participants.email', 'participants.first_name', 'participants.last_name')
+            ->orderBy('participants.email')
+            ->get();
+
+        // 3. Zgrupuj po emailu
+        return $details->groupBy('email')->map(function ($items) {
+            return $items->map(function ($item) {
+                return [
+                    'name' => trim($item->first_name . ' ' . $item->last_name),
+                    'count' => $item->count,
+                ];
+            });
+        });
+    }
+}

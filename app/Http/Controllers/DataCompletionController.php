@@ -210,4 +210,24 @@ class DataCompletionController extends Controller
             return back()->withErrors(['error' => 'Wystąpił błąd podczas odświeżania statystyk: ' . $e->getMessage()]);
         }
     }
+
+    /**
+     * Widok "Sprawdź konflikty"
+     */
+    public function conflicts(Request $request)
+    {
+        // Pobierz dostępne typy szkoleń (source_id_old) do filtra
+        $sourceTypes = Course::select('source_id_old')
+            ->distinct()
+            ->whereNotNull('source_id_old')
+            ->where('source_id_old', '!=', '')
+            ->orderBy('source_id_old')
+            ->pluck('source_id_old');
+
+        $filterSourceId = $request->input('source_id', 'certgen_Publigo');
+
+        $conflicts = $this->service->getEmailConflicts($filterSourceId);
+
+        return view('data-completion.conflicts', compact('conflicts', 'sourceTypes', 'filterSourceId'));
+    }
 }
