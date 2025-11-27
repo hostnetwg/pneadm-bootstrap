@@ -221,14 +221,28 @@
                     
                 </div>
 
-                <div class="form-group">
-                    <label for="certificate_format">Format numeracji certyfikatów</label>
-                    <input type="text" name="certificate_format" id="certificate_format" class="form-control" 
-                           value="{{ old('certificate_format', isset($course) ? $course->certificate_format : '{nr}/{course_id}/{year}/PNE') }}" 
-                           placeholder="Wpisz format, np. RL/{nr}/{course_id}/2/{year}/PNE">
-                    <small class="form-text text-muted">
-                        Możesz używać zmiennych: <code>{nr}</code>, <code>{course_id}</code>, <code>{year}</code>.
-                    </small>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="certificate_format" class="form-label">Format numeracji zaświadczeń</label>
+                            <input type="text" name="certificate_format" id="certificate_format" class="form-control" 
+                                   value="{{ old('certificate_format', isset($course) ? $course->certificate_format : '{nr}/{course_id}/{year}/PNE') }}" 
+                                   placeholder="Wpisz format, np. RL/{nr}/{course_id}/2/{year}/PNE">
+                            <small class="form-text text-muted">
+                                Możesz używać zmiennych: <code>{nr}</code>, <code>{course_id}</code>, <code>{year}</code>.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="issue_date_certyficates" class="form-label">Data wydania zaświadczeń</label>
+                            <input type="date" name="issue_date_certyficates" id="issue_date_certyficates" class="form-control @error('issue_date_certyficates') is-invalid @enderror" value="{{ old('issue_date_certyficates', $course->issue_date_certyficates ? $course->issue_date_certyficates->format('Y-m-d') : '') }}">
+                            @error('issue_date_certyficates')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <small class="form-text text-muted">
+                                Globalna data wydania zaświadczeń dla tego szkolenia
+                            </small>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group mb-3">

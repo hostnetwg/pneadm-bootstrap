@@ -18,6 +18,7 @@ class Course extends Model
         'offer_summary',
         'start_date',
         'end_date',
+        'issue_date_certyficates',
         'is_paid', // 1/0
         'type', // online/offline
         'category', // open/closed
@@ -36,6 +37,7 @@ class Course extends Model
         'is_paid' => 'boolean', // ✅ Konwersja na boolean dla poprawnego odczytu        
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'issue_date_certyficates' => 'date',
         'is_active' => 'boolean'
     ];
 

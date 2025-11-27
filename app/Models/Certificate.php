@@ -14,7 +14,13 @@ class Certificate extends Model
         'course_id',
         'certificate_number',
         'file_path',
+        'issue_date',
         'generated_at'
+    ];
+
+    protected $casts = [
+        'issue_date' => 'date',
+        'generated_at' => 'datetime',
     ];
 
     public function participant()
