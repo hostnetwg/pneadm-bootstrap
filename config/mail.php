@@ -119,13 +119,16 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configuration for the data completion module email addresses.
-    | These are used for reply-to addresses in data completion request emails.
+    | FROM address: biuro@nowoczesna-edukacja.pl (nowa skrzynka, mniejsze ryzyko spamu)
+    | Reply-To address: kontakt@nowoczesna-edukacja.pl (główna skrzynka kontaktowa)
     |
     */
 
     'data_completion' => [
-        'reply_to_address' => env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl'),
-        'reply_to_name' => env('MAIL_DATA_COMPLETION_FROM_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
+        'from_address' => env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl'),
+        'from_name' => env('MAIL_DATA_COMPLETION_FROM_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
+        'reply_to_address' => env('MAIL_DATA_COMPLETION_REPLY_TO_ADDRESS', 'kontakt@nowoczesna-edukacja.pl'),
+        'reply_to_name' => env('MAIL_DATA_COMPLETION_REPLY_TO_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
     ],
 
 ];

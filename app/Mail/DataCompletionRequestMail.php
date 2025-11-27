@@ -40,11 +40,13 @@ class DataCompletionRequestMail extends Mailable
             : 'Prośba o uzupełnienie danych do rejestru zaświadczeń';
         
         // Użyj specjalnego adresu dla modułu uzupełniania danych
-        // FROM musi być zgodny z autoryzacją SMTP (kontakt@nowoczesna-edukacja.pl)
-        // ReplyTo będzie biuro@nowoczesna-edukacja.pl
-        $fromAddress = config('mail.from.address', 'kontakt@nowoczesna-edukacja.pl');
-        $fromName = config('mail.from.name', 'NODN Platforma Nowoczesnej Edukacji');
-        $replyToAddress = config('mail.data_completion.reply_to_address', 'biuro@nowoczesna-edukacja.pl');
+        // FROM: biuro@nowoczesna-edukacja.pl (nowa skrzynka, mniejsze ryzyko spamu)
+        // Reply-To: kontakt@nowoczesna-edukacja.pl (główna skrzynka kontaktowa)
+        // Uwaga: Autoryzacja SMTP musi być na kontakt@nowoczesna-edukacja.pl,
+        // ale FROM może być biuro@ jeśli serwer to obsługuje
+        $fromAddress = config('mail.data_completion.from_address', 'biuro@nowoczesna-edukacja.pl');
+        $fromName = config('mail.data_completion.from_name', 'NODN Platforma Nowoczesnej Edukacji');
+        $replyToAddress = config('mail.data_completion.reply_to_address', 'kontakt@nowoczesna-edukacja.pl');
         $replyToName = config('mail.data_completion.reply_to_name', $fromName);
             
         return $this->subject($subject)
