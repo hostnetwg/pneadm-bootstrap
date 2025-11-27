@@ -30,9 +30,9 @@ class DataCompletionFormController extends Controller
         }
 
         if (!$tokenModel->isValid()) {
-            $message = 'Token został już wykorzystany.';
+            $message = 'Twoje dane zostały już zaktualizowane, a ten link nie jest już aktywny. Dziękujemy za współpracę.';
             if ($tokenModel->expires_at && $tokenModel->expires_at->isPast()) {
-                $message = 'Token wygasł. Prosimy o kontakt z administratorem.';
+                $message = 'Ten link wygasł. W razie potrzeby prosimy o kontakt.';
             }
             
             return view('data-completion.form-error', [

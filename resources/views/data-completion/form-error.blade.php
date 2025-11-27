@@ -29,14 +29,14 @@
             <div class="card">
                 <div class="card-body text-center py-5">
                     <div class="mb-4">
-                        <i class="fas fa-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                        <i class="fas fa-info-circle text-primary" style="font-size: 4rem;"></i>
                     </div>
-                    <h3 class="mb-3">Wystąpił błąd</h3>
+                    <h3 class="mb-3">Informacja</h3>
                     <p class="text-muted mb-4">
                         {{ $message }}
                     </p>
                     <p class="text-muted small">
-                        Jeśli problem się powtarza, skontaktuj się z administratorem.
+                        W razie pytań prosimy pisać na <a href="mailto:kontakt@nowoczesna-edukacja.pl">kontakt@nowoczesna-edukacja.pl</a>.
                     </p>
                 </div>
             </div>
