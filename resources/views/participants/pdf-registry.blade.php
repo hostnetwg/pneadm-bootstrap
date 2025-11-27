@@ -200,8 +200,25 @@
                     </td>
                     <td style="border: none; padding: 0;">
                         <span class="info-label">Data wydania:</span> 
-                        @if($course->end_date)
-                            {{ $course->end_date->format('d.m.Y') }}
+                        @php
+                            $issueDate = null;
+                            if ($course->issue_date_certyficates && $course->end_date) {
+                                // Jeśli data wydania zaświadczeń jest późniejsza niż data zakończenia, użyj jej
+                                if ($course->issue_date_certyficates->gt($course->end_date)) {
+                                    $issueDate = $course->issue_date_certyficates;
+                                } else {
+                                    $issueDate = $course->end_date;
+                                }
+                            } elseif ($course->end_date) {
+                                // Jeśli nie ma issue_date_certyficates, użyj daty zakończenia
+                                $issueDate = $course->end_date;
+                            } elseif ($course->issue_date_certyficates) {
+                                // Jeśli jest tylko issue_date_certyficates (bez end_date), użyj jej
+                                $issueDate = $course->issue_date_certyficates;
+                            }
+                        @endphp
+                        @if($issueDate)
+                            {{ $issueDate->format('d.m.Y') }}
                         @else
                             -
                         @endif
