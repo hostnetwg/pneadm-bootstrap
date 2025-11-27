@@ -18,6 +18,7 @@ use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\ZamowieniaProdController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\Admin\StatisticsController;
 use App\Http\Controllers\SendyController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
@@ -34,6 +35,7 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/refresh', [DashboardController::class, 'refresh'])->name('dashboard.refresh');
     
     // User Preferences API
     Route::prefix('api/user')->name('api.user.')->group(function () {
@@ -45,6 +47,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', UsersController::class);
         Route::patch('users/{user}/toggle-status', [UsersController::class, 'toggleStatus'])->name('users.toggle-status');
+        
+        // Statystyki
+        Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics.index');
         
         // Zarządzanie szablonami certyfikatów
         Route::resource('certificate-templates', CertificateTemplateController::class);

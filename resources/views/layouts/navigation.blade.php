@@ -270,6 +270,9 @@
             </button>
             <div class="collapse {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li><a href="{{ route('admin.statistics.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                        <i class="bi bi-bar-chart me-1"></i>Statystyki
+                    </a></li>
                     <li><a href="{{ route('admin.users.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Użytkownicy</a></li>
                     <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>
                     <li><a href="{{ route('activity-logs.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
