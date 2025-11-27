@@ -113,4 +113,19 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Data Completion Module Mail Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the data completion module email addresses.
+    | These are used for reply-to addresses in data completion request emails.
+    |
+    */
+
+    'data_completion' => [
+        'reply_to_address' => env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl'),
+        'reply_to_name' => env('MAIL_DATA_COMPLETION_FROM_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
+    ],
+
 ];

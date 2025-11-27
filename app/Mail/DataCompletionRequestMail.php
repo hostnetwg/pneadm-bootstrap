@@ -44,8 +44,8 @@ class DataCompletionRequestMail extends Mailable
         // ReplyTo będzie biuro@nowoczesna-edukacja.pl
         $fromAddress = config('mail.from.address', 'kontakt@nowoczesna-edukacja.pl');
         $fromName = config('mail.from.name', 'NODN Platforma Nowoczesnej Edukacji');
-        $replyToAddress = env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl');
-        $replyToName = env('MAIL_DATA_COMPLETION_FROM_NAME', $fromName);
+        $replyToAddress = config('mail.data_completion.reply_to_address', 'biuro@nowoczesna-edukacja.pl');
+        $replyToName = config('mail.data_completion.reply_to_name', $fromName);
             
         return $this->subject($subject)
                     ->from($fromAddress, $fromName)

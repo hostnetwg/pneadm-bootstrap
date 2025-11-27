@@ -140,7 +140,7 @@ class DataCompletionService
                         Log::info('Próba wysyłki emaila', [
                             'to' => $recipientEmail,
                             'from' => config('mail.from.address'),
-                            'reply_to' => env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl'),
+                            'reply_to' => config('mail.data_completion.reply_to_address', 'biuro@nowoczesna-edukacja.pl'),
                             'original_email' => $email,
                             'test_mode' => $testMode,
                             'smtp_host' => config('mail.mailers.smtp.host'),
