@@ -59,7 +59,14 @@
                             <div class="card bg-success text-white h-100">
                                 <div class="card-body text-center">
                                     <h5 class="card-title">Uzupełniono</h5>
-                                    <p class="display-6">{{ $globalStats['completed_data'] }}</p>
+                                    <p class="display-6">
+                                        {{ $globalStats['completed_data'] }}
+                                        @if($globalStats['requests_sent'] > 0)
+                                            <span class="fs-6 opacity-75">
+                                                ({{ round(($globalStats['completed_data'] / $globalStats['requests_sent']) * 100, 1) }}%)
+                                            </span>
+                                        @endif
+                                    </p>
                                     <small>osób</small>
                                 </div>
                             </div>
