@@ -198,7 +198,7 @@
                         <td>{{ $participant->last_name }}</td>                        
                         <td>{{ $participant->first_name }}</td>
                         <td>{{ $participant->email ?? 'Brak' }}</td>
-                        <td>{{ $participant->birth_date ?? 'Brak' }}</td>
+                        <td>{{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : 'Brak' }}</td>
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
                         <td>
                             @if ($participant->access_expires_at)
@@ -290,7 +290,7 @@
                             <ul class="mb-0">
                                 <li><strong>Imię i nazwisko:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
                                 <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
-                                <li><strong>Data urodzenia:</strong> {{ $participant->birth_date ?? 'Brak' }}</li>
+                                <li><strong>Data urodzenia:</strong> {{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : 'Brak' }}</li>
                                 <li><strong>Miejsce urodzenia:</strong> {{ $participant->birth_place ?? 'Brak' }}</li>
                                 <li><strong>Szkolenie:</strong> {!! $course->title !!}</li>
                                 <li><strong>Data wygaśnięcia dostępu:</strong> {{ $participant->access_expires_at ? $participant->access_expires_at->format('d.m.Y H:i') : 'Bezterminowy' }}</li>

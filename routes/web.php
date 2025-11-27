@@ -239,6 +239,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/restore', [CoursePriceVariantController::class, 'restore'])->name('restore');
     });
 
+    // Uzupełnienie danych uczestników
+    Route::prefix('data-completion')->name('data-completion.')->group(function () {
+        Route::get('/test', [\App\Http\Controllers\DataCompletionController::class, 'test'])->name('test');
+        Route::get('/collect', [\App\Http\Controllers\DataCompletionController::class, 'collect'])->name('collect');
+        Route::get('/simulate-test/{courseId}', [\App\Http\Controllers\DataCompletionController::class, 'simulateTest'])->name('simulate-test');
+        Route::post('/send-test-email/{courseId}', [\App\Http\Controllers\DataCompletionController::class, 'sendTestEmail'])->name('send-test-email');
+        Route::post('/send-for-course/{courseId}', [\App\Http\Controllers\DataCompletionController::class, 'sendForCourse'])->name('send-for-course');
+        Route::post('/refresh-bd-certgen-stats', [\App\Http\Controllers\DataCompletionController::class, 'refreshBDCertgenEducationStats'])->name('refresh-bd-certgen-stats');
+    });
+
     // Lista wszystkich uczestników
     Route::get('/participants', [ParticipantController::class, 'all'])->name('participants.all');
     Route::get('/participants/emails', [ParticipantController::class, 'emailsList'])->name('participants.emails-list');
@@ -312,6 +322,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Publiczny formularz uzupełniania danych (bez auth)
+Route::get('/uzupelnij-dane/{token}', [\App\Http\Controllers\DataCompletionFormController::class, 'show'])->name('data-completion.form');
+Route::post('/uzupelnij-dane/{token}', [\App\Http\Controllers\DataCompletionFormController::class, 'store'])->name('data-completion.form.store');
 
 // Webhook dla Publigo.pl - bez CSRF protection
 Route::post('/api/publigo/webhook', [PubligoController::class, 'webhook'])

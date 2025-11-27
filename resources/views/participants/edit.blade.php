@@ -33,7 +33,7 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label for="birth_date" class="form-label">Data urodzenia</label>
-                        <input type="date" name="birth_date" id="birth_date" class="form-control" value="{{ old('birth_date', $participant->birth_date) }}">
+                        <input type="date" name="birth_date" id="birth_date" class="form-control" value="{{ old('birth_date', $participant->birth_date ? $participant->birth_date->format('Y-m-d') : '') }}">
                     </div>
                     <div class="col-md-6">
                         <label for="birth_place" class="form-label">Miejsce urodzenia</label>
