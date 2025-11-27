@@ -44,6 +44,9 @@ class DataCompletionController extends Controller
      */
     public function collect(Request $request)
     {
+        // Pobierz globalne statystyki
+        $globalStats = $this->service->getGlobalStatistics();
+
         // Pobierz tylko kursy certgen_Publigo
         $courses = Course::where('source_id_old', 'certgen_Publigo')
             ->orderBy('start_date', 'desc')
@@ -58,7 +61,7 @@ class DataCompletionController extends Controller
             return $courseArray;
         });
 
-        return view('data-completion.collect', compact('courses'));
+        return view('data-completion.collect', compact('courses', 'globalStats'));
     }
 
     /**

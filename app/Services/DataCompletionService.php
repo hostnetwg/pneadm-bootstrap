@@ -485,6 +485,67 @@ class DataCompletionService
     }
 
     /**
+     * Pobiera globalne statystyki dla wszystkich kursów certgen_Publigo
+     */
+    public function getGlobalStatistics(): array
+    {
+        // Pobierz ID wszystkich kursów certgen_Publigo
+        $courseIds = Course::where('source_id_old', 'certgen_Publigo')->pluck('id');
+
+        if ($courseIds->isEmpty()) {
+            return [
+                'total_courses' => 0,
+                'total_participants' => 0,
+                'missing_data' => 0,
+                'completed_data' => 0,
+                'requests_sent' => 0,
+            ];
+        }
+
+        // Liczba unikalnych uczestników (po emailu) w tych kursach
+        $totalParticipants = Participant::whereIn('course_id', $courseIds)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->distinct('email')
+            ->count('email');
+
+        // Liczba uczestników z brakującymi danymi
+        $missingData = Participant::whereIn('course_id', $courseIds)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->where(function($q) {
+                $q->whereNull('birth_date')
+                  ->orWhereNull('birth_place')
+                  ->orWhere('birth_place', '');
+            })
+            ->distinct('email')
+            ->count('email');
+
+        // Liczba uczestników z uzupełnionymi danymi
+        $completedData = Participant::whereIn('course_id', $courseIds)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereNotNull('birth_date')
+            ->whereNotNull('birth_place')
+            ->where('birth_place', '!=', '')
+            ->distinct('email')
+            ->count('email');
+
+        // Liczba wysłanych próśb
+        $requestsSent = DataCompletionRequest::whereIn('course_id', $courseIds)
+            ->distinct('email') // Liczymy unikalne osoby, do których wysłano prośbę (niezależnie od liczby kursów)
+            ->count('email');
+
+        return [
+            'total_courses' => $courseIds->count(),
+            'total_participants' => $totalParticipants,
+            'missing_data' => $missingData,
+            'completed_data' => $completedData,
+            'requests_sent' => $requestsSent,
+        ];
+    }
+
+    /**
      * Ujednolica dane uczestnika (imię i nazwisko) dla wszystkich rekordów z danym adresem e-mail.
      */
     public function unifyParticipantData(string $email, string $targetFirstName, string $targetLastName): int

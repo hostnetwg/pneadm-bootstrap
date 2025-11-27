@@ -35,10 +35,55 @@
                     </form>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">
-                        Poniżej znajduje się lista kursów z <code>source_id_old = "certgen_Publigo"</code>.
-                        Kliknij "Poproś o uzupełnienie" aby wysłać prośby do uczestników z brakującymi danymi.
-                    </p>
+                    
+                    <!-- Globalne Statystyki -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Wszystkie Kursy</h5>
+                                    <p class="display-6">{{ $globalStats['total_courses'] }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-dark h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Braki Danych</h5>
+                                    <p class="display-6">{{ $globalStats['missing_data'] }}</p>
+                                    <small>osób</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Uzupełniono</h5>
+                                    <p class="display-6">{{ $globalStats['completed_data'] }}</p>
+                                    <small>osób</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Wysłano Próśb</h5>
+                                    <p class="display-6">{{ $globalStats['requests_sent'] }}</p>
+                                    <small>unikalnych adresów</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold">Kursy do uzupełnienia danych (tryb produkcyjny)</h3>
+                            <p class="text-sm text-gray-600">
+                                Poniżej znajduje się lista kursów z <code>source_id_old = "certgen_Publigo"</code>.
+                                Kliknij "Poproś o uzupełnienie", aby wysłać prośby do uczestników z brakującymi danymi.
+                            </p>
+                        </div>
+                    </div>
 
                     <div class="table-responsive">
                         <table class="table table-striped table-hover">
@@ -131,4 +176,3 @@
         </div>
     </div>
 </x-app-layout>
-
