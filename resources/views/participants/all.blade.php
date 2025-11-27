@@ -212,6 +212,7 @@
                                         @endif
                                     </a>
                                 </th>
+                                <th style="width: 25%;">Szkolenie</th>
                                 <th style="width: 8%;" class="text-center">Akcje</th>
                             </tr>
                         </thead>
@@ -224,14 +225,34 @@
                                 <td>{{ $participant->email ?: '-' }}</td>
                                 <td>{{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : '-' }}</td>
                                 <td>{{ $participant->birth_place ?: '-' }}</td>
+                                <td>
+                                    @if($participant->course)
+                                        <a href="{{ route('courses.show', $participant->course->id) }}" class="text-decoration-none" target="_blank">
+                                            {{ str_replace('&nbsp;', ' ', $participant->course->title) }}
+                                        </a>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
                                 <td class="text-center">
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-primary" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#viewModal{{ $participant->id }}"
-                                            title="Podgląd uczestnika">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#viewModal{{ $participant->id }}"
+                                                title="Podgląd uczestnika">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        @if($participant->course)
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteModal{{ $participant->id }}"
+                                                title="Usuń uczestnika">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -244,7 +265,53 @@
                     {{ $participants->links() }}
                 </div>
 
-                <!-- Modale podglądu uczestników -->
+                @foreach ($participants as $participant)
+    @if($participant->course)
+    <div class="modal fade" id="deleteModal{{ $participant->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $participant->id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel{{ $participant->id }}">
+                        <i class="fas fa-exclamation-triangle"></i> Potwierdzenie usunięcia
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz usunąć uczestnika <strong>#{{ $participant->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły uczestnika:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Imię i nazwisko:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
+                            <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
+                            <li><strong>Szkolenie:</strong> {!! $participant->course->title !!}</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted mt-3 small">
+                        <i class="fas fa-info-circle"></i>
+                        Uczestnik zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić w sekcji Kosz.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Anuluj
+                    </button>
+                    <form action="{{ route('participants.destroy', [$participant->course->id, $participant->id]) }}" 
+                          method="POST" 
+                          class="d-inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Usuń uczestnika
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+    @endforeach
+
+    <!-- Modale podglądu uczestników -->
                 @foreach ($participants as $participant)
                 <div class="modal fade" id="viewModal{{ $participant->id }}" tabindex="-1" aria-labelledby="viewModalLabel{{ $participant->id }}" aria-hidden="true">
                     <div class="modal-dialog modal-lg">

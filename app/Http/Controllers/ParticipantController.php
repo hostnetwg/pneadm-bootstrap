@@ -538,7 +538,7 @@ class ParticipantController extends Controller
     {
         $participant->delete();
 
-        return redirect()->route('participants.index', $course)->with('success', 'Uczestnik usunięty.');
+        return back()->with('success', 'Uczestnik usunięty.');
     }
 
     /**
