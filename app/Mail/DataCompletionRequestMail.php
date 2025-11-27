@@ -50,6 +50,7 @@ class DataCompletionRequestMail extends Mailable
         $replyToName = config('mail.data_completion.reply_to_name', $fromName);
             
         return $this->subject($subject)
+                    ->mailer('data_completion') // Użyj dedykowanego mailera dla modułu
                     ->from($fromAddress, $fromName)
                     ->replyTo($replyToAddress, $replyToName)
                     ->view('data-completion.email')

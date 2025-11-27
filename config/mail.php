@@ -49,6 +49,19 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        'data_completion' => [
+            'transport' => 'smtp',
+            'scheme' => env('MAIL_DATA_COMPLETION_SCHEME', env('MAIL_SCHEME')),
+            'url' => env('MAIL_DATA_COMPLETION_URL', env('MAIL_URL')),
+            'host' => env('MAIL_DATA_COMPLETION_HOST', env('MAIL_HOST', '127.0.0.1')),
+            'port' => env('MAIL_DATA_COMPLETION_PORT', env('MAIL_PORT', 2525)),
+            'username' => env('MAIL_DATA_COMPLETION_USERNAME', 'biuro@nowoczesna-edukacja.pl'),
+            'password' => env('MAIL_DATA_COMPLETION_PASSWORD', 'noYkeT#70'),
+            'encryption' => env('MAIL_DATA_COMPLETION_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls')),
+            'timeout' => null,
+            'local_domain' => env('MAIL_DATA_COMPLETION_EHLO_DOMAIN', env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST))),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],
