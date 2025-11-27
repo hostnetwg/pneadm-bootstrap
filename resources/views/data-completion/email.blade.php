@@ -51,12 +51,21 @@
         .button {
             display: inline-block;
             background-color: #0d6efd;
-            color: white;
-            padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 5px;
+            color: #ffffff !important; /* Wymuszenie białego koloru */
+            padding: 14px 30px;
+            text-decoration: none !important; /* Usunięcie podkreślenia */
+            border-radius: 6px;
             margin: 20px 0;
             text-align: center;
+            font-weight: bold;
+            border: 1px solid #0d6efd; /* Dodatkowa ramka dla pewności */
+            mso-padding-alt: 0; /* Fix dla Outlooka */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        /* Fix dla linków w Gmailu i innych klientach */
+        a.button:visited, a.button:hover, a.button:active {
+            color: #ffffff !important;
+            text-decoration: none !important;
         }
         .footer {
             text-align: center;
@@ -89,14 +98,11 @@
         <p>Witaj {{ $participantName }},</p>
         
         <p>
-            Zgodnie z przepisami prawa oświatowego, w szczególności z art. 115 ust. 4 ustawy z dnia 14 grudnia 2016 r. 
-            Prawo oświatowe (Dz.U. 2023 poz. 900) oraz § 18 rozporządzenia Ministra Edukacji Narodowej z dnia 19 marca 2019 r. 
-            w sprawie kształcenia ustawicznego w formach pozaszkolnych (Dz.U. 2019 poz. 652), 
-            prowadzimy rejestr wydanych zaświadczeń, który wymaga uzupełnienia Twoich danych osobowych.
+            Działając na podstawie § 26 ust. 1 w związku z § 23 ust. 1 Rozporządzenia Ministra Edukacji Narodowej z dnia 28 maja 2019 r. w sprawie placówek doskonalenia nauczycieli (Dz.U. z 2019 r. poz. 1045 z późn. zm.), nasza placówka zobowiązana jest do prowadzenia rejestru wydanych zaświadczeń.
         </p>
         
         <p>
-            Brakuje nam następujących informacji:
+            Abyśmy mogli dopełnić tego obowiązku brakuje nam następujących informacji:
         </p>
         <ul>
             <li>Data urodzenia</li>
@@ -108,7 +114,17 @@
         </p>
         
         <div style="text-align: center; margin-bottom: 20px;">
-            <a href="{{ $formUrl }}" class="button">Uzupełnij dane</a>
+            <!-- Outlook conditional comment dla lepszego renderowania przycisków -->
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ $formUrl }}" style="height:50px;v-text-anchor:middle;width:200px;" arcsize="10%" stroke="f" fillcolor="#0d6efd">
+            <w:anchorlock/>
+            <center>
+            <![endif]-->
+            <a href="{{ $formUrl }}" class="button" style="background-color:#0d6efd;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:50px;text-align:center;text-decoration:none;width:200px;-webkit-text-size-adjust:none;">Uzupełnij dane</a>
+            <!--[if mso]>
+            </center>
+            </v:roundrect>
+            <![endif]-->
         </div>
         
         <p style="background-color: #fff3cd; padding: 12px; border-left: 4px solid #ffc107; margin: 20px 0;">

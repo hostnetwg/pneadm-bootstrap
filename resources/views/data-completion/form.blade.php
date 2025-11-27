@@ -169,23 +169,23 @@
                     <div style="font-size: 0.8rem; color: #6c757d; line-height: 1.5;">
                         <p class="mb-2">
                             <strong>Administrator danych:</strong> Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji", 
-                            ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń
+                            ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń.
                         </p>
                         <p class="mb-2">
-                            <strong>Cel przetwarzania:</strong> Prowadzenie rejestru wydanych zaświadczeń zgodnie z przepisami prawa oświatowego.
+                            <strong>Cel przetwarzania:</strong> Prowadzenie dokumentacji przebiegu doskonalenia zawodowego oraz rejestru wydanych zaświadczeń.
                         </p>
                         <p class="mb-2">
-                            <strong>Podstawa prawna:</strong> Art. 6 ust. 1 lit. c RODO (wypełnienie obowiązku prawnego ciążącego na administratorze) 
-                            oraz przepisy prawa oświatowego dotyczące prowadzenia dokumentacji szkoleń.
+                            <strong>Podstawa prawna:</strong> Art. 6 ust. 1 lit. c RODO (wypełnienie obowiązku prawnego ciążącego na administratorze), 
+                            wynikającego z Rozporządzenia MEN z dnia 28 maja 2019 r. w sprawie placówek doskonalenia nauczycieli.
                         </p>
                         <p class="mb-2">
                             <strong>Okres przechowywania:</strong> Dane będą przechowywane przez okres wymagany przepisami prawa dotyczącymi 
-                            dokumentacji szkoleń i wydanych zaświadczeń.
+                            archiwizacji dokumentacji w placówkach oświatowych.
                         </p>
                         <p class="mb-2">
-                            <strong>Prawa osoby, której dane dotyczą:</strong> Masz prawo do dostępu do swoich danych, ich sprostowania, 
-                            usunięcia lub ograniczenia przetwarzania, a także prawo do wniesienia sprzeciwu wobec przetwarzania oraz prawo 
-                            do przenoszenia danych. Masz również prawo do wniesienia skargi do organu nadzorczego (UODO).
+                            <strong>Prawa osoby, której dane dotyczą:</strong> Posiada Pani/Pan prawo dostępu do treści swoich danych oraz prawo ich sprostowania, 
+                            a także prawo do ograniczenia przetwarzania. Przysługuje Pani/Panu również prawo wniesienia skargi do organu nadzorczego 
+                            (Prezesa Urzędu Ochrony Danych Osobowych), gdy uzna Pani/Pan, iż przetwarzanie danych narusza przepisy RODO.
                         </p>
                         <p class="mb-0">
                             <strong>Kontakt w sprawach RODO:</strong> 
