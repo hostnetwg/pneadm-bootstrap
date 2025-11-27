@@ -89,8 +89,10 @@
         <p>Witaj {{ $participantName }},</p>
         
         <p>
-            Zgodnie z przepisami dotyczącymi prowadzenia rejestru wydanych zaświadczeń, 
-            potrzebujemy uzupełnienia Twoich danych osobowych.
+            Zgodnie z przepisami prawa oświatowego, w szczególności z art. 115 ust. 4 ustawy z dnia 14 grudnia 2016 r. 
+            Prawo oświatowe (Dz.U. 2023 poz. 900) oraz § 18 rozporządzenia Ministra Edukacji Narodowej z dnia 19 marca 2019 r. 
+            w sprawie kształcenia ustawicznego w formach pozaszkolnych (Dz.U. 2019 poz. 652), 
+            prowadzimy rejestr wydanych zaświadczeń, który wymaga uzupełnienia Twoich danych osobowych.
         </p>
         
         <p>
