@@ -143,7 +143,7 @@ class CoursesController extends Controller
         // Dla większych zbiorów danych, ograniczamy relacje które są używane tylko do liczenia
         if (!$isAll || $filteredCount < 300) {
             $eagerLoads['participants'] = function($query) {
-                $query->select('id', 'course_id');
+                $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
             };
             $eagerLoads['certificates'] = function($query) {
                 $query->select('id', 'course_id');
@@ -167,6 +167,9 @@ class CoursesController extends Controller
         // Dla większych zbiorów, ładuj relacje do liczenia osobno (lazy loading)
         if ($isAll && $filteredCount >= 300) {
             $courses->getCollection()->loadCount(['participants', 'certificates']);
+            $courses->getCollection()->load(['participants' => function($query) {
+                $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
+            }]);
             $courses->getCollection()->load(['surveys' => function($query) {
                 $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
             }]);

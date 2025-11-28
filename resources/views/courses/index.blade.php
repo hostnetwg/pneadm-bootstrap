@@ -353,6 +353,22 @@
                         </td>
                         <td class="text-center align-middle">
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants->count() }}</span><br>
+                            @php
+                                // Upewnij się, że uczestnicy są załadowani z potrzebnymi polami
+                                if (!$course->relationLoaded('participants')) {
+                                    $course->load(['participants' => function($query) {
+                                        $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
+                                    }]);
+                                }
+                                
+                                $completeDataCount = $course->participants->filter(function($participant) {
+                                    return !empty(trim($participant->last_name ?? '')) 
+                                        && !empty(trim($participant->first_name ?? '')) 
+                                        && !is_null($participant->birth_date) 
+                                        && !empty(trim($participant->birth_place ?? ''));
+                                })->count();
+                            @endphp
+                            <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $completeDataCount }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
                             @if($course->orders_count > 0)
                                 <a href="{{ route('form-orders.index', ['filter' => 'new', 'search' => $course->id_old]) }}" 
