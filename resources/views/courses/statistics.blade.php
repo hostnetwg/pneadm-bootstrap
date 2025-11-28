@@ -214,7 +214,7 @@
     <div class="header">
         <div class="organization">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</div>
         <h1>Statystyki szkoleń</h1>
-        <div class="subtitle">Wygenerowano: {{ $generated_at->format('d.m.Y H:i') }}</div>
+        <div class="subtitle">Wygenerowano: {{ $generated_at->format('d.m.Y') }}</div>
     </div>
     
     @if(!empty(array_filter($filters_applied)))
@@ -254,7 +254,6 @@
         <p><strong>Typy szkoleń:</strong> {{ $statistics['online_courses'] }} online, {{ $statistics['offline_courses'] }} stacjonarnych, {{ $statistics['open_courses'] }} otwartych, {{ $statistics['closed_courses'] }} zamkniętych</p>
         <p><strong>Łączna liczba uczestników:</strong> {{ $statistics['total_participants'] }}</p>
         <p><strong>Godziny szkoleń:</strong> {{ $statistics['total_hours_paid'] }}h (płatne), {{ $statistics['total_hours_free'] }}h (bezpłatne)</p>
-        <p><strong>Zaświadczenia:</strong> {{ $statistics['total_certificates'] }} ({{ $statistics['certificates_paid_courses'] }} z szkoleń płatnych, {{ $statistics['certificates_free_courses'] }} z szkoleń bezpłatnych)</p>
     </div>
     
     <!-- Lista szkoleń -->
@@ -272,8 +271,7 @@
                     </div>
                     <div>
                         <strong>Czas trwania:</strong> {{ $course->start_date && $course->end_date ? $course->start_date->diffInMinutes($course->end_date) : 0 }} min |
-                        <strong>Uczestnicy:</strong> {{ $course->participants->count() }} |
-                        <strong>Zaświadczenia:</strong> {{ $course->certificates->count() }}
+                        <strong>Uczestnicy:</strong> {{ $course->participants->count() }}
                     </div>
                     @if($course->instructor)
                     <div>
