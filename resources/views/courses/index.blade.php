@@ -243,6 +243,7 @@
                         <th style="width: 10%;">Rodzaj</th>
                         <th style="width: 18%;">Lokalizacja / Dostęp</th>
                         <th style="width: 6%;">Instruktor</th>
+                        <th class="text-center" style="width: 3%;" title="Check lista">C</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
@@ -350,6 +351,13 @@
                         </td>
                         <td class="align-middle">
                             {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
+                        </td>
+                        <td class="text-center align-middle">
+                            @if(!empty(trim($course->description ?? '')))
+                                <i class="bi bi-check-circle-fill text-success" title="podano zakres szkolenia" style="font-size: 1.2em;"></i>
+                            @else
+                                <i class="bi bi-x-circle-fill text-danger" title="brak zakresu szkolenia" style="font-size: 1.2em;"></i>
+                            @endif
                         </td>
                         <td class="text-center align-middle">
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants->count() }}</span><br>
