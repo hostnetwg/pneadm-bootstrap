@@ -39,7 +39,7 @@
                     <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCertificatesModal">
                         <i class="fas fa-certificate me-1"></i> Import zaświadczeń z PUBLIGO CSV
                     </button>
-                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników bez zaświadczeń?')">
+                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)? Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.')">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
                     </a>
                     <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">

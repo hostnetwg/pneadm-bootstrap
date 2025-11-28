@@ -142,14 +142,21 @@ class CertificateController extends Controller
 
     public function bulkGenerate(Course $course)
     {
-        // Pobranie wszystkich uczestników kursu, którzy nie mają jeszcze certyfikatu
-        $participantsWithoutCertificates = $course->participants()
-            ->whereDoesntHave('certificate')
+        // Pobranie wszystkich uczestników kursu z kompletnymi danymi
+        // Kompletne dane: Nazwisko, Imię, Data urodzenia, Miejsce urodzenia
+        $participantsWithCompleteData = $course->participants()
+            ->whereNotNull('last_name')
+            ->where('last_name', '!=', '')
+            ->whereNotNull('first_name')
+            ->where('first_name', '!=', '')
+            ->whereNotNull('birth_date')
+            ->whereNotNull('birth_place')
+            ->where('birth_place', '!=', '')
             ->orderBy('order')
             ->get();
 
-        if ($participantsWithoutCertificates->isEmpty()) {
-            return redirect()->back()->with('info', 'Wszyscy uczestnicy mają już wygenerowane zaświadczenia.');
+        if ($participantsWithCompleteData->isEmpty()) {
+            return redirect()->back()->with('info', 'Brak uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia).');
         }
 
         $courseYear = $this->resolveCourseYear($course);
@@ -157,10 +164,11 @@ class CertificateController extends Controller
 
         $generatedCount = 0;
 
-        foreach ($participantsWithoutCertificates as $participant) {
+        foreach ($participantsWithCompleteData as $participant) {
             $certificateNumber = $this->formatCertificateNumber($course, $nextCertificateNumber, $courseYear);
 
             // Zapis numeru certyfikatu w bazie danych
+            // Uwaga: generujemy zaświadczenia również dla uczestników, którzy już mają zaświadczenia
             Certificate::create([
                 'participant_id' => $participant->id,
                 'course_id' => $course->id,
@@ -172,7 +180,7 @@ class CertificateController extends Controller
             $generatedCount++;
         }
 
-        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników bez certyfikatów.");
+        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników z kompletnymi danymi.");
     }
 
 
