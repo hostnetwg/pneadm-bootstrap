@@ -35,7 +35,7 @@
 
                 <div class="mb-3">
                     <label for="description" class="form-label">Opis</label>
-                    <textarea name="description" class="form-control" id="description" rows="3">{{ $course->description }}</textarea>
+                    <textarea name="description" class="form-control" id="description" rows="6">{{ $course->description }}</textarea>
                 </div>
 
                 <!-- Sekcja opisu oferty -->
