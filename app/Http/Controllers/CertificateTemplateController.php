@@ -47,7 +47,8 @@ class CertificateTemplateController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
+            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
         ]);
 
         // Generowanie slug z nazwy
@@ -78,7 +79,14 @@ class CertificateTemplateController extends Controller
                 'orientation' => $request->input('orientation', 'portrait'),
                 'title_size' => $request->input('title_size', 38),
                 'title_color' => $request->input('title_color', '#000000'),
-                'course_title_size' => $request->input('course_title_size', 32)
+                'course_title_size' => $request->input('course_title_size', 32),
+                'show_certificate_number' => $request->has('show_certificate_number'),
+                'margin_top' => $request->input('margin_top', 10),
+                'margin_bottom' => $request->input('margin_bottom', 10),
+                'margin_left' => $request->input('margin_left', 50),
+                'margin_right' => $request->input('margin_right', 50),
+                'date_margin_left' => $request->input('date_margin_left', 0),
+                'instructor_margin_right' => $request->input('instructor_margin_right', 0)
             ]
         ];
 
@@ -136,7 +144,8 @@ class CertificateTemplateController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
+            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
         ]);
 
         // Przygotowanie konfiguracji
@@ -149,6 +158,28 @@ class CertificateTemplateController extends Controller
             return $orderA <=> $orderB;
         });
         
+        // Obsługa uploadu/usuwania tła
+        $backgroundImagePath = $certificateTemplate->config['settings']['background_image'] ?? null;
+        
+        // Jeśli zaznaczono usunięcie tła
+        if ($request->has('remove_background') && $backgroundImagePath) {
+            // Usuń stary plik
+            if (Storage::disk('public')->exists($backgroundImagePath)) {
+                Storage::disk('public')->delete($backgroundImagePath);
+            }
+            $backgroundImagePath = null;
+        }
+        
+        // Jeśli przesłano nowe tło
+        if ($request->hasFile('background_image')) {
+            // Usuń stare tło jeśli istnieje
+            if ($backgroundImagePath && Storage::disk('public')->exists($backgroundImagePath)) {
+                Storage::disk('public')->delete($backgroundImagePath);
+            }
+            // Zapisz nowe tło
+            $backgroundImagePath = $request->file('background_image')->store('certificate-backgrounds', 'public');
+        }
+        
         $config = [
             'blocks' => $blocks,
             'settings' => [
@@ -156,7 +187,16 @@ class CertificateTemplateController extends Controller
                 'orientation' => $request->input('orientation', 'portrait'),
                 'title_size' => $request->input('title_size', 38),
                 'title_color' => $request->input('title_color', '#000000'),
-                'course_title_size' => $request->input('course_title_size', 32)
+                'course_title_size' => $request->input('course_title_size', 32),
+                'show_certificate_number' => $request->has('show_certificate_number'),
+                'margin_top' => $request->input('margin_top', 10),
+                'margin_bottom' => $request->input('margin_bottom', 10),
+                'margin_left' => $request->input('margin_left', 50),
+                'margin_right' => $request->input('margin_right', 50),
+                'date_margin_left' => $request->input('date_margin_left', 0),
+                'instructor_margin_right' => $request->input('instructor_margin_right', 0),
+                'background_image' => $backgroundImagePath,
+                'show_background' => $request->has('show_background')
             ]
         ];
 
@@ -254,6 +294,33 @@ class CertificateTemplateController extends Controller
         // Używamy tego samego mechanizmu co w CertificateController
         $templateView = $certificateTemplate->blade_path;
         
+        // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
+        $config = $certificateTemplate->config ?? [];
+        $blocks = $config['blocks'] ?? [];
+        $settings = $config['settings'] ?? [];
+        
+        // Wyciągnięcie wartości z konfiguracji bloków
+        $headerConfig = null;
+        $courseInfoConfig = null;
+        $footerConfig = null;
+        
+        foreach ($blocks as $block) {
+            $type = $block['type'] ?? '';
+            $blockConfig = $block['config'] ?? [];
+            
+            switch ($type) {
+                case 'header':
+                    $headerConfig = $blockConfig;
+                    break;
+                case 'course_info':
+                    $courseInfoConfig = $blockConfig;
+                    break;
+                case 'footer':
+                    $footerConfig = $blockConfig;
+                    break;
+            }
+        }
+        
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($templateView, [
             'participant' => $participant,
             'certificateNumber' => $certificateNumber,
@@ -261,6 +328,12 @@ class CertificateTemplateController extends Controller
             'instructor' => $instructor,
             'durationMinutes' => $durationMinutes,
             'isPdfMode' => $isPdfMode,
+            // Konfiguracja szablonu
+            'templateConfig' => $config,
+            'templateSettings' => $settings,
+            'headerConfig' => $headerConfig,
+            'courseInfoConfig' => $courseInfoConfig,
+            'footerConfig' => $footerConfig,
         ])->setPaper('A4', 'portrait')
           ->setOptions([
               'defaultFont' => 'DejaVu Sans',

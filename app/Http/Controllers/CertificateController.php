@@ -39,9 +39,9 @@ class CertificateController extends Controller
 
     public function generate($participantId)
     {
-        // Pobieranie uczestnika i kursu
+        // Pobieranie uczestnika i kursu z załadowaną relacją szablonu
         $participant = Participant::findOrFail($participantId);
-        $course = Course::findOrFail($participant->course_id);
+        $course = Course::with('certificateTemplate')->findOrFail($participant->course_id);
     
         // Pobieranie instruktora, jeśli kurs ma relację do instruktora
         $instructor = $course->instructor ?? null;
@@ -82,12 +82,45 @@ class CertificateController extends Controller
 
         // Określenie szablonu do użycia
         $templateView = 'certificates.default'; // Domyślny szablon
+        $templateConfig = null; // Konfiguracja szablonu
         
         // Jeśli kurs ma przypisany szablon, użyj go
-        if ($course->certificateTemplate && $course->certificateTemplate->bladeFileExists()) {
-            $templateView = $course->certificateTemplate->blade_path;
+        if ($course->certificate_template_id && $course->certificateTemplate) {
+            // Sprawdź czy plik blade istnieje
+            if ($course->certificateTemplate->bladeFileExists()) {
+                $templateView = $course->certificateTemplate->blade_path;
+                // Pobierz konfigurację szablonu
+                $templateConfig = $course->certificateTemplate->config;
+            }
         }
     
+        // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
+        $config = $templateConfig ?? [];
+        $blocks = $config['blocks'] ?? [];
+        $settings = $config['settings'] ?? [];
+        
+        // Wyciągnięcie wartości z konfiguracji bloków
+        $headerConfig = null;
+        $courseInfoConfig = null;
+        $footerConfig = null;
+        
+        foreach ($blocks as $block) {
+            $type = $block['type'] ?? '';
+            $blockConfig = $block['config'] ?? [];
+            
+            switch ($type) {
+                case 'header':
+                    $headerConfig = $blockConfig;
+                    break;
+                case 'course_info':
+                    $courseInfoConfig = $blockConfig;
+                    break;
+                case 'footer':
+                    $footerConfig = $blockConfig;
+                    break;
+            }
+        }
+        
         // Tworzenie widoku PDF z przekazaniem wszystkich danych
         $isPdfMode = true; // Generujemy PDF, nie podgląd HTML
         
@@ -98,6 +131,12 @@ class CertificateController extends Controller
             'instructor' => $instructor,
             'durationMinutes' => $durationMinutes,
             'isPdfMode' => $isPdfMode,
+            // Konfiguracja szablonu
+            'templateConfig' => $config,
+            'templateSettings' => $settings,
+            'headerConfig' => $headerConfig,
+            'courseInfoConfig' => $courseInfoConfig,
+            'footerConfig' => $footerConfig,
         ])->setPaper('A4', 'portrait')
           ->setOptions([
               'defaultFont' => 'DejaVu Sans', // Obsługa polskich znaków

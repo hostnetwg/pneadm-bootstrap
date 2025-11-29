@@ -42,13 +42,32 @@ class TemplateBuilderService
         $html .= "    <meta charset=\"UTF-8\">\n";
         $html .= "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
         $html .= "    <title>Zaświadczenie</title>\n";
+        
+        // Dodaj kod PHP dla tła przed style
+        if (!empty($settings['background_image'] ?? null)) {
+            $html .= "    @php\n";
+            $html .= "        // Obsługa tła - konwersja do base64 dla PDF\n";
+            $html .= "        \$backgroundImageCss = '';\n";
+            $html .= "        \$showBackground = \$templateSettings['show_background'] ?? false;\n";
+            $html .= "        if (\$showBackground && !empty(\$templateSettings['background_image'] ?? null)) {\n";
+            $html .= "            \$backgroundPath = storage_path('app/public/' . \$templateSettings['background_image']);\n";
+            $html .= "            if (file_exists(\$backgroundPath)) {\n";
+            $html .= "                \$imageData = file_get_contents(\$backgroundPath);\n";
+            $html .= "                \$imageBase64 = base64_encode(\$imageData);\n";
+            $html .= "                \$imageMime = mime_content_type(\$backgroundPath);\n";
+            $html .= "                \$backgroundImageCss = \"background-image: url('data:{\$imageMime};base64,{\$imageBase64}'); background-size: cover; background-position: center; background-repeat: no-repeat;\";\n";
+            $html .= "            }\n";
+            $html .= "        }\n";
+            $html .= "    @endphp\n";
+        }
+        
         $html .= $this->buildStyles($settings);
         $html .= "</head>\n";
         $html .= "<body>\n";
         
         // Generowanie bloków
         foreach ($blocks as $block) {
-            $html .= $this->buildBlock($block);
+            $html .= $this->buildBlock($block, $settings);
         }
         
         $html .= "</body>\n";
@@ -64,33 +83,63 @@ class TemplateBuilderService
     {
         $fontFamily = $settings['font_family'] ?? 'DejaVu Sans';
         $orientation = $settings['orientation'] ?? 'portrait';
+        $marginTop = $settings['margin_top'] ?? 10;
+        $marginBottom = $settings['margin_bottom'] ?? 10;
+        $marginLeft = $settings['margin_left'] ?? 50;
+        $marginRight = $settings['margin_right'] ?? 50;
+        $dateMarginLeft = $settings['date_margin_left'] ?? 0;
+        $instructorMarginRight = $settings['instructor_margin_right'] ?? 0;
+        $totalDateMarginLeft = $marginLeft + $dateMarginLeft;
+        $totalInstructorMarginRight = $marginRight + $instructorMarginRight;
         
         $styles = "    <style>\n";
+        
+        // Ustawienia @page - muszą być przed body, aby usunąć domyślne marginesy DOMPDF
+        $styles .= "        @page {\n";
+        $styles .= "            margin: 0;\n";
+        if ($orientation === 'landscape') {
+            $styles .= "            size: A4 landscape;\n";
+        }
+        $styles .= "        }\n";
+        
         $styles .= "        body {\n";
         $styles .= "            font-family: \"{$fontFamily}\", sans-serif;\n";
         $styles .= "            text-align: center;\n";
         $styles .= "            position: relative;\n";
         $styles .= "            margin: 0;\n";
-        $styles .= "            padding: 10px 20px;\n";
+        $styles .= "            padding: {$marginTop}px {$marginRight}px {$marginBottom}px {$marginLeft}px;\n";
         $styles .= "            height: 100%;\n";
-        $styles .= "        }\n";
-        
-        if ($orientation === 'landscape') {
-            $styles .= "        @page {\n";
-            $styles .= "            size: A4 landscape;\n";
-            $styles .= "        }\n";
+        $styles .= "            line-height: 1;\n";
+        if (!empty($settings['background_image'] ?? null)) {
+            $styles .= "            {!! \$backgroundImageCss ?? '' !!}\n";
         }
-        
+        $styles .= "        }\n";
+        $styles .= "        h1, h2, h3, p, ol, ul, li {\n";
+        $styles .= "            margin: 0;\n";
+        $styles .= "            padding: 0;\n";
+        $styles .= "            line-height: 1;\n";
+        $styles .= "        }\n";
         $styles .= "        .certificate-title {\n";
+        $styles .= "            margin-top: 0;\n";
+        $styles .= "            margin-bottom: 20px;\n";
+        $styles .= "            padding-top: 0;\n";
+        $styles .= "            padding-bottom: 0;\n";
+        $styles .= "            line-height: 1;\n";
         $styles .= "            font-size: " . ($settings['title_size'] ?? '38') . "px;\n";
         $styles .= "            font-weight: bold;\n";
         $styles .= "            color: " . ($settings['title_color'] ?? '#000') . ";\n";
         $styles .= "        }\n";
-        $styles .= "        h3 {\n";
-        $styles .= "            margin-bottom: 5px;\n";
+        $styles .= "        body > p {\n";
+        $styles .= "            margin-top: 15px;\n";
+        $styles .= "            margin-bottom: 15px;\n";
         $styles .= "        }\n";
-        $styles .= "        h2 {\n";
-        $styles .= "            margin-top: 5px;\n";
+        $styles .= "        body > h2:not(.course-title) {\n";
+        $styles .= "            margin-top: 15px;\n";
+        $styles .= "            margin-bottom: 15px;\n";
+        $styles .= "        }\n";
+        $styles .= "        body > h3 {\n";
+        $styles .= "            margin-top: 20px;\n";
+        $styles .= "            margin-bottom: 15px;\n";
         $styles .= "        }\n";
         $styles .= "        .course-title {\n";
         $styles .= "            word-break: normal;\n";
@@ -99,61 +148,70 @@ class TemplateBuilderService
         $styles .= "            font-size: " . ($settings['course_title_size'] ?? '32') . "px;\n";
         $styles .= "            font-weight: bold;\n";
         $styles .= "            line-height: 1.1;\n";
-        $styles .= "            margin-left: 45px;\n";
-        $styles .= "            margin-right: 45px;\n";
+        $styles .= "            margin-top: 15px;\n";
+        $styles .= "            margin-bottom: 20px;\n";
+        $styles .= "            padding-left: 0;\n";
+        $styles .= "            padding-right: 0;\n";
         $styles .= "        }\n";
         $styles .= "        .bold {\n";
         $styles .= "            font-weight: bold;\n";
         $styles .= "        }\n";
-        // Pozycjonowanie sekcji w zależności od orientacji
-        if ($orientation === 'landscape') {
-            // Dla landscape - oba elementy na tej samej wysokości
-            $styles .= "        .date-section {\n";
-            $styles .= "            position: absolute;\n";
-            $styles .= "            top: 580px;\n";
-            $styles .= "            left: 60px;\n";
-            $styles .= "            width: calc(50% - 60px);\n";
-            $styles .= "            text-align: left;\n";
-            $styles .= "        }\n";
-            $styles .= "        .instructor-section {\n";
-            $styles .= "            position: absolute;\n";
-            $styles .= "            top: 580px;\n";
-            $styles .= "            right: 60px;\n";
-            $styles .= "            width: calc(50% - 60px);\n";
-            $styles .= "            text-align: right;\n";
-            $styles .= "            display: flex;\n";
-            $styles .= "            flex-direction: column;\n";
-            $styles .= "            align-items: flex-end;\n";
-            $styles .= "            gap: 3px;\n";
-            $styles .= "        }\n";
+        // Pozycjonowanie sekcji - górna krawędź od dołu strony, na tej samej wysokości, powyżej stopki
+        // A4 wymiary w pikselach (96 DPI): Portrait: 794x1123px, Landscape: 1123x794px
+        $pageHeight = ($orientation === 'landscape') ? 794 : 1123;
+        $dateTop = $pageHeight - $marginBottom - 180; // Górna krawędź 180px powyżej stopki
+        // Szacunkowa wysokość stopki (logo ~80px + tekst ~60px + marginesy ~20px = ~160px)
+        $footerHeight = 160;
+        // Pozycja stopki - jeśli marginBottom = 0, użyj bottom: 0, w przeciwnym razie oblicz top
+        if ($marginBottom == 0) {
+            $footerCss = "            bottom: 0;\n";
         } else {
-            // Dla portrait - domyślne pozycjonowanie
-            $styles .= "        .date-section {\n";
-            $styles .= "            position: absolute;\n";
-            $styles .= "            bottom: 180px;\n";
-            $styles .= "            left: 60px;\n";
-            $styles .= "            width: calc(50% - 60px);\n";
-            $styles .= "            text-align: left;\n";
-            $styles .= "        }\n";
-            $styles .= "        .instructor-section {\n";
-            $styles .= "            position: absolute;\n";
-            $styles .= "            top: 820px;\n";
-            $styles .= "            right: 60px;\n";
-            $styles .= "            width: calc(50% - 60px);\n";
-            $styles .= "            text-align: right;\n";
-            $styles .= "            display: flex;\n";
-            $styles .= "            flex-direction: column;\n";
-            $styles .= "            align-items: flex-end;\n";
-            $styles .= "            gap: 3px;\n";
-            $styles .= "        }\n";
+            $footerTop = $pageHeight - $marginBottom - $footerHeight;
+            $footerCss = "            top: {$footerTop}px;\n";
         }
+        $styles .= "        .date-section {\n";
+        $styles .= "            position: absolute;\n";
+        $styles .= "            top: {$dateTop}px;\n";
+        $styles .= "            left: {$totalDateMarginLeft}px;\n";
+        $styles .= "            right: 50%;\n";
+        $styles .= "            text-align: left;\n";
+        $styles .= "        }\n";
+        $styles .= "        .instructor-section {\n";
+        $styles .= "            position: absolute;\n";
+        $styles .= "            top: {$dateTop}px;\n";
+        $styles .= "            left: 50%;\n";
+        $styles .= "            right: {$totalInstructorMarginRight}px;\n";
+        $styles .= "            text-align: right;\n";
+        $styles .= "            display: flex;\n";
+        $styles .= "            flex-direction: column;\n";
+        $styles .= "            align-items: flex-end;\n";
+        $styles .= "            gap: 3px;\n";
+        $styles .= "        }\n";
         $styles .= "        .instructor-section p {\n";
         $styles .= "            margin: 0;\n";
         $styles .= "            position: relative;\n";
         $styles .= "            z-index: 10;\n";
+        $styles .= "            width: fit-content;\n";
+        $styles .= "            margin-left: auto;\n";
+        $styles .= "            margin-right: auto;\n";
         $styles .= "        }\n";
         $styles .= "        .instructor-section .signature-container {\n";
-        $styles .= "            width: 100%;\n";
+        $styles .= "            width: fit-content;\n";
+        $styles .= "            max-width: 100%;\n";
+        $styles .= "            display: flex;\n";
+        $styles .= "            justify-content: center;\n";
+        $styles .= "            align-items: center;\n";
+        $styles .= "            align-self: center;\n";
+        $styles .= "            margin: 0 auto;\n";
+        $styles .= "        }\n";
+        $styles .= "        .participant-name {\n";
+        $styles .= "            margin-top: 15px;\n";
+        $styles .= "            margin-bottom: 20px;\n";
+        $styles .= "            word-break: normal;\n";
+        $styles .= "            white-space: normal;\n";
+        $styles .= "            hyphens: none;\n";
+        $styles .= "            padding-left: 0;\n";
+        $styles .= "            padding-right: 0;\n";
         $styles .= "        }\n";
         $styles .= "        .instructor-section .signature-img {\n";
         $styles .= "            position: relative;\n";
@@ -161,14 +219,18 @@ class TemplateBuilderService
         $styles .= "            display: block;\n";
         $styles .= "            margin-left: auto;\n";
         $styles .= "            margin-right: auto;\n";
+        $styles .= "            background: transparent;\n";
+        $styles .= "            background-color: transparent;\n";
         $styles .= "        }\n";
+        $footerWidth = "calc(100% - " . ($marginLeft + $marginRight) . "px)";
         $styles .= "        .footer {\n";
         $styles .= "            font-size: 10px;\n";
         $styles .= "            text-align: center;\n";
-        $styles .= "            position: absolute;\n";
-        $styles .= "            bottom: 30px;\n";
-        $styles .= "            left: 0;\n";
-        $styles .= "            width: 100%;\n";
+        $styles .= "            position: fixed;\n";
+        $styles .= $footerCss;
+        $styles .= "            left: {$marginLeft}px;\n";
+        $styles .= "            right: {$marginRight}px;\n";
+        $styles .= "            width: {$footerWidth};\n";
         $styles .= "        }\n";
         $styles .= "    </style>\n";
         
@@ -178,7 +240,7 @@ class TemplateBuilderService
     /**
      * Buduje pojedynczy blok szablonu
      */
-    private function buildBlock($block)
+    private function buildBlock($block, $settings = [])
     {
         $type = $block['type'] ?? '';
         $config = $block['config'] ?? [];
@@ -189,7 +251,7 @@ class TemplateBuilderService
             case 'participant_info':
                 return $this->buildParticipantInfoBlock($config);
             case 'course_info':
-                return $this->buildCourseInfoBlock($config);
+                return $this->buildCourseInfoBlock($config, $settings);
             case 'instructor_signature':
                 return $this->buildInstructorSignatureBlock($config);
             case 'footer':
@@ -217,7 +279,7 @@ class TemplateBuilderService
     private function buildParticipantInfoBlock($config)
     {
         $html = "    <p>Pan/i</p>\n";
-        $html .= "    <h2>{{ \$participant->first_name }} {{ \$participant->last_name }}</h2>\n\n";
+        $html .= "    <h2 class=\"participant-name\">{{ \$participant->first_name }} {{ \$participant->last_name }}</h2>\n\n";
         
         if (!empty($config['show_birth_info'])) {
             $html .= "    @if (!empty(\$participant->birth_date) && !empty(\$participant->birth_place))\n";
@@ -233,8 +295,10 @@ class TemplateBuilderService
     /**
      * Blok informacji o kursie
      */
-    private function buildCourseInfoBlock($config)
+    private function buildCourseInfoBlock($config, $settings = [])
     {
+        $marginLeft = $settings['margin_left'] ?? 50;
+        $marginRight = $settings['margin_right'] ?? 50;
         $completionText = $config['completion_text'] ?? 'ukończył/a szkolenie';
         // Nie używamy htmlspecialchars, aby umożliwić HTML
         $html = "    <p>" . $completionText . "</p>\n";
@@ -256,18 +320,16 @@ class TemplateBuilderService
             $html .= "    @php\n";
             $html .= "        \$description = trim(\$course->description ?? '');\n";
             $html .= "        if (!empty(\$description)) {\n";
-            $html .= "            // Dynamiczne dostosowanie rozmiaru czcionki na podstawie długości zakresu\n";
-            $html .= "            \$itemCount = 0;\n";
-            $html .= "            if (preg_match('/^\\\\d+\\\\.\\\\s*/m', \$description)) {\n";
-            $html .= "                \$itemCount = preg_match_all('/^\\\\d+\\\\.\\\\s*/m', \$description);\n";
-            $html .= "            }\n";
-            $html .= "            // Ustaw rozmiar czcionki na podstawie liczby punktów\n";
-            $html .= "            \$fontSize = \$itemCount > 4 ? '13px' : '16px';\n";
-            $html .= "            \$marginBottom = \$itemCount > 4 ? '2px' : '5px';\n";
+            $html .= "            // Dynamiczne dostosowanie rozmiaru czcionki na podstawie długości zakresu (liczby znaków)\n";
+            $html .= "            \$charCount = mb_strlen(\$description);\n";
+            $html .= "            // Ustaw rozmiar czcionki na podstawie liczby znaków\n";
+            $html .= "            // Dla dłuższych tekstów (>500 znaków) mniejsza czcionka, dla krótszych większa\n";
+            $html .= "            \$fontSize = \$charCount > 500 ? '13px' : '16px';\n";
+            $html .= "            \$marginBottom = \$charCount > 500 ? '2px' : '5px';\n";
             $html .= "            if (preg_match('/^\\\\d+\\\\.\\\\s*/m', \$description)) {\n";
             $html .= "                // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką\n";
             $html .= "                \$items = preg_split('/\\\\n(?=\\\\d+\\\\.)/', \$description);\n";
-            $html .= "                echo '<ol style=\"text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . \$fontSize . ';\">';\n";
+            $html .= "                echo '<ol style=\"text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . \$fontSize . ';\">';\n";
             $html .= "                foreach (\$items as \$item) {\n";
             $html .= "                    \$cleanItem = preg_replace('/^\\\\d+\\\\.\\\\s*/', '', trim(\$item));\n";
             $html .= "                    if (\$cleanItem) {\n";
@@ -277,7 +339,7 @@ class TemplateBuilderService
             $html .= "                echo '</ol>';\n";
             $html .= "            } else {\n";
             $html .= "                // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką\n";
-            $html .= "                echo '<p style=\"text-align: left; margin-left: 45px; margin-right: 45px; font-size: ' . \$fontSize . ';\">' . htmlspecialchars(\$description) . '</p>';\n";
+            $html .= "                echo '<p style=\"text-align: left; padding-left: 0; padding-right: 0; font-size: ' . \$fontSize . ';\">' . htmlspecialchars(\$description) . '</p>';\n";
             $html .= "            }\n";
             $html .= "        }\n";
             $html .= "    @endphp\n\n";
@@ -292,8 +354,8 @@ class TemplateBuilderService
     private function buildInstructorSignatureBlock($config)
     {
         $html = "    <div class=\"date-section\">\n";
-        $html .= "        <p style=\"margin: 0;\">Data, {{ \\Carbon\\Carbon::parse(\$course->end_date)->format('d.m.Y') }}r.<br>\n";
-        $html .= "        Nr rejestru: {{ \$certificateNumber }}</p>\n";
+        $html .= "        <p style=\"margin: 0;\">Data, {{ \\Carbon\\Carbon::parse(\$course->end_date)->format('d.m.Y') }}r.@if((\$templateSettings['show_certificate_number'] ?? true))<br>\n";
+        $html .= "        Nr rejestru: {{ \$certificateNumber }}@endif</p>\n";
         $html .= "    </div>\n\n";
         
         $html .= "    <div class=\"instructor-section\">\n";
@@ -311,15 +373,81 @@ class TemplateBuilderService
         $html .= "            <span class=\"bold\">{{ \$instructor->first_name }} {{ \$instructor->last_name }}</span>\n";
         $html .= "        </p>\n";
         $html .= "        \n";
-        $html .= "        <div class=\"signature-container\">\n";
+        $html .= "        <div class=\"signature-container\" style=\"margin-right: {{ rand(10, 100) }}px; margin-top: {{ rand(0, 25) }}px;\">\n";
         $html .= "            @if(!empty(\$instructor->signature))\n";
         $html .= "                @php\n";
         $html .= "                    // Obsługa ścieżki do grafiki podpisu\n";
         $html .= "                    if (\$isPdfMode ?? false) {\n";
-        $html .= "                        // Dla PDF używamy base64 encoding - najpewniejsze rozwiązanie\n";
+        $html .= "                        // Dla PDF używamy base64 encoding z usunięciem białego tła\n";
         $html .= "                        \$signatureFile = storage_path('app/public/' . \$instructor->signature);\n";
         $html .= "                        if (file_exists(\$signatureFile)) {\n";
-        $html .= "                            \$signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents(\$signatureFile));\n";
+        $html .= "                            // Funkcja do usuwania białego tła\n";
+        $html .= "                            \$imageInfo = getimagesize(\$signatureFile);\n";
+        $html .= "                            if (\$imageInfo) {\n";
+        $html .= "                                \$mimeType = \$imageInfo['mime'];\n";
+        $html .= "                                \$width = \$imageInfo[0];\n";
+        $html .= "                                \$height = \$imageInfo[1];\n";
+        $html .= "                                \n";
+        $html .= "                                // Wczytaj obraz w zależności od typu\n";
+        $html .= "                                switch (\$mimeType) {\n";
+        $html .= "                                    case 'image/png':\n";
+        $html .= "                                        \$sourceImage = imagecreatefrompng(\$signatureFile);\n";
+        $html .= "                                        break;\n";
+        $html .= "                                    case 'image/jpeg':\n";
+        $html .= "                                    case 'image/jpg':\n";
+        $html .= "                                        \$sourceImage = imagecreatefromjpeg(\$signatureFile);\n";
+        $html .= "                                        break;\n";
+        $html .= "                                    case 'image/gif':\n";
+        $html .= "                                        \$sourceImage = imagecreatefromgif(\$signatureFile);\n";
+        $html .= "                                        break;\n";
+        $html .= "                                    default:\n";
+        $html .= "                                        \$sourceImage = null;\n";
+        $html .= "                                }\n";
+        $html .= "                                \n";
+        $html .= "                                if (\$sourceImage) {\n";
+        $html .= "                                    // Utwórz nowy obraz z przezroczystością\n";
+        $html .= "                                    \$transparentImage = imagecreatetruecolor(\$width, \$height);\n";
+        $html .= "                                    imagealphablending(\$transparentImage, false);\n";
+        $html .= "                                    imagesavealpha(\$transparentImage, true);\n";
+        $html .= "                                    \$transparent = imagecolorallocatealpha(\$transparentImage, 0, 0, 0, 127);\n";
+        $html .= "                                    imagefill(\$transparentImage, 0, 0, \$transparent);\n";
+        $html .= "                                \n";
+        $html .= "                                    // Kopiuj piksele, zamieniając białe na przezroczyste\n";
+        $html .= "                                    for (\$x = 0; \$x < \$width; \$x++) {\n";
+        $html .= "                                        for (\$y = 0; \$y < \$height; \$y++) {\n";
+        $html .= "                                            \$rgb = imagecolorat(\$sourceImage, \$x, \$y);\n";
+        $html .= "                                            \$r = (\$rgb >> 16) & 0xFF;\n";
+        $html .= "                                            \$g = (\$rgb >> 8) & 0xFF;\n";
+        $html .= "                                            \$b = \$rgb & 0xFF;\n";
+        $html .= "                                            \n";
+        $html .= "                                            // Jeśli piksel jest biały lub bardzo jasny (threshold 240), ustaw jako przezroczysty\n";
+        $html .= "                                            if (\$r >= 240 && \$g >= 240 && \$b >= 240) {\n";
+        $html .= "                                                imagesetpixel(\$transparentImage, \$x, \$y, \$transparent);\n";
+        $html .= "                                            } else {\n";
+        $html .= "                                                \$color = imagecolorallocate(\$transparentImage, \$r, \$g, \$b);\n";
+        $html .= "                                                imagesetpixel(\$transparentImage, \$x, \$y, \$color);\n";
+        $html .= "                                            }\n";
+        $html .= "                                        }\n";
+        $html .= "                                    }\n";
+        $html .= "                                \n";
+        $html .= "                                    // Zapisz do bufora jako PNG\n";
+        $html .= "                                    ob_start();\n";
+        $html .= "                                    imagepng(\$transparentImage);\n";
+        $html .= "                                    \$imageData = ob_get_contents();\n";
+        $html .= "                                    ob_end_clean();\n";
+        $html .= "                                \n";
+        $html .= "                                    // Zwolnij pamięć\n";
+        $html .= "                                    imagedestroy(\$sourceImage);\n";
+        $html .= "                                    imagedestroy(\$transparentImage);\n";
+        $html .= "                                \n";
+        $html .= "                                    \$signatureSrc = 'data:image/png;base64,' . base64_encode(\$imageData);\n";
+        $html .= "                                } else {\n";
+        $html .= "                                    // Fallback - użyj oryginalnego obrazu\n";
+        $html .= "                                    \$signatureSrc = 'data:image/jpeg;base64,' . base64_encode(file_get_contents(\$signatureFile));\n";
+        $html .= "                                }\n";
+        $html .= "                            } else {\n";
+        $html .= "                                \$signatureSrc = null;\n";
+        $html .= "                            }\n";
         $html .= "                        } else {\n";
         $html .= "                            \$signatureSrc = null;\n";
         $html .= "                        }\n";

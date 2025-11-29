@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="container-fluid">
-        <form action="{{ route('admin.certificate-templates.store') }}" method="POST" id="template-form">
+        <form action="{{ route('admin.certificate-templates.store') }}" method="POST" id="template-form" enctype="multipart/form-data">
             @csrf
 
             <div class="row">
@@ -106,6 +106,139 @@
                                            value="32" 
                                            min="10" 
                                            max="100">
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="show_certificate_number" 
+                                               name="show_certificate_number" 
+                                               value="1"
+                                               checked>
+                                        <label class="form-check-label" for="show_certificate_number">
+                                            Pokaż numer rejestru w certyfikacie
+                                        </label>
+                                        <small class="form-text text-muted d-block">
+                                            Jeśli odznaczone, numer rejestru nie będzie wyświetlany w certyfikacie.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-4">
+                            
+                            <h6 class="mb-3">Marginesy dokumentu</h6>
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="margin_top" class="form-label">Góra (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="margin_top" 
+                                           name="margin_top" 
+                                           value="10" 
+                                           min="0" 
+                                           max="200">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="margin_bottom" class="form-label">Dół (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="margin_bottom" 
+                                           name="margin_bottom" 
+                                           value="10" 
+                                           min="0" 
+                                           max="200">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="margin_left" class="form-label">Lewy margines (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="margin_left" 
+                                           name="margin_left" 
+                                           value="50" 
+                                           min="0" 
+                                           max="200">
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="margin_right" class="form-label">Prawy margines (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="margin_right" 
+                                           name="margin_right" 
+                                           value="50" 
+                                           min="0" 
+                                           max="200">
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">
+                                Marginesy określają odstępy od krawędzi dokumentu. Tekst automatycznie dostosuje się do ustawionych marginesów. Ustaw 0px, aby tekst był przy samej krawędzi.
+                            </small>
+                            
+                            <hr class="my-4">
+                            
+                            <h6 class="mb-3">Tło zaświadczenia</h6>
+                            <div class="mb-3">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="show_background" 
+                                           name="show_background" 
+                                           value="1"
+                                           {{ old('show_background', false) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="show_background">
+                                        Użyj tła zaświadczenia
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Zaznacz, aby wyświetlać grafikę tła na zaświadczeniu (jeśli jest wczytana).
+                                    </small>
+                                </div>
+                                
+                                <label for="background_image" class="form-label">Grafika tła (gilosz)</label>
+                                <input type="file" 
+                                       class="form-control @error('background_image') is-invalid @enderror" 
+                                       id="background_image" 
+                                       name="background_image" 
+                                       accept="image/*">
+                                @error('background_image')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                                <small class="form-text text-muted">
+                                    Wgraj grafikę tła (np. gilosz), która będzie wyświetlana na zaświadczeniu. Zalecane formaty: PNG, JPG. Maksymalny rozmiar: 5MB.
+                                </small>
+                            </div>
+
+                            <hr class="my-4">
+                            
+                            <h6 class="mb-3">Dodatkowe marginesy dla sekcji</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="date_margin_left" class="form-label">Dodatkowy lewy margines dla "Data" (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="date_margin_left" 
+                                           name="date_margin_left" 
+                                           value="0" 
+                                           min="0" 
+                                           max="200">
+                                    <small class="form-text text-muted">
+                                        Ten margines doda się do ogólnego lewego marginesu dla sekcji "Data".
+                                    </small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="instructor_margin_right" class="form-label">Dodatkowy prawy margines dla "Prowadzący" (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="instructor_margin_right" 
+                                           name="instructor_margin_right" 
+                                           value="0" 
+                                           min="0" 
+                                           max="200">
+                                    <small class="form-text text-muted">
+                                        Ten margines doda się do ogólnego prawego marginesu dla sekcji "Prowadzący".
+                                    </small>
                                 </div>
                             </div>
                         </div>
