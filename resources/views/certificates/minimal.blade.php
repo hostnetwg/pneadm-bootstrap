@@ -85,7 +85,7 @@
     <p>ukończył/a szkolenie</p>
     <p>zorganizowane w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r. przez</p>
 
-    <p class="bold">Platforma Nowoczesnej Edukacji</p>
+    <p class="bold">"Platforma Nowoczesnej Edukacji"</p>
 
     <h3>TEMAT SZKOLENIA</h3>
     <h2 class="course-title">{!! $course->title !!}</h2>

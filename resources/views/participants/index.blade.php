@@ -42,6 +42,9 @@
                     <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)? Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.')">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
                     </a>
+                    <a href="{{ route('certificates.bulk-generate-all', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla WSZYSTKICH uczestników (bez względu na kompletność danych)? Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.')">
+                        <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia dla wszystkich
+                    </a>
                     <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">
                         <i class="fas fa-trash me-1"></i> Usuń zaświadczenia
                     </a>

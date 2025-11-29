@@ -272,6 +272,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])->name('certificates.generate');
     Route::delete('/certificates/{certificate}', [CertificateController::class, 'destroy'])->name('certificates.destroy');
     Route::get('/courses/{course}/certificates/bulk-generate', [CertificateController::class, 'bulkGenerate'])->name('certificates.bulk-generate');
+    Route::get('/courses/{course}/certificates/bulk-generate-all', [CertificateController::class, 'bulkGenerateAll'])->name('certificates.bulk-generate-all');
     Route::get('/courses/{course}/certificates/bulk-delete', [CertificateController::class, 'bulkDelete'])->name('certificates.bulk-delete');
 
 

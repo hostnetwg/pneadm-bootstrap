@@ -299,7 +299,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="organization">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</div>
+        <div class="organization">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"</div>
         <h1>Raport ankiety</h1>
         <div class="subtitle">Wygenerowano: {{ now()->format('d.m.Y H:i') }}</div>
     </div>
@@ -694,7 +694,7 @@
     <div class="footer">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli Platforma Nowoczesnej Edukacji</strong><br>
+                <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"</strong><br>
                 ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń
             </div>
         </div>

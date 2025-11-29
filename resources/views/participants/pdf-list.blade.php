@@ -120,7 +120,7 @@
 <body>
     <div class="header">
         <div class="organization">Niepubliczny Ośrodek Doskonalenia Nauczycieli</div>
-        <div class="platform">Platforma Nowoczesnej Edukacji</div>
+        <div class="platform">"Platforma Nowoczesnej Edukacji"</div>
         <div class="title">Lista uczestników</div>
     </div>
     
@@ -204,7 +204,7 @@
     <div class="footer">
         <div style="display: flex; justify-content: center; align-items: center;">
             <div>
-                <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli Platforma Nowoczesnej Edukacji</strong><br>
+                <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"</strong><br>
                 ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń
             </div>
         </div>

@@ -183,7 +183,43 @@ class CertificateController extends Controller
         return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników z kompletnymi danymi.");
     }
 
+    /**
+     * Generowanie zaświadczeń dla WSZYSTKICH uczestników (bez filtrowania po komplecie danych)
+     */
+    public function bulkGenerateAll(Course $course)
+    {
+        // Pobranie wszystkich uczestników kursu (bez filtrowania)
+        $allParticipants = $course->participants()
+            ->orderBy('order')
+            ->get();
 
+        if ($allParticipants->isEmpty()) {
+            return redirect()->back()->with('info', 'Brak uczestników w tym szkoleniu.');
+        }
+
+        $courseYear = $this->resolveCourseYear($course);
+        $nextCertificateNumber = $this->determineNextSequence($course, $courseYear);
+
+        $generatedCount = 0;
+
+        foreach ($allParticipants as $participant) {
+            $certificateNumber = $this->formatCertificateNumber($course, $nextCertificateNumber, $courseYear);
+
+            // Zapis numeru certyfikatu w bazie danych
+            // Uwaga: generujemy zaświadczenia również dla uczestników, którzy już mają zaświadczenia
+            Certificate::create([
+                'participant_id' => $participant->id,
+                'course_id' => $course->id,
+                'certificate_number' => $certificateNumber,
+                'generated_at' => now()
+            ]);
+
+            $nextCertificateNumber++;
+            $generatedCount++;
+        }
+
+        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla wszystkich uczestników.");
+    }
 
     public function bulkDelete(Course $course)
     {
