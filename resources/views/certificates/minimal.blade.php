@@ -46,7 +46,7 @@
             margin: 0;
         }
         body {
-            font-family: "DejaVu Sans", sans-serif;
+            font-family: "{{ $templateSettings['font_family'] ?? 'DejaVu Sans' }}", sans-serif;
             text-align: center;
             position: relative;
             margin: 0;
@@ -61,30 +61,26 @@
             line-height: 1;
         }
         .certificate-title {
-            font-size: 42px;
+            font-size: {{ $templateSettings['title_size'] ?? 46 }}px;
             font-weight: bold;
-            color: #2c3e50;
+            color: {{ $templateSettings['title_color'] ?? '#000000' }};
             margin-top: 0;
             margin-bottom: 20px;
             padding-top: 0;
             padding-bottom: 0;
             line-height: 1;
- 2px solid purple;
         }
         body > p {
             margin-top: 15px;
             margin-bottom: 15px;
- 1px solid cyan;
         }
         body > h2:not(.course-title) {
             margin-top: 15px;
             margin-bottom: 15px;
- 2px solid magenta;
         }
         body > h3 {
             margin-top: 20px;
             margin-bottom: 15px;
- 2px solid yellow;
         }
         .course-title {
             margin-top: 15px;
@@ -94,22 +90,18 @@
             word-break: normal;
             white-space: normal;
             hyphens: none;
-            font-size: 28px;
+            font-size: {{ $templateSettings['course_title_size'] ?? 26 }}px;
             font-weight: bold;
             line-height: 1.1;
             padding-left: 0;
             padding-right: 0;
- 2px solid darkorange;
         }
         .bold {
             font-weight: bold;
- 1px solid pink;
         }
         ol, ul {
- 2px solid brown;
         }
         li {
- 1px solid gray;
         }
         .date-section {
             position: absolute;
@@ -117,7 +109,6 @@
             left: {{ $totalDateMarginLeft }}px;
             right: 50%;
             text-align: left;
- 2px solid red;
             z-index: 10;
         }
         .instructor-section {
@@ -130,7 +121,6 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 3px;
- 2px solid blue;
             z-index: 10;
         }
         .instructor-section p {
@@ -158,7 +148,6 @@
             hyphens: none;
             padding-left: 0;
             padding-right: 0;
- 2px solid blue;
         }
         .instructor-section .signature-img {
             position: relative;
@@ -177,65 +166,142 @@
             left: {{ $marginLeft }}px;
             right: {{ $marginRight }}px;
             width: calc(100% - {{ $marginLeft + $marginRight }}px);
- 2px solid green;
             z-index: 1;
         }
         .footer img {
- 2px solid orange;
         }
     </style>
 </head>
 <body>
-    <h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">CERTYFIKAT UKOŃCZENIA</h1>
-    <p>ukończył/a szkolenie</p>
-    <p>zorganizowane w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r. przez</p>
-
-    <p class="bold">"Platforma Nowoczesnej Edukacji"</p>
-
-    <h3>TEMAT SZKOLENIA</h3>
-    <h2 class="course-title">{!! $course->title !!}</h2>
-
     @php
-        $description = trim($course->description ?? '');
-        if (!empty($description)) {
-            // Dynamiczne dostosowanie rozmiaru czcionki na podstawie długości zakresu (liczby znaków)
-            $charCount = mb_strlen($description);
-            // Ustaw rozmiar czcionki na podstawie liczby znaków
-            // Dla dłuższych tekstów (>500 znaków) mniejsza czcionka, dla krótszych większa
-            $fontSize = $charCount > 500 ? '13px' : '16px';
-            $marginBottom = $charCount > 500 ? '2px' : '5px';
-            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
-                // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką
-                $items = preg_split('/\\n(?=\\d+\\.)/', $description);
-                echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
-                foreach ($items as $item) {
-                    $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
-                    if ($cleanItem) {
-                        echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+        // Renderuj bloki w kolejności z konfiguracji szablonu
+        $sortedBlocks = $sortedBlocks ?? [];
+        
+        // Jeśli mamy posortowane bloki, renderuj je dynamicznie
+        if (!empty($sortedBlocks)) {
+            foreach ($sortedBlocks as $block) {
+                $blockType = $block['type'] ?? '';
+                $blockConfig = $block['config'] ?? [];
+                
+                switch ($blockType) {
+                    case 'header':
+                        echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">' . ($blockConfig['title'] ?? 'ZAŚWIADCZENIE') . '</h1>';
+                        break;
+                    
+                    case 'participant_info':
+                        echo '<p>Pan/i</p>';
+                        echo '<h2 class="participant-name">' . htmlspecialchars($participant->first_name . ' ' . $participant->last_name) . '</h2>';
+                        if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
+                            echo '<p>urodzony/a: ' . \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') . 'r. w miejscowości ' . htmlspecialchars($participant->birth_place) . '</p>';
+                        } else {
+                            echo '<p>&nbsp;</p>';
+                        }
+                        break;
+                    
+                    case 'course_info':
+                        $completionText = $blockConfig['completion_text'] ?? 'ukończył/a szkolenie';
+                        $subjectLabel = $blockConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
+                        $organizerName = $blockConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
+                        $showDuration = $blockConfig['show_duration'] ?? true;
+                        
+                        echo '<p>' . $completionText . '</p>';
+                        echo '<p>zorganizowanym w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+                        if ($showDuration) {
+                            echo ' w wymiarze ' . $durationMinutes . ' minut,';
+                        }
+                        echo ' przez</p>';
+                        echo '<p class="bold">' . $organizerName . '</p>';
+                        echo '<h3>' . $subjectLabel . '</h3>';
+                        echo '<h2 class="course-title">' . $course->title . '</h2>';
+                        
+                        $showDescription = $blockConfig['show_description'] ?? true;
+                        $description = trim($course->description ?? '');
+                        if ($showDescription && !empty($description)) {
+                            $charCount = mb_strlen($description);
+                            $fontSize = $charCount > 500 ? '13px' : '16px';
+                            $marginBottom = $charCount > 500 ? '2px' : '5px';
+                            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                                $items = preg_split('/\\n(?=\\d+\\.)/', $description);
+                                echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
+                                foreach ($items as $item) {
+                                    $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
+                                    if ($cleanItem) {
+                                        echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+                                    }
+                                }
+                                echo '</ol>';
+                            } else {
+                                echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+                            }
+                        }
+                        break;
+                    
+                    case 'custom_text':
+                        if (!empty($blockConfig['text'])) {
+                            $align = $blockConfig['align'] ?? 'center';
+                            echo '<p style="text-align: ' . $align . '; margin-top: 15px; margin-bottom: 15px;">' . $blockConfig['text'] . '</p>';
+                        }
+                        break;
+                }
+            }
+        } else {
+            // Kompatybilność wsteczna - stara logika dla szablonów bez sortedBlocks
+            echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">' . ($headerConfig['title'] ?? 'ZAŚWIADCZENIE') . '</h1>';
+            echo '<p>Pan/i</p>';
+            echo '<h2 class="participant-name">' . htmlspecialchars($participant->first_name . ' ' . $participant->last_name) . '</h2>';
+            
+            if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
+                echo '<p>urodzony/a: ' . \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') . 'r. w miejscowości ' . htmlspecialchars($participant->birth_place) . '</p>';
+            } else {
+                echo '<p>&nbsp;</p>';
+            }
+            
+            $completionText = $courseInfoConfig['completion_text'] ?? 'ukończył/a szkolenie';
+            $subjectLabel = $courseInfoConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
+            $organizerName = $courseInfoConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
+            $showDuration = $courseInfoConfig['show_duration'] ?? true;
+            
+            echo '<p>' . $completionText . '</p>';
+            echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+            if ($showDuration) {
+                echo ' w wymiarze ' . $durationMinutes . ' minut,';
+            }
+            echo ' przez</p>';
+            echo '<p class="bold">' . $organizerName . '</p>';
+            echo '<h3>' . $subjectLabel . '</h3>';
+            echo '<h2 class="course-title">' . $course->title . '</h2>';
+            
+            $showDescription = $courseInfoConfig['show_description'] ?? true;
+            $description = trim($course->description ?? '');
+            if ($showDescription && !empty($description)) {
+                $charCount = mb_strlen($description);
+                $fontSize = $charCount > 500 ? '13px' : '16px';
+                $marginBottom = $charCount > 500 ? '2px' : '5px';
+                if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                    $items = preg_split('/\\n(?=\\d+\\.)/', $description);
+                    echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
+                    foreach ($items as $item) {
+                        $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
+                        if ($cleanItem) {
+                            echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+                        }
+                    }
+                    echo '</ol>';
+                } else {
+                    echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+                }
+            }
+            
+            if (!empty($customTextBlocks)) {
+                foreach ($customTextBlocks as $customTextConfig) {
+                    if (!empty($customTextConfig['text'])) {
+                        $align = $customTextConfig['align'] ?? 'center';
+                        echo '<p style="text-align: ' . $align . '; margin-top: 15px; margin-bottom: 15px;">' . $customTextConfig['text'] . '</p>';
                     }
                 }
-                echo '</ol>';
-            } else {
-                // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką
-                echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
             }
         }
     @endphp
-
-    {{-- Wyświetl wszystkie bloki "Własny tekst" --}}
-    @if(!empty($customTextBlocks))
-        @foreach($customTextBlocks as $customTextConfig)
-            @if(!empty($customTextConfig['text']))
-                @php
-                    $align = $customTextConfig['align'] ?? 'center';
-                @endphp
-                <p style="text-align: {{ $align }}; margin-top: 15px; margin-bottom: 15px;">{!! $customTextConfig['text'] !!}</p>
-            @endif
-        @endforeach
-    @endif
-
-    <p>Pan/i</p>
-    <h2 class="participant-name">{{ $participant->first_name }} {{ $participant->last_name }}</h2>
 
     <div class="date-section">
         <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.@if(($templateSettings['show_certificate_number'] ?? true))<br>
@@ -347,5 +413,22 @@
         </div>
     </div>
 
+    <div class="footer">
+        <div style="text-align: center; margin-bottom: 15px;">
+            @php
+                $logoPath = 'certificates/logos/1759876024_logo-pne-czarne.png';
+                if ($isPdfMode ?? false) {
+                    // Dla PDF używamy base64 encoding
+                    $logoFile = storage_path('app/public/' . $logoPath);
+                    $logoSrc = 'data:image/png;base64,' . base64_encode(file_get_contents($logoFile));
+                } else {
+                    // Dla HTML używamy asset()
+                    $logoSrc = asset('storage/' . $logoPath);
+                }
+            @endphp
+            <img src="{{ $logoSrc }}" alt="Logo" style="max-width: 120px; height: auto;">
+        </div>
+        {!! $footerConfig['text'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"<br>ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>- AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -' !!}
+    </div>
 </body>
 </html>

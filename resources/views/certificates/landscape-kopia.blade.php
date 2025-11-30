@@ -47,7 +47,7 @@
             size: A4 landscape;
         }
         body {
-            font-family: "DejaVu Sans", sans-serif;
+            font-family: "{{ $templateSettings['font_family'] ?? 'DejaVu Sans' }}", sans-serif;
             text-align: center;
             position: relative;
             margin: 0;
@@ -62,15 +62,14 @@
             line-height: 1;
         }
         .certificate-title {
-            font-size: 36px;
+            font-size: {{ $templateSettings['title_size'] ?? 36 }}px;
             font-weight: bold;
-            color: #000000;
+            color: {{ $templateSettings['title_color'] ?? '#000000' }};
             margin-top: 0;
             margin-bottom: 20px;
             padding-top: 0;
             padding-bottom: 0;
             line-height: 1;
- 2px solid purple;
         }
         body > p {
             margin-top: 15px;
@@ -95,7 +94,7 @@
             word-break: normal;
             white-space: normal;
             hyphens: none;
-            font-size: 30px;
+            font-size: {{ $templateSettings['course_title_size'] ?? 30 }}px;
             font-weight: bold;
             line-height: 1.1;
             padding-left: 0;

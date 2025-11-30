@@ -46,7 +46,7 @@
             margin: 0;
         }
         body {
-            font-family: "DejaVu Sans", sans-serif;
+            font-family: "{{ $templateSettings['font_family'] ?? 'DejaVu Sans' }}", sans-serif;
             text-align: center;
             position: relative;
             margin: 0;
@@ -61,9 +61,9 @@
             line-height: 1;
         }
         .certificate-title {
-            font-size: 48px;
+            font-size: {{ $templateSettings['title_size'] ?? 46 }}px;
             font-weight: bold;
-            color: #b71515;
+            color: {{ $templateSettings['title_color'] ?? '#000000' }};
             margin-top: 0;
             margin-bottom: 20px;
             padding-top: 0;
@@ -90,7 +90,7 @@
             word-break: normal;
             white-space: normal;
             hyphens: none;
-            font-size: 22px;
+            font-size: {{ $templateSettings['course_title_size'] ?? 26 }}px;
             font-weight: bold;
             line-height: 1.1;
             padding-left: 0;
@@ -177,6 +177,7 @@
         // Renderuj bloki w kolejności z konfiguracji szablonu
         $sortedBlocks = $sortedBlocks ?? [];
         
+        // Jeśli mamy posortowane bloki, renderuj je dynamicznie
         if (!empty($sortedBlocks)) {
             foreach ($sortedBlocks as $block) {
                 $blockType = $block['type'] ?? '';
@@ -204,7 +205,7 @@
                         $showDuration = $blockConfig['show_duration'] ?? true;
                         
                         echo '<p>' . $completionText . '</p>';
-                        echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+                        echo '<p>zorganizowanym w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
                         if ($showDuration) {
                             echo ' w wymiarze ' . $durationMinutes . ' minut,';
                         }
@@ -244,22 +245,35 @@
                 }
             }
         } else {
-            // Kompatybilność wsteczna
-            echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">ZAŚWIADCZENIE</h1>';
+            // Kompatybilność wsteczna - stara logika dla szablonów bez sortedBlocks
+            echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">' . ($headerConfig['title'] ?? 'ZAŚWIADCZENIE') . '</h1>';
             echo '<p>Pan/i</p>';
             echo '<h2 class="participant-name">' . htmlspecialchars($participant->first_name . ' ' . $participant->last_name) . '</h2>';
+            
             if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
                 echo '<p>urodzony/a: ' . \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') . 'r. w miejscowości ' . htmlspecialchars($participant->birth_place) . '</p>';
             } else {
                 echo '<p>&nbsp;</p>';
             }
-            echo '<p>ukończył/a szkolenie</p>';
-            echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r. w wymiarze ' . $durationMinutes . ' minut, przez</p>';
-            echo '<p class="bold">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"</p>';
-            echo '<h3>TEMAT SZKOLENIA</h3>';
+            
+            $completionText = $courseInfoConfig['completion_text'] ?? 'ukończył/a szkolenie';
+            $subjectLabel = $courseInfoConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
+            $organizerName = $courseInfoConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
+            $showDuration = $courseInfoConfig['show_duration'] ?? true;
+            
+            echo '<p>' . $completionText . '</p>';
+            echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+            if ($showDuration) {
+                echo ' w wymiarze ' . $durationMinutes . ' minut,';
+            }
+            echo ' przez</p>';
+            echo '<p class="bold">' . $organizerName . '</p>';
+            echo '<h3>' . $subjectLabel . '</h3>';
             echo '<h2 class="course-title">' . $course->title . '</h2>';
+            
+            $showDescription = $courseInfoConfig['show_description'] ?? true;
             $description = trim($course->description ?? '');
-            if (!empty($description)) {
+            if ($showDescription && !empty($description)) {
                 $charCount = mb_strlen($description);
                 $fontSize = $charCount > 500 ? '13px' : '16px';
                 $marginBottom = $charCount > 500 ? '2px' : '5px';
@@ -277,6 +291,7 @@
                     echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
                 }
             }
+            
             if (!empty($customTextBlocks)) {
                 foreach ($customTextBlocks as $customTextConfig) {
                     if (!empty($customTextConfig['text'])) {
@@ -413,7 +428,7 @@
             @endphp
             <img src="{{ $logoSrc }}" alt="Logo" style="max-width: 120px; height: auto;">
         </div>
-        Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"<br>ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>- AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -
+        {!! $footerConfig['text'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"<br>ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>- AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -' !!}
     </div>
 </body>
 </html>

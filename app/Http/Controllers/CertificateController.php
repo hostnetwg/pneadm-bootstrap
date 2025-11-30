@@ -145,6 +145,10 @@ class CertificateController extends Controller
         // Tworzenie widoku PDF z przekazaniem wszystkich danych
         $isPdfMode = true; // Generujemy PDF, nie podgląd HTML
         
+        // Pobierz orientację i czcionkę z konfiguracji szablonu
+        $orientation = $settings['orientation'] ?? 'portrait';
+        $fontFamily = $settings['font_family'] ?? 'DejaVu Sans';
+        
         $pdf = Pdf::loadView($templateView, [
             'participant' => $participant,
             'certificateNumber' => $certificateNumber,
@@ -162,9 +166,9 @@ class CertificateController extends Controller
             'sortedBlocks' => $regularBlocks,
             'instructorSignatureBlock' => $instructorSignatureBlock,
             'footerBlock' => $footerBlock,
-        ])->setPaper('A4', 'portrait')
+        ])->setPaper('A4', $orientation)
           ->setOptions([
-              'defaultFont' => 'DejaVu Sans', // Obsługa polskich znaków
+              'defaultFont' => $fontFamily,
               'isHtml5ParserEnabled' => true, 
               'isRemoteEnabled' => true
           ]);

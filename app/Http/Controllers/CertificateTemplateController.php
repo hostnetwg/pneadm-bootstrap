@@ -433,6 +433,10 @@ class CertificateTemplateController extends Controller
             }
         }
         
+        // Pobierz orientację i czcionkę z konfiguracji szablonu
+        $orientation = $settings['orientation'] ?? 'portrait';
+        $fontFamily = $settings['font_family'] ?? 'DejaVu Sans';
+        
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($templateView, [
             'participant' => $participant,
             'certificateNumber' => $certificateNumber,
@@ -446,9 +450,9 @@ class CertificateTemplateController extends Controller
             'headerConfig' => $headerConfig,
             'courseInfoConfig' => $courseInfoConfig,
             'footerConfig' => $footerConfig,
-        ])->setPaper('A4', 'portrait')
+        ])->setPaper('A4', $orientation)
           ->setOptions([
-              'defaultFont' => 'DejaVu Sans',
+              'defaultFont' => $fontFamily,
               'isHtml5ParserEnabled' => true,
               'isRemoteEnabled' => true
           ]);
