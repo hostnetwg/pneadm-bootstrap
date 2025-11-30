@@ -220,37 +220,6 @@
                                 @endif
                             </div>
 
-                            <hr class="my-4">
-
-                            <h6 class="mb-3">Dodatkowe marginesy dla sekcji</h6>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="date_margin_left" class="form-label">Dodatkowy lewy margines dla "Data" (px)</label>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           id="date_margin_left" 
-                                           name="date_margin_left" 
-                                           value="{{ old('date_margin_left', $certificateTemplate->config['settings']['date_margin_left'] ?? 0) }}" 
-                                           min="0" 
-                                           max="200">
-                                    <small class="form-text text-muted">
-                                        Ten margines doda się do ogólnego lewego marginesu dla sekcji "Data".
-                                    </small>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="instructor_margin_right" class="form-label">Dodatkowy prawy margines dla "Prowadzący" (px)</label>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           id="instructor_margin_right" 
-                                           name="instructor_margin_right" 
-                                           value="{{ old('instructor_margin_right', $certificateTemplate->config['settings']['instructor_margin_right'] ?? 0) }}" 
-                                           min="0" 
-                                           max="200">
-                                    <small class="form-text text-muted">
-                                        Ten margines doda się do ogólnego prawego marginesu dla sekcji "Prowadzący".
-                                    </small>
-                                </div>
-                            </div>
                         </div>
                     </div>
 

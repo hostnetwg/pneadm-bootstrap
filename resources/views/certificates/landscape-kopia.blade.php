@@ -11,10 +11,8 @@
         $marginBottom = $templateSettings['margin_bottom'] ?? 10;
         $marginLeft = $templateSettings['margin_left'] ?? 50;
         $marginRight = $templateSettings['margin_right'] ?? 50;
-        $dateMarginLeft = $templateSettings['date_margin_left'] ?? 0;
-        $instructorMarginRight = $templateSettings['instructor_margin_right'] ?? 0;
-        $totalDateMarginLeft = $marginLeft + $dateMarginLeft;
-        $totalInstructorMarginRight = $marginRight + $instructorMarginRight;
+        $totalDateMarginLeft = $marginLeft;
+        $totalInstructorMarginRight = $marginRight;
         // A4 wymiary w pikselach (96 DPI): Portrait: 794x1123px, Landscape: 1123x794px
         $orientation = $templateSettings['orientation'] ?? 'landscape';
         $pageHeight = ($orientation === 'landscape') ? 794 : 1123; // Wysokość strony A4

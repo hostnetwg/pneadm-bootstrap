@@ -142,9 +142,7 @@ class CertificateTemplateController extends Controller
                 'margin_top' => $request->input('margin_top', 10),
                 'margin_bottom' => $request->input('margin_bottom', 10),
                 'margin_left' => $request->input('margin_left', 50),
-                'margin_right' => $request->input('margin_right', 50),
-                'date_margin_left' => $request->input('date_margin_left', 0),
-                'instructor_margin_right' => $request->input('instructor_margin_right', 0)
+                'margin_right' => $request->input('margin_right', 50)
             ]
         ];
 
@@ -309,8 +307,6 @@ class CertificateTemplateController extends Controller
                 'margin_bottom' => $request->input('margin_bottom', 10),
                 'margin_left' => $request->input('margin_left', 50),
                 'margin_right' => $request->input('margin_right', 50),
-                'date_margin_left' => $request->input('date_margin_left', 0),
-                'instructor_margin_right' => $request->input('instructor_margin_right', 0),
                 'background_image' => $backgroundImagePath,
                 'show_background' => $request->has('show_background')
             ]

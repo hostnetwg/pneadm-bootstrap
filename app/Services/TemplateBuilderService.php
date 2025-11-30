@@ -125,10 +125,8 @@ class TemplateBuilderService
         $marginBottom = $settings['margin_bottom'] ?? 10;
         $marginLeft = $settings['margin_left'] ?? 50;
         $marginRight = $settings['margin_right'] ?? 50;
-        $dateMarginLeft = $settings['date_margin_left'] ?? 0;
-        $instructorMarginRight = $settings['instructor_margin_right'] ?? 0;
-        $totalDateMarginLeft = $marginLeft + $dateMarginLeft;
-        $totalInstructorMarginRight = $marginRight + $instructorMarginRight;
+        $totalDateMarginLeft = $marginLeft;
+        $totalInstructorMarginRight = $marginRight;
         
         $styles = "    <style>\n";
         
