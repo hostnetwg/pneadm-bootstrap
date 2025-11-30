@@ -336,9 +336,10 @@ class TemplateBuilderService
         $marginLeft = $settings['margin_left'] ?? 50;
         $marginRight = $settings['margin_right'] ?? 50;
         $completionText = $config['completion_text'] ?? 'ukończył/a szkolenie';
+        $eventText = $config['event_text'] ?? 'zorganizowanym w dniu';
         // Nie używamy htmlspecialchars, aby umożliwić HTML
         $html = "    <p>" . $completionText . "</p>\n";
-        $html .= "    <p>zorganizowane w dniu {{ \\Carbon\\Carbon::parse(\$course->start_date)->format('d.m.Y') }}r. ";
+        $html .= "    <p>" . $eventText . " {{ \\Carbon\\Carbon::parse(\$course->start_date)->format('d.m.Y') }}r. ";
         
         if (!empty($config['show_duration'])) {
             $html .= "w wymiarze {{ \$durationMinutes }} minut, ";
@@ -575,6 +576,7 @@ class TemplateBuilderService
                 'description' => 'Temat szkolenia, organizator, czas trwania',
                 'fields' => [
                     'completion_text' => ['type' => 'textarea', 'label' => 'Tekst ukończenia (obsługuje HTML, np. "ukończył/a szkolenie z cyklu <h3>TIK w pracy NAUCZYCIELA</h3>")', 'default' => 'ukończył/a szkolenie'],
+                    'event_text' => ['type' => 'text', 'label' => 'Tekst wydarzenia (np. "zorganizowanym w dniu", "zorganizowane w dniu", "które odbyło się")', 'default' => 'zorganizowanym w dniu'],
                     'subject_label' => ['type' => 'textarea', 'label' => 'Etykieta tematu (obsługuje HTML, np. "TEMAT SZKOLENIA", "TEMAT WEBINARU")', 'default' => 'TEMAT SZKOLENIA'],
                     'show_duration' => ['type' => 'checkbox', 'label' => 'Pokaż czas trwania', 'default' => true],
                     'show_description' => ['type' => 'checkbox', 'label' => 'Pokaż zakres szkolenia', 'default' => true],

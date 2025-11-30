@@ -182,12 +182,13 @@
                 
                 case 'course_info':
                     $completionText = $blockConfig['completion_text'] ?? 'ukończył/a szkolenie';
+                    $eventText = $blockConfig['event_text'] ?? 'zorganizowanym w dniu';
                     $subjectLabel = $blockConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
                     $organizerName = $blockConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
                     $showDuration = $blockConfig['show_duration'] ?? true;
                     
                     echo '<p>' . $completionText . '</p>';
-                    echo '<p>zorganizowanym w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+                    echo '<p>' . $eventText . ' ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
                     if ($showDuration) {
                         echo ' w wymiarze ' . $durationMinutes . ' minut,';
                     }
