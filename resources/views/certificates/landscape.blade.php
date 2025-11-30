@@ -136,6 +136,11 @@
             hyphens: none;
             padding-left: 0;
             padding-right: 0;
+            font-size: {{ $templateSettings['participant_name_size'] ?? 24 }}px;
+            font-family: "{{ $templateSettings['participant_name_font'] ?? 'DejaVu Sans' }}", sans-serif;
+            @if($templateSettings['participant_name_italic'] ?? false)
+            font-style: italic;
+            @endif
         }
         .instructor-section .signature-img {
             position: relative;

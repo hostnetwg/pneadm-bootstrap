@@ -240,6 +240,8 @@ class TemplateBuilderService
         $styles .= "            align-self: center;\n";
         $styles .= "            margin: 0 auto;\n";
         $styles .= "        }\n";
+        $participantNameFont = $settings['participant_name_font'] ?? 'DejaVu Sans';
+        $participantNameItalic = !empty($settings['participant_name_italic']);
         $styles .= "        .participant-name {\n";
         $styles .= "            margin-top: 15px;\n";
         $styles .= "            margin-bottom: 20px;\n";
@@ -248,6 +250,11 @@ class TemplateBuilderService
         $styles .= "            hyphens: none;\n";
         $styles .= "            padding-left: 0;\n";
         $styles .= "            padding-right: 0;\n";
+        $styles .= "            font-size: " . ($settings['participant_name_size'] ?? '24') . "px;\n";
+        $styles .= "            font-family: \"{$participantNameFont}\", sans-serif;\n";
+        if ($participantNameItalic) {
+            $styles .= "            font-style: italic;\n";
+        }
         $styles .= "        }\n";
         $styles .= "        .instructor-section .signature-img {\n";
         $styles .= "            position: relative;\n";

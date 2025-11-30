@@ -35,8 +35,9 @@ class CertificateTemplateController extends Controller
     {
         $availableBlocks = $this->templateBuilder->getAvailableBlocks();
         $availableLogos = $this->getAvailableLogos();
+        $availableBackgrounds = $this->getAvailableBackgrounds();
         
-        return view('admin.certificate-templates.create', compact('availableBlocks', 'availableLogos'));
+        return view('admin.certificate-templates.create', compact('availableBlocks', 'availableLogos', 'availableBackgrounds'));
     }
 
     /**
@@ -48,8 +49,15 @@ class CertificateTemplateController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
+            'background_image' => 'nullable' // Może być text (z galerii) lub file (upload)
         ]);
+        
+        // Dodatkowa walidacja dla pliku, jeśli został przesłany
+        if ($request->hasFile('background_image')) {
+            $request->validate([
+                'background_image' => 'image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
+            ]);
+        }
 
         // Generowanie slug z nazwy
         $slug = Str::slug($request->name);
@@ -130,6 +138,30 @@ class CertificateTemplateController extends Controller
             return $orderA <=> $orderB;
         });
         
+        // Obsługa usuwania logo z bloków
+        foreach ($blocks as $blockId => &$block) {
+            $config = $block['config'] ?? [];
+            if (!empty($config['remove_logo'])) {
+                // Usuń logo_path z konfiguracji
+                unset($config['logo_path']);
+                unset($config['remove_logo']);
+                $block['config'] = $config;
+            }
+        }
+        unset($block);
+        
+        // Obsługa tła - może być wybrane z galerii (text input) lub wgrane (file)
+        $backgroundImagePath = null;
+        // Jeśli wybrano tło z galerii (text input)
+        if ($request->has('background_image') && !$request->hasFile('background_image')) {
+            $backgroundImagePath = $request->input('background_image') ?: null;
+        }
+        // Jeśli przesłano nowe tło (file upload)
+        elseif ($request->hasFile('background_image')) {
+            // Zapisz nowe tło do galerii
+            $backgroundImagePath = $request->file('background_image')->store('certificates/backgrounds', 'public');
+        }
+        
         $config = [
             'blocks' => $blocks,
             'settings' => [
@@ -138,11 +170,16 @@ class CertificateTemplateController extends Controller
                 'title_size' => $request->input('title_size', 38),
                 'title_color' => $request->input('title_color', '#000000'),
                 'course_title_size' => $request->input('course_title_size', 32),
+                'participant_name_size' => $request->input('participant_name_size', 24),
+                'participant_name_font' => $request->input('participant_name_font', 'DejaVu Sans'),
+                'participant_name_italic' => $request->has('participant_name_italic'),
                 'show_certificate_number' => $request->has('show_certificate_number'),
                 'margin_top' => $request->input('margin_top', 10),
                 'margin_bottom' => $request->input('margin_bottom', 10),
                 'margin_left' => $request->input('margin_left', 50),
-                'margin_right' => $request->input('margin_right', 50)
+                'margin_right' => $request->input('margin_right', 50),
+                'background_image' => $backgroundImagePath,
+                'show_background' => $request->has('show_background')
             ]
         ];
 
@@ -188,8 +225,9 @@ class CertificateTemplateController extends Controller
     {
         $availableBlocks = $this->templateBuilder->getAvailableBlocks();
         $availableLogos = $this->getAvailableLogos();
+        $availableBackgrounds = $this->getAvailableBackgrounds();
         
-        return view('admin.certificate-templates.edit', compact('certificateTemplate', 'availableBlocks', 'availableLogos'));
+        return view('admin.certificate-templates.edit', compact('certificateTemplate', 'availableBlocks', 'availableLogos', 'availableBackgrounds'));
     }
 
     /**
@@ -201,8 +239,15 @@ class CertificateTemplateController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
+            'background_image' => 'nullable' // Może być text (z galerii) lub file (upload)
         ]);
+        
+        // Dodatkowa walidacja dla pliku, jeśli został przesłany
+        if ($request->hasFile('background_image')) {
+            $request->validate([
+                'background_image' => 'image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
+            ]);
+        }
 
         // Przygotowanie konfiguracji
         $blocks = $request->input('blocks', []);
@@ -272,26 +317,33 @@ class CertificateTemplateController extends Controller
             return $orderA <=> $orderB;
         });
         
-        // Obsługa uploadu/usuwania tła
+        // Obsługa usuwania logo z bloków
+        foreach ($blocks as $blockId => &$block) {
+            $config = $block['config'] ?? [];
+            if (!empty($config['remove_logo'])) {
+                // Usuń logo_path z konfiguracji
+                unset($config['logo_path']);
+                unset($config['remove_logo']);
+                $block['config'] = $config;
+            }
+        }
+        unset($block);
+        
+        // Obsługa tła - może być wybrane z galerii (text input) lub wgrane (file)
         $backgroundImagePath = $certificateTemplate->config['settings']['background_image'] ?? null;
         
         // Jeśli zaznaczono usunięcie tła
-        if ($request->has('remove_background') && $backgroundImagePath) {
-            // Usuń stary plik
-            if (Storage::disk('public')->exists($backgroundImagePath)) {
-                Storage::disk('public')->delete($backgroundImagePath);
-            }
+        if ($request->has('remove_background')) {
             $backgroundImagePath = null;
         }
-        
-        // Jeśli przesłano nowe tło
-        if ($request->hasFile('background_image')) {
-            // Usuń stare tło jeśli istnieje
-            if ($backgroundImagePath && Storage::disk('public')->exists($backgroundImagePath)) {
-                Storage::disk('public')->delete($backgroundImagePath);
-            }
-            // Zapisz nowe tło
-            $backgroundImagePath = $request->file('background_image')->store('certificate-backgrounds', 'public');
+        // Jeśli wybrano tło z galerii (text input)
+        elseif ($request->has('background_image') && !$request->hasFile('background_image')) {
+            $backgroundImagePath = $request->input('background_image') ?: null;
+        }
+        // Jeśli przesłano nowe tło (file upload)
+        elseif ($request->hasFile('background_image')) {
+            // Zapisz nowe tło do galerii
+            $backgroundImagePath = $request->file('background_image')->store('certificates/backgrounds', 'public');
         }
         
         $config = [
@@ -302,6 +354,9 @@ class CertificateTemplateController extends Controller
                 'title_size' => $request->input('title_size', 38),
                 'title_color' => $request->input('title_color', '#000000'),
                 'course_title_size' => $request->input('course_title_size', 32),
+                'participant_name_size' => $request->input('participant_name_size', 24),
+                'participant_name_font' => $request->input('participant_name_font', 'DejaVu Sans'),
+                'participant_name_italic' => $request->has('participant_name_italic'),
                 'show_certificate_number' => $request->has('show_certificate_number'),
                 'margin_top' => $request->input('margin_top', 10),
                 'margin_bottom' => $request->input('margin_bottom', 10),
@@ -515,6 +570,32 @@ class CertificateTemplateController extends Controller
     }
 
     /**
+     * Pobiera listę dostępnych tła
+     */
+    protected function getAvailableBackgrounds()
+    {
+        $backgroundsPath = 'certificates/backgrounds';
+        
+        if (!Storage::disk('public')->exists($backgroundsPath)) {
+            Storage::disk('public')->makeDirectory($backgroundsPath);
+        }
+        
+        $files = Storage::disk('public')->files($backgroundsPath);
+        
+        $backgrounds = [];
+        foreach ($files as $file) {
+            $backgrounds[] = [
+                'path' => $file,
+                'url' => asset('storage/' . $file),
+                'name' => basename($file),
+                'size' => Storage::disk('public')->size($file)
+            ];
+        }
+        
+        return $backgrounds;
+    }
+
+    /**
      * Upload nowego logo
      */
     public function uploadLogo(Request $request)
@@ -560,6 +641,61 @@ class CertificateTemplateController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Logo zostało usunięte'
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Plik nie istnieje'
+        ], 404);
+    }
+
+    /**
+     * Upload nowego tła
+     */
+    public function uploadBackground(Request $request)
+    {
+        $request->validate([
+            'background' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120' // 5MB
+        ]);
+
+        if ($request->hasFile('background')) {
+            $file = $request->file('background');
+            $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+            
+            $path = $file->storeAs('certificates/backgrounds', $filename, 'public');
+            
+            return response()->json([
+                'success' => true,
+                'path' => $path,
+                'url' => asset('storage/' . $path),
+                'name' => $filename
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Nie przesłano pliku'
+        ], 400);
+    }
+
+    /**
+     * Usuwa tło
+     */
+    public function deleteBackground(Request $request)
+    {
+        $request->validate([
+            'path' => 'required|string'
+        ]);
+
+        $path = $request->input('path');
+        
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Tło zostało usunięte'
             ]);
         }
 

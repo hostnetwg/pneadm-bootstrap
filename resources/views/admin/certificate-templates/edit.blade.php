@@ -76,7 +76,9 @@
                                     <select class="form-select" id="font_family" name="font_family">
                                         <option value="DejaVu Sans" {{ old('font_family', $certificateTemplate->config['settings']['font_family'] ?? 'DejaVu Sans') == 'DejaVu Sans' ? 'selected' : '' }}>DejaVu Sans</option>
                                         <option value="DejaVu Serif" {{ old('font_family', $certificateTemplate->config['settings']['font_family'] ?? '') == 'DejaVu Serif' ? 'selected' : '' }}>DejaVu Serif</option>
+                                        <option value="DejaVu Sans Mono" {{ old('font_family', $certificateTemplate->config['settings']['font_family'] ?? '') == 'DejaVu Sans Mono' ? 'selected' : '' }}>DejaVu Sans Mono</option>
                                     </select>
+                                    <small class="form-text text-muted">Wszystkie czcionki obsługują polskie znaki</small>
                                 </div>
 
                                 <div class="col-md-6 mb-3">
@@ -116,6 +118,42 @@
                                            value="{{ old('course_title_size', $certificateTemplate->config['settings']['course_title_size'] ?? 32) }}"
                                            min="10" 
                                            max="100">
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label for="participant_name_size" class="form-label">Rozmiar imienia i nazwiska (px)</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="participant_name_size" 
+                                           name="participant_name_size" 
+                                           value="{{ old('participant_name_size', $certificateTemplate->config['settings']['participant_name_size'] ?? 24) }}"
+                                           min="10" 
+                                           max="100">
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label for="participant_name_font" class="form-label">Czcionka imienia i nazwiska</label>
+                                    <select class="form-select" id="participant_name_font" name="participant_name_font">
+                                        <option value="DejaVu Sans" {{ old('participant_name_font', $certificateTemplate->config['settings']['participant_name_font'] ?? 'DejaVu Sans') == 'DejaVu Sans' ? 'selected' : '' }}>DejaVu Sans</option>
+                                        <option value="DejaVu Serif" {{ old('participant_name_font', $certificateTemplate->config['settings']['participant_name_font'] ?? '') == 'DejaVu Serif' ? 'selected' : '' }}>DejaVu Serif</option>
+                                        <option value="DejaVu Sans Mono" {{ old('participant_name_font', $certificateTemplate->config['settings']['participant_name_font'] ?? '') == 'DejaVu Sans Mono' ? 'selected' : '' }}>DejaVu Sans Mono</option>
+                                    </select>
+                                    <small class="form-text text-muted">Wszystkie czcionki obsługują polskie znaki</small>
+                                </div>
+
+                                <div class="col-md-4 mb-3">
+                                    <label for="participant_name_italic" class="form-label">Styl tekstu</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="participant_name_italic" 
+                                               name="participant_name_italic" 
+                                               value="1"
+                                               {{ old('participant_name_italic', $certificateTemplate->config['settings']['participant_name_italic'] ?? false) ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="participant_name_italic">
+                                            Pochylenie (kursywa)
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -188,17 +226,20 @@
                                 </div>
                                 
                                 <label for="background_image" class="form-label">Grafika tła (gilosz)</label>
-                                <input type="file" 
-                                       class="form-control @error('background_image') is-invalid @enderror" 
-                                       id="background_image" 
-                                       name="background_image" 
-                                       accept="image/*">
-                                @error('background_image')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                                <small class="form-text text-muted">
-                                    Wgraj grafikę tła (np. gilosz), która będzie wyświetlana na zaświadczeniu. Zalecane formaty: PNG, JPG. Maksymalny rozmiar: 5MB.
-                                </small>
+                                <div class="input-group mb-2">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="background_image" 
+                                           name="background_image" 
+                                           value="{{ old('background_image', $certificateTemplate->config['settings']['background_image'] ?? '') }}"
+                                           readonly
+                                           placeholder="Wybierz tło z galerii">
+                                    <button type="button" 
+                                            class="btn btn-outline-secondary" 
+                                            onclick="openBackgroundGallery()">
+                                        <i class="bi bi-images me-1"></i>Wybierz tło
+                                    </button>
+                                </div>
                                 @if(!empty($certificateTemplate->config['settings']['background_image'] ?? null))
                                     <div class="mt-2">
                                         <p class="mb-1"><strong>Aktualne tło:</strong></p>
@@ -218,6 +259,9 @@
                                         </div>
                                     </div>
                                 @endif
+                                <small class="form-text text-muted">
+                                    Wybierz grafikę tła (np. gilosz) z galerii lub wgraj nową. Zalecane formaty: PNG, JPG. Maksymalny rozmiar: 5MB.
+                                </small>
                             </div>
 
                         </div>
@@ -302,10 +346,22 @@
                                                                     </div>
                                                                     <div id="{{ $blockId }}_logo_preview">
                                                                         @if(!empty($block['config'][$fieldName]))
-                                                                            <img src="{{ asset('storage/' . $block['config'][$fieldName]) }}" 
-                                                                                 alt="Logo" 
-                                                                                 style="max-width: 150px; margin-top: 10px;" 
-                                                                                 class="img-thumbnail">
+                                                                            <div class="mt-2">
+                                                                                <img src="{{ asset('storage/' . $block['config'][$fieldName]) }}" 
+                                                                                     alt="Logo" 
+                                                                                     style="max-width: 150px; margin-top: 10px;" 
+                                                                                     class="img-thumbnail">
+                                                                                <div class="form-check mt-2">
+                                                                                    <input class="form-check-input" 
+                                                                                           type="checkbox" 
+                                                                                           id="remove_logo_{{ $blockId }}" 
+                                                                                           name="blocks[{{ $blockId }}][config][remove_logo]" 
+                                                                                           value="1">
+                                                                                    <label class="form-check-label" for="remove_logo_{{ $blockId }}">
+                                                                                        Usuń aktualne logo
+                                                                                    </label>
+                                                                                </div>
+                                                                            </div>
                                                                         @endif
                                                                     </div>
                                                                 @else
@@ -791,6 +847,70 @@
         </div>
     </div>
 
+    <!-- Modal galerii tła -->
+    <div class="modal fade" id="backgroundGalleryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Galeria Tła</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Upload nowego tła -->
+                    <div class="mb-4">
+                        <label class="form-label"><strong>Dodaj nowe tło</strong></label>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="background-upload-input" accept="image/*">
+                            <button type="button" class="btn btn-primary" id="upload-background-btn">
+                                <i class="bi bi-upload me-1"></i>Wgraj
+                            </button>
+                        </div>
+                        <small class="text-muted">Dozwolone: JPG, PNG, GIF (max 5MB)</small>
+                        <div id="background-upload-progress" class="mt-2" style="display:none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Galeria istniejących tła -->
+                    <div>
+                        <label class="form-label"><strong>Dostępne tła</strong></label>
+                        <div class="row g-3" id="backgrounds-gallery">
+                            @if(count($availableBackgrounds ?? []) > 0)
+                                @foreach($availableBackgrounds as $background)
+                                    <div class="col-md-3">
+                                        <div class="card h-100 background-item" data-background-path="{{ $background['path'] }}">
+                                            <img src="{{ $background['url'] }}" class="card-img-top" alt="{{ $background['name'] }}" style="height: 150px; object-fit: cover; padding: 10px;">
+                                            <div class="card-body p-2">
+                                                <p class="card-text small mb-1">{{ $background['name'] }}</p>
+                                                <p class="card-text small text-muted">{{ round($background['size']/1024, 1) }} KB</p>
+                                                <button type="button" class="btn btn-sm btn-success select-background-btn w-100 mb-1" data-background-path="{{ $background['path'] }}" data-background-url="{{ $background['url'] }}">
+                                                    <i class="bi bi-check-circle me-1"></i>Wybierz
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger delete-background-btn w-100" data-background-path="{{ $background['path'] }}">
+                                                    <i class="bi bi-trash me-1"></i>Usuń
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @else
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle me-2"></i>Brak dostępnych tła. Wgraj pierwsze tło używając powyższego formularza.
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
     <style>
         .block-item {
@@ -1130,11 +1250,28 @@
                     // Ustaw ścieżkę logo w polu
                     document.querySelector(`[name="${currentLogoField}"]`).value = logoPath;
                     
-                    // Pokaż podgląd
+                    // Pokaż podgląd z checkboxem
                     const previewId = currentLogoField.replace('logo_path', 'logo_preview');
                     const preview = document.getElementById(previewId);
                     if (preview) {
-                        preview.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-width: 150px; margin-top: 10px;" class="img-thumbnail">`;
+                        // Wyciągnij blockId z nazwy pola (np. "blocks[header][config][logo_path]" -> "header")
+                        const blockIdMatch = currentLogoField.match(/blocks\[([^\]]+)\]/);
+                        const blockId = blockIdMatch ? blockIdMatch[1] : 'unknown';
+                        preview.innerHTML = `
+                            <div class="mt-2">
+                                <img src="${logoUrl}" alt="Logo" style="max-width: 150px; margin-top: 10px;" class="img-thumbnail">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="remove_logo_${blockId}" 
+                                           name="blocks[${blockId}][config][remove_logo]" 
+                                           value="1">
+                                    <label class="form-check-label" for="remove_logo_${blockId}">
+                                        Usuń aktualne logo
+                                    </label>
+                                </div>
+                            </div>
+                        `;
                     }
                     
                     // Zamknij modal
@@ -1157,6 +1294,156 @@
                                 <i class="bi bi-check-circle me-1"></i>Wybierz
                             </button>
                             <button type="button" class="btn btn-sm btn-danger delete-logo-btn w-100" data-logo-path="${path}">
+                                <i class="bi bi-trash me-1"></i>Usuń
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const infoAlert = gallery.querySelector('.alert-info');
+            if (infoAlert) {
+                infoAlert.remove();
+            }
+            
+            gallery.insertAdjacentHTML('beforeend', html);
+        }
+
+        // ===== Obsługa Tła =====
+        
+        // Funkcja otwierająca galerię tła
+        window.openBackgroundGallery = function() {
+            const modalElement = document.getElementById('backgroundGalleryModal');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        };
+
+        // Upload tła
+        document.getElementById('upload-background-btn').addEventListener('click', function() {
+            const fileInput = document.getElementById('background-upload-input');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Wybierz plik');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('background', file);
+            formData.append('_token', '{{ csrf_token() }}');
+
+            document.getElementById('background-upload-progress').style.display = 'block';
+
+            fetch('/api/admin/certificate-templates/upload-background', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('background-upload-progress').style.display = 'none';
+                
+                if (data.success) {
+                    // Dodaj nowe tło do galerii
+                    addBackgroundToGallery(data.path, data.url, data.name);
+                    fileInput.value = '';
+                    alert('Tło zostało wgrane!');
+                } else {
+                    alert('Błąd: ' + (data.message || 'Nieznany błąd'));
+                }
+            })
+            .catch(error => {
+                document.getElementById('background-upload-progress').style.display = 'none';
+                alert('Błąd uploadu: ' + error);
+            });
+        });
+
+        // Usuwanie tła
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-background-btn') || e.target.closest('.delete-background-btn')) {
+                const btn = e.target.classList.contains('delete-background-btn') ? e.target : e.target.closest('.delete-background-btn');
+                const backgroundPath = btn.dataset.backgroundPath;
+                
+                if (!confirm('Czy na pewno chcesz usunąć to tło?')) {
+                    return;
+                }
+
+                fetch('/api/admin/certificate-templates/delete-background', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ path: backgroundPath })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        btn.closest('.col-md-3').remove();
+                        alert('Tło zostało usunięte');
+                    } else {
+                        alert('Błąd: ' + (data.message || 'Nie można usunąć'));
+                    }
+                })
+                .catch(error => {
+                    alert('Błąd: ' + error);
+                });
+            }
+        });
+
+        // Wybieranie tła
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('select-background-btn') || e.target.closest('.select-background-btn')) {
+                const btn = e.target.classList.contains('select-background-btn') ? e.target : e.target.closest('.select-background-btn');
+                const backgroundPath = btn.dataset.backgroundPath;
+                const backgroundUrl = btn.dataset.backgroundUrl;
+                
+                // Ustaw ścieżkę tła w polu
+                document.getElementById('background_image').value = backgroundPath;
+                
+                // Pokaż podgląd
+                const previewContainer = document.getElementById('background_image').closest('.input-group').nextElementSibling;
+                if (previewContainer && previewContainer.classList.contains('mt-2')) {
+                    // Jeśli już istnieje podgląd, zaktualizuj go
+                    const img = previewContainer.querySelector('img');
+                    if (img) {
+                        img.src = backgroundUrl;
+                    } else {
+                        // Utwórz nowy podgląd
+                        previewContainer.innerHTML = `
+                            <p class="mb-1"><strong>Aktualne tło:</strong></p>
+                            <img src="${backgroundUrl}" alt="Tło zaświadczenia" class="img-thumbnail" style="max-width: 300px; max-height: 200px;">
+                        `;
+                    }
+                } else {
+                    // Utwórz nowy kontener podglądu
+                    const newPreview = document.createElement('div');
+                    newPreview.className = 'mt-2';
+                    newPreview.innerHTML = `
+                        <p class="mb-1"><strong>Aktualne tło:</strong></p>
+                        <img src="${backgroundUrl}" alt="Tło zaświadczenia" class="img-thumbnail" style="max-width: 300px; max-height: 200px;">
+                    `;
+                    document.getElementById('background_image').closest('.input-group').parentNode.insertBefore(newPreview, document.getElementById('background_image').closest('.input-group').nextSibling);
+                }
+                
+                // Zamknij modal
+                bootstrap.Modal.getInstance(document.getElementById('backgroundGalleryModal')).hide();
+            }
+        });
+
+        // Dodawanie nowego tła do galerii
+        function addBackgroundToGallery(path, url, name) {
+            const gallery = document.getElementById('backgrounds-gallery');
+            
+            const html = `
+                <div class="col-md-3">
+                    <div class="card h-100 background-item" data-background-path="${path}">
+                        <img src="${url}" class="card-img-top" alt="${name}" style="height: 150px; object-fit: cover; padding: 10px;">
+                        <div class="card-body p-2">
+                            <p class="card-text small mb-1">${name}</p>
+                            <button type="button" class="btn btn-sm btn-success select-background-btn w-100 mb-1" data-background-path="${path}" data-background-url="${url}">
+                                <i class="bi bi-check-circle me-1"></i>Wybierz
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger delete-background-btn w-100" data-background-path="${path}">
                                 <i class="bi bi-trash me-1"></i>Usuń
                             </button>
                         </div>

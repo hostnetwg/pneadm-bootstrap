@@ -39,6 +39,8 @@ Route::post('/publigo/simple-test', function() {
 // Endpointy dla zarządzania logo w szablonach certyfikatów
 Route::post('/admin/certificate-templates/upload-logo', [CertificateTemplateController::class, 'uploadLogo'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 Route::delete('/admin/certificate-templates/delete-logo', [CertificateTemplateController::class, 'deleteLogo'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+Route::post('/admin/certificate-templates/upload-background', [CertificateTemplateController::class, 'uploadBackground'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+Route::delete('/admin/certificate-templates/delete-background', [CertificateTemplateController::class, 'deleteBackground'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Test endpoint z przykładowymi danymi Publigo
 Route::post('/publigo/test-data', function() {
