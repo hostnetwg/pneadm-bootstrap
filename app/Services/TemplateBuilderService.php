@@ -36,6 +36,13 @@ class TemplateBuilderService
         $blocks = $config['blocks'] ?? [];
         $settings = $config['settings'] ?? [];
         
+        // Sortuj bloki według pola 'order' przed renderowaniem
+        uasort($blocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
         $html = "<!DOCTYPE html>\n";
         $html .= "<html lang=\"pl\">\n";
         $html .= "<head>\n";
@@ -65,9 +72,40 @@ class TemplateBuilderService
         $html .= "</head>\n";
         $html .= "<body>\n";
         
-        // Generowanie bloków
+        // Generowanie bloków - wyodrębnij stałe elementy (instructor_signature i footer)
+        $regularBlocks = [];
+        $instructorSignatureBlock = null;
+        $footerBlock = null;
+        
         foreach ($blocks as $block) {
+            $type = $block['type'] ?? '';
+            if ($type === 'instructor_signature') {
+                $instructorSignatureBlock = $block;
+            } elseif ($type === 'footer') {
+                $footerBlock = $block;
+            } else {
+                $regularBlocks[] = $block;
+            }
+        }
+        
+        // Sortuj regularBlocks według order (na wypadek, gdyby były dodane w różnej kolejności)
+        usort($regularBlocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
+        // Renderuj najpierw zwykłe bloki
+        foreach ($regularBlocks as $block) {
             $html .= $this->buildBlock($block, $settings);
+        }
+        
+        // Renderuj na końcu stałe elementy (zawsze na dole zaświadczenia)
+        if ($instructorSignatureBlock) {
+            $html .= $this->buildBlock($instructorSignatureBlock, $settings);
+        }
+        if ($footerBlock) {
+            $html .= $this->buildBlock($footerBlock, $settings);
         }
         
         $html .= "</body>\n";

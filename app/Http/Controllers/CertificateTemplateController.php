@@ -65,6 +65,64 @@ class CertificateTemplateController extends Controller
         // Przygotowanie konfiguracji
         $blocks = $request->input('blocks', []);
         
+        // Obsługa stałych elementów (instructor_signature i footer)
+        // Jeśli checkbox jest zaznaczony, upewnij się że blok istnieje
+        if ($request->has('show_instructor_signature')) {
+            // Sprawdź czy blok już istnieje
+            $instructorBlockExists = false;
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'instructor_signature') {
+                    $instructorBlockExists = true;
+                    // Ustaw order na 9999, aby był zawsze na końcu
+                    $blocks[$blockId]['order'] = 9999;
+                    break;
+                }
+            }
+            // Jeśli nie istnieje, dodaj nowy
+            if (!$instructorBlockExists) {
+                $blocks['instructor_signature_new'] = [
+                    'type' => 'instructor_signature',
+                    'order' => 9999,
+                    'config' => []
+                ];
+            }
+        } else {
+            // Usuń blok jeśli checkbox nie jest zaznaczony
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'instructor_signature') {
+                    unset($blocks[$blockId]);
+                }
+            }
+        }
+        
+        if ($request->has('show_footer')) {
+            // Sprawdź czy blok już istnieje
+            $footerBlockExists = false;
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'footer') {
+                    $footerBlockExists = true;
+                    // Ustaw order na 9999, aby był zawsze na końcu
+                    $blocks[$blockId]['order'] = 9999;
+                    break;
+                }
+            }
+            // Jeśli nie istnieje, dodaj nowy
+            if (!$footerBlockExists) {
+                $blocks['footer_new'] = [
+                    'type' => 'footer',
+                    'order' => 9999,
+                    'config' => []
+                ];
+            }
+        } else {
+            // Usuń blok jeśli checkbox nie jest zaznaczony
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'footer') {
+                    unset($blocks[$blockId]);
+                }
+            }
+        }
+        
         // Sortuj bloki według pola 'order' przed zapisem
         uasort($blocks, function($a, $b) {
             $orderA = $a['order'] ?? 999;
@@ -150,6 +208,64 @@ class CertificateTemplateController extends Controller
 
         // Przygotowanie konfiguracji
         $blocks = $request->input('blocks', []);
+        
+        // Obsługa stałych elementów (instructor_signature i footer)
+        // Jeśli checkbox jest zaznaczony, upewnij się że blok istnieje
+        if ($request->has('show_instructor_signature')) {
+            // Sprawdź czy blok już istnieje
+            $instructorBlockExists = false;
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'instructor_signature') {
+                    $instructorBlockExists = true;
+                    // Ustaw order na 9999, aby był zawsze na końcu
+                    $blocks[$blockId]['order'] = 9999;
+                    break;
+                }
+            }
+            // Jeśli nie istnieje, dodaj nowy
+            if (!$instructorBlockExists) {
+                $blocks['instructor_signature_new'] = [
+                    'type' => 'instructor_signature',
+                    'order' => 9999,
+                    'config' => []
+                ];
+            }
+        } else {
+            // Usuń blok jeśli checkbox nie jest zaznaczony
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'instructor_signature') {
+                    unset($blocks[$blockId]);
+                }
+            }
+        }
+        
+        if ($request->has('show_footer')) {
+            // Sprawdź czy blok już istnieje
+            $footerBlockExists = false;
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'footer') {
+                    $footerBlockExists = true;
+                    // Ustaw order na 9999, aby był zawsze na końcu
+                    $blocks[$blockId]['order'] = 9999;
+                    break;
+                }
+            }
+            // Jeśli nie istnieje, dodaj nowy
+            if (!$footerBlockExists) {
+                $blocks['footer_new'] = [
+                    'type' => 'footer',
+                    'order' => 9999,
+                    'config' => []
+                ];
+            }
+        } else {
+            // Usuń blok jeśli checkbox nie jest zaznaczony
+            foreach ($blocks as $blockId => $block) {
+                if (($block['type'] ?? '') === 'footer') {
+                    unset($blocks[$blockId]);
+                }
+            }
+        }
         
         // Sortuj bloki według pola 'order' przed zapisem
         uasort($blocks, function($a, $b) {

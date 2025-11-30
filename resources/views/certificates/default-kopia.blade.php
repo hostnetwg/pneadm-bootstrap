@@ -175,60 +175,132 @@
     </style>
 </head>
 <body>
-    <h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">{{ $headerConfig['title'] ?? 'ZAŚWIADCZENIE' }}</h1>
-    <p>Pan/i</p>
-    <h2 class="participant-name">{{ $participant->first_name }} {{ $participant->last_name }}</h2>
-
-    @if (!empty($participant->birth_date) && !empty($participant->birth_place))
-        <p>urodzony/a: {{ \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') }}r. w miejscowości {{ $participant->birth_place }}</p>
-    @else
-        <p>&nbsp;</p>
-    @endif
-
     @php
-        // Pobierz tekst ukończenia z konfiguracji lub użyj domyślnego
-        $completionText = $courseInfoConfig['completion_text'] ?? 'ukończył/a szkolenie';
-        // Pobierz etykietę tematu z konfiguracji lub użyj domyślnej
-        $subjectLabel = $courseInfoConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
-        // Pobierz nazwę organizatora z konfiguracji lub użyj domyślnej
-        $organizerName = $courseInfoConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
-        // Sprawdź czy pokazywać czas trwania
-        $showDuration = $courseInfoConfig['show_duration'] ?? true;
-    @endphp
-    
-    <p>{!! $completionText !!}</p>
-    <p>zorganizowane w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r.@if($showDuration) w wymiarze {{ $durationMinutes }} minut,@endif przez</p>
-
-    <p class="bold">{!! $organizerName !!}</p>
-
-    <h3>{!! $subjectLabel !!}</h3>
-    <h2 class="course-title">{!! $course->title !!}</h2>
-
-    @php
-        // Sprawdź czy pokazywać opis z konfiguracji
-        $showDescription = $courseInfoConfig['show_description'] ?? true;
-        $description = trim($course->description ?? '');
-        if ($showDescription && !empty($description)) {
-            // Dynamiczne dostosowanie rozmiaru czcionki na podstawie długości zakresu (liczby znaków)
-            $charCount = mb_strlen($description);
-            // Ustaw rozmiar czcionki na podstawie liczby znaków
-            // Dla dłuższych tekstów (>500 znaków) mniejsza czcionka, dla krótszych większa
-            $fontSize = $charCount > 500 ? '13px' : '16px';
-            $marginBottom = $charCount > 500 ? '2px' : '5px';
-            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
-                // To jest lista numerowana - formatuj jako <ol> z dynamiczną czcionką
-                $items = preg_split('/\\n(?=\\d+\\.)/', $description);
-                echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
-                foreach ($items as $item) {
-                    $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
-                    if ($cleanItem) {
-                        echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+        // Renderuj bloki w kolejności z konfiguracji szablonu
+        $sortedBlocks = $sortedBlocks ?? [];
+        
+        // Jeśli mamy posortowane bloki, renderuj je dynamicznie
+        if (!empty($sortedBlocks)) {
+            foreach ($sortedBlocks as $block) {
+                $blockType = $block['type'] ?? '';
+                $blockConfig = $block['config'] ?? [];
+                
+                switch ($blockType) {
+                    case 'header':
+                        echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">' . ($blockConfig['title'] ?? 'ZAŚWIADCZENIE') . '</h1>';
+                        break;
+                    
+                    case 'participant_info':
+                        echo '<p>Pan/i</p>';
+                        echo '<h2 class="participant-name">' . htmlspecialchars($participant->first_name . ' ' . $participant->last_name) . '</h2>';
+                        if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
+                            echo '<p>urodzony/a: ' . \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') . 'r. w miejscowości ' . htmlspecialchars($participant->birth_place) . '</p>';
+                        } else {
+                            echo '<p>&nbsp;</p>';
+                        }
+                        break;
+                    
+                    case 'course_info':
+                        $completionText = $blockConfig['completion_text'] ?? 'ukończył/a szkolenie';
+                        $subjectLabel = $blockConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
+                        $organizerName = $blockConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
+                        $showDuration = $blockConfig['show_duration'] ?? true;
+                        
+                        echo '<p>' . $completionText . '</p>';
+                        echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+                        if ($showDuration) {
+                            echo ' w wymiarze ' . $durationMinutes . ' minut,';
+                        }
+                        echo ' przez</p>';
+                        echo '<p class="bold">' . $organizerName . '</p>';
+                        echo '<h3>' . $subjectLabel . '</h3>';
+                        echo '<h2 class="course-title">' . $course->title . '</h2>';
+                        
+                        $showDescription = $blockConfig['show_description'] ?? true;
+                        $description = trim($course->description ?? '');
+                        if ($showDescription && !empty($description)) {
+                            $charCount = mb_strlen($description);
+                            $fontSize = $charCount > 500 ? '13px' : '16px';
+                            $marginBottom = $charCount > 500 ? '2px' : '5px';
+                            if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                                $items = preg_split('/\\n(?=\\d+\\.)/', $description);
+                                echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
+                                foreach ($items as $item) {
+                                    $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
+                                    if ($cleanItem) {
+                                        echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+                                    }
+                                }
+                                echo '</ol>';
+                            } else {
+                                echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+                            }
+                        }
+                        break;
+                    
+                    case 'custom_text':
+                        if (!empty($blockConfig['text'])) {
+                            $align = $blockConfig['align'] ?? 'center';
+                            echo '<p style="text-align: ' . $align . '; margin-top: 15px; margin-bottom: 15px;">' . $blockConfig['text'] . '</p>';
+                        }
+                        break;
+                }
+            }
+        } else {
+            // Kompatybilność wsteczna - stara logika dla szablonów bez sortedBlocks
+            echo '<h1 class="certificate-title" style="margin-top: 0 !important; padding-top: 0 !important; line-height: 1 !important;">' . ($headerConfig['title'] ?? 'ZAŚWIADCZENIE') . '</h1>';
+            echo '<p>Pan/i</p>';
+            echo '<h2 class="participant-name">' . htmlspecialchars($participant->first_name . ' ' . $participant->last_name) . '</h2>';
+            
+            if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
+                echo '<p>urodzony/a: ' . \Carbon\Carbon::parse($participant->birth_date)->format('d.m.Y') . 'r. w miejscowości ' . htmlspecialchars($participant->birth_place) . '</p>';
+            } else {
+                echo '<p>&nbsp;</p>';
+            }
+            
+            $completionText = $courseInfoConfig['completion_text'] ?? 'ukończył/a szkolenie';
+            $subjectLabel = $courseInfoConfig['subject_label'] ?? 'TEMAT SZKOLENIA';
+            $organizerName = $courseInfoConfig['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"';
+            $showDuration = $courseInfoConfig['show_duration'] ?? true;
+            
+            echo '<p>' . $completionText . '</p>';
+            echo '<p>zorganizowane w dniu ' . \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') . 'r.';
+            if ($showDuration) {
+                echo ' w wymiarze ' . $durationMinutes . ' minut,';
+            }
+            echo ' przez</p>';
+            echo '<p class="bold">' . $organizerName . '</p>';
+            echo '<h3>' . $subjectLabel . '</h3>';
+            echo '<h2 class="course-title">' . $course->title . '</h2>';
+            
+            $showDescription = $courseInfoConfig['show_description'] ?? true;
+            $description = trim($course->description ?? '');
+            if ($showDescription && !empty($description)) {
+                $charCount = mb_strlen($description);
+                $fontSize = $charCount > 500 ? '13px' : '16px';
+                $marginBottom = $charCount > 500 ? '2px' : '5px';
+                if (preg_match('/^\\d+\\.\\s*/m', $description)) {
+                    $items = preg_split('/\\n(?=\\d+\\.)/', $description);
+                    echo '<ol style="text-align: left; padding-left: 25px; padding-right: 0; font-size: ' . $fontSize . ';">';
+                    foreach ($items as $item) {
+                        $cleanItem = preg_replace('/^\\d+\\.\\s*/', '', trim($item));
+                        if ($cleanItem) {
+                            echo '<li style="text-align: left; margin-bottom: ' . $marginBottom . ';">' . htmlspecialchars($cleanItem) . '</li>';
+                        }
+                    }
+                    echo '</ol>';
+                } else {
+                    echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
+                }
+            }
+            
+            if (!empty($customTextBlocks)) {
+                foreach ($customTextBlocks as $customTextConfig) {
+                    if (!empty($customTextConfig['text'])) {
+                        $align = $customTextConfig['align'] ?? 'center';
+                        echo '<p style="text-align: ' . $align . '; margin-top: 15px; margin-bottom: 15px;">' . $customTextConfig['text'] . '</p>';
                     }
                 }
-                echo '</ol>';
-            } else {
-                // To jest zwykły tekst - jako akapit wyrównany do lewej z dynamiczną czcionką
-                echo '<p style="text-align: left; padding-left: 0; padding-right: 0; font-size: ' . $fontSize . ';">' . htmlspecialchars($description) . '</p>';
             }
         }
     @endphp

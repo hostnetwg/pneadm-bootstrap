@@ -224,6 +224,18 @@
         }
     @endphp
 
+    {{-- Wyświetl wszystkie bloki "Własny tekst" --}}
+    @if(!empty($customTextBlocks))
+        @foreach($customTextBlocks as $customTextConfig)
+            @if(!empty($customTextConfig['text']))
+                @php
+                    $align = $customTextConfig['align'] ?? 'center';
+                @endphp
+                <p style="text-align: {{ $align }}; margin-top: 15px; margin-bottom: 15px;">{!! $customTextConfig['text'] !!}</p>
+            @endif
+        @endforeach
+    @endif
+
     <p>Pan/i</p>
     <h2 class="participant-name">{{ $participant->first_name }} {{ $participant->last_name }}</h2>
 

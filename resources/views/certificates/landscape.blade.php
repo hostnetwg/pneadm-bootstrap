@@ -201,6 +201,18 @@
     <h3>TEMAT SZKOLENIA</h3>
     <h2 class="course-title">{!! $course->title !!}</h2>
 
+    {{-- Wyświetl wszystkie bloki "Własny tekst" --}}
+    @if(!empty($customTextBlocks))
+        @foreach($customTextBlocks as $customTextConfig)
+            @if(!empty($customTextConfig['text']))
+                @php
+                    $align = $customTextConfig['align'] ?? 'center';
+                @endphp
+                <p style="text-align: {{ $align }}; margin-top: 15px; margin-bottom: 15px;">{!! $customTextConfig['text'] !!}</p>
+            @endif
+        @endforeach
+    @endif
+
     <div class="date-section">
         <p style="margin: 0;">Data, {{ \Carbon\Carbon::parse($course->end_date)->format('d.m.Y') }}r.@if(($templateSettings['show_certificate_number'] ?? true))<br>
         Nr rejestru: {{ $certificateNumber }}@endif</p>

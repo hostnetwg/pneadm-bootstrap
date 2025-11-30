@@ -119,25 +119,6 @@
                                 </div>
                             </div>
                             
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <div class="form-check">
-                                        <input class="form-check-input" 
-                                               type="checkbox" 
-                                               id="show_certificate_number" 
-                                               name="show_certificate_number" 
-                                               value="1"
-                                               {{ old('show_certificate_number', $certificateTemplate->config['settings']['show_certificate_number'] ?? true) ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="show_certificate_number">
-                                            Pokaż numer rejestru w certyfikacie
-                                        </label>
-                                        <small class="form-text text-muted d-block">
-                                            Jeśli odznaczone, numer rejestru nie będzie wyświetlany w certyfikacie.
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <hr class="my-4">
                             
                             <h6 class="mb-3">Marginesy dokumentu</h6>
@@ -278,7 +259,7 @@
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="bi bi-grid-3x3 me-2"></i>Bloki Szablonu
-                                <small class="text-muted ms-2">(przeciągnij, aby zmienić kolejność)</small>
+                                <small class="text-muted ms-2">(użyj strzałek w nagłówku, aby zmienić kolejność)</small>
                             </div>
                             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addBlockModal">
                                 <i class="bi bi-plus-circle me-1"></i>Dodaj Blok
@@ -288,8 +269,21 @@
                             <div id="blocks-container" class="mb-3 sortable-blocks">
                                 @if(!empty($certificateTemplate->config['blocks']))
                                     @php
-                                        // Sortuj bloki według pola 'order' jeśli istnieje
-                                        $sortedBlocks = collect($certificateTemplate->config['blocks'])->sortBy(function($block) {
+                                        // Wyodrębnij bloki instructor_signature i footer
+                                        $fixedBlocks = [];
+                                        $sortableBlocks = [];
+                                        
+                                        foreach ($certificateTemplate->config['blocks'] as $blockId => $block) {
+                                            $blockType = $block['type'] ?? '';
+                                            if ($blockType === 'instructor_signature' || $blockType === 'footer') {
+                                                $fixedBlocks[$blockId] = $block;
+                                            } else {
+                                                $sortableBlocks[$blockId] = $block;
+                                            }
+                                        }
+                                        
+                                        // Sortuj tylko bloki sortowalne według pola 'order'
+                                        $sortedBlocks = collect($sortableBlocks)->sortBy(function($block) {
                                             return $block['order'] ?? 999;
                                         })->toArray();
                                     @endphp
@@ -300,9 +294,14 @@
                                         @endphp
                                         @if($blockData)
                                             <div class="card mb-3 block-item" data-block-id="{{ $blockId }}">
-                                                <div class="card-header d-flex justify-content-between align-items-center drag-handle" style="cursor: move;">
-                                                    <div>
-                                                        <i class="bi bi-grip-vertical me-2"></i>
+                                                <div class="card-header d-flex justify-content-between align-items-center">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary move-block-up" title="Przesuń w górę">
+                                                            <i class="bi bi-arrow-up"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary move-block-down" title="Przesuń w dół">
+                                                            <i class="bi bi-arrow-down"></i>
+                                                        </button>
                                                         <strong>{{ $blockData['name'] }}</strong>
                                                     </div>
                                                     <button type="button" class="btn btn-sm btn-danger remove-block-btn">
@@ -397,6 +396,299 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Stałe elementy (Data wystawienia i podpis prowadzącego oraz Stopka) -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <i class="bi bi-pin-angle me-2"></i>Stałe Elementy Zaświadczenia
+                            <small class="text-muted ms-2">(zawsze na dole zaświadczenia, kolejność nie ma znaczenia)</small>
+                        </div>
+                        <div class="card-body">
+                            @php
+                                $instructorSignatureBlock = null;
+                                $footerBlock = null;
+                                
+                                if (!empty($certificateTemplate->config['blocks'])) {
+                                    foreach ($certificateTemplate->config['blocks'] as $blockId => $block) {
+                                        if (($block['type'] ?? '') === 'instructor_signature') {
+                                            $instructorSignatureBlock = ['id' => $blockId, 'data' => $block];
+                                        } elseif (($block['type'] ?? '') === 'footer') {
+                                            $footerBlock = ['id' => $blockId, 'data' => $block];
+                                        }
+                                    }
+                                }
+                            @endphp
+                            
+                            <!-- Data wystawienia i podpis prowadzącego -->
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="show_instructor_signature" 
+                                               name="show_instructor_signature" 
+                                               value="1"
+                                               {{ $instructorSignatureBlock ? 'checked' : '' }}>
+                                        <label class="form-check-label fw-bold" for="show_instructor_signature">
+                                            Data wystawienia i podpis prowadzącego
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Wyświetla sekcję "Data" i "Prowadzący" na dole zaświadczenia</small>
+                                </div>
+                                @if($instructorSignatureBlock)
+                                    <div class="card-body" id="instructor-signature-config">
+                                        @php
+                                            $blockId = $instructorSignatureBlock['id'];
+                                            $block = $instructorSignatureBlock['data'];
+                                            $blockData = $availableBlocks['instructor_signature'] ?? null;
+                                        @endphp
+                                        <input type="hidden" name="blocks[{{ $blockId }}][type]" value="instructor_signature">
+                                        <input type="hidden" name="blocks[{{ $blockId }}][order]" value="9999">
+                                        
+                                        {{-- Checkbox "Pokaż numer rejestru w certyfikacie" --}}
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="show_certificate_number" 
+                                                   name="show_certificate_number" 
+                                                   value="1"
+                                                   {{ old('show_certificate_number', $certificateTemplate->config['settings']['show_certificate_number'] ?? true) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="show_certificate_number">
+                                                Pokaż numer rejestru w certyfikacie
+                                            </label>
+                                            <small class="form-text text-muted d-block">
+                                                Jeśli odznaczone, numer rejestru nie będzie wyświetlany w certyfikacie.
+                                            </small>
+                                        </div>
+                                        
+                                        @if($blockData)
+                                            @foreach($blockData['fields'] ?? [] as $fieldName => $fieldConfig)
+                                                <div class="mb-3">
+                                                    <label for="{{ $blockId }}_{{ $fieldName }}" class="form-label">{{ $fieldConfig['label'] }}</label>
+                                                    @if($fieldConfig['type'] === 'text')
+                                                        <input type="text" 
+                                                               class="form-control" 
+                                                               id="{{ $blockId }}_{{ $fieldName }}" 
+                                                               name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                               value="{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}">
+                                                    @elseif($fieldConfig['type'] === 'checkbox')
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" 
+                                                                   type="checkbox" 
+                                                                   id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                   name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                                   value="1"
+                                                                   {{ !empty($block['config'][$fieldName]) ? 'checked' : '' }}>
+                                                            <label class="form-check-label" for="{{ $blockId }}_{{ $fieldName }}">
+                                                                {{ $fieldConfig['label'] }}
+                                                            </label>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="card-body" id="instructor-signature-config" style="display: none;">
+                                        <input type="hidden" name="blocks[instructor_signature_new][type]" value="instructor_signature">
+                                        <input type="hidden" name="blocks[instructor_signature_new][order]" value="9999">
+                                        
+                                        {{-- Checkbox "Pokaż numer rejestru w certyfikacie" --}}
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" 
+                                                   type="checkbox" 
+                                                   id="show_certificate_number_hidden" 
+                                                   name="show_certificate_number" 
+                                                   value="1"
+                                                   {{ old('show_certificate_number', $certificateTemplate->config['settings']['show_certificate_number'] ?? true) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="show_certificate_number_hidden">
+                                                Pokaż numer rejestru w certyfikacie
+                                            </label>
+                                            <small class="form-text text-muted d-block">
+                                                Jeśli odznaczone, numer rejestru nie będzie wyświetlany w certyfikacie.
+                                            </small>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                            
+                            <!-- Stopka -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="show_footer" 
+                                               name="show_footer" 
+                                               value="1"
+                                               {{ $footerBlock ? 'checked' : '' }}>
+                                        <label class="form-check-label fw-bold" for="show_footer">
+                                            Stopka
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Wyświetla stopkę z logo i tekstem na dole zaświadczenia</small>
+                                </div>
+                                @if($footerBlock)
+                                    <div class="card-body" id="footer-config">
+                                        @php
+                                            $blockId = $footerBlock['id'];
+                                            $block = $footerBlock['data'];
+                                            $blockData = $availableBlocks['footer'] ?? null;
+                                        @endphp
+                                        <input type="hidden" name="blocks[{{ $blockId }}][type]" value="footer">
+                                        <input type="hidden" name="blocks[{{ $blockId }}][order]" value="9999">
+                                        @if($blockData)
+                                            @foreach($blockData['fields'] ?? [] as $fieldName => $fieldConfig)
+                                                <div class="mb-3">
+                                                    <label for="{{ $blockId }}_{{ $fieldName }}" class="form-label">{{ $fieldConfig['label'] }}</label>
+                                                    
+                                                    @if($fieldConfig['type'] === 'text')
+                                                        @if($fieldName === 'logo_path')
+                                                            <div class="input-group">
+                                                                <input type="text" 
+                                                                       class="form-control" 
+                                                                       id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                       name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                                       value="{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}"
+                                                                       readonly>
+                                                                <button type="button" 
+                                                                        class="btn btn-outline-secondary" 
+                                                                        onclick="openLogoGallery('blocks[{{ $blockId }}][config][{{ $fieldName }}]')">
+                                                                    <i class="bi bi-image me-1"></i>Wybierz logo
+                                                                </button>
+                                                            </div>
+                                                            <div id="{{ $blockId }}_logo_preview">
+                                                                @if(!empty($block['config'][$fieldName]))
+                                                                    <img src="{{ asset('storage/' . $block['config'][$fieldName]) }}" 
+                                                                         alt="Logo" 
+                                                                         style="max-width: 150px; margin-top: 10px;" 
+                                                                         class="img-thumbnail">
+                                                                @endif
+                                                            </div>
+                                                        @else
+                                                            <input type="text" 
+                                                                   class="form-control" 
+                                                                   id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                   name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                                   value="{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}">
+                                                        @endif
+                                                    @elseif($fieldConfig['type'] === 'number')
+                                                        <input type="number" 
+                                                               class="form-control" 
+                                                               id="{{ $blockId }}_{{ $fieldName }}" 
+                                                               name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                               value="{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}">
+                                                    @elseif($fieldConfig['type'] === 'textarea')
+                                                        <textarea class="form-control" 
+                                                                  id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                  name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                                  rows="3">{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}</textarea>
+                                                    @elseif($fieldConfig['type'] === 'checkbox')
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" 
+                                                                   type="checkbox" 
+                                                                   id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                   name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
+                                                                   value="1"
+                                                                   {{ !empty($block['config'][$fieldName]) ? 'checked' : '' }}>
+                                                            <label class="form-check-label" for="{{ $blockId }}_{{ $fieldName }}">
+                                                                {{ $fieldConfig['label'] }}
+                                                            </label>
+                                                        </div>
+                                                    @elseif($fieldConfig['type'] === 'select')
+                                                        <select class="form-select" 
+                                                                id="{{ $blockId }}_{{ $fieldName }}" 
+                                                                name="blocks[{{ $blockId }}][config][{{ $fieldName }}]">
+                                                            @foreach($fieldConfig['options'] ?? [] as $value => $label)
+                                                                <option value="{{ $value }}" 
+                                                                        {{ ($block['config'][$fieldName] ?? $fieldConfig['default'] ?? '') == $value ? 'selected' : '' }}>
+                                                                    {{ $label }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="card-body" id="footer-config" style="display: none;">
+                                        <input type="hidden" name="blocks[footer_new][type]" value="footer">
+                                        <input type="hidden" name="blocks[footer_new][order]" value="9999">
+                                        @php
+                                            $blockData = $availableBlocks['footer'] ?? null;
+                                        @endphp
+                                        @if($blockData)
+                                            @foreach($blockData['fields'] ?? [] as $fieldName => $fieldConfig)
+                                                <div class="mb-3">
+                                                    <label for="footer_new_{{ $fieldName }}" class="form-label">{{ $fieldConfig['label'] }}</label>
+                                                    
+                                                    @if($fieldConfig['type'] === 'text')
+                                                        @if($fieldName === 'logo_path')
+                                                            <div class="input-group">
+                                                                <input type="text" 
+                                                                       class="form-control" 
+                                                                       id="footer_new_{{ $fieldName }}" 
+                                                                       name="blocks[footer_new][config][{{ $fieldName }}]" 
+                                                                       value="{{ $fieldConfig['default'] ?? '' }}"
+                                                                       readonly>
+                                                                <button type="button" 
+                                                                        class="btn btn-outline-secondary" 
+                                                                        onclick="openLogoGallery('blocks[footer_new][config][{{ $fieldName }}]')">
+                                                                    <i class="bi bi-image me-1"></i>Wybierz logo
+                                                                </button>
+                                                            </div>
+                                                            <div id="footer_new_logo_preview"></div>
+                                                        @else
+                                                            <input type="text" 
+                                                                   class="form-control" 
+                                                                   id="footer_new_{{ $fieldName }}" 
+                                                                   name="blocks[footer_new][config][{{ $fieldName }}]" 
+                                                                   value="{{ $fieldConfig['default'] ?? '' }}">
+                                                        @endif
+                                                    @elseif($fieldConfig['type'] === 'number')
+                                                        <input type="number" 
+                                                               class="form-control" 
+                                                               id="footer_new_{{ $fieldName }}" 
+                                                               name="blocks[footer_new][config][{{ $fieldName }}]" 
+                                                               value="{{ $fieldConfig['default'] ?? '' }}">
+                                                    @elseif($fieldConfig['type'] === 'textarea')
+                                                        <textarea class="form-control" 
+                                                                  id="footer_new_{{ $fieldName }}" 
+                                                                  name="blocks[footer_new][config][{{ $fieldName }}]" 
+                                                                  rows="3">{{ $fieldConfig['default'] ?? '' }}</textarea>
+                                                    @elseif($fieldConfig['type'] === 'checkbox')
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" 
+                                                                   type="checkbox" 
+                                                                   id="footer_new_{{ $fieldName }}" 
+                                                                   name="blocks[footer_new][config][{{ $fieldName }}]" 
+                                                                   value="1"
+                                                                   {{ !empty($fieldConfig['default']) ? 'checked' : '' }}>
+                                                            <label class="form-check-label" for="footer_new_{{ $fieldName }}">
+                                                                {{ $fieldConfig['label'] }}
+                                                            </label>
+                                                        </div>
+                                                    @elseif($fieldConfig['type'] === 'select')
+                                                        <select class="form-select" 
+                                                                id="footer_new_{{ $fieldName }}" 
+                                                                name="blocks[footer_new][config][{{ $fieldName }}]">
+                                                            @foreach($fieldConfig['options'] ?? [] as $value => $label)
+                                                                <option value="{{ $value }}" 
+                                                                        {{ ($fieldConfig['default'] ?? '') == $value ? 'selected' : '' }}>
+                                                                    {{ $label }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-4">
@@ -447,16 +739,18 @@
                 <div class="modal-body">
                     <div class="list-group">
                         @foreach($availableBlocks as $type => $block)
-                            <a href="#" 
-                               class="list-group-item list-group-item-action add-block-btn" 
-                               data-block-type="{{ $type }}"
-                               data-block-name="{{ $block['name'] }}"
-                               data-bs-dismiss="modal">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ $block['name'] }}</h6>
-                                </div>
-                                <p class="mb-1 small text-muted">{{ $block['description'] }}</p>
-                            </a>
+                            @if($type !== 'instructor_signature' && $type !== 'footer')
+                                <a href="#" 
+                                   class="list-group-item list-group-item-action add-block-btn" 
+                                   data-block-type="{{ $type }}"
+                                   data-block-name="{{ $block['name'] }}"
+                                   data-bs-dismiss="modal">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ $block['name'] }}</h6>
+                                    </div>
+                                    <p class="mb-1 small text-muted">{{ $block['description'] }}</p>
+                                </a>
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -529,37 +823,26 @@
     </div>
 
     @push('scripts')
-    <!-- SortableJS CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    
     <style>
-        .sortable-blocks .block-item {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        .block-item {
+            transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
         }
         
-        .sortable-blocks .block-item.sortable-chosen {
+        .block-item.moving {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        
+        .move-block-up:disabled,
+        .move-block-down:disabled {
             opacity: 0.5;
+            cursor: not-allowed;
         }
         
-        .sortable-blocks .block-item.sortable-ghost {
-            opacity: 0.3;
-            background-color: #f0f0f0;
-        }
-        
-        .sortable-blocks .block-item.sortable-drag {
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-        }
-        
-        .drag-handle:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .drag-handle .bi-grip-vertical {
-            cursor: grab;
-        }
-        
-        .drag-handle.dragging .bi-grip-vertical {
-            cursor: grabbing;
+        .move-block-up:not(:disabled):hover,
+        .move-block-down:not(:disabled):hover {
+            background-color: #0d6efd;
+            color: white;
         }
     </style>
     
@@ -570,7 +853,6 @@
         let blockCounter = {{ count($certificateTemplate->config['blocks'] ?? []) }};
         const availableBlocks = @json($availableBlocks);
         let currentLogoField = null;
-        let sortable = null;
         
         // console.log('Zmienne zainicjalizowane - blockCounter:', blockCounter);
         
@@ -600,14 +882,60 @@
             // console.log('=== DOM LOADED ===');
             // console.log('Available blocks:', availableBlocks);
 
-            // Inicjalizacja Sortable dla drag & drop bloków
-            initializeSortable();
-            
             // Ustaw początkowe wartości order dla istniejących bloków
             updateBlockOrder();
+            
+            // Aktualizuj stan przycisków strzałek (góra/dół)
+            updateArrowButtons();
+            
+            // Obsługa checkboxów dla stałych elementów
+            const showInstructorSignature = document.getElementById('show_instructor_signature');
+            const instructorSignatureConfig = document.getElementById('instructor-signature-config');
+            const showFooter = document.getElementById('show_footer');
+            const footerConfig = document.getElementById('footer-config');
+            
+            if (showInstructorSignature && instructorSignatureConfig) {
+                // Ustaw początkowy stan
+                instructorSignatureConfig.style.display = showInstructorSignature.checked ? 'block' : 'none';
+                
+                showInstructorSignature.addEventListener('change', function() {
+                    instructorSignatureConfig.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+            
+            if (showFooter && footerConfig) {
+                // Ustaw początkowy stan
+                footerConfig.style.display = showFooter.checked ? 'block' : 'none';
+                
+                showFooter.addEventListener('change', function() {
+                    footerConfig.style.display = this.checked ? 'block' : 'none';
+                });
+            }
 
-            // Delegacja eventów dla usuwania bloków (działa dla istniejących i nowych)
+            // Delegacja eventów dla usuwania i przesuwania bloków (działa dla istniejących i nowych)
             document.addEventListener('click', function(e) {
+                // Obsługa przycisków przesuwania
+                if (e.target.classList.contains('move-block-up') || e.target.closest('.move-block-up')) {
+                    e.preventDefault();
+                    const btn = e.target.classList.contains('move-block-up') ? e.target : e.target.closest('.move-block-up');
+                    const blockItem = btn.closest('.block-item');
+                    if (blockItem) {
+                        moveBlockUp(blockItem);
+                    }
+                    return;
+                }
+                
+                if (e.target.classList.contains('move-block-down') || e.target.closest('.move-block-down')) {
+                    e.preventDefault();
+                    const btn = e.target.classList.contains('move-block-down') ? e.target : e.target.closest('.move-block-down');
+                    const blockItem = btn.closest('.block-item');
+                    if (blockItem) {
+                        moveBlockDown(blockItem);
+                    }
+                    return;
+                }
+                
+                // Obsługa usuwania bloków
                 if (e.target.classList.contains('remove-block-btn') || e.target.closest('.remove-block-btn')) {
                     e.preventDefault();
                     const btn = e.target.classList.contains('remove-block-btn') ? e.target : e.target.closest('.remove-block-btn');
@@ -624,18 +952,10 @@
                                     Dodaj bloki do szablonu klikając "Dodaj Blok" powyżej.
                                 </div>
                             `;
-                            // Zniszcz Sortable, bo nie ma bloków
-                            if (sortable) {
-                                sortable.destroy();
-                                sortable = null;
-                            }
-                        } else {
-                            // Reinicjalizuj Sortable po usunięciu bloku
-                            if (sortable) {
-                                sortable.destroy();
-                            }
-                            initializeSortable();
                         }
+                        // Aktualizuj kolejność i przyciski
+                        updateBlockOrder();
+                        updateArrowButtons();
                         console.log('Blok usunięty');
                     }
                 }
@@ -658,9 +978,14 @@
             
             let html = `
                 <div class="card mb-3 block-item" data-block-id="${blockId}">
-                    <div class="card-header d-flex justify-content-between align-items-center drag-handle" style="cursor: move;">
-                        <div>
-                            <i class="bi bi-grip-vertical me-2"></i>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary move-block-up" title="Przesuń w górę">
+                                <i class="bi bi-arrow-up"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary move-block-down" title="Przesuń w dół">
+                                <i class="bi bi-arrow-down"></i>
+                            </button>
                             <strong>${name}</strong>
                         </div>
                         <button type="button" class="btn btn-sm btn-danger remove-block-btn">
@@ -692,14 +1017,9 @@
             container.insertAdjacentHTML('beforeend', html);
             console.log('Blok dodany:', blockId);
             
-            // Reinicjalizuj Sortable po dodaniu nowego bloku
-            if (sortable) {
-                sortable.destroy();
-            }
-            initializeSortable();
-            
             // Aktualizuj kolejność wszystkich bloków (nowy blok dostanie poprawny order)
             updateBlockOrder();
+            updateArrowButtons();
             
             // Nie dodajemy event listenera tutaj - delegacja eventów obsługuje to globalnie
         }
@@ -883,43 +1203,67 @@
             gallery.insertAdjacentHTML('beforeend', html);
         }
 
-        // Funkcja inicjalizująca Sortable
-        function initializeSortable() {
-            const blocksContainer = document.getElementById('blocks-container');
-            
-            if (!blocksContainer) {
-                console.log('Brak kontenera bloków');
-                return;
+        // Funkcja przesuwająca blok w górę
+        function moveBlockUp(blockItem) {
+            const previousBlock = blockItem.previousElementSibling;
+            if (previousBlock && previousBlock.classList.contains('block-item')) {
+                // Dodaj klasę moving dla efektu wizualnego
+                blockItem.classList.add('moving');
+                
+                // Przesuń blok
+                blockItem.parentNode.insertBefore(blockItem, previousBlock);
+                
+                // Usuń klasę moving po animacji
+                setTimeout(() => {
+                    blockItem.classList.remove('moving');
+                }, 300);
+                
+                // Aktualizuj kolejność i przyciski
+                updateBlockOrder();
+                updateArrowButtons();
             }
-            
-            // Sprawdź czy są jakieś bloki do sortowania
-            const blockItems = blocksContainer.querySelectorAll('.block-item');
-            if (blockItems.length === 0) {
-                console.log('Brak bloków do sortowania');
-                return;
+        }
+        
+        // Funkcja przesuwająca blok w dół
+        function moveBlockDown(blockItem) {
+            const nextBlock = blockItem.nextElementSibling;
+            if (nextBlock && nextBlock.classList.contains('block-item')) {
+                // Dodaj klasę moving dla efektu wizualnego
+                blockItem.classList.add('moving');
+                
+                // Przesuń blok
+                blockItem.parentNode.insertBefore(nextBlock, blockItem);
+                
+                // Usuń klasę moving po animacji
+                setTimeout(() => {
+                    blockItem.classList.remove('moving');
+                }, 300);
+                
+                // Aktualizuj kolejność i przyciski
+                updateBlockOrder();
+                updateArrowButtons();
             }
-            
-            sortable = new Sortable(blocksContainer, {
-                animation: 150,
-                handle: '.drag-handle',
-                ghostClass: 'sortable-ghost',
-                chosenClass: 'sortable-chosen',
-                dragClass: 'sortable-drag',
-                onStart: function(evt) {
-                    evt.item.querySelector('.drag-handle').classList.add('dragging');
-                },
-                onEnd: function(evt) {
-                    evt.item.querySelector('.drag-handle').classList.remove('dragging');
-                    console.log('Blok przeniesiony z pozycji', evt.oldIndex, 'na pozycję', evt.newIndex);
-                    
-                    // Aktualizuj kolejność wszystkich bloków
-                    updateBlockOrder();
+        }
+        
+        // Funkcja aktualizująca stan przycisków strzałek (góra/dół)
+        function updateArrowButtons() {
+            const blockItems = document.querySelectorAll('.block-item');
+            blockItems.forEach((blockItem, index) => {
+                const upBtn = blockItem.querySelector('.move-block-up');
+                const downBtn = blockItem.querySelector('.move-block-down');
+                
+                // Pierwszy blok - wyłącz przycisk "w górę"
+                if (upBtn) {
+                    upBtn.disabled = (index === 0);
+                }
+                
+                // Ostatni blok - wyłącz przycisk "w dół"
+                if (downBtn) {
+                    downBtn.disabled = (index === blockItems.length - 1);
                 }
             });
-            
-            // console.log('Sortable zainicjalizowany dla', blockItems.length, 'bloków');
         }
-
+        
         // Funkcja aktualizująca pole 'order' dla wszystkich bloków
         function updateBlockOrder() {
             const blocksContainer = document.getElementById('blocks-container');

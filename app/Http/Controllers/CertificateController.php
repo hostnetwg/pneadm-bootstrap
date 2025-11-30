@@ -99,26 +99,47 @@ class CertificateController extends Controller
         $blocks = $config['blocks'] ?? [];
         $settings = $config['settings'] ?? [];
         
-        // Wyciągnięcie wartości z konfiguracji bloków
+        // Wyodrębnij stałe elementy (instructor_signature i footer) - zawsze na końcu
+        $regularBlocks = [];
+        $instructorSignatureBlock = null;
+        $footerBlock = null;
+        
+        foreach ($blocks as $block) {
+            $type = $block['type'] ?? '';
+            if ($type === 'instructor_signature') {
+                $instructorSignatureBlock = $block;
+            } elseif ($type === 'footer') {
+                $footerBlock = $block;
+            } else {
+                $regularBlocks[] = $block;
+            }
+        }
+        
+        // Sortuj regularne bloki według pola 'order'
+        usort($regularBlocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
+        // Wyciągnięcie wartości z konfiguracji bloków (dla kompatybilności wstecznej)
         $headerConfig = null;
         $courseInfoConfig = null;
         $footerConfig = null;
         
-        foreach ($blocks as $block) {
+        foreach ($regularBlocks as $block) {
             $type = $block['type'] ?? '';
             $blockConfig = $block['config'] ?? [];
             
-            switch ($type) {
-                case 'header':
-                    $headerConfig = $blockConfig;
-                    break;
-                case 'course_info':
-                    $courseInfoConfig = $blockConfig;
-                    break;
-                case 'footer':
-                    $footerConfig = $blockConfig;
-                    break;
+            if ($type === 'header') {
+                $headerConfig = $blockConfig;
+            } elseif ($type === 'course_info') {
+                $courseInfoConfig = $blockConfig;
             }
+        }
+        
+        if ($footerBlock) {
+            $footerConfig = $footerBlock['config'] ?? [];
         }
         
         // Tworzenie widoku PDF z przekazaniem wszystkich danych
@@ -137,6 +158,10 @@ class CertificateController extends Controller
             'headerConfig' => $headerConfig,
             'courseInfoConfig' => $courseInfoConfig,
             'footerConfig' => $footerConfig,
+            // Posortowane bloki do renderowania w odpowiedniej kolejności
+            'sortedBlocks' => $regularBlocks,
+            'instructorSignatureBlock' => $instructorSignatureBlock,
+            'footerBlock' => $footerBlock,
         ])->setPaper('A4', 'portrait')
           ->setOptions([
               'defaultFont' => 'DejaVu Sans', // Obsługa polskich znaków
