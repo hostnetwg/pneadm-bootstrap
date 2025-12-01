@@ -346,22 +346,38 @@
                                                                     </div>
                                                                     <div id="{{ $blockId }}_logo_preview">
                                                                         @if(!empty($block['config'][$fieldName]))
-                                                                            <div class="mt-2">
-                                                                                <img src="{{ asset('storage/' . $block['config'][$fieldName]) }}" 
-                                                                                     alt="Logo" 
-                                                                                     style="max-width: 150px; margin-top: 10px;" 
-                                                                                     class="img-thumbnail">
-                                                                                <div class="form-check mt-2">
-                                                                                    <input class="form-check-input" 
-                                                                                           type="checkbox" 
-                                                                                           id="remove_logo_{{ $blockId }}" 
-                                                                                           name="blocks[{{ $blockId }}][config][remove_logo]" 
-                                                                                           value="1">
-                                                                                    <label class="form-check-label" for="remove_logo_{{ $blockId }}">
-                                                                                        Usuń aktualne logo
-                                                                                    </label>
+                                                                            @php
+                                                                                $logoPath = $block['config'][$fieldName];
+                                                                                $logoUrl = asset('storage/' . $logoPath);
+                                                                                // Sprawdź czy plik istnieje (przez symlink)
+                                                                                $logoExists = file_exists(public_path('storage/' . $logoPath));
+                                                                            @endphp
+                                                                            @if($logoExists)
+                                                                                <div class="mt-2">
+                                                                                    <img src="{{ $logoUrl }}" 
+                                                                                         alt="Logo" 
+                                                                                         style="max-width: 150px; margin-top: 10px;" 
+                                                                                         class="img-thumbnail"
+                                                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                                                    <div class="alert alert-warning mt-2" style="display: none;">
+                                                                                        <small>Logo nie zostało znalezione: {{ $logoPath }}</small>
+                                                                                    </div>
+                                                                                    <div class="form-check mt-2">
+                                                                                        <input class="form-check-input" 
+                                                                                               type="checkbox" 
+                                                                                               id="remove_logo_{{ $blockId }}" 
+                                                                                               name="blocks[{{ $blockId }}][config][remove_logo]" 
+                                                                                               value="1">
+                                                                                        <label class="form-check-label" for="remove_logo_{{ $blockId }}">
+                                                                                            Usuń aktualne logo
+                                                                                        </label>
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
+                                                                            @else
+                                                                                <div class="alert alert-warning mt-2">
+                                                                                    <small>Logo nie zostało znalezione: {{ $logoPath }}</small>
+                                                                                </div>
+                                                                            @endif
                                                                         @endif
                                                                     </div>
                                                                 @else
@@ -584,10 +600,26 @@
                                                             </div>
                                                             <div id="{{ $blockId }}_logo_preview">
                                                                 @if(!empty($block['config'][$fieldName]))
-                                                                    <img src="{{ asset('storage/' . $block['config'][$fieldName]) }}" 
-                                                                         alt="Logo" 
-                                                                         style="max-width: 150px; margin-top: 10px;" 
-                                                                         class="img-thumbnail">
+                                                                    @php
+                                                                        $logoPath = $block['config'][$fieldName];
+                                                                        $logoUrl = asset('storage/' . $logoPath);
+                                                                        // Sprawdź czy plik istnieje (przez symlink)
+                                                                        $logoExists = file_exists(public_path('storage/' . $logoPath));
+                                                                    @endphp
+                                                                    @if($logoExists)
+                                                                        <img src="{{ $logoUrl }}" 
+                                                                             alt="Logo" 
+                                                                             style="max-width: 150px; margin-top: 10px;" 
+                                                                             class="img-thumbnail"
+                                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                                        <div class="alert alert-warning mt-2" style="display: none;">
+                                                                            <small>Logo nie zostało znalezione: {{ $logoPath }}</small>
+                                                                        </div>
+                                                                    @else
+                                                                        <div class="alert alert-warning mt-2">
+                                                                            <small>Logo nie zostało znalezione: {{ $logoPath }}</small>
+                                                                        </div>
+                                                                    @endif
                                                                 @endif
                                                             </div>
                                                         @else

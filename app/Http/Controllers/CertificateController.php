@@ -81,23 +81,47 @@ class CertificateController extends Controller
         $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
 
         // Określenie szablonu do użycia
-        $templateView = 'certificates.default'; // Domyślny szablon
+        // Wszystkie szablony są w pakiecie pne-certificate-generator
+        $templateView = 'pne-certificate-generator::certificates.default'; // Domyślny szablon z pakietu
         $templateConfig = null; // Konfiguracja szablonu
         
         // Jeśli kurs ma przypisany szablon, użyj go
         if ($course->certificate_template_id && $course->certificateTemplate) {
-            // Sprawdź czy plik blade istnieje
-            if ($course->certificateTemplate->bladeFileExists()) {
-                $templateView = $course->certificateTemplate->blade_path;
-                // Pobierz konfigurację szablonu
-                $templateConfig = $course->certificateTemplate->config;
+            // Pobierz konfigurację szablonu
+            $templateConfig = $course->certificateTemplate->config;
+            
+            // Użyj szablonu z pakietu (zawsze)
+            $templateView = $course->certificateTemplate->blade_path;
+            
+            // Sprawdź czy szablon istnieje w pakiecie
+            if (!\Illuminate\Support\Facades\View::exists($templateView)) {
+                \Log::warning('Template not found in package, using default', [
+                    'template_slug' => $course->certificateTemplate->slug,
+                    'template_id' => $course->certificateTemplate->id,
+                    'requested_view' => $templateView
+                ]);
+                // Użyj domyślnego szablonu, ale z konfiguracją z bazy
+                $templateView = 'pne-certificate-generator::certificates.default';
             }
         }
     
         // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
         $config = $templateConfig ?? [];
-        $blocks = $config['blocks'] ?? [];
+        $blocksRaw = $config['blocks'] ?? [];
         $settings = $config['settings'] ?? [];
+        
+        // Konwertuj blocks z obiektu na tablicę (jeśli jest obiektem)
+        $blocks = [];
+        if (is_array($blocksRaw)) {
+            // Sprawdź czy to obiekt (associative array) czy tablica numeryczna
+            if (array_keys($blocksRaw) !== range(0, count($blocksRaw) - 1)) {
+                // To jest obiekt (associative array) - konwertuj na tablicę
+                $blocks = array_values($blocksRaw);
+            } else {
+                // To już jest tablica numeryczna
+                $blocks = $blocksRaw;
+            }
+        }
         
         // Wyodrębnij stałe elementy (instructor_signature i footer) - zawsze na końcu
         $regularBlocks = [];

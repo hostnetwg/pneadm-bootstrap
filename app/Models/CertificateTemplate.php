@@ -35,18 +35,22 @@ class CertificateTemplate extends Model
 
     /**
      * Zwraca ścieżkę do pliku blade szablonu
+     * Zawsze z pakietu - szablony nie są już przechowywane lokalnie
      */
     public function getBladePathAttribute()
     {
-        return "certificates.{$this->slug}";
+        // Zawsze używaj pakietu
+        return "pne-certificate-generator::certificates.{$this->slug}";
     }
 
     /**
      * Sprawdza czy plik blade szablonu istnieje
+     * Sprawdza TYLKO w pakiecie - szablony nie są już przechowywane lokalnie
      */
     public function bladeFileExists()
     {
-        $path = resource_path("views/certificates/{$this->slug}.blade.php");
-        return file_exists($path);
+        // Sprawdź tylko w pakiecie
+        $packageView = "pne-certificate-generator::certificates.{$this->slug}";
+        return \Illuminate\Support\Facades\View::exists($packageView);
     }
 }

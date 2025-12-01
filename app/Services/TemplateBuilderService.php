@@ -9,23 +9,91 @@ class TemplateBuilderService
 {
     /**
      * Generuje plik blade z konfiguracji szablonu
+     * Zapisuje TYLKO w pakiecie pne-certificate-generator (wspólny dla obu projektów)
+     * NIE zapisuje lokalnie - wszystkie szablony muszą być w pakiecie
      */
     public function generateBladeFile($config, $slug)
     {
         $bladeContent = $this->buildBladeContent($config);
         
         $fileName = Str::slug($slug) . '.blade.php';
-        $path = resource_path("views/certificates/{$fileName}");
         
-        // Tworzenie folderu jeśli nie istnieje
-        $directory = dirname($path);
-        if (!File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
+        // Zapisuj TYLKO w pakiecie
+        $packagePath = $this->getPackagePath();
+        if (!$packagePath) {
+            throw new \Exception('Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume lub ścieżkę pakietu.');
         }
         
-        File::put($path, $bladeContent);
+        $packageFilePath = $packagePath . '/resources/views/certificates/' . $fileName;
+        $packageDirectory = dirname($packageFilePath);
         
-        return $fileName;
+        if (!File::exists($packageDirectory)) {
+            File::makeDirectory($packageDirectory, 0755, true);
+        }
+        
+        try {
+            File::put($packageFilePath, $bladeContent);
+            \Log::info('Template saved to package', [
+                'slug' => $slug,
+                'package_path' => $packageFilePath
+            ]);
+            return $fileName;
+        } catch (\Exception $e) {
+            \Log::error('Failed to save template to package', [
+                'slug' => $slug,
+                'package_path' => $packageFilePath,
+                'error' => $e->getMessage()
+            ]);
+            throw new \Exception('Nie udało się zapisać szablonu w pakiecie: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Pobiera ścieżkę do pakietu pne-certificate-generator
+     * Sprawdza różne możliwe lokalizacje (w kolejności priorytetu)
+     */
+    protected function getPackagePath(): ?string
+    {
+        // Opcja 1: Przez Docker volume (w kontenerze) - najwyższy priorytet
+        $dockerPath = '/var/www/pne-certificate-generator';
+        if (File::exists($dockerPath) && File::exists($dockerPath . '/composer.json')) {
+            return $dockerPath;
+        }
+        
+        // Opcja 2: Relatywna ścieżka z pneadm-bootstrap (dla lokalnego developmentu)
+        $relativePath = base_path('../pne-certificate-generator');
+        if (File::exists($relativePath) && File::exists($relativePath . '/composer.json')) {
+            return $relativePath;
+        }
+        
+        // Opcja 3: Przez vendor (jeśli pakiet jest zainstalowany przez Composer)
+        $vendorPath = base_path('vendor/pne/certificate-generator');
+        if (File::exists($vendorPath) && File::exists($vendorPath . '/composer.json')) {
+            return $vendorPath;
+        }
+        
+        // Opcja 4: Absolutna ścieżka (fallback dla WSL)
+        $absolutePath = '/home/hostnet/WEB-APP/pne-certificate-generator';
+        if (File::exists($absolutePath) && File::exists($absolutePath . '/composer.json')) {
+            return $absolutePath;
+        }
+        
+        // Opcja 5: Przez realpath (rozwiązuje symlinki i względne ścieżki)
+        $realPath = realpath(base_path('../pne-certificate-generator'));
+        if ($realPath && File::exists($realPath) && File::exists($realPath . '/composer.json')) {
+            return $realPath;
+        }
+        
+        // Loguj błąd dla debugowania
+        \Log::error('Cannot find pne-certificate-generator package', [
+            'docker_path' => $dockerPath . ' (exists: ' . (File::exists($dockerPath) ? 'yes' : 'no') . ')',
+            'relative_path' => $relativePath . ' (exists: ' . (File::exists($relativePath) ? 'yes' : 'no') . ')',
+            'vendor_path' => $vendorPath . ' (exists: ' . (File::exists($vendorPath) ? 'yes' : 'no') . ')',
+            'absolute_path' => $absolutePath . ' (exists: ' . (File::exists($absolutePath) ? 'yes' : 'no') . ')',
+            'base_path' => base_path(),
+        ]);
+        
+        return null;
     }
 
     /**

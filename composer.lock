@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "556abd259824d884b90d880f844f8c17",
+    "content-hash": "97067fef6d05d0528599a720e75d2975",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -2881,6 +2881,58 @@
                 }
             ],
             "time": "2024-07-20T21:41:07+00:00"
+        },
+        {
+            "name": "pne/certificate-generator",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:hostnetwg/pne-certificate-generator.git",
+                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hostnetwg/pne-certificate-generator/zipball/cdf984aa792eecd013b646545b6d6f4f4e051256",
+                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256",
+                "shasum": ""
+            },
+            "require": {
+                "barryvdh/laravel-dompdf": "^3.1",
+                "illuminate/database": "^11.0",
+                "illuminate/filesystem": "^11.0",
+                "illuminate/support": "^11.0",
+                "illuminate/view": "^11.0",
+                "php": "^8.2"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Pne\\CertificateGenerator\\CertificateGeneratorServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Pne\\CertificateGenerator\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "PNE Platform",
+                    "email": "info@pnedu.pl"
+                }
+            ],
+            "description": "Wspólny pakiet do generowania zaświadczeń dla platformy PNE",
+            "support": {
+                "source": "https://github.com/hostnetwg/pne-certificate-generator/tree/main",
+                "issues": "https://github.com/hostnetwg/pne-certificate-generator/issues"
+            },
+            "time": "2025-11-30T23:24:37+00:00"
         },
         {
             "name": "psr/clock",
@@ -8498,8 +8550,10 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "stable",
-    "stability-flags": {},
+    "minimum-stability": "dev",
+    "stability-flags": {
+        "pne/certificate-generator": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

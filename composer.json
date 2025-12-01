@@ -13,7 +13,8 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "guzzlehttp/guzzle": "^7.9",
         "laravel/framework": "^11.31",
-        "laravel/tinker": "^2.9"
+        "laravel/tinker": "^2.9",
+        "pne/certificate-generator": "dev-main"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -63,6 +64,12 @@
             "dont-discover": []
         }
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:hostnetwg/pne-certificate-generator.git"
+        }
+    ],
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
@@ -72,6 +79,6 @@
             "php-http/discovery": true
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }

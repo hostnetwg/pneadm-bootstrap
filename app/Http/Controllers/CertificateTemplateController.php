@@ -158,8 +158,37 @@ class CertificateTemplateController extends Controller
         }
         // Jeśli przesłano nowe tło (file upload)
         elseif ($request->hasFile('background_image')) {
-            // Zapisz nowe tło do galerii
-            $backgroundImagePath = $request->file('background_image')->store('certificates/backgrounds', 'public');
+            // Zapisz TYLKO w pakiecie
+            $file = $request->file('background_image');
+            $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+            
+            $packagePath = $this->getPackagePath();
+            if (!$packagePath) {
+                throw new \Exception('Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.');
+            }
+            
+            $packageStoragePath = $packagePath . '/storage/certificates/backgrounds';
+            $packageFilePath = $packageStoragePath . '/' . $filename;
+            
+            if (!File::exists($packageStoragePath)) {
+                File::makeDirectory($packageStoragePath, 0755, true);
+            }
+            
+            try {
+                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                $backgroundImagePath = 'certificates/backgrounds/' . $filename;
+                
+                \Log::info('Background saved to package during template update', [
+                    'package_path' => $packageFilePath,
+                    'filename' => $filename
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to save background to package during template update', [
+                    'package_path' => $packageFilePath,
+                    'error' => $e->getMessage()
+                ]);
+                throw new \Exception('Nie udało się zapisać tła w pakiecie: ' . $e->getMessage());
+            }
         }
         
         $config = [
@@ -342,8 +371,37 @@ class CertificateTemplateController extends Controller
         }
         // Jeśli przesłano nowe tło (file upload)
         elseif ($request->hasFile('background_image')) {
-            // Zapisz nowe tło do galerii
-            $backgroundImagePath = $request->file('background_image')->store('certificates/backgrounds', 'public');
+            // Zapisz TYLKO w pakiecie
+            $file = $request->file('background_image');
+            $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+            
+            $packagePath = $this->getPackagePath();
+            if (!$packagePath) {
+                throw new \Exception('Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.');
+            }
+            
+            $packageStoragePath = $packagePath . '/storage/certificates/backgrounds';
+            $packageFilePath = $packageStoragePath . '/' . $filename;
+            
+            if (!File::exists($packageStoragePath)) {
+                File::makeDirectory($packageStoragePath, 0755, true);
+            }
+            
+            try {
+                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                $backgroundImagePath = 'certificates/backgrounds/' . $filename;
+                
+                \Log::info('Background saved to package during template update', [
+                    'package_path' => $packageFilePath,
+                    'filename' => $filename
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to save background to package during template update', [
+                    'package_path' => $packageFilePath,
+                    'error' => $e->getMessage()
+                ]);
+                throw new \Exception('Nie udało się zapisać tła w pakiecie: ' . $e->getMessage());
+            }
         }
         
         $config = [
@@ -463,29 +521,63 @@ class CertificateTemplateController extends Controller
         
         // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
         $config = $certificateTemplate->config ?? [];
-        $blocks = $config['blocks'] ?? [];
+        $blocksRaw = $config['blocks'] ?? [];
         $settings = $config['settings'] ?? [];
         
-        // Wyciągnięcie wartości z konfiguracji bloków
+        // Konwertuj blocks z obiektu na tablicę (jeśli jest obiektem)
+        $blocks = [];
+        if (is_array($blocksRaw)) {
+            // Sprawdź czy to obiekt (associative array) czy tablica numeryczna
+            if (array_keys($blocksRaw) !== range(0, count($blocksRaw) - 1)) {
+                // To jest obiekt (associative array) - konwertuj na tablicę
+                $blocks = array_values($blocksRaw);
+            } else {
+                // To już jest tablica numeryczna
+                $blocks = $blocksRaw;
+            }
+        }
+        
+        // Wyodrębnij stałe elementy (instructor_signature i footer) - zawsze na końcu
+        $regularBlocks = [];
+        $instructorSignatureBlock = null;
+        $footerBlock = null;
+        
+        foreach ($blocks as $block) {
+            $type = $block['type'] ?? '';
+            if ($type === 'instructor_signature') {
+                $instructorSignatureBlock = $block;
+            } elseif ($type === 'footer') {
+                $footerBlock = $block;
+            } else {
+                $regularBlocks[] = $block;
+            }
+        }
+        
+        // Sortuj regularne bloki według pola 'order'
+        usort($regularBlocks, function($a, $b) {
+            $orderA = $a['order'] ?? 999;
+            $orderB = $b['order'] ?? 999;
+            return $orderA <=> $orderB;
+        });
+        
+        // Wyciągnięcie wartości z konfiguracji bloków (dla kompatybilności wstecznej)
         $headerConfig = null;
         $courseInfoConfig = null;
         $footerConfig = null;
         
-        foreach ($blocks as $block) {
+        foreach ($regularBlocks as $block) {
             $type = $block['type'] ?? '';
             $blockConfig = $block['config'] ?? [];
             
-            switch ($type) {
-                case 'header':
-                    $headerConfig = $blockConfig;
-                    break;
-                case 'course_info':
-                    $courseInfoConfig = $blockConfig;
-                    break;
-                case 'footer':
-                    $footerConfig = $blockConfig;
-                    break;
+            if ($type === 'header') {
+                $headerConfig = $blockConfig;
+            } elseif ($type === 'course_info') {
+                $courseInfoConfig = $blockConfig;
             }
+        }
+        
+        if ($footerBlock) {
+            $footerConfig = $footerBlock['config'] ?? [];
         }
         
         // Pobierz orientację i czcionkę z konfiguracji szablonu
@@ -505,6 +597,10 @@ class CertificateTemplateController extends Controller
             'headerConfig' => $headerConfig,
             'courseInfoConfig' => $courseInfoConfig,
             'footerConfig' => $footerConfig,
+            // Posortowane bloki do renderowania w odpowiedniej kolejności
+            'sortedBlocks' => $regularBlocks,
+            'instructorSignatureBlock' => $instructorSignatureBlock,
+            'footerBlock' => $footerBlock,
         ])->setPaper('A4', $orientation)
           ->setOptions([
               'defaultFont' => $fontFamily,
@@ -545,25 +641,30 @@ class CertificateTemplateController extends Controller
 
     /**
      * Pobiera listę dostępnych logo
+     * Sprawdza TYLKO pakiet - pliki nie są już przechowywane lokalnie
      */
     protected function getAvailableLogos()
     {
-        $logosPath = 'certificates/logos';
-        
-        if (!Storage::disk('public')->exists($logosPath)) {
-            Storage::disk('public')->makeDirectory($logosPath);
-        }
-        
-        $files = Storage::disk('public')->files($logosPath);
-        
         $logos = [];
-        foreach ($files as $file) {
-            $logos[] = [
-                'path' => $file,
-                'url' => asset('storage/' . $file), // Prawidłowa ścieżka publiczna
-                'name' => basename($file),
-                'size' => Storage::disk('public')->size($file)
-            ];
+        
+        // Sprawdź TYLKO pakiet
+        $packagePath = $this->getPackagePath();
+        if ($packagePath) {
+            $packageLogosPath = $packagePath . '/storage/certificates/logos';
+            if (File::exists($packageLogosPath)) {
+                $packageFiles = File::files($packageLogosPath);
+                foreach ($packageFiles as $file) {
+                    $filename = $file->getFilename();
+                    $logos[] = [
+                        'path' => 'certificates/logos/' . $filename,
+                        'url' => asset('storage/certificates/logos/' . $filename), // URL przez symlink
+                        'name' => $filename,
+                        'size' => $file->getSize()
+                    ];
+                }
+            }
+        } else {
+            \Log::warning('Package path not found when getting available logos');
         }
         
         return $logos;
@@ -571,25 +672,30 @@ class CertificateTemplateController extends Controller
 
     /**
      * Pobiera listę dostępnych tła
+     * Sprawdza TYLKO pakiet - pliki nie są już przechowywane lokalnie
      */
     protected function getAvailableBackgrounds()
     {
-        $backgroundsPath = 'certificates/backgrounds';
-        
-        if (!Storage::disk('public')->exists($backgroundsPath)) {
-            Storage::disk('public')->makeDirectory($backgroundsPath);
-        }
-        
-        $files = Storage::disk('public')->files($backgroundsPath);
-        
         $backgrounds = [];
-        foreach ($files as $file) {
-            $backgrounds[] = [
-                'path' => $file,
-                'url' => asset('storage/' . $file),
-                'name' => basename($file),
-                'size' => Storage::disk('public')->size($file)
-            ];
+        
+        // Sprawdź TYLKO pakiet
+        $packagePath = $this->getPackagePath();
+        if ($packagePath) {
+            $packageBackgroundsPath = $packagePath . '/storage/certificates/backgrounds';
+            if (File::exists($packageBackgroundsPath)) {
+                $packageFiles = File::files($packageBackgroundsPath);
+                foreach ($packageFiles as $file) {
+                    $filename = $file->getFilename();
+                    $backgrounds[] = [
+                        'path' => 'certificates/backgrounds/' . $filename,
+                        'url' => asset('storage/certificates/backgrounds/' . $filename), // URL przez symlink
+                        'name' => $filename,
+                        'size' => $file->getSize()
+                    ];
+                }
+            }
+        } else {
+            \Log::warning('Package path not found when getting available backgrounds');
         }
         
         return $backgrounds;
@@ -597,6 +703,8 @@ class CertificateTemplateController extends Controller
 
     /**
      * Upload nowego logo
+     * Zapisuje TYLKO w pakiecie pne-certificate-generator (wspólny dla obu projektów)
+     * NIE tworzy lokalnych kopii
      */
     public function uploadLogo(Request $request)
     {
@@ -608,14 +716,53 @@ class CertificateTemplateController extends Controller
             $file = $request->file('logo');
             $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
             
-            $path = $file->storeAs('certificates/logos', $filename, 'public');
+            // Zapisuj TYLKO w pakiecie
+            $packagePath = $this->getPackagePath();
+            if (!$packagePath) {
+                \Log::error('Package path not found for logo upload');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.'
+                ], 500);
+            }
             
-            return response()->json([
-                'success' => true,
-                'path' => $path,
-                'url' => asset('storage/' . $path), // Prawidłowa ścieżka publiczna
-                'name' => $filename
-            ]);
+            $packageStoragePath = $packagePath . '/storage/certificates/logos';
+            $packageFilePath = $packageStoragePath . '/' . $filename;
+            
+            if (!File::exists($packageStoragePath)) {
+                File::makeDirectory($packageStoragePath, 0755, true);
+            }
+            
+            try {
+                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                
+                \Log::info('Logo saved to package', [
+                    'package_path' => $packageFilePath,
+                    'filename' => $filename
+                ]);
+                
+                // URL do pliku z pakietu (przez symlink lub bezpośredni dostęp)
+                // W Docker volume plik jest dostępny bezpośrednio
+                $url = asset('storage/certificates/logos/' . $filename);
+                
+                return response()->json([
+                    'success' => true,
+                    'path' => 'certificates/logos/' . $filename, // Względna ścieżka
+                    'url' => $url,
+                    'name' => $filename
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to save logo to package', [
+                    'package_path' => $packageFilePath,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nie udało się zapisać logo w pakiecie: ' . $e->getMessage()
+                ], 500);
+            }
         }
 
         return response()->json([
@@ -623,9 +770,36 @@ class CertificateTemplateController extends Controller
             'message' => 'Nie przesłano pliku'
         ], 400);
     }
+    
+    /**
+     * Pobiera ścieżkę do pakietu pne-certificate-generator
+     */
+    protected function getPackagePath(): ?string
+    {
+        // Opcja 1: Przez Docker volume (w kontenerze)
+        $dockerPath = '/var/www/pne-certificate-generator';
+        if (File::exists($dockerPath)) {
+            return $dockerPath;
+        }
+        
+        // Opcja 2: Relatywna ścieżka z pneadm-bootstrap
+        $relativePath = base_path('../pne-certificate-generator');
+        if (File::exists($relativePath)) {
+            return $relativePath;
+        }
+        
+        // Opcja 3: Przez vendor (jeśli pakiet jest zainstalowany przez Composer)
+        $vendorPath = base_path('vendor/pne/certificate-generator');
+        if (File::exists($vendorPath)) {
+            return $vendorPath;
+        }
+        
+        return null;
+    }
 
     /**
      * Usuwa logo
+     * Usuwa TYLKO z pakietu - pliki nie są już przechowywane lokalnie
      */
     public function deleteLogo(Request $request)
     {
@@ -635,23 +809,66 @@ class CertificateTemplateController extends Controller
 
         $path = $request->input('path');
         
-        if (Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->delete($path);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Logo zostało usunięte'
-            ]);
+        // Normalizuj ścieżkę (usuń ewentualne prefiksy)
+        $normalizedPath = ltrim($path, '/');
+        if (strpos($normalizedPath, 'storage/') === 0) {
+            $normalizedPath = substr($normalizedPath, 8); // Usuń 'storage/'
         }
+        
+        // Usuń TYLKO z pakietu
+        $packagePath = $this->getPackagePath();
+        if (!$packagePath) {
+            \Log::error('Package path not found when deleting logo', ['path' => $path]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Nie można znaleźć pakietu pne-certificate-generator.'
+            ], 500);
+        }
+        
+        $packagePaths = [
+            $packagePath . '/storage/' . $normalizedPath,
+            $packagePath . '/storage/certificates/logos/' . basename($normalizedPath), // Jeśli tylko nazwa pliku
+        ];
+        
+        foreach ($packagePaths as $packageFilePath) {
+            if (File::exists($packageFilePath)) {
+                try {
+                    File::delete($packageFilePath);
+                    \Log::info('Logo deleted from package', ['path' => $packageFilePath]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Logo zostało usunięte'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to delete logo from package', [
+                        'path' => $packageFilePath,
+                        'error' => $e->getMessage()
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Nie udało się usunąć logo: ' . $e->getMessage()
+                    ], 500);
+                }
+            }
+        }
+
+        \Log::warning('Logo deletion failed - file not found in package', [
+            'requested_path' => $path,
+            'normalized_path' => $normalizedPath,
+            'package_path' => $packagePath,
+            'checked_paths' => $packagePaths
+        ]);
 
         return response()->json([
             'success' => false,
-            'message' => 'Plik nie istnieje'
+            'message' => 'Plik nie istnieje w pakiecie.'
         ], 404);
     }
 
     /**
      * Upload nowego tła
+     * Zapisuje TYLKO w pakiecie pne-certificate-generator (wspólny dla obu projektów)
+     * NIE tworzy lokalnych kopii
      */
     public function uploadBackground(Request $request)
     {
@@ -663,14 +880,52 @@ class CertificateTemplateController extends Controller
             $file = $request->file('background');
             $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
             
-            $path = $file->storeAs('certificates/backgrounds', $filename, 'public');
+            // Zapisuj TYLKO w pakiecie
+            $packagePath = $this->getPackagePath();
+            if (!$packagePath) {
+                \Log::error('Package path not found for background upload');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.'
+                ], 500);
+            }
             
-            return response()->json([
-                'success' => true,
-                'path' => $path,
-                'url' => asset('storage/' . $path),
-                'name' => $filename
-            ]);
+            $packageStoragePath = $packagePath . '/storage/certificates/backgrounds';
+            $packageFilePath = $packageStoragePath . '/' . $filename;
+            
+            if (!File::exists($packageStoragePath)) {
+                File::makeDirectory($packageStoragePath, 0755, true);
+            }
+            
+            try {
+                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                
+                \Log::info('Background saved to package', [
+                    'package_path' => $packageFilePath,
+                    'filename' => $filename
+                ]);
+                
+                // URL do pliku z pakietu (przez symlink lub bezpośredni dostęp)
+                $url = asset('storage/certificates/backgrounds/' . $filename);
+                
+                return response()->json([
+                    'success' => true,
+                    'path' => 'certificates/backgrounds/' . $filename, // Względna ścieżka
+                    'url' => $url,
+                    'name' => $filename
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to save background to package', [
+                    'package_path' => $packageFilePath,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nie udało się zapisać tła w pakiecie: ' . $e->getMessage()
+                ], 500);
+            }
         }
 
         return response()->json([
@@ -681,6 +936,7 @@ class CertificateTemplateController extends Controller
 
     /**
      * Usuwa tło
+     * Usuwa TYLKO z pakietu - pliki nie są już przechowywane lokalnie
      */
     public function deleteBackground(Request $request)
     {
@@ -690,18 +946,61 @@ class CertificateTemplateController extends Controller
 
         $path = $request->input('path');
         
-        if (Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->delete($path);
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Tło zostało usunięte'
-            ]);
+        // Normalizuj ścieżkę (usuń ewentualne prefiksy i zamień stare ścieżki)
+        $normalizedPath = ltrim($path, '/');
+        if (strpos($normalizedPath, 'storage/') === 0) {
+            $normalizedPath = substr($normalizedPath, 8); // Usuń 'storage/'
         }
+        // Zamień stare ścieżki na nowe
+        $normalizedPath = str_replace('certificate-backgrounds/', 'certificates/backgrounds/', $normalizedPath);
+        
+        // Usuń TYLKO z pakietu
+        $packagePath = $this->getPackagePath();
+        if (!$packagePath) {
+            \Log::error('Package path not found when deleting background', ['path' => $path]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Nie można znaleźć pakietu pne-certificate-generator.'
+            ], 500);
+        }
+        
+        $packagePaths = [
+            $packagePath . '/storage/' . $normalizedPath,
+            $packagePath . '/storage/certificates/backgrounds/' . basename($normalizedPath), // Jeśli tylko nazwa pliku
+        ];
+        
+        foreach ($packagePaths as $packageFilePath) {
+            if (File::exists($packageFilePath)) {
+                try {
+                    File::delete($packageFilePath);
+                    \Log::info('Background deleted from package', ['path' => $packageFilePath]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Tło zostało usunięte'
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to delete background from package', [
+                        'path' => $packageFilePath,
+                        'error' => $e->getMessage()
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Nie udało się usunąć tła: ' . $e->getMessage()
+                    ], 500);
+                }
+            }
+        }
+
+        \Log::warning('Background deletion failed - file not found in package', [
+            'requested_path' => $path,
+            'normalized_path' => $normalizedPath,
+            'package_path' => $packagePath,
+            'checked_paths' => $packagePaths
+        ]);
 
         return response()->json([
             'success' => false,
-            'message' => 'Plik nie istnieje'
+            'message' => 'Plik nie istnieje w pakiecie.'
         ], 404);
     }
 }

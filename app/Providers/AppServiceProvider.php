@@ -26,5 +26,8 @@ class AppServiceProvider extends ServiceProvider
         
         // Rejestracja Observer dla automatycznego zapisu uczestników
         FormOrder::observe(FormOrderObserver::class);
+        
+        // ServiceProvider dla pne-certificate-generator jest automatycznie wykrywany
+        // przez Laravel dzięki konfiguracji w composer.json pakietu
     }
 }
