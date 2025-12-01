@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "97067fef6d05d0528599a720e75d2975",
+    "content-hash": "ec978bda9feb286e94d77e8978e2f951",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -2885,16 +2885,10 @@
         {
             "name": "pne/certificate-generator",
             "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "git@github.com:hostnetwg/pne-certificate-generator.git",
-                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256"
-            },
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/hostnetwg/pne-certificate-generator/zipball/cdf984aa792eecd013b646545b6d6f4f4e051256",
-                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256",
-                "shasum": ""
+                "type": "path",
+                "url": "/var/www/pne-certificate-generator",
+                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256"
             },
             "require": {
                 "barryvdh/laravel-dompdf": "^3.1",
@@ -2904,7 +2898,6 @@
                 "illuminate/view": "^11.0",
                 "php": "^8.2"
             },
-            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -2928,11 +2921,9 @@
                 }
             ],
             "description": "Wspólny pakiet do generowania zaświadczeń dla platformy PNE",
-            "support": {
-                "source": "https://github.com/hostnetwg/pne-certificate-generator/tree/main",
-                "issues": "https://github.com/hostnetwg/pne-certificate-generator/issues"
-            },
-            "time": "2025-11-30T23:24:37+00:00"
+            "transport-options": {
+                "relative": false
+            }
         },
         {
             "name": "psr/clock",

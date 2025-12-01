@@ -66,8 +66,8 @@
     },
     "repositories": [
         {
-            "type": "vcs",
-            "url": "git@github.com:hostnetwg/pne-certificate-generator.git"
+            "type": "path",
+            "url": "/var/www/pne-certificate-generator"
         }
     ],
     "config": {

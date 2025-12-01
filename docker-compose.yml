@@ -19,6 +19,7 @@ services:
       IGNITION_LOCAL_SITES_PATH: '${PWD}'
     volumes:
       - '.:/var/www/html'
+      - '../pne-certificate-generator:/var/www/pne-certificate-generator'
     networks:
       - sail
     depends_on:
