@@ -296,10 +296,55 @@ class PubligoController extends Controller
                     continue;
                 }
 
-                // Sprawdź czy kurs ma ograniczony czas dostępu
+                // Oblicz datę końcową dostępu dla kursów Publigo
+                // Zasada: 2 miesiące dostępu do nagrania po zakończeniu szkolenia
                 $accessExpiresAt = null;
-                if ($course->access_duration_days) {
-                    $accessExpiresAt = now()->addDays($course->access_duration_days);
+                $now = now();
+                
+                if ($course->start_date) {
+                    // Kurs ma datę rozpoczęcia - użyj nowej logiki (2 miesiące)
+                    $startDate = $course->start_date;
+                    
+                    if ($now->lt($startDate)) {
+                        // Zapis PRZED datą rozpoczęcia kursu
+                        // Dostęp do 2 miesięcy od daty rozpoczęcia kursu
+                        $accessExpiresAt = $startDate->copy()->addMonths(2);
+                        
+                        \Log::info('Access expires: 2 months from course start date (registration before start)', [
+                            'course_id' => $course->id,
+                            'course_title' => $course->title,
+                            'start_date' => $startDate->format('Y-m-d H:i:s'),
+                            'registration_date' => $now->format('Y-m-d H:i:s'),
+                            'access_expires_at' => $accessExpiresAt->format('Y-m-d H:i:s'),
+                            'order_id' => $orderId
+                        ]);
+                    } else {
+                        // Zapis PO dacie rozpoczęcia kursu
+                        // Dostęp do 2 miesięcy od daty zapisu (zakupu)
+                        $accessExpiresAt = $now->copy()->addMonths(2);
+                        
+                        \Log::info('Access expires: 2 months from registration date (registration after start)', [
+                            'course_id' => $course->id,
+                            'course_title' => $course->title,
+                            'start_date' => $startDate->format('Y-m-d H:i:s'),
+                            'registration_date' => $now->format('Y-m-d H:i:s'),
+                            'access_expires_at' => $accessExpiresAt->format('Y-m-d H:i:s'),
+                            'order_id' => $orderId
+                        ]);
+                    }
+                } else {
+                    // Kurs nie ma daty rozpoczęcia - użyj starej logiki (access_duration_days) jako fallback
+                    if ($course->access_duration_days) {
+                        $accessExpiresAt = $now->copy()->addDays($course->access_duration_days);
+                        
+                        \Log::info('Access expires: using access_duration_days (course without start_date)', [
+                            'course_id' => $course->id,
+                            'course_title' => $course->title,
+                            'access_duration_days' => $course->access_duration_days,
+                            'access_expires_at' => $accessExpiresAt->format('Y-m-d H:i:s'),
+                            'order_id' => $orderId
+                        ]);
+                    }
                 }
 
                 // Sprawdź czy istnieje wcześniejszy uczestnik z tym samym e-mailem,
@@ -348,6 +393,7 @@ class PubligoController extends Controller
                     'birth_date' => $participant->birth_date?->format('Y-m-d'),
                     'birth_place' => $participant->birth_place,
                     'data_copied_from_previous' => $previousParticipant ? true : false,
+                    'access_expires_at' => $participant->access_expires_at?->format('Y-m-d H:i:s'),
                     'order_id' => $orderId
                 ]);
 
