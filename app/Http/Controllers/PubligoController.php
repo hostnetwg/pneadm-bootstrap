@@ -302,14 +302,40 @@ class PubligoController extends Controller
                     $accessExpiresAt = now()->addDays($course->access_duration_days);
                 }
 
+                // Sprawdź czy istnieje wcześniejszy uczestnik z tym samym e-mailem,
+                // który ma wypełnione oba pola: birth_date i birth_place
+                $previousParticipant = Participant::where('email', $customer['email'])
+                    ->whereNotNull('birth_date')
+                    ->whereNotNull('birth_place')
+                    ->orderBy('created_at', 'desc') // Najnowszy uczestnik z tymi danymi
+                    ->first();
+
+                $birthDate = null;
+                $birthPlace = null;
+
+                if ($previousParticipant) {
+                    $birthDate = $previousParticipant->birth_date;
+                    $birthPlace = $previousParticipant->birth_place;
+                    
+                    \Log::info('Found previous participant with birth data - copying to new participant', [
+                        'email' => $customer['email'],
+                        'previous_participant_id' => $previousParticipant->id,
+                        'previous_course_id' => $previousParticipant->course_id,
+                        'birth_date' => $birthDate?->format('Y-m-d'),
+                        'birth_place' => $birthPlace,
+                        'new_course_id' => $course->id,
+                        'order_id' => $orderId
+                    ]);
+                }
+
                 // Utwórz nowego uczestnika
                 $participant = Participant::create([
                     'course_id' => $course->id,
                     'first_name' => $customer['first_name'],
                     'last_name' => $customer['last_name'],
                     'email' => $customer['email'],
-                    'birth_date' => null, // Publigo nie wysyła daty urodzenia
-                    'birth_place' => null, // Publigo nie wysyła miejsca urodzenia
+                    'birth_date' => $birthDate, // Skopiowane z poprzedniego uczestnika lub null
+                    'birth_place' => $birthPlace, // Skopiowane z poprzedniego uczestnika lub null
                     'order' => Participant::where('course_id', $course->id)->count() + 1,
                     'access_expires_at' => $accessExpiresAt
                 ]);
@@ -319,6 +345,9 @@ class PubligoController extends Controller
                     'course_id' => $course->id,
                     'course_title' => $course->title,
                     'email' => $customer['email'],
+                    'birth_date' => $participant->birth_date?->format('Y-m-d'),
+                    'birth_place' => $participant->birth_place,
+                    'data_copied_from_previous' => $previousParticipant ? true : false,
                     'order_id' => $orderId
                 ]);
 
