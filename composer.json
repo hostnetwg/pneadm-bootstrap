@@ -67,7 +67,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "/var/www/pne-certificate-generator"
+            "url": "../pne-certificate-generator"
         }
     ],
     "config": {

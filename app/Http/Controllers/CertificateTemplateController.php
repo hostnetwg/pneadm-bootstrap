@@ -647,7 +647,7 @@ class CertificateTemplateController extends Controller
     {
         $logos = [];
         
-        // Sprawdź TYLKO pakiet
+        // 1. Sprawdź w pakiecie (dev lub jeśli pakiet jest zapisywalny)
         $packagePath = $this->getPackagePath();
         if ($packagePath) {
             $packageLogosPath = $packagePath . '/storage/certificates/logos';
@@ -657,14 +657,39 @@ class CertificateTemplateController extends Controller
                     $filename = $file->getFilename();
                     $logos[] = [
                         'path' => 'certificates/logos/' . $filename,
-                        'url' => asset('storage/certificates/logos/' . $filename), // URL przez symlink
+                        'url' => asset('storage/certificates/logos/' . $filename),
                         'name' => $filename,
-                        'size' => $file->getSize()
+                        'size' => $file->getSize(),
+                        'source' => 'package'
                     ];
                 }
             }
-        } else {
-            \Log::warning('Package path not found when getting available logos');
+        }
+        
+        // 2. Sprawdź w storage aplikacji (produkcja - gdy pakiet jest w vendor)
+        $appLogosPath = storage_path('app/public/certificates/logos');
+        if (File::exists($appLogosPath)) {
+            $appFiles = File::files($appLogosPath);
+            foreach ($appFiles as $file) {
+                $filename = $file->getFilename();
+                // Sprawdź czy już nie ma w liście (unikaj duplikatów)
+                $exists = false;
+                foreach ($logos as $existing) {
+                    if ($existing['name'] === $filename) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    $logos[] = [
+                        'path' => 'certificates/logos/' . $filename,
+                        'url' => asset('storage/certificates/logos/' . $filename),
+                        'name' => $filename,
+                        'size' => $file->getSize(),
+                        'source' => 'app'
+                    ];
+                }
+            }
         }
         
         return $logos;
@@ -672,13 +697,13 @@ class CertificateTemplateController extends Controller
 
     /**
      * Pobiera listę dostępnych tła
-     * Sprawdza TYLKO pakiet - pliki nie są już przechowywane lokalnie
+     * Sprawdza pakiet (dev) i storage aplikacji (produkcja)
      */
     protected function getAvailableBackgrounds()
     {
         $backgrounds = [];
         
-        // Sprawdź TYLKO pakiet
+        // 1. Sprawdź w pakiecie (dev lub jeśli pakiet jest zapisywalny)
         $packagePath = $this->getPackagePath();
         if ($packagePath) {
             $packageBackgroundsPath = $packagePath . '/storage/certificates/backgrounds';
@@ -688,14 +713,39 @@ class CertificateTemplateController extends Controller
                     $filename = $file->getFilename();
                     $backgrounds[] = [
                         'path' => 'certificates/backgrounds/' . $filename,
-                        'url' => asset('storage/certificates/backgrounds/' . $filename), // URL przez symlink
+                        'url' => asset('storage/certificates/backgrounds/' . $filename),
                         'name' => $filename,
-                        'size' => $file->getSize()
+                        'size' => $file->getSize(),
+                        'source' => 'package'
                     ];
                 }
             }
-        } else {
-            \Log::warning('Package path not found when getting available backgrounds');
+        }
+        
+        // 2. Sprawdź w storage aplikacji (produkcja - gdy pakiet jest w vendor)
+        $appBackgroundsPath = storage_path('app/public/certificates/backgrounds');
+        if (File::exists($appBackgroundsPath)) {
+            $appFiles = File::files($appBackgroundsPath);
+            foreach ($appFiles as $file) {
+                $filename = $file->getFilename();
+                // Sprawdź czy już nie ma w liście (unikaj duplikatów)
+                $exists = false;
+                foreach ($backgrounds as $existing) {
+                    if ($existing['name'] === $filename) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    $backgrounds[] = [
+                        'path' => 'certificates/backgrounds/' . $filename,
+                        'url' => asset('storage/certificates/backgrounds/' . $filename),
+                        'name' => $filename,
+                        'size' => $file->getSize(),
+                        'source' => 'app'
+                    ];
+                }
+            }
         }
         
         return $backgrounds;
@@ -716,53 +766,63 @@ class CertificateTemplateController extends Controller
             $file = $request->file('logo');
             $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
             
-            // Zapisuj TYLKO w pakiecie
-            $packagePath = $this->getPackagePath();
-            if (!$packagePath) {
-                \Log::error('Package path not found for logo upload');
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.'
-                ], 500);
-            }
+            $relativePath = 'certificates/logos/' . $filename;
+            $savedPath = null;
             
-            $packageStoragePath = $packagePath . '/storage/certificates/logos';
-            $packageFilePath = $packageStoragePath . '/' . $filename;
-            
-            if (!File::exists($packageStoragePath)) {
-                File::makeDirectory($packageStoragePath, 0755, true);
-            }
-            
-            try {
-                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+            // Sprawdź czy pakiet jest zapisywalny
+            if ($this->isPackageWritable()) {
+                // Dev: zapisz w pakiecie
+                $packagePath = $this->getPackagePath();
+                $packageStoragePath = $packagePath . '/storage/certificates/logos';
+                $packageFilePath = $packageStoragePath . '/' . $filename;
                 
-                \Log::info('Logo saved to package', [
-                    'package_path' => $packageFilePath,
+                if (!File::exists($packageStoragePath)) {
+                    File::makeDirectory($packageStoragePath, 0755, true);
+                }
+                
+                try {
+                    File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                    $savedPath = $packageFilePath;
+                    
+                    \Log::info('Logo saved to package', [
+                        'package_path' => $packageFilePath,
+                        'filename' => $filename
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to save logo to package', [
+                        'package_path' => $packageFilePath,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Fallback do storage aplikacji
+                    $this->saveToAppStorage($file, $relativePath);
+                    $savedPath = storage_path('app/public/' . $relativePath);
+                }
+            } else {
+                // Produkcja: zapisz w storage aplikacji
+                $this->saveToAppStorage($file, $relativePath);
+                $savedPath = storage_path('app/public/' . $relativePath);
+                
+                \Log::info('Logo saved to app storage (production)', [
+                    'path' => $savedPath,
                     'filename' => $filename
                 ]);
-                
-                // URL do pliku z pakietu (przez symlink lub bezpośredni dostęp)
-                // W Docker volume plik jest dostępny bezpośrednio
-                $url = asset('storage/certificates/logos/' . $filename);
+            }
+            
+            if ($savedPath && File::exists($savedPath)) {
+                $url = asset('storage/' . $relativePath);
                 
                 return response()->json([
                     'success' => true,
-                    'path' => 'certificates/logos/' . $filename, // Względna ścieżka
+                    'path' => $relativePath,
                     'url' => $url,
                     'name' => $filename
                 ]);
-            } catch (\Exception $e) {
-                \Log::error('Failed to save logo to package', [
-                    'package_path' => $packageFilePath,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nie udało się zapisać logo w pakiecie: ' . $e->getMessage()
-                ], 500);
             }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Nie udało się zapisać logo'
+            ], 500);
         }
 
         return response()->json([
@@ -798,8 +858,59 @@ class CertificateTemplateController extends Controller
     }
 
     /**
+     * Sprawdza czy pakiet jest zapisywalny (path repository) czy tylko do odczytu (vendor)
+     */
+    protected function isPackageWritable(): bool
+    {
+        $packagePath = $this->getPackagePath();
+        
+        if (!$packagePath) {
+            return false;
+        }
+        
+        // Jeśli pakiet jest w vendor - nie jest zapisywalny
+        if (strpos($packagePath, 'vendor/') !== false) {
+            return false;
+        }
+        
+        // Sprawdź czy można zapisać w katalogu storage pakietu
+        $testPath = $packagePath . '/storage';
+        if (!File::exists($testPath)) {
+            return false;
+        }
+        
+        // Sprawdź uprawnienia - próba utworzenia testowego pliku
+        $testFile = $testPath . '/.writable_test_' . time();
+        try {
+            @File::put($testFile, 'test');
+            if (File::exists($testFile)) {
+                File::delete($testFile);
+                return true;
+            }
+        } catch (\Exception $e) {
+            return false;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Zapisuje plik do storage aplikacji
+     */
+    protected function saveToAppStorage($file, string $relativePath): void
+    {
+        $directory = dirname(storage_path('app/public/' . $relativePath));
+        
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+        
+        Storage::disk('public')->put($relativePath, file_get_contents($file->getRealPath()));
+    }
+
+    /**
      * Usuwa logo
-     * Usuwa TYLKO z pakietu - pliki nie są już przechowywane lokalnie
+     * Usuwa z pakietu lub storage aplikacji
      */
     public function deleteLogo(Request $request)
     {
@@ -815,60 +926,64 @@ class CertificateTemplateController extends Controller
             $normalizedPath = substr($normalizedPath, 8); // Usuń 'storage/'
         }
         
-        // Usuń TYLKO z pakietu
+        $deleted = false;
+        
+        // 1. Spróbuj usunąć z pakietu
         $packagePath = $this->getPackagePath();
-        if (!$packagePath) {
-            \Log::error('Package path not found when deleting logo', ['path' => $path]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Nie można znaleźć pakietu pne-certificate-generator.'
-            ], 500);
-        }
-        
-        $packagePaths = [
-            $packagePath . '/storage/' . $normalizedPath,
-            $packagePath . '/storage/certificates/logos/' . basename($normalizedPath), // Jeśli tylko nazwa pliku
-        ];
-        
-        foreach ($packagePaths as $packageFilePath) {
-            if (File::exists($packageFilePath)) {
-                try {
-                    File::delete($packageFilePath);
-                    \Log::info('Logo deleted from package', ['path' => $packageFilePath]);
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Logo zostało usunięte'
-                    ]);
-                } catch (\Exception $e) {
-                    \Log::error('Failed to delete logo from package', [
-                        'path' => $packageFilePath,
-                        'error' => $e->getMessage()
-                    ]);
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Nie udało się usunąć logo: ' . $e->getMessage()
-                    ], 500);
+        if ($packagePath) {
+            $packagePaths = [
+                $packagePath . '/storage/' . $normalizedPath,
+                $packagePath . '/storage/certificates/logos/' . basename($normalizedPath),
+            ];
+            
+            foreach ($packagePaths as $packageFilePath) {
+                if (File::exists($packageFilePath)) {
+                    try {
+                        File::delete($packageFilePath);
+                        \Log::info('Logo deleted from package', ['path' => $packageFilePath]);
+                        $deleted = true;
+                        break;
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to delete logo from package', [
+                            'path' => $packageFilePath,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
             }
         }
-
-        \Log::warning('Logo deletion failed - file not found in package', [
-            'requested_path' => $path,
-            'normalized_path' => $normalizedPath,
-            'package_path' => $packagePath,
-            'checked_paths' => $packagePaths
-        ]);
-
+        
+        // 2. Spróbuj usunąć z storage aplikacji
+        $appPath = storage_path('app/public/' . $normalizedPath);
+        if (File::exists($appPath)) {
+            try {
+                File::delete($appPath);
+                \Log::info('Logo deleted from app storage', ['path' => $appPath]);
+                $deleted = true;
+            } catch (\Exception $e) {
+                \Log::error('Failed to delete logo from app storage', [
+                    'path' => $appPath,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        if ($deleted) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Logo zostało usunięte'
+            ]);
+        }
+        
         return response()->json([
             'success' => false,
-            'message' => 'Plik nie istnieje w pakiecie.'
+            'message' => 'Plik nie istnieje.'
         ], 404);
     }
 
     /**
      * Upload nowego tła
-     * Zapisuje TYLKO w pakiecie pne-certificate-generator (wspólny dla obu projektów)
-     * NIE tworzy lokalnych kopii
+     * Zapisuje w pakiecie (dev) lub w storage aplikacji (produkcja)
      */
     public function uploadBackground(Request $request)
     {
@@ -880,52 +995,63 @@ class CertificateTemplateController extends Controller
             $file = $request->file('background');
             $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
             
-            // Zapisuj TYLKO w pakiecie
-            $packagePath = $this->getPackagePath();
-            if (!$packagePath) {
-                \Log::error('Package path not found for background upload');
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume.'
-                ], 500);
-            }
+            $relativePath = 'certificates/backgrounds/' . $filename;
+            $savedPath = null;
             
-            $packageStoragePath = $packagePath . '/storage/certificates/backgrounds';
-            $packageFilePath = $packageStoragePath . '/' . $filename;
-            
-            if (!File::exists($packageStoragePath)) {
-                File::makeDirectory($packageStoragePath, 0755, true);
-            }
-            
-            try {
-                File::put($packageFilePath, file_get_contents($file->getRealPath()));
+            // Sprawdź czy pakiet jest zapisywalny
+            if ($this->isPackageWritable()) {
+                // Dev: zapisz w pakiecie
+                $packagePath = $this->getPackagePath();
+                $packageStoragePath = $packagePath . '/storage/certificates/backgrounds';
+                $packageFilePath = $packageStoragePath . '/' . $filename;
                 
-                \Log::info('Background saved to package', [
-                    'package_path' => $packageFilePath,
+                if (!File::exists($packageStoragePath)) {
+                    File::makeDirectory($packageStoragePath, 0755, true);
+                }
+                
+                try {
+                    File::put($packageFilePath, file_get_contents($file->getRealPath()));
+                    $savedPath = $packageFilePath;
+                    
+                    \Log::info('Background saved to package', [
+                        'package_path' => $packageFilePath,
+                        'filename' => $filename
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to save background to package', [
+                        'package_path' => $packageFilePath,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Fallback do storage aplikacji
+                    $this->saveToAppStorage($file, $relativePath);
+                    $savedPath = storage_path('app/public/' . $relativePath);
+                }
+            } else {
+                // Produkcja: zapisz w storage aplikacji
+                $this->saveToAppStorage($file, $relativePath);
+                $savedPath = storage_path('app/public/' . $relativePath);
+                
+                \Log::info('Background saved to app storage (production)', [
+                    'path' => $savedPath,
                     'filename' => $filename
                 ]);
-                
-                // URL do pliku z pakietu (przez symlink lub bezpośredni dostęp)
-                $url = asset('storage/certificates/backgrounds/' . $filename);
+            }
+            
+            if ($savedPath && File::exists($savedPath)) {
+                $url = asset('storage/' . $relativePath);
                 
                 return response()->json([
                     'success' => true,
-                    'path' => 'certificates/backgrounds/' . $filename, // Względna ścieżka
+                    'path' => $relativePath,
                     'url' => $url,
                     'name' => $filename
                 ]);
-            } catch (\Exception $e) {
-                \Log::error('Failed to save background to package', [
-                    'package_path' => $packageFilePath,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nie udało się zapisać tła w pakiecie: ' . $e->getMessage()
-                ], 500);
             }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Nie udało się zapisać tła'
+            ], 500);
         }
 
         return response()->json([
@@ -954,53 +1080,58 @@ class CertificateTemplateController extends Controller
         // Zamień stare ścieżki na nowe
         $normalizedPath = str_replace('certificate-backgrounds/', 'certificates/backgrounds/', $normalizedPath);
         
-        // Usuń TYLKO z pakietu
+        $deleted = false;
+        
+        // 1. Spróbuj usunąć z pakietu
         $packagePath = $this->getPackagePath();
-        if (!$packagePath) {
-            \Log::error('Package path not found when deleting background', ['path' => $path]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Nie można znaleźć pakietu pne-certificate-generator.'
-            ], 500);
-        }
-        
-        $packagePaths = [
-            $packagePath . '/storage/' . $normalizedPath,
-            $packagePath . '/storage/certificates/backgrounds/' . basename($normalizedPath), // Jeśli tylko nazwa pliku
-        ];
-        
-        foreach ($packagePaths as $packageFilePath) {
-            if (File::exists($packageFilePath)) {
-                try {
-                    File::delete($packageFilePath);
-                    \Log::info('Background deleted from package', ['path' => $packageFilePath]);
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Tło zostało usunięte'
-                    ]);
-                } catch (\Exception $e) {
-                    \Log::error('Failed to delete background from package', [
-                        'path' => $packageFilePath,
-                        'error' => $e->getMessage()
-                    ]);
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Nie udało się usunąć tła: ' . $e->getMessage()
-                    ], 500);
+        if ($packagePath) {
+            $packagePaths = [
+                $packagePath . '/storage/' . $normalizedPath,
+                $packagePath . '/storage/certificates/backgrounds/' . basename($normalizedPath),
+            ];
+            
+            foreach ($packagePaths as $packageFilePath) {
+                if (File::exists($packageFilePath)) {
+                    try {
+                        File::delete($packageFilePath);
+                        \Log::info('Background deleted from package', ['path' => $packageFilePath]);
+                        $deleted = true;
+                        break;
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to delete background from package', [
+                            'path' => $packageFilePath,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
             }
         }
-
-        \Log::warning('Background deletion failed - file not found in package', [
-            'requested_path' => $path,
-            'normalized_path' => $normalizedPath,
-            'package_path' => $packagePath,
-            'checked_paths' => $packagePaths
-        ]);
-
+        
+        // 2. Spróbuj usunąć z storage aplikacji
+        $appPath = storage_path('app/public/' . $normalizedPath);
+        if (File::exists($appPath)) {
+            try {
+                File::delete($appPath);
+                \Log::info('Background deleted from app storage', ['path' => $appPath]);
+                $deleted = true;
+            } catch (\Exception $e) {
+                \Log::error('Failed to delete background from app storage', [
+                    'path' => $appPath,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        if ($deleted) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Tło zostało usunięte'
+            ]);
+        }
+        
         return response()->json([
             'success' => false,
-            'message' => 'Plik nie istnieje w pakiecie.'
+            'message' => 'Plik nie istnieje.'
         ], 404);
     }
 }

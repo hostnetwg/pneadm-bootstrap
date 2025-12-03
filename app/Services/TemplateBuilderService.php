@@ -9,8 +9,7 @@ class TemplateBuilderService
 {
     /**
      * Generuje plik blade z konfiguracji szablonu
-     * Zapisuje TYLKO w pakiecie pne-certificate-generator (wspólny dla obu projektów)
-     * NIE zapisuje lokalnie - wszystkie szablony muszą być w pakiecie
+     * Zapisuje w pakiecie (dev) lub w aplikacji (produkcja)
      */
     public function generateBladeFile($config, $slug)
     {
@@ -18,33 +17,38 @@ class TemplateBuilderService
         
         $fileName = Str::slug($slug) . '.blade.php';
         
-        // Zapisuj TYLKO w pakiecie
+        // Sprawdź czy pakiet jest zapisywalny
         $packagePath = $this->getPackagePath();
-        if (!$packagePath) {
-            throw new \Exception('Nie można znaleźć pakietu pne-certificate-generator. Sprawdź konfigurację Docker volume lub ścieżkę pakietu.');
-        }
+        $isPackageWritable = $this->isPackageWritable();
         
-        $packageFilePath = $packagePath . '/resources/views/certificates/' . $fileName;
-        $packageDirectory = dirname($packageFilePath);
-        
-        if (!File::exists($packageDirectory)) {
-            File::makeDirectory($packageDirectory, 0755, true);
-        }
-        
-        try {
-            File::put($packageFilePath, $bladeContent);
-            \Log::info('Template saved to package', [
-                'slug' => $slug,
-                'package_path' => $packageFilePath
-            ]);
-            return $fileName;
-        } catch (\Exception $e) {
-            \Log::error('Failed to save template to package', [
-                'slug' => $slug,
-                'package_path' => $packageFilePath,
-                'error' => $e->getMessage()
-            ]);
-            throw new \Exception('Nie udało się zapisać szablonu w pakiecie: ' . $e->getMessage());
+        if ($isPackageWritable && $packagePath) {
+            // Dev: zapisz w pakiecie
+            $packageFilePath = $packagePath . '/resources/views/certificates/' . $fileName;
+            $packageDirectory = dirname($packageFilePath);
+            
+            if (!File::exists($packageDirectory)) {
+                File::makeDirectory($packageDirectory, 0755, true);
+            }
+            
+            try {
+                File::put($packageFilePath, $bladeContent);
+                \Log::info('Template saved to package', [
+                    'slug' => $slug,
+                    'package_path' => $packageFilePath
+                ]);
+                return $fileName;
+            } catch (\Exception $e) {
+                \Log::error('Failed to save template to package', [
+                    'slug' => $slug,
+                    'package_path' => $packageFilePath,
+                    'error' => $e->getMessage()
+                ]);
+                // Fallback do aplikacji
+                return $this->saveBladeToApp($bladeContent, $fileName, $slug);
+            }
+        } else {
+            // Produkcja: zapisz w aplikacji
+            return $this->saveBladeToApp($bladeContent, $fileName, $slug);
         }
     }
     
@@ -94,6 +98,72 @@ class TemplateBuilderService
         ]);
         
         return null;
+    }
+
+    /**
+     * Sprawdza czy pakiet jest zapisywalny (path repository) czy tylko do odczytu (vendor)
+     */
+    protected function isPackageWritable(): bool
+    {
+        $packagePath = $this->getPackagePath();
+        
+        if (!$packagePath) {
+            return false;
+        }
+        
+        // Jeśli pakiet jest w vendor - nie jest zapisywalny
+        if (strpos($packagePath, 'vendor/') !== false) {
+            return false;
+        }
+        
+        // Sprawdź czy można zapisać w katalogu resources/views pakietu
+        $testPath = $packagePath . '/resources/views';
+        if (!File::exists($testPath)) {
+            return false;
+        }
+        
+        // Sprawdź uprawnienia - próba utworzenia testowego pliku
+        $testFile = $testPath . '/.writable_test_' . time();
+        try {
+            @File::put($testFile, 'test');
+            if (File::exists($testFile)) {
+                File::delete($testFile);
+                return true;
+            }
+        } catch (\Exception $e) {
+            return false;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Zapisuje plik Blade do aplikacji (produkcja)
+     */
+    protected function saveBladeToApp(string $bladeContent, string $fileName, string $slug): string
+    {
+        $appPath = resource_path('views/certificates/' . $fileName);
+        $appDirectory = dirname($appPath);
+        
+        if (!File::exists($appDirectory)) {
+            File::makeDirectory($appDirectory, 0755, true);
+        }
+        
+        try {
+            File::put($appPath, $bladeContent);
+            \Log::info('Template saved to app (production)', [
+                'slug' => $slug,
+                'app_path' => $appPath
+            ]);
+            return $fileName;
+        } catch (\Exception $e) {
+            \Log::error('Failed to save template to app', [
+                'slug' => $slug,
+                'app_path' => $appPath,
+                'error' => $e->getMessage()
+            ]);
+            throw new \Exception('Nie udało się zapisać szablonu w aplikacji: ' . $e->getMessage());
+        }
     }
 
     /**
