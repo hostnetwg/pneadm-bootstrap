@@ -61,6 +61,19 @@
                                     Szablon aktywny
                                 </label>
                             </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="is_default" 
+                                       name="is_default" 
+                                       value="1"
+                                       {{ old('is_default', $certificateTemplate->is_default ?? false) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="is_default">
+                                    <strong>Domyślny szablon</strong>
+                                    <small class="text-muted d-block">Ten szablon będzie używany gdy w szkoleniu wybrano "Domyślny szablon"</small>
+                                </label>
+                            </div>
                         </div>
                     </div>
 

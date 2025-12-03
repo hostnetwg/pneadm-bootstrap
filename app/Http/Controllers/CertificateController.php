@@ -103,6 +103,26 @@ class CertificateController extends Controller
                 // Użyj domyślnego szablonu, ale z konfiguracją z bazy
                 $templateView = 'pne-certificate-generator::certificates.default';
             }
+        } else {
+            // Kurs nie ma przypisanego szablonu - użyj domyślnego szablonu z bazy
+            $defaultTemplate = \App\Models\CertificateTemplate::where('is_default', true)
+                ->where('is_active', true)
+                ->first();
+            
+            if ($defaultTemplate) {
+                $templateConfig = $defaultTemplate->config;
+                $templateView = $defaultTemplate->blade_path;
+                
+                // Sprawdź czy szablon istnieje w pakiecie
+                if (!\Illuminate\Support\Facades\View::exists($templateView)) {
+                    \Log::warning('Default template not found in package, using fallback', [
+                        'template_slug' => $defaultTemplate->slug,
+                        'template_id' => $defaultTemplate->id,
+                        'requested_view' => $templateView
+                    ]);
+                    $templateView = 'pne-certificate-generator::certificates.default';
+                }
+            }
         }
     
         // Przygotowanie danych konfiguracji dla widoku (z fallbackami)

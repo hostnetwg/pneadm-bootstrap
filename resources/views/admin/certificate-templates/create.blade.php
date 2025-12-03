@@ -1,9 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        Nowy Szablon Certyfikatu
+        @if(isset($templateToClone))
+            Klonowanie Szablonu: {{ $templateToClone->name }}
+        @else
+            Nowy Szablon Certyfikatu
+        @endif
     </x-slot>
 
     <div class="container-fluid">
+        @if(isset($templateToClone))
+            <div class="alert alert-info mb-4">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Klonowanie szablonu:</strong> Formularz został wypełniony danymi z szablonu "{{ $templateToClone->name }}". 
+                Zmień nazwę i inne ustawienia według potrzeb, a następnie kliknij "Zapisz zmiany" aby utworzyć kopię.
+            </div>
+        @endif
+
         <form action="{{ route('admin.certificate-templates.store') }}" method="POST" id="template-form" enctype="multipart/form-data">
             @csrf
 
@@ -21,7 +33,7 @@
                                        class="form-control @error('name') is-invalid @enderror" 
                                        id="name" 
                                        name="name" 
-                                       value="{{ old('name') }}" 
+                                       value="{{ old('name', isset($templateToClone) ? $templateToClone->name . ' (Kopia)' : '') }}" 
                                        required>
                                 @error('name')
                                     <div class="invalid-feedback">{{ $message }}</div>
@@ -34,22 +46,40 @@
                                 <textarea class="form-control @error('description') is-invalid @enderror" 
                                           id="description" 
                                           name="description" 
-                                          rows="3">{{ old('description') }}</textarea>
+                                          rows="3">{{ old('description', isset($templateToClone) ? $templateToClone->description : '') }}</textarea>
                                 @error('description')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
 
-                            <div class="form-check">
+                            <div class="form-check mb-3">
                                 <input class="form-check-input" 
                                        type="checkbox" 
                                        id="is_active" 
                                        name="is_active" 
                                        value="1"
-                                       {{ old('is_active', true) ? 'checked' : '' }}>
+                                       {{ old('is_active', isset($templateToClone) ? $templateToClone->is_active : true) ? 'checked' : '' }}>
                                 <label class="form-check-label" for="is_active">
                                     Szablon aktywny
                                 </label>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="is_default" 
+                                       name="is_default" 
+                                       value="1"
+                                       {{ old('is_default', isset($templateToClone) ? false : false) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="is_default">
+                                    <strong>Domyślny szablon</strong>
+                                    <small class="text-muted d-block">Ten szablon będzie używany gdy w szkoleniu wybrano "Domyślny szablon"</small>
+                                </label>
+                                @if(isset($templateToClone))
+                                    <small class="form-text text-muted d-block mt-1">
+                                        <i class="bi bi-info-circle"></i> Kopia szablonu nie będzie automatycznie ustawiona jako domyślna, nawet jeśli oryginał był domyślny.
+                                    </small>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -64,16 +94,24 @@
                                 <div class="col-md-6 mb-3">
                                     <label for="font_family" class="form-label">Czcionka</label>
                                     <select class="form-select" id="font_family" name="font_family">
-                                        <option value="DejaVu Sans">DejaVu Sans</option>
-                                        <option value="DejaVu Serif">DejaVu Serif</option>
+                                        @php
+                                            $fontFamily = old('font_family', isset($templateToClone) ? ($templateToClone->config['settings']['font_family'] ?? 'DejaVu Sans') : 'DejaVu Sans');
+                                        @endphp
+                                        <option value="DejaVu Sans" {{ $fontFamily == 'DejaVu Sans' ? 'selected' : '' }}>DejaVu Sans</option>
+                                        <option value="DejaVu Serif" {{ $fontFamily == 'DejaVu Serif' ? 'selected' : '' }}>DejaVu Serif</option>
+                                        <option value="DejaVu Sans Mono" {{ $fontFamily == 'DejaVu Sans Mono' ? 'selected' : '' }}>DejaVu Sans Mono</option>
                                     </select>
+                                    <small class="form-text text-muted">Wszystkie czcionki obsługują polskie znaki</small>
                                 </div>
 
                                 <div class="col-md-6 mb-3">
                                     <label for="orientation" class="form-label">Orientacja</label>
                                     <select class="form-select" id="orientation" name="orientation">
-                                        <option value="portrait">Pionowa</option>
-                                        <option value="landscape">Pozioma</option>
+                                        @php
+                                            $orientation = old('orientation', isset($templateToClone) ? ($templateToClone->config['settings']['orientation'] ?? 'portrait') : 'portrait');
+                                        @endphp
+                                        <option value="portrait" {{ $orientation == 'portrait' ? 'selected' : '' }}>Pionowa</option>
+                                        <option value="landscape" {{ $orientation == 'landscape' ? 'selected' : '' }}>Pozioma</option>
                                     </select>
                                 </div>
 
@@ -83,7 +121,7 @@
                                            class="form-control" 
                                            id="title_size" 
                                            name="title_size" 
-                                           value="38" 
+                                           value="{{ old('title_size', isset($templateToClone) ? ($templateToClone->config['settings']['title_size'] ?? 38) : 38) }}" 
                                            min="10" 
                                            max="100">
                                 </div>
@@ -94,7 +132,7 @@
                                            class="form-control form-control-color" 
                                            id="title_color" 
                                            name="title_color" 
-                                           value="#000000">
+                                           value="{{ old('title_color', isset($templateToClone) ? ($templateToClone->config['settings']['title_color'] ?? '#000000') : '#000000') }}">
                                 </div>
 
                                 <div class="col-md-4 mb-3">
@@ -103,7 +141,7 @@
                                            class="form-control" 
                                            id="course_title_size" 
                                            name="course_title_size" 
-                                           value="32" 
+                                           value="{{ old('course_title_size', isset($templateToClone) ? ($templateToClone->config['settings']['course_title_size'] ?? 32) : 32) }}" 
                                            min="10" 
                                            max="100">
                                 </div>
@@ -114,7 +152,7 @@
                                            class="form-control" 
                                            id="participant_name_size" 
                                            name="participant_name_size" 
-                                           value="24" 
+                                           value="{{ old('participant_name_size', isset($templateToClone) ? ($templateToClone->config['settings']['participant_name_size'] ?? 24) : 24) }}" 
                                            min="10" 
                                            max="100">
                                 </div>
@@ -122,9 +160,12 @@
                                 <div class="col-md-4 mb-3">
                                     <label for="participant_name_font" class="form-label">Czcionka imienia i nazwiska</label>
                                     <select class="form-select" id="participant_name_font" name="participant_name_font">
-                                        <option value="DejaVu Sans" selected>DejaVu Sans</option>
-                                        <option value="DejaVu Serif">DejaVu Serif</option>
-                                        <option value="DejaVu Sans Mono">DejaVu Sans Mono</option>
+                                        @php
+                                            $participantNameFont = old('participant_name_font', isset($templateToClone) ? ($templateToClone->config['settings']['participant_name_font'] ?? 'DejaVu Sans') : 'DejaVu Sans');
+                                        @endphp
+                                        <option value="DejaVu Sans" {{ $participantNameFont == 'DejaVu Sans' ? 'selected' : '' }}>DejaVu Sans</option>
+                                        <option value="DejaVu Serif" {{ $participantNameFont == 'DejaVu Serif' ? 'selected' : '' }}>DejaVu Serif</option>
+                                        <option value="DejaVu Sans Mono" {{ $participantNameFont == 'DejaVu Sans Mono' ? 'selected' : '' }}>DejaVu Sans Mono</option>
                                     </select>
                                     <small class="form-text text-muted">Wszystkie czcionki obsługują polskie znaki</small>
                                 </div>
@@ -136,7 +177,8 @@
                                                type="checkbox" 
                                                id="participant_name_italic" 
                                                name="participant_name_italic" 
-                                               value="1">
+                                               value="1"
+                                               {{ old('participant_name_italic', isset($templateToClone) ? ($templateToClone->config['settings']['participant_name_italic'] ?? false) : false) ? 'checked' : '' }}>
                                         <label class="form-check-label" for="participant_name_italic">
                                             Pochylenie (kursywa)
                                         </label>
@@ -152,7 +194,7 @@
                                                id="show_certificate_number" 
                                                name="show_certificate_number" 
                                                value="1"
-                                               checked>
+                                               {{ old('show_certificate_number', isset($templateToClone) ? ($templateToClone->config['settings']['show_certificate_number'] ?? true) : true) ? 'checked' : '' }}>
                                         <label class="form-check-label" for="show_certificate_number">
                                             Pokaż numer rejestru w certyfikacie
                                         </label>
@@ -173,7 +215,7 @@
                                            class="form-control" 
                                            id="margin_top" 
                                            name="margin_top" 
-                                           value="10" 
+                                           value="{{ old('margin_top', isset($templateToClone) ? ($templateToClone->config['settings']['margin_top'] ?? 10) : 10) }}" 
                                            min="0" 
                                            max="200">
                                 </div>
@@ -183,7 +225,7 @@
                                            class="form-control" 
                                            id="margin_bottom" 
                                            name="margin_bottom" 
-                                           value="10" 
+                                           value="{{ old('margin_bottom', isset($templateToClone) ? ($templateToClone->config['settings']['margin_bottom'] ?? 10) : 10) }}" 
                                            min="0" 
                                            max="200">
                                 </div>
@@ -193,7 +235,7 @@
                                            class="form-control" 
                                            id="margin_left" 
                                            name="margin_left" 
-                                           value="50" 
+                                           value="{{ old('margin_left', isset($templateToClone) ? ($templateToClone->config['settings']['margin_left'] ?? 50) : 50) }}" 
                                            min="0" 
                                            max="200">
                                 </div>
@@ -203,7 +245,7 @@
                                            class="form-control" 
                                            id="margin_right" 
                                            name="margin_right" 
-                                           value="50" 
+                                           value="{{ old('margin_right', isset($templateToClone) ? ($templateToClone->config['settings']['margin_right'] ?? 50) : 50) }}" 
                                            min="0" 
                                            max="200">
                                 </div>
@@ -222,7 +264,7 @@
                                            id="show_background" 
                                            name="show_background" 
                                            value="1"
-                                           {{ old('show_background', false) ? 'checked' : '' }}>
+                                           {{ old('show_background', isset($templateToClone) ? ($templateToClone->config['settings']['show_background'] ?? false) : false) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="show_background">
                                         Użyj tła zaświadczenia
                                     </label>
@@ -237,7 +279,7 @@
                                            class="form-control" 
                                            id="background_image" 
                                            name="background_image" 
-                                           value="{{ old('background_image', '') }}"
+                                           value="{{ old('background_image', isset($templateToClone) ? ($templateToClone->config['settings']['background_image'] ?? '') : '') }}"
                                            readonly
                                            placeholder="Wybierz tło z galerii">
                                     <button type="button" 
@@ -410,6 +452,13 @@
     <!-- SortableJS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     
+    @if(isset($templateToClone))
+    <script>
+        // Przekaż konfigurację szablonu do sklonowania do JavaScript
+        const templateToCloneConfig = @json($templateToClone->config ?? []);
+    </script>
+    @endif
+    
     <style>
         .sortable-blocks .block-item {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -463,6 +512,25 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('=== DOM LOADED (CREATE) ===');
             
+            // Jeśli klonujemy szablon, załaduj jego bloki
+            @if(isset($templateToClone))
+            if (typeof templateToCloneConfig !== 'undefined') {
+                console.log('Konfiguracja szablonu do sklonowania:', templateToCloneConfig);
+                console.log('Bloki w konfiguracji:', templateToCloneConfig.blocks);
+                
+                if (templateToCloneConfig.blocks) {
+                    // Użyj setTimeout aby upewnić się, że funkcja loadBlocksFromConfig jest już zdefiniowana
+                    setTimeout(() => {
+                        loadBlocksFromConfig(templateToCloneConfig.blocks);
+                    }, 100);
+                } else {
+                    console.warn('Brak bloków w konfiguracji szablonu do sklonowania');
+                }
+            } else {
+                console.warn('templateToCloneConfig nie jest zdefiniowany');
+            }
+            @endif
+            
             // Inicjalizacja Sortable dla drag & drop bloków
             initializeSortable();
             
@@ -511,7 +579,7 @@
                 });
             });
 
-        function addBlock(type, name) {
+        function addBlock(type, name, blockConfig = null) {
             const blockId = 'block_' + blockCounter++;
             const blockData = availableBlocks[type];
             
@@ -528,13 +596,27 @@
                     </div>
                     <div class="card-body">
                         <input type="hidden" name="blocks[${blockId}][type]" value="${type}">
-                        <input type="hidden" name="blocks[${blockId}][order]" value="999" class="block-order-input">
+                        <input type="hidden" name="blocks[${blockId}][order]" value="${blockConfig?.order ?? 999}" class="block-order-input">
             `;
 
             // Dodawanie pól konfiguracji bloku
             if (blockData.fields && Object.keys(blockData.fields).length > 0) {
+                // Pobierz konfigurację bloku (może być w blockConfig.config lub bezpośrednio w blockConfig)
+                const blockConfigData = blockConfig?.config || blockConfig || {};
+                
+                console.log(`Dodawanie pól dla bloku ${blockId} typu ${type}:`, {
+                    blockConfig: blockConfig,
+                    blockConfigData: blockConfigData,
+                    fields: Object.keys(blockData.fields)
+                });
+                
                 for (const [fieldName, fieldConfig] of Object.entries(blockData.fields)) {
-                    html += renderField(blockId, fieldName, fieldConfig);
+                    // Użyj wartości z blockConfigData jeśli istnieje, w przeciwnym razie użyj default
+                    const fieldValue = blockConfigData[fieldName] !== undefined ? blockConfigData[fieldName] : (fieldConfig.default ?? '');
+                    
+                    console.log(`  Pole ${fieldName}: wartość z konfiguracji = ${blockConfigData[fieldName]}, wartość użyta = ${fieldValue}`);
+                    
+                    html += renderField(blockId, fieldName, fieldConfig, fieldValue);
                 }
             }
 
@@ -562,9 +644,10 @@
             updateBlockOrder();
         }
 
-        function renderField(blockId, fieldName, config) {
+        function renderField(blockId, fieldName, config, value = null) {
             const fullName = `blocks[${blockId}][config][${fieldName}]`;
             const id = `${blockId}_${fieldName}`;
+            const fieldValue = value !== null ? value : (config.default || '');
             
             let html = `<div class="mb-3">`;
             html += `<label for="${id}" class="form-label">${config.label}</label>`;
@@ -574,24 +657,24 @@
                     // Specjalna obsługa dla pola logo_path
                     if (fieldName === 'logo_path') {
                         html += `<div class="input-group">`;
-                        html += `<input type="text" class="form-control" id="${id}" name="${fullName}" value="${config.default || ''}" readonly>`;
+                        html += `<input type="text" class="form-control" id="${id}" name="${fullName}" value="${fieldValue}" readonly>`;
                         html += `<button type="button" class="btn btn-outline-secondary" onclick="openLogoGallery('${fullName}')">`;
                         html += `<i class="bi bi-image me-1"></i>Wybierz logo`;
                         html += `</button>`;
                         html += `</div>`;
                         html += `<div id="${id.replace('logo_path', 'logo_preview')}"></div>`;
                     } else {
-                        html += `<input type="text" class="form-control" id="${id}" name="${fullName}" value="${config.default || ''}">`;
+                        html += `<input type="text" class="form-control" id="${id}" name="${fullName}" value="${fieldValue}">`;
                     }
                     break;
                 case 'number':
-                    html += `<input type="number" class="form-control" id="${id}" name="${fullName}" value="${config.default || ''}">`;
+                    html += `<input type="number" class="form-control" id="${id}" name="${fullName}" value="${fieldValue}">`;
                     break;
                 case 'textarea':
-                    html += `<textarea class="form-control" id="${id}" name="${fullName}" rows="3">${config.default || ''}</textarea>`;
+                    html += `<textarea class="form-control" id="${id}" name="${fullName}" rows="3">${fieldValue}</textarea>`;
                     break;
                 case 'checkbox':
-                    const checked = config.default ? 'checked' : '';
+                    const checked = fieldValue ? 'checked' : '';
                     html += `
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="${id}" name="${fullName}" value="1" ${checked}>
@@ -794,6 +877,69 @@
         }
 
         // openLogoGallery jest już zdefiniowana globalnie na górze skryptu
+        
+        // Funkcja do ładowania bloków z konfiguracji (używana przy klonowaniu)
+        function loadBlocksFromConfig(blocks) {
+            console.log('loadBlocksFromConfig wywołana z:', blocks);
+            
+            if (!blocks) {
+                console.log('Brak bloków do załadowania - blocks jest null/undefined');
+                return;
+            }
+
+            // Konwertuj obiekt na tablicę jeśli potrzeba
+            let blocksArray = [];
+            if (Array.isArray(blocks)) {
+                blocksArray = blocks;
+            } else if (typeof blocks === 'object') {
+                // To jest obiekt (associative array) - konwertuj na tablicę
+                blocksArray = Object.values(blocks);
+            } else {
+                console.error('Nieprawidłowy format bloków:', typeof blocks);
+                return;
+            }
+
+            if (blocksArray.length === 0) {
+                console.log('Brak bloków do załadowania - pusta tablica');
+                return;
+            }
+
+            const container = document.getElementById('blocks-container');
+            const infoAlert = container.querySelector('.alert-info');
+            if (infoAlert) {
+                infoAlert.remove();
+            }
+
+            // Sortuj bloki według order
+            const sortedBlocks = [...blocksArray].sort((a, b) => {
+                const orderA = a.order ?? 999;
+                const orderB = b.order ?? 999;
+                return orderA - orderB;
+            });
+
+            console.log('Sortowanie bloków:', sortedBlocks);
+
+            sortedBlocks.forEach((block, index) => {
+                const blockType = block.type;
+                const blockData = availableBlocks[blockType];
+                
+                console.log(`Przetwarzanie bloku ${index + 1}/${sortedBlocks.length}:`, {
+                    type: blockType,
+                    config: block.config,
+                    order: block.order
+                });
+                
+                if (blockData) {
+                    const blockName = blockData.name || blockType;
+                    // Przekaż cały obiekt block jako trzeci parametr - zawiera type, order i config
+                    addBlock(blockType, blockName, block);
+                } else {
+                    console.warn('Nieznany typ bloku:', blockType, 'Dostępne typy:', Object.keys(availableBlocks));
+                }
+            });
+
+            console.log('Załadowano', sortedBlocks.length, 'bloków z konfiguracji');
+        }
         
         console.log('=== INICJALIZACJA ZAKOŃCZONA (CREATE) ===');
         }); // Koniec DOMContentLoaded

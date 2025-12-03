@@ -17,12 +17,14 @@ class CertificateTemplate extends Model
         'description',
         'config',
         'preview_image',
-        'is_active'
+        'is_active',
+        'is_default'
     ];
 
     protected $casts = [
         'config' => 'array',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        'is_default' => 'boolean'
     ];
 
     /**

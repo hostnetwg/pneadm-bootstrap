@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ec978bda9feb286e94d77e8978e2f951",
+    "content-hash": "335669a7cc7782fdfa0e233659084c24",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -2887,8 +2887,8 @@
             "version": "dev-main",
             "dist": {
                 "type": "path",
-                "url": "/var/www/pne-certificate-generator",
-                "reference": "cdf984aa792eecd013b646545b6d6f4f4e051256"
+                "url": "../pne-certificate-generator",
+                "reference": "2fb1724d3623d2e9d4e1673214a1a645620f5664"
             },
             "require": {
                 "barryvdh/laravel-dompdf": "^3.1",
@@ -2922,7 +2922,7 @@
             ],
             "description": "Wspólny pakiet do generowania zaświadczeń dla platformy PNE",
             "transport-options": {
-                "relative": false
+                "relative": true
             }
         },
         {

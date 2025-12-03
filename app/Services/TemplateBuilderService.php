@@ -334,15 +334,9 @@ class TemplateBuilderService
         // A4 wymiary w pikselach (96 DPI): Portrait: 794x1123px, Landscape: 1123x794px
         $pageHeight = ($orientation === 'landscape') ? 794 : 1123;
         $dateTop = $pageHeight - $marginBottom - 180; // Górna krawędź 180px powyżej stopki
-        // Szacunkowa wysokość stopki (logo ~80px + tekst ~60px + marginesy ~20px = ~160px)
-        $footerHeight = 160;
-        // Pozycja stopki - jeśli marginBottom = 0, użyj bottom: 0, w przeciwnym razie oblicz top
-        if ($marginBottom == 0) {
-            $footerCss = "            bottom: 0;\n";
-        } else {
-            $footerTop = $pageHeight - $marginBottom - $footerHeight;
-            $footerCss = "            top: {$footerTop}px;\n";
-        }
+        // Pozycja stopki - zawsze od dolnej krawędzi kontenera (bottom)
+        // Dolna krawędź stopki będzie na wysokości dolnego marginesu
+        $footerCss = "            bottom: {$marginBottom}px;\n";
         $styles .= "        .date-section {\n";
         $styles .= "            position: absolute;\n";
         $styles .= "            top: {$dateTop}px;\n";

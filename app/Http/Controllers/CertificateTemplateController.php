@@ -30,14 +30,20 @@ class CertificateTemplateController extends Controller
 
     /**
      * Formularz tworzenia nowego szablonu
+     * Opcjonalnie może klonować istniejący szablon (gdy przekazano clone_id)
      */
-    public function create()
+    public function create(Request $request)
     {
         $availableBlocks = $this->templateBuilder->getAvailableBlocks();
         $availableLogos = $this->getAvailableLogos();
         $availableBackgrounds = $this->getAvailableBackgrounds();
         
-        return view('admin.certificate-templates.create', compact('availableBlocks', 'availableLogos', 'availableBackgrounds'));
+        $templateToClone = null;
+        if ($request->has('clone_id')) {
+            $templateToClone = CertificateTemplate::find($request->clone_id);
+        }
+        
+        return view('admin.certificate-templates.create', compact('availableBlocks', 'availableLogos', 'availableBackgrounds', 'templateToClone'));
     }
 
     /**
@@ -59,16 +65,8 @@ class CertificateTemplateController extends Controller
             ]);
         }
 
-        // Generowanie slug z nazwy
-        $slug = Str::slug($request->name);
-        
-        // Sprawdzenie czy slug jest unikalny
-        $originalSlug = $slug;
-        $counter = 1;
-        while (CertificateTemplate::where('slug', $slug)->exists()) {
-            $slug = $originalSlug . '-' . $counter;
-            $counter++;
-        }
+        // Tymczasowy slug - zostanie zaktualizowany po utworzeniu szablonu (gdy będziemy mieć ID)
+        $tempSlug = 'temp-' . time() . '-' . rand(1000, 9999);
 
         // Przygotowanie konfiguracji
         $blocks = $request->input('blocks', []);
@@ -212,18 +210,48 @@ class CertificateTemplateController extends Controller
             ]
         ];
 
-        // Tworzenie szablonu w bazie
+        // Obsługa domyślnego szablonu
+        $isDefault = $request->has('is_default');
+        
+        // Jeśli jest tylko jeden szablon (ten który tworzymy), automatycznie ustaw jako domyślny
+        $existingTemplatesCount = CertificateTemplate::count();
+        if ($existingTemplatesCount === 0) {
+            $isDefault = true;
+        }
+        
+        if ($isDefault) {
+            // Odznacz wszystkie inne szablony jako niedomyślne
+            CertificateTemplate::where('id', '!=', 0)->update(['is_default' => false]);
+        }
+        
+        // Tworzenie szablonu w bazie z tymczasowym slugiem
         $template = CertificateTemplate::create([
             'name' => $validated['name'],
-            'slug' => $slug,
+            'slug' => $tempSlug,
             'description' => $validated['description'] ?? null,
             'config' => $config,
-            'is_active' => $request->has('is_active')
+            'is_active' => $request->has('is_active'),
+            'is_default' => $isDefault
         ]);
 
-        // Generowanie pliku blade
+        // Teraz mamy ID - wygeneruj slug na podstawie ID i nazwy (ID na początku)
+        $baseSlug = Str::slug($template->name);
+        $finalSlug = $template->id . '-' . $baseSlug;
+        
+        // Sprawdź czy slug jest unikalny (powinien być, bo zawiera ID)
+        $counter = 1;
+        $originalFinalSlug = $finalSlug;
+        while (CertificateTemplate::where('slug', $finalSlug)->where('id', '!=', $template->id)->exists()) {
+            $finalSlug = $originalFinalSlug . '-' . $counter;
+            $counter++;
+        }
+        
+        // Zaktualizuj slug w bazie
+        $template->update(['slug' => $finalSlug]);
+
+        // Generowanie pliku blade z finalnym slugiem
         try {
-            $this->templateBuilder->generateBladeFile($config, $slug);
+            $this->templateBuilder->generateBladeFile($config, $finalSlug);
             
             return redirect()
                 ->route('admin.certificate-templates.index')
@@ -425,12 +453,27 @@ class CertificateTemplateController extends Controller
             ]
         ];
 
+        // Obsługa domyślnego szablonu
+        $isDefault = $request->has('is_default');
+        
+        // Jeśli jest tylko jeden szablon (ten który edytujemy), automatycznie ustaw jako domyślny
+        $existingTemplatesCount = CertificateTemplate::where('id', '!=', $certificateTemplate->id)->count();
+        if ($existingTemplatesCount === 0) {
+            $isDefault = true;
+        }
+        
+        if ($isDefault) {
+            // Odznacz wszystkie inne szablony jako niedomyślne
+            CertificateTemplate::where('id', '!=', $certificateTemplate->id)->update(['is_default' => false]);
+        }
+        
         // Aktualizacja w bazie
         $certificateTemplate->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'config' => $config,
-            'is_active' => $request->has('is_active')
+            'is_active' => $request->has('is_active'),
+            'is_default' => $isDefault
         ]);
 
         // Ponowne generowanie pliku blade
@@ -454,15 +497,22 @@ class CertificateTemplateController extends Controller
     public function destroy(CertificateTemplate $certificateTemplate)
     {
         // Sprawdzenie czy szablon nie jest używany przez kursy
-        if ($certificateTemplate->courses()->count() > 0) {
+        $courses = $certificateTemplate->courses()->get();
+        
+        if ($courses->count() > 0) {
             return redirect()
                 ->back()
-                ->with('error', 'Nie można usunąć szablonu, który jest używany przez kursy.');
+                ->with('error', 'Nie można usunąć szablonu, który jest używany przez kursy.')
+                ->with('courses_using_template', $courses);
         }
 
         $name = $certificateTemplate->name;
+        $slug = $certificateTemplate->slug;
         
-        // Soft delete - nie usuwamy pliku blade, tylko oznaczamy jako usunięty
+        // Usuń plik blade przed soft delete
+        $this->deleteBladeFile($slug);
+        
+        // Soft delete - oznaczamy jako usunięty w bazie
         $certificateTemplate->delete();
 
         return redirect()
@@ -612,31 +662,14 @@ class CertificateTemplateController extends Controller
     }
 
     /**
-     * Klonuje szablon
+     * Przekierowuje do formularza tworzenia z danymi do sklonowania
      */
     public function clone(CertificateTemplate $certificateTemplate)
     {
-        $newSlug = $certificateTemplate->slug . '-kopia';
-        $counter = 1;
-        while (CertificateTemplate::where('slug', $newSlug)->exists()) {
-            $newSlug = $certificateTemplate->slug . '-kopia-' . $counter;
-            $counter++;
-        }
-
-        $newTemplate = CertificateTemplate::create([
-            'name' => $certificateTemplate->name . ' (Kopia)',
-            'slug' => $newSlug,
-            'description' => $certificateTemplate->description,
-            'config' => $certificateTemplate->config,
-            'is_active' => false
-        ]);
-
-        // Kopiowanie pliku blade
-        $this->templateBuilder->generateBladeFile($certificateTemplate->config, $newSlug);
-
+        // Przekieruj do formularza tworzenia z parametrem clone_id
         return redirect()
-            ->route('admin.certificate-templates.edit', $newTemplate)
-            ->with('success', "Szablon został sklonowany. Możesz teraz edytować kopię.");
+            ->route('admin.certificate-templates.create', ['clone_id' => $certificateTemplate->id])
+            ->with('info', "Formularz został wypełniony danymi z szablonu \"{$certificateTemplate->name}\". Zmień nazwę i zapisz, aby utworzyć kopię.");
     }
 
     /**
@@ -1133,5 +1166,69 @@ class CertificateTemplateController extends Controller
             'success' => false,
             'message' => 'Plik nie istnieje.'
         ], 404);
+    }
+    
+    /**
+     * Usuwa plik blade szablonu
+     * Sprawdza pakiet i aplikację
+     */
+    protected function deleteBladeFile(string $slug): void
+    {
+        $fileName = Str::slug($slug) . '.blade.php';
+        $deleted = false;
+        
+        // 1. Spróbuj usunąć z pakietu
+        $packagePath = $this->getPackagePath();
+        if ($packagePath) {
+            $packageBladePath = $packagePath . '/resources/views/certificates/' . $fileName;
+            if (File::exists($packageBladePath)) {
+                try {
+                    File::delete($packageBladePath);
+                    \Log::info('Blade file deleted from package', [
+                        'slug' => $slug,
+                        'file' => $fileName,
+                        'path' => $packageBladePath
+                    ]);
+                    $deleted = true;
+                } catch (\Exception $e) {
+                    \Log::error('Failed to delete blade file from package', [
+                        'slug' => $slug,
+                        'file' => $fileName,
+                        'path' => $packageBladePath,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+        }
+        
+        // 2. Spróbuj usunąć z aplikacji (fallback)
+        $appBladePath = resource_path('views/certificates/' . $fileName);
+        if (File::exists($appBladePath)) {
+            try {
+                File::delete($appBladePath);
+                \Log::info('Blade file deleted from app', [
+                    'slug' => $slug,
+                    'file' => $fileName,
+                    'path' => $appBladePath
+                ]);
+                $deleted = true;
+            } catch (\Exception $e) {
+                \Log::error('Failed to delete blade file from app', [
+                    'slug' => $slug,
+                    'file' => $fileName,
+                    'path' => $appBladePath,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        if (!$deleted) {
+            \Log::warning('Blade file not found for deletion', [
+                'slug' => $slug,
+                'file' => $fileName,
+                'package_path' => $packagePath ? $packagePath . '/resources/views/certificates/' . $fileName : null,
+                'app_path' => $appBladePath
+            ]);
+        }
     }
 }

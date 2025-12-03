@@ -37,6 +37,7 @@
                             <th>Slug</th>
                             <th>Opis</th>
                             <th>Status</th>
+                            <th>Domyślny</th>
                             <th>Plik</th>
                             <th>Utworzono</th>
                             <th class="text-end">Akcje</th>
@@ -65,6 +66,15 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if($template->is_default ?? false)
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-star-fill"></i> Domyślny
+                                        </span>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td>
                                     @if($template->bladeFileExists())
                                         <span class="badge bg-success">
                                             <i class="bi bi-file-earmark-check"></i> Istnieje
@@ -89,16 +99,11 @@
                                            title="Edytuj">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <form action="{{ route('admin.certificate-templates.clone', $template) }}" 
-                                              method="POST" 
-                                              class="d-inline">
-                                            @csrf
-                                            <button type="submit" 
-                                                    class="btn btn-sm btn-secondary"
-                                                    title="Klonuj">
-                                                <i class="bi bi-files"></i>
-                                            </button>
-                                        </form>
+                                        <a href="{{ route('admin.certificate-templates.clone', $template) }}" 
+                                           class="btn btn-sm btn-secondary"
+                                           title="Klonuj">
+                                            <i class="bi bi-files"></i>
+                                        </a>
                                         <button type="button" 
                                                 class="btn btn-sm btn-danger"
                                                 title="Usuń"
@@ -146,36 +151,79 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Czy na pewno chcesz usunąć szablon <strong>#{{ $template->id }}</strong>?</p>
-                    <div class="bg-light p-3 rounded">
-                        <h6 class="mb-2">Szczegóły szablonu:</h6>
-                        <ul class="mb-0">
-                            <li><strong>Nazwa:</strong> {{ $template->name }}</li>
-                            <li><strong>Slug:</strong> {{ $template->slug }}</li>
-                            <li><strong>Opis:</strong> {{ $template->description ? Str::limit($template->description, 100) : 'Brak' }}</li>
-                            <li><strong>Status:</strong> {{ $template->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
-                            <li><strong>Plik szablonu:</strong> {{ $template->bladeFileExists() ? 'Istnieje' : 'Brak pliku' }}</li>
-                            <li><strong>Data utworzenia:</strong> {{ $template->created_at->format('d.m.Y H:i') }}</li>
-                        </ul>
-                    </div>
-                    <p class="text-muted mt-3">
-                        <i class="bi bi-info-circle"></i>
-                        Szablon zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
-                    </p>
+                    @php
+                        $coursesUsing = $template->courses()->get();
+                    @endphp
+                    
+                    @if($coursesUsing->count() > 0)
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Uwaga!</strong> Ten szablon jest używany przez {{ $coursesUsing->count() }} {{ $coursesUsing->count() === 1 ? 'szkolenie' : 'szkoleń' }}.
+                            Nie można go usunąć dopóki nie zmienisz szablonu w tych szkoleniach.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6 class="mb-2">Szkolenia używające tego szablonu:</h6>
+                            <ul class="list-group">
+                                @foreach($coursesUsing as $course)
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ $course->title }}</strong>
+                                            <br>
+                                            <small class="text-muted">ID: {{ $course->id }} | Data: {{ $course->start_date ? $course->start_date->format('d.m.Y') : 'Brak' }}</small>
+                                        </div>
+                                        <a href="{{ route('courses.edit', $course->id) }}" 
+                                           class="btn btn-sm btn-primary"
+                                           target="_blank">
+                                            <i class="bi bi-pencil"></i> Edytuj
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Kliknij "Edytuj" przy każdym szkoleniu, aby zmienić szablon na inny lub ustawić "Domyślny szablon".
+                        </div>
+                    @else
+                        <p>Czy na pewno chcesz usunąć szablon <strong>#{{ $template->id }}</strong>?</p>
+                        <div class="bg-light p-3 rounded">
+                            <h6 class="mb-2">Szczegóły szablonu:</h6>
+                            <ul class="mb-0">
+                                <li><strong>Nazwa:</strong> {{ $template->name }}</li>
+                                <li><strong>Slug:</strong> {{ $template->slug }}</li>
+                                <li><strong>Opis:</strong> {{ $template->description ? Str::limit($template->description, 100) : 'Brak' }}</li>
+                                <li><strong>Status:</strong> {{ $template->is_active ? 'Aktywny' : 'Nieaktywny' }}</li>
+                                <li><strong>Plik szablonu:</strong> {{ $template->bladeFileExists() ? 'Istnieje' : 'Brak pliku' }}</li>
+                                <li><strong>Data utworzenia:</strong> {{ $template->created_at->format('d.m.Y H:i') }}</li>
+                            </ul>
+                        </div>
+                        <p class="text-muted mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            Szablon zostanie przeniesiony do kosza (soft delete) i będzie można go przywrócić.
+                        </p>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle"></i> Anuluj
                     </button>
-                    <form action="{{ route('admin.certificate-templates.destroy', $template) }}" 
-                          method="POST" 
-                          class="d-inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Usuń szablon
+                    @if($coursesUsing->count() === 0)
+                        <form action="{{ route('admin.certificate-templates.destroy', $template) }}" 
+                              method="POST" 
+                              class="d-inline">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Usuń szablon
+                            </button>
+                        </form>
+                    @else
+                        <button type="button" class="btn btn-danger" disabled>
+                            <i class="bi bi-trash"></i> Nie można usunąć
                         </button>
-                    </form>
+                    @endif
                 </div>
             </div>
         </div>

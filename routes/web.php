@@ -54,7 +54,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         // Zarządzanie szablonami certyfikatów
         Route::resource('certificate-templates', CertificateTemplateController::class);
         Route::get('certificate-templates/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');
-        Route::post('certificate-templates/{certificateTemplate}/clone', [CertificateTemplateController::class, 'clone'])->name('certificate-templates.clone');
+        Route::get('certificate-templates/{certificateTemplate}/clone', [CertificateTemplateController::class, 'clone'])->name('certificate-templates.clone');
         Route::post('certificate-templates/{id}/restore', [CertificateTemplateController::class, 'restore'])->name('certificate-templates.restore');
     });
 
