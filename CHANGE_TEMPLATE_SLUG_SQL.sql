@@ -27,3 +27,4 @@ SELECT id, name, slug, is_active, is_default
 FROM certificate_templates 
 WHERE id = 5;
 
+

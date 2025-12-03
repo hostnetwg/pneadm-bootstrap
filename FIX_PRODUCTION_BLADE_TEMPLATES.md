@@ -152,3 +152,4 @@ Więc szablony zapisane w `resources/views/certificates/` aplikacji będą znajd
 1. Na dev (Docker) - powinno działać jak dotychczas (zapis w pakiecie)
 2. Na produkcji - szablony powinny zapisywać się w aplikacji i być dostępne dla generatora
 
+

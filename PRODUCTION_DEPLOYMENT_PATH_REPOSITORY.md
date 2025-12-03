@@ -282,3 +282,4 @@ Po wdrożeniu wszystko powinno działać:
 - ✅ Generator znajduje wszystkie pliki
 - ✅ Galeria pokazuje wszystkie grafiki
 
+

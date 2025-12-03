@@ -359,3 +359,4 @@ public function deleteBackground(Request $request)
     ], 404);
 }
 
+

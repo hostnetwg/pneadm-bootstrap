@@ -42,3 +42,4 @@ echo ""
 echo "Sprawdź instalację:"
 echo "  ls -la vendor/pne/certificate-generator/"
 
+

@@ -246,3 +246,4 @@ Analogicznie dla `getAvailableBackgrounds()`.
 - [ ] Przetestowano generowanie certyfikatu w `adm.pnedu.pl`
 - [ ] Przetestowano generowanie certyfikatu w `pnedu.pl`
 
+
