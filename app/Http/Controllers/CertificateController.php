@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Certificate;
 use App\Models\Participant;
 use App\Models\Course;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Certificate\CertificateGeneratorService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
@@ -77,145 +77,14 @@ class CertificateController extends Controller
         $startDateTime = Carbon::parse(trim($course->start_date));
         $endDateTime = Carbon::parse(trim($course->end_date));
 
-        // Obliczanie czasu trwania w minutach
-        $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
-
-        // Określenie szablonu do użycia
-        // Wszystkie szablony są w pakiecie pne-certificate-generator
-        $templateView = 'pne-certificate-generator::certificates.default'; // Domyślny szablon z pakietu
-        $templateConfig = null; // Konfiguracja szablonu
+        // Użyj nowego CertificateGeneratorService zamiast plików Blade
+        $certificateGenerator = app(CertificateGeneratorService::class);
         
-        // Jeśli kurs ma przypisany szablon, użyj go
-        if ($course->certificate_template_id && $course->certificateTemplate) {
-            // Pobierz konfigurację szablonu
-            $templateConfig = $course->certificateTemplate->config;
-            
-            // Użyj szablonu z pakietu (zawsze)
-            $templateView = $course->certificateTemplate->blade_path;
-            
-            // Sprawdź czy szablon istnieje w pakiecie
-            if (!\Illuminate\Support\Facades\View::exists($templateView)) {
-                \Log::warning('Template not found in package, using default', [
-                    'template_slug' => $course->certificateTemplate->slug,
-                    'template_id' => $course->certificateTemplate->id,
-                    'requested_view' => $templateView
-                ]);
-                // Użyj domyślnego szablonu, ale z konfiguracją z bazy
-                $templateView = 'pne-certificate-generator::certificates.default';
-            }
-        } else {
-            // Kurs nie ma przypisanego szablonu - użyj domyślnego szablonu z bazy
-            $defaultTemplate = \App\Models\CertificateTemplate::where('is_default', true)
-                ->where('is_active', true)
-                ->first();
-            
-            if ($defaultTemplate) {
-                $templateConfig = $defaultTemplate->config;
-                $templateView = $defaultTemplate->blade_path;
-                
-                // Sprawdź czy szablon istnieje w pakiecie
-                if (!\Illuminate\Support\Facades\View::exists($templateView)) {
-                    \Log::warning('Default template not found in package, using fallback', [
-                        'template_slug' => $defaultTemplate->slug,
-                        'template_id' => $defaultTemplate->id,
-                        'requested_view' => $templateView
-                    ]);
-                    $templateView = 'pne-certificate-generator::certificates.default';
-                }
-            }
-        }
-    
-        // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
-        $config = $templateConfig ?? [];
-        $blocksRaw = $config['blocks'] ?? [];
-        $settings = $config['settings'] ?? [];
-        
-        // Konwertuj blocks z obiektu na tablicę (jeśli jest obiektem)
-        $blocks = [];
-        if (is_array($blocksRaw)) {
-            // Sprawdź czy to obiekt (associative array) czy tablica numeryczna
-            if (array_keys($blocksRaw) !== range(0, count($blocksRaw) - 1)) {
-                // To jest obiekt (associative array) - konwertuj na tablicę
-                $blocks = array_values($blocksRaw);
-            } else {
-                // To już jest tablica numeryczna
-                $blocks = $blocksRaw;
-            }
-        }
-        
-        // Wyodrębnij stałe elementy (instructor_signature i footer) - zawsze na końcu
-        $regularBlocks = [];
-        $instructorSignatureBlock = null;
-        $footerBlock = null;
-        
-        foreach ($blocks as $block) {
-            $type = $block['type'] ?? '';
-            if ($type === 'instructor_signature') {
-                $instructorSignatureBlock = $block;
-            } elseif ($type === 'footer') {
-                $footerBlock = $block;
-            } else {
-                $regularBlocks[] = $block;
-            }
-        }
-        
-        // Sortuj regularne bloki według pola 'order'
-        usort($regularBlocks, function($a, $b) {
-            $orderA = $a['order'] ?? 999;
-            $orderB = $b['order'] ?? 999;
-            return $orderA <=> $orderB;
-        });
-        
-        // Wyciągnięcie wartości z konfiguracji bloków (dla kompatybilności wstecznej)
-        $headerConfig = null;
-        $courseInfoConfig = null;
-        $footerConfig = null;
-        
-        foreach ($regularBlocks as $block) {
-            $type = $block['type'] ?? '';
-            $blockConfig = $block['config'] ?? [];
-            
-            if ($type === 'header') {
-                $headerConfig = $blockConfig;
-            } elseif ($type === 'course_info') {
-                $courseInfoConfig = $blockConfig;
-            }
-        }
-        
-        if ($footerBlock) {
-            $footerConfig = $footerBlock['config'] ?? [];
-        }
-        
-        // Tworzenie widoku PDF z przekazaniem wszystkich danych
-        $isPdfMode = true; // Generujemy PDF, nie podgląd HTML
-        
-        // Pobierz orientację i czcionkę z konfiguracji szablonu
-        $orientation = $settings['orientation'] ?? 'portrait';
-        $fontFamily = $settings['font_family'] ?? 'DejaVu Sans';
-        
-        $pdf = Pdf::loadView($templateView, [
-            'participant' => $participant,
-            'certificateNumber' => $certificateNumber,
-            'course' => $course,
-            'instructor' => $instructor,
-            'durationMinutes' => $durationMinutes,
-            'isPdfMode' => $isPdfMode,
-            // Konfiguracja szablonu
-            'templateConfig' => $config,
-            'templateSettings' => $settings,
-            'headerConfig' => $headerConfig,
-            'courseInfoConfig' => $courseInfoConfig,
-            'footerConfig' => $footerConfig,
-            // Posortowane bloki do renderowania w odpowiedniej kolejności
-            'sortedBlocks' => $regularBlocks,
-            'instructorSignatureBlock' => $instructorSignatureBlock,
-            'footerBlock' => $footerBlock,
-        ])->setPaper('A4', $orientation)
-          ->setOptions([
-              'defaultFont' => $fontFamily,
-              'isHtml5ParserEnabled' => true, 
-              'isRemoteEnabled' => true
-          ]);
+        // Generuj PDF używając nowego systemu (renderowanie z JSON)
+        $pdf = $certificateGenerator->generatePdf($participant->id, [
+            'save_to_storage' => true,
+            'cache' => false
+        ]);
     
         // Zapisywanie pliku PDF w storage/public/certificates
         Storage::disk('public')->put($filePath, $pdf->output());
