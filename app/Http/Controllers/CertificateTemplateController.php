@@ -564,12 +564,12 @@ class CertificateTemplateController extends Controller
 
         $durationMinutes = 420; // 7 godzin
         $certificateNumber = '1/2025/PRZYKŁAD';
-        $isPdfMode = true; // Generujemy PDF dla podglądu!
 
-        // Używamy tego samego mechanizmu co w CertificateController
-        $templateView = $certificateTemplate->blade_path;
+        // Użyj nowego TemplateRenderer zamiast plików Blade
+        $templateRenderer = app(\App\Services\Certificate\TemplateRenderer::class);
+        $pdfGenerator = app(\App\Services\Certificate\PDFGenerator::class);
         
-        // Przygotowanie danych konfiguracji dla widoku (z fallbackami)
+        // Przygotuj dane w formacie oczekiwanym przez TemplateRenderer
         $config = $certificateTemplate->config ?? [];
         $blocksRaw = $config['blocks'] ?? [];
         $settings = $config['settings'] ?? [];
@@ -577,12 +577,9 @@ class CertificateTemplateController extends Controller
         // Konwertuj blocks z obiektu na tablicę (jeśli jest obiektem)
         $blocks = [];
         if (is_array($blocksRaw)) {
-            // Sprawdź czy to obiekt (associative array) czy tablica numeryczna
             if (array_keys($blocksRaw) !== range(0, count($blocksRaw) - 1)) {
-                // To jest obiekt (associative array) - konwertuj na tablicę
                 $blocks = array_values($blocksRaw);
             } else {
-                // To już jest tablica numeryczna
                 $blocks = $blocksRaw;
             }
         }
@@ -610,53 +607,26 @@ class CertificateTemplateController extends Controller
             return $orderA <=> $orderB;
         });
         
-        // Wyciągnięcie wartości z konfiguracji bloków (dla kompatybilności wstecznej)
-        $headerConfig = null;
-        $courseInfoConfig = null;
-        $footerConfig = null;
-        
-        foreach ($regularBlocks as $block) {
-            $type = $block['type'] ?? '';
-            $blockConfig = $block['config'] ?? [];
-            
-            if ($type === 'header') {
-                $headerConfig = $blockConfig;
-            } elseif ($type === 'course_info') {
-                $courseInfoConfig = $blockConfig;
-            }
-        }
-        
-        if ($footerBlock) {
-            $footerConfig = $footerBlock['config'] ?? [];
-        }
-        
-        // Pobierz orientację i czcionkę z konfiguracji szablonu
-        $orientation = $settings['orientation'] ?? 'portrait';
-        $fontFamily = $settings['font_family'] ?? 'DejaVu Sans';
-        
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($templateView, [
+        // Przygotuj dane dla TemplateRenderer
+        $data = [
             'participant' => $participant,
-            'certificateNumber' => $certificateNumber,
             'course' => $course,
             'instructor' => $instructor,
+            'certificateNumber' => $certificateNumber,
             'durationMinutes' => $durationMinutes,
-            'isPdfMode' => $isPdfMode,
-            // Konfiguracja szablonu
-            'templateConfig' => $config,
-            'templateSettings' => $settings,
-            'headerConfig' => $headerConfig,
-            'courseInfoConfig' => $courseInfoConfig,
-            'footerConfig' => $footerConfig,
-            // Posortowane bloki do renderowania w odpowiedniej kolejności
-            'sortedBlocks' => $regularBlocks,
-            'instructorSignatureBlock' => $instructorSignatureBlock,
-            'footerBlock' => $footerBlock,
-        ])->setPaper('A4', $orientation)
-          ->setOptions([
-              'defaultFont' => $fontFamily,
-              'isHtml5ParserEnabled' => true,
-              'isRemoteEnabled' => true
-          ]);
+            'is_pdf_mode' => true,
+            'template_config' => $config,
+            'settings' => $settings,
+            'sorted_blocks' => $regularBlocks,
+            'instructor_signature_block' => $instructorSignatureBlock,
+            'footer_block' => $footerBlock,
+        ];
+        
+        // Renderuj HTML z JSON
+        $html = $templateRenderer->render($data);
+        
+        // Generuj PDF
+        $pdf = $pdfGenerator->generate($html, $settings);
 
         return $pdf->stream('podglad-szablonu-' . $certificateTemplate->slug . '.pdf');
     }
