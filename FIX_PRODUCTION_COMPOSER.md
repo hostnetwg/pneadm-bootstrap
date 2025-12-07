@@ -124,3 +124,5 @@ Jeśli w przyszłości chcesz zsynchronizować konfigurację, możesz rozważyć
 - Lub zawsze używać VCS (GitHub) i edytować pakiet bezpośrednio w `vendor/` (zmiany będą nadpisywane przy `composer update`)
 
 
+
+

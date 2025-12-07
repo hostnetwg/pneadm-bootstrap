@@ -28,3 +28,5 @@ FROM certificate_templates
 WHERE id = 5;
 
 
+
+

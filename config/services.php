@@ -73,4 +73,9 @@ return [
         'lump_sum_rate' => env('IFIRMA_LUMP_SUM_RATE', 0.85),
     ],
 
+    'pneadm' => [
+        'api_token' => env('PNEADM_API_TOKEN'),
+        'api_url' => env('PNEADM_API_URL', env('APP_URL')),
+    ],
+
 ];

@@ -49,7 +49,7 @@ return [
         // 3. Baza certyfikatów / importu danych
         'mysql_certgen' => [
             'driver' => 'mysql',
-            'host' => env('DB_SECOND_HOST', '127.0.0.1'),
+            'host' => env('DB_SECOND_HOST', 'mysql'), // W Dockerze użyj 'mysql' (nazwa serwisu)
             'port' => env('DB_SECOND_PORT', '3306'),
             'database' => env('DB_SECOND_DATABASE', 'certgen'),
             'username' => env('DB_SECOND_USERNAME', 'sail'),

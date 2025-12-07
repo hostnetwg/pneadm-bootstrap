@@ -283,3 +283,5 @@ Po wdrożeniu wszystko powinno działać:
 - ✅ Galeria pokazuje wszystkie grafiki
 
 
+
+

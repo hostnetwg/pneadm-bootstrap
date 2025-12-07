@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\Api\CertificateApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -82,4 +83,11 @@ Route::post('/publigo/test-data', function() {
         'data' => $testData,
         'timestamp' => now()->toISOString()
     ]);
+});
+
+// Certificate API endpoints (chronione tokenem API)
+Route::prefix('certificates')->name('api.certificates.')->middleware('api.token')->group(function () {
+    Route::post('/generate', [CertificateApiController::class, 'generate'])->name('generate');
+    Route::post('/data', [CertificateApiController::class, 'getData'])->name('data');
+    Route::get('/health', [CertificateApiController::class, 'health'])->name('health');
 });
