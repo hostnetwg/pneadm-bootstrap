@@ -26,6 +26,7 @@ use App\Http\Controllers\TrashController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\UserPreferencesController;
 use App\Http\Controllers\CoursePriceVariantController;
+use App\Http\Controllers\AccountingController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -322,6 +323,19 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/user/{userId}', [ActivityLogController::class, 'userLogs'])->name('user-logs');
         Route::get('/model/{modelType}/{modelId}', [ActivityLogController::class, 'modelLogs'])->name('model-logs');
         Route::get('/{id}', [ActivityLogController::class, 'show'])->name('show');
+    });
+
+    // Księgowość - Raporty i Wprowadź dane
+    Route::prefix('accounting')->name('accounting.')->group(function () {
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [AccountingController::class, 'reportsIndex'])->name('index');
+        });
+        Route::prefix('data-entry')->name('data-entry.')->group(function () {
+            Route::get('/', [AccountingController::class, 'dataEntryIndex'])->name('index');
+            Route::post('/', [AccountingController::class, 'dataEntryStore'])->name('store');
+            Route::put('/{id}', [AccountingController::class, 'dataEntryUpdate'])->name('update');
+            Route::delete('/{id}', [AccountingController::class, 'dataEntryDestroy'])->name('destroy');
+        });
     });
 });
 

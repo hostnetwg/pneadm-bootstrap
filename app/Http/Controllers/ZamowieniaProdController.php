@@ -108,7 +108,7 @@ class ZamowieniaProdController extends Controller
                 'price_id_ProdPubligo' => $request->price_id_ProdPubligo,
                 'status' => $request->status,
                 'nazwa' => $request->nazwa,
-                'promocja' => $request->promocja,
+                'promocja' => $request->promocja ?? '',
             ]);
 
             // Dodaj warianty cenowe
@@ -190,7 +190,7 @@ class ZamowieniaProdController extends Controller
                     'price_id_ProdPubligo' => $request->price_id_ProdPubligo,
                     'status' => $request->status,
                     'nazwa' => $request->nazwa,
-                    'promocja' => $request->promocja,
+                    'promocja' => $request->promocja ?? '',
                 ]);
 
             // Usuń stare warianty

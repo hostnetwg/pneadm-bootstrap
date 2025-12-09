@@ -257,6 +257,35 @@
 
         <li class="border-top my-3"></li>
         
+        <!-- Księgowość -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('accounting.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#accounting-collapse"
+                    aria-expanded="{{ request()->routeIs('accounting.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#file-earmark-text"></use>
+                </svg>
+                Księgowość
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('accounting.*') ? 'show' : '' }}" id="accounting-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('accounting.reports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.reports.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Raporty
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('accounting.data-entry.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.data-entry.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Wprowadź dane
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        
         <!-- Ustawienia -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('settings.*') ? '' : 'collapsed' }}"
