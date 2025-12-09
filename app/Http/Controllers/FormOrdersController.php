@@ -154,8 +154,8 @@ class FormOrdersController extends Controller
         $stats = [
             'total' => FormOrder::count(),
             'new' => $newCount,
-            'yesterday' => FormOrder::whereDate('order_date', Carbon::yesterday()->format('Y-m-d'))->new()->count(),
-            'today' => FormOrder::whereDate('order_date', Carbon::today()->format('Y-m-d'))->new()->count(),
+            'yesterday' => FormOrder::whereDate('order_date', Carbon::yesterday()->format('Y-m-d'))->count(),
+            'today' => FormOrder::whereDate('order_date', Carbon::today()->format('Y-m-d'))->count(),
             'archival' => $archivalCount,
             'sales_value' => FormOrder::withInvoice()->sum('product_price'),
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
