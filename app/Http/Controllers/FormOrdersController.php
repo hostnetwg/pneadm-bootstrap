@@ -62,7 +62,19 @@ class FormOrdersController extends Controller
                   ->orWhere('invoice_number', 'LIKE', "%{$search}%")
                   ->orWhere('notes', 'LIKE', "%{$search}%")
                   ->orWhere('id', 'LIKE', "%{$search}%")
-                  ->orWhere('publigo_product_id', 'LIKE', "%{$search}%"); // Dodano wyszukiwanie po Publigo ID
+                  ->orWhere('publigo_product_id', 'LIKE', "%{$search}%")
+                  // Wyszukiwanie po danych nabywcy
+                  ->orWhere('buyer_name', 'LIKE', "%{$search}%")
+                  ->orWhere('buyer_address', 'LIKE', "%{$search}%")
+                  ->orWhere('buyer_postal_code', 'LIKE', "%{$search}%")
+                  ->orWhere('buyer_city', 'LIKE', "%{$search}%")
+                  ->orWhere('buyer_nip', 'LIKE', "%{$search}%")
+                  // Wyszukiwanie po danych odbiorcy
+                  ->orWhere('recipient_name', 'LIKE', "%{$search}%")
+                  ->orWhere('recipient_address', 'LIKE', "%{$search}%")
+                  ->orWhere('recipient_postal_code', 'LIKE', "%{$search}%")
+                  ->orWhere('recipient_city', 'LIKE', "%{$search}%")
+                  ->orWhere('recipient_nip', 'LIKE', "%{$search}%");
             });
         }
         
