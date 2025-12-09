@@ -276,6 +276,7 @@
                                     <th>Miesiąc</th>
                                     <th class="text-end">Kwota</th>
                                     <th class="text-end">% rocznej sumy</th>
+                                    <th>Notatki</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -301,12 +302,22 @@
                                                 -
                                             @endif
                                         </td>
+                                        <td>
+                                            @if(!empty($data['notes']))
+                                                <span class="text-muted" title="{{ $data['notes'] }}">
+                                                    {{ Str::limit($data['notes'], 50) }}
+                                                </span>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                                 <tr class="table-primary fw-bold">
                                     <td>SUMA</td>
                                     <td class="text-end">{{ number_format($totalAmount, 2, ',', ' ') }} zł</td>
                                     <td class="text-end">100%</td>
+                                    <td></td>
                                 </tr>
                             </tbody>
                         </table>

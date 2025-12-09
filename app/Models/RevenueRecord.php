@@ -177,6 +177,7 @@ class RevenueRecord extends Model
                 'month_name' => $months[$month],
                 'amount' => $record ? (float) $record->amount : 0.00,
                 'period_label' => $months[$month] . ' ' . $year,
+                'notes' => $record ? $record->notes : null,
             ];
         }
 
@@ -235,6 +236,7 @@ class RevenueRecord extends Model
                 'month_name' => $months[$currentMonth],
                 'amount' => $record ? (float) $record->amount : 0.00,
                 'period_label' => $months[$currentMonth] . ' ' . $currentYear,
+                'notes' => $record ? $record->notes : null,
             ];
 
             // Przejdź do następnego miesiąca
