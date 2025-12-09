@@ -332,50 +332,52 @@
             }
         }
 
-        // Wykres porównawczy miesiąc do miesiąca
+        // Wykres porównawczy miesiąc do miesiąca - wszystkie lata
         @if(count($monthToMonthComparison['years']) > 0)
         const monthToMonthCtx = document.getElementById('monthToMonthChart');
         if (monthToMonthCtx) {
             const comparisonData = @json($monthToMonthComparison['data']);
             const years = @json($monthToMonthComparison['years']);
-            const currentYear = {{ date('Y') }};
-            const previousYear = currentYear - 1;
 
             // Przygotuj etykiety (miesiące)
             const labels = comparisonData.map(item => item.month_name);
 
-            // Przygotuj dane dla bieżącego roku
-            const currentYearData = comparisonData.map(item => {
-                const yearData = item.years.find(y => y.year === currentYear);
-                return yearData ? parseFloat(yearData.amount) : 0;
-            });
+            // Paleta kolorów dla każdego roku (różne kolory dla lepszej czytelności)
+            const colorPalette = [
+                { bg: 'rgba(13, 110, 253, 0.8)', border: 'rgba(13, 110, 253, 1)' },      // Niebieski - 2020
+                { bg: 'rgba(25, 135, 84, 0.8)', border: 'rgba(25, 135, 84, 1)' },        // Zielony - 2021
+                { bg: 'rgba(255, 193, 7, 0.8)', border: 'rgba(255, 193, 7, 1)' },       // Żółty - 2022
+                { bg: 'rgba(220, 53, 69, 0.8)', border: 'rgba(220, 53, 69, 1)' },       // Czerwony - 2023
+                { bg: 'rgba(108, 117, 125, 0.8)', border: 'rgba(108, 117, 125, 1)' },   // Szary - 2024
+                { bg: 'rgba(111, 66, 193, 0.8)', border: 'rgba(111, 66, 193, 1)' },     // Fioletowy - 2025
+                { bg: 'rgba(253, 126, 20, 0.8)', border: 'rgba(253, 126, 20, 1)' },     // Pomarańczowy - 2026
+                { bg: 'rgba(32, 201, 151, 0.8)', border: 'rgba(32, 201, 151, 1)' },     // Turkusowy - 2027
+            ];
 
-            // Przygotuj dane dla poprzedniego roku
-            const previousYearData = comparisonData.map(item => {
-                const yearData = item.years.find(y => y.year === previousYear);
-                return yearData ? parseFloat(yearData.amount) : 0;
+            // Przygotuj dane dla każdego roku jako osobna seria
+            const datasets = years.map((year, index) => {
+                const yearData = comparisonData.map(item => {
+                    const yearDataItem = item.years.find(y => y.year === year);
+                    return yearDataItem ? parseFloat(yearDataItem.amount) : 0;
+                });
+
+                const colorIndex = index % colorPalette.length;
+                const colors = colorPalette[colorIndex];
+
+                return {
+                    label: year.toString(),
+                    data: yearData,
+                    backgroundColor: colors.bg,
+                    borderColor: colors.border,
+                    borderWidth: 1.5
+                };
             });
 
             new Chart(monthToMonthCtx, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [
-                        {
-                            label: 'Bieżący okres (' + currentYear + ')',
-                            data: currentYearData,
-                            backgroundColor: 'rgba(255, 193, 7, 0.8)',
-                            borderColor: 'rgba(255, 193, 7, 1)',
-                            borderWidth: 2
-                        },
-                        {
-                            label: 'Poprzedni okres (' + previousYear + ')',
-                            data: previousYearData,
-                            backgroundColor: 'rgba(108, 117, 125, 0.6)',
-                            borderColor: 'rgba(108, 117, 125, 1)',
-                            borderWidth: 2
-                        }
-                    ]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -383,7 +385,14 @@
                     plugins: {
                         legend: {
                             display: true,
-                            position: 'bottom'
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 15,
+                                padding: 10,
+                                font: {
+                                    size: 11
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -411,7 +420,10 @@
                         x: {
                             ticks: {
                                 maxRotation: 45,
-                                minRotation: 45
+                                minRotation: 45,
+                                font: {
+                                    size: 10
+                                }
                             }
                         }
                     }
