@@ -121,3 +121,7 @@ chown -R sail:sail ../pne-certificate-generator/resources/views/certificates
 - Sprawdź namespace: `pne-certificate-generator::certificates.{slug}`
 
 
+
+
+
+

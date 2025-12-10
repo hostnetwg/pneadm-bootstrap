@@ -215,10 +215,10 @@ class TemplateRenderer
         $styles .= "            width: fit-content;\n";
         $styles .= "            max-width: 100%;\n";
         $styles .= "            display: flex;\n";
-        $styles .= "            justify-content: center;\n";
+        $styles .= "            justify-content: flex-end;\n";
         $styles .= "            align-items: center;\n";
-        $styles .= "            align-self: center;\n";
-        $styles .= "            margin: 0 auto;\n";
+        $styles .= "            align-self: flex-end;\n";
+        $styles .= "            margin: 0;\n";
         $styles .= "        }\n";
         
         $participantNameFont = $settings['participant_name_font'] ?? 'DejaVu Sans';
@@ -316,7 +316,7 @@ class TemplateRenderer
             if (!empty($participant->birth_date) && !empty($participant->birth_place)) {
                 $birthDate = Carbon::parse($participant->birth_date)->format('d.m.Y');
                 $birthPlace = htmlspecialchars($participant->birth_place);
-                $html .= "    <p>urodzony/a: {$birthDate}r. w miejscowości {$birthPlace}</p>\n\n";
+                $html .= "    <p>urodzony/a: {$birthDate}&nbsp;r. w miejscowości {$birthPlace}</p>\n\n";
             } else {
                 $html .= "    <p>&nbsp;</p>\n\n";
             }
@@ -340,7 +340,7 @@ class TemplateRenderer
         
         if ($course) {
             $startDate = Carbon::parse($course->start_date)->format('d.m.Y');
-            $html .= "    <p>{$eventText} {$startDate}r. ";
+            $html .= "    <p>{$eventText} {$startDate}&nbsp;r. ";
             
             if (!empty($config['show_duration'])) {
                 $html .= "w wymiarze {$durationMinutes} minut, ";
@@ -404,7 +404,7 @@ class TemplateRenderer
         
         if ($course) {
             $endDate = Carbon::parse($course->end_date)->format('d.m.Y');
-            $html .= "        <p style=\"margin: 0;\">Data, {$endDate}r.";
+            $html .= "        <p style=\"margin: 0;\">Data, {$endDate}&nbsp;r.";
             
             if (!empty($templateSettings['show_certificate_number'] ?? true)) {
                 $html .= "<br>\n        Nr rejestru: " . htmlspecialchars($certificateNumber);
@@ -434,7 +434,7 @@ class TemplateRenderer
         
         $html .= "        </p>\n";
         $html .= "        \n";
-        $html .= "        <div class=\"signature-container\" style=\"margin-right: " . rand(10, 100) . "px; margin-top: " . rand(0, 25) . "px;\">\n";
+        $html .= "        <div class=\"signature-container\">\n";
         
         if ($instructor && !empty($instructor->signature)) {
             $signatureSrc = $this->getSignatureImageSrc($instructor->signature, $isPdfMode);
@@ -510,20 +510,49 @@ class TemplateRenderer
         $transparent = imagecolorallocatealpha($transparentImage, 0, 0, 0, 127);
         imagefill($transparentImage, 0, 0, $transparent);
         
+        // Włącz obsługę alpha dla źródłowego obrazu (jeśli PNG)
+        if ($mimeType === 'image/png') {
+            imagealphablending($sourceImage, false);
+            imagesavealpha($sourceImage, true);
+        }
+        
         // Kopiuj piksele, zamieniając białe na przezroczyste
         for ($x = 0; $x < $width; $x++) {
             for ($y = 0; $y < $height; $y++) {
-                $rgb = imagecolorat($sourceImage, $x, $y);
-                $r = ($rgb >> 16) & 0xFF;
-                $g = ($rgb >> 8) & 0xFF;
-                $b = $rgb & 0xFF;
+                $rgba = imagecolorat($sourceImage, $x, $y);
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $a = ($rgba >> 24) & 0x7F; // Alpha channel (0 = nieprzezroczysty, 127 = przezroczysty)
                 
-                // Jeśli piksel jest biały lub bardzo jasny (threshold 240), ustaw jako przezroczysty
-                if ($r >= 240 && $g >= 240 && $b >= 240) {
-                    imagesetpixel($transparentImage, $x, $y, $transparent);
+                // Dla PNG - zawsze sprawdź oryginalny alpha
+                if ($mimeType === 'image/png') {
+                    // Jeśli piksel jest już przezroczysty w oryginalnym obrazie (alpha > 0), zachowaj to
+                    if ($a > 0) {
+                        // Zachowaj oryginalny alpha (0 = nieprzezroczysty, 127 = przezroczysty)
+                        $alpha = $a;
+                        $color = imagecolorallocatealpha($transparentImage, $r, $g, $b, $alpha);
+                        imagesetpixel($transparentImage, $x, $y, $color);
+                    } else {
+                        // Piksel nie jest przezroczysty - sprawdź czy jest biały i usuń tło
+                        if ($r >= 240 && $g >= 240 && $b >= 240) {
+                            imagesetpixel($transparentImage, $x, $y, $transparent);
+                        } else {
+                            // Nie jest biały - zachowaj z pełną nieprzezroczystością
+                            $color = imagecolorallocatealpha($transparentImage, $r, $g, $b, 0);
+                            imagesetpixel($transparentImage, $x, $y, $color);
+                        }
+                    }
                 } else {
-                    $color = imagecolorallocate($transparentImage, $r, $g, $b);
-                    imagesetpixel($transparentImage, $x, $y, $color);
+                    // Dla JPEG - usuń białe tło
+                    // Jeśli piksel jest biały lub bardzo jasny (threshold 240), ustaw jako przezroczysty
+                    if ($r >= 240 && $g >= 240 && $b >= 240) {
+                        imagesetpixel($transparentImage, $x, $y, $transparent);
+                    } else {
+                        // Użyj imagecolorallocatealpha z pełną nieprzezroczystością (alpha = 0)
+                        $color = imagecolorallocatealpha($transparentImage, $r, $g, $b, 0);
+                        imagesetpixel($transparentImage, $x, $y, $color);
+                    }
                 }
             }
         }

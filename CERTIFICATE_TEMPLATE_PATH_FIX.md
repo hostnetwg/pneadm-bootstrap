@@ -75,3 +75,7 @@ $packagePath = '/var/www/pne-certificate-generator/storage/' . $relativePath;
 - ✅ Logo i tła powinny się teraz poprawnie ładować z pakietu
 
 
+
+
+
+

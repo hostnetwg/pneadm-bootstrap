@@ -64,3 +64,7 @@
 - Niestandardowe szablony są generowane dynamicznie i zapisywane lokalnie w każdym projekcie
 
 
+
+
+
+

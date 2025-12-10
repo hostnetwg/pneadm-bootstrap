@@ -115,3 +115,7 @@ public function generateBladeFile($config, $slug)
 - Synchronizacja między projektami (git lub shared volume)
 
 
+
+
+
+

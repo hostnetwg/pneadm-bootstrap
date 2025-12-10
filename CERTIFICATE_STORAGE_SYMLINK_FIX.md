@@ -91,3 +91,7 @@ Powinno wyświetlić obraz.
 - ✅ Podgląd w edytorze działa
 
 
+
+
+
+

@@ -48,3 +48,7 @@ Spróbuj teraz wygenerować certyfikat - powinno działać z lokalnymi szablonam
 Po restarcie kontenerów i instalacji pakietu, system automatycznie przełączy się na szablony z pakietu.
 
 
+
+
+
+

@@ -111,3 +111,7 @@ chown -R sail:sail ../pne-certificate-generator/storage
 - ✅ Szablony używają plików z pakietu
 
 
+
+
+
+

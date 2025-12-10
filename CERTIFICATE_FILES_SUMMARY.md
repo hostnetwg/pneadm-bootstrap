@@ -103,3 +103,7 @@ ln -s ../pne-certificate-generator/storage/certificates storage/app/public/certi
 - ⏳ **Opcjonalne:** Konfiguracja dostępu publicznego do plików z pakietu (symlink/publikacja)
 
 
+
+
+
+

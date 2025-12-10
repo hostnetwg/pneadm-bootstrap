@@ -80,3 +80,7 @@ echo "Write test: SUCCESS"
 - ✅ Edytor szablonów może teraz zapisywać pliki w pakiecie
 
 
+
+
+
+
