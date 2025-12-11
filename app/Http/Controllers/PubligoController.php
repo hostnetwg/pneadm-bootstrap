@@ -20,6 +20,7 @@ use App\Models\Publigo;
 use App\Models\Instructor;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Models\FormOrder;
 use App\Models\WebhookLog;
 
 class PubligoController extends Controller
@@ -371,6 +372,27 @@ class PubligoController extends Controller
                         'new_course_id' => $course->id,
                         'order_id' => $orderId
                     ]);
+                } else {
+                    // Jeśli nie ma poprzedniego uczestnika, sprawdź FormOrder z tym samym emailem
+                    $formOrder = \App\Models\FormOrder::where('participant_email', $customer['email'])
+                        ->whereNotNull('participant_birth_date')
+                        ->whereNotNull('participant_birth_place')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+                    if ($formOrder) {
+                        $birthDate = $formOrder->participant_birth_date;
+                        $birthPlace = $formOrder->participant_birth_place;
+                        
+                        \Log::info('Found FormOrder with birth data - copying to participant', [
+                            'email' => $customer['email'],
+                            'form_order_id' => $formOrder->id,
+                            'birth_date' => $birthDate?->format('Y-m-d'),
+                            'birth_place' => $birthPlace,
+                            'new_course_id' => $course->id,
+                            'order_id' => $orderId
+                        ]);
+                    }
                 }
 
                 // Utwórz nowego uczestnika

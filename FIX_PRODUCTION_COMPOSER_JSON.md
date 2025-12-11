@@ -96,3 +96,5 @@ Sekcja `repositories` powinna wyglądać tak:
 
 **UWAGA:** Po `}` nie powinno być przecinka przed `]` - to jest częsty błąd powodujący problemy.
 
+
+

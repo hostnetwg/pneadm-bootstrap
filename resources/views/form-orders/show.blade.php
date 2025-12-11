@@ -200,7 +200,7 @@ nowoczesna-edukacja.pl </div>
                                 <i class="bi bi-check-circle"></i> 
                                 <strong>Zamówienie zostało wysłane do Publigo</strong>
                                 <small class="d-block text-muted mt-1">
-                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana' }}
+                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') : 'Nieznana' }}
                                 </small>
                                 
                                 {{-- Przycisk resetowania dla administratorów --}}
@@ -458,7 +458,8 @@ echo $remarks;
                                         @php
                                             $orderDateRaw = $zamowienie->getRawOriginal('order_date');
                                             $orderDateFormatted = $orderDateRaw
-                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, config('app.timezone'))
+                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                    ->setTimezone('Europe/Warsaw')
                                                     ->format('d.m.Y H:i')
                                                 : null;
                                         @endphp
@@ -1486,7 +1487,7 @@ nowoczesna-edukacja.pl `;
                             <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                             @if($zamowienie->publigo_sent_at)
-                                <li><strong>Data wysłania do Publigo:</strong> {{ $zamowienie->publigo_sent_at->format('d.m.Y H:i') }}</li>
+                                <li><strong>Data wysłania do Publigo:</strong> {{ $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
                             @endif
                         </ul>
                     </div>
@@ -1529,7 +1530,8 @@ nowoczesna-edukacja.pl `;
                             @php
                                 $orderDateRaw = $zamowienie->getRawOriginal('order_date');
                                 $orderDateFormatted = $orderDateRaw
-                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, config('app.timezone'))
+                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                        ->setTimezone('Europe/Warsaw')
                                         ->format('d.m.Y H:i')
                                     : '—';
                             @endphp

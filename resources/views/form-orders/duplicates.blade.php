@@ -309,7 +309,8 @@
                                                         @php
                                                             $orderDateRaw = $order->getRawOriginal('order_date');
                                                             $orderDateFormatted = $orderDateRaw
-                                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, config('app.timezone'))
+                                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
+                                                                    ->setTimezone('Europe/Warsaw')
                                                                     ->format('d.m.Y H:i')
                                                                 : '—';
                                                         @endphp

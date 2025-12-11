@@ -735,25 +735,6 @@ class CertificateTemplateController extends Controller
             'message' => 'Nie przesłano pliku'
         ], 400);
     }
-        $testPath = $packagePath . '/storage';
-        if (!File::exists($testPath)) {
-            return false;
-        }
-        
-        // Sprawdź uprawnienia - próba utworzenia testowego pliku
-        $testFile = $testPath . '/.writable_test_' . time();
-        try {
-            @File::put($testFile, 'test');
-            if (File::exists($testFile)) {
-                File::delete($testFile);
-                return true;
-            }
-        } catch (\Exception $e) {
-            return false;
-        }
-        
-        return false;
-    }
 
     /**
      * Zapisuje plik do storage aplikacji

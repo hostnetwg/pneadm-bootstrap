@@ -95,3 +95,5 @@ Powinno wyświetlić obraz.
 
 
 
+
+

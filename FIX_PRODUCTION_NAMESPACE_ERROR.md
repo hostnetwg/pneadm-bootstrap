@@ -63,3 +63,5 @@ Po wykonaniu komend sprawdź czy aplikacja działa:
 - Upewnij się, że `APP_ENV=production` w pliku `.env`
 - Sprawdź czy `composer.json` i `composer.lock` są zsynchronizowane z repozytorium
 
+
+

@@ -116,3 +116,5 @@ git config --global user.name "Your Name"
 - **Aplikacja działa** - wszystkie błędy są związane z cache/optymalizacją, nie z działaniem aplikacji
 - **Najważniejsze:** Zaktualizuj pakiet `pne-certificate-generator` po commit zmian, aby naprawić błąd "Cannot redeclare function"
 
+
+
