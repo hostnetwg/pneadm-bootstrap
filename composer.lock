@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "335669a7cc7782fdfa0e233659084c24",
+    "content-hash": "c2ba9dd8117333748376f45be7746ffc",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -2881,49 +2881,6 @@
                 }
             ],
             "time": "2024-07-20T21:41:07+00:00"
-        },
-        {
-            "name": "pne/certificate-generator",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../pne-certificate-generator",
-                "reference": "2fb1724d3623d2e9d4e1673214a1a645620f5664"
-            },
-            "require": {
-                "barryvdh/laravel-dompdf": "^3.1",
-                "illuminate/database": "^11.0",
-                "illuminate/filesystem": "^11.0",
-                "illuminate/support": "^11.0",
-                "illuminate/view": "^11.0",
-                "php": "^8.2"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Pne\\CertificateGenerator\\CertificateGeneratorServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Pne\\CertificateGenerator\\": "src/"
-                }
-            },
-            "license": [
-                "proprietary"
-            ],
-            "authors": [
-                {
-                    "name": "PNE Platform",
-                    "email": "info@pnedu.pl"
-                }
-            ],
-            "description": "Wspólny pakiet do generowania zaświadczeń dla platformy PNE",
-            "transport-options": {
-                "relative": true
-            }
         },
         {
             "name": "psr/clock",
@@ -8542,9 +8499,7 @@
     ],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "pne/certificate-generator": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -9,7 +9,7 @@ class TemplateBuilderService
 {
     /**
      * Generuje plik blade z konfiguracji szablonu
-     * Zapisuje w pakiecie (dev) lub w aplikacji (produkcja)
+     * Zapisuje lokalnie w aplikacji
      */
     public function generateBladeFile($config, $slug)
     {
@@ -17,128 +17,11 @@ class TemplateBuilderService
         
         $fileName = Str::slug($slug) . '.blade.php';
         
-        // Sprawdź czy pakiet jest zapisywalny
-        $packagePath = $this->getPackagePath();
-        $isPackageWritable = $this->isPackageWritable();
-        
-        if ($isPackageWritable && $packagePath) {
-            // Dev: zapisz w pakiecie
-            $packageFilePath = $packagePath . '/resources/views/certificates/' . $fileName;
-            $packageDirectory = dirname($packageFilePath);
-            
-            if (!File::exists($packageDirectory)) {
-                File::makeDirectory($packageDirectory, 0755, true);
-            }
-            
-            try {
-                File::put($packageFilePath, $bladeContent);
-                \Log::info('Template saved to package', [
-                    'slug' => $slug,
-                    'package_path' => $packageFilePath
-                ]);
-                return $fileName;
-            } catch (\Exception $e) {
-                \Log::error('Failed to save template to package', [
-                    'slug' => $slug,
-                    'package_path' => $packageFilePath,
-                    'error' => $e->getMessage()
-                ]);
-                // Fallback do aplikacji
-                return $this->saveBladeToApp($bladeContent, $fileName, $slug);
-            }
-        } else {
-            // Produkcja: zapisz w aplikacji
-            return $this->saveBladeToApp($bladeContent, $fileName, $slug);
-        }
-    }
-    
-    /**
-     * Pobiera ścieżkę do pakietu pne-certificate-generator
-     * Sprawdza różne możliwe lokalizacje (w kolejności priorytetu)
-     */
-    protected function getPackagePath(): ?string
-    {
-        // Opcja 1: Przez Docker volume (w kontenerze) - najwyższy priorytet
-        $dockerPath = '/var/www/pne-certificate-generator';
-        if (File::exists($dockerPath) && File::exists($dockerPath . '/composer.json')) {
-            return $dockerPath;
-        }
-        
-        // Opcja 2: Relatywna ścieżka z pneadm-bootstrap (dla lokalnego developmentu)
-        $relativePath = base_path('../pne-certificate-generator');
-        if (File::exists($relativePath) && File::exists($relativePath . '/composer.json')) {
-            return $relativePath;
-        }
-        
-        // Opcja 3: Przez vendor (jeśli pakiet jest zainstalowany przez Composer)
-        $vendorPath = base_path('vendor/pne/certificate-generator');
-        if (File::exists($vendorPath) && File::exists($vendorPath . '/composer.json')) {
-            return $vendorPath;
-        }
-        
-        // Opcja 4: Absolutna ścieżka (fallback dla WSL)
-        $absolutePath = '/home/hostnet/WEB-APP/pne-certificate-generator';
-        if (File::exists($absolutePath) && File::exists($absolutePath . '/composer.json')) {
-            return $absolutePath;
-        }
-        
-        // Opcja 5: Przez realpath (rozwiązuje symlinki i względne ścieżki)
-        $realPath = realpath(base_path('../pne-certificate-generator'));
-        if ($realPath && File::exists($realPath) && File::exists($realPath . '/composer.json')) {
-            return $realPath;
-        }
-        
-        // Loguj błąd dla debugowania
-        \Log::error('Cannot find pne-certificate-generator package', [
-            'docker_path' => $dockerPath . ' (exists: ' . (File::exists($dockerPath) ? 'yes' : 'no') . ')',
-            'relative_path' => $relativePath . ' (exists: ' . (File::exists($relativePath) ? 'yes' : 'no') . ')',
-            'vendor_path' => $vendorPath . ' (exists: ' . (File::exists($vendorPath) ? 'yes' : 'no') . ')',
-            'absolute_path' => $absolutePath . ' (exists: ' . (File::exists($absolutePath) ? 'yes' : 'no') . ')',
-            'base_path' => base_path(),
-        ]);
-        
-        return null;
+        return $this->saveBladeToApp($bladeContent, $fileName, $slug);
     }
 
     /**
-     * Sprawdza czy pakiet jest zapisywalny (path repository) czy tylko do odczytu (vendor)
-     */
-    protected function isPackageWritable(): bool
-    {
-        $packagePath = $this->getPackagePath();
-        
-        if (!$packagePath) {
-            return false;
-        }
-        
-        // Jeśli pakiet jest w vendor - nie jest zapisywalny
-        if (strpos($packagePath, 'vendor/') !== false) {
-            return false;
-        }
-        
-        // Sprawdź czy można zapisać w katalogu resources/views pakietu
-        $testPath = $packagePath . '/resources/views';
-        if (!File::exists($testPath)) {
-            return false;
-        }
-        
-        // Sprawdź uprawnienia - próba utworzenia testowego pliku
-        $testFile = $testPath . '/.writable_test_' . time();
-        try {
-            @File::put($testFile, 'test');
-            if (File::exists($testFile)) {
-                File::delete($testFile);
-                return true;
-            }
-        } catch (\Exception $e) {
-            return false;
-        }
-        
-        return false;
-    }
-
-    /**
-     * Zapisuje plik Blade do aplikacji (produkcja)
+     * Zapisuje plik Blade lokalnie w aplikacji
      */
     protected function saveBladeToApp(string $bladeContent, string $fileName, string $slug): string
     {

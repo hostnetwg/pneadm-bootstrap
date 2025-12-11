@@ -84,9 +84,8 @@ class ChangeTemplateSlug extends Command
         $this->newLine();
         
         // 4. Sprawdź pliki blade
-        $packagePath = base_path('../pne-certificate-generator');
-        $oldBladeFile = $packagePath . '/resources/views/certificates/' . $oldSlug . '.blade.php';
-        $newBladeFile = $packagePath . '/resources/views/certificates/' . $newSlug . '.blade.php';
+        $oldBladeFile = resource_path('views/certificates/' . $oldSlug . '.blade.php');
+        $newBladeFile = resource_path('views/certificates/' . $newSlug . '.blade.php');
         
         $this->info("📁 Pliki blade:");
         $this->line("   Stary: {$oldSlug}.blade.php - " . (File::exists($oldBladeFile) ? "✅ Istnieje" : "❌ Nie istnieje"));
