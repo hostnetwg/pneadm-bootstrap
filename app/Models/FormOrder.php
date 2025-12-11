@@ -112,6 +112,7 @@ class FormOrder extends Model
         'publigo_product_id' => 'integer',
         'publigo_price_id' => 'integer',
         'publigo_sent' => 'integer',
+        'order_date' => 'datetime',
         'publigo_sent_at' => 'datetime',
         'invoice_payment_delay' => 'integer',
         'status_completed' => 'integer',
@@ -133,39 +134,6 @@ class FormOrder extends Model
         'status_completed' => 0,
     ];
 
-    /**
-     * Accessor - zwraca datę zamówienia dokładnie z bazy (bez konwersji UTC)
-     * 
-     * Problem: Dane w bazie są w strefie czasowej Europe/Warsaw (nie UTC).
-     * Laravel Eloquent domyślnie traktuje daty z bazy jako UTC i konwertuje je.
-     * 
-     * Rozwiązanie: Parsujemy surową wartość z bazy jako datę w lokalnej strefie czasowej
-     * aplikacji (Europe/Warsaw), używając createFromFormat() z trzecim parametrem.
-     */
-    public function getOrderDateAttribute($value)
-    {
-        // Pobierz surową wartość z bazy danych (przed jakimkolwiek castem)
-        $rawValue = $this->attributes['order_date'] ?? null;
-        
-        if (!$rawValue) {
-            return null;
-        }
-        
-        // Parsuj surową wartość jako datę w lokalnej strefie czasowej aplikacji (Europe/Warsaw)
-        // Trzeci parametr 'Europe/Warsaw' mówi Carbon, że surowa wartość JEST już w tej strefie
-        // Nie ma konwersji - po prostu traktujemy string z bazy jako datę w Europe/Warsaw
-        try {
-            return \Carbon\Carbon::createFromFormat(
-                'Y-m-d H:i:s',
-                $rawValue,
-                config('app.timezone') // Europe/Warsaw
-            );
-        } catch (\Exception $e) {
-            // Jeśli format się nie zgadza, spróbuj parse (ale to może konwertować)
-            return \Carbon\Carbon::parse($rawValue)->setTimezone(config('app.timezone'));
-        }
-    }
-    
     /**
      * Zwraca surową wartość order_date z bazy (bez żadnej konwersji)
      * Użyj tego jeśli potrzebujesz dokładnie tego co jest w bazie
