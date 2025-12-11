@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\LogsActivity;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class CertificateTemplate extends Model
 {
@@ -33,5 +35,21 @@ class CertificateTemplate extends Model
     public function courses()
     {
         return $this->hasMany(Course::class, 'certificate_template_id');
+    }
+
+    /**
+     * Sprawdza czy plik Blade szablonu istnieje
+     * Sprawdza lokalny katalog aplikacji (resources/views/certificates/)
+     */
+    public function bladeFileExists(): bool
+    {
+        if (!$this->slug) {
+            return false;
+        }
+
+        $fileName = Str::slug($this->slug) . '.blade.php';
+        $bladePath = resource_path('views/certificates/' . $fileName);
+
+        return File::exists($bladePath);
     }
 }
