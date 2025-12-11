@@ -144,21 +144,28 @@ class FormOrder extends Model
     }
 
     /**
-     * Mutator - zapisuje datę w formacie zgodnym z bazą
+     * Mutator - zapisuje datę w UTC w formacie zgodnym z bazą
+     * Zawsze zapisujemy daty w UTC, niezależnie od timezone aplikacji
      */
     public function setOrderDateAttribute($value): void
     {
         if ($value instanceof \DateTimeInterface) {
-            $this->attributes['order_date'] = $value->format('Y-m-d H:i:s');
+            // Konwertuj na UTC przed zapisem
+            $carbon = Carbon::instance($value)->utc();
+            $this->attributes['order_date'] = $carbon->format('Y-m-d H:i:s');
             return;
         }
 
         if (is_numeric($value)) {
-            $this->attributes['order_date'] = Carbon::createFromTimestamp($value)->format('Y-m-d H:i:s');
+            // Timestamp zawsze jest w UTC
+            $this->attributes['order_date'] = Carbon::createFromTimestamp($value, 'UTC')->format('Y-m-d H:i:s');
             return;
         }
 
-        $this->attributes['order_date'] = Carbon::parse($value)->format('Y-m-d H:i:s');
+        // Parsuj i konwertuj na UTC
+        // Carbon::parse() używa timezone aplikacji, więc musimy przekonwertować na UTC
+        $carbon = Carbon::parse($value);
+        $this->attributes['order_date'] = $carbon->utc()->format('Y-m-d H:i:s');
     }
 
     /**

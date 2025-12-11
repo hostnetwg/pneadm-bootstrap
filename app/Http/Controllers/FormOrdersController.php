@@ -163,11 +163,15 @@ class FormOrdersController extends Controller
         $newCount = FormOrder::new()->count();
 
         // Statystyki do wyświetlenia
+        // Używamy UTC dla zapytań, ponieważ dane w bazie są w UTC
+        $todayUTC = Carbon::today('UTC');
+        $yesterdayUTC = Carbon::yesterday('UTC');
+        
         $stats = [
             'total' => FormOrder::count(),
             'new' => $newCount,
-            'yesterday' => FormOrder::whereDate('order_date', Carbon::yesterday()->format('Y-m-d'))->count(),
-            'today' => FormOrder::whereDate('order_date', Carbon::today()->format('Y-m-d'))->count(),
+            'yesterday' => FormOrder::whereDate('order_date', $yesterdayUTC->format('Y-m-d'))->count(),
+            'today' => FormOrder::whereDate('order_date', $todayUTC->format('Y-m-d'))->count(),
             'archival' => $archivalCount,
             'sales_value' => FormOrder::withInvoice()->sum('product_price'),
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
@@ -248,7 +252,7 @@ class FormOrdersController extends Controller
 
             // Tworzenie nowego zamówienia
             $formOrder = FormOrder::create([
-                'order_date' => now(),
+                'order_date' => now('UTC'),
                 'product_id' => $course->id, // ID kursu z bazy
                 'product_name' => $course->title,
                 'product_price' => $request->product_price ?? 0, // Można ustawić ręcznie
