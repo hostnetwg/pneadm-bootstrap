@@ -31,6 +31,11 @@ class InstructorsController extends Controller
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
             'notes' => 'nullable|string|max:5000',
+            'website_url' => 'nullable|url|max:255',
+            'linkedin_url' => 'nullable|url|max:255',
+            'facebook_url' => 'nullable|url|max:255',
+            'youtube_url' => 'nullable|url|max:255',
+            'x_com_url' => 'nullable|url|max:255',
         ]);
     
         $photoPath = null;
@@ -63,6 +68,11 @@ class InstructorsController extends Controller
             'signature' => $signaturePath,            
             'is_active' => $request->has('is_active'),
             'notes' => $request->input('notes'),
+            'website_url' => $request->input('website_url'),
+            'linkedin_url' => $request->input('linkedin_url'),
+            'facebook_url' => $request->input('facebook_url'),
+            'youtube_url' => $request->input('youtube_url'),
+            'x_com_url' => $request->input('x_com_url'),
         ]);
     
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został dodany.');
@@ -105,6 +115,11 @@ class InstructorsController extends Controller
             'remove_photo' => 'nullable|string',
             'remove_signature' => 'nullable|string',
             'notes' => 'nullable|string|max:5000',
+            'website_url' => 'nullable|url|max:255',
+            'linkedin_url' => 'nullable|url|max:255',
+            'facebook_url' => 'nullable|url|max:255',
+            'youtube_url' => 'nullable|url|max:255',
+            'x_com_url' => 'nullable|url|max:255',
         ]);
     
         // ✅ Usunięcie zdjęcia, jeśli użytkownik zaznaczył "Usuń zdjęcie"
@@ -162,6 +177,11 @@ class InstructorsController extends Controller
         $instructor->bio_html = $bioHtml;
         $instructor->is_active = $request->has('is_active');
         $instructor->notes = $request->input('notes');
+        $instructor->website_url = $request->input('website_url');
+        $instructor->linkedin_url = $request->input('linkedin_url');
+        $instructor->facebook_url = $request->input('facebook_url');
+        $instructor->youtube_url = $request->input('youtube_url');
+        $instructor->x_com_url = $request->input('x_com_url');
     
         $instructor->save();
     

@@ -153,6 +153,46 @@
                         </div>
                     </div>
 
+                    <!-- Linki społecznościowe -->
+                    @if($instructor->website_url || $instructor->linkedin_url || $instructor->facebook_url || $instructor->youtube_url || $instructor->x_com_url)
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-share-alt"></i> Linki społecznościowe
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap gap-3">
+                                    @if($instructor->website_url)
+                                        <a href="{{ $instructor->website_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-globe"></i> Strona WWW
+                                        </a>
+                                    @endif
+                                    @if($instructor->linkedin_url)
+                                        <a href="{{ $instructor->linkedin_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                            <i class="fab fa-linkedin"></i> LinkedIn
+                                        </a>
+                                    @endif
+                                    @if($instructor->facebook_url)
+                                        <a href="{{ $instructor->facebook_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                            <i class="fab fa-facebook"></i> Facebook
+                                        </a>
+                                    @endif
+                                    @if($instructor->youtube_url)
+                                        <a href="{{ $instructor->youtube_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-danger btn-sm">
+                                            <i class="fab fa-youtube"></i> YouTube
+                                        </a>
+                                    @endif
+                                    @if($instructor->x_com_url)
+                                        <a href="{{ $instructor->x_com_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-dark btn-sm">
+                                            <i class="fab fa-x-twitter"></i> X.com
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Notatki -->
                     @if($instructor->notes)
                         <div class="card mb-4">

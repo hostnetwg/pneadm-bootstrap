@@ -26,6 +26,11 @@ class Instructor extends Model
         'signature',      // Ścieżka do podpisu instruktora
         'is_active',      // Czy instruktor jest aktywny
         'notes',          // Notatki na temat trenera
+        'website_url',    // URL strony WWW
+        'linkedin_url',   // URL profilu LinkedIn
+        'facebook_url',   // URL profilu Facebook
+        'youtube_url',    // URL kanału YouTube
+        'x_com_url',      // URL profilu X.com (Twitter)
     ];
 
     /**

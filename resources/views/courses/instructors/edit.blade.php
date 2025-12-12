@@ -160,6 +160,52 @@
                     <small class="form-text text-muted">Pole do robienia notatek na temat trenera. Widoczne tylko w panelu administracyjnym.</small>
                 </div>
 
+                <!-- Sekcja linków społecznościowych -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Linki społecznościowe</h5>
+                        <small class="text-muted">Opcjonalne linki do profili instruktora</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="website_url" class="form-label">
+                                    <i class="fas fa-globe"></i> Strona WWW
+                                </label>
+                                <input type="url" name="website_url" class="form-control" id="website_url" value="{{ $instructor->website_url }}" placeholder="https://example.com">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="linkedin_url" class="form-label">
+                                    <i class="fab fa-linkedin"></i> LinkedIn
+                                </label>
+                                <input type="url" name="linkedin_url" class="form-control" id="linkedin_url" value="{{ $instructor->linkedin_url }}" placeholder="https://linkedin.com/in/username">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="facebook_url" class="form-label">
+                                    <i class="fab fa-facebook"></i> Facebook
+                                </label>
+                                <input type="url" name="facebook_url" class="form-control" id="facebook_url" value="{{ $instructor->facebook_url }}" placeholder="https://facebook.com/username">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="youtube_url" class="form-label">
+                                    <i class="fab fa-youtube"></i> YouTube
+                                </label>
+                                <input type="url" name="youtube_url" class="form-control" id="youtube_url" value="{{ $instructor->youtube_url }}" placeholder="https://youtube.com/@username">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="x_com_url" class="form-label">
+                                    <i class="fab fa-x-twitter"></i> X.com (Twitter)
+                                </label>
+                                <input type="url" name="x_com_url" class="form-control" id="x_com_url" value="{{ $instructor->x_com_url }}" placeholder="https://x.com/username">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                     <a href="{{ route('courses.instructors.index') }}" class="btn btn-secondary">Anuluj</a>
