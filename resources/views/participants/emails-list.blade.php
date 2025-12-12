@@ -440,22 +440,15 @@
                                             <thead class="table-dark">
                                                 <tr>
                                                     <th style="width: 5%;">ID</th>
-                                                    <th style="width: 40%;">Nazwa szkolenia</th>
+                                                    <th style="width: 45%;">Nazwa szkolenia</th>
                                                     <th style="width: 15%;">Data rozpoczęcia</th>
-                                                    <th style="width: 15%;">Data zakończenia</th>
-                                                    <th style="width: 10%;">Instruktor</th>
-                                                    <th style="width: 10%;">Uczestników</th>
-                                                    <th style="width: 5%;" class="text-center">Akcje</th>
+                                                    <th style="width: 15%;">Instruktor</th>
+                                                    <th style="width: 10%;" class="text-center">Płatne/Bezpłatne</th>
+                                                    <th style="width: 10%;" class="text-center">Akcje</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 @foreach($courses as $course)
-                                                @php
-                                                    $participantsInCourse = $email->participants()
-                                                        ->where('course_id', $course->id)
-                                                        ->whereNull('deleted_at')
-                                                        ->count();
-                                                @endphp
                                                 <tr>
                                                     <td>{{ $course->id }}</td>
                                                     <td>
@@ -472,13 +465,6 @@
                                                         @endif
                                                     </td>
                                                     <td>
-                                                        @if($course->end_date)
-                                                            {{ $course->end_date->format('Y-m-d') }}
-                                                        @else
-                                                            <span class="text-muted">-</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
                                                         @if($course->instructor)
                                                             {{ $course->instructor->first_name }} {{ $course->instructor->last_name }}
                                                         @else
@@ -486,7 +472,11 @@
                                                         @endif
                                                     </td>
                                                     <td class="text-center">
-                                                        <span class="badge bg-primary">{{ $participantsInCourse }}</span>
+                                                        @if($course->is_paid)
+                                                            <span class="badge bg-warning text-dark">Płatne</span>
+                                                        @else
+                                                            <span class="badge bg-success">Bezpłatne</span>
+                                                        @endif
                                                     </td>
                                                     <td class="text-center">
                                                         <a href="{{ route('courses.show', $course->id) }}" 
