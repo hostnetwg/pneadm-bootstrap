@@ -97,3 +97,4 @@ Powinno wyświetlić obraz.
 
 
 
+

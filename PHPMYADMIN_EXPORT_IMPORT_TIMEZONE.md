@@ -182,3 +182,4 @@ WHERE order_date >= '2025-01-01';
 - [ ] Ustaw `SET time_zone = '+00:00';` przed importem
 - [ ] Po imporcie zweryfikuj kilka rekordów
 
+
