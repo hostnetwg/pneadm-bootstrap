@@ -106,15 +106,9 @@ class ParticipantController extends Controller
      */
     public function emailsList(Request $request)
     {
-        // Pobierz liczbę unikalnych kursów dla każdego e-maila
-        $coursesCount = DB::table('participants')
-            ->select('email', DB::raw('COUNT(DISTINCT course_id) as courses_count'))
-            ->whereNotNull('email')
-            ->where('email', '!=', '')
-            ->groupBy('email')
-            ->pluck('courses_count', 'email')
-            ->toArray();
-
+        // Usunięto nieużywane zapytanie coursesCount - dane są obliczane w subquery
+        
+        // Usunięto eager loading 'participants.course' - nie jest używane w głównej liście, tylko w modalu
         $query = ParticipantEmail::with('firstParticipant')
             ->select('participant_emails.*')
             ->selectRaw('COALESCE((
@@ -122,7 +116,25 @@ class ParticipantController extends Controller
                 FROM participants 
                 WHERE participants.email = participant_emails.email 
                 AND participants.deleted_at IS NULL
-            ), 0) as courses_count');
+            ), 0) as courses_count')
+            ->selectRaw('COALESCE((
+                SELECT COUNT(DISTINCT p.course_id) 
+                FROM participants p
+                INNER JOIN courses c ON c.id = p.course_id
+                WHERE p.email = participant_emails.email 
+                AND p.deleted_at IS NULL
+                AND c.is_paid = 1
+                AND c.deleted_at IS NULL
+            ), 0) as paid_courses_count')
+            ->selectRaw('COALESCE((
+                SELECT COUNT(DISTINCT p.course_id) 
+                FROM participants p
+                INNER JOIN courses c ON c.id = p.course_id
+                WHERE p.email = participant_emails.email 
+                AND p.deleted_at IS NULL
+                AND c.is_paid = 0
+                AND c.deleted_at IS NULL
+            ), 0) as free_courses_count');
         
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
@@ -150,38 +162,50 @@ class ParticipantController extends Controller
             }
         }
 
-        // Filtr: Nieprawidłowe adresy e-mail
-        if ($request->filled('filter_invalid_email')) {
-            // Pobierz wszystkie e-maile i zweryfikuj je używając PHP filter_var (zgodnie z RFC)
-            // To pozwala na wykrycie e-maili z BOM i innych problemów, których MySQL REGEXP może nie wykryć
-            $allEmails = ParticipantEmail::select('id', 'email')->get();
-            $invalidEmailIds = [];
-            
-            foreach ($allEmails as $emailRecord) {
-                // Usuń BOM przed walidacją
-                $cleanEmail = ltrim($emailRecord->email, "\xEF\xBB\xBF");
-                $cleanEmail = trim($cleanEmail);
-                
-                // Użyj tej samej walidacji co w widoku (PHP filter_var)
-                if (filter_var($cleanEmail, FILTER_VALIDATE_EMAIL) === false) {
-                    $invalidEmailIds[] = $emailRecord->id;
-                }
+        // Filtr: Typ szkoleń (płatne/bezpłatne)
+        if ($request->filled('filter_course_type')) {
+            if ($request->get('filter_course_type') === 'paid') {
+                // Tylko e-maile które mają płatne szkolenia - użyj subquery zamiast kolumny z selectRaw
+                $query->whereRaw('(
+                    SELECT COUNT(DISTINCT p.course_id) 
+                    FROM participants p
+                    INNER JOIN courses c ON c.id = p.course_id
+                    WHERE p.email = participant_emails.email 
+                    AND p.deleted_at IS NULL
+                    AND c.is_paid = 1
+                    AND c.deleted_at IS NULL
+                ) > 0');
+            } elseif ($request->get('filter_course_type') === 'free') {
+                // Tylko e-maile które mają bezpłatne szkolenia - użyj subquery zamiast kolumny z selectRaw
+                $query->whereRaw('(
+                    SELECT COUNT(DISTINCT p.course_id) 
+                    FROM participants p
+                    INNER JOIN courses c ON c.id = p.course_id
+                    WHERE p.email = participant_emails.email 
+                    AND p.deleted_at IS NULL
+                    AND c.is_paid = 0
+                    AND c.deleted_at IS NULL
+                ) > 0');
             }
-            
+        }
+
+        // Filtr: Nieprawidłowe adresy e-mail
+        // Zoptymalizowano: użycie MySQL REGEXP zamiast pobierania wszystkich rekordów do PHP
+        // MySQL REGEXP jest szybsze dla dużych zbiorów danych
+        if ($request->filled('filter_invalid_email')) {
             if ($request->get('filter_invalid_email') === 'invalid') {
                 // Wyświetl tylko nieprawidłowe e-maile
-                if (!empty($invalidEmailIds)) {
-                    $query->whereIn('participant_emails.id', $invalidEmailIds);
-                } else {
-                    // Jeśli nie ma nieprawidłowych, zwróć pusty wynik
-                    $query->whereRaw('1 = 0');
-                }
+                // Użyj REGEXP do walidacji - wykrywa również e-maile z BOM na początku
+                $query->where(function($q) {
+                    // Nieprawidłowy format e-maila
+                    $q->whereRaw("email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'")
+                      // Lub e-maile z BOM (UTF-8 BOM: EFBBBF) - sprawdź pierwsze 3 bajty
+                      ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
+                });
             } elseif ($request->get('filter_invalid_email') === 'valid') {
-                // Wyświetl tylko prawidłowe e-maile
-                if (!empty($invalidEmailIds)) {
-                    $query->whereNotIn('participant_emails.id', $invalidEmailIds);
-                }
-                // Jeśli nie ma nieprawidłowych, wszystkie są prawidłowe - nie dodawaj warunku
+                // Wyświetl tylko prawidłowe e-maile (bez BOM)
+                $query->whereRaw("email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'");
+                $query->whereRaw("NOT (HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF')");
             }
         }
 
@@ -189,28 +213,23 @@ class ParticipantController extends Controller
         $sortBy = $request->get('sort_by', 'email');
         $sortDirection = $request->get('sort_direction', 'asc');
         
-        // Obsługa sortowania po courses_count
-        if ($sortBy === 'courses_count') {
-            $query->orderByRaw("courses_count {$sortDirection}");
+        // Obsługa sortowania po courses_count, paid_courses_count, free_courses_count
+        if (in_array($sortBy, ['courses_count', 'paid_courses_count', 'free_courses_count'])) {
+            $query->orderByRaw("{$sortBy} {$sortDirection}");
         } else {
             $query->orderBy($sortBy, $sortDirection);
         }
         
-        // Paginacja
+        // Paginacja - zawsze używaj paginacji dla wydajności
         $perPage = $request->get('per_page', 50);
         
-        if ($perPage === 'all') {
-            $emails = $query->get();
-            $emails = new \Illuminate\Pagination\LengthAwarePaginator(
-                $emails,
-                $emails->count(),
-                $emails->count(),
-                1,
-                ['path' => request()->url(), 'pageName' => 'page']
-            );
-        } else {
-            $emails = $query->paginate($perPage)->withQueryString();
+        // Ograniczenie maksymalnej liczby rekordów na stronę dla bezpieczeństwa
+        $maxPerPage = 500;
+        if ($perPage === 'all' || $perPage > $maxPerPage) {
+            $perPage = $maxPerPage;
         }
+        
+        $emails = $query->paginate($perPage)->withQueryString();
         
         return view('participants.emails-list', compact('emails'));
     }
@@ -701,7 +720,7 @@ class ParticipantController extends Controller
 
         if ($validator->fails()) {
             // Zachowaj filtry przy powrocie
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });
@@ -719,7 +738,7 @@ class ParticipantController extends Controller
 
         // Jeśli e-mail się nie zmienił, nie rób nic
         if ($oldEmail === $newEmail) {
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });
@@ -904,7 +923,7 @@ class ParticipantController extends Controller
             }
 
             // Zachowaj filtry z query string (nie z formularza)
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });
@@ -920,7 +939,7 @@ class ParticipantController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });
@@ -945,7 +964,7 @@ class ParticipantController extends Controller
             ]);
 
             // Zachowaj filtry z query string
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });
@@ -959,7 +978,7 @@ class ParticipantController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $queryParams = array_filter($queryParams, function($value) {
                 return $value !== null && $value !== '';
             });

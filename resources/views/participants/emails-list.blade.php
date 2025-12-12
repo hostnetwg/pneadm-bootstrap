@@ -73,10 +73,20 @@
                         </select>
                     </div>
 
+                    <!-- Filtr: Typ szkoleń -->
+                    <div class="col-md-2">
+                        <label for="filter_course_type" class="form-label fw-bold">Typ szkoleń</label>
+                        <select name="filter_course_type" id="filter_course_type" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="paid" {{ request('filter_course_type') == 'paid' ? 'selected' : '' }}>Płatne</option>
+                            <option value="free" {{ request('filter_course_type') == 'free' ? 'selected' : '' }}>Bezpłatne</option>
+                        </select>
+                    </div>
+
                     <!-- Przyciski -->
-                    <div class="col-md-2 d-flex gap-2">
+                    <div class="col-md-3 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtruj</button>
-                        @if(request()->anyFilled(['search', 'filter_active', 'filter_verified', 'filter_invalid_email']))
+                        @if(request()->anyFilled(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type']))
                             <a href="{{ route('participants.emails-list', array_filter(request()->only(['sort_by', 'sort_direction', 'per_page']))) }}" class="btn btn-secondary"><i class="fas fa-times"></i> Resetuj</a>
                         @endif
                     </div>
@@ -100,8 +110,7 @@
                             <option value="50" {{ request('per_page', 50) == 50 ? 'selected' : '' }}>50</option>
                             <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
                             <option value="200" {{ request('per_page') == 200 ? 'selected' : '' }}>200</option>
-                            <option value="500" {{ request('per_page') == 500 ? 'selected' : '' }}>500</option>
-                            <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>Wszystkie</option>
+                            <option value="500" {{ request('per_page') == 500 ? 'selected' : '' }}>500 (max)</option>
                         </select>
                     </form>
                 </div>
@@ -142,9 +151,9 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th style="width: 10%;">
+                                <th style="width: 8%;" class="text-center">
                                     <a href="{{ route('participants.emails-list', array_merge(request()->query(), ['sort_by' => 'courses_count', 'sort_direction' => request('sort_by') == 'courses_count' && request('sort_direction', 'asc') == 'asc' ? 'desc' : 'asc'])) }}" 
-                                       class="text-light text-decoration-none d-flex align-items-center justify-content-between">
+                                       class="text-light text-decoration-none d-flex align-items-center justify-content-center">
                                         <span>Szkoleń</span>
                                         @if(request('sort_by') == 'courses_count')
                                             @if(request('sort_direction', 'asc') == 'asc')
@@ -157,7 +166,37 @@
                                         @endif
                                     </a>
                                 </th>
-                                <th style="width: 15%;">Pierwszy uczestnik</th>
+                                <th style="width: 8%;" class="text-center">
+                                    <a href="{{ route('participants.emails-list', array_merge(request()->query(), ['sort_by' => 'paid_courses_count', 'sort_direction' => request('sort_by') == 'paid_courses_count' && request('sort_direction', 'asc') == 'asc' ? 'desc' : 'asc'])) }}" 
+                                       class="text-light text-decoration-none d-flex align-items-center justify-content-center">
+                                        <span>Płatne</span>
+                                        @if(request('sort_by') == 'paid_courses_count')
+                                            @if(request('sort_direction', 'asc') == 'asc')
+                                                <i class="fas fa-sort-up ms-2"></i>
+                                            @else
+                                                <i class="fas fa-sort-down ms-2"></i>
+                                            @endif
+                                        @else
+                                            <i class="fas fa-sort ms-2 text-muted"></i>
+                                        @endif
+                                    </a>
+                                </th>
+                                <th style="width: 8%;" class="text-center">
+                                    <a href="{{ route('participants.emails-list', array_merge(request()->query(), ['sort_by' => 'free_courses_count', 'sort_direction' => request('sort_by') == 'free_courses_count' && request('sort_direction', 'asc') == 'asc' ? 'desc' : 'asc'])) }}" 
+                                       class="text-light text-decoration-none d-flex align-items-center justify-content-center">
+                                        <span>Bezpłatne</span>
+                                        @if(request('sort_by') == 'free_courses_count')
+                                            @if(request('sort_direction', 'asc') == 'asc')
+                                                <i class="fas fa-sort-up ms-2"></i>
+                                            @else
+                                                <i class="fas fa-sort-down ms-2"></i>
+                                            @endif
+                                        @else
+                                            <i class="fas fa-sort ms-2 text-muted"></i>
+                                        @endif
+                                    </a>
+                                </th>
+                                <th style="width: 12%;">Pierwszy uczestnik</th>
                                 <th style="width: 10%;" class="text-center">Status</th>
                                 <th style="width: 10%;" class="text-center">Weryfikacja</th>
                                 <th style="width: 10%;">
@@ -199,6 +238,12 @@
                                 <td class="text-center">
                                     <span class="badge bg-primary">{{ $email->courses_count ?? 0 }}</span>
                                 </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning text-dark">{{ $email->paid_courses_count ?? 0 }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-success">{{ $email->free_courses_count ?? 0 }}</span>
+                                </td>
                                 <td>
                                     @if($email->firstParticipant)
                                         <a href="{{ route('participants.all', ['search' => $email->email]) }}" class="text-decoration-none">
@@ -232,6 +277,13 @@
                                                 data-bs-target="#viewEmailModal{{ $email->id }}"
                                                 title="Podgląd e-maila">
                                             <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#coursesModal{{ $email->id }}"
+                                                title="Lista szkoleń">
+                                            <i class="fas fa-graduation-cap"></i>
                                         </button>
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-warning" 
@@ -353,6 +405,119 @@
                                     <i class="fas fa-users"></i> Pokaż uczestników z tym e-mailem
                                 </a>
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal listy szkoleń -->
+                <div class="modal fade" id="coursesModal{{ $email->id }}" tabindex="-1" aria-labelledby="coursesModalLabel{{ $email->id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title" id="coursesModalLabel{{ $email->id }}">
+                                    <i class="fas fa-graduation-cap"></i> Lista szkoleń dla: {{ $email->email }}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                @php
+                                    // Pobierz unikalne kursy dla tego e-maila
+                                    $courses = $email->participants()
+                                        ->with('course')
+                                        ->whereNull('deleted_at')
+                                        ->get()
+                                        ->pluck('course')
+                                        ->filter()
+                                        ->unique('id')
+                                        ->sortByDesc('start_date')
+                                        ->values();
+                                @endphp
+
+                                @if($courses->count() > 0)
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th style="width: 5%;">ID</th>
+                                                    <th style="width: 40%;">Nazwa szkolenia</th>
+                                                    <th style="width: 15%;">Data rozpoczęcia</th>
+                                                    <th style="width: 15%;">Data zakończenia</th>
+                                                    <th style="width: 10%;">Instruktor</th>
+                                                    <th style="width: 10%;">Uczestników</th>
+                                                    <th style="width: 5%;" class="text-center">Akcje</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($courses as $course)
+                                                @php
+                                                    $participantsInCourse = $email->participants()
+                                                        ->where('course_id', $course->id)
+                                                        ->whereNull('deleted_at')
+                                                        ->count();
+                                                @endphp
+                                                <tr>
+                                                    <td>{{ $course->id }}</td>
+                                                    <td>
+                                                        <strong>{{ strip_tags($course->title) }}</strong>
+                                                        @if($course->source_id_old)
+                                                            <br><small class="text-muted">Źródło: {{ $course->source_id_old }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($course->start_date)
+                                                            {{ $course->start_date->format('Y-m-d') }}
+                                                        @else
+                                                            <span class="text-muted">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($course->end_date)
+                                                            {{ $course->end_date->format('Y-m-d') }}
+                                                        @else
+                                                            <span class="text-muted">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($course->instructor)
+                                                            {{ $course->instructor->first_name }} {{ $course->instructor->last_name }}
+                                                        @else
+                                                            <span class="text-muted">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="badge bg-primary">{{ $participantsInCourse }}</span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a href="{{ route('courses.show', $course->id) }}" 
+                                                           class="btn btn-sm btn-outline-primary" 
+                                                           target="_blank"
+                                                           title="Szczegóły kursu">
+                                                            <i class="fas fa-external-link-alt"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="mt-3">
+                                        <p class="text-muted mb-0">
+                                            <strong>Łącznie szkoleń:</strong> {{ $courses->count() }}
+                                        </p>
+                                    </div>
+                                @else
+                                    <div class="text-center py-5">
+                                        <i class="fas fa-graduation-cap fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Brak szkoleń</h5>
+                                        <p class="text-muted">Ten adres e-mail nie jest powiązany z żadnym szkoleniem.</p>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="fas fa-times"></i> Zamknij
+                                </button>
                             </div>
                         </div>
                     </div>

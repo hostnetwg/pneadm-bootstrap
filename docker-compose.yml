@@ -4,7 +4,7 @@ services:
       context: './vendor/laravel/sail/runtimes/8.4'
       dockerfile: Dockerfile
       args:
-        WWWGROUP: '${WWWGROUP}'
+        WWWGROUP: '${WWWGROUP:-1000}'
     image: 'sail-8.4/app'
     container_name: pneadm-bootstrap-app
     extra_hosts:
@@ -13,7 +13,7 @@ services:
       - '8083:80'
       - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
     environment:
-      WWWUSER: '${WWWUSER}'
+      WWWUSER: '${WWWUSER:-1000}'
       LARAVEL_SAIL: 1
       XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
       XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
