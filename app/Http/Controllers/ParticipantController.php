@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Participant;
 use App\Models\Course;
 use App\Models\ParticipantEmail;
+use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class ParticipantController extends Controller
 {
@@ -144,6 +147,41 @@ class ParticipantController extends Controller
                 $query->where(function($q) {
                     $q->where('is_verified', false)->orWhereNull('is_verified');
                 });
+            }
+        }
+
+        // Filtr: Nieprawidłowe adresy e-mail
+        if ($request->filled('filter_invalid_email')) {
+            // Pobierz wszystkie e-maile i zweryfikuj je używając PHP filter_var (zgodnie z RFC)
+            // To pozwala na wykrycie e-maili z BOM i innych problemów, których MySQL REGEXP może nie wykryć
+            $allEmails = ParticipantEmail::select('id', 'email')->get();
+            $invalidEmailIds = [];
+            
+            foreach ($allEmails as $emailRecord) {
+                // Usuń BOM przed walidacją
+                $cleanEmail = ltrim($emailRecord->email, "\xEF\xBB\xBF");
+                $cleanEmail = trim($cleanEmail);
+                
+                // Użyj tej samej walidacji co w widoku (PHP filter_var)
+                if (filter_var($cleanEmail, FILTER_VALIDATE_EMAIL) === false) {
+                    $invalidEmailIds[] = $emailRecord->id;
+                }
+            }
+            
+            if ($request->get('filter_invalid_email') === 'invalid') {
+                // Wyświetl tylko nieprawidłowe e-maile
+                if (!empty($invalidEmailIds)) {
+                    $query->whereIn('participant_emails.id', $invalidEmailIds);
+                } else {
+                    // Jeśli nie ma nieprawidłowych, zwróć pusty wynik
+                    $query->whereRaw('1 = 0');
+                }
+            } elseif ($request->get('filter_invalid_email') === 'valid') {
+                // Wyświetl tylko prawidłowe e-maile
+                if (!empty($invalidEmailIds)) {
+                    $query->whereNotIn('participant_emails.id', $invalidEmailIds);
+                }
+                // Jeśli nie ma nieprawidłowych, wszystkie są prawidłowe - nie dodawaj warunku
             }
         }
 
@@ -642,6 +680,292 @@ class ParticipantController extends Controller
         $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
 
         return $pdf->download($fileName);
+    }
+
+    /**
+     * Aktualizuje adres e-mail we wszystkich powiązanych tabelach
+     */
+    public function updateEmail(Request $request, ParticipantEmail $participantEmail)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => [
+                'required',
+                'email:rfc,dns',
+                'max:255',
+            ],
+        ], [
+            'email.required' => 'Adres e-mail jest wymagany.',
+            'email.email' => 'Adres e-mail ma nieprawidłowy format.',
+            'email.max' => 'Adres e-mail nie może być dłuższy niż 255 znaków.',
+        ]);
+
+        if ($validator->fails()) {
+            // Zachowaj filtry przy powrocie
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $oldEmail = $participantEmail->email;
+        // Usuń BOM (Byte Order Mark) UTF-8 i inne niewidoczne znaki z początku
+        $newEmail = trim(strtolower($request->input('email')));
+        // Usuń UTF-8 BOM (EF BB BF)
+        $newEmail = ltrim($newEmail, "\xEF\xBB\xBF");
+        $newEmail = trim($newEmail);
+
+        // Jeśli e-mail się nie zmienił, nie rób nic
+        if ($oldEmail === $newEmail) {
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)
+                ->with('info', 'Adres e-mail nie uległ zmianie.');
+        }
+
+        // Sprawdź czy nowy e-mail już istnieje w participant_emails
+        $existingEmailRecord = ParticipantEmail::where('email', $newEmail)
+            ->where('id', '!=', $participantEmail->id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        try {
+            DB::beginTransaction();
+
+            // Przygotuj stare e-maile do wyszukiwania (z BOM i bez BOM, żeby znaleźć wszystkie warianty)
+            $oldEmailClean = ltrim($oldEmail, "\xEF\xBB\xBF");
+            $oldEmailClean = trim($oldEmailClean);
+            $oldEmailsToSearch = array_unique([$oldEmail, $oldEmailClean]);
+            $oldEmailsToSearch = array_filter($oldEmailsToSearch);
+
+            // Jeśli nowy e-mail już istnieje w participant_emails, scal rekordy
+            if ($existingEmailRecord) {
+                // SCALANIE REKORDÓW - nowy e-mail już istnieje
+                
+                // 1. Zaktualizuj wszystkie tabele używając obu wariantów e-maila (stary błędny i nowy poprawny)
+                //    Wszystkie wystąpienia starego e-maila zostaną zaktualizowane na nowy
+                
+                // 2. Aktualizuj participants (używając obu wariantów starego e-maila)
+                $participantsUpdated = DB::table('participants')
+                    ->whereIn('email', $oldEmailsToSearch)
+                    ->whereNull('deleted_at')
+                    ->update(['email' => $newEmail]);
+
+                // 3. Aktualizuj form_orders
+                $formOrdersUpdated = 0;
+                $formOrdersToUpdate = DB::table('form_orders')
+                    ->where(function($query) use ($oldEmailsToSearch) {
+                        $query->whereIn('participant_email', $oldEmailsToSearch)
+                              ->orWhereIn('orderer_email', $oldEmailsToSearch);
+                    })
+                    ->get();
+
+                foreach ($formOrdersToUpdate as $order) {
+                    $updateData = ['updated_at' => now()];
+                    
+                    if (in_array($order->participant_email, $oldEmailsToSearch)) {
+                        $updateData['participant_email'] = $newEmail;
+                    }
+                    
+                    if (in_array($order->orderer_email, $oldEmailsToSearch)) {
+                        $updateData['orderer_email'] = $newEmail;
+                    }
+                    
+                    DB::table('form_orders')
+                        ->where('id', $order->id)
+                        ->update($updateData);
+                    
+                    $formOrdersUpdated++;
+                }
+
+                // 4. Aktualizuj form_order_participants
+                $formOrderParticipantsUpdated = DB::table('form_order_participants')
+                    ->whereIn('participant_email', $oldEmailsToSearch)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'participant_email' => $newEmail,
+                        'updated_at' => now(),
+                    ]);
+
+                // 5. Zaktualizuj istniejący rekord participant_emails (scal z błędnym)
+                //    - Zwiększ participants_count o liczbę z błędnego rekordu
+                //    - Zachowaj lepsze wartości dla is_verified i is_active (jeśli istniejący ma lepsze)
+                $existingEmailRecord->participants_count = $existingEmailRecord->participants_count + $participantEmail->participants_count;
+                // Jeśli istniejący rekord nie ma first_participant_id, użyj z błędnego
+                if (!$existingEmailRecord->first_participant_id && $participantEmail->first_participant_id) {
+                    $existingEmailRecord->first_participant_id = $participantEmail->first_participant_id;
+                }
+                // Zachowaj lepsze wartości dla is_verified i is_active
+                if (!$existingEmailRecord->is_verified && $participantEmail->is_verified) {
+                    $existingEmailRecord->is_verified = true;
+                }
+                if (!$existingEmailRecord->is_active && $participantEmail->is_active) {
+                    $existingEmailRecord->is_active = true;
+                }
+                // Scal notatki jeśli istnieją
+                if ($participantEmail->notes && !$existingEmailRecord->notes) {
+                    $existingEmailRecord->notes = $participantEmail->notes;
+                } elseif ($participantEmail->notes && $existingEmailRecord->notes) {
+                    $existingEmailRecord->notes = $existingEmailRecord->notes . "\n\n[Merged from: {$oldEmail}]\n" . $participantEmail->notes;
+                }
+                $existingEmailRecord->save();
+
+                // 6. Usuń błędny rekord (soft delete)
+                $participantEmail->delete();
+                
+                $merged = true;
+            } else {
+                // NORMALNA AKTUALIZACJA - nowy e-mail nie istnieje
+                
+                // 1. Aktualizuj participant_emails (upewnij się, że nie ma BOM)
+                $participantEmail->email = $newEmail;
+                $participantEmail->save();
+                
+                $merged = false;
+
+                // 2. Aktualizuj participants (szukaj zarówno z BOM jak i bez BOM)
+                $participantsUpdated = DB::table('participants')
+                    ->whereIn('email', $oldEmailsToSearch)
+                    ->whereNull('deleted_at')
+                    ->update(['email' => $newEmail]);
+
+                // 3. Aktualizuj form_orders (participant_email i orderer_email) - szukaj zarówno z BOM jak i bez BOM
+                $formOrdersUpdated = 0;
+                $formOrdersToUpdate = DB::table('form_orders')
+                    ->where(function($query) use ($oldEmailsToSearch) {
+                        $query->whereIn('participant_email', $oldEmailsToSearch)
+                              ->orWhereIn('orderer_email', $oldEmailsToSearch);
+                    })
+                    ->get();
+
+                foreach ($formOrdersToUpdate as $order) {
+                    $updateData = ['updated_at' => now()];
+                    
+                    // Sprawdź czy participant_email pasuje do któregoś ze starych e-maili
+                    if (in_array($order->participant_email, $oldEmailsToSearch)) {
+                        $updateData['participant_email'] = $newEmail;
+                    }
+                    
+                    // Sprawdź czy orderer_email pasuje do któregoś ze starych e-maili
+                    if (in_array($order->orderer_email, $oldEmailsToSearch)) {
+                        $updateData['orderer_email'] = $newEmail;
+                    }
+                    
+                    DB::table('form_orders')
+                        ->where('id', $order->id)
+                        ->update($updateData);
+                    
+                    $formOrdersUpdated++;
+                }
+
+                // 4. Aktualizuj form_order_participants - szukaj zarówno z BOM jak i bez BOM
+                $formOrderParticipantsUpdated = DB::table('form_order_participants')
+                    ->whereIn('participant_email', $oldEmailsToSearch)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'participant_email' => $newEmail,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            DB::commit();
+
+            \Log::info('E-mail zaktualizowany', [
+                'old_email' => $oldEmail,
+                'new_email' => $newEmail,
+                'merged' => $merged ?? false,
+                'participants_updated' => $participantsUpdated ?? 0,
+                'form_orders_updated' => $formOrdersUpdated ?? 0,
+                'form_order_participants_updated' => $formOrderParticipantsUpdated ?? 0,
+            ]);
+
+            if ($merged) {
+                $message = sprintf(
+                    'Adres e-mail został scalony: "%s" → "%s". Błędny rekord został usunięty, a wszystkie powiązania przeniesione do istniejącego poprawnego rekordu. Zaktualizowano: %d uczestników, %d zamówień, %d uczestników zamówień.',
+                    $oldEmail,
+                    $newEmail,
+                    $participantsUpdated ?? 0,
+                    $formOrdersUpdated ?? 0,
+                    $formOrderParticipantsUpdated ?? 0
+                );
+            } else {
+                $message = sprintf(
+                    'Adres e-mail został zaktualizowany z "%s" na "%s". Zaktualizowano: %d uczestników, %d zamówień, %d uczestników zamówień.',
+                    $oldEmail,
+                    $newEmail,
+                    $participantsUpdated ?? 0,
+                    $formOrdersUpdated ?? 0,
+                    $formOrderParticipantsUpdated ?? 0
+                );
+            }
+
+            // Zachowaj filtry z query string (nie z formularza)
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Błąd podczas aktualizacji e-maila', [
+                'old_email' => $oldEmail,
+                'new_email' => $newEmail,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)
+                ->with('error', 'Błąd podczas aktualizacji e-maila: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
+     * Usuwa adres e-mail (soft delete)
+     */
+    public function destroyEmail(Request $request, ParticipantEmail $participantEmail)
+    {
+        try {
+            $email = $participantEmail->email;
+            $participantEmail->delete();
+
+            \Log::info('E-mail usunięty (soft delete)', [
+                'email' => $email,
+                'participant_email_id' => $participantEmail->id,
+            ]);
+
+            // Zachowaj filtry z query string
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)
+                ->with('success', "Adres e-mail \"{$email}\" został usunięty.");
+
+        } catch (\Exception $e) {
+            \Log::error('Błąd podczas usuwania e-maila', [
+                'email' => $participantEmail->email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $queryParams = array_filter($queryParams, function($value) {
+                return $value !== null && $value !== '';
+            });
+            return redirect()->route('participants.emails-list', $queryParams)
+                ->with('error', 'Błąd podczas usuwania e-maila: ' . $e->getMessage());
+        }
     }
 }
 

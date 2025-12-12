@@ -183,3 +183,5 @@ WHERE order_date >= '2025-01-01';
 - [ ] Po imporcie zweryfikuj kilka rekordów
 
 
+
+

@@ -256,6 +256,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/participants', [ParticipantController::class, 'all'])->name('participants.all');
     Route::get('/participants/emails', [ParticipantController::class, 'emailsList'])->name('participants.emails-list');
     Route::post('/participants/collect-emails', [ParticipantController::class, 'collectEmails'])->name('participants.collect-emails');
+    Route::put('/participants/emails/{participantEmail}', [ParticipantController::class, 'updateEmail'])->name('participants.emails.update');
+    Route::delete('/participants/emails/{participantEmail}', [ParticipantController::class, 'destroyEmail'])->name('participants.emails.destroy');
     
     Route::prefix('courses/{course}/participants')->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników

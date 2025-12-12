@@ -92,3 +92,5 @@ Szablony sprawdzają logo w pakiecie (priorytet), potem lokalnie. Logo powinno b
 
 
 
+
+

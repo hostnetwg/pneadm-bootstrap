@@ -23,7 +23,7 @@
             <form method="GET" action="{{ route('participants.emails-list') }}" class="mb-4 p-3 bg-light rounded shadow-sm">
                 <div class="row g-3 align-items-end">
                     <!-- Wyszukiwarka -->
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="search" class="form-label fw-bold">Wyszukaj</label>
                         <div class="input-group">
                             <span class="input-group-text">
@@ -63,10 +63,20 @@
                         </select>
                     </div>
 
+                    <!-- Filtr: Nieprawidłowe e-maile -->
+                    <div class="col-md-2">
+                        <label for="filter_invalid_email" class="form-label fw-bold">Walidacja e-mail</label>
+                        <select name="filter_invalid_email" id="filter_invalid_email" class="form-select">
+                            <option value="">Wszystkie</option>
+                            <option value="valid" {{ request('filter_invalid_email') == 'valid' ? 'selected' : '' }}>Prawidłowe</option>
+                            <option value="invalid" {{ request('filter_invalid_email') == 'invalid' ? 'selected' : '' }}>Nieprawidłowe</option>
+                        </select>
+                    </div>
+
                     <!-- Przyciski -->
-                    <div class="col-md-4 d-flex gap-2">
+                    <div class="col-md-2 d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtruj</button>
-                        @if(request()->anyFilled(['search', 'filter_active', 'filter_verified']))
+                        @if(request()->anyFilled(['search', 'filter_active', 'filter_verified', 'filter_invalid_email']))
                             <a href="{{ route('participants.emails-list', array_filter(request()->only(['sort_by', 'sort_direction', 'per_page']))) }}" class="btn btn-secondary"><i class="fas fa-times"></i> Resetuj</a>
                         @endif
                     </div>
@@ -170,9 +180,22 @@
                         </thead>
                         <tbody>
                             @foreach ($emails as $email)
+                            @php
+                                // Usuń BOM (Byte Order Mark) UTF-8 przed walidacją
+                                $cleanEmail = ltrim($email->email, "\xEF\xBB\xBF");
+                                $cleanEmail = trim($cleanEmail);
+                                $isValidEmail = filter_var($cleanEmail, FILTER_VALIDATE_EMAIL) !== false;
+                            @endphp
                             <tr>
                                 <td>{{ $email->id }}</td>
-                                <td><strong>{{ $email->email }}</strong></td>
+                                <td>
+                                    <strong>{{ $email->email }}</strong>
+                                    @if(!$isValidEmail)
+                                        <span class="badge bg-danger ms-2" title="Nieprawidłowy format e-maila">
+                                            <i class="fas fa-exclamation-triangle"></i> Nieprawidłowy
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     <span class="badge bg-primary">{{ $email->courses_count ?? 0 }}</span>
                                 </td>
@@ -202,13 +225,29 @@
                                 </td>
                                 <td>{{ $email->created_at ? $email->created_at->format('Y-m-d') : '-' }}</td>
                                 <td class="text-center">
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-primary" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#viewEmailModal{{ $email->id }}"
-                                            title="Podgląd e-maila">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#viewEmailModal{{ $email->id }}"
+                                                title="Podgląd e-maila">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-warning" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editEmailModal{{ $email->id }}"
+                                                title="Edytuj e-mail">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteEmailModal{{ $email->id }}"
+                                                title="Usuń e-mail">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -223,6 +262,12 @@
 
                 <!-- Modale podglądu e-maili -->
                 @foreach ($emails as $email)
+                @php
+                    // Usuń BOM (Byte Order Mark) UTF-8 przed walidacją
+                    $cleanEmailModal = ltrim($email->email, "\xEF\xBB\xBF");
+                    $cleanEmailModal = trim($cleanEmailModal);
+                    $isValidEmailModal = filter_var($cleanEmailModal, FILTER_VALIDATE_EMAIL) !== false;
+                @endphp
                 <div class="modal fade" id="viewEmailModal{{ $email->id }}" tabindex="-1" aria-labelledby="viewEmailModalLabel{{ $email->id }}" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
@@ -233,6 +278,12 @@
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
+                                @if(!$isValidEmailModal)
+                                <div class="alert alert-warning mb-3">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    <strong>Uwaga:</strong> Ten adres e-mail ma nieprawidłowy format.
+                                </div>
+                                @endif
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <strong>ID:</strong>
@@ -240,7 +291,14 @@
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>E-mail:</strong>
-                                        <p class="mb-0"><strong>{{ $email->email }}</strong></p>
+                                        <p class="mb-0">
+                                            <strong>{{ $email->email }}</strong>
+                                            @if(!$isValidEmailModal)
+                                                <span class="badge bg-danger ms-2">
+                                                    <i class="fas fa-exclamation-triangle"></i> Nieprawidłowy format
+                                                </span>
+                                            @endif
+                                        </p>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Liczba szkoleń:</strong>
@@ -296,6 +354,117 @@
                                 </a>
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal edycji e-maila -->
+                <div class="modal fade" id="editEmailModal{{ $email->id }}" tabindex="-1" aria-labelledby="editEmailModalLabel{{ $email->id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form action="{{ route('participants.emails.update', $email->id) }}" method="POST">
+                                @csrf
+                                @method('PUT')
+                                @foreach(request()->query() as $key => $value)
+                                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                @endforeach
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title" id="editEmailModalLabel{{ $email->id }}">
+                                        <i class="fas fa-edit"></i> Edytuj e-mail #{{ $email->id }}
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Uwaga:</strong> Zmiana tego adresu e-mail zaktualizuje go również w:
+                                        <ul class="mb-0 mt-2">
+                                            <li>Tabeli <code>participants</code></li>
+                                            <li>Tabeli <code>form_orders</code> (pola <code>participant_email</code> i <code>orderer_email</code>)</li>
+                                            <li>Tabeli <code>form_order_participants</code></li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="email_{{ $email->id }}" class="form-label fw-bold">Aktualny adres e-mail:</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               value="{{ $email->email }}" 
+                                               readonly 
+                                               style="background-color: #e9ecef;">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="new_email_{{ $email->id }}" class="form-label fw-bold">Nowy adres e-mail: <span class="text-danger">*</span></label>
+                                        <input type="email" 
+                                               class="form-control @error('email') is-invalid @enderror" 
+                                               id="new_email_{{ $email->id }}" 
+                                               name="email" 
+                                               value="{{ old('email', $email->email) }}" 
+                                               required 
+                                               autocomplete="off"
+                                               placeholder="np. agatakolodziej4@wp.pl">
+                                        @error('email')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                        <small class="form-text text-muted">
+                                            Wprowadź poprawny adres e-mail. Zostanie on zaktualizowany we wszystkich powiązanych tabelach.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="fas fa-times"></i> Anuluj
+                                    </button>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-save"></i> Zapisz zmiany
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal usuwania e-maila -->
+                <div class="modal fade" id="deleteEmailModal{{ $email->id }}" tabindex="-1" aria-labelledby="deleteEmailModalLabel{{ $email->id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form action="{{ route('participants.emails.destroy', $email->id) }}" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                @foreach(request()->query() as $key => $value)
+                                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                @endforeach
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title" id="deleteEmailModalLabel{{ $email->id }}">
+                                        <i class="fas fa-exclamation-triangle"></i> Potwierdzenie usunięcia
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Czy na pewno chcesz usunąć adres e-mail <strong>{{ $email->email }}</strong>?</p>
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Uwaga:</strong> To usunięcie jest "soft delete" - adres e-mail zostanie oznaczony jako usunięty, ale dane w tabelach <code>participants</code>, <code>form_orders</code> i <code>form_order_participants</code> pozostaną bez zmian.
+                                    </div>
+                                    <div class="bg-light p-3 rounded">
+                                        <h6 class="mb-2">Szczegóły:</h6>
+                                        <ul class="mb-0">
+                                            <li><strong>ID:</strong> {{ $email->id }}</li>
+                                            <li><strong>E-mail:</strong> {{ $email->email }}</li>
+                                            <li><strong>Liczba szkoleń:</strong> {{ $email->courses_count ?? 0 }}</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="fas fa-times"></i> Anuluj
+                                    </button>
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="fas fa-trash"></i> Usuń e-mail
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
