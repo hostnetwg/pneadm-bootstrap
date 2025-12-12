@@ -9,7 +9,7 @@ class InstructorsController extends Controller
     public function index()
     {
         //$instructors = Instructor::all();  // Pobieranie wszystkich instruktorów
-        $instructors = Instructor::paginate(10); // 10 instruktorów na stronę  
+        $instructors = Instructor::paginate(25); // 25 instruktorów na stronę  
         return view('courses.instructors.index', compact('instructors'));
     }
 
