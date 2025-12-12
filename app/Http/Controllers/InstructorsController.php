@@ -30,6 +30,7 @@ class InstructorsController extends Controller
             'bio_html' => 'nullable|string|max:10000',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
+            'notes' => 'nullable|string|max:5000',
         ]);
     
         $photoPath = null;
@@ -61,6 +62,7 @@ class InstructorsController extends Controller
             'photo' => $photoPath,
             'signature' => $signaturePath,            
             'is_active' => $request->has('is_active'),
+            'notes' => $request->input('notes'),
         ]);
     
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został dodany.');
@@ -102,6 +104,7 @@ class InstructorsController extends Controller
             'is_active' => 'nullable|string',
             'remove_photo' => 'nullable|string',
             'remove_signature' => 'nullable|string',
+            'notes' => 'nullable|string|max:5000',
         ]);
     
         // ✅ Usunięcie zdjęcia, jeśli użytkownik zaznaczył "Usuń zdjęcie"
@@ -158,6 +161,7 @@ class InstructorsController extends Controller
         $instructor->bio = $request->input('bio');
         $instructor->bio_html = $bioHtml;
         $instructor->is_active = $request->has('is_active');
+        $instructor->notes = $request->input('notes');
     
         $instructor->save();
     

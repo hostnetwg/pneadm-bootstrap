@@ -25,6 +25,7 @@ class Instructor extends Model
         'photo',          // Ścieżka do zdjęcia
         'signature',      // Ścieżka do podpisu instruktora
         'is_active',      // Czy instruktor jest aktywny
+        'notes',          // Notatki na temat trenera
     ];
 
     /**

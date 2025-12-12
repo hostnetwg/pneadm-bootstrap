@@ -154,6 +154,12 @@
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
 
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notatki</label>
+                    <textarea name="notes" class="form-control" id="notes" rows="5" placeholder="Notatki na temat trenera (tylko do użytku wewnętrznego)">{{ $instructor->notes }}</textarea>
+                    <small class="form-text text-muted">Pole do robienia notatek na temat trenera. Widoczne tylko w panelu administracyjnym.</small>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                     <a href="{{ route('courses.instructors.index') }}" class="btn btn-secondary">Anuluj</a>

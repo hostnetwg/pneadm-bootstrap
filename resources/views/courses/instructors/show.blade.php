@@ -153,6 +153,25 @@
                         </div>
                     </div>
 
+                    <!-- Notatki -->
+                    @if($instructor->notes)
+                        <div class="card mb-4">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-sticky-note"></i> Notatki
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info mb-0">
+                                    <small class="text-muted d-block mb-2">
+                                        <i class="fas fa-info-circle"></i> Notatki wewnętrzne - widoczne tylko w panelu administracyjnym
+                                    </small>
+                                    <div class="notes-content" style="white-space: pre-wrap;">{{ $instructor->notes }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Biografia -->
                     @if($instructor->bio || $instructor->bio_html)
                         <div class="card mb-4">
