@@ -209,9 +209,9 @@ class ParticipantController extends Controller
             }
         }
 
-        // Sortowanie
-        $sortBy = $request->get('sort_by', 'email');
-        $sortDirection = $request->get('sort_direction', 'asc');
+        // Sortowanie - domyślnie sortuj malejąco według ID
+        $sortBy = $request->get('sort_by', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
         
         // Obsługa sortowania po courses_count, paid_courses_count, free_courses_count
         if (in_array($sortBy, ['courses_count', 'paid_courses_count', 'free_courses_count'])) {
@@ -248,6 +248,7 @@ class ParticipantController extends Controller
                 ->select('email', DB::raw('MIN(id) as first_participant_id'), DB::raw('COUNT(*) as count'))
                 ->whereNotNull('email')
                 ->where('email', '!=', '')
+                ->whereNull('deleted_at')
                 ->groupBy('email')
                 ->get();
 
@@ -255,68 +256,78 @@ class ParticipantController extends Controller
                 return redirect()->route('participants.all')->with('info', 'Brak e-maili do zebrania.');
             }
 
-            // Przygotuj dane do bulk upsert
-            $emailsToInsert = [];
-            $emailsToUpdate = [];
-            
-            // Pobierz istniejące e-maile w jednym zapytaniu
-            $existingEmails = ParticipantEmail::pluck('id', 'email')->toArray();
+            $added = 0;
+            $updated = 0;
+            $skipped = 0;
 
+            // Funkcja pomocnicza do normalizacji e-maila
+            $normalizeEmail = function($email) {
+                // Usuń BOM (Byte Order Mark) UTF-8
+                $email = ltrim($email, "\xEF\xBB\xBF");
+                // Trim i lowercase
+                $email = trim(strtolower($email));
+                return $email;
+            };
+
+            // Użyj upsert dla każdego e-maila (w partiach po 500 dla wydajności)
+            $emailsToUpsert = [];
+            
             foreach ($uniqueEmails as $emailData) {
-                $email = $emailData->email;
+                $rawEmail = $emailData->email;
+                $normalizedEmail = $normalizeEmail($rawEmail);
+                
+                // Pomiń puste e-maile po normalizacji
+                if (empty($normalizedEmail)) {
+                    $skipped++;
+                    continue;
+                }
+                
                 $firstParticipantId = $emailData->first_participant_id;
                 $count = $emailData->count;
 
-                if (isset($existingEmails[$email])) {
-                    // Email istnieje - przygotuj do aktualizacji
-                    $emailsToUpdate[] = [
-                        'id' => $existingEmails[$email],
-                        'participants_count' => $count,
-                        'updated_at' => now(),
-                    ];
-                } else {
-                    // Nowy email - przygotuj do wstawienia
-                    $emailsToInsert[] = [
-                        'email' => $email,
-                        'first_participant_id' => $firstParticipantId,
-                        'participants_count' => $count,
-                        'is_active' => true,
-                        'is_verified' => false,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
+                $emailsToUpsert[] = [
+                    'email' => $normalizedEmail,
+                    'first_participant_id' => $firstParticipantId,
+                    'participants_count' => $count,
+                    'is_active' => true,
+                    'is_verified' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
             }
 
-            $added = 0;
-            $updated = 0;
-
-            // Bulk insert nowych e-maili (w partiach po 500)
-            if (!empty($emailsToInsert)) {
-                foreach (array_chunk($emailsToInsert, 500) as $chunk) {
-                    DB::table('participant_emails')->insert($chunk);
-                    $added += count($chunk);
-                }
-            }
-
-            // Bulk update istniejących e-maili (w partiach po 500 dla wydajności)
-            if (!empty($emailsToUpdate)) {
-                foreach (array_chunk($emailsToUpdate, 500) as $chunk) {
-                    DB::transaction(function () use ($chunk, &$updated) {
-                        foreach ($chunk as $updateData) {
-                            DB::table('participant_emails')
-                                ->where('id', $updateData['id'])
-                                ->update([
-                                    'participants_count' => $updateData['participants_count'],
+            // Bulk upsert (w partiach po 500)
+            if (!empty($emailsToUpsert)) {
+                foreach (array_chunk($emailsToUpsert, 500) as $chunk) {
+                    DB::transaction(function () use ($chunk, &$added, &$updated) {
+                        foreach ($chunk as $emailData) {
+                            $existing = ParticipantEmail::where('email', $emailData['email'])
+                                ->whereNull('deleted_at')
+                                ->first();
+                            
+                            if ($existing) {
+                                // Aktualizuj istniejący rekord
+                                $existing->update([
+                                    'participants_count' => $emailData['participants_count'],
                                     'updated_at' => now(),
                                 ]);
+                                $updated++;
+                            } else {
+                                // Utwórz nowy rekord
+                                ParticipantEmail::create($emailData);
+                                $added++;
+                            }
                         }
-                        $updated += count($chunk);
                     });
                 }
             }
 
-            $message = "Zebrano bazę e-mail. Dodano: {$added}, zaktualizowano: {$updated}.";
+            $message = "Zebrano bazę e-mail. Dodano: {$added}, zaktualizowano: {$updated}";
+            if ($skipped > 0) {
+                $message .= ", pominięto: {$skipped}";
+            }
+            $message .= ".";
+            
             return redirect()->route('participants.all')->with('success', $message);
         } catch (\Exception $e) {
             \Log::error('Błąd podczas zbierania e-maili: ' . $e->getMessage(), [
