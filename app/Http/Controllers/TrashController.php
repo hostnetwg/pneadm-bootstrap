@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Instructor;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Models\ParticipantEmail;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use App\Models\CourseLocation;
@@ -70,6 +71,11 @@ class TrashController extends Controller
                 'model' => Participant::class,
                 'display_fields' => ['first_name', 'last_name', 'email'],
                 'label' => 'Uczestnicy'
+            ],
+            'participant_emails' => [
+                'model' => ParticipantEmail::class,
+                'display_fields' => ['email', 'first_participant_id'],
+                'label' => 'E-maile uczestników'
             ],
             'form_orders' => [
                 'model' => FormOrder::class,
@@ -221,6 +227,7 @@ class TrashController extends Controller
                 'instructors' => Instructor::class,
                 'courses' => Course::class,
                 'participants' => Participant::class,
+                'participant_emails' => ParticipantEmail::class,
                 'form_orders' => FormOrder::class,
                 'form_order_participants' => FormOrderParticipant::class,
                 'course_locations' => CourseLocation::class,
@@ -251,6 +258,7 @@ class TrashController extends Controller
             'instructors' => Instructor::class,
             'courses' => Course::class,
             'participants' => Participant::class,
+            'participant_emails' => ParticipantEmail::class,
             'form_orders' => FormOrder::class,
             'form_order_participants' => FormOrderParticipant::class,
             'course_locations' => CourseLocation::class,

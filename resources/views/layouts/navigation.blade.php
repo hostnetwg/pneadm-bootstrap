@@ -165,6 +165,25 @@
             </div>
         </li>
         <li class="border-top my-3"></li>
+        <!-- RSPO -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('rspo.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#rspo-collapse"
+                    aria-expanded="{{ request()->routeIs('rspo.*') ? 'true' : 'false' }}">
+                <i class="bi bi-building me-2"></i>
+                RSPO
+                <svg class="bi pe-none ms-auto" width="16" height="16"><use xlink:href="#chevron-right"></use></svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('rspo.*') ? 'show' : '' }}" id="rspo-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('rspo.search') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Wyszukaj
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
         <!-- Publigo NE.pl -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('publigo.*') ? '' : 'collapsed' }}"

@@ -299,36 +299,110 @@ class ParticipantController extends Controller
             // Bulk upsert (w partiach po 500)
             if (!empty($emailsToUpsert)) {
                 foreach (array_chunk($emailsToUpsert, 500) as $chunk) {
-                    DB::transaction(function () use ($chunk, &$added, &$updated) {
+                    DB::transaction(function () use ($chunk, &$added, &$updated, &$skipped) {
                         foreach ($chunk as $emailData) {
-                            $existing = ParticipantEmail::where('email', $emailData['email'])
-                                ->whereNull('deleted_at')
-                                ->first();
-                            
-                            if ($existing) {
-                                // Aktualizuj istniejący rekord
-                                $existing->update([
-                                    'participants_count' => $emailData['participants_count'],
-                                    'updated_at' => now(),
-                                ]);
-                                $updated++;
-                            } else {
-                                // Utwórz nowy rekord
-                                ParticipantEmail::create($emailData);
-                                $added++;
+                            try {
+                                // Sprawdź czy rekord już istnieje (tylko aktywne, bez soft deleted)
+                                $existing = ParticipantEmail::where('email', $emailData['email'])
+                                    ->whereNull('deleted_at')
+                                    ->first();
+                                
+                                if ($existing) {
+                                    // Aktualizuj istniejący rekord
+                                    $existing->update([
+                                        'participants_count' => $emailData['participants_count'],
+                                        'updated_at' => now(),
+                                    ]);
+                                    $updated++;
+                                } else {
+                                    // Sprawdź czy istnieje jako soft deleted
+                                    $softDeleted = ParticipantEmail::withTrashed()
+                                        ->where('email', $emailData['email'])
+                                        ->whereNotNull('deleted_at')
+                                        ->first();
+                                    
+                                    if ($softDeleted) {
+                                        // Przywróć i zaktualizuj soft deleted rekord
+                                        $softDeleted->restore();
+                                        $softDeleted->update([
+                                            'first_participant_id' => $emailData['first_participant_id'],
+                                            'participants_count' => $emailData['participants_count'],
+                                            'is_active' => $emailData['is_active'],
+                                            'is_verified' => $emailData['is_verified'],
+                                            'updated_at' => now(),
+                                        ]);
+                                        $added++; // Traktuj przywrócenie jako dodanie
+                                    } else {
+                                        // Utwórz nowy rekord używając updateOrCreate dla bezpieczeństwa
+                                        // updateOrCreate automatycznie obsługuje duplikaty
+                                        $result = ParticipantEmail::updateOrCreate(
+                                            ['email' => $emailData['email']],
+                                            [
+                                                'first_participant_id' => $emailData['first_participant_id'],
+                                                'participants_count' => $emailData['participants_count'],
+                                                'is_active' => $emailData['is_active'],
+                                                'is_verified' => $emailData['is_verified'],
+                                                'created_at' => $emailData['created_at'],
+                                                'updated_at' => $emailData['updated_at'],
+                                            ]
+                                        );
+                                        
+                                        // Sprawdź czy został utworzony nowy rekord czy zaktualizowany
+                                        if ($result->wasRecentlyCreated) {
+                                            $added++;
+                                        } else {
+                                            $updated++;
+                                        }
+                                    }
+                                }
+                            } catch (\Illuminate\Database\QueryException $e) {
+                                // Obsługa błędu duplikatu (na wypadek race condition w transakcji)
+                                if ($e->getCode() == 23000 || str_contains($e->getMessage(), 'Duplicate entry')) {
+                                    // E-mail już istnieje - spróbuj zaktualizować
+                                    $existing = ParticipantEmail::where('email', $emailData['email'])
+                                        ->whereNull('deleted_at')
+                                        ->first();
+                                    
+                                    if ($existing) {
+                                        $existing->update([
+                                            'participants_count' => $emailData['participants_count'],
+                                            'updated_at' => now(),
+                                        ]);
+                                        $updated++;
+                                    } else {
+                                        // Jeśli nie udało się znaleźć, pomiń (prawdopodobnie race condition)
+                                        $skipped++;
+                                    }
+                                } else {
+                                    // Inny błąd - rzuć dalej
+                                    throw $e;
+                                }
                             }
                         }
                     });
                 }
             }
 
-            $message = "Zebrano bazę e-mail. Dodano: {$added}, zaktualizowano: {$updated}";
-            if ($skipped > 0) {
-                $message .= ", pominięto: {$skipped}";
+            // Przygotuj komunikat zależnie od wyników
+            if ($added == 0 && $updated == 0 && $skipped == 0) {
+                $message = "Nie znaleziono żadnych e-maili do przetworzenia.";
+                $messageType = 'info';
+            } elseif ($added == 0 && $updated == 0) {
+                $message = "Zaimportowano 0 rekordów. Wszystkie e-maile z tabeli participants już znajdują się w bazie participant_emails.";
+                if ($skipped > 0) {
+                    $message .= " Pominięto {$skipped} nieprawidłowych e-maili.";
+                }
+                $messageType = 'info';
+            } else {
+                $message = "Zebrano bazę e-mail. Dodano: {$added}, zaktualizowano: {$updated}";
+                if ($skipped > 0) {
+                    $message .= ", pominięto: {$skipped}";
+                }
+                $message .= ".";
+                $messageType = 'success';
             }
-            $message .= ".";
             
-            return redirect()->route('participants.all')->with('success', $message);
+            return redirect()->route('participants.all')->with($messageType, $message);
         } catch (\Exception $e) {
             \Log::error('Błąd podczas zbierania e-maili: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()

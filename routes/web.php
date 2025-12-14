@@ -9,6 +9,7 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
+use App\Http\Controllers\RSPOController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\MarketingCampaignController;
@@ -74,6 +75,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     // trasa dla eksportu danych
     Route::get('/education/export', [EducationController::class, 'exportToCourses'])->name('education.export');
     Route::get('/education/export-participants/{id}', [EducationController::class, 'exportParticipants'])->name('education.exportParticipants');            
+
+    /* RSPO - Rejestr Szkół i Placówek Oświatowych */
+    Route::prefix('rspo')->name('rspo.')->group(function () {
+        Route::get('/search', [RSPOController::class, 'search'])->name('search');
+    });
 
     /* Certgen:publigo */
     
