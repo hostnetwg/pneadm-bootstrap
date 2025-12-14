@@ -31,30 +31,66 @@ class RSPOController extends Controller
                         foreach ($data as &$type) {
                             $typeId = $type['id'] ?? null;
                             if ($typeId) {
-                                $count = Cache::remember("rspo_type_count_{$typeId}", 86400, function () use ($typeId) {
-                                    try {
-                                        // Pobierz tylko informację o całkowitej liczbie (używamy application/ld+json dla hydra:totalItems)
-                                        // Skrócony timeout, aby nie blokować strony
-                                        $countResponse = Http::accept('application/ld+json')
-                                            ->timeout(3)
-                                            ->get(self::API_BASE_URL . '/placowki/', [
-                                                'typ_podmiotu_id' => $typeId,
-                                                'page' => 1,
-                                            ]);
-                                        
-                                        if ($countResponse->successful()) {
-                                            $countData = $countResponse->json();
-                                            $totalItems = $countData['hydra:totalItems'] ?? null;
-                                            if ($totalItems !== null) {
-                                                return (int) $totalItems;
+                                $cacheKey = "rspo_type_count_{$typeId}";
+                                $count = Cache::get($cacheKey);
+                                
+                                // Jeśli nie ma cache, spróbuj pobrać
+                                if ($count === null) {
+                                    // Próba z retry (max 2 próby)
+                                    $maxRetries = 2;
+                                    $retryDelay = 1; // sekunda
+                                    
+                                    for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+                                        try {
+                                            // Pobierz tylko informację o całkowitej liczbie (używamy application/ld+json dla hydra:totalItems)
+                                            // Używamy itemsPerPage=1 aby zminimalizować ilość danych do pobrania
+                                            $countResponse = Http::accept('application/ld+json')
+                                                ->timeout(15) // Zwiększony timeout dla typów z dużą liczbą placówek
+                                                ->get(self::API_BASE_URL . '/placowki/', [
+                                                    'typ_podmiotu_id' => $typeId,
+                                                    'page' => 1,
+                                                    'itemsPerPage' => 1, // Minimalna ilość danych - potrzebujemy tylko metadanych
+                                                ]);
+                                            
+                                            if ($countResponse->successful()) {
+                                                $countData = $countResponse->json();
+                                                $totalItems = $countData['hydra:totalItems'] ?? null;
+                                                if ($totalItems !== null) {
+                                                    $count = (int) $totalItems;
+                                                    // Cache'uj sukces na 24h
+                                                    Cache::put($cacheKey, $count, 86400);
+                                                    break; // Sukces - wyjdź z pętli
+                                                }
+                                            } elseif ($countResponse->status() >= 500 && $attempt < $maxRetries) {
+                                                // Błąd serwera - spróbuj ponownie
+                                                \Log::warning("RSPO API Error (type count for {$typeId}, attempt {$attempt}): HTTP {$countResponse->status()}");
+                                                sleep($retryDelay);
+                                                continue;
                                             }
+                                        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                                            // Timeout lub problem z połączeniem - spróbuj ponownie jeśli to nie ostatnia próba
+                                            if ($attempt < $maxRetries) {
+                                                \Log::warning("RSPO API Connection Error (type count for {$typeId}, attempt {$attempt}): " . $e->getMessage());
+                                                sleep($retryDelay);
+                                                continue;
+                                            } else {
+                                                \Log::warning("RSPO API Connection Error (type count for {$typeId}, final attempt): " . $e->getMessage());
+                                            }
+                                        } catch (\Exception $e) {
+                                            // Loguj błąd dla debugowania
+                                            \Log::warning("RSPO API Error (type count for {$typeId}, attempt {$attempt}): " . $e->getMessage());
+                                            // Nie retry dla innych błędów
+                                            break;
                                         }
-                                    } catch (\Exception $e) {
-                                        // Loguj błąd dla debugowania
-                                        \Log::warning("RSPO API Error (type count for {$typeId}): " . $e->getMessage());
                                     }
-                                    return null;
-                                });
+                                    
+                                    // Jeśli po wszystkich próbach nie udało się pobrać, cache'uj null na 5 minut
+                                    // aby szybko spróbować ponownie przy następnym załadowaniu
+                                    if ($count === null) {
+                                        Cache::put($cacheKey, null, 300); // 5 minut dla błędów
+                                    }
+                                }
+                                
                                 // Zawsze dodaj count (może być null jeśli nie udało się pobrać)
                                 $type['count'] = $count;
                             }
