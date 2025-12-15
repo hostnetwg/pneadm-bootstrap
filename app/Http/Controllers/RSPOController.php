@@ -2,13 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TerytService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\JsonResponse;
 
 class RSPOController extends Controller
 {
     private const API_BASE_URL = 'https://api-rspo.men.gov.pl/api';
+    
+    private TerytService $terytService;
+
+    public function __construct(TerytService $terytService)
+    {
+        $this->terytService = $terytService;
+    }
 
     /**
      * Wyświetla stronę wyszukiwarki RSPO
@@ -118,8 +127,13 @@ class RSPOController extends Controller
 
         // Wyszukaj placówki (można wyszukiwać wszystkie typy lub konkretny typ)
         // Wyszukiwanie wykonujemy zawsze, gdy formularz został wysłany
-        // Jeśli typ_podmiotu_id jest pusty, wyszukujemy wszystkie typy
-        if ($request->has('typ_podmiotu_id') || $page > 1) {
+        $hasSearchParams = $request->has('typ_podmiotu_id') || 
+                          $request->has('wojewodztwo_nazwa') || 
+                          $request->has('powiat_nazwa') || 
+                          $request->has('miejscowosc_nazwa') || 
+                          $page > 1;
+        
+        if ($hasSearchParams) {
             try {
                 // Buduj parametry zapytania
                 $params = [
@@ -129,6 +143,20 @@ class RSPOController extends Controller
                 // Dodaj parametr typu podmiotu tylko jeśli wybrano konkretny typ
                 if ($selectedTypeId) {
                     $params['typ_podmiotu_id'] = $selectedTypeId;
+                }
+                
+                // Dodaj parametry lokalizacji zgodnie z dokumentacją API RSPO
+                // API RSPO używa: wojewodztwo, powiat, miejscowosc (bez _nazwa)
+                if ($request->has('wojewodztwo_nazwa') && $request->filled('wojewodztwo_nazwa')) {
+                    $params['wojewodztwo'] = $request->get('wojewodztwo_nazwa');
+                }
+                
+                if ($request->has('powiat_nazwa') && $request->filled('powiat_nazwa')) {
+                    $params['powiat'] = $request->get('powiat_nazwa');
+                }
+                
+                if ($request->has('miejscowosc_nazwa') && $request->filled('miejscowosc_nazwa')) {
+                    $params['miejscowosc'] = $request->get('miejscowosc_nazwa');
                 }
 
                 // Używamy application/ld+json aby otrzymać format Hydra z informacją o całkowitej liczbie wyników
@@ -171,12 +199,173 @@ class RSPOController extends Controller
             }
         }
 
+        // Pobierz województwa z TERYT dla formularza
+        $wojewodztwa = $this->terytService->getWojewodztwa();
+        
+        // Pobierz wybrane wartości z requestu
+        $selectedWojewodztwo = $request->get('wojewodztwo_nazwa');
+        $selectedPowiat = $request->get('powiat_nazwa');
+        $selectedMiejscowosc = $request->get('miejscowosc_nazwa');
+        
+        // Jeśli wybrano województwo, pobierz powiaty
+        $powiaty = [];
+        if ($selectedWojewodztwo) {
+            // Znajdź kod województwa
+            foreach ($wojewodztwa as $woj) {
+                if (($woj['nazwa'] ?? '') === $selectedWojewodztwo) {
+                    $powiaty = $this->terytService->getPowiaty($woj['kod']);
+                    break;
+                }
+            }
+        }
+        
+        // Jeśli wybrano powiat, pobierz miejscowości
+        $miejscowosci = [];
+        if ($selectedPowiat && !empty($powiaty)) {
+            foreach ($powiaty as $pow) {
+                if (($pow['nazwa'] ?? '') === $selectedPowiat) {
+                    $miejscowosci = $this->terytService->getMiejscowosci(
+                        $pow['wojewodztwo_kod'],
+                        $pow['kod']
+                    );
+                    break;
+                }
+            }
+        }
+
         return view('rspo.search', compact(
             'types', 
-            'selectedTypeId', 
+            'selectedTypeId',
+            'wojewodztwa',
+            'powiaty',
+            'miejscowosci',
+            'selectedWojewodztwo',
+            'selectedPowiat',
+            'selectedMiejscowosc',
             'results', 
             'pagination', 
             'page'
         ));
+    }
+
+    /**
+     * AJAX: Pobiera powiaty dla województwa
+     */
+    public function getPowiaty(Request $request): JsonResponse
+    {
+        $request->validate([
+            'wojewodztwo_kod' => 'required|string',
+        ]);
+
+        try {
+            // Pobierz parametry
+            $wojewodztwoKod = $request->wojewodztwo_kod;
+            $wojewodztwoNazwa = $request->get('wojewodztwo_nazwa');
+            
+            \Log::info('RSPO getPowiaty - Request', [
+                'wojewodztwo_kod' => $wojewodztwoKod,
+                'wojewodztwo_nazwa' => $wojewodztwoNazwa
+            ]);
+            
+            // Jeśli kod jest pusty lub null, użyj nazwy do znalezienia kodu
+            if (empty($wojewodztwoKod) || $wojewodztwoKod === 'null' || $wojewodztwoKod === '') {
+                if ($wojewodztwoNazwa) {
+                    // Spróbuj znaleźć kod po nazwie z selecta
+                    $wojewodztwa = $this->terytService->getWojewodztwa();
+                    foreach ($wojewodztwa as $woj) {
+                        if (($woj['nazwa'] ?? '') === $wojewodztwoNazwa) {
+                            $wojewodztwoKod = $woj['kod'] ?? '';
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Jeśli nadal nie mamy kodu, użyj nazwy bezpośrednio
+            if (empty($wojewodztwoKod) && $wojewodztwoNazwa) {
+                // Użyj metody która przyjmuje nazwę
+                $powiaty = $this->terytService->getPowiatyByNazwa($wojewodztwoNazwa);
+            } else {
+                $powiaty = $this->terytService->getPowiaty($wojewodztwoKod);
+            }
+            
+            \Log::info('RSPO getPowiaty - Response', [
+                'wojewodztwo_kod' => $wojewodztwoKod,
+                'powiaty_count' => count($powiaty)
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'powiaty' => $powiaty
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('RSPO Controller Error - getPowiaty', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'wojewodztwo_kod' => $request->wojewodztwo_kod,
+                'wojewodztwo_nazwa' => $request->get('wojewodztwo_nazwa')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Błąd podczas pobierania powiatów: ' . $e->getMessage(),
+                'powiaty' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * AJAX: Pobiera miejscowości dla powiatu
+     */
+    public function getMiejscowosci(Request $request): JsonResponse
+    {
+        $request->validate([
+            'wojewodztwo_kod' => 'required|string',
+            'powiat_kod' => 'required|string',
+        ]);
+
+        try {
+            $wojewodztwoKod = $request->wojewodztwo_kod;
+            $powiatKod = $request->powiat_kod;
+            $powiatNazwa = $request->get('powiat_nazwa');
+            
+            \Log::info('RSPO getMiejscowosci - Request', [
+                'wojewodztwo_kod' => $wojewodztwoKod,
+                'powiat_kod' => $powiatKod,
+                'powiat_nazwa' => $powiatNazwa
+            ]);
+            
+            // Jeśli mamy nazwę i kod powiatu, użyj obu (kod jest bardziej niezawodny)
+            if ($powiatNazwa) {
+                $miejscowosci = $this->terytService->getMiejscowosciByNazwaPowiatu($powiatNazwa, $powiatKod);
+            } else {
+                $miejscowosci = $this->terytService->getMiejscowosci($wojewodztwoKod, $powiatKod);
+            }
+            
+            \Log::info('RSPO getMiejscowosci - Response', [
+                'wojewodztwo_kod' => $wojewodztwoKod,
+                'powiat_kod' => $powiatKod,
+                'miejscowosci_count' => count($miejscowosci)
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'miejscowosci' => $miejscowosci
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('RSPO Controller Error - getMiejscowosci', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'wojewodztwo_kod' => $request->wojewodztwo_kod,
+                'powiat_kod' => $request->powiat_kod,
+                'powiat_nazwa' => $request->get('powiat_nazwa')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Błąd podczas pobierania miejscowości: ' . $e->getMessage(),
+                'miejscowosci' => []
+            ], 500);
+        }
     }
 }

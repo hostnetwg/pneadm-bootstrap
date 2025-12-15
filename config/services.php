@@ -78,4 +78,11 @@ return [
         'api_url' => env('PNEADM_API_URL', env('APP_URL')),
     ],
 
+    'teryt' => [
+        'username' => env('TERYT_USERNAME', 'WaldemarGrabowski'),
+        'password' => env('TERYT_PASSWORD', 'k1Yc4S0ius'),
+        'wsdl' => env('TERYT_WSDL', 'https://uslugaterytws1.stat.gov.pl/wsdl/terytws1.wsdl'),
+        'endpoint' => env('TERYT_ENDPOINT', 'https://uslugaterytws1.stat.gov.pl/terytws1.svc'),
+    ],
+
 ];

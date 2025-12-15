@@ -11,12 +11,13 @@
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="bi bi-funnel"></i> Wyszukiwanie według typu szkoły
+                        <i class="bi bi-funnel"></i> Zaawansowane wyszukiwanie
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="GET" action="{{ route('rspo.search') }}" class="row g-3">
-                        <div class="col-md-10">
+                    <form method="GET" action="{{ route('rspo.search') }}" id="searchForm" class="row g-3">
+                        {{-- Typ podmiotu --}}
+                        <div class="col-md-6">
                             <label for="typ_podmiotu_id" class="form-label">
                                 <strong>Typ podmiotu:</strong>
                             </label>
@@ -25,7 +26,6 @@
                                 @if(isset($types) && is_array($types) && count($types) > 0)
                                     @foreach($types as $type)
                                         @php
-                                            // API zwraca prosty format: {"id": 90, "nazwa": "Bednarska Szkoła Realna", "count": 123}
                                             $typeId = $type['id'] ?? null;
                                             $typeName = $type['nazwa'] ?? 'Brak nazwy';
                                             $typeCount = $type['count'] ?? null;
@@ -41,10 +41,74 @@
                                 @endif
                             </select>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">
+
+                        {{-- Województwo --}}
+                        <div class="col-md-6">
+                            <label for="wojewodztwo_nazwa" class="form-label">
+                                <strong>Województwo:</strong>
+                            </label>
+                            <select name="wojewodztwo_nazwa" id="wojewodztwo_nazwa" class="form-select">
+                                <option value="">-- Wszystkie województwa --</option>
+                                @if(isset($wojewodztwa) && is_array($wojewodztwa))
+                                    @foreach($wojewodztwa as $woj)
+                                        <option value="{{ $woj['nazwa'] ?? '' }}" 
+                                                data-kod="{{ $woj['kod'] ?? '' }}"
+                                                {{ ($selectedWojewodztwo ?? '') == ($woj['nazwa'] ?? '') ? 'selected' : '' }}>
+                                            {{ $woj['nazwa'] ?? 'Brak nazwy' }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </div>
+
+                        {{-- Powiat --}}
+                        <div class="col-md-6">
+                            <label for="powiat_nazwa" class="form-label">
+                                <strong>Powiat:</strong>
+                            </label>
+                            <select name="powiat_nazwa" id="powiat_nazwa" class="form-select" {{ empty($powiaty) ? 'disabled' : '' }}>
+                                <option value="">-- Wybierz powiat --</option>
+                                @if(isset($powiaty) && is_array($powiaty) && count($powiaty) > 0)
+                                    @foreach($powiaty as $pow)
+                                        <option value="{{ $pow['nazwa'] ?? '' }}" 
+                                                data-kod="{{ $pow['kod'] ?? '' }}"
+                                                data-woj-kod="{{ $pow['wojewodztwo_kod'] ?? '' }}"
+                                                {{ ($selectedPowiat ?? '') == ($pow['nazwa'] ?? '') ? 'selected' : '' }}>
+                                            {{ $pow['nazwa'] ?? 'Brak nazwy' }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <small class="form-text text-muted">Wybierz najpierw województwo</small>
+                        </div>
+
+                        {{-- Miejscowość --}}
+                        <div class="col-md-6">
+                            <label for="miejscowosc_nazwa" class="form-label">
+                                <strong>Miejscowość:</strong>
+                            </label>
+                            <select name="miejscowosc_nazwa" id="miejscowosc_nazwa" class="form-select" {{ empty($miejscowosci) ? 'disabled' : '' }}>
+                                <option value="">-- Wybierz miejscowość --</option>
+                                @if(isset($miejscowosci) && is_array($miejscowosci) && count($miejscowosci) > 0)
+                                    @foreach($miejscowosci as $miejsc)
+                                        <option value="{{ $miejsc['nazwa'] ?? '' }}" 
+                                                {{ ($selectedMiejscowosc ?? '') == ($miejsc['nazwa'] ?? '') ? 'selected' : '' }}>
+                                            {{ $miejsc['nazwa'] ?? 'Brak nazwy' }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <small class="form-text text-muted">Wybierz najpierw powiat</small>
+                        </div>
+
+                        {{-- Przycisk wyszukiwania --}}
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-search me-2"></i>Szukaj
                             </button>
+                            <a href="{{ route('rspo.search') }}" class="btn btn-secondary ms-2">
+                                <i class="bi bi-arrow-counterclockwise me-2"></i>Wyczyść
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -252,5 +316,151 @@
             @endif
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const wojewodztwoSelect = document.getElementById('wojewodztwo_nazwa');
+            const powiatSelect = document.getElementById('powiat_nazwa');
+            const miejscowoscSelect = document.getElementById('miejscowosc_nazwa');
+
+            // Obsługa zmiany województwa
+            if (wojewodztwoSelect) {
+                wojewodztwoSelect.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const wojewodztwoKod = selectedOption.getAttribute('data-kod');
+                    const wojewodztwoNazwa = selectedOption.value || selectedOption.textContent.trim();
+                    
+                    console.log('Wybrano województwo:', {
+                        kod: wojewodztwoKod,
+                        nazwa: wojewodztwoNazwa,
+                        value: selectedOption.value
+                    });
+                    
+                    // Resetuj powiat i miejscowość
+                    powiatSelect.innerHTML = '<option value="">-- Wybierz powiat --</option>';
+                    powiatSelect.disabled = !wojewodztwoNazwa;
+                    miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
+                    miejscowoscSelect.disabled = true;
+                    
+                    if (wojewodztwoNazwa && wojewodztwoNazwa !== '') {
+                        // Pobierz powiaty dla wybranego województwa
+                        powiatSelect.disabled = true;
+                        powiatSelect.innerHTML = '<option value="">Ładowanie...</option>';
+                        
+                        const url = `{{ route('rspo.api.powiaty') }}?wojewodztwo_kod=${encodeURIComponent(wojewodztwoKod || '')}&wojewodztwo_nazwa=${encodeURIComponent(wojewodztwoNazwa)}`;
+                        console.log('Fetching powiaty from:', url);
+                        
+                        fetch(url, {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json'
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Powiaty response:', data);
+                            if (data.success && data.powiaty && Array.isArray(data.powiaty)) {
+                                powiatSelect.innerHTML = '<option value="">-- Wybierz powiat --</option>';
+                                if (data.powiaty.length > 0) {
+                                    data.powiaty.forEach(powiat => {
+                                        const option = document.createElement('option');
+                                        option.value = powiat.nazwa || '';
+                                        option.setAttribute('data-kod', powiat.kod || '');
+                                        option.setAttribute('data-woj-kod', powiat.wojewodztwo_kod || wojewodztwoKod || '');
+                                        option.textContent = powiat.nazwa || 'Brak nazwy';
+                                        powiatSelect.appendChild(option);
+                                    });
+                                    powiatSelect.disabled = false;
+                                } else {
+                                    powiatSelect.innerHTML = '<option value="">Brak powiatów dla wybranego województwa</option>';
+                                }
+                            } else {
+                                console.error('Invalid response format:', data);
+                                powiatSelect.innerHTML = '<option value="">Błąd podczas pobierania powiatów</option>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading powiaty:', error);
+                            powiatSelect.innerHTML = '<option value="">Błąd podczas pobierania powiatów</option>';
+                        });
+                    }
+                });
+            }
+
+            // Obsługa zmiany powiatu
+            if (powiatSelect) {
+                powiatSelect.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const powiatKod = selectedOption.getAttribute('data-kod');
+                    const wojewodztwoKod = selectedOption.getAttribute('data-woj-kod');
+                    const powiatNazwa = selectedOption.value || selectedOption.textContent.trim();
+                    
+                    console.log('Wybrano powiat:', {
+                        kod: powiatKod,
+                        nazwa: powiatNazwa,
+                        wojewodztwo_kod: wojewodztwoKod
+                    });
+                    
+                    // Resetuj miejscowość
+                    miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
+                    miejscowoscSelect.disabled = !powiatNazwa || powiatNazwa === '';
+                    
+                    if (powiatNazwa && powiatNazwa !== '') {
+                        // Pobierz miejscowości dla wybranego powiatu
+                        miejscowoscSelect.disabled = true;
+                        miejscowoscSelect.innerHTML = '<option value="">Ładowanie...</option>';
+                        
+                        const url = `{{ route('rspo.api.miejscowosci') }}?wojewodztwo_kod=${encodeURIComponent(wojewodztwoKod || '')}&powiat_kod=${encodeURIComponent(powiatKod || '')}&powiat_nazwa=${encodeURIComponent(powiatNazwa)}`;
+                        console.log('Fetching miejscowosci from:', url);
+                        console.log('Powiat kod:', powiatKod, 'Powiat nazwa:', powiatNazwa);
+                        
+                        fetch(url, {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json'
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Miejscowosci response:', data);
+                            if (data.success && data.miejscowosci && Array.isArray(data.miejscowosci)) {
+                                miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
+                                if (data.miejscowosci.length > 0) {
+                                    data.miejscowosci.forEach(miejscowosc => {
+                                        const option = document.createElement('option');
+                                        option.value = miejscowosc.nazwa || '';
+                                        option.textContent = miejscowosc.nazwa || 'Brak nazwy';
+                                        miejscowoscSelect.appendChild(option);
+                                    });
+                                    miejscowoscSelect.disabled = false;
+                                } else {
+                                    miejscowoscSelect.innerHTML = '<option value="">Brak miejscowości dla wybranego powiatu</option>';
+                                }
+                            } else {
+                                console.error('Invalid response format:', data);
+                                miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading miejscowosci:', error);
+                            miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                        });
+                    }
+                });
+            }
+        });
+    </script>
+    @endpush
 
 </x-app-layout>
