@@ -349,10 +349,12 @@ class PubligoController extends Controller
                 }
 
                 // Sprawdź czy istnieje wcześniejszy uczestnik z tym samym e-mailem,
-                // który ma wypełnione oba pola: birth_date i birth_place
+                // który ma wypełnione datę lub miejsce urodzenia (lub oba)
                 $previousParticipant = Participant::where('email', $customer['email'])
-                    ->whereNotNull('birth_date')
-                    ->whereNotNull('birth_place')
+                    ->where(function($query) {
+                        $query->whereNotNull('birth_date')
+                              ->orWhereNotNull('birth_place');
+                    })
                     ->orderBy('created_at', 'desc') // Najnowszy uczestnik z tymi danymi
                     ->first();
 
@@ -360,8 +362,14 @@ class PubligoController extends Controller
                 $birthPlace = null;
 
                 if ($previousParticipant) {
-                    $birthDate = $previousParticipant->birth_date;
-                    $birthPlace = $previousParticipant->birth_place;
+                    // Kopiuj datę urodzenia jeśli istnieje
+                    if ($previousParticipant->birth_date) {
+                        $birthDate = $previousParticipant->birth_date;
+                    }
+                    // Kopiuj miejsce urodzenia jeśli istnieje
+                    if ($previousParticipant->birth_place) {
+                        $birthPlace = $previousParticipant->birth_place;
+                    }
                     
                     \Log::info('Found previous participant with birth data - copying to new participant', [
                         'email' => $customer['email'],
@@ -369,6 +377,8 @@ class PubligoController extends Controller
                         'previous_course_id' => $previousParticipant->course_id,
                         'birth_date' => $birthDate?->format('Y-m-d'),
                         'birth_place' => $birthPlace,
+                        'has_birth_date' => $previousParticipant->birth_date !== null,
+                        'has_birth_place' => $previousParticipant->birth_place !== null,
                         'new_course_id' => $course->id,
                         'order_id' => $orderId
                     ]);
