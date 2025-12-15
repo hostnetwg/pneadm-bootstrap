@@ -97,7 +97,7 @@
                                    id="search" 
                                    name="search" 
                                    value="{{ $search }}" 
-                                   placeholder="Imię, email, produkt, numer faktury, notatki, ID, Publigo ID...">
+                                   placeholder="Imię, email uczestnika, email zamawiającego, produkt, numer faktury, notatki, ID, Publigo ID...">
                         </div>
                         <div class="col-md-3">
                             <label for="per_page" class="form-label">Rekordów na stronę:</label>

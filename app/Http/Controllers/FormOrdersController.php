@@ -58,6 +58,7 @@ class FormOrdersController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('participant_name', 'LIKE', "%{$search}%")
                   ->orWhere('participant_email', 'LIKE', "%{$search}%")
+                  ->orWhere('orderer_email', 'LIKE', "%{$search}%")
                   ->orWhere('product_name', 'LIKE', "%{$search}%")
                   ->orWhere('invoice_number', 'LIKE', "%{$search}%")
                   ->orWhere('notes', 'LIKE', "%{$search}%")
