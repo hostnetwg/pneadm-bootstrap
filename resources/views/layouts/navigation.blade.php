@@ -181,6 +181,11 @@
                            Wyszukaj
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('rspo.import.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
+                           Dodaj do Sendy
+                        </a>
+                    </li>
                 </ul>
             </div>
         </li>

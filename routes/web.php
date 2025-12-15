@@ -10,6 +10,7 @@ use App\Http\Controllers\EducationController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\RSPOController;
+use App\Http\Controllers\RSPOImportController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\MarketingCampaignController;
@@ -79,6 +80,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     /* RSPO - Rejestr Szkół i Placówek Oświatowych */
     Route::prefix('rspo')->name('rspo.')->group(function () {
         Route::get('/search', [RSPOController::class, 'search'])->name('search');
+        
+        // Import do Sendy
+        Route::prefix('import')->name('import.')->group(function () {
+            Route::get('/', [RSPOImportController::class, 'index'])->name('index');
+            Route::post('/import', [RSPOImportController::class, 'import'])->name('import');
+        });
     });
 
     /* Certgen:publigo */

@@ -188,8 +188,40 @@ class SendyService
             $response = Http::asForm()->post($this->baseUrl . '/subscribe', $data);
 
             if ($response->successful()) {
-                $result = $response->body();
-                return $result === 'true';
+                $result = trim($response->body());
+                
+                // Sendy zwraca różne odpowiedzi:
+                // 'true' - sukces
+                // 'Already subscribed.' - email już jest na liście (to też sukces)
+                // 'Bounced email address.' - email odbija (błąd)
+                // 'Email is suppressed.' - email zablokowany (błąd)
+                // Inne komunikaty błędów
+                
+                // Loguj wszystkie odpowiedzi dla debugowania (tylko pierwsze 10)
+                static $logCount = 0;
+                if ($logCount < 10) {
+                    Log::info('Sendy API Response - subscribe', [
+                        'response' => $result,
+                        'response_length' => strlen($result),
+                        'email' => $email,
+                        'list_id' => $listId
+                    ]);
+                    $logCount++;
+                }
+                
+                if ($result === 'true' || $result === 'Already subscribed.') {
+                    return true;
+                }
+                
+                // Jeśli to błąd, zaloguj szczegóły
+                Log::warning('Sendy API Warning - subscribe', [
+                    'response' => $result,
+                    'email' => $email,
+                    'list_id' => $listId,
+                    'additional_data' => $additionalData
+                ]);
+                
+                return false;
             }
 
             Log::error('Sendy API Error - subscribe', [
@@ -281,6 +313,116 @@ class SendyService
             ]);
             return false;
         }
+    }
+
+    /**
+     * Tworzy nową listę w Sendy
+     */
+    public function createList(
+        string $brandId,
+        string $listName,
+        string $fromName,
+        string $fromEmail,
+        string $replyTo,
+        string $subject = 'Newsletter'
+    ): ?string {
+        try {
+            $response = Http::asForm()->post($this->baseUrl . '/api/lists/create-list.php', [
+                'api_key' => $this->apiKey,
+                'brand_id' => $brandId,
+                'list_name' => $listName,
+                'from_name' => $fromName,
+                'from_email' => $fromEmail,
+                'reply_to' => $replyTo,
+                'subject' => $subject
+            ]);
+
+            if ($response->successful()) {
+                $result = $response->body();
+                
+                // Sendy zwraca ID listy jako string lub JSON z błędem
+                if (is_numeric($result) || (is_string($result) && strlen($result) > 0 && $result !== 'true' && $result !== 'false')) {
+                    return $result;
+                }
+                
+                // Sprawdź czy to JSON z błędem
+                $jsonResult = json_decode($result, true);
+                if ($jsonResult && isset($jsonResult['error'])) {
+                    Log::error('Sendy API Error - createList', [
+                        'error' => $jsonResult['error'],
+                        'list_name' => $listName,
+                        'brand_id' => $brandId
+                    ]);
+                    return null;
+                }
+            }
+
+            Log::error('Sendy API Error - createList', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'list_name' => $listName,
+                'brand_id' => $brandId
+            ]);
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('Sendy Service Exception - createList', [
+                'message' => $e->getMessage(),
+                'list_name' => $listName,
+                'brand_id' => $brandId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Masowe dodawanie subskrybentów do listy
+     */
+    public function bulkSubscribe(string $listId, array $subscribers): array
+    {
+        $results = [
+            'success' => 0,
+            'failed' => 0,
+            'errors' => []
+        ];
+
+        foreach ($subscribers as $subscriber) {
+            $email = $subscriber['email'] ?? null;
+            $name = $subscriber['name'] ?? null;
+            $rspo = $subscriber['rspo'] ?? null;
+
+            if (!$email) {
+                $results['failed']++;
+                $results['errors'][] = "Brak adresu email dla: " . ($name ?? 'nieznana szkoła');
+                continue;
+            }
+
+            $additionalData = [];
+            if ($name) {
+                $additionalData['name'] = $name;
+            }
+            
+            // Dodaj custom field RSPO jeśli istnieje
+            // Sendy używa personalization tag jako nazwy parametru
+            // Jeśli w Sendy masz custom field z tagiem [RSPO,fallback=], użyj 'RSPO' jako parametru
+            if ($rspo) {
+                $additionalData['RSPO'] = (string) $rspo;
+            }
+
+            if ($this->subscribe($email, $listId, $additionalData)) {
+                $results['success']++;
+            } else {
+                $results['failed']++;
+                $results['errors'][] = "Nie udało się dodać: {$email}";
+            }
+
+            // Małe opóźnienie aby nie przeciążać API
+            // Zmniejszone do 50ms dla szybszego importu (można zwiększyć jeśli API zwraca błędy rate limit)
+            usleep(50000); // 0.05 sekundy
+        }
+
+        return $results;
     }
 
     /**

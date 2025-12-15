@@ -589,16 +589,44 @@ class ParticipantController extends Controller
         try {
             $handle = fopen($file->getPathname(), 'r');
             
-            // Pomiń nagłówek
+            // Pomiń nagłówek i znormalizuj nazwy kolumn (małe litery, bez cudzysłowów)
             $header = fgetcsv($handle);
+            if ($header === false) {
+                throw new \RuntimeException('Plik CSV jest pusty lub nieczytelny.');
+            }
+
+            $normalizedHeader = array_map(function ($column) {
+                return Str::of($column)
+                    ->lower()
+                    ->replace('"', '')
+                    ->trim()
+                    ->toString();
+            }, $header);
             
             while (($row = fgetcsv($handle)) !== false) {
                 try {
-                    // Mapowanie kolumn CSV
-                    $csvData = array_combine($header, $row);
+                    if (count($row) !== count($normalizedHeader)) {
+                        $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - Nieprawidłowa liczba kolumn.";
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    // Mapowanie kolumn CSV do ujednoliconych kluczy
+                    $csvData = array_combine($normalizedHeader, $row);
+                    if ($csvData === false) {
+                        $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - Nie udało się sparsować wiersza.";
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    // Obsługa różnych nazw kolumn z eksportu Publigo
+                    $email = $csvData['e-mail uczestnika'] ?? $csvData['email'] ?? null;
+                    if (empty($email)) {
+                        throw new \RuntimeException('Brak kolumny E-mail uczestnika/Email lub pusty email.');
+                    }
                     
                     // Sprawdź czy uczestnik już istnieje
-                    $existingParticipant = Participant::where('email', $csvData['E-mail uczestnika'])
+                    $existingParticipant = Participant::where('email', $email)
                                                      ->where('course_id', $course->id)
                                                      ->first();
                     
@@ -608,15 +636,35 @@ class ParticipantController extends Controller
                     }
 
                     // Parsowanie imienia i nazwiska
-                    $fullName = trim($csvData['Imię i nazwisko'], '"');
+                    $fullName = trim(
+                        $csvData['imię i nazwisko'] ?? $csvData['imie i nazwisko'] ?? $csvData['name'] ?? '',
+                        '"'
+                    );
                     $nameParts = explode(' ', $fullName, 2);
                     $firstName = $nameParts[0] ?? '';
                     $lastName = $nameParts[1] ?? '';
 
+                    // Pobierz wcześniej zapisane dane urodzenia dla tego e-maila (jeśli istnieją)
+                    $birthDate = null;
+                    $birthPlace = null;
+                    $existingProfile = Participant::where('email', $email)
+                        ->where(function ($q) {
+                            $q->whereNotNull('birth_date')
+                              ->orWhereNotNull('birth_place');
+                        })
+                        ->orderByDesc('updated_at')
+                        ->first();
+
+                    if ($existingProfile) {
+                        $birthDate = $existingProfile->birth_date;
+                        $birthPlace = $existingProfile->birth_place;
+                    }
+
                     // Parsowanie daty wygaśnięcia dostępu
                     $accessExpiresAt = null;
-                    if (!empty($csvData['Dostęp wygasa'])) {
-                        $expiresDate = trim($csvData['Dostęp wygasa'], '"');
+                    $expiresDateRaw = $csvData['dostęp wygasa'] ?? $csvData['dostep wygasa'] ?? null;
+                    if (!empty($expiresDateRaw)) {
+                        $expiresDate = trim($expiresDateRaw, '"');
                         if ($expiresDate && $expiresDate !== '') {
                             // Próbuj różne formaty daty
                             $formats = ['Y-m-d H:i:s', 'd.m.Y H:i', 'Y-m-d H:i'];
@@ -629,6 +677,9 @@ class ParticipantController extends Controller
                                 }
                             }
                         }
+                    } elseif (!empty($course->start_date)) {
+                        // Domyślnie: 2 miesiące od daty rozpoczęcia szkolenia
+                        $accessExpiresAt = $course->start_date->copy()->addMonthsNoOverflow(2);
                     }
 
                     // Pobranie ostatniego numeru porządkowego
@@ -639,9 +690,9 @@ class ParticipantController extends Controller
                         'course_id' => $course->id,
                         'first_name' => $firstName,
                         'last_name' => $lastName,
-                        'email' => $csvData['E-mail uczestnika'],
-                        'birth_date' => null,
-                        'birth_place' => null,
+                        'email' => $email,
+                        'birth_date' => $birthDate,
+                        'birth_place' => $birthPlace,
                         'access_expires_at' => $accessExpiresAt,
                         'order' => $lastOrder + 1,
                     ]);
