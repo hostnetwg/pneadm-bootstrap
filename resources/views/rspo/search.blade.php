@@ -82,6 +82,26 @@
                             <small class="form-text text-muted">Wybierz najpierw województwo</small>
                         </div>
 
+                        {{-- Gmina --}}
+                        <div class="col-md-6">
+                            <label for="gmina_nazwa" class="form-label">
+                                <strong>Gmina:</strong>
+                            </label>
+                            <select name="gmina_nazwa" id="gmina_nazwa" class="form-select" {{ empty($gminy) ? 'disabled' : '' }}>
+                                <option value="">-- Wybierz gminę --</option>
+                                @if(isset($gminy) && is_array($gminy) && count($gminy) > 0)
+                                    @foreach($gminy as $gmina)
+                                        <option value="{{ $gmina['nazwa'] ?? '' }}" 
+                                                data-kod="{{ $gmina['kod'] ?? '' }}"
+                                                {{ ($selectedGmina ?? '') == ($gmina['nazwa'] ?? '') ? 'selected' : '' }}>
+                                            {{ $gmina['nazwa'] ?? 'Brak nazwy' }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <small class="form-text text-muted">Wybierz najpierw powiat</small>
+                        </div>
+
                         {{-- Miejscowość --}}
                         <div class="col-md-6">
                             <label for="miejscowosc_nazwa" class="form-label">
@@ -267,6 +287,9 @@
                                             if (!empty($selectedPowiat)) {
                                                 $paginationParams['powiat_nazwa'] = $selectedPowiat;
                                             }
+                                            if (!empty($selectedGmina)) {
+                                                $paginationParams['gmina_nazwa'] = $selectedGmina;
+                                            }
                                             if (!empty($selectedMiejscowosc)) {
                                                 $paginationParams['miejscowosc_nazwa'] = $selectedMiejscowosc;
                                             }
@@ -293,6 +316,9 @@
                                             }
                                             if (!empty($selectedPowiat)) {
                                                 $paginationParams['powiat_nazwa'] = $selectedPowiat;
+                                            }
+                                            if (!empty($selectedGmina)) {
+                                                $paginationParams['gmina_nazwa'] = $selectedGmina;
                                             }
                                             if (!empty($selectedMiejscowosc)) {
                                                 $paginationParams['miejscowosc_nazwa'] = $selectedMiejscowosc;
@@ -340,6 +366,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const wojewodztwoSelect = document.getElementById('wojewodztwo_nazwa');
             const powiatSelect = document.getElementById('powiat_nazwa');
+            const gminaSelect = document.getElementById('gmina_nazwa');
             const miejscowoscSelect = document.getElementById('miejscowosc_nazwa');
 
             // Obsługa zmiany województwa
@@ -355,9 +382,11 @@
                         value: selectedOption.value
                     });
                     
-                    // Resetuj powiat i miejscowość
+                    // Resetuj powiat, gminę i miejscowość
                     powiatSelect.innerHTML = '<option value="">-- Wybierz powiat --</option>';
                     powiatSelect.disabled = !wojewodztwoNazwa;
+                    gminaSelect.innerHTML = '<option value="">-- Wybierz gminę --</option>';
+                    gminaSelect.disabled = true;
                     miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
                     miejscowoscSelect.disabled = true;
                     
@@ -425,18 +454,19 @@
                         wojewodztwo_kod: wojewodztwoKod
                     });
                     
-                    // Resetuj miejscowość
+                    // Resetuj gminę i miejscowość
+                    gminaSelect.innerHTML = '<option value="">-- Wybierz gminę --</option>';
+                    gminaSelect.disabled = !powiatNazwa || powiatNazwa === '';
                     miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
-                    miejscowoscSelect.disabled = !powiatNazwa || powiatNazwa === '';
+                    miejscowoscSelect.disabled = true;
                     
                     if (powiatNazwa && powiatNazwa !== '') {
-                        // Pobierz miejscowości dla wybranego powiatu
-                        miejscowoscSelect.disabled = true;
-                        miejscowoscSelect.innerHTML = '<option value="">Ładowanie...</option>';
+                        // Pobierz gminy dla wybranego powiatu
+                        gminaSelect.disabled = true;
+                        gminaSelect.innerHTML = '<option value="">Ładowanie...</option>';
                         
-                        const url = `{{ route('rspo.api.miejscowosci') }}?wojewodztwo_kod=${encodeURIComponent(wojewodztwoKod || '')}&powiat_kod=${encodeURIComponent(powiatKod || '')}&powiat_nazwa=${encodeURIComponent(powiatNazwa)}`;
-                        console.log('Fetching miejscowosci from:', url);
-                        console.log('Powiat kod:', powiatKod, 'Powiat nazwa:', powiatNazwa);
+                        const url = `{{ route('rspo.api.gminy') }}?powiat_kod=${encodeURIComponent(powiatKod || '')}&powiat_nazwa=${encodeURIComponent(powiatNazwa)}`;
+                        console.log('Fetching gminy from:', url);
                         
                         fetch(url, {
                             headers: {
@@ -451,28 +481,73 @@
                             return response.json();
                         })
                         .then(data => {
-                            console.log('Miejscowosci response:', data);
-                            if (data.success && data.miejscowosci && Array.isArray(data.miejscowosci)) {
-                                miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
-                                if (data.miejscowosci.length > 0) {
-                                    data.miejscowosci.forEach(miejscowosc => {
+                            console.log('Gminy response:', data);
+                            if (data.success && data.gminy && Array.isArray(data.gminy)) {
+                                gminaSelect.innerHTML = '<option value="">-- Wybierz gminę --</option>';
+                                if (data.gminy.length > 0) {
+                                    data.gminy.forEach(gmina => {
                                         const option = document.createElement('option');
-                                        option.value = miejscowosc.nazwa || '';
-                                        option.textContent = miejscowosc.nazwa || 'Brak nazwy';
-                                        miejscowoscSelect.appendChild(option);
+                                        option.value = gmina.nazwa || '';
+                                        option.setAttribute('data-kod', gmina.kod || '');
+                                        option.textContent = gmina.nazwa || 'Brak nazwy';
+                                        gminaSelect.appendChild(option);
                                     });
-                                    miejscowoscSelect.disabled = false;
+                                    gminaSelect.disabled = false;
                                 } else {
-                                    miejscowoscSelect.innerHTML = '<option value="">Brak miejscowości dla wybranego powiatu</option>';
+                                    gminaSelect.innerHTML = '<option value="">Brak gmin dla wybranego powiatu</option>';
                                 }
+                                
+                                // Również pobierz miejscowości dla powiatu (można filtrować później po gminie)
+                                miejscowoscSelect.disabled = true;
+                                miejscowoscSelect.innerHTML = '<option value="">Ładowanie...</option>';
+                                
+                                const miejscowosciUrl = `{{ route('rspo.api.miejscowosci') }}?wojewodztwo_kod=${encodeURIComponent(wojewodztwoKod || '')}&powiat_kod=${encodeURIComponent(powiatKod || '')}&powiat_nazwa=${encodeURIComponent(powiatNazwa)}`;
+                                console.log('Fetching miejscowosci from:', miejscowosciUrl);
+                                
+                                fetch(miejscowosciUrl, {
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json'
+                                    }
+                                })
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    console.log('Miejscowosci response:', data);
+                                    if (data.success && data.miejscowosci && Array.isArray(data.miejscowosci)) {
+                                        miejscowoscSelect.innerHTML = '<option value="">-- Wybierz miejscowość --</option>';
+                                        if (data.miejscowosci.length > 0) {
+                                            data.miejscowosci.forEach(miejscowosc => {
+                                                const option = document.createElement('option');
+                                                option.value = miejscowosc.nazwa || '';
+                                                option.textContent = miejscowosc.nazwa || 'Brak nazwy';
+                                                miejscowoscSelect.appendChild(option);
+                                            });
+                                            miejscowoscSelect.disabled = false;
+                                        } else {
+                                            miejscowoscSelect.innerHTML = '<option value="">Brak miejscowości dla wybranego powiatu</option>';
+                                        }
+                                    } else {
+                                        console.error('Invalid response format:', data);
+                                        miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error loading miejscowosci:', error);
+                                    miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                                });
                             } else {
                                 console.error('Invalid response format:', data);
-                                miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                                gminaSelect.innerHTML = '<option value="">Błąd podczas pobierania gmin</option>';
                             }
                         })
                         .catch(error => {
-                            console.error('Error loading miejscowosci:', error);
-                            miejscowoscSelect.innerHTML = '<option value="">Błąd podczas pobierania miejscowości</option>';
+                            console.error('Error loading gminy:', error);
+                            gminaSelect.innerHTML = '<option value="">Błąd podczas pobierania gmin</option>';
                         });
                     }
                 });

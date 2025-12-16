@@ -146,13 +146,17 @@ class RSPOController extends Controller
                 }
                 
                 // Dodaj parametry lokalizacji zgodnie z dokumentacją API RSPO
-                // API RSPO używa: wojewodztwo_nazwa, powiat_nazwa, miejscowosc_nazwa
+                // API RSPO używa: wojewodztwo_nazwa, powiat_nazwa, gmina_nazwa, miejscowosc_nazwa
                 if ($request->has('wojewodztwo_nazwa') && $request->filled('wojewodztwo_nazwa')) {
                     $params['wojewodztwo_nazwa'] = $request->get('wojewodztwo_nazwa');
                 }
                 
                 if ($request->has('powiat_nazwa') && $request->filled('powiat_nazwa')) {
                     $params['powiat_nazwa'] = $request->get('powiat_nazwa');
+                }
+                
+                if ($request->has('gmina_nazwa') && $request->filled('gmina_nazwa')) {
+                    $params['gmina_nazwa'] = $request->get('gmina_nazwa');
                 }
                 
                 if ($request->has('miejscowosc_nazwa') && $request->filled('miejscowosc_nazwa')) {
@@ -170,6 +174,7 @@ class RSPOController extends Controller
                     // Pobierz wartości filtrów do późniejszego filtrowania
                     $selectedWojewodztwo = $request->get('wojewodztwo_nazwa');
                     $selectedPowiat = $request->get('powiat_nazwa');
+                    $selectedGmina = $request->get('gmina_nazwa');
                     $selectedMiejscowosc = $request->get('miejscowosc_nazwa');
                     
                     // Normalizuj wartości do porównania (małe litery, bez białych znaków)
@@ -178,6 +183,7 @@ class RSPOController extends Controller
                     };
                     $normalizedWojewodztwo = $normalize($selectedWojewodztwo);
                     $normalizedPowiat = $normalize($selectedPowiat);
+                    $normalizedGmina = $normalize($selectedGmina);
                     $normalizedMiejscowosc = $normalize($selectedMiejscowosc);
                     
                     // Obsługa formatu Hydra (JSON-LD) - zawiera informację o całkowitej liczbie wyników
@@ -185,8 +191,8 @@ class RSPOController extends Controller
                         $allResults = $data['hydra:member'];
                         
                         // Jeśli filtrujemy, musimy pobrać więcej stron i przefiltrować
-                        // (API może nie filtrować poprawnie dla powiatów i miejscowości)
-                        $hasFilters = !empty($selectedWojewodztwo) || !empty($selectedPowiat) || !empty($selectedMiejscowosc);
+                        // (API może nie filtrować poprawnie dla powiatów, gmin i miejscowości)
+                        $hasFilters = !empty($selectedWojewodztwo) || !empty($selectedPowiat) || !empty($selectedGmina) || !empty($selectedMiejscowosc);
                         
                         // Cache key dla przefiltrowanych wyników
                         $cacheKey = null;
@@ -196,6 +202,7 @@ class RSPOController extends Controller
                             $cacheKey = 'rspo_filtered_' . md5(json_encode([
                                 'wojewodztwo' => $selectedWojewodztwo,
                                 'powiat' => $selectedPowiat,
+                                'gmina' => $selectedGmina,
                                 'miejscowosc' => $selectedMiejscowosc,
                                 'typ' => $selectedTypeId
                             ]));
@@ -234,6 +241,7 @@ class RSPOController extends Controller
                             foreach ($allResults as $placowka) {
                                 $wojewodztwo = $placowka['wojewodztwo'] ?? null;
                                 $powiat = $placowka['powiat'] ?? null;
+                                $gmina = $placowka['gmina'] ?? null;
                                 $miejscowosc = $placowka['miejscowosc'] ?? null;
                                 
                                 // Filtruj po województwie
@@ -243,6 +251,11 @@ class RSPOController extends Controller
                                 
                                 // Filtruj po powiecie
                                 if (!empty($normalizedPowiat) && $normalize($powiat) !== $normalizedPowiat) {
+                                    continue;
+                                }
+                                
+                                // Filtruj po gminie
+                                if (!empty($normalizedGmina) && $normalize($gmina) !== $normalizedGmina) {
                                     continue;
                                 }
                                 
@@ -300,6 +313,7 @@ class RSPOController extends Controller
         // Pobierz wybrane wartości z requestu
         $selectedWojewodztwo = $request->get('wojewodztwo_nazwa');
         $selectedPowiat = $request->get('powiat_nazwa');
+        $selectedGmina = $request->get('gmina_nazwa');
         $selectedMiejscowosc = $request->get('miejscowosc_nazwa');
         
         // Jeśli wybrano województwo, pobierz powiaty
@@ -312,6 +326,12 @@ class RSPOController extends Controller
                     break;
                 }
             }
+        }
+        
+        // Jeśli wybrano powiat, pobierz gminy
+        $gminy = [];
+        if ($selectedPowiat) {
+            $gminy = $this->terytService->getGminyByNazwaPowiatu($selectedPowiat);
         }
         
         // Jeśli wybrano powiat, pobierz miejscowości
@@ -333,9 +353,11 @@ class RSPOController extends Controller
             'selectedTypeId',
             'wojewodztwa',
             'powiaty',
+            'gminy',
             'miejscowosci',
             'selectedWojewodztwo',
             'selectedPowiat',
+            'selectedGmina',
             'selectedMiejscowosc',
             'results', 
             'pagination', 
@@ -410,19 +432,68 @@ class RSPOController extends Controller
     }
 
     /**
-     * AJAX: Pobiera miejscowości dla powiatu
+     * AJAX: Pobiera gminy dla powiatu
+     */
+    public function getGminy(Request $request): JsonResponse
+    {
+        $request->validate([
+            'powiat_kod' => 'nullable|string',
+            'powiat_nazwa' => 'required|string',
+        ]);
+
+        try {
+            $powiatKod = $request->get('powiat_kod');
+            $powiatNazwa = $request->get('powiat_nazwa');
+            
+            \Log::info('RSPO getGminy - Request', [
+                'powiat_kod' => $powiatKod,
+                'powiat_nazwa' => $powiatNazwa
+            ]);
+            
+            // Użyj metody która przyjmuje nazwę powiatu
+            $gminy = $this->terytService->getGminyByNazwaPowiatu($powiatNazwa, $powiatKod);
+            
+            \Log::info('RSPO getGminy - Response', [
+                'powiat_nazwa' => $powiatNazwa,
+                'gminy_count' => count($gminy)
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'gminy' => $gminy
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('RSPO Controller Error - getGminy', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'powiat_kod' => $request->get('powiat_kod'),
+                'powiat_nazwa' => $request->get('powiat_nazwa')
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Błąd podczas pobierania gmin: ' . $e->getMessage(),
+                'gminy' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * AJAX: Pobiera miejscowości dla powiatu (lub gminy)
      */
     public function getMiejscowosci(Request $request): JsonResponse
     {
         $request->validate([
-            'wojewodztwo_kod' => 'required|string',
-            'powiat_kod' => 'required|string',
+            'wojewodztwo_kod' => 'nullable|string',
+            'powiat_kod' => 'nullable|string',
+            'powiat_nazwa' => 'required|string',
         ]);
 
         try {
-            $wojewodztwoKod = $request->wojewodztwo_kod;
-            $powiatKod = $request->powiat_kod;
+            $wojewodztwoKod = $request->get('wojewodztwo_kod');
+            $powiatKod = $request->get('powiat_kod');
             $powiatNazwa = $request->get('powiat_nazwa');
+            $gminaNazwa = $request->get('gmina_nazwa');
             
             \Log::info('RSPO getMiejscowosci - Request', [
                 'wojewodztwo_kod' => $wojewodztwoKod,

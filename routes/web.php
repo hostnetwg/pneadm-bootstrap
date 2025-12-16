@@ -81,6 +81,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::prefix('rspo')->name('rspo.')->group(function () {
         Route::get('/search', [RSPOController::class, 'search'])->name('search');
         Route::get('/api/powiaty', [RSPOController::class, 'getPowiaty'])->name('api.powiaty');
+        Route::get('/api/gminy', [RSPOController::class, 'getGminy'])->name('api.gminy');
         Route::get('/api/miejscowosci', [RSPOController::class, 'getMiejscowosci'])->name('api.miejscowosci');
         
         // Import do Sendy

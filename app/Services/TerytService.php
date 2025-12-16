@@ -580,11 +580,153 @@ class TerytService
     }
 
     /**
+     * Pobiera listę gmin dla powiatu po nazwie (bezpośrednio z RSPO)
+     */
+    public function getGminyByNazwaPowiatu(string $powiatNazwa, ?string $powiatKod = null): array
+    {
+        return $this->getGminyFromRSPO($powiatNazwa, $powiatKod);
+    }
+
+    /**
      * Pobiera listę miejscowości dla powiatu po nazwie (bezpośrednio z RSPO)
      */
     public function getMiejscowosciByNazwaPowiatu(string $powiatNazwa, ?string $powiatKod = null): array
     {
         return $this->getMiejscowosciFromRSPO($powiatNazwa, $powiatKod);
+    }
+
+    /**
+     * Pobiera listę gmin dla powiatu z API RSPO
+     * Używa endpointu /api/placowki/ aby wyciągnąć unikalne gminy
+     */
+    private function getGminyFromRSPO(string $powiatNazwa, ?string $powiatKod = null): array
+    {
+        $cacheKey = "rspo_gminy_{$powiatNazwa}_" . ($powiatKod ?? 'no_kod');
+        
+        return Cache::remember($cacheKey, 86400, function () use ($powiatNazwa, $powiatKod) {
+            try {
+                // Użyj endpointu /api/placowki/ z filtrem powiatu
+                $params = ['page' => 1, 'itemsPerPage' => 100];
+                if ($powiatKod) {
+                    $params['powiat_kod_teryt'] = $powiatKod;
+                } else {
+                    $params['powiat_nazwa'] = $powiatNazwa;
+                }
+                
+                $response = \Illuminate\Support\Facades\Http::accept('application/ld+json')
+                    ->timeout(30)
+                    ->get('https://api-rspo.men.gov.pl/api/placowki/', $params);
+                
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $gminy = [];
+                    
+                    if (isset($data['hydra:member'])) {
+                        foreach ($data['hydra:member'] as $placowka) {
+                            // Sprawdź czy placówka należy do wybranego powiatu
+                            $powiatPlacowki = $placowka['powiat'] ?? null;
+                            $powiatKodPlacowki = $placowka['powiatKodTERYT'] ?? null;
+                            
+                            // Filtruj po kodzie lub nazwie powiatu
+                            if ($powiatKod) {
+                                if (trim($powiatKodPlacowki) !== trim($powiatKod)) {
+                                    continue;
+                                }
+                            } else {
+                                if (strtoupper(trim($powiatPlacowki)) !== strtoupper(trim($powiatNazwa))) {
+                                    continue;
+                                }
+                            }
+                            
+                            // Pobierz gminę z placówki
+                            $gminaNazwa = $placowka['gmina'] ?? null;
+                            $gminaKod = $placowka['gminaKodTERYT'] ?? null;
+                            
+                            if ($gminaNazwa && !isset($gminy[$gminaNazwa])) {
+                                $gminy[$gminaNazwa] = [
+                                    'nazwa' => $gminaNazwa,
+                                    'kod' => $gminaKod,
+                                ];
+                            }
+                        }
+                    }
+                    
+                    // Pobierz więcej stron jeśli potrzeba
+                    $totalItems = $data['hydra:totalItems'] ?? 0;
+                    $maxPages = min(20, ceil($totalItems / 100)); // Max 20 stron
+                    
+                    for ($page = 2; $page <= $maxPages; $page++) {
+                        $pageParams = ['page' => $page, 'itemsPerPage' => 100];
+                        if ($powiatKod) {
+                            $pageParams['powiat_kod_teryt'] = $powiatKod;
+                        } else {
+                            $pageParams['powiat_nazwa'] = $powiatNazwa;
+                        }
+                        
+                        $pageResponse = \Illuminate\Support\Facades\Http::accept('application/ld+json')
+                            ->timeout(30)
+                            ->get('https://api-rspo.men.gov.pl/api/placowki/', $pageParams);
+                        
+                        if ($pageResponse->successful()) {
+                            $pageData = $pageResponse->json();
+                            if (isset($pageData['hydra:member'])) {
+                                foreach ($pageData['hydra:member'] as $placowka) {
+                                    // Sprawdź czy placówka należy do wybranego powiatu
+                                    $powiatPlacowki = $placowka['powiat'] ?? null;
+                                    $powiatKodPlacowki = $placowka['powiatKodTERYT'] ?? null;
+                                    
+                                    // Filtruj po kodzie lub nazwie powiatu
+                                    if ($powiatKod) {
+                                        if (trim($powiatKodPlacowki) !== trim($powiatKod)) {
+                                            continue;
+                                        }
+                                    } else {
+                                        if (strtoupper(trim($powiatPlacowki)) !== strtoupper(trim($powiatNazwa))) {
+                                            continue;
+                                        }
+                                    }
+                                    
+                                    // Pobierz gminę z placówki
+                                    $gminaNazwa = $placowka['gmina'] ?? null;
+                                    $gminaKod = $placowka['gminaKodTERYT'] ?? null;
+                                    
+                                    if ($gminaNazwa && !isset($gminy[$gminaNazwa])) {
+                                        $gminy[$gminaNazwa] = [
+                                            'nazwa' => $gminaNazwa,
+                                            'kod' => $gminaKod,
+                                        ];
+                                    }
+                                }
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Konwertuj z tablicy asocjacyjnej na zwykłą tablicę i posortuj
+                    $result = array_values($gminy);
+                    usort($result, function($a, $b) {
+                        return strcmp($a['nazwa'] ?? '', $b['nazwa'] ?? '');
+                    });
+                    
+                    return $result;
+                } else {
+                    Log::error('TERYT getGminyFromRSPO Error - HTTP', [
+                        'status' => $response->status(),
+                        'powiat_nazwa' => $powiatNazwa,
+                        'powiat_kod' => $powiatKod
+                    ]);
+                    return [];
+                }
+            } catch (\Exception $e) {
+                Log::error('TERYT getGminyFromRSPO Error', [
+                    'message' => $e->getMessage(),
+                    'powiat_nazwa' => $powiatNazwa,
+                    'powiat_kod' => $powiatKod
+                ]);
+                return [];
+            }
+        });
     }
 
     /**
