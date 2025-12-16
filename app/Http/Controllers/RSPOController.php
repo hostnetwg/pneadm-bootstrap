@@ -146,38 +146,133 @@ class RSPOController extends Controller
                 }
                 
                 // Dodaj parametry lokalizacji zgodnie z dokumentacją API RSPO
-                // API RSPO używa: wojewodztwo, powiat, miejscowosc (bez _nazwa)
+                // API RSPO używa: wojewodztwo_nazwa, powiat_nazwa, miejscowosc_nazwa
                 if ($request->has('wojewodztwo_nazwa') && $request->filled('wojewodztwo_nazwa')) {
-                    $params['wojewodztwo'] = $request->get('wojewodztwo_nazwa');
+                    $params['wojewodztwo_nazwa'] = $request->get('wojewodztwo_nazwa');
                 }
                 
                 if ($request->has('powiat_nazwa') && $request->filled('powiat_nazwa')) {
-                    $params['powiat'] = $request->get('powiat_nazwa');
+                    $params['powiat_nazwa'] = $request->get('powiat_nazwa');
                 }
                 
                 if ($request->has('miejscowosc_nazwa') && $request->filled('miejscowosc_nazwa')) {
-                    $params['miejscowosc'] = $request->get('miejscowosc_nazwa');
+                    $params['miejscowosc_nazwa'] = $request->get('miejscowosc_nazwa');
                 }
 
                 // Używamy application/ld+json aby otrzymać format Hydra z informacją o całkowitej liczbie wyników
                 $response = Http::accept('application/ld+json')
-                    ->timeout(15)
+                    ->timeout(30)
                     ->get(self::API_BASE_URL . '/placowki/', $params);
 
                 if ($response->successful()) {
                     $data = $response->json();
                     
+                    // Pobierz wartości filtrów do późniejszego filtrowania
+                    $selectedWojewodztwo = $request->get('wojewodztwo_nazwa');
+                    $selectedPowiat = $request->get('powiat_nazwa');
+                    $selectedMiejscowosc = $request->get('miejscowosc_nazwa');
+                    
+                    // Normalizuj wartości do porównania (małe litery, bez białych znaków)
+                    $normalize = function($str) {
+                        return mb_strtolower(trim($str ?? ''), 'UTF-8');
+                    };
+                    $normalizedWojewodztwo = $normalize($selectedWojewodztwo);
+                    $normalizedPowiat = $normalize($selectedPowiat);
+                    $normalizedMiejscowosc = $normalize($selectedMiejscowosc);
+                    
                     // Obsługa formatu Hydra (JSON-LD) - zawiera informację o całkowitej liczbie wyników
                     if (isset($data['hydra:member'])) {
-                        $results = $data['hydra:member'];
-                        $totalItems = $data['hydra:totalItems'] ?? count($results);
+                        $allResults = $data['hydra:member'];
+                        
+                        // Jeśli filtrujemy, musimy pobrać więcej stron i przefiltrować
+                        // (API może nie filtrować poprawnie dla powiatów i miejscowości)
+                        $hasFilters = !empty($selectedWojewodztwo) || !empty($selectedPowiat) || !empty($selectedMiejscowosc);
+                        
+                        // Cache key dla przefiltrowanych wyników
+                        $cacheKey = null;
+                        $filteredResults = null;
+                        
+                        if ($hasFilters) {
+                            $cacheKey = 'rspo_filtered_' . md5(json_encode([
+                                'wojewodztwo' => $selectedWojewodztwo,
+                                'powiat' => $selectedPowiat,
+                                'miejscowosc' => $selectedMiejscowosc,
+                                'typ' => $selectedTypeId
+                            ]));
+                            
+                            // Spróbuj pobrać z cache
+                            $filteredResults = Cache::get($cacheKey);
+                        }
+                        
+                        // Jeśli nie ma w cache, pobierz i przefiltruj
+                        if ($filteredResults === null) {
+                            if ($hasFilters) {
+                                // Pobierz więcej stron aby znaleźć wszystkie pasujące wyniki
+                                $totalItemsFromAPI = $data['hydra:totalItems'] ?? 0;
+                                // Ograniczenie do 50 stron (5000 placówek) dla wydajności
+                                $pagesToSearch = min(50, ceil($totalItemsFromAPI / 100));
+                                
+                                for ($p = 2; $p <= $pagesToSearch; $p++) {
+                                    $pageParams = array_merge($params, ['page' => $p]);
+                                    $pageResponse = Http::accept('application/ld+json')
+                                        ->timeout(30)
+                                        ->get(self::API_BASE_URL . '/placowki/', $pageParams);
+                                    
+                                    if ($pageResponse->successful()) {
+                                        $pageData = $pageResponse->json();
+                                        if (isset($pageData['hydra:member'])) {
+                                            $allResults = array_merge($allResults, $pageData['hydra:member']);
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Filtruj wyniki po stronie aplikacji (API może nie filtrować poprawnie)
+                            $filteredResults = [];
+                            foreach ($allResults as $placowka) {
+                                $wojewodztwo = $placowka['wojewodztwo'] ?? null;
+                                $powiat = $placowka['powiat'] ?? null;
+                                $miejscowosc = $placowka['miejscowosc'] ?? null;
+                                
+                                // Filtruj po województwie
+                                if (!empty($normalizedWojewodztwo) && $normalize($wojewodztwo) !== $normalizedWojewodztwo) {
+                                    continue;
+                                }
+                                
+                                // Filtruj po powiecie
+                                if (!empty($normalizedPowiat) && $normalize($powiat) !== $normalizedPowiat) {
+                                    continue;
+                                }
+                                
+                                // Filtruj po miejscowości
+                                if (!empty($normalizedMiejscowosc) && $normalize($miejscowosc) !== $normalizedMiejscowosc) {
+                                    continue;
+                                }
+                                
+                                $filteredResults[] = $placowka;
+                            }
+                            
+                            // Cache przefiltrowane wyniki na 1 godzinę
+                            if ($hasFilters && $cacheKey) {
+                                Cache::put($cacheKey, $filteredResults, 3600);
+                            }
+                        }
+                        
+                        // Paginacja po filtrowaniu
+                        $totalFiltered = count($filteredResults);
+                        $itemsPerPage = 100;
+                        $offset = ($page - 1) * $itemsPerPage;
+                        $results = array_slice($filteredResults, $offset, $itemsPerPage);
+                        
                         $pagination = [
                             'current_page' => (int) $page,
-                            'total_items' => (int) $totalItems,
+                            'total_items' => $totalFiltered,
                             'items_per_page' => count($results),
-                            'total_pages' => (int) ceil($totalItems / 100), // API zwraca max 100 wyników na stronę
-                            'has_next' => isset($data['hydra:view']['hydra:next']),
-                            'has_previous' => isset($data['hydra:view']['hydra:previous']),
+                            'total_pages' => (int) ceil($totalFiltered / $itemsPerPage),
+                            'has_next' => ($offset + count($results)) < $totalFiltered,
+                            'has_previous' => $page > 1,
                         ];
                     } elseif (is_array($data) && count($data) > 0) {
                         // Fallback: prosta tablica obiektów (gdy API nie zwraca formatu Hydra)

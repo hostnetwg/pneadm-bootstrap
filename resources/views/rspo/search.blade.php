@@ -261,6 +261,15 @@
                                             if ($selectedTypeId) {
                                                 $paginationParams['typ_podmiotu_id'] = $selectedTypeId;
                                             }
+                                            if (!empty($selectedWojewodztwo)) {
+                                                $paginationParams['wojewodztwo_nazwa'] = $selectedWojewodztwo;
+                                            }
+                                            if (!empty($selectedPowiat)) {
+                                                $paginationParams['powiat_nazwa'] = $selectedPowiat;
+                                            }
+                                            if (!empty($selectedMiejscowosc)) {
+                                                $paginationParams['miejscowosc_nazwa'] = $selectedMiejscowosc;
+                                            }
                                         @endphp
                                         @if($pagination['has_previous'] && $page > 1)
                                             <li class="page-item">
@@ -271,13 +280,22 @@
                                         @endif
                                         
                                         <li class="page-item active">
-                                            <span class="page-link">Strona {{ $page }}</span>
+                                            <span class="page-link">Strona {{ $page }} z {{ $pagination['total_pages'] ?? '?' }}</span>
                                         </li>
                                         
                                         @php
                                             $paginationParams = ['page' => $page + 1];
                                             if ($selectedTypeId) {
                                                 $paginationParams['typ_podmiotu_id'] = $selectedTypeId;
+                                            }
+                                            if (!empty($selectedWojewodztwo)) {
+                                                $paginationParams['wojewodztwo_nazwa'] = $selectedWojewodztwo;
+                                            }
+                                            if (!empty($selectedPowiat)) {
+                                                $paginationParams['powiat_nazwa'] = $selectedPowiat;
+                                            }
+                                            if (!empty($selectedMiejscowosc)) {
+                                                $paginationParams['miejscowosc_nazwa'] = $selectedMiejscowosc;
                                             }
                                         @endphp
                                         @if($pagination['has_next'])
