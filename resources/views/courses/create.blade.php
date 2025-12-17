@@ -241,7 +241,14 @@
                         </select>
                         <div class="form-text">Źródło danych kursu (opcjonalne)</div>
                     </div>
-                </div>                
+                </div>
+
+                <!-- Pole Notatki -->
+                <div class="mb-3">
+                    <label for="notatki" class="form-label">Notatki techniczne</label>
+                    <textarea name="notatki" id="notatki" class="form-control" rows="4" placeholder="Dodatkowe informacje techniczne związane z danym szkoleniem...">{{ old('notatki') }}</textarea>
+                    <div class="form-text">Pole przeznaczone na dodatkowe informacje techniczne związane z danym szkoleniem</div>
+                </div>
 
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" checked>

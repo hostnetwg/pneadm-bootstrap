@@ -29,6 +29,7 @@ class Course extends Model
         'certificate_template_id',
         'access_duration_days',
         'access_notes',
+        'notatki',
         'id_old',
         'source_id_old'
     ];

@@ -115,3 +115,4 @@ sail artisan cache:clear
 - Dane logowania TERYT są przechowywane w `.env` (nie commituj!)
 - Cache'owanie zmniejsza liczbę zapytań do API TERYT
 - Timeout zapobiega zawieszeniu aplikacji
+

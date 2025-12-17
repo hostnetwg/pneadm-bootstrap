@@ -229,3 +229,4 @@ class RSPOImportService
             && !empty($school['name']);
     }
 }
+

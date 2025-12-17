@@ -353,11 +353,18 @@
                             {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
                         </td>
                         <td class="text-center align-middle">
-                            @if(!empty(trim($course->description ?? '')))
-                                <i class="bi bi-check-circle-fill text-success" title="podano zakres szkolenia" style="font-size: 1.2em;"></i>
-                            @else
-                                <i class="bi bi-x-circle-fill text-danger" title="brak zakresu szkolenia" style="font-size: 1.2em;"></i>
-                            @endif
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                @if(!empty(trim($course->description ?? '')))
+                                    <i class="bi bi-check-circle-fill text-success" title="podano zakres szkolenia" style="font-size: 1.2em;"></i>
+                                @else
+                                    <i class="bi bi-x-circle-fill text-danger" title="brak zakresu szkolenia" style="font-size: 1.2em;"></i>
+                                @endif
+                                @if(!empty(trim($course->notatki ?? '')))
+                                    <i class="bi bi-journal-text text-primary" 
+                                       title="{{ e($course->notatki) }}" 
+                                       style="font-size: 1.2em; cursor: help;"></i>
+                                @endif
+                            </div>
                         </td>
                         <td class="text-center align-middle">
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants->count() }}</span><br>

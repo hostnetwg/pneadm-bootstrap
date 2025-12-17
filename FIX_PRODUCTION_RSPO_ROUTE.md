@@ -63,3 +63,4 @@ Po wykonaniu komend sprawdź czy działa:
 - `php artisan route:clear` i `route:cache` są kluczowe - bez tego route nie będzie widoczny
 - Na produkcji zawsze wykonuj te komendy po `git pull` gdy dodano nowe route
 
+

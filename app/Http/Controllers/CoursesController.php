@@ -715,6 +715,7 @@ class CoursesController extends Controller
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
+            'notatki' => 'nullable|string',
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //    
         
@@ -866,6 +867,7 @@ class CoursesController extends Controller
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
+            'notatki' => 'nullable|string',
         ]);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //        

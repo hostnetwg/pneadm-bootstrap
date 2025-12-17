@@ -286,6 +286,13 @@
                     </div>
                 </div>
 
+                <!-- Pole Notatki -->
+                <div class="mb-3">
+                    <label for="notatki" class="form-label">Notatki techniczne</label>
+                    <textarea name="notatki" id="notatki" class="form-control" rows="4" placeholder="Dodatkowe informacje techniczne związane z danym szkoleniem...">{{ old('notatki', $course->notatki) }}</textarea>
+                    <div class="form-text">Pole przeznaczone na dodatkowe informacje techniczne związane z danym szkoleniem</div>
+                </div>
+
                 <button type="submit" class="btn btn-success">Zapisz zmiany</button>
                 <a href="{{ route('courses.index', request()->query()) }}" class="btn btn-secondary">Anuluj</a>
                 <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">

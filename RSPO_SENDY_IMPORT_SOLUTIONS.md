@@ -321,3 +321,4 @@ Command wyświetla podsumowanie:
 - [ ] Wybierz strategię grupowania
 - [ ] Sprawdź logi po teście
 - [ ] Wykonaj pełny import
+

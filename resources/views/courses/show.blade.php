@@ -70,6 +70,13 @@
                                 </div>
                             @endif
 
+                            @if($course->notatki)
+                                <h5>Notatki techniczne</h5>
+                                <div class="border rounded p-3 bg-secondary bg-opacity-10">
+                                    <p class="mb-0">{{ $course->notatki }}</p>
+                                </div>
+                            @endif
+
                             <div class="row">
                                 <div class="col-md-6">
                                     <h5>Podstawowe informacje</h5>

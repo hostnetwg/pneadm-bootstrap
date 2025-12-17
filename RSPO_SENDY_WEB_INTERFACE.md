@@ -224,3 +224,4 @@ Interfejs znajduje się pod menu RSPO, jako drugi element (pod "Wyszukaj").
 - Formularz używa standardowej walidacji Laravel
 - Wszystkie operacje są logowane
 - Sendy API ma rate limiting - dodano opóźnienie 0.1s między subskrypcjami
+

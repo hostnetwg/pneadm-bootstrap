@@ -52,3 +52,4 @@ class WSSoapClient extends SoapClient
         return parent::__doRequest($request, $location, $action, $version, $one_way);
     }
 }
+

@@ -47,3 +47,4 @@ git status
 cd /ścieżka/do/pneadm-bootstrap && rm -f resources/views/certificates/default.blade.php resources/views/certificates/landscape.blade.php resources/views/certificates/minimal.blade.php && git pull && git checkout HEAD -- resources/views/certificates/default.blade.php resources/views/certificates/landscape.blade.php resources/views/certificates/minimal.blade.php 2>/dev/null || true
 ```
 
+
