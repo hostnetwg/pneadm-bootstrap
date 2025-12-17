@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('courses', function (Blueprint $table) {
-            //
+            if (!Schema::hasColumn('courses', 'notatki')) {
+                $table->text('notatki')->nullable()->after('access_notes');
+            }
         });
     }
 
@@ -22,7 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('courses', function (Blueprint $table) {
-            //
+            if (Schema::hasColumn('courses', 'notatki')) {
+                $table->dropColumn('notatki');
+            }
         });
     }
 };
