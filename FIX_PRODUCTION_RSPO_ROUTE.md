@@ -64,3 +64,5 @@ Po wykonaniu komend sprawdź czy działa:
 - Na produkcji zawsze wykonuj te komendy po `git pull` gdy dodano nowe route
 
 
+
+

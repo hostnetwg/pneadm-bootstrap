@@ -85,3 +85,5 @@ Jeśli zmiany są ważne, możesz je scalić ręcznie lub użyć `git merge` zam
 
 
 
+
+

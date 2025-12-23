@@ -322,3 +322,5 @@ Command wyświetla podsumowanie:
 - [ ] Sprawdź logi po teście
 - [ ] Wykonaj pełny import
 
+
+

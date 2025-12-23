@@ -78,3 +78,5 @@ SHOW COLUMNS FROM courses WHERE Field = 'notatki';
 - Kolumna jest typu `TEXT` i może być `NULL`
 - Kolumna jest umieszczona po kolumnie `access_notes`
 - Po dodaniu kolumny aplikacja powinna działać bez błędów
+
+

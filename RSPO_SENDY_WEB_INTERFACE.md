@@ -225,3 +225,5 @@ Interfejs znajduje się pod menu RSPO, jako drugi element (pod "Wyszukaj").
 - Wszystkie operacje są logowane
 - Sendy API ma rate limiting - dodano opóźnienie 0.1s między subskrypcjami
 
+
+

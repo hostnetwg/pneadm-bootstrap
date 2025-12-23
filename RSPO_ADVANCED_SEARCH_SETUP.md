@@ -116,3 +116,5 @@ sail artisan cache:clear
 - Cache'owanie zmniejsza liczbę zapytań do API TERYT
 - Timeout zapobiega zawieszeniu aplikacji
 
+
+

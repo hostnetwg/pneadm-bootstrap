@@ -16,6 +16,25 @@
                 </div>
             @endif
 
+            <!-- Komunikat o błędzie -->
+            @if(session('error'))
+                <div class="alert alert-danger">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <!-- Błędy walidacji -->
+            @if($errors->any())
+                <div class="alert alert-danger">
+                    <h5 class="alert-heading">Wystąpiły błędy walidacji:</h5>
+                    <ul class="mb-0">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <!-- Formularz edycji kursu -->
             <form action="{{ route('courses.update', $course->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
@@ -90,9 +109,12 @@
                                     </button>
                                 </div>
                             </div>
-                            <textarea name="offer_description_html" class="form-control" id="offer_description_html" rows="10" placeholder="Wpisz pełny opis oferty z formatowaniem HTML...">{{ old('offer_description_html', $course->offer_description_html) }}</textarea>
+                            <textarea name="offer_description_html" class="form-control @error('offer_description_html') is-invalid @enderror" id="offer_description_html" rows="10" placeholder="Wpisz pełny opis oferty z formatowaniem HTML...">{{ old('offer_description_html', $course->offer_description_html) }}</textarea>
+                            @error('offer_description_html')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                             <div class="form-text">
-                                Możesz używać podstawowych tagów HTML: &lt;strong&gt;, &lt;em&gt;, &lt;h3&gt;, &lt;h4&gt;, &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;, &lt;a&gt;, &lt;p&gt;, &lt;br&gt;
+                                Możesz używać tagów HTML: &lt;section&gt;, &lt;div&gt;, &lt;h1&gt;-&lt;h6&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;a&gt;, &lt;img&gt;, &lt;hr&gt;, &lt;button&gt;, &lt;code&gt;, &lt;small&gt; i inne standardowe tagi HTML oraz Bootstrap 5.
                             </div>
                         </div>
                     </div>

@@ -702,7 +702,7 @@ class CoursesController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'offer_summary' => 'nullable|string|max:500',
-            'offer_description_html' => 'nullable|string|max:10000',
+            'offer_description_html' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'issue_date_certyficates' => 'nullable|date',
@@ -719,10 +719,18 @@ class CoursesController extends Controller
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //    
         
-        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (!empty($validated['offer_description_html'])) {
             $validated['offer_description_html'] = strip_tags($validated['offer_description_html'], 
-                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+                '<p><br><br/><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>' .
+                '<section><article><header><footer><nav><main><aside>' .
+                '<hr><hr/><button><code><pre><small><mark><del><ins><sub><sup>' .
+                '<table><thead><tbody><tfoot><tr><td><th><caption><colgroup><col>' .
+                '<blockquote><cite><abbr><dfn><time><address><q><samp><var><kbd>' .
+                '<dl><dt><dd><fieldset><legend><label><input><select><option><textarea><form>' .
+                '<details><summary><dialog><menu><menuitem><output><progress><meter>' .
+                '<svg><canvas><audio><video><source><track><embed><object><param><iframe>' .
+                '<style><link><meta><noscript><script><template><slot>');
         }
         
         try {
@@ -853,7 +861,7 @@ class CoursesController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'offer_summary' => 'nullable|string|max:500',
-            'offer_description_html' => 'nullable|string|max:10000',
+            'offer_description_html' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'issue_date_certyficates' => 'nullable|date',
@@ -874,10 +882,18 @@ class CoursesController extends Controller
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
         
-        // ✅ Sanityzacja HTML - usunięcie niebezpiecznych tagów
+        // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (!empty($validated['offer_description_html'])) {
             $validated['offer_description_html'] = strip_tags($validated['offer_description_html'], 
-                '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
+                '<p><br><br/><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>' .
+                '<section><article><header><footer><nav><main><aside>' .
+                '<hr><hr/><button><code><pre><small><mark><del><ins><sub><sup>' .
+                '<table><thead><tbody><tfoot><tr><td><th><caption><colgroup><col>' .
+                '<blockquote><cite><abbr><dfn><time><address><q><samp><var><kbd>' .
+                '<dl><dt><dd><fieldset><legend><label><input><select><option><textarea><form>' .
+                '<details><summary><dialog><menu><menuitem><output><progress><meter>' .
+                '<svg><canvas><audio><video><source><track><embed><object><param><iframe>' .
+                '<style><link><meta><noscript><script><template><slot>');
         }
     
         // ✅ Tworzymy folder `courses/images`, jeśli nie istnieje
