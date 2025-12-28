@@ -416,20 +416,28 @@ class PubligoController extends Controller
                     $sendyService = new SendyService();
                     $sendyListId = 'dncdl0kfUMnk43BysMa892NQ'; // ID listy "UCZESTNICY PŁATNYCH SZKOLEŃ"
                     
-                    // Przygotuj custom fields dla SENDY
-                    $sendyCustomFields = [
-                        'Name' => $customer['first_name'], // Imię
-                        'Email' => $customer['email'], // Email (już jest w podstawowym parametrze, ale dodajemy jako custom field)
-                        'Sername' => $customer['last_name'], // Nazwisko
-                        'Data' => now()->format('Y-m-d H:i:s'), // Data zapisu
-                        'id_szkolenia' => (string) $course->id, // ID szkolenia (jako string, bo SENDY może wymagać stringa)
+                    // Przygotuj pełne imię i nazwisko dla standardowego pola SENDY
+                    $fullName = trim($customer['first_name'] . ' ' . $customer['last_name']);
+                    
+                    // Pobierz datę szkolenia (start_date kursu) - ta sama data co do pierwszej listy SENDY
+                    $courseDate = $course->start_date ? $course->start_date->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s');
+                    
+                    // Przygotuj pola dla SENDY
+                    // Standardowe pola SENDY: 'name' (małe litery w API, wyświetlane jako "Name" w interfejsie)
+                    // Custom fields: muszą mieć dokładnie takie same nazwy jak w SENDY (case-sensitive)
+                    $sendyFields = [
+                        'name' => $fullName, // Standardowe pole SENDY - pełne imię i nazwisko (małe litery w API)
+                        'Sername' => $customer['last_name'], // Custom field - nazwisko (dokładnie jak w SENDY)
+                        'data' => $courseDate, // Custom field - data szkolenia (małe litery, jak w SENDY)
+                        'id_szkolenia' => (string) $course->id, // Custom field - ID szkolenia (dokładnie jak w SENDY)
                     ];
                     
-                    // Dodaj do SENDY z custom fields
+                    // Dodaj do SENDY z polami (standardowe + custom fields)
+                    // Email jest przekazywany jako osobny parametr (standardowe pole SENDY)
                     $sendySuccess = $sendyService->subscribe(
                         $customer['email'],
                         $sendyListId,
-                        $sendyCustomFields
+                        $sendyFields
                     );
                     
                     if ($sendySuccess) {
