@@ -419,8 +419,8 @@ class PubligoController extends Controller
                     // Przygotuj pełne imię i nazwisko dla standardowego pola SENDY
                     $fullName = trim($customer['first_name'] . ' ' . $customer['last_name']);
                     
-                    // Pobierz datę szkolenia (start_date kursu) - ta sama data co do pierwszej listy SENDY
-                    $courseDate = $course->start_date ? $course->start_date->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s');
+                    // Pobierz datę szkolenia (start_date kursu) - format RRRR-MM-DD
+                    $courseDate = $course->start_date ? $course->start_date->format('Y-m-d') : now()->format('Y-m-d');
                     
                     // Przygotuj pola dla SENDY
                     // Standardowe pola SENDY: 'name' (małe litery w API, wyświetlane jako "Name" w interfejsie)
