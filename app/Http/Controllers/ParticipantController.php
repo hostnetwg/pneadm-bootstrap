@@ -235,6 +235,167 @@ class ParticipantController extends Controller
     }
 
     /**
+     * Eksport listy emaili do CSV dla SENDY
+     */
+    public function exportToCsv(Request $request)
+    {
+        try {
+            // Zwiększ limit czasu dla dużych zbiorów danych
+            set_time_limit(300);
+            
+            // Użyj tych samych filtrów co w emailsList
+            $query = ParticipantEmail::query();
+            
+            // Obsługa wyszukiwania
+            if ($request->filled('search')) {
+                $searchTerm = $request->get('search');
+                $query->where('email', 'LIKE', "%{$searchTerm}%");
+            }
+
+            // Filtr: Status aktywności
+            if ($request->filled('filter_active')) {
+                if ($request->get('filter_active') === 'active') {
+                    $query->where('is_active', true);
+                } elseif ($request->get('filter_active') === 'inactive') {
+                    $query->where('is_active', false);
+                }
+            }
+
+            // Filtr: Weryfikacja
+            if ($request->filled('filter_verified')) {
+                if ($request->get('filter_verified') === 'verified') {
+                    $query->where('is_verified', true);
+                } elseif ($request->get('filter_verified') === 'unverified') {
+                    $query->where(function($q) {
+                        $q->where('is_verified', false)->orWhereNull('is_verified');
+                    });
+                }
+            }
+
+            // Filtr: Typ szkoleń (płatne/bezpłatne)
+            if ($request->filled('filter_course_type')) {
+                if ($request->get('filter_course_type') === 'paid') {
+                    $query->whereRaw('(
+                        SELECT COUNT(DISTINCT p.course_id) 
+                        FROM participants p
+                        INNER JOIN courses c ON c.id = p.course_id
+                        WHERE p.email = participant_emails.email 
+                        AND p.deleted_at IS NULL
+                        AND c.is_paid = 1
+                        AND c.deleted_at IS NULL
+                    ) > 0');
+                } elseif ($request->get('filter_course_type') === 'free') {
+                    $query->whereRaw('(
+                        SELECT COUNT(DISTINCT p.course_id) 
+                        FROM participants p
+                        INNER JOIN courses c ON c.id = p.course_id
+                        WHERE p.email = participant_emails.email 
+                        AND p.deleted_at IS NULL
+                        AND c.is_paid = 0
+                        AND c.deleted_at IS NULL
+                    ) > 0');
+                }
+            }
+
+            // Filtr: Nieprawidłowe adresy e-mail
+            if ($request->filled('filter_invalid_email')) {
+                if ($request->get('filter_invalid_email') === 'invalid') {
+                    $query->where(function($q) {
+                        $q->whereRaw("email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'")
+                          ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
+                    });
+                } elseif ($request->get('filter_invalid_email') === 'valid') {
+                    $query->whereRaw("email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'");
+                    $query->whereRaw("NOT (HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF')");
+                }
+            }
+            
+            // Pobierz wszystkie emaile (bez paginacji dla eksportu)
+            $emails = $query->get();
+            
+            // Przygotuj dane CSV
+            $csvData = [];
+            
+            // Nagłówek CSV
+            $csvData[] = ['Name', 'Email', 'Sername', 'data', 'id_szkolenia'];
+            
+            foreach ($emails as $emailRecord) {
+                // Znajdź ostatniego uczestnika (najnowszy po start_date kursu lub created_at)
+                $lastParticipant = DB::table('participants')
+                    ->where('participants.email', $emailRecord->email)
+                    ->whereNull('participants.deleted_at')
+                    ->join('courses', 'participants.course_id', '=', 'courses.id')
+                    ->whereNull('courses.deleted_at')
+                    ->orderBy('courses.start_date', 'desc')
+                    ->orderBy('participants.created_at', 'desc')
+                    ->select('participants.first_name', 'participants.last_name', 'courses.id as course_id', 'courses.start_date')
+                    ->first();
+                
+                // Pobierz dane (obsługa przypadku gdy nie ma uczestnika)
+                $firstName = $lastParticipant ? ($lastParticipant->first_name ?? '') : '';
+                $lastName = $lastParticipant ? ($lastParticipant->last_name ?? '') : '';
+                $courseDate = '';
+                $courseId = '';
+                
+                if ($lastParticipant) {
+                    if ($lastParticipant->start_date) {
+                        // Konwertuj datę na format Y-m-d
+                        $courseDate = is_string($lastParticipant->start_date) 
+                            ? date('Y-m-d', strtotime($lastParticipant->start_date))
+                            : (is_object($lastParticipant->start_date) 
+                                ? $lastParticipant->start_date->format('Y-m-d')
+                                : '');
+                    }
+                    $courseId = $lastParticipant->course_id ?? '';
+                }
+                
+                // Dodaj wiersz do CSV
+                $csvData[] = [
+                    $firstName,                    // Name - imię
+                    $emailRecord->email,           // Email
+                    $lastName,                     // Sername - nazwisko
+                    $courseDate,                   // data - data ostatniego szkolenia (RRRR-MM-DD)
+                    $courseId                      // id_szkolenia - ID ostatniego szkolenia
+                ];
+            }
+            
+            // Generuj plik CSV
+            $filename = 'participants_export_' . date('Y-m-d_His') . '.csv';
+            
+            $headers = [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ];
+            
+            // Funkcja do generowania CSV z właściwym formatowaniem (z cudzysłowami)
+            $callback = function() use ($csvData) {
+                $file = fopen('php://output', 'w');
+                
+                // Dodaj BOM dla UTF-8 (żeby Excel poprawnie otwierał polskie znaki)
+                fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+                
+                foreach ($csvData as $row) {
+                    // Formatuj każdy wiersz z cudzysłowami i escapowaniem
+                    fputcsv($file, $row, ',', '"');
+                }
+                
+                fclose($file);
+            };
+            
+            return response()->stream($callback, 200, $headers);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error exporting participants to CSV', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->route('participants.emails-list', $request->query())
+                ->with('error', 'Błąd podczas eksportu do CSV: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Zbiera unikalne adresy e-mail z tabeli participants i zapisuje je w participant_emails
      */
     public function collectEmails()

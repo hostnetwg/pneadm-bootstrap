@@ -99,6 +99,9 @@
                     <strong>Wyświetlane rekordy:</strong> {{ $emails->total() }}
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('participants.emails.export-csv', request()->query()) }}" class="btn btn-success">
+                        <i class="fas fa-file-csv me-1"></i> Eksport do CSV -> SENDY
+                    </a>
                     <label for="per_page" class="form-label mb-0 fw-bold">Wyświetl:</label>
                     <form method="GET" action="{{ route('participants.emails-list') }}" class="d-flex align-items-center">
                         @foreach(request()->query() as $key => $value)

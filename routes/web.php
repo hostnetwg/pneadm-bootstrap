@@ -271,6 +271,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     // Lista wszystkich uczestników
     Route::get('/participants', [ParticipantController::class, 'all'])->name('participants.all');
     Route::get('/participants/emails', [ParticipantController::class, 'emailsList'])->name('participants.emails-list');
+    Route::get('/participants/emails/export-csv', [ParticipantController::class, 'exportToCsv'])->name('participants.emails.export-csv');
     Route::post('/participants/collect-emails', [ParticipantController::class, 'collectEmails'])->name('participants.collect-emails');
     Route::put('/participants/emails/{participantEmail}', [ParticipantController::class, 'updateEmail'])->name('participants.emails.update');
     Route::delete('/participants/emails/{participantEmail}', [ParticipantController::class, 'destroyEmail'])->name('participants.emails.destroy');
