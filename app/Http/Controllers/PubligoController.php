@@ -430,6 +430,7 @@ class PubligoController extends Controller
                         'Sername' => $customer['last_name'], // Custom field - nazwisko (dokładnie jak w SENDY)
                         'data' => $courseDate, // Custom field - data szkolenia (małe litery, jak w SENDY)
                         'id_szkolenia' => (string) $course->id, // Custom field - ID szkolenia (dokładnie jak w SENDY)
+                        'gdpr' => 'true', // Zgodność z GDPR (dla użytkowników z UE)
                     ];
                     
                     // Dodaj do SENDY z polami (standardowe + custom fields)
