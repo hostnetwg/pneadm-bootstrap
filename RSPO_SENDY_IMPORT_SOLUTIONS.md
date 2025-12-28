@@ -324,3 +324,4 @@ Command wyświetla podsumowanie:
 
 
 
+

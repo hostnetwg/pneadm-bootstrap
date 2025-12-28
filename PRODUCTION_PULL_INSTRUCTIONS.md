@@ -50,3 +50,4 @@ cd /ścieżka/do/pneadm-bootstrap && rm -f resources/views/certificates/default.
 
 
 
+

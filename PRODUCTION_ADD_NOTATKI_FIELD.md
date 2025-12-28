@@ -80,3 +80,4 @@ SHOW COLUMNS FROM courses WHERE Field = 'notatki';
 - Po dodaniu kolumny aplikacja powinna działać bez błędów
 
 
+

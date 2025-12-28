@@ -66,3 +66,4 @@ Po wykonaniu komend sprawdź czy działa:
 
 
 
+

@@ -22,6 +22,7 @@ use App\Models\Course;
 use App\Models\Participant;
 use App\Models\FormOrder;
 use App\Models\WebhookLog;
+use App\Services\SendyService;
 
 class PubligoController extends Controller
 {
@@ -409,6 +410,55 @@ class PubligoController extends Controller
                     'access_expires_at' => $participant->access_expires_at?->format('Y-m-d H:i:s'),
                     'order_id' => $orderId
                 ]);
+
+                // Dodaj uczestnika do listy SENDY "UCZESTNICY PŁATNYCH SZKOLEŃ"
+                try {
+                    $sendyService = new SendyService();
+                    $sendyListId = 'dncdl0kfUMnk43BysMa892NQ'; // ID listy "UCZESTNICY PŁATNYCH SZKOLEŃ"
+                    
+                    // Przygotuj custom fields dla SENDY
+                    $sendyCustomFields = [
+                        'Name' => $customer['first_name'], // Imię
+                        'Email' => $customer['email'], // Email (już jest w podstawowym parametrze, ale dodajemy jako custom field)
+                        'Sername' => $customer['last_name'], // Nazwisko
+                        'Data' => now()->format('Y-m-d H:i:s'), // Data zapisu
+                        'id_szkolenia' => (string) $course->id, // ID szkolenia (jako string, bo SENDY może wymagać stringa)
+                    ];
+                    
+                    // Dodaj do SENDY z custom fields
+                    $sendySuccess = $sendyService->subscribe(
+                        $customer['email'],
+                        $sendyListId,
+                        $sendyCustomFields
+                    );
+                    
+                    if ($sendySuccess) {
+                        \Log::info('Participant added to SENDY list successfully', [
+                            'participant_id' => $participant->id,
+                            'email' => $customer['email'],
+                            'sendy_list_id' => $sendyListId,
+                            'course_id' => $course->id,
+                            'order_id' => $orderId
+                        ]);
+                    } else {
+                        \Log::warning('Failed to add participant to SENDY list', [
+                            'participant_id' => $participant->id,
+                            'email' => $customer['email'],
+                            'sendy_list_id' => $sendyListId,
+                            'course_id' => $course->id,
+                            'order_id' => $orderId
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Loguj błąd, ale nie przerywaj procesu webhooka
+                    \Log::error('Error adding participant to SENDY list', [
+                        'participant_id' => $participant->id,
+                        'email' => $customer['email'],
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'order_id' => $orderId
+                    ]);
+                }
 
                 $registeredParticipants[] = [
                     'course_id' => $course->id,
