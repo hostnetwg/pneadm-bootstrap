@@ -416,14 +416,6 @@ class PubligoController extends Controller
                     $sendyService = new SendyService();
                     $sendyListId = 'dncdl0kfUMnk43BysMa892NQ'; // ID listy "UCZESTNICY PŁATNYCH SZKOLEŃ"
                     
-                    // Pobierz datę szkolenia (start_date kursu) - format RRRR-MM-DD (string)
-                    // start_date jest typu datetime w bazie (np. "2025-02-07 00:00:00"), wyciągamy tylko datę
-                    if ($course->start_date) {
-                        $courseDate = $course->start_date->format('Y-m-d'); // Format Y-m-d (np. "2026-01-21")
-                    } else {
-                        $courseDate = now()->format('Y-m-d'); // Format Y-m-d (np. "2026-01-21")
-                    }
-                    
                     // Przygotuj pola dla SENDY
                     // Standardowe pola SENDY: 'name' (małe litery w API, wyświetlane jako "Name" w interfejsie)
                     // Custom fields: muszą mieć dokładnie takie same nazwy jak w SENDY (case-sensitive)
@@ -431,7 +423,7 @@ class PubligoController extends Controller
                     $sendyFields = [
                         'name' => $customer['first_name'], // Standardowe pole SENDY - tylko imię (małe litery w API)
                         'Sername' => $customer['last_name'], // Custom field - nazwisko (dokładnie jak w SENDY)
-                        'data' => $courseDate, // Custom field - data szkolenia (małe litery, jak w SENDY)
+                        'data' => $course->start_date ? $course->start_date : now(), // Custom field - data szkolenia (datetime)
                         'id_szkolenia' => (string) $course->id, // Custom field - ID szkolenia (dokładnie jak w SENDY)
                         'gdpr' => 'true', // Zgodność z GDPR (dla użytkowników z UE)
                     ];
@@ -450,9 +442,7 @@ class PubligoController extends Controller
                             'email' => $customer['email'],
                             'sendy_list_id' => $sendyListId,
                             'course_id' => $course->id,
-                            'order_id' => $orderId,
-                            'course_date_sent' => $courseDate, // Loguj datę która została wysłana
-                            'course_date_type' => gettype($courseDate), // Loguj typ danych
+                            'order_id' => $orderId
                         ]);
                     } else {
                         \Log::warning('Failed to add participant to SENDY list', [
