@@ -72,3 +72,4 @@ Po wykonaniu komend sprawdź czy aplikacja działa:
 
 
 
+

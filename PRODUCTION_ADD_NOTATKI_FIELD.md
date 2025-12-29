@@ -81,3 +81,4 @@ SHOW COLUMNS FROM courses WHERE Field = 'notatki';
 
 
 
+
