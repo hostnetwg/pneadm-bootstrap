@@ -416,8 +416,13 @@ class PubligoController extends Controller
                     $sendyService = new SendyService();
                     $sendyListId = 'dncdl0kfUMnk43BysMa892NQ'; // ID listy "UCZESTNICY PŁATNYCH SZKOLEŃ"
                     
-                    // Pobierz datę szkolenia (start_date kursu) - format RRRR-MM-DD
-                    $courseDate = $course->start_date ? $course->start_date->format('Y-m-d') : now()->format('Y-m-d');
+                    // Pobierz datę szkolenia (start_date kursu) - format RRRR-MM-DD (string)
+                    // start_date jest typu datetime w bazie (np. "2025-02-07 00:00:00"), wyciągamy tylko datę
+                    if ($course->start_date) {
+                        $courseDate = $course->start_date->format('Y-m-d'); // Format Y-m-d (np. "2026-01-21")
+                    } else {
+                        $courseDate = now()->format('Y-m-d'); // Format Y-m-d (np. "2026-01-21")
+                    }
                     
                     // Przygotuj pola dla SENDY
                     // Standardowe pola SENDY: 'name' (małe litery w API, wyświetlane jako "Name" w interfejsie)
@@ -445,7 +450,9 @@ class PubligoController extends Controller
                             'email' => $customer['email'],
                             'sendy_list_id' => $sendyListId,
                             'course_id' => $course->id,
-                            'order_id' => $orderId
+                            'order_id' => $orderId,
+                            'course_date_sent' => $courseDate, // Loguj datę która została wysłana
+                            'course_date_type' => gettype($courseDate), // Loguj typ danych
                         ]);
                     } else {
                         \Log::warning('Failed to add participant to SENDY list', [
