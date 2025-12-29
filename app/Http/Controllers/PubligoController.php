@@ -424,19 +424,10 @@ class PubligoController extends Controller
                     $sendyFields = [
                         'name' => $customer['first_name'], // Standardowe pole SENDY - tylko imię (małe litery w API)
                         'Sername' => $customer['last_name'], // Custom field - nazwisko (dokładnie jak w SENDY)
-                        'data' => $courseDate, // Custom field - data szkolenia
+                        'data' => (string) $courseDate, // Custom field - data szkolenia (konwersja na string)
                         'id_szkolenia' => (string) $course->id, // Custom field - ID szkolenia (dokładnie jak w SENDY)
                         'gdpr' => 'true', // Zgodność z GDPR (dla użytkowników z UE)
                     ];
-                    
-                    // Loguj przed wysłaniem
-                    \Log::info('Sending to SENDY list', [
-                        'email' => $customer['email'],
-                        'list_id' => $sendyListId,
-                        'fields' => $sendyFields,
-                        'course_date_type' => get_class($courseDate),
-                        'course_date_value' => (string) $courseDate,
-                    ]);
                     
                     // Dodaj do SENDY z polami (standardowe + custom fields)
                     // Email jest przekazywany jako osobny parametr (standardowe pole SENDY)
