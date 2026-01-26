@@ -291,6 +291,9 @@
                                                 <div class="fw-semibold">{{ $zamowienie->recipient_name ?? '—' }}</div>
                                                 <div>{{ $zamowienie->recipient_address ?? '—' }}</div>
                                                 <div>{{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}</div>
+                                                @if($zamowienie->recipient_nip)
+                                                    <div class="text-primary fw-semibold">NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip) }}</div>
+                                                @endif
                                                 <div class="text-primary fw-semibold">nowoczesna-edukacja.pl</div>
                                             </div>
                                         </div>
@@ -631,6 +634,8 @@
                 const odbiorcaData = `ODBIORCA: {{ $zamowienie->recipient_name ?? '' }}
 {{ $zamowienie->recipient_address ?? '' }}
 {{ $zamowienie->recipient_postal_code ?? '' }} {{ $zamowienie->recipient_city ?? '' }}
+@if($zamowienie->recipient_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip) }}
+@endif
 nowoczesna-edukacja.pl `;
                 copyToClipboard(odbiorcaData, button);
             }

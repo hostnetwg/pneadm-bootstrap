@@ -140,6 +140,8 @@
 {{ $zamowienie->recipient_name ?? '—' }}
 {{ $zamowienie->recipient_address ?? '—' }}
 {{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}
+@if($zamowienie->recipient_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip) }}
+@endif
 nowoczesna-edukacja.pl </div>
                             </div>
 
@@ -429,6 +431,9 @@ if (!empty($zamowienie->recipient_address)) $recipientData[] = $zamowienie->reci
 if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
     $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
 }
+if (!empty($zamowienie->recipient_nip)) {
+    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
+}
 
 // Tylko dane odbiorcy - bez uwag od zamawiającego i bez pnedu.pl #ID (to dodaje backend)
 $remarks = "ODBIORCA:\n";
@@ -523,6 +528,8 @@ echo $remarks;
 {{ $zamowienie->recipient_name ?? '—' }}
 {{ $zamowienie->recipient_address ?? '—' }}
 {{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}
+@if($zamowienie->recipient_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip) }}
+@endif
 nowoczesna-edukacja.pl `;
             copyToClipboard(odbiorcaData, 'copyOdbiorcaData');
         }

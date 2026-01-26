@@ -701,6 +701,9 @@ class FormOrdersController extends Controller
                 if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
                     $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
                 }
+                if (!empty($zamowienie->recipient_nip)) {
+                    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
+                }
 
                 $uwagi = "ODBIORCA:\n";
                 if (!empty($recipientData)) {
@@ -1097,6 +1100,9 @@ class FormOrdersController extends Controller
                 }
                 if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
                     $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+                }
+                if (!empty($zamowienie->recipient_nip)) {
+                    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
                 }
 
                 $uwagi = "ODBIORCA:\n";
