@@ -122,3 +122,9 @@ Jeśli nadal występuje błąd 401:
 - **Różne tokeny** dla różnych środowisk (dev, staging, production)
 - **Rotuj tokeny** okresowo (np. co 6 miesięcy)
 
+
+
+
+
+
+

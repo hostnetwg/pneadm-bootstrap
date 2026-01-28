@@ -249,3 +249,9 @@ Analogicznie dla `getAvailableBackgrounds()`.
 
 
 
+
+
+
+
+
+

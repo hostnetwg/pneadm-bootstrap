@@ -86,3 +86,9 @@ php artisan config:clear && php artisan cache:clear && php artisan route:clear &
 - Na środowisku developerskim pozostaw **path repository** (działa przez Docker volume)
 - Pakiet `pne/certificate-generator` jest jeszcze używany w starym `CertificateController` (do czasu pełnej migracji)
 
+
+
+
+
+
+

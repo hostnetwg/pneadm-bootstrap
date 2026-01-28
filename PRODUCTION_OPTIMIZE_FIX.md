@@ -61,3 +61,9 @@ grep -r "CertificateGeneratorServiceProvider" config/
 composer show pne/certificate-generator
 ```
 
+
+
+
+
+
+

@@ -95,3 +95,9 @@ Gotowy skrypt SQL znajduje się w: `CHANGE_TEMPLATE_SLUG_SQL.sql`
 
 
 
+
+
+
+
+
+

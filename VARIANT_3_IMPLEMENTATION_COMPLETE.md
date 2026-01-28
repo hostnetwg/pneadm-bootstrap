@@ -243,3 +243,9 @@ curl -H "Authorization: Bearer TWÓJ_TOKEN" \
 - Można go całkowicie usunąć w przyszłości, gdy cała logika zostanie przeniesiona
 - Szablony są przechowywane tylko w bazie danych (JSON) - nie ma potrzeby plików Blade
 
+
+
+
+
+
+

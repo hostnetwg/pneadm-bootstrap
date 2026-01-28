@@ -300,7 +300,7 @@
     <div class="footer">
         <div style="text-align: center; margin-bottom: 15px;">
             @php
-                $logoPath = 'certificates/logos/1764625956_logo-pne-czarne.png';
+                $logoPath = 'certificates/logos/1764722091_logo-pne-czarne.png';
                 if ($isPdfMode ?? false) {
                     // Dla PDF używamy base64 encoding
                     $logoFile = storage_path('app/public/' . $logoPath);

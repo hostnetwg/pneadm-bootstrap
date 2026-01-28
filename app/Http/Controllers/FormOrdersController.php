@@ -538,7 +538,8 @@ class FormOrdersController extends Controller
             }
 
             // Sprawdzenie czy ma wszystkie wymagane dane
-            $requiredFields = ['participant_email', 'participant_name', 'recipient_address', 'recipient_postal_code', 'recipient_city'];
+            // Sprawdzamy dane uczestnika oraz dane adresowe NABYWCY (używane jako adres wysyłkowy)
+            $requiredFields = ['participant_email', 'participant_name', 'buyer_address', 'buyer_postal_code', 'buyer_city'];
             $missingFields = [];
             
             foreach ($requiredFields as $field) {
@@ -556,14 +557,15 @@ class FormOrdersController extends Controller
 
             // Przygotowanie obiektu zgodnego z oczekiwaniami PubligoApiService
             // Musimy zmapować pola z nowego formatu na stary
+            // Używamy danych NABYWCY zamiast ODBIORCY dla adresu wysyłkowego
             $orderDataForService = (object)[
                 'id' => $zamowienie->id, // Dodanie brakującego pola ID
                 'konto_email' => $zamowienie->participant_email,
                 'konto_imie_nazwisko' => $zamowienie->participant_name,
-                'odb_nazwa' => $zamowienie->recipient_name,
-                'odb_adres' => $zamowienie->recipient_address,
-                'odb_kod' => $zamowienie->recipient_postal_code,
-                'odb_poczta' => $zamowienie->recipient_city,
+                'odb_nazwa' => $zamowienie->buyer_name, // Używamy nazwy nabywcy
+                'odb_adres' => $zamowienie->buyer_address, // Używamy adresu nabywcy
+                'odb_kod' => $zamowienie->buyer_postal_code, // Używamy kodu pocztowego nabywcy
+                'odb_poczta' => $zamowienie->buyer_city, // Używamy miasta nabywcy
                 'idProdPubligo' => $zamowienie->publigo_product_id,
                 'price_idProdPubligo' => $zamowienie->publigo_price_id,
             ];

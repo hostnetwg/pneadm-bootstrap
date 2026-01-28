@@ -56,3 +56,9 @@ echo "  3. Sprawdź połączenie:"
 echo "     cd pnedu && sail artisan tinker"
 echo "     DB::connection('pneadm')->select('SELECT 1');"
 
+
+
+
+
+
+

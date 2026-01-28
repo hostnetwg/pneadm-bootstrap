@@ -1040,3 +1040,9 @@ System będzie:
 - ✅ Bezpieczniejszy (API z tokenem)
 - ✅ Lepszy do skalowania (możliwość cache'owania)
 
+
+
+
+
+
+

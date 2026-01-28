@@ -358,3 +358,9 @@ Po wykonaniu wszystkich kroków:
 - ✅ API komunikacja działa
 - ✅ Można testować generowanie certyfikatów
 
+
+
+
+
+
+

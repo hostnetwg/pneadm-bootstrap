@@ -132,3 +132,9 @@ DB::connection('certgen')->select('SELECT DATABASE()');
 - ✅ phpMyAdmin widzi wszystkie bazy
 - ✅ Zmiany widoczne natychmiast w obu serwisach
 
+
+
+
+
+
+

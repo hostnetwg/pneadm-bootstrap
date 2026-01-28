@@ -250,3 +250,9 @@ Route::prefix('accounting')->name('accounting.')->group(function () {
 **Status:** 📝 Plan gotowy do implementacji
 **Data utworzenia:** {{ date('Y-m-d') }}
 
+
+
+
+
+
+
