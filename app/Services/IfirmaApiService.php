@@ -237,14 +237,26 @@ class IfirmaApiService
             }
 
             // Sprawdź czy odpowiedź zawiera błąd w strukturze JSON (iFirma zwraca 200 nawet przy błędach)
+            // WAŻNE: iFirma może zwrócić Kod=200 nawet przy błędach walidacji!
+            // Musimy sprawdzać również pole 'Informacja' - jeśli zawiera błąd, traktujemy to jako błąd
             $hasErrorInResponse = false;
             $errorMessage = null;
             
             if ($jsonData !== null && isset($jsonData['response'])) {
                 $apiResponse = $jsonData['response'];
+                
+                // Sprawdź kod błędu (różny od 0 i 200)
                 if (isset($apiResponse['Kod']) && $apiResponse['Kod'] != 0 && $apiResponse['Kod'] != 200) {
                     $hasErrorInResponse = true;
                     $errorMessage = $apiResponse['Informacja'] ?? 'Błąd API iFirma';
+                }
+                // Sprawdź czy w Informacja jest komunikat błędu (nawet jeśli Kod=200)
+                elseif (isset($apiResponse['Informacja']) && 
+                        (stripos($apiResponse['Informacja'], 'błąd') !== false || 
+                         stripos($apiResponse['Informacja'], 'niepoprawna') !== false ||
+                         stripos($apiResponse['Informacja'], 'nie można') !== false)) {
+                    $hasErrorInResponse = true;
+                    $errorMessage = $apiResponse['Informacja'];
                 }
             }
 

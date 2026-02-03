@@ -1046,3 +1046,4 @@ System będzie:
 
 
 
+

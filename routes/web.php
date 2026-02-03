@@ -183,6 +183,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/{id}/ifirma/check-invoice', [FormOrdersController::class, 'checkInvoiceStatus'])->name('ifirma.check-invoice');
         Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
         Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');
+        Route::post('/{id}/ifirma/invoice-with-receiver', [FormOrdersController::class, 'createIfirmaInvoiceWithReceiver'])->name('ifirma.invoice-with-receiver');
     });
 
     // Marketing Campaigns - źródła pozyskania

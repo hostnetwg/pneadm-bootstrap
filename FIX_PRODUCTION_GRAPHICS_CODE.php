@@ -368,3 +368,4 @@ public function deleteBackground(Request $request)
 
 
 
+

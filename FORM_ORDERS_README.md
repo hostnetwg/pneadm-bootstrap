@@ -124,6 +124,19 @@ Po przeniesieniu danych należy zaktualizować:
 
 Można to robić **stopniowo** - stary system może działać równolegle.
 
+## iFirma - faktura z odbiorcą
+
+Wystawianie faktury z odbiorcą (przycisk „Wystaw Fakturę iFirma z Odbiorcą”) używa
+struktury `Kontrahent.OdbiorcaNaFakturze`, a nie pola root `DodatkowyPodmiot`.
+
+Wymagane minimum dla odbiorcy:
+- `UzywajDanychOdbiorcyNaFakturach`
+- `Nazwa`
+- `KodPocztowy`
+- `Miejscowosc`
+
+Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()`.
+
 ## Więcej informacji
 
 Zobacz pełną dokumentację: `FORM_ORDERS_MIGRATION.md`
