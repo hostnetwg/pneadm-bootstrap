@@ -40,11 +40,24 @@ class RSPOImportController extends Controller
             }
         }
 
-        // Pobierz istniejące listy z Sendy
-        $brandId = self::DEFAULT_BRAND_ID;
-        $sendyLists = $this->sendyService->getLists($brandId);
+        // Pobierz marki (Brands) i wszystkie listy z Sendy
+        $sendyBrands = array_values($this->sendyService->getBrands());
+        $sendyLists = $this->sendyService->getAllLists();
 
-        return view("rspo.import.index", compact("typesWithCounts", "sendyLists", "brandId"));
+        // Dla old('list_id') - ustal brand_id wybranej listy
+        $selectedBrandId = self::DEFAULT_BRAND_ID;
+        if (old('list_id') && !empty($sendyLists)) {
+            foreach ($sendyLists as $list) {
+                if (($list['id'] ?? null) == old('list_id')) {
+                    $selectedBrandId = $list['brand_id'] ?? self::DEFAULT_BRAND_ID;
+                    break;
+                }
+            }
+        } elseif (!empty($sendyBrands)) {
+            $selectedBrandId = $sendyBrands[0]['id'] ?? self::DEFAULT_BRAND_ID;
+        }
+
+        return view("rspo.import.index", compact("typesWithCounts", "sendyLists", "sendyBrands", "selectedBrandId"));
     }
 
     public function import(Request $request): RedirectResponse
@@ -79,9 +92,8 @@ class RSPOImportController extends Controller
             // Pobierz ID listy z formularza
             $listId = $request->input("list_id");
 
-            // Pobierz nazwę listy dla wyświetlenia wyników
-            $brandId = self::DEFAULT_BRAND_ID;
-            $sendyLists = $this->sendyService->getLists($brandId);
+            // Pobierz nazwę listy dla wyświetlenia wyników (lista może być w dowolnym Brand)
+            $sendyLists = $this->sendyService->getAllLists();
             $listName = "Nieznana lista";
             foreach ($sendyLists as $list) {
                 if (($list["id"] ?? null) == $listId) {

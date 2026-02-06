@@ -81,6 +81,28 @@
                             </div>
 
                             <div class="col-md-12">
+                                <label for="brand_id" class="form-label">
+                                    <strong>Brand:</strong>
+                                </label>
+                                <select id="brand_id" 
+                                        class="form-select"
+                                        aria-label="Wybierz Brand z Sendy">
+                                    @if(isset($sendyBrands) && is_array($sendyBrands) && count($sendyBrands) > 0)
+                                        @foreach($sendyBrands as $brand)
+                                            <option value="{{ $brand['id'] ?? '' }}" {{ ($selectedBrandId ?? '') == ($brand['id'] ?? '') ? 'selected' : '' }}>
+                                                {{ $brand['name'] ?? 'Brak nazwy' }}
+                                            </option>
+                                        @endforeach
+                                    @else
+                                        <option value="">-- Brak dostępnych Brandów --</option>
+                                    @endif
+                                </select>
+                                <small class="form-text text-muted">
+                                    Wybierz Brand (https://sendyhost.net), aby zawęzić listę dostępnych list.
+                                </small>
+                            </div>
+
+                            <div class="col-md-12">
                                 <label for="list_id" class="form-label">
                                     <strong>Lista Sendy:</strong> <span class="text-danger">*</span>
                                 </label>
@@ -91,7 +113,9 @@
                                     <option value="">-- Wybierz listę --</option>
                                     @if(isset($sendyLists) && is_array($sendyLists) && count($sendyLists) > 0)
                                         @foreach($sendyLists as $list)
-                                            <option value="{{ $list['id'] ?? '' }}" {{ old('list_id') == ($list['id'] ?? '') ? 'selected' : '' }}>
+                                            <option value="{{ $list['id'] ?? '' }}" 
+                                                    data-brand-id="{{ $list['brand_id'] ?? '' }}"
+                                                    {{ old('list_id') == ($list['id'] ?? '') ? 'selected' : '' }}>
                                                 {{ $list['name'] ?? 'Brak nazwy' }}
                                             </option>
                                         @endforeach
@@ -103,8 +127,8 @@
                                 @if(empty($sendyLists) || count($sendyLists) == 0)
                                     <div class="alert alert-warning mt-2">
                                         <i class="bi bi-exclamation-triangle me-2"></i>
-                                        Nie znaleziono list w Sendy dla Brand ID: {{ $brandId ?? 4 }}. 
-                                        Utwórz listę ręcznie w Sendy, a następnie odśwież tę stronę.
+                                        Nie znaleziono list w Sendy. 
+                                        Utwórz listę ręcznie w Sendy (https://sendyhost.net), a następnie odśwież tę stronę.
                                     </div>
                                 @else
                                     <small class="form-text text-muted">
@@ -199,6 +223,40 @@
         document.addEventListener('DOMContentLoaded', function() {
             const selectAll = document.getElementById('selectAll');
             const typeCheckboxes = document.querySelectorAll('.type-checkbox');
+            const brandSelect = document.getElementById('brand_id');
+            const listSelect = document.getElementById('list_id');
+
+            // Filtrowanie list Sendy według wybranego Brand
+            function filterListsByBrand() {
+                if (!brandSelect || !listSelect) return;
+                const selectedBrandId = String(brandSelect.value || '');
+                const options = listSelect.querySelectorAll('option[data-brand-id]');
+                let hasVisibleOptions = false;
+                let firstVisibleValue = '';
+
+                options.forEach(opt => {
+                    const brandId = String(opt.getAttribute('data-brand-id') || '');
+                    const matches = !selectedBrandId || brandId === selectedBrandId;
+                    opt.style.display = matches ? '' : 'none';
+                    opt.disabled = !matches;
+                    if (matches) {
+                        hasVisibleOptions = true;
+                        if (!firstVisibleValue && opt.value) firstVisibleValue = opt.value;
+                    }
+                });
+
+                // Jeśli aktualnie wybrana lista nie należy do wybranego Brand, ustaw pierwszą dostępną
+                const currentValue = listSelect.value;
+                const currentOpt = Array.from(listSelect.options).find(o => o.value === currentValue);
+                if (currentValue && currentOpt && currentOpt.disabled) {
+                    listSelect.value = firstVisibleValue || '';
+                }
+            }
+
+            if (brandSelect && listSelect) {
+                brandSelect.addEventListener('change', filterListsByBrand);
+                filterListsByBrand(); // Wywołaj przy ładowaniu strony
+            }
 
             // Zaznacz/odznacz wszystkie
             if (selectAll) {
