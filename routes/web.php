@@ -13,6 +13,7 @@ use App\Http\Controllers\RSPOController;
 use App\Http\Controllers\RSPOImportController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\FormOrdersController;
+use App\Http\Controllers\OnlinePaymentOrderController;
 use App\Http\Controllers\MarketingCampaignController;
 use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\WebhookPubligoController;
@@ -184,6 +185,15 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
         Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');
         Route::post('/{id}/ifirma/invoice-with-receiver', [FormOrdersController::class, 'createIfirmaInvoiceWithReceiver'])->name('ifirma.invoice-with-receiver');
+    });
+
+    // Online Payment Orders - zamówienia PayU/Paynow (pnedu.pl)
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+    ->prefix('online-payment-orders')
+    ->name('online-payment-orders.')
+    ->group(function () {
+        Route::get('/', [OnlinePaymentOrderController::class, 'index'])->name('index');
+        Route::get('/{id}', [OnlinePaymentOrderController::class, 'show'])->name('show');
     });
 
     // Marketing Campaigns - źródła pozyskania
