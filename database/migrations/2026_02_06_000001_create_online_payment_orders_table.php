@@ -12,6 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Sprawdź czy tabela już istnieje - jeśli tak, pomiń migrację
+        if (Schema::hasTable('online_payment_orders')) {
+            return;
+        }
+
         Schema::create('online_payment_orders', function (Blueprint $table) {
             $table->id();
             $table->string('ident', 64)->unique();

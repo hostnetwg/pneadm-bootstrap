@@ -64,3 +64,24 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+---
+
+## 🗄️ Database Migrations - Important Rule
+
+### ⚠️ Migration Location Rule
+
+**Migracje do bazy `pneadm` → w projekcie `pneadm-bootstrap`**
+- Lokalizacja: `pneadm-bootstrap/database/migrations/`
+- Przykłady tabel: `form_orders`, `online_payment_orders`, `payment_webhook_logs`, `courses`, `participants`, etc.
+
+**Migracje do bazy `pnedu` → w projekcie `pnedu`**
+- Lokalizacja: `pnedu/database/migrations/`
+- Przykłady tabel: `users`, `password_reset_tokens`, `sessions`, etc.
+
+**Migracje do bazy `certgen` → w projekcie `pneadm-bootstrap`**
+- Lokalizacja: `pneadm-bootstrap/database/migrations/`
+
+**Zasada:** Migracja zawsze w projekcie, który odpowiada za bazę danych, do której należy tabela!
+
+Więcej informacji: [SHARED_DATABASES_SETUP.md](./SHARED_DATABASES_SETUP.md)

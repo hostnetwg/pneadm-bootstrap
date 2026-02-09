@@ -12,8 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('form_orders', function (Blueprint $table) {
-            $table->date('participant_birth_date')->nullable()->after('participant_email')->comment('Data urodzenia uczestnika - wymagane do wystawienia zaświadczeń');
-            $table->string('participant_birth_place', 255)->nullable()->after('participant_birth_date')->comment('Miejsce urodzenia uczestnika - wymagane do wystawienia zaświadczeń');
+            // Sprawdź czy kolumna już istnieje przed dodaniem
+            if (!Schema::hasColumn('form_orders', 'participant_birth_date')) {
+                $table->date('participant_birth_date')->nullable()->after('participant_email')->comment('Data urodzenia uczestnika - wymagane do wystawienia zaświadczeń');
+            }
+            if (!Schema::hasColumn('form_orders', 'participant_birth_place')) {
+                $table->string('participant_birth_place', 255)->nullable()->after('participant_birth_date')->comment('Miejsce urodzenia uczestnika - wymagane do wystawienia zaświadczeń');
+            }
         });
     }
 

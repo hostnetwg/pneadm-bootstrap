@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OnlinePaymentOrder;
+use App\Models\WebhookLog;
 use Illuminate\Http\Request;
 
 class OnlinePaymentOrderController extends Controller
@@ -45,6 +46,10 @@ class OnlinePaymentOrderController extends Controller
     public function show(int $id)
     {
         $order = OnlinePaymentOrder::with('course')->findOrFail($id);
-        return view('online-payment-orders.show', compact('order'));
+        $webhookLogs = WebhookLog::where('online_payment_order_id', $id)
+            ->orderByDesc('created_at')
+            ->get();
+        
+        return view('online-payment-orders.show', compact('order', 'webhookLogs'));
     }
 }

@@ -52,6 +52,11 @@ class OnlinePaymentOrder extends Model
         return $this->belongsTo(Course::class);
     }
 
+    public function webhookLogs()
+    {
+        return $this->hasMany(WebhookLog::class, 'online_payment_order_id');
+    }
+
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {

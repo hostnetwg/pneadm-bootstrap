@@ -124,6 +124,43 @@ DB::connection('certgen')->select('SELECT DATABASE()');
 - **Wspólna sieć**: `pne-network` (external network)
 - **Wspólny volume**: `pne-mysql-shared` (przechowuje dane MySQL)
 
+## 📝 Migracje baz danych - WAŻNA REGUŁA
+
+### ⚠️ LOKALIZACJA MIGRACJI - ZAWSZE PRZESTRZEGAJ TEJ ZASADY:
+
+**Migracje do bazy `pneadm` → w projekcie `pneadm-bootstrap`**
+- Wszystkie migracje dotyczące tabel w bazie `pneadm` MUSZĄ być w katalogu:
+  - `pneadm-bootstrap/database/migrations/`
+- Przykłady tabel: `form_orders`, `online_payment_orders`, `payment_webhook_logs`, `courses`, `participants`, `certificates`, etc.
+
+**Migracje do bazy `pnedu` → w projekcie `pnedu`**
+- Wszystkie migracje dotyczące tabel w bazie `pnedu` MUSZĄ być w katalogu:
+  - `pnedu/database/migrations/`
+- Przykłady tabel: `users`, `password_reset_tokens`, `sessions`, `cache`, etc.
+
+**Migracje do bazy `certgen` → w projekcie `pneadm-bootstrap`**
+- Wszystkie migracje dotyczące tabel w bazie `certgen` MUSZĄ być w katalogu:
+  - `pneadm-bootstrap/database/migrations/`
+- Przykłady tabel: stare zamówienia, dane historyczne
+
+### Jak sprawdzić do której bazy należy tabela?
+1. Sprawdź w modelu Eloquent: `protected $connection = 'pneadm'` → migracja w `pneadm-bootstrap`
+2. Sprawdź w `config/database.php` jakie są dostępne połączenia
+3. Sprawdź w migracji: `Schema::connection('pneadm')->create(...)` → migracja w `pneadm-bootstrap`
+
+### Przykłady:
+```php
+// ✅ DOBRZE - Migracja w pneadm-bootstrap dla tabeli w bazie pneadm
+// Plik: pneadm-bootstrap/database/migrations/2026_02_09_000001_create_payment_webhook_logs_table.php
+Schema::create('payment_webhook_logs', ...); // Domyślnie baza pneadm
+
+// ✅ DOBRZE - Migracja w pnedu dla tabeli w bazie pnedu
+// Plik: pnedu/database/migrations/2024_01_01_000001_create_users_table.php
+Schema::create('users', ...); // Domyślnie baza pnedu
+```
+
+**ZASADA:** Migracja zawsze w projekcie, który odpowiada za bazę danych, do której należy tabela!
+
 ## ✅ Status
 
 - ✅ Wszystkie trzy bazy utworzone
@@ -131,6 +168,7 @@ DB::connection('certgen')->select('SELECT DATABASE()');
 - ✅ Oba serwisy łączą się do wspólnego MySQL
 - ✅ phpMyAdmin widzi wszystkie bazy
 - ✅ Zmiany widoczne natychmiast w obu serwisach
+- ✅ Reguła lokalizacji migracji dodana do `.cursorrules`
 
 
 

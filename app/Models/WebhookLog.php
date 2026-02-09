@@ -4,39 +4,65 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WebhookLog extends Model
 {
     use HasFactory;
 
+    protected $table = 'payment_webhook_logs';
+
     protected $fillable = [
-        'source',
-        'endpoint',
-        'method',
-        'request_data',
-        'response_data',
-        'status_code',
+        'online_payment_order_id',
+        'payment_gateway',
+        'gateway_payment_id',
+        'external_id',
+        'status',
+        'status_mapped',
+        'payload',
+        'signature',
+        'signature_valid',
         'ip_address',
-        'user_agent',
-        'headers',
         'error_message',
-        'success'
     ];
 
     protected $casts = [
-        'headers' => 'array',
-        'request_data' => 'array',
-        'response_data' => 'array',
-        'success' => 'boolean',
+        'payload' => 'array',
+        'signature_valid' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
-    public function scopePubligo($query)
+    public function order(): BelongsTo
     {
-        return $query->where('source', 'publigo');
+        return $this->belongsTo(OnlinePaymentOrder::class, 'online_payment_order_id');
     }
 
-    public function scopeRecent($query, $days = 7)
+    /**
+     * Zmapuj status z bramki płatności na status zamówienia.
+     */
+    public static function mapStatus(string $gateway, string $gatewayStatus): ?string
     {
-        return $query->where('created_at', '>=', now()->subDays($days));
+        $gatewayStatus = strtoupper($gatewayStatus);
+
+        if ($gateway === 'payu') {
+            return match ($gatewayStatus) {
+                'COMPLETED' => OnlinePaymentOrder::STATUS_PAID,
+                'CANCELED', 'REJECTED', 'EXPIRED' => OnlinePaymentOrder::STATUS_CANCELLED,
+                'PENDING', 'NEW' => OnlinePaymentOrder::STATUS_PENDING,
+                default => null,
+            };
+        }
+
+        if ($gateway === 'paynow') {
+            return match ($gatewayStatus) {
+                'CONFIRMED' => OnlinePaymentOrder::STATUS_PAID,
+                'CANCELLED', 'REJECTED', 'EXPIRED', 'ERROR' => OnlinePaymentOrder::STATUS_CANCELLED,
+                'PENDING', 'NEW' => OnlinePaymentOrder::STATUS_PENDING,
+                default => null,
+            };
+        }
+
+        return null;
     }
 }
