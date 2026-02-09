@@ -216,4 +216,3 @@ Schema::create('online_payment_orders', ...); // Domyślnie baza pneadm
 ```
 
 **ZASADA:** Migracja zawsze w projekcie, który odpowiada za bazę danych, do której należy tabela!
-

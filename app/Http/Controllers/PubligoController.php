@@ -159,9 +159,9 @@ class PubligoController extends Controller
             $rawInput = $request->getContent();
             $jsonData = json_decode($rawInput, true);
             
-            // Sprawdzamy czy to PHP serialized format
+            // Publigo wysyła dane w formacie PHP serialized (a:10:{s:2:"id";i:81031;...})
             $phpData = null;
-            if (strpos($rawInput, 'a:') === 0 && strpos($rawInput, '{') === 0) {
+            if (str_starts_with(trim($rawInput), 'a:')) {
                 $phpData = @unserialize($rawInput);
                 \Log::info('PHP serialized data detected', [
                     'php_unserialize_success' => $phpData !== false,
@@ -193,16 +193,7 @@ class PubligoController extends Controller
                 'url_params_count' => isset($data['url_params']) ? count($data['url_params']) : 0
             ]);
 
-            // Sprawdzamy czy JSON został poprawnie sparsowany
-            if ($jsonData === null) {
-                \Log::error('Invalid JSON data received', [
-                    'raw_input' => $rawInput,
-                    'json_error' => json_last_error_msg()
-                ]);
-                return response()->json(['message' => 'Invalid JSON data'], 400);
-            }
-
-            // Sprawdzamy czy mamy podstawowe dane
+            // Sprawdzamy czy mamy podstawowe dane (z PHP unserialize, JSON lub request)
             if (!isset($data['id']) || !isset($data['status']) || !isset($data['customer'])) {
                 \Log::error('Missing required fields in webhook data', ['data' => $data]);
                 return response()->json(['message' => 'Missing required fields'], 400);
