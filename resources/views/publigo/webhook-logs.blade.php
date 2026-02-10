@@ -135,15 +135,24 @@
                                         <span class="badge bg-info">{{ $log->source }}</span>
                                     </td>
                                     <td class="text-center">
-                                        <button onclick="showLogDetails({{ $log->id }})" 
-                                                class="btn btn-outline-primary btn-sm">
+                                        <button type="button" 
+                                                class="btn btn-outline-primary btn-sm btn-log-details"
+                                                data-log-id="{{ $log->id }}"
+                                                data-log-date="{{ $log->created_at->format('d.m.Y H:i:s') }}"
+                                                data-log-success="{{ $log->success ? '1' : '0' }}"
+                                                data-log-status-code="{{ $log->status_code ?? '' }}"
+                                                data-log-error="{{ e($log->error_message ?? '') }}"
+                                                data-log-request="{{ e(json_encode($log->request_data ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
+                                                data-log-response="{{ e(json_encode($log->response_data ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
+                                                data-log-headers="{{ e(json_encode($log->headers ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
+                                                data-log-user-agent="{{ e($log->user_agent ?? '') }}">
                                             <i class="bi bi-eye me-1"></i>Szczegóły
                                         </button>
                                     </td>
                                 </tr>
                                 @if($log->error_message)
                                     <tr class="table-danger">
-                                        <td colspan="7">
+                                        <td colspan="8">
                                             <div class="p-2">
                                                 <strong class="text-danger">Błąd:</strong>
                                                 <span class="text-danger">{{ $log->error_message }}</span>
@@ -170,6 +179,54 @@
             @endif
         </div>
     </div>
+</div>
+
+<!-- Modal szczegółów logu -->
+<div class="modal fade" id="logDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-text me-2"></i>Szczegóły webhooka
+                    <span id="modalLogDate" class="ms-2 text-muted small"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <span id="modalLogStatus" class="badge"></span>
+                    <span id="modalLogStatusCode" class="ms-2 text-muted small"></span>
+                </div>
+                <div id="modalLogError" class="alert alert-danger d-none mb-3"></div>
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-request">Request</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-response">Response</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-headers">Headers</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-user-agent">User-Agent</button>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-request">
+                        <pre id="modalRequestData" class="bg-light p-3 rounded small" style="max-height: 400px; overflow: auto;"></pre>
+                    </div>
+                    <div class="tab-pane fade" id="tab-response">
+                        <pre id="modalResponseData" class="bg-light p-3 rounded small" style="max-height: 400px; overflow: auto;"></pre>
+                    </div>
+                    <div class="tab-pane fade" id="tab-headers">
+                        <pre id="modalHeadersData" class="bg-light p-3 rounded small" style="max-height: 400px; overflow: auto;"></pre>
+                    </div>
+                    <div class="tab-pane fade" id="tab-user-agent">
+                        <pre id="modalUserAgent" class="bg-light p-3 rounded small"></pre>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -182,10 +239,44 @@ setInterval(function() {
     }
 }, 30000);
 
-// Funkcja do pokazywania szczegółów logu (placeholder)
-function showLogDetails(logId) {
-    // TODO: Implementować modal z szczegółami logu
-    alert('Szczegóły logu ID: ' + logId + '\n\nTa funkcja będzie zaimplementowana w przyszłości.');
-}
+// Obsługa przycisku Szczegóły
+document.querySelectorAll('.btn-log-details').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var logId = this.dataset.logId;
+        var logDate = this.dataset.logDate;
+        var success = this.dataset.logSuccess === '1';
+        var statusCode = this.dataset.logStatusCode;
+        var error = this.dataset.logError;
+        var requestData = null;
+        var responseData = null;
+        var headers = null;
+        var userAgent = this.dataset.logUserAgent || '';
+
+        try { requestData = JSON.parse(this.dataset.logRequest || '{}'); } catch(e) {}
+        try { responseData = JSON.parse(this.dataset.logResponse || '{}'); } catch(e) {}
+        try { headers = JSON.parse(this.dataset.logHeaders || '{}'); } catch(e) {}
+
+        document.getElementById('modalLogDate').textContent = logDate;
+        var statusEl = document.getElementById('modalLogStatus');
+        statusEl.className = 'badge ' + (success ? 'bg-success' : 'bg-danger');
+        statusEl.textContent = success ? 'Sukces' : 'Błąd';
+        document.getElementById('modalLogStatusCode').textContent = statusCode ? 'HTTP ' + statusCode : '';
+
+        var errorEl = document.getElementById('modalLogError');
+        if (error) {
+            errorEl.textContent = error;
+            errorEl.classList.remove('d-none');
+        } else {
+            errorEl.classList.add('d-none');
+        }
+
+        document.getElementById('modalRequestData').textContent = JSON.stringify(requestData, null, 2);
+        document.getElementById('modalResponseData').textContent = JSON.stringify(responseData, null, 2);
+        document.getElementById('modalHeadersData').textContent = JSON.stringify(headers, null, 2);
+        document.getElementById('modalUserAgent').textContent = userAgent || '(brak)';
+
+        new bootstrap.Modal(document.getElementById('logDetailsModal')).show();
+    });
+});
 </script>
 </x-app-layout>

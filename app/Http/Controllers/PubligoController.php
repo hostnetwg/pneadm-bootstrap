@@ -21,7 +21,7 @@ use App\Models\Instructor;
 use App\Models\Course;
 use App\Models\Participant;
 use App\Models\FormOrder;
-use App\Models\WebhookLog;
+use App\Models\PubligoWebhookLog;
 use App\Services\SendyService;
 
 class PubligoController extends Controller
@@ -126,8 +126,8 @@ class PubligoController extends Controller
      */
     public function webhook(Request $request)
     {
-        // Logowanie do bazy danych
-        $webhookLog = WebhookLog::create([
+        // Logowanie do bazy danych (tabela webhook_logs – osobna od payment_webhook_logs)
+        $webhookLog = PubligoWebhookLog::create([
             'source' => 'publigo',
             'endpoint' => '/api/publigo/webhook',
             'method' => $request->method(),
@@ -193,9 +193,10 @@ class PubligoController extends Controller
                 'url_params_count' => isset($data['url_params']) ? count($data['url_params']) : 0
             ]);
 
-            // Sprawdzamy czy mamy podstawowe dane (z PHP unserialize, JSON lub request)
+            // Sprawdzamy czy mamy poprawne dane (z PHP unserialize, JSON lub request)
             if (!isset($data['id']) || !isset($data['status']) || !isset($data['customer'])) {
                 \Log::error('Missing required fields in webhook data', ['data' => $data]);
+                $webhookLog->update(['error_message' => 'Missing required fields', 'status_code' => 400, 'success' => false]);
                 return response()->json(['message' => 'Missing required fields'], 400);
             }
 
@@ -208,6 +209,7 @@ class PubligoController extends Controller
             // Sprawdzamy czy customer ma wymagane pola
             if (!isset($customer['first_name']) || !isset($customer['last_name']) || !isset($customer['email'])) {
                 \Log::error('Missing customer fields', ['customer' => $customer]);
+                $webhookLog->update(['error_message' => 'Missing customer fields', 'status_code' => 400, 'success' => false]);
                 return response()->json(['message' => 'Missing customer fields'], 400);
             }
 
@@ -218,6 +220,7 @@ class PubligoController extends Controller
                     'url_params' => $urlParams,
                     'items' => $items
                 ]);
+                $webhookLog->update(['error_message' => 'Missing url_params or items', 'status_code' => 400, 'success' => false]);
                 return response()->json(['message' => 'Missing url_params or items'], 400);
             }
 
@@ -552,11 +555,29 @@ class PubligoController extends Controller
     }
 
     /**
-     * Strona z logami webhooków
+     * Strona z logami webhooków Publigo
      */
-    public function webhookLogs()
+    public function webhookLogs(Request $request)
     {
-        $logs = WebhookLog::orderBy('created_at', 'desc')->paginate(50);
+        $query = PubligoWebhookLog::where('source', 'publigo');
+
+        if ($request->filled('type')) {
+            if ($request->type === 'error') {
+                $query->where('success', false);
+            } elseif ($request->type === 'success') {
+                $query->where('success', true);
+            }
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $logs = $query->orderBy('created_at', 'desc')->paginate(50)->withQueryString();
+
         return view('publigo.webhook-logs', compact('logs'));
     }
 
