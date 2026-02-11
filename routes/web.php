@@ -185,6 +185,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
         Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');
         Route::post('/{id}/ifirma/invoice-with-receiver', [FormOrdersController::class, 'createIfirmaInvoiceWithReceiver'])->name('ifirma.invoice-with-receiver');
+        Route::post('/{id}/ifirma/invoice-with-ksef', [FormOrdersController::class, 'createIfirmaInvoiceWithKsef'])->name('ifirma.invoice-with-ksef');
     });
 
     // Online Payment Orders - zamówienia PayU/Paynow (pnedu.pl)

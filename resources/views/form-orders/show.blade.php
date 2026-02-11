@@ -270,6 +270,22 @@ nowoczesna-edukacja.pl </div>
                                     @endif
                                 </label>
                             </div>
+
+                            {{-- Button Wystaw fakturę i prześlij do KSeF --}}
+                            <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithKsefBtn" 
+                                    style="background-color: #dc3545; border-color: #dc3545; color: white;"
+                                    onclick="checkAndCreateInvoiceWithKsef({{ $zamowienie->id }})">
+                                <i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF
+                            </button>
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithKsef">
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithKsef">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div id="ifirmaResult" class="mt-2"></div>
@@ -1092,6 +1108,41 @@ nowoczesna-edukacja.pl `;
             const button = document.getElementById('ifirmaInvoiceWithReceiverBtn');
             const invoiceNumberInput = document.getElementById('invoice_number');
             
+            // Sprawdź czy checkbox "Wyślij automatycznie na e-mail" jest zaznaczony
+            const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoiceWithReceiver');
+            const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
+            
+            // Jeśli checkbox e-mail jest zaznaczony, pokaż modal ostrzegawczy o KSeF
+            if (sendEmail) {
+                // Ustaw funkcję potwierdzenia w modalu
+                const confirmBtn = document.getElementById('ksefWarningConfirmBtn');
+                if (confirmBtn) {
+                    confirmBtn.onclick = function() {
+                        // Zamknij modal KSeF
+                        const ksefModal = bootstrap.Modal.getInstance(document.getElementById('ksefWarningModal'));
+                        if (ksefModal) {
+                            ksefModal.hide();
+                        }
+                        // Kontynuuj normalny flow po zamknięciu modala
+                        proceedWithInvoiceCheck(orderId);
+                    };
+                }
+                
+                // Pokaż modal ostrzegawczy o KSeF
+                const ksefModal = new bootstrap.Modal(document.getElementById('ksefWarningModal'));
+                ksefModal.show();
+                return; // Przerwij wykonanie - kontynuacja nastąpi po potwierdzeniu w modalu
+            }
+            
+            // Jeśli checkbox nie jest zaznaczony, kontynuuj normalnie
+            proceedWithInvoiceCheck(orderId);
+        }
+
+        // Funkcja pomocnicza do sprawdzania statusu faktury i kontynuacji procesu
+        function proceedWithInvoiceCheck(orderId) {
+            const button = document.getElementById('ifirmaInvoiceWithReceiverBtn');
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            
             // Ustaw typ faktury na z odbiorcą
             window.invoiceType = 'with-receiver';
             
@@ -1333,6 +1384,291 @@ nowoczesna-edukacja.pl `;
                 // Przywrócenie stanu przycisku
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą';
+            });
+        }
+
+        // Funkcja sprawdzająca czy invoice_number jest wypełnione przed wystawieniem faktury z KSeF
+        function checkAndCreateInvoiceWithKsef(orderId) {
+            const button = document.getElementById('ifirmaInvoiceWithKsefBtn');
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            
+            // Ustaw typ faktury na z KSeF
+            window.invoiceType = 'with-ksef';
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Sprawdzanie...';
+            
+            // Sprawdź status faktury w bazie danych
+            fetch(`/form-orders/${orderId}/ifirma/check-invoice`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.has_invoice && data.invoice_number) {
+                        // Faktura już istnieje w bazie - wypełnij pole formularza i pokaż modal
+                        if (invoiceNumberInput) {
+                            invoiceNumberInput.value = data.invoice_number;
+                            
+                            // Zmień podświetlenie na zielone
+                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+                            invoiceNumberInput.style.borderWidth = '';
+                            invoiceNumberInput.style.boxShadow = '';
+                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+                            invoiceNumberInput.style.borderWidth = '2px';
+                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
+                            
+                            // Wizualny efekt - podświetlenie tła na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
+                            invoiceNumberInput.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                invoiceNumberInput.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                        
+                        // Aktualizuj wyświetlany numer faktury w modalu
+                        const invoiceNumberDisplay = document.getElementById('currentInvoiceNumberDisplay');
+                        if (invoiceNumberDisplay) {
+                            invoiceNumberDisplay.textContent = data.invoice_number;
+                        }
+                        
+                        // Aktualizuj przycisk w modalu
+                        const confirmBtn = document.getElementById('invoiceWarningConfirmBtn');
+                        if (confirmBtn) {
+                            confirmBtn.onclick = function() { confirmCreateIfirmaInvoiceWithKsef(orderId); };
+                        }
+                        
+                        // Pokaż modal ostrzeżenia
+                        const modal = new bootstrap.Modal(document.getElementById('invoiceWarningModal'));
+                        modal.show();
+                    } else {
+                        // Nie ma faktury w bazie - wystaw fakturę bezpośrednio
+                        createIfirmaInvoiceWithKsef(orderId);
+                    }
+                } else {
+                    // Błąd podczas sprawdzania - pokaż komunikat
+                    const resultDiv = document.getElementById('ifirmaResult');
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Błąd:</strong> ${data.error || 'Nie udało się sprawdzić statusu faktury.'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const resultDiv = document.getElementById('ifirmaResult');
+                if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd połączenia:</strong> Wystąpił błąd podczas sprawdzania statusu faktury.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                }
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF';
+            });
+        }
+
+        // Funkcja potwierdzająca wystawienie faktury z KSeF (wywoływana z modala ostrzeżenia)
+        function confirmCreateIfirmaInvoiceWithKsef(orderId) {
+            // Zamknij modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('invoiceWarningModal'));
+            if (modal) {
+                modal.hide();
+            }
+            // Wywołaj funkcję wystawiania faktury z parametrem force=true
+            createIfirmaInvoiceWithKsef(orderId, true);
+        }
+
+        // Funkcja do wystawiania faktury z KSeF w iFirma
+        function createIfirmaInvoiceWithKsef(orderId, force = false) {
+            const button = document.getElementById('ifirmaInvoiceWithKsefBtn');
+            const resultDiv = document.getElementById('ifirmaResult');
+            
+            // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
+            const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoiceWithKsef');
+            const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
+            
+            // Zmiana stanu przycisku
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            
+            // Wyczyść poprzednie komunikaty
+            resultDiv.innerHTML = '';
+            
+            // Pokaż progress indicator
+            resultDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Ładowanie...</span>
+                        </div>
+                        <div>
+                            <strong>Wystawianie faktury...</strong>
+                            <div class="progress mt-2" style="height: 5px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 33%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Przygotuj dane do wysłania
+            const requestData = {
+                send_email: sendEmail
+            };
+            
+            // Dodaj parametr force tylko jeśli jest true
+            if (force) {
+                requestData.force = true;
+            }
+            
+            // Wysłanie zapytania AJAX
+            fetch(`/form-orders/${orderId}/ifirma/invoice-with-ksef`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                // Sprawdź status odpowiedzi
+                if (response.status === 409) {
+                    // Konflikt - faktura już istnieje
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Faktura już została wystawiona');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Sukces
+                    const alertClass = force ? 'alert-warning' : 'alert-success';
+                    const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
+                    const alertMessage = force 
+                        ? `<strong>Uwaga!</strong> Faktura z KSeF została wystawiona mimo istniejącego numeru. ${data.message}`
+                        : `<strong>Sukces!</strong> ${data.message}`;
+                    
+                    let ksefInfo = '';
+                    if (data.ksef_number) {
+                        ksefInfo = `<br><small>Numer KSeF: <strong class="text-success">${data.ksef_number}</strong></small>`;
+                    }
+                    
+                    resultDiv.innerHTML = `
+                        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                            <i class="bi ${alertIcon}"></i>
+                            ${alertMessage}
+                            ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
+                            ${ksefInfo}
+                            ${data.existing_invoice_number && force ? `<br><small class="text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></small>` : ''}
+                            ${data.email_sent && data.emails_sent ? `<br><small class="text-muted">E-mail wysłany na: ${data.emails_sent.join(', ')}</small>` : ''}
+                            ${data.email_errors && data.email_errors.length > 0 ? `<br><small class="text-danger">Błędy wysyłki e-mail: ${data.email_errors.length}</small>` : ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
+                                <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                    
+                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
+                    if (data.invoice_number) {
+                        const invoiceNumberInput = document.getElementById('invoice_number');
+                        if (invoiceNumberInput) {
+                            invoiceNumberInput.value = data.invoice_number;
+                            
+                            // Zmień podświetlenie na zielone
+                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+                            invoiceNumberInput.style.borderWidth = '';
+                            invoiceNumberInput.style.boxShadow = '';
+                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+                            invoiceNumberInput.style.borderWidth = '2px';
+                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
+                            
+                            // Wizualny efekt - podświetlenie tła na zielono na moment
+                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
+                            invoiceNumberInput.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                invoiceNumberInput.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                    }
+                } else {
+                    // Błąd
+                    let errorMessage = data.error || 'Nieznany błąd';
+                    let stepInfo = '';
+                    if (data.step === 'ksef_send') {
+                        stepInfo = '<br><small class="text-muted">Faktura została wystawiona, ale nie udało się przesłać do KSeF.</small>';
+                        if (data.can_retry) {
+                            stepInfo += '<br><small class="text-muted">Możesz spróbować ponownie później.</small>';
+                        }
+                    }
+                    
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${errorMessage}
+                            ${stepInfo}
+                            ${data.ksef_error ? `<br><small class="text-muted">Szczegóły błędu KSeF: ${data.ksef_error}</small>` : ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        ${data.ifirma_response ? `
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showIfirmaDetails()">
+                                    <i class="bi bi-info-circle"></i> Pokaż szczegóły błędu
+                                </button>
+                            </div>
+                        ` : ''}
+                    `;
+                    
+                    // Przechowanie danych do wyświetlenia szczegółów
+                    window.ifirmaResponseData = data;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Sprawdź czy to błąd 409 (konflikt - faktura już istnieje)
+                const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
+                const isConflict = errorMessage.includes('już została wystawiona') || errorMessage.includes('already');
+                
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Błąd:</strong> ${errorMessage}
+                        ${isConflict ? `<br><small class="text-muted">Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.</small>` : ''}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Przywrócenie stanu przycisku
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF';
             });
         }
 
@@ -1706,7 +2042,49 @@ nowoczesna-edukacja.pl `;
             // DOM już załadowany, wywołaj od razu
             initializeEmailCheckboxes();
         }
+
+        // Obsługa resetowania przycisku w modalu KSeF po zamknięciu
+        const ksefModalElement = document.getElementById('ksefWarningModal');
+        if (ksefModalElement) {
+            ksefModalElement.addEventListener('hidden.bs.modal', function () {
+                // Resetuj przycisk po zamknięciu modala (jeśli użytkownik anulował)
+                const button = document.getElementById('ifirmaInvoiceWithReceiverBtn');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą';
+                }
+            });
+        }
     </script>
+
+    {{-- Modal ostrzeżenia o KSeF przed wystawieniem faktury z automatycznym e-mailem --}}
+    <div class="modal fade" id="ksefWarningModal" tabindex="-1" aria-labelledby="ksefWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="ksefWarningModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Uwaga - Wysyłka faktury na e-mail bez KSeF
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Zaznaczono opcję automatycznego wysłania faktury na e-mail dla zamówienia <strong>#{{ $zamowienie->id }}</strong>.</p>
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> Zostanie wystawiona faktura w iFirma i automatycznie wysłana na e-mail, <strong>bez późniejszej możliwości wysłania jej do KSeF</strong>.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning" id="ksefWarningConfirmBtn">
+                        <i class="bi bi-check-circle"></i> Kontynuuj - Wystaw fakturę i wyślij na e-mail
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- Modal ostrzeżenia przed wystawieniem faktury gdy invoice_number jest już wypełnione --}}
     <div class="modal fade" id="invoiceWarningModal" tabindex="-1" aria-labelledby="invoiceWarningModalLabel" aria-hidden="true">

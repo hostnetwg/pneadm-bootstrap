@@ -1897,6 +1897,442 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Wystawia fakturę w iFirma, przesyła do KSeF i opcjonalnie wysyła na e-mail
+     * 
+     * @param Request $request
+     * @param int $id ID zamówienia
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createIfirmaInvoiceWithKsef(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (!$zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.'
+                ], 404);
+            }
+
+            // ZAWSZE sprawdzamy bazę danych (nie formularz!)
+            $hasInvoice = $zamowienie->has_invoice;
+            $existingInvoiceNumber = $zamowienie->invoice_number;
+            $force = $request->input('force', false);
+
+            // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
+            if ($hasInvoice && !$force) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Faktura dla tego zamówienia została już wystawiona.',
+                    'existing_invoice_number' => $existingInvoiceNumber,
+                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.'
+                ], 409);
+            }
+
+            // Sprawdzenie czy zamówienie ma wymagane dane nabywcy
+            if (empty($zamowienie->buyer_name)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Sprawdzenie czy zamówienie ma dane odbiorcy
+            if (empty($zamowienie->recipient_name)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                ], 400);
+            }
+            if (empty($zamowienie->recipient_postal_code) || empty($zamowienie->recipient_city)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                ], 400);
+            }
+
+            // Sprawdzenie czy zamówienie ma produkt i cenę
+            if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                ], 400);
+            }
+
+            // Uwagi - TYLKO identyfikator zamówienia
+            $uwagi = "pnedu.pl #{$zamowienie->id}";
+
+            // Przygotowanie danych kontrahenta (NABYWCA - podmiot 2)
+            $kontrahent = [
+                'Nazwa' => $zamowienie->buyer_name,
+                'NIP' => null,
+                'Ulica' => '',
+                'KodPocztowy' => '',
+                'Miejscowosc' => '',
+                'Kraj' => 'Polska',
+                'PrefiksUE' => 'PL',
+                'OsobaFizyczna' => false,
+                'Email' => null,
+            ];
+            
+            // NIP nabywcy
+            if (!empty($zamowienie->buyer_nip)) {
+                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
+                if (!empty($nip)) {
+                    $kontrahent['NIP'] = $nip;
+                }
+            }
+            
+            // Adres nabywcy
+            if (!empty($zamowienie->buyer_address)) {
+                $kontrahent['Ulica'] = $zamowienie->buyer_address;
+            }
+            if (!empty($zamowienie->buyer_postal_code)) {
+                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
+            }
+            if (!empty($zamowienie->buyer_city)) {
+                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
+            }
+            
+            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
+            $emailToSave = null;
+            if (!empty($zamowienie->orderer_email)) {
+                $emailToSave = strtolower(trim($zamowienie->orderer_email));
+            } elseif (!empty($zamowienie->participant_email)) {
+                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            }
+            
+            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+                $kontrahent['Email'] = $emailToSave;
+            }
+
+            // Odbiorca na fakturze (podmiot 3) - wewnątrz Kontrahenta
+            $odbiorcaNaFakturze = [
+                'UzywajDanychOdbiorcyNaFakturach' => true,
+                'Nazwa' => $zamowienie->recipient_name,
+                'KodPocztowy' => $zamowienie->recipient_postal_code,
+                'Miejscowosc' => $zamowienie->recipient_city,
+            ];
+            
+            // Opcjonalne pola odbiorcy
+            if (!empty($zamowienie->recipient_address)) {
+                $odbiorcaNaFakturze['Ulica'] = $zamowienie->recipient_address;
+            }
+            if (!empty($zamowienie->recipient_nip)) {
+                $recipientNip = preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
+                if (!empty($recipientNip)) {
+                    $odbiorcaNaFakturze['NIP'] = $recipientNip;
+                }
+            }
+            $odbiorcaNaFakturze['Kraj'] = 'Polska';
+            $odbiorcaNaFakturze['Rola'] = 'ODBIORCA';
+
+            $kontrahent['OdbiorcaNaFakturze'] = $odbiorcaNaFakturze;
+
+            // Sprawdzenie, czy konto jest na RYCZAŁCIE
+            $isLumpSum = config('services.ifirma.is_lump_sum', false);
+            $vatExempt = config('services.ifirma.vat_exempt', false);
+            
+            // Przygotowanie pozycji faktury
+            $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
+            
+            $pozycja = [];
+            
+            // Dla zwolnionych z VAT: NAJPIERW PodstawaPrawna, POTEM StawkaVat = null
+            if ($vatExempt) {
+                $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
+                $pozycja['StawkaVat'] = null;
+            } else {
+                $pozycja['StawkaVat'] = 0.23;
+                if ($isLumpSum) {
+                    $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
+                }
+            }
+            
+            // Pozostałe pola
+            $pozycja['Ilosc'] = (float) 1.0;
+            $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
+            $pozycja['NazwaPelna'] = $zamowienie->product_name;
+            $pozycja['Jednostka'] = 'sztuk';
+            $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
+
+            // Przygotowanie danych faktury krajowej z odbiorcą w Kontrahencie
+            $invoiceData = [
+                'Zaplacono' => 0.00,
+                'ZaplaconoNaDokumencie' => 0.00,
+                'LiczOd' => 'BRT',
+                'NumerKontaBankowego' => null,
+                'DataWystawienia' => now()->format('Y-m-d'),
+                'MiejsceWystawienia' => 'Bieżuń',
+                'DataSprzedazy' => now()->format('Y-m-d'),
+                'FormatDatySprzedazy' => 'DZN',
+                'SposobZaplaty' => 'PRZ',
+                'RodzajPodpisuOdbiorcy' => 'BPO',
+                'WidocznyNumerBdo' => false,
+                'Numer' => null,
+                'Pozycje' => [$pozycja],
+                'Kontrahent' => $kontrahent,
+            ];
+            
+            // Termin płatności
+            $paymentDelay = !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14;
+            $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+
+            // Uwagi - tylko identyfikator zamówienia
+            $invoiceData['Uwagi'] = $uwagi;
+
+            // Numer konta bankowego - dodaj tylko jeśli istnieje
+            $bankAccount = config('services.ifirma.bank_account', '');
+            if (!empty(trim($bankAccount))) {
+                $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
+            }
+
+            // Logowanie szczegółowej struktury danych przed wysłaniem
+            Log::info('iFirma Invoice With KSeF Request Data', [
+                'order_id' => $zamowienie->id,
+                'invoice_data' => $invoiceData,
+                'kontrahent' => $kontrahent,
+                'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
+                'payment_delay_days' => $paymentDelay,
+            ]);
+
+            // KROK 1: Wystawienie faktury pro forma przez API iFirma
+            $ifirmaService = new IfirmaApiService();
+            $result = $ifirmaService->createInvoice($invoiceData);
+
+            Log::info('iFirma Invoice With KSeF Response', [
+                'order_id' => $zamowienie->id,
+                'status' => $result['status'] ?? 'unknown',
+                'status_code' => $result['status_code'] ?? null,
+                'message' => $result['message'] ?? null,
+            ]);
+
+            // Zwrócenie odpowiedzi
+            if ($result['status'] !== 'success') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['message'] ?? 'Nie udało się wystawić faktury',
+                    'step' => 'invoice_creation',
+                    'details' => $result
+                ], $result['status_code'] ?? 500);
+            }
+
+            // Pobierz Identyfikator z odpowiedzi
+            $invoiceId = null;
+            if (isset($result['data']['response']['Identyfikator'])) {
+                $invoiceId = $result['data']['response']['Identyfikator'];
+            } elseif (isset($result['data']['Identyfikator'])) {
+                $invoiceId = $result['data']['Identyfikator'];
+            }
+
+            if (empty($invoiceId)) {
+                Log::error('iFirma Invoice With KSeF: Brak Identyfikatora w odpowiedzi', [
+                    'order_id' => $zamowienie->id,
+                    'response' => $result
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie udało się uzyskać identyfikatora faktury z odpowiedzi iFirma',
+                    'step' => 'invoice_creation',
+                    'details' => $result
+                ], 500);
+            }
+
+            // Pobierz pełny numer faktury
+            $invoiceNumber = null;
+            try {
+                $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
+                if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
+                    $fullInvoiceData = $invoiceDetails['data'];
+                    if (isset($fullInvoiceData['PelnyNumer'])) {
+                        $invoiceNumber = $fullInvoiceData['PelnyNumer'];
+                    } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
+                        $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
+                    }
+                }
+            } catch (Exception $e) {
+                Log::warning('Nie udało się pobrać pełnego numeru faktury', [
+                    'invoice_id' => $invoiceId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            // Aktualizacja numeru faktury w bazie
+            $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
+            $zamowienie->has_invoice = 1;
+            $zamowienie->save();
+
+            // KROK 2: Przesłanie faktury do KSeF
+            Log::info('iFirma Invoice With KSeF: Przesyłanie do KSeF', [
+                'order_id' => $zamowienie->id,
+                'invoice_id' => $invoiceId,
+                'invoice_number' => $invoiceNumber
+            ]);
+
+            $ksefResult = $ifirmaService->sendInvoiceToKsef($invoiceId, 'fakturakraj');
+
+            $ksefNumber = null;
+            $ksefError = null;
+
+            if ($ksefResult['status'] === 'success') {
+                // Próba pobrania numeru KSeF z odpowiedzi
+                if (isset($ksefResult['data']['response']['NumerKSeF'])) {
+                    $ksefNumber = $ksefResult['data']['response']['NumerKSeF'];
+                } elseif (isset($ksefResult['data']['NumerKSeF'])) {
+                    $ksefNumber = $ksefResult['data']['NumerKSeF'];
+                }
+
+                // Aktualizacja statusu KSeF w bazie
+                $zamowienie->ksef_status = 'sent';
+                $zamowienie->ksef_sent_at = now();
+                if ($ksefNumber) {
+                    $zamowienie->ksef_number = $ksefNumber;
+                }
+                $zamowienie->ksef_error = null;
+                $zamowienie->save();
+
+                Log::info('iFirma Invoice With KSeF: Przesłane do KSeF', [
+                    'order_id' => $zamowienie->id,
+                    'invoice_id' => $invoiceId,
+                    'ksef_number' => $ksefNumber
+                ]);
+            } else {
+                // Błąd przesyłania do KSeF - zapisz fakturę, ale oznacz błąd KSeF
+                $ksefError = $ksefResult['message'] ?? 'Nieznany błąd przesyłania do KSeF';
+                
+                $zamowienie->ksef_status = 'failed';
+                $zamowienie->ksef_error = $ksefError;
+                $zamowienie->save();
+
+                Log::error('iFirma Invoice With KSeF: Błąd przesyłania do KSeF', [
+                    'order_id' => $zamowienie->id,
+                    'invoice_id' => $invoiceId,
+                    'error' => $ksefError,
+                    'ksef_response' => $ksefResult
+                ]);
+
+                // Jeśli KSeF się nie powiódł, nie wysyłamy e-mail (faktura bez numeru KSeF)
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Faktura została wystawiona, ale nie udało się przesłać do KSeF',
+                    'step' => 'ksef_send',
+                    'invoice_id' => $invoiceId,
+                    'invoice_number' => $invoiceNumber,
+                    'ksef_error' => $ksefError,
+                    'can_retry' => true
+                ], 500);
+            }
+
+            // KROK 3: Wysyłka e-mailem (jeśli zaznaczono checkbox)
+            $sendEmail = $request->input('send_email', false);
+            $emailsSent = [];
+            $emailErrors = [];
+            
+            if ($sendEmail && !empty($invoiceId)) {
+                // Zbierz unikalne adresy e-mail
+                $emails = [];
+                
+                if (!empty($zamowienie->orderer_email)) {
+                    $emails[] = strtolower(trim($zamowienie->orderer_email));
+                }
+                
+                if (!empty($zamowienie->participant_email)) {
+                    $participantEmail = strtolower(trim($zamowienie->participant_email));
+                    if (!in_array($participantEmail, $emails)) {
+                        $emails[] = $participantEmail;
+                    }
+                }
+                
+                // Wysyłka do wszystkich adresów
+                foreach ($emails as $email) {
+                    try {
+                        // Dodaj informację o numerze KSeF do treści wiadomości
+                        $emailMessage = "W załączeniu przesyłamy fakturę nr {$invoiceNumber}";
+                        if ($ksefNumber) {
+                            $emailMessage .= " (numer KSeF: {$ksefNumber})";
+                        }
+                        $emailMessage .= " dotyczącą zamówienia nr {$zamowienie->id}.";
+
+                        $sendResult = $ifirmaService->sendInvoiceByEmail(
+                            $invoiceId, 
+                            $email, 
+                            $invoiceNumber, 
+                            $zamowienie->id,
+                            'invoice'
+                        );
+                        
+                        if ($sendResult['status'] === 'success') {
+                            $emailsSent[] = $email;
+                            Log::info('Faktura z KSeF wysłana e-mailem', [
+                                'invoice_id' => $invoiceId,
+                                'email' => $email,
+                                'ksef_number' => $ksefNumber
+                            ]);
+                        } else {
+                            $emailErrors[] = [
+                                'email' => $email,
+                                'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                            ];
+                            Log::warning('Błąd wysyłki faktury z KSeF', [
+                                'invoice_id' => $invoiceId,
+                                'email' => $email,
+                                'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        $emailErrors[] = [
+                            'email' => $email,
+                            'error' => $e->getMessage()
+                        ];
+                        Log::error('Exception podczas wysyłki faktury z KSeF', [
+                            'invoice_id' => $invoiceId,
+                            'email' => $email,
+                            'exception' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+
+            // Przygotowanie komunikatu sukcesu
+            $message = 'Faktura została wystawiona w iFirma.pl';
+            if ($ksefNumber) {
+                $message .= " i przesłana do KSeF (nr: {$ksefNumber})";
+            }
+            if (!empty($emailsSent)) {
+                $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+            }
+            if (!empty($emailErrors)) {
+                $message .= ' (Błędy wysyłki e-mail: ' . count($emailErrors) . ')';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'invoice_id' => $invoiceId,
+                'invoice_number' => $invoiceNumber,
+                'ksef_number' => $ksefNumber,
+                'ksef_sent_at' => $zamowienie->ksef_sent_at ? $zamowienie->ksef_sent_at->toDateTimeString() : null,
+                'email_sent' => !empty($emailsSent),
+                'emails_sent' => $emailsSent,
+                'email_errors' => $emailErrors,
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Exception podczas wystawiania faktury z KSeF', [
+                'order_id' => $id,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Usuwa zamówienie (soft delete)
      */
     public function destroy(Request $request, $id)

@@ -532,6 +532,90 @@ class IfirmaApiService
     }
 
     /**
+     * Wysyła fakturę do KSeF (Krajowy System e-Faktur)
+     * 
+     * @param string|int $invoiceId Identyfikator faktury
+     * @param string $invoiceType Typ faktury (domyślnie 'fakturakraj')
+     * @return array Wynik żądania zawierający m.in. numer KSeF
+     */
+    public function sendInvoiceToKsef($invoiceId, string $invoiceType = 'fakturakraj'): array
+    {
+        // Sprawdź konfigurację
+        if (empty($this->keys['faktura'])) {
+            return [
+                'status' => 'config_error',
+                'message' => 'Brak skonfigurowanego klucza autoryzacji dla faktur'
+            ];
+        }
+
+        // Mapowanie typów faktur do endpointów KSeF zgodnie z dokumentacją API iFirma
+        $ksefEndpoints = [
+            'fakturakraj' => 'fakturakraj',
+            'fakturakraj/korekta' => 'fakturakraj',
+            'fakturaproformakraj' => 'fakturaproformakraj',
+            'fakturawysylka' => 'fakturawysylka',
+            'fakturawaluta' => 'fakturawaluta',
+            'fakturaeksporttowarow' => 'fakturaeksporttowarow',
+            'fakturaeksportuslug' => 'fakturaeksportuslug',
+            'fakturaeksportuslugue' => 'fakturaeksportuslugue',
+            'fakturawdt' => 'fakturawdt',
+            'fakturakoncowa' => 'fakturakoncowa',
+            'fakturazaliczka' => 'fakturazaliczka',
+            'fakturakoncowawaluta' => 'fakturakoncowawaluta',
+            'fakturazaliczkowawaluta' => 'fakturazaliczkowawaluta',
+            'fakturaparagon' => 'fakturaparagon',
+            'fakturametodakasowa' => 'fakturametodakasowa',
+            'fakturasrodektrwaly' => 'fakturasrodektrwaly',
+            'fakturawyposazenie' => 'fakturawyposazenie',
+            'fakturaszczegolnyobowiazek' => 'fakturaszczegolnyobowiazek',
+            'fakturaoss' => 'fakturaoss',
+        ];
+
+        // Użyj domyślnego typu jeśli nie znaleziono w mapowaniu
+        $endpointType = $ksefEndpoints[$invoiceType] ?? 'fakturakraj';
+
+        // Przygotowanie danych do wysyłki zgodnie z dokumentacją iFirma API
+        // https://api.ifirma.pl/wysylanie-faktury-do-ksef/
+        $ksefData = [
+            'DataWysylki' => null
+        ];
+
+        // Konwersja identyfikatora - jeśli zawiera ukośniki, zamień na podkreślenia
+        $ksefInvoiceId = is_string($invoiceId) && str_contains($invoiceId, '/') 
+            ? str_replace('/', '_', $invoiceId) 
+            : $invoiceId;
+
+        Log::info('iFirma: Wysyłanie faktury do KSeF', [
+            'invoice_id' => $invoiceId,
+            'ksef_invoice_id' => $ksefInvoiceId,
+            'invoice_type' => $invoiceType,
+            'endpoint_type' => $endpointType,
+            'ksef_data' => $ksefData
+        ]);
+
+        // Endpoint do wysyłki faktury do KSeF
+        $endpoint = "{$endpointType}/ksef/send/{$ksefInvoiceId}.json";
+        
+        $result = $this->post($endpoint, $ksefData, 'faktura');
+
+        // Logowanie odpowiedzi
+        if ($result['status'] === 'success') {
+            Log::info('iFirma: Faktura przesłana do KSeF', [
+                'invoice_id' => $invoiceId,
+                'response' => $result['data'] ?? null
+            ]);
+        } else {
+            Log::error('iFirma: Błąd przesyłania faktury do KSeF', [
+                'invoice_id' => $invoiceId,
+                'error' => $result['message'] ?? 'Nieznany błąd',
+                'response' => $result
+            ]);
+        }
+
+        return $result;
+    }
+
+    /**
      * Parsuje komunikat błędu z odpowiedzi API
      * 
      * @param string $response Raw response body
