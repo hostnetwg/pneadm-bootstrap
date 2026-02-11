@@ -2160,7 +2160,6 @@ class FormOrdersController extends Controller
 
             // Aktualizacja numeru faktury w bazie
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
-            $zamowienie->has_invoice = 1;
             $zamowienie->save();
 
             // KROK 2: Przesłanie faktury do KSeF
