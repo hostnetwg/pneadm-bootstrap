@@ -439,26 +439,8 @@ nowoczesna-edukacja.pl </div>
                                         <textarea class="form-control form-control-sm" 
                                                   id="invoice_api_remarks" 
                                                   rows="4" 
-                                                  placeholder="ODBIORCA:&#10;[dane odbiorcy]"
-                                                  style="font-family: monospace; font-size: 12px;">@php
-$recipientData = [];
-if (!empty($zamowienie->recipient_name)) $recipientData[] = $zamowienie->recipient_name;
-if (!empty($zamowienie->recipient_address)) $recipientData[] = $zamowienie->recipient_address;
-if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
-    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
-}
-if (!empty($zamowienie->recipient_nip)) {
-    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
-}
-
-// Tylko dane odbiorcy - bez uwag od zamawiającego i bez pnedu.pl #ID (to dodaje backend)
-$remarks = "ODBIORCA:\n";
-if (!empty($recipientData)) {
-    $remarks .= implode("\n", $recipientData);
-}
-
-echo $remarks;
-@endphp</textarea>
+                                                  placeholder="Wpisz uwagi do faktury..."
+                                                  style="font-family: monospace; font-size: 12px;"></textarea>
                                         <small class="text-muted">
                                             <i class="bi bi-info-circle"></i> Ten tekst zostanie użyty jako "Uwagi" na fakturze. 
                                             <strong>Na końcu automatycznie dodamy: "pnedu.pl #{{ $zamowienie->id }}"</strong>
