@@ -689,10 +689,13 @@ class FormOrdersController extends Controller
 
             // Przygotowanie uwag do faktury
             // Sprawdź, czy użytkownik przesłał niestandardowe uwagi (edytowane w formularzu)
-            $uwagi = $request->input('custom_remarks', '');
-            
-            if (empty(trim($uwagi))) {
-                // Jeśli nie ma niestandardowych uwag, generuj automatycznie dane odbiorcy
+            // JavaScript zawsze wyśle to pole (nawet jako pusty string), więc sprawdzamy czy jest w request
+            if ($request->has('custom_remarks')) {
+                // Pole tekstowe było edytowane - użyj dokładnie tego co jest w polu
+                // Jeśli użytkownik wyczyścił pole (pusty string), użyj pustego stringa (nie generuj danych odbiorcy)
+                $uwagi = trim($request->input('custom_remarks', ''));
+            } else {
+                // Pole nie było przesłane w request - generuj automatycznie dane odbiorcy
                 $recipientData = [];
                 if (!empty($zamowienie->recipient_name)) {
                     $recipientData[] = $zamowienie->recipient_name;
@@ -713,7 +716,7 @@ class FormOrdersController extends Controller
                 }
             }
             
-            // ZAWSZE na końcu dodaj identyfikator zamówienia (bez "---")
+            // ZAWSZE na końcu dodaj identyfikator zamówienia
             // Dzięki temu każda faktura pro-forma będzie miała powiązanie z zamówieniem
             if (!empty(trim($uwagi))) {
                 $uwagi .= "\npnedu.pl #{$zamowienie->id}";
@@ -746,6 +749,19 @@ class FormOrdersController extends Controller
                 if (!empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
+            }
+            
+            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
+            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
+            $emailToSave = null;
+            if (!empty($zamowienie->orderer_email)) {
+                $emailToSave = strtolower(trim($zamowienie->orderer_email));
+            } elseif (!empty($zamowienie->participant_email)) {
+                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            }
+            
+            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+                $kontrahent['Email'] = $emailToSave;
             }
 
             // Przygotowanie pozycji faktury
@@ -1089,10 +1105,14 @@ class FormOrdersController extends Controller
             }
 
             // Przygotowanie uwag do faktury
-            $uwagi = $request->input('custom_remarks', '');
-            
-            if (empty(trim($uwagi))) {
-                // Jeśli nie ma niestandardowych uwag, generuj automatycznie dane odbiorcy
+            // Sprawdź, czy użytkownik przesłał niestandardowe uwagi (edytowane w formularzu)
+            // JavaScript zawsze wyśle to pole (nawet jako pusty string), więc sprawdzamy czy jest w request
+            if ($request->has('custom_remarks')) {
+                // Pole tekstowe było edytowane - użyj dokładnie tego co jest w polu
+                // Jeśli użytkownik wyczyścił pole (pusty string), użyj pustego stringa (nie generuj danych odbiorcy)
+                $uwagi = trim($request->input('custom_remarks', ''));
+            } else {
+                // Pole nie było przesłane w request - generuj automatycznie dane odbiorcy
                 $recipientData = [];
                 if (!empty($zamowienie->recipient_name)) {
                     $recipientData[] = $zamowienie->recipient_name;
@@ -1156,9 +1176,17 @@ class FormOrdersController extends Controller
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
             
-            // Email
-            if (!empty($zamowienie->buyer_email)) {
-                $kontrahent['Email'] = strtolower(trim($zamowienie->buyer_email));
+            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
+            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
+            $emailToSave = null;
+            if (!empty($zamowienie->orderer_email)) {
+                $emailToSave = strtolower(trim($zamowienie->orderer_email));
+            } elseif (!empty($zamowienie->participant_email)) {
+                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            }
+            
+            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+                $kontrahent['Email'] = $emailToSave;
             }
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
@@ -1552,9 +1580,17 @@ class FormOrdersController extends Controller
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
             
-            // Email nabywcy
-            if (!empty($zamowienie->buyer_email)) {
-                $kontrahent['Email'] = strtolower(trim($zamowienie->buyer_email));
+            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
+            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
+            $emailToSave = null;
+            if (!empty($zamowienie->orderer_email)) {
+                $emailToSave = strtolower(trim($zamowienie->orderer_email));
+            } elseif (!empty($zamowienie->participant_email)) {
+                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            }
+            
+            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+                $kontrahent['Email'] = $emailToSave;
             }
 
             // Odbiorca na fakturze (podmiot 3) - wewnątrz Kontrahenta

@@ -722,6 +722,15 @@ nowoczesna-edukacja.pl `;
             // Wyczyść poprzednie komunikaty
             resultDiv.innerHTML = '';
             
+            // Przygotuj dane do wysłania
+            // Zawsze wyślij custom_remarks (nawet jeśli pusty string) - backend użyje dokładnie tego co jest w polu
+            // Jeśli pole jest puste, wyślij pusty string - backend użyje pustego stringa (nie generuj danych odbiorcy)
+            // Jeśli pole ma wartość, wyślij ją - backend użyje dokładnie tego co jest w polu
+            const requestData = {
+                custom_remarks: customRemarks, // Zawsze wyślij (nawet jeśli pusty string)
+                send_email: sendEmail
+            };
+            
             // Wysłanie zapytania AJAX z niestandardowymi uwagami i opcją wysyłki e-mail
             fetch(`/form-orders/${orderId}/ifirma/proforma`, {
                 method: 'POST',
@@ -729,10 +738,7 @@ nowoczesna-edukacja.pl `;
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({
-                    custom_remarks: customRemarks,
-                    send_email: sendEmail
-                })
+                body: JSON.stringify(requestData)
             })
             .then(response => response.json())
             .then(data => {
@@ -954,8 +960,10 @@ nowoczesna-edukacja.pl `;
             resultDiv.innerHTML = '';
             
             // Przygotuj dane do wysłania
+            // Jeśli customRemarks jest pusty, wyślij pusty string - backend użyje dokładnie tego co jest w polu (pusty string)
+            // Jeśli customRemarks ma wartość, wyślij ją - backend użyje dokładnie tego co jest w polu
             const requestData = {
-                custom_remarks: customRemarks,
+                custom_remarks: customRemarks, // Zawsze wyślij (nawet jeśli pusty string) - backend użyje dokładnie tego co jest w polu
                 send_email: sendEmail
             };
             
