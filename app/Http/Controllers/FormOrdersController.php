@@ -2175,21 +2175,80 @@ class FormOrdersController extends Controller
             $ksefError = null;
 
             if ($ksefResult['status'] === 'success') {
-                // Próba pobrania numeru KSeF z odpowiedzi
+                // Próba pobrania numeru KSeF z odpowiedzi bezpośredniej
                 if (isset($ksefResult['data']['response']['NumerKSeF'])) {
                     $ksefNumber = $ksefResult['data']['response']['NumerKSeF'];
                 } elseif (isset($ksefResult['data']['NumerKSeF'])) {
                     $ksefNumber = $ksefResult['data']['NumerKSeF'];
                 }
-
-                // Aktualizacja statusu KSeF w bazie
-                $zamowienie->ksef_status = 'sent';
-                $zamowienie->ksef_sent_at = now();
-                if ($ksefNumber) {
-                    $zamowienie->ksef_number = $ksefNumber;
+                
+                // Jeśli numer KSeF nie jest w bezpośredniej odpowiedzi, pobierz szczegóły faktury
+                if (empty($ksefNumber)) {
+                    try {
+                        $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
+                        if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
+                            $fullInvoiceData = $invoiceDetails['data'];
+                            
+                            // Sprawdź różne możliwe lokalizacje numeru KSeF w odpowiedzi
+                            if (isset($fullInvoiceData['NumerKSeF'])) {
+                                $ksefNumber = $fullInvoiceData['NumerKSeF'];
+                            } elseif (isset($fullInvoiceData['response']['NumerKSeF'])) {
+                                $ksefNumber = $fullInvoiceData['response']['NumerKSeF'];
+                            } elseif (isset($fullInvoiceData['Ksef']['NumerKSeF'])) {
+                                $ksefNumber = $fullInvoiceData['Ksef']['NumerKSeF'];
+                            } elseif (isset($fullInvoiceData['KSeF'])) {
+                                $ksefNumber = is_array($fullInvoiceData['KSeF']) 
+                                    ? ($fullInvoiceData['KSeF']['Numer'] ?? $fullInvoiceData['KSeF']['numer'] ?? null)
+                                    : $fullInvoiceData['KSeF'];
+                            }
+                            
+                            Log::info('iFirma Invoice With KSeF: Pobrano szczegóły faktury po przesłaniu do KSeF', [
+                                'order_id' => $zamowienie->id,
+                                'invoice_id' => $invoiceId,
+                                'ksef_number_found' => !empty($ksefNumber),
+                                'invoice_data_keys' => array_keys($fullInvoiceData),
+                                'full_response_sample' => json_encode($fullInvoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                            ]);
+                        }
+                    } catch (Exception $e) {
+                        Log::warning('Nie udało się pobrać szczegółów faktury po przesłaniu do KSeF', [
+                            'invoice_id' => $invoiceId,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                 }
-                $zamowienie->ksef_error = null;
-                $zamowienie->save();
+
+                // Aktualizacja statusu KSeF w bazie - zawsze zapisuj status, nawet jeśli numer KSeF nie jest dostępny
+                // Użyj update() aby upewnić się, że wartości są zapisane
+                $updateData = [
+                    'ksef_status' => 'sent',
+                    'ksef_sent_at' => now(),
+                    'ksef_error' => null,
+                ];
+                
+                if (!empty($ksefNumber)) {
+                    $updateData['ksef_number'] = $ksefNumber;
+                }
+                
+                // Zapis z pełnym logowaniem przed i po
+                Log::info('iFirma Invoice With KSeF: Przed zapisem do bazy', [
+                    'order_id' => $zamowienie->id,
+                    'update_data' => $updateData,
+                    'ksef_number_from_response' => $ksefNumber,
+                ]);
+                
+                $zamowienie->update($updateData);
+                
+                // Odśwież model z bazy, aby sprawdzić zapisane wartości
+                $zamowienie->refresh();
+                
+                Log::info('iFirma Invoice With KSeF: Po zapisie do bazy', [
+                    'order_id' => $zamowienie->id,
+                    'ksef_status' => $zamowienie->ksef_status,
+                    'ksef_sent_at' => $zamowienie->ksef_sent_at,
+                    'ksef_number' => $zamowienie->ksef_number,
+                    'ksef_error' => $zamowienie->ksef_error,
+                ]);
 
                 Log::info('iFirma Invoice With KSeF: Przesłane do KSeF', [
                     'order_id' => $zamowienie->id,

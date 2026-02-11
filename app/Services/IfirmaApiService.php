@@ -598,16 +598,22 @@ class IfirmaApiService
         
         $result = $this->post($endpoint, $ksefData, 'faktura');
 
-        // Logowanie odpowiedzi
+        // Logowanie odpowiedzi z pełną strukturą
         if ($result['status'] === 'success') {
-            Log::info('iFirma: Faktura przesłana do KSeF', [
+            Log::info('iFirma: Faktura przesłana do KSeF - pełna odpowiedź', [
                 'invoice_id' => $invoiceId,
-                'response' => $result['data'] ?? null
+                'status' => $result['status'],
+                'status_code' => $result['status_code'] ?? null,
+                'response_data' => $result['data'] ?? null,
+                'response_data_json' => isset($result['data']) ? json_encode($result['data'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : null,
+                'raw_response' => $result['raw_response'] ?? null,
             ]);
         } else {
             Log::error('iFirma: Błąd przesyłania faktury do KSeF', [
                 'invoice_id' => $invoiceId,
                 'error' => $result['message'] ?? 'Nieznany błąd',
+                'status' => $result['status'],
+                'status_code' => $result['status_code'] ?? null,
                 'response' => $result
             ]);
         }
