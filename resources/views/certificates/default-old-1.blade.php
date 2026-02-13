@@ -43,7 +43,7 @@
             padding-top: 0;
             padding-bottom: 0;
             line-height: 1;
-            font-size: 38px;
+            font-size: 48px;
             font-weight: bold;
             color: #000000;
         }
@@ -152,9 +152,9 @@
     @endif
 
     <p>ukończył/a szkolenie</p>
-    <p>zorganizowanym w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r. w wymiarze {{ $durationMinutes }} minut, przez</p>
+    <p>zorganizowane w dniu {{ \Carbon\Carbon::parse($course->start_date)->format('d.m.Y') }}r. w wymiarze {{ $durationMinutes }} minut, przez</p>
 
-    <p class="bold">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji</p>
+    <p class="bold"><span style="color: red;">Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>"Platforma Nowoczesnej Edukacji"</span></p>
 
     <h3>TEMAT SZKOLENIA</h3>
     <h2 class="course-title">{{ $course->title }}</h2>
@@ -311,7 +311,7 @@
             @endphp
             <img src="{{ $logoSrc }}" alt="Logo" style="max-width: 120px; height: auto;">
         </div>
-        Niepubliczny Ośrodek Doskonalenia Nauczycieli Platforma Nowoczesnej Edukacji<br>ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>- AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -
+        Niepubliczny Ośrodek Doskonalenia Nauczycieli "Platforma Nowoczesnej Edukacji"<br>ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>- AKREDYTACJA MAZOWIECKIEGO KURATORA OŚWIATY -
     </div>
 </body>
 </html>

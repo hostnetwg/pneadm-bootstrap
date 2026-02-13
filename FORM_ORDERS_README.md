@@ -137,6 +137,138 @@ Wymagane minimum dla odbiorcy:
 
 Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()`.
 
+## iFirma - integracja z KSeF (Krajowy System e-Faktur)
+
+### Funkcjonalność
+
+System umożliwia automatyczne wystawienie faktury w iFirma i przesłanie jej do KSeF w jednym procesie.
+
+### Przycisk "Wystaw fakturę i prześlij do KSeF"
+
+Czerwony przycisk na stronie szczegółów zamówienia (`/form-orders/{id}`) umożliwia:
+1. Wystawienie faktury w iFirma (z odbiorcą)
+2. Automatyczne przesłanie faktury do KSeF
+3. Opcjonalne wysłanie faktury na e-mail (z numerem KSeF)
+
+### Checkbox "Wyślij automatycznie na e-mail"
+
+- Jeśli zaznaczony: faktura zostanie automatycznie wysłana na e-mail po przesłaniu do KSeF
+- E-mail zawiera numer KSeF w treści wiadomości
+- Adresy e-mail są wyświetlane w nawiasach obok checkboxa
+
+### Flow działania
+
+```
+1. Kliknięcie "Wystaw fakturę i prześlij do KSeF"
+   ↓
+2. Sprawdzenie statusu faktury w bazie
+   ↓
+3. Wystawienie faktury w iFirma → otrzymanie Identyfikator
+   ↓
+4. Przesłanie faktury do KSeF → otrzymanie numeru KSeF
+   ↓
+5. (Opcjonalnie) Wysłanie e-mail z fakturą (z numerem KSeF)
+   ↓
+6. Zapis wszystkich danych w bazie
+```
+
+### Pola w bazie danych
+
+Dodane pola w tabeli `form_orders`:
+- `ksef_number` (string, nullable) - Numer KSeF faktury
+- `ksef_sent_at` (timestamp, nullable) - Data i czas przesłania do KSeF
+- `ksef_status` (enum: 'pending', 'sent', 'failed', nullable) - Status przesłania
+- `ksef_error` (text, nullable) - Szczegóły błędu przesłania
+
+### Obsługa błędów
+
+**Scenariusz 1: Błąd wystawienia faktury**
+- Proces przerywany
+- Faktura nie jest wystawiana
+- Komunikat błędu wyświetlany użytkownikowi
+
+**Scenariusz 2: Błąd przesyłania do KSeF**
+- Faktura już wystawiona w iFirma
+- Status KSeF: `failed`
+- Błąd zapisany w `ksef_error`
+- E-mail **nie jest wysyłany** (faktura bez numeru KSeF)
+- Możliwość retry (przycisk "Spróbuj ponownie")
+
+**Scenariusz 3: Błąd wysyłki e-mail**
+- Faktura wystawiona i przesłana do KSeF
+- Numer KSeF zapisany w bazie
+- Status KSeF: `sent`
+- Ostrzeżenie o błędzie e-mail
+- Możliwość ponownego wysłania e-mail
+
+### API Endpoint
+
+```
+POST /form-orders/{id}/ifirma/invoice-with-ksef
+```
+
+**Request body:**
+```json
+{
+  "send_email": true|false,
+  "force": true|false  // opcjonalne, dla ponownego wystawienia
+}
+```
+
+**Response (sukces):**
+```json
+{
+  "success": true,
+  "message": "Faktura została wystawiona w iFirma.pl i przesłana do KSeF (nr: XXX) i wysłana na: email@example.com",
+  "invoice_id": "123456",
+  "invoice_number": "87/2/2026",
+  "ksef_number": "KSeF/2026/123456",
+  "ksef_sent_at": "2026-02-11 13:28:28",
+  "email_sent": true,
+  "emails_sent": ["email@example.com"],
+  "email_errors": []
+}
+```
+
+**Response (błąd KSeF):**
+```json
+{
+  "success": false,
+  "error": "Faktura została wystawiona, ale nie udało się przesłać do KSeF",
+  "step": "ksef_send",
+  "invoice_id": "123456",
+  "invoice_number": "87/2/2026",
+  "ksef_error": "Szczegóły błędu",
+  "can_retry": true
+}
+```
+
+### Implementacja
+
+**Backend:**
+- `FormOrdersController::createIfirmaInvoiceWithKsef()` - główna metoda
+- `IfirmaApiService::sendInvoiceToKsef()` - wysyłka do KSeF przez API
+
+**Frontend:**
+- `checkAndCreateInvoiceWithKsef()` - sprawdzenie statusu przed wystawieniem
+- `createIfirmaInvoiceWithKsef()` - główna funkcja JavaScript
+- Progress indicator podczas procesu
+
+### Logowanie
+
+Wszystkie operacje są logowane w `storage/logs/laravel.log`:
+- `iFirma Invoice With KSeF: Przesyłanie do KSeF` - przed wysyłką
+- `iFirma Invoice With KSeF: Przesłane do KSeF` - po sukcesie
+- `iFirma Invoice With KSeF: Błąd przesyłania do KSeF` - przy błędzie
+- `iFirma: Faktura przesłana do KSeF - pełna odpowiedź` - pełna struktura odpowiedzi API
+
+### Uwagi
+
+1. **Kolejność operacji**: Faktura → KSeF → E-mail (nie można odwrócić)
+2. **Numer KSeF**: Może nie być dostępny bezpośrednio w odpowiedzi API - system próbuje pobrać go z szczegółów faktury
+3. **Status KSeF**: Zawsze zapisywany (`sent` lub `failed`), nawet jeśli numer KSeF nie jest dostępny
+4. **E-mail z KSeF**: Jeśli faktura została wysłana na e-mail bez KSeF, nie można już później przesłać jej do KSeF (ograniczenie iFirma)
+
 ## Więcej informacji
 
 Zobacz pełną dokumentację: `FORM_ORDERS_MIGRATION.md`
