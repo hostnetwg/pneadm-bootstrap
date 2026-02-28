@@ -92,6 +92,12 @@ class FormOrder extends Model
         'invoice_notes',
         'invoice_payment_delay',
         
+        // Dane KSeF
+        'ksef_number',
+        'ksef_sent_at',
+        'ksef_status',
+        'ksef_error',
+        
         // Status i notatki
         'status_completed',
         'notes',
@@ -117,6 +123,7 @@ class FormOrder extends Model
         'invoice_payment_delay' => 'integer',
         'status_completed' => 'integer',
         'updated_manually_at' => 'datetime',
+        'ksef_sent_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
