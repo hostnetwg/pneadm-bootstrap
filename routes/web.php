@@ -105,6 +105,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     // Zarządzanie webhookami Publigo
     Route::get('/publigo/webhooks', [PubligoController::class, 'webhooks'])->name('publigo.webhooks');
     Route::get('/publigo/webhooks/logs', [PubligoController::class, 'webhookLogs'])->name('publigo.webhooks.logs');
+    Route::get('/publigo/webhooks/logs/{id}', [PubligoController::class, 'webhookLogDetail'])->name('publigo.webhooks.logs.detail');
     Route::post('/publigo/test-webhook', [PubligoController::class, 'testWebhook'])->name('publigo.test-webhook');
     Route::get('/publigo/test-api', [PubligoController::class, 'testApi'])->name('publigo.test-api');
     Route::get('/publigo/products', [PubligoController::class, 'productsIndex'])->name('publigo.products.index');

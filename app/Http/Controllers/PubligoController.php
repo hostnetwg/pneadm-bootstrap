@@ -582,6 +582,25 @@ class PubligoController extends Controller
     }
 
     /**
+     * Szczegóły pojedynczego logu webhooka (dla modala AJAX)
+     */
+    public function webhookLogDetail(int $id)
+    {
+        $log = PubligoWebhookLog::where('source', 'publigo')->findOrFail($id);
+        return response()->json([
+            'id' => $log->id,
+            'created_at' => $log->created_at->format('d.m.Y H:i:s'),
+            'success' => $log->success,
+            'status_code' => $log->status_code,
+            'error_message' => $log->error_message,
+            'request_data' => $log->request_data,
+            'response_data' => $log->response_data,
+            'headers' => $log->headers,
+            'user_agent' => $log->user_agent,
+        ]);
+    }
+
+    /**
      * Test webhooka z panelu administracyjnego
      */
     public function testWebhook(Request $request)

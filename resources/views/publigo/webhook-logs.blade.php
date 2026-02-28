@@ -137,15 +137,7 @@
                                     <td class="text-center">
                                         <button type="button" 
                                                 class="btn btn-outline-primary btn-sm btn-log-details"
-                                                data-log-id="{{ $log->id }}"
-                                                data-log-date="{{ $log->created_at->format('d.m.Y H:i:s') }}"
-                                                data-log-success="{{ $log->success ? '1' : '0' }}"
-                                                data-log-status-code="{{ $log->status_code ?? '' }}"
-                                                data-log-error="{{ e($log->error_message ?? '') }}"
-                                                data-log-request="{{ e(json_encode($log->request_data ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
-                                                data-log-response="{{ e(json_encode($log->response_data ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
-                                                data-log-headers="{{ e(json_encode($log->headers ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) }}"
-                                                data-log-user-agent="{{ e($log->user_agent ?? '') }}">
+                                                data-log-id="{{ $log->id }}">
                                             <i class="bi bi-eye me-1"></i>Szczegóły
                                         </button>
                                     </td>
@@ -239,43 +231,47 @@ setInterval(function() {
     }
 }, 30000);
 
-// Obsługa przycisku Szczegóły
+// Obsługa przycisku Szczegóły - pobieranie danych przez AJAX
 document.querySelectorAll('.btn-log-details').forEach(function(btn) {
     btn.addEventListener('click', function() {
         var logId = this.dataset.logId;
-        var logDate = this.dataset.logDate;
-        var success = this.dataset.logSuccess === '1';
-        var statusCode = this.dataset.logStatusCode;
-        var error = this.dataset.logError;
-        var requestData = null;
-        var responseData = null;
-        var headers = null;
-        var userAgent = this.dataset.logUserAgent || '';
+        var modal = document.getElementById('logDetailsModal');
+        document.getElementById('modalRequestData').textContent = 'Ładowanie...';
+        document.getElementById('modalResponseData').textContent = '';
+        document.getElementById('modalHeadersData').textContent = '';
+        document.getElementById('modalUserAgent').textContent = '';
+        new bootstrap.Modal(modal).show();
 
-        try { requestData = JSON.parse(this.dataset.logRequest || '{}'); } catch(e) {}
-        try { responseData = JSON.parse(this.dataset.logResponse || '{}'); } catch(e) {}
-        try { headers = JSON.parse(this.dataset.logHeaders || '{}'); } catch(e) {}
+        fetch('{{ url("/publigo/webhooks/logs") }}/' + logId, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('modalLogDate').textContent = data.created_at;
+            var statusEl = document.getElementById('modalLogStatus');
+            statusEl.className = 'badge ' + (data.success ? 'bg-success' : 'bg-danger');
+            statusEl.textContent = data.success ? 'Sukces' : 'Błąd';
+            document.getElementById('modalLogStatusCode').textContent = data.status_code ? 'HTTP ' + data.status_code : '';
 
-        document.getElementById('modalLogDate').textContent = logDate;
-        var statusEl = document.getElementById('modalLogStatus');
-        statusEl.className = 'badge ' + (success ? 'bg-success' : 'bg-danger');
-        statusEl.textContent = success ? 'Sukces' : 'Błąd';
-        document.getElementById('modalLogStatusCode').textContent = statusCode ? 'HTTP ' + statusCode : '';
+            var errorEl = document.getElementById('modalLogError');
+            if (data.error_message) {
+                errorEl.textContent = data.error_message;
+                errorEl.classList.remove('d-none');
+            } else {
+                errorEl.classList.add('d-none');
+            }
 
-        var errorEl = document.getElementById('modalLogError');
-        if (error) {
-            errorEl.textContent = error;
-            errorEl.classList.remove('d-none');
-        } else {
-            errorEl.classList.add('d-none');
-        }
-
-        document.getElementById('modalRequestData').textContent = JSON.stringify(requestData, null, 2);
-        document.getElementById('modalResponseData').textContent = JSON.stringify(responseData, null, 2);
-        document.getElementById('modalHeadersData').textContent = JSON.stringify(headers, null, 2);
-        document.getElementById('modalUserAgent').textContent = userAgent || '(brak)';
-
-        new bootstrap.Modal(document.getElementById('logDetailsModal')).show();
+            document.getElementById('modalRequestData').textContent = data.request_data != null
+                ? JSON.stringify(data.request_data, null, 2) : '(brak danych)';
+            document.getElementById('modalResponseData').textContent = data.response_data != null
+                ? JSON.stringify(data.response_data, null, 2) : '(brak danych)';
+            document.getElementById('modalHeadersData').textContent = data.headers != null
+                ? JSON.stringify(data.headers, null, 2) : '(brak danych)';
+            document.getElementById('modalUserAgent').textContent = data.user_agent || '(brak)';
+        })
+        .catch(function(err) {
+            document.getElementById('modalRequestData').textContent = 'Błąd ładowania: ' + err.message;
+        });
     });
 });
 </script>
