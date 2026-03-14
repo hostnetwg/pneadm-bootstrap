@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Participant;
 use App\Models\ParticipantEmail;
+use App\Models\ParticipantDownloadToken;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -130,6 +131,9 @@ class ParticipantObserver
         }
 
         $this->syncParticipantEmail($participant->email, $participant->id);
+
+        // Token do linku pobierania zaświadczeń (pnedu.pl/certificates/{token})
+        ParticipantDownloadToken::getOrCreateTokenForEmail($participant->email);
     }
 
     /**

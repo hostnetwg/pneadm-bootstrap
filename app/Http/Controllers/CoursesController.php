@@ -873,6 +873,7 @@ class CoursesController extends Controller
             'is_active' => 'nullable|string',
             'certificate_format' => 'nullable|string|max:255',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
+            'certificates_download_enabled' => 'nullable|boolean',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
             'notatki' => 'nullable|string',
@@ -881,6 +882,7 @@ class CoursesController extends Controller
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //        
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
+        $validated['certificates_download_enabled'] = $request->boolean('certificates_download_enabled');
         
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (!empty($validated['offer_description_html'])) {

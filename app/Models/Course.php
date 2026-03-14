@@ -27,6 +27,7 @@ class Course extends Model
         'is_active',
         'certificate_format',
         'certificate_template_id',
+        'certificates_download_enabled',
         'access_duration_days',
         'access_notes',
         'notatki',
@@ -39,7 +40,8 @@ class Course extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'issue_date_certyficates' => 'date',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        'certificates_download_enabled' => 'boolean'
     ];
 
     /**

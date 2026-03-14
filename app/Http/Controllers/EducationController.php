@@ -94,6 +94,10 @@ class EducationController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                // Token do linku pobierania zaświadczeń (raw insert – Observer nie wywołany)
+                if (!empty($student->email)) {
+                    \App\Models\ParticipantDownloadToken::getOrCreateTokenForEmail($student->email);
+                }
                 $importedCount++;
             } catch (\Exception $e) {
                 // Jeśli wystąpi błąd, dodajemy ID do pominiętych

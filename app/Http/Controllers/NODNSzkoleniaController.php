@@ -234,7 +234,7 @@ class NODNSzkoleniaController extends Controller
     
             // Jeśli uczestnik nie istnieje, dodajemy go
             if (!$participant) {
-                $participantId = DB::connection('mysql')->table('participants')->insertGetId([
+$participantId = DB::connection('mysql')->table('participants')->insertGetId([
                     'course_id' => $course->id,
                     'first_name' => ucfirst($firstName),
                     'last_name' => ucfirst($lastName),
@@ -243,7 +243,13 @@ class NODNSzkoleniaController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-    
+
+                // Token do linku pobierania zaświadczeń (raw insert – Observer nie wywołany)
+                $email = $uczestnik->email ?? null;
+                if (!empty($email)) {
+                    \App\Models\ParticipantDownloadToken::getOrCreateTokenForEmail($email);
+                }
+
                 $importedCount++;
             } else {
                 $participantId = $participant->id;

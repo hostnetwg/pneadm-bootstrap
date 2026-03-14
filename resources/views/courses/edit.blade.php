@@ -285,6 +285,12 @@
                 </div>
 
                 <div class="form-check mb-3">
+                    <input type="checkbox" name="certificates_download_enabled" class="form-check-input" id="certificates_download_enabled" value="1" {{ old('certificates_download_enabled', $course->certificates_download_enabled) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="certificates_download_enabled">Udostępnij pobieranie zaświadczeń (link na pnedu.pl)</label>
+                    <small class="form-text text-muted d-block">Uczestnicy z e-mailem będą mogli pobrać zaświadczenie przez unikalny link bez logowania.</small>
+                </div>
+
+                <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
