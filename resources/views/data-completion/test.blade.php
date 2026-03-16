@@ -18,9 +18,9 @@
                 </div>
             @endif
 
-            @if(session('error'))
+            @if(session('error') || $errors->any())
                 <div class="alert alert-danger">
-                    {{ session('error') }}
+                    {{ session('error') ?: $errors->first() }}
                 </div>
             @endif
 

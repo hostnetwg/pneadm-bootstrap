@@ -284,10 +284,61 @@
                     </small>
                 </div>
 
-                <div class="form-check mb-3">
-                    <input type="checkbox" name="certificates_download_enabled" class="form-check-input" id="certificates_download_enabled" value="1" {{ old('certificates_download_enabled', $course->certificates_download_enabled) ? 'checked' : '' }}>
-                    <label class="form-check-label" for="certificates_download_enabled">Udostępnij pobieranie zaświadczeń (link na pnedu.pl)</label>
-                    <small class="form-text text-muted d-block">Uczestnicy z e-mailem będą mogli pobrać zaświadczenie przez unikalny link bez logowania.</small>
+                <div class="mb-3">
+                    <label for="certificate_download_status" class="form-label">Status zaświadczeń</label>
+                    <select name="certificate_download_status" id="certificate_download_status" class="form-select">
+                        <option value="download_enabled" {{ old('certificate_download_status', $course->certificate_download_status) === 'download_enabled' ? 'selected' : '' }}>Udostępnij pobieranie zaświadczeń (link na pnedu.pl)</option>
+                        <option value="in_preparation" {{ old('certificate_download_status', $course->certificate_download_status) === 'in_preparation' ? 'selected' : '' }}>Zaświadczenie w przygotowaniu</option>
+                        <option value="no_certificate" {{ old('certificate_download_status', $course->certificate_download_status) === 'no_certificate' ? 'selected' : '' }}>Brak zaświadczenia</option>
+                    </select>
+                    <small class="form-text text-muted d-block">Określa, czy uczestnicy mogą pobierać zaświadczenia przez link z tokenem oraz jak wyświetlać status na pnedu.pl.</small>
+                </div>
+
+                <!-- Rejestracja zaświadczenia (formularz na pnedu.pl) -->
+                <div class="card mb-4" id="certificate-registration">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-user-plus me-1"></i> Rejestracja uczestnika/zaświadczenia</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Umożliwia udostępnienie publicznego formularza na pnedu.pl, w którym uczestnicy mogą się zarejestrować do szkolenia (zapis do listy uczestników). Zaświadczenia generujesz jak dotychczas z panelu.</p>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="certificate_registration_open" class="form-check-input" id="certificate_registration_open" {{ old('certificate_registration_open', $course->certificate_registration_open) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="certificate_registration_open">Włącz rejestrację zaświadczenia</label>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="certificate_registration_starts_at" class="form-label">Rejestracja od (opcjonalnie)</label>
+                                <input type="datetime-local" name="certificate_registration_starts_at" id="certificate_registration_starts_at" class="form-control" value="{{ old('certificate_registration_starts_at', $course->certificate_registration_starts_at ? $course->certificate_registration_starts_at->format('Y-m-d\TH:i') : '') }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="certificate_registration_ends_at" class="form-label">Rejestracja do (opcjonalnie)</label>
+                                <input type="datetime-local" name="certificate_registration_ends_at" id="certificate_registration_ends_at" class="form-control" value="{{ old('certificate_registration_ends_at', $course->certificate_registration_ends_at ? $course->certificate_registration_ends_at->format('Y-m-d\TH:i') : '') }}">
+                            </div>
+                        </div>
+                        @if($course->certificate_registration_token)
+                            <div class="mb-3">
+                                <label class="form-label">Token (tylko do odczytu)</label>
+                                <input type="text" class="form-control font-monospace" value="{{ $course->certificate_registration_token }}" readonly>
+                            </div>
+                            @php
+                                $regUrl = rtrim(config('services.pnedu_frontend_url', ''), '/') . '/certificate-registration/' . $course->certificate_registration_token;
+                            @endphp
+                            <div class="mb-3">
+                                <label class="form-label">Link do formularza</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-monospace" id="certificate-registration-url" value="{{ $regUrl }}" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('certificate-registration-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
+                                        Kopiuj link
+                                    </button>
+                                </div>
+                                <a href="{{ $regUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-link btn-sm mt-1 px-0">
+                                    <i class="fas fa-external-link-alt me-1"></i>Otwórz formularz w nowej karcie
+                                </a>
+                            </div>
+                        @else
+                            <p class="text-muted small mb-0">Zapisz kurs z włączoną rejestracją – wygeneruje się token i pojawi się link.</p>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="form-check mb-3">

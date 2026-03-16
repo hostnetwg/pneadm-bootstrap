@@ -78,6 +78,9 @@ return [
         'api_url' => env('PNEADM_API_URL', env('APP_URL')),
     ],
 
+    // Adres frontu pnedu.pl (lista zaświadczeń po tokenie) – do linków testowych w panelu admina
+    'pnedu_frontend_url' => env('PNEDU_FRONTEND_URL', 'http://localhost:8081'),
+
     'teryt' => [
         'username' => env('TERYT_USERNAME', 'WaldemarGrabowski'),
         'password' => env('TERYT_PASSWORD', 'k1Yc4S0ius'),

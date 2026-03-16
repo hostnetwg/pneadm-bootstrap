@@ -338,6 +338,44 @@
                             @endif
                         </div>
                     </div>
+
+                    <!-- Rejestracja zaświadczenia -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-user-plus me-1"></i> Rejestracja zaświadczenia</h5>
+                            <a href="{{ route('courses.edit', [$course->id, 'filter_preserve' => 1]) }}#certificate-registration" class="btn btn-sm btn-outline-primary">Edytuj ustawienia</a>
+                        </div>
+                        <div class="card-body">
+                            @if($course->certificate_registration_open)
+                                <p class="mb-2">
+                                    <span class="badge bg-success">Włączona</span>
+                                    @if($course->certificate_registration_starts_at || $course->certificate_registration_ends_at)
+                                        <span class="text-muted small ms-1">
+                                            @if($course->certificate_registration_starts_at && $course->certificate_registration_ends_at)
+                                                {{ $course->certificate_registration_starts_at->format('d.m.Y H:i') }} – {{ $course->certificate_registration_ends_at->format('d.m.Y H:i') }}
+                                            @elseif($course->certificate_registration_starts_at)
+                                                od {{ $course->certificate_registration_starts_at->format('d.m.Y H:i') }}
+                                            @else
+                                                do {{ $course->certificate_registration_ends_at->format('d.m.Y H:i') }}
+                                            @endif
+                                        </span>
+                                    @endif
+                                </p>
+                                @if($course->certificate_registration_token)
+                                    @php $regUrl = rtrim(config('services.pnedu_frontend_url', ''), '/') . '/certificate-registration/' . $course->certificate_registration_token; @endphp
+                                    <div class="input-group">
+                                        <input type="text" class="form-control form-control-sm font-monospace" id="show-cert-reg-url" value="{{ $regUrl }}" readonly>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('show-cert-reg-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">Kopiuj link</button>
+                                    </div>
+                                    <a href="{{ $regUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-link btn-sm mt-1 px-0">
+                                        <i class="fas fa-external-link-alt me-1"></i>Otwórz formularz w nowej karcie
+                                    </a>
+                                @endif
+                            @else
+                                <p class="text-muted mb-0">Wyłączona. Włącz w <a href="{{ route('courses.edit', [$course->id]) }}#certificate-registration">edycji kursu</a>.</p>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-4">

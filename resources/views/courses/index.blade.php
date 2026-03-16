@@ -354,6 +354,16 @@
                         </td>
                         <td class="text-center align-middle">
                             <div class="d-flex flex-column align-items-center gap-1">
+                                @php
+                                    $certStatus = $course->certificate_download_status ?? 'in_preparation';
+                                @endphp
+                                @if($certStatus === 'download_enabled')
+                                    <i class="bi bi-award-fill text-success" title="Udostępniono pobieranie zaświadczeń (link na pnedu.pl)" style="font-size: 1.2em;"></i>
+                                @elseif($certStatus === 'in_preparation')
+                                    <i class="bi bi-award-fill text-warning" title="Zaświadczenie w przygotowaniu" style="font-size: 1.2em;"></i>
+                                @else
+                                    <i class="bi bi-award-fill text-danger" title="Brak zaświadczenia" style="font-size: 1.2em;"></i>
+                                @endif
                                 @if(!empty(trim($course->description ?? '')))
                                     <i class="bi bi-check-circle-fill text-success" title="podano zakres szkolenia" style="font-size: 1.2em;"></i>
                                 @else

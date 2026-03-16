@@ -20,6 +20,29 @@
     </x-slot>
 
     <div class="container py-3">
+        @if(!empty($certificatePdfGenerationCompletedAt))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Generowanie plików PDF dla tego szkolenia zakończone.</strong> ({{ $certificatePdfGenerationCompletedAt }})
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+            </div>
+        @endif
+        <div id="generatingPdfsAlert" class="alert alert-info d-none mb-4" role="alert"
+             data-progress-url="{{ route('certificates.pdf-generation-progress', $course) }}"
+             data-status-url="{{ route('certificates.pdf-generation-status', $course) }}"
+             data-cancel-url="{{ route('certificates.cancel-pdf-generation', $course) }}">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            <span class="generating-pdfs-text"><strong>Trwa generowanie plików PDF.</strong> Na koniec zobaczysz komunikat z potwierdzeniem.</span>
+            <span class="generating-pdfs-cancel-wrap d-none ms-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="cancelPdfGenerationBtn">Przerwij generowanie</button>
+            </span>
+        </div>
+        <div id="otherCoursePdfGenerationAlert" class="alert alert-warning d-none mb-4" role="alert"
+             data-status-any-url="{{ route('certificates.pdf-generation-status-any') }}"
+             data-current-course-id="{{ $course->id }}">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            <span class="other-course-pdfs-text"></span>
+        </div>
         <!-- Nagłówek z akcjami -->
         <div class="row mb-4">
             <div class="col-md-8">
@@ -39,15 +62,21 @@
                     <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCertificatesModal">
                         <i class="fas fa-certificate me-1"></i> Import zaświadczeń z PUBLIGO CSV
                     </button>
-                    <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)? Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.')">
+                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#bulkGenerateModal">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
-                    </a>
-                    <a href="{{ route('certificates.bulk-generate-all', $course) }}" class="btn btn-warning" onclick="return confirm('Czy na pewno chcesz wygenerować zaświadczenia dla WSZYSTKICH uczestników (bez względu na kompletność danych)? Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.')">
+                    </button>
+                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#bulkGenerateAllModal">
                         <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia dla wszystkich
-                    </a>
-                    <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger" onclick="return confirm('Czy na pewno chcesz usunąć WSZYSTKIE zaświadczenia dla tego szkolenia? Ta operacja jest nieodwracalna!')">
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#generateAllPdfsModal" title="Generowanie w tle – wymaga działającego workera kolejki (sail artisan queue:work)">
+                        <i class="fas fa-file-pdf me-1"></i> Wygeneruj pliki PDF dla wszystkich zaświadczeń
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#deletePdfFilesModal" title="Usuwa pliki PDF, zachowuje rekordy i numery – potem można wygenerować od nowa">
+                        <i class="fas fa-file-pdf me-1"></i> Usuń tylko pliki PDF zaświadczeń
+                    </button>
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#bulkDeleteModal">
                         <i class="fas fa-trash me-1"></i> Usuń zaświadczenia
-                    </a>
+                    </button>
                     <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
                     </a>
@@ -227,20 +256,45 @@
                                 <a href="{{ route('certificates.generate', $participant->id) }}">
                                     {{ $participant->certificate->certificate_number }}
                                 </a>
+                                @if(!empty($participant->certificate->file_path))
+                                    <a href="{{ route('certificates.download-pdf', $participant->certificate) }}" class="text-success ms-1 text-decoration-none" title="Pobierz plik PDF z serwera (bez generowania)">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                @endif
                             @else
                                 Brak zaświadczenia
                             @endif
                         </td>
                         <td>
-                            @if ($participant->certificate)
-                                <button type="button" class="btn btn-danger btn-sm" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#deleteCertificateModal{{ $participant->certificate->id }}">
-                                    <i class="bi bi-trash"></i> Usuń
-                                </button>
-                            @else
-                                <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
-                            @endif
+                            <div class="d-flex flex-column gap-1">
+                                @if ($participant->certificate)
+                                    <button type="button" class="btn btn-danger btn-sm" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#deleteCertificateModal{{ $participant->certificate->id }}">
+                                        <i class="bi bi-trash"></i> Usuń
+                                    </button>
+                                    @if(!empty($participant->certificate->file_path))
+                                        <form action="{{ route('certificates.delete-pdf', $participant->certificate) }}" method="POST" class="d-inline" onsubmit="return confirm('Usunąć tylko plik PDF tego zaświadczenia? Numer zaświadczenia zostanie zachowany – potem możesz wygenerować plik ponownie (np. po poprawce danych).');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Usuwa plik PDF, zachowuje zaświadczenie – potem wygeneruj ponownie">
+                                                <i class="bi bi-file-earmark-pdf"></i> Usuń PDF
+                                            </button>
+                                        </form>
+                                    @endif
+                                @else
+                                    <a href="{{ route('certificates.store', $participant) }}" class="btn btn-primary btn-sm">Generuj</a>
+                                @endif
+                                @php
+                                    $certToken = !empty($participant->email) ? ($downloadTokensByEmail[strtolower(trim($participant->email))] ?? null) : null;
+                                @endphp
+                                @if($certToken)
+                                    <a href="{{ $pneduFrontendUrl }}/certificates/{{ $certToken }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="Lista zaświadczeń (pnedu.pl)">Zaświadczenia (pnedu)</a>
+                                    <form action="{{ route('participants.send-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do zaświadczeń?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Wyślij e-mail</button>
+                                    </form>
+                                @endif
+                            </div>
                         </td>                         
                         <td>
                             <div class="d-flex flex-column gap-1">
@@ -374,6 +428,157 @@
             </div>
             @endif
         @endforeach
+
+        {{-- Modal: Wygeneruj zaświadczenia (tylko z kompletnymi danymi) --}}
+        <div class="modal fade" id="bulkGenerateModal" tabindex="-1" aria-labelledby="bulkGenerateModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="bulkGenerateModalLabel">
+                            <i class="bi bi-exclamation-triangle"></i> Wygeneruj zaświadczenia
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz wygenerować zaświadczenia dla wszystkich uczestników z <strong>kompletnymi danymi</strong> (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)?</p>
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <a href="{{ route('certificates.bulk-generate', $course) }}" class="btn btn-warning">
+                            <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal: Wygeneruj zaświadczenia dla wszystkich --}}
+        <div class="modal fade" id="bulkGenerateAllModal" tabindex="-1" aria-labelledby="bulkGenerateAllModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="bulkGenerateAllModalLabel">
+                            <i class="bi bi-exclamation-triangle"></i> Wygeneruj zaświadczenia dla wszystkich
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz wygenerować zaświadczenia dla <strong>WSZYSTKICH</strong> uczestników (bez względu na kompletność danych)?</p>
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Uczestnicy, którzy już mają zaświadczenia, otrzymają kolejne.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <a href="{{ route('certificates.bulk-generate-all', $course) }}" class="btn btn-warning">
+                            <i class="fas fa-certificate me-1"></i> Wygeneruj zaświadczenia dla wszystkich
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal: Wygeneruj pliki PDF w tle (kolejka) --}}
+        <div class="modal fade" id="generateAllPdfsModal" tabindex="-1" aria-labelledby="generateAllPdfsModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="generateAllPdfsModalLabel">
+                            <i class="fas fa-file-pdf me-2"></i> Wygeneruj pliki PDF dla wszystkich zaświadczeń
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Zlecić generowanie plików PDF w tle (kolejka)? Działa także przy 1000+ uczestników.</p>
+                        <p class="text-warning mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Upewnij się, że worker kolejki działa: <code>sail artisan queue:work</code>
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form id="generateAllPdfsForm" action="{{ route('certificates.generate-all-pdfs', $course) }}" method="POST" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-pdf me-1"></i> Zleć generowanie
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal: Usuń tylko pliki PDF zaświadczeń --}}
+        <div class="modal fade" id="deletePdfFilesModal" tabindex="-1" aria-labelledby="deletePdfFilesModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="deletePdfFilesModalLabel">
+                            <i class="bi bi-exclamation-triangle"></i> Usuń tylko pliki PDF zaświadczeń
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Usunąć tylko pliki PDF z dysku (zachowując numery zaświadczeń)?</p>
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Po edycji danych szkolenia możesz potem wygenerować pliki ponownie.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('certificates.delete-pdf-files', $course) }}" method="POST" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-file-pdf me-1"></i> Usuń pliki PDF
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal: Usuń wszystkie zaświadczenia --}}
+        <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="bulkDeleteModalLabel">
+                            <i class="bi bi-exclamation-triangle"></i> Usuń zaświadczenia
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć <strong>WSZYSTKIE</strong> zaświadczenia dla tego szkolenia?</p>
+                        <p class="text-danger mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Ta operacja jest nieodwracalna!
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <a href="{{ route('certificates.bulk-delete', $course) }}" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Usuń zaświadczenia
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Import CSV -->
@@ -476,4 +681,180 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        var pdfProgressIntervalId = null;
+
+        function clearModalBackdrop() {
+            document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+
+        function updateProgressText(alertEl) {
+            var progressUrl = alertEl && alertEl.getAttribute('data-progress-url');
+            var textEl = alertEl && alertEl.querySelector('.generating-pdfs-text');
+            if (!progressUrl || !textEl) return;
+            fetch(progressUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    textEl.innerHTML = '<strong>Trwa generowanie plików PDF w tle (kolejka).</strong> Wygenerowano <strong>' + data.with_file + ' z ' + data.total + '</strong> plików. Na koniec zobaczysz komunikat z potwierdzeniem.';
+                })
+                .catch(function() {});
+        }
+
+        function showCancelButtonAndWire(alertEl) {
+            var cancelWrap = alertEl && alertEl.querySelector('.generating-pdfs-cancel-wrap');
+            var cancelUrl = alertEl && alertEl.getAttribute('data-cancel-url');
+            var textEl = alertEl && alertEl.querySelector('.generating-pdfs-text');
+            if (!cancelWrap || !cancelUrl) return;
+            cancelWrap.classList.remove('d-none');
+            var btn = cancelWrap.querySelector('#cancelPdfGenerationBtn');
+            if (!btn || btn.dataset.wired) return;
+            btn.dataset.wired = '1';
+            btn.addEventListener('click', function() {
+                btn.disabled = true;
+                var token = (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+                var headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                if (token) headers['X-CSRF-TOKEN'] = token;
+                var body = token ? new URLSearchParams({ _token: token }) : null;
+                if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                fetch(cancelUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: headers,
+                    body: body
+                }).then(function(r) { return r.json(); }).then(function(data) {
+                    if (pdfProgressIntervalId) { clearInterval(pdfProgressIntervalId); pdfProgressIntervalId = null; }
+                    cancelWrap.classList.add('d-none');
+                    if (textEl) textEl.innerHTML = '<strong>Generowanie przerwane.</strong>';
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        }
+
+        function startBatchProgressPolling(alertEl) {
+            if (!alertEl) return;
+            alertEl.classList.remove('d-none');
+            updateProgressText(alertEl);
+            pdfProgressIntervalId = setInterval(function() { updateProgressText(alertEl); }, 2000);
+            fetch(alertEl.getAttribute('data-status-url'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { if (data.active) showCancelButtonAndWire(alertEl); });
+        }
+
+        document.getElementById('generateAllPdfsForm')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var form = this;
+            var modalEl = document.getElementById('generateAllPdfsModal');
+            var alertEl = document.getElementById('generatingPdfsAlert');
+            function startFetch() {
+                if (alertEl) alertEl.classList.remove('d-none');
+                var progressUrl = alertEl && alertEl.getAttribute('data-progress-url');
+                var textEl = alertEl && alertEl.querySelector('.generating-pdfs-text');
+                var progressIntervalId = null;
+                if (progressUrl && textEl) {
+                    function updateProgress() {
+                        fetch(progressUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                textEl.innerHTML = '<strong>Trwa generowanie plików PDF.</strong> Wygenerowano <strong>' + data.with_file + ' z ' + data.total + '</strong> plików. Na koniec zobaczysz komunikat z potwierdzeniem.';
+                            })
+                            .catch(function() {});
+                    }
+                    updateProgress();
+                    progressIntervalId = setInterval(updateProgress, 2000);
+                    pdfProgressIntervalId = progressIntervalId;
+                    fetch(alertEl.getAttribute('data-status-url'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) { if (data.active) showCancelButtonAndWire(alertEl); });
+                }
+                fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+                }).then(function(res) {
+                    if (progressIntervalId) clearInterval(progressIntervalId);
+                    pdfProgressIntervalId = null;
+                    if (res.redirected) {
+                        window.location.href = res.url;
+                    } else {
+                        window.location.reload();
+                    }
+                }).catch(function() {
+                    if (progressIntervalId) clearInterval(progressIntervalId);
+                    pdfProgressIntervalId = null;
+                    if (alertEl) {
+                        alertEl.classList.remove('alert-info');
+                        alertEl.classList.add('alert-danger');
+                        alertEl.innerHTML = '<strong>Błąd połączenia.</strong> Odśwież stronę i spróbuj ponownie.';
+                    }
+                });
+            }
+            if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                if (modal) {
+                    modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                        clearModalBackdrop();
+                        startFetch();
+                    }, { once: true });
+                    modal.hide();
+                } else {
+                    clearModalBackdrop();
+                    startFetch();
+                }
+            } else {
+                clearModalBackdrop();
+                startFetch();
+            }
+        });
+
+        (function checkBatchOnLoad() {
+            var alertEl = document.getElementById('generatingPdfsAlert');
+            var statusUrl = alertEl && alertEl.getAttribute('data-status-url');
+            if (!statusUrl) return;
+            fetch(statusUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.active) startBatchProgressPolling(alertEl);
+                })
+                .catch(function() {});
+        })();
+
+        (function checkOtherCourseBatch() {
+            var alertEl = document.getElementById('otherCoursePdfGenerationAlert');
+            var statusAnyUrl = alertEl && alertEl.getAttribute('data-status-any-url');
+            var currentCourseId = alertEl && parseInt(alertEl.getAttribute('data-current-course-id'), 10);
+            if (!statusAnyUrl || isNaN(currentCourseId)) return;
+            var textEl = alertEl && alertEl.querySelector('.other-course-pdfs-text');
+            function update() {
+                fetch(statusAnyUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.active || data.course_id === currentCourseId) {
+                            alertEl.classList.add('d-none');
+                            return;
+                        }
+                        var rawTitle = data.course_title || 'kurs #' + data.course_id;
+                        var title = String(rawTitle).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        var url = data.participants_url || '';
+                        if (url) {
+                            textEl.innerHTML = '<strong>Trwa generowanie plików PDF w tle dla innego szkolenia:</strong> <a href="' + url.replace(/"/g, '&quot;') + '" class="alert-link">' + title + '</a>. Poczekaj na zakończenie przed zleceniem kolejnego.';
+                        } else {
+                            textEl.innerHTML = '<strong>Trwa generowanie plików PDF w tle dla innego szkolenia:</strong> „' + title + '”. Poczekaj na zakończenie przed zleceniem kolejnego.';
+                        }
+                        alertEl.classList.remove('d-none');
+                    })
+                    .catch(function() {});
+            }
+            update();
+            setInterval(update, 10000);
+        })();
+    </script>
+    @endpush
 </x-app-layout>

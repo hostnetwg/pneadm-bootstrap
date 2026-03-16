@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Participant;
 use App\Models\Course;
 use App\Models\ParticipantEmail;
+use App\Models\ParticipantDownloadToken;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\CertificateLinkMail;
 
 class ParticipantController extends Controller
 {
@@ -643,8 +646,53 @@ class ParticipantController extends Controller
         } else {
             $participants = $query->paginate($perPage);
         }
-    
-        return view('participants.index', compact('participants', 'course'));
+
+        $pneduFrontendUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/');
+        $downloadTokensByEmail = [];
+        foreach ($participants as $p) {
+            $email = $p->email;
+            if ($email !== null && $email !== '') {
+                $norm = ParticipantDownloadToken::normalizeEmail($email);
+                if (!isset($downloadTokensByEmail[$norm])) {
+                    $downloadTokensByEmail[$norm] = ParticipantDownloadToken::getOrCreateTokenForEmail($email);
+                }
+            }
+        }
+
+        $certificatePdfGenerationCompletedAt = null;
+        $cacheKey = 'certificate_pdf_generation_finished_' . $course->id;
+        if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+            $certificatePdfGenerationCompletedAt = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+        }
+
+        return view('participants.index', compact('participants', 'course', 'pneduFrontendUrl', 'downloadTokensByEmail', 'certificatePdfGenerationCompletedAt'));
+    }
+
+    /**
+     * Wysyła e-mail z linkiem do listy zaświadczeń (pnedu) na adres uczestnika.
+     */
+    public function sendCertificateLink(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $email = $participant->email;
+        if ($email === null || trim($email) === '') {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma podanego adresu e-mail.');
+        }
+
+        $token = ParticipantDownloadToken::getOrCreateTokenForEmail($email);
+        $certificatesUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/') . '/certificates/' . $token;
+
+        try {
+            Mail::to($email)->send(new CertificateLinkMail($participant, $course, $certificatesUrl));
+        } catch (\Throwable $e) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: ' . $e->getMessage());
+        }
+
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do zaświadczeń został wysłany na adres ' . $email);
     }
     
     

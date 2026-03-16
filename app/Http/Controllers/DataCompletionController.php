@@ -123,7 +123,7 @@ class DataCompletionController extends Controller
             );
 
             if ($result['sent'] > 0) {
-                return back()->with('success', 'Wysłano testowy email na adres: waldemar.grabowski@hostnet.pl (oryginalny adres: ' . $request->input('test_email') . ')');
+                return back()->with('success', 'Wysłano testowy email na adres: ' . $request->input('test_email') . '. Sprawdź skrzynkę (np. Mailpit: http://localhost:8026).');
             } else {
                 $errorMsg = 'Nie udało się wysłać testowego emaila.';
                 if (count($result['errors']) > 0) {

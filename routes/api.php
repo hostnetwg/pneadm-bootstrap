@@ -88,6 +88,17 @@ Route::post('/publigo/test-data', function() {
 // Certificate API endpoints (chronione tokenem API)
 Route::prefix('certificates')->name('api.certificates.')->middleware('api.token')->group(function () {
     Route::post('/generate', [CertificateApiController::class, 'generate'])->name('generate');
+    Route::post('/ensure', [CertificateApiController::class, 'ensure'])->name('ensure');
     Route::post('/data', [CertificateApiController::class, 'getData'])->name('data');
     Route::get('/health', [CertificateApiController::class, 'health'])->name('health');
+});
+
+Route::post('/participants/update-birth-data', [CertificateApiController::class, 'updateBirthData'])
+    ->middleware('api.token')
+    ->name('api.participants.update-birth-data');
+
+// Rejestracja zaświadczenia (formularz na pnedu) – chronione tokenem API
+Route::prefix('certificate-registration')->name('api.certificate-registration.')->middleware('api.token')->group(function () {
+    Route::get('/status/{token}', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'status'])->name('status');
+    Route::post('/register', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'register'])->name('register');
 });

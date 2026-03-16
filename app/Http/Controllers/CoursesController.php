@@ -873,7 +873,10 @@ class CoursesController extends Controller
             'is_active' => 'nullable|string',
             'certificate_format' => 'nullable|string|max:255',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
-            'certificates_download_enabled' => 'nullable|boolean',
+            'certificate_download_status' => 'nullable|string|in:download_enabled,in_preparation,no_certificate',
+            'certificate_registration_open' => 'nullable',
+            'certificate_registration_starts_at' => 'nullable|date',
+            'certificate_registration_ends_at' => 'nullable|date|after_or_equal:certificate_registration_starts_at',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
             'notatki' => 'nullable|string',
@@ -882,7 +885,17 @@ class CoursesController extends Controller
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //        
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
-        $validated['certificates_download_enabled'] = $request->boolean('certificates_download_enabled');
+        $validated['certificate_download_status'] = $request->input('certificate_download_status', 'in_preparation');
+
+        // Rejestracja zaświadczenia: checkbox + daty; token generowany przy pierwszym włączeniu
+        $validated['certificate_registration_open'] = $request->has('certificate_registration_open');
+        $validated['certificate_registration_starts_at'] = $request->filled('certificate_registration_starts_at')
+            ? $request->input('certificate_registration_starts_at') : null;
+        $validated['certificate_registration_ends_at'] = $request->filled('certificate_registration_ends_at')
+            ? $request->input('certificate_registration_ends_at') : null;
+        if ($validated['certificate_registration_open'] && empty($course->certificate_registration_token)) {
+            $validated['certificate_registration_token'] = \Illuminate\Support\Str::random(64);
+        }
         
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (!empty($validated['offer_description_html'])) {

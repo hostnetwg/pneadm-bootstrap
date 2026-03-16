@@ -27,7 +27,11 @@ class Course extends Model
         'is_active',
         'certificate_format',
         'certificate_template_id',
-        'certificates_download_enabled',
+        'certificate_download_status',
+        'certificate_registration_open',
+        'certificate_registration_starts_at',
+        'certificate_registration_ends_at',
+        'certificate_registration_token',
         'access_duration_days',
         'access_notes',
         'notatki',
@@ -41,7 +45,9 @@ class Course extends Model
         'end_date' => 'datetime',
         'issue_date_certyficates' => 'date',
         'is_active' => 'boolean',
-        'certificates_download_enabled' => 'boolean'
+        'certificate_registration_open' => 'boolean',
+        'certificate_registration_starts_at' => 'datetime',
+        'certificate_registration_ends_at' => 'datetime',
     ];
 
     /**

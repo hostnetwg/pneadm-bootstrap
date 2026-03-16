@@ -6,7 +6,12 @@ use Illuminate\Http\Request;
 use App\Models\Certificate;
 use App\Models\Participant;
 use App\Models\Course;
+use App\Jobs\GenerateCertificatePdfJob;
 use App\Services\Certificate\CertificateGeneratorService;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
@@ -97,8 +102,9 @@ class CertificateController extends Controller
             ]);
         }
     
-        // Pobieranie pliku PDF (z folderu public/storage)
-        return response()->download(storage_path('app/public/' . $filePath));
+        // Pobieranie pliku PDF (z folderu public/storage) – nazwa przy zapisie na dysk użytkownika z przedrostkiem
+        $downloadFileName = 'zaswiadczenie_' . str_replace('/', '-', $certificateNumber) . '.pdf';
+        return response()->download(storage_path('app/public/' . $filePath), $downloadFileName);
     }
     
 
@@ -200,6 +206,219 @@ class CertificateController extends Controller
         }
 
         return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla wszystkich uczestników.");
+    }
+
+    /**
+     * Zleca generowanie plików PDF dla wszystkich zaświadczeń kursu.
+     * Dla małej liczby zaświadczeń (≤25) generuje od razu w żądaniu (bez workera).
+     * Dla większej liczby używa batcha w tle – wymaga działającego workera (sail artisan queue:work).
+     */
+    public function generateAllPdfs(Course $course)
+    {
+        $certificates = Certificate::where('course_id', $course->id)->get();
+        if ($certificates->isEmpty()) {
+            return redirect()->back()->with('info', 'Brak zaświadczeń dla tego szkolenia. Najpierw wygeneruj zaświadczenia (rekordy w bazie).');
+        }
+
+        $count = $certificates->count();
+        $syncThreshold = 25;
+
+        if ($count <= $syncThreshold) {
+            // Generowanie synchroniczne – działa bez queue workera
+            set_time_limit(600); // do 10 min (dompdf + obrazy mogą trwać kilka sekund na PDF)
+            $generator = app(CertificateGeneratorService::class);
+            $generated = 0;
+            foreach ($certificates as $certificate) {
+                $cert = Certificate::where('participant_id', $certificate->participant_id)->first();
+                if ($cert && !empty($cert->file_path)) {
+                    $relativePath = Str::replaceFirst('storage/', '', $cert->file_path);
+                    if (Storage::disk('public')->exists($relativePath)) {
+                        continue; // idempotent – plik już jest
+                    }
+                }
+                try {
+                    $generator->generatePdf($certificate->participant_id, [
+                        'save_to_storage' => true,
+                        'cache' => false,
+                    ]);
+                    $generated++;
+                } catch (\Throwable $e) {
+                    Log::warning('GenerateCertificatePdf (sync): błąd', [
+                        'participant_id' => $certificate->participant_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            Cache::put("certificate_pdf_generation_finished_{$course->id}", now()->toDateTimeString(), 86400);
+            return redirect()->back()->with('success', "Wygenerowano pliki PDF dla {$generated} zaświadczeń.");
+        }
+
+        // Duża liczba – batch w tle (wymaga queue workera)
+        $jobs = $certificates->map(fn ($certificate) => new GenerateCertificatePdfJob($certificate->participant_id))->all();
+
+        Bus::batch($jobs)
+            ->name("certificate-pdfs-course-{$course->id}")
+            ->then(function (Batch $batch) {
+                $name = $batch->name ?? '';
+                if (preg_match('/^certificate-pdfs-course-(\d+)$/', $name, $m)) {
+                    $courseId = (int) $m[1];
+                    Cache::put("certificate_pdf_generation_finished_{$courseId}", now()->toDateTimeString(), 86400);
+                }
+            })
+            ->dispatch();
+
+        return redirect()->back()->with('success', "Zlecono generowanie {$count} plików PDF. Pliki są generowane w tle. Po zakończeniu zobaczysz komunikat na tej stronie. Upewnij się, że worker kolejki działa (sail artisan queue:work).");
+    }
+
+    /**
+     * Postęp generowania plików PDF dla kursu (do odpytywania co 2 s z frontu).
+     * Liczba „X z Y” z tabeli certificates (faktyczne pliki), nie z job_batches.
+     */
+    public function pdfGenerationProgress(Course $course)
+    {
+        $total = Certificate::where('course_id', $course->id)->count();
+        $withFile = Certificate::where('course_id', $course->id)->whereNotNull('file_path')->where('file_path', '!=', '')->count();
+
+        return response()->json([
+            'total' => $total,
+            'with_file' => $withFile,
+        ]);
+    }
+
+    /**
+     * Czy dla kursu trwa generowanie PDF w tle (batch w kolejce). Do wykrywania na starcie strony i przycisku „Przerwij”.
+     */
+    public function pdfGenerationStatus(Course $course)
+    {
+        $connection = config('queue.batching.database');
+        $batchTable = config('queue.batching.table', 'job_batches');
+        $name = "certificate-pdfs-course-{$course->id}";
+        $row = DB::connection($connection)->table($batchTable)
+            ->where('name', $name)
+            ->whereNull('finished_at')
+            ->whereNull('cancelled_at')
+            ->first();
+
+        if (!$row) {
+            return response()->json(['active' => false]);
+        }
+
+        return response()->json([
+            'active' => true,
+            'batch_id' => $row->id,
+        ]);
+    }
+
+    /**
+     * Przerywa generowanie plików PDF w tle (anuluje batch). Użycie: przycisk „Przerwij generowanie”.
+     */
+    public function cancelPdfGeneration(Course $course)
+    {
+        $connection = config('queue.batching.database');
+        $batchTable = config('queue.batching.table', 'job_batches');
+        $name = "certificate-pdfs-course-{$course->id}";
+        $row = DB::connection($connection)->table($batchTable)
+            ->where('name', $name)
+            ->whereNull('finished_at')
+            ->whereNull('cancelled_at')
+            ->first();
+
+        if (!$row) {
+            return response()->json(['success' => false, 'message' => 'Brak aktywnego generowania.'], 404);
+        }
+
+        $batch = Bus::findBatch($row->id);
+        if ($batch && !$batch->cancelled()) {
+            $batch->cancel();
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Czy trwa generowanie plików PDF w tle dla dowolnego szkolenia (do globalnego komunikatu na listach uczestników).
+     * Zwraca pierwszy znaleziony aktywny batch z nazwą kursu.
+     */
+    public function pdfGenerationStatusAny()
+    {
+        $connection = config('queue.batching.database');
+        $batchTable = config('queue.batching.table', 'job_batches');
+        $row = DB::connection($connection)->table($batchTable)
+            ->whereNull('finished_at')
+            ->whereNull('cancelled_at')
+            ->where('name', 'like', 'certificate-pdfs-course-%')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$row || !preg_match('/^certificate-pdfs-course-(\d+)$/', $row->name, $m)) {
+            return response()->json(['active' => false]);
+        }
+
+        $courseId = (int) $m[1];
+        $course = Course::find($courseId);
+
+        return response()->json([
+            'active' => true,
+            'course_id' => $courseId,
+            'course_title' => $course ? $course->title : null,
+            'participants_url' => $course ? route('participants.index', $course) : null,
+        ]);
+    }
+
+    /**
+     * Usuwa tylko pliki PDF zaświadczeń z dysku i zeruje file_path (zachowuje rekordy i numery).
+     * Po edycji tytułu/zagadnień kursu pozwala wygenerować pliki od nowa.
+     */
+    public function deleteCertificatePdfFiles(Course $course)
+    {
+        $certificates = Certificate::where('course_id', $course->id)->whereNotNull('file_path')->get();
+        $deleted = 0;
+
+        foreach ($certificates as $certificate) {
+            $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path ?? '');
+            if ($relativePath !== '' && Storage::disk('public')->exists($relativePath)) {
+                Storage::disk('public')->delete($relativePath);
+            }
+            $certificate->update(['file_path' => null]);
+            $deleted++;
+        }
+
+        return redirect()->back()->with('success', "Usunięto pliki PDF dla {$deleted} zaświadczeń. Numery zaświadczeń zostały zachowane. Możesz teraz wygenerować pliki ponownie (np. po edycji danych szkolenia).");
+    }
+
+    /**
+     * Pobiera istniejący plik PDF z serwera (bez generowania). Używane przy kliknięciu w ikonę PDF.
+     */
+    public function downloadCertificatePdf(Certificate $certificate)
+    {
+        if (empty($certificate->file_path)) {
+            return redirect()->back()->with('error', 'Brak pliku PDF na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
+        }
+
+        $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
+        if (!Storage::disk('public')->exists($relativePath)) {
+            return redirect()->back()->with('error', 'Plik PDF nie istnieje na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
+        }
+
+        $certificateNumber = $certificate->certificate_number;
+        $downloadFileName = 'zaswiadczenie_' . str_replace('/', '-', $certificateNumber) . '.pdf';
+        return response()->download(storage_path('app/public/' . $relativePath), $downloadFileName);
+    }
+
+    /**
+     * Usuwa tylko plik PDF jednego zaświadczenia (zachowuje rekord i numer). Pozwala wygenerować PDF ponownie np. po poprawce danych uczestnika.
+     */
+    public function deleteCertificatePdf(Certificate $certificate)
+    {
+        if (!empty($certificate->file_path)) {
+            $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
+            if ($relativePath !== '' && Storage::disk('public')->exists($relativePath)) {
+                Storage::disk('public')->delete($relativePath);
+            }
+            $certificate->update(['file_path' => null]);
+        }
+
+        return redirect()->back()->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
     }
 
     public function bulkDelete(Course $course)

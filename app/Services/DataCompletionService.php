@@ -126,8 +126,8 @@ class DataCompletionService
 
                 // Wysyłka maila (tylko jeśli nie jest to tryb testowy lub jest testowy email)
                 if (!$testMode || ($testEmail && $email === strtolower(trim($testEmail)))) {
-                    // W trybie testowym zawsze wysyłaj na waldemar.grabowski@hostnet.pl
-                    $recipientEmail = $testMode ? 'waldemar.grabowski@hostnet.pl' : $email;
+                    // W trybie testowym wysyłaj na adres wpisany w formularzu (żeby użytkownik mógł zobaczyć e-mail np. w Mailpit)
+                    $recipientEmail = $testMode ? strtolower(trim($testEmail)) : $email;
                     
                     try {
                         $mail = new \App\Mail\DataCompletionRequestMail(
@@ -217,6 +217,39 @@ class DataCompletionService
                     'email' => $email,
                     'course_id' => $courseId,
                     'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Tryb testowy: jeśli nie wysłano nic (np. wpisany e-mail nie jest uczestnikiem z brakami), wyślij jeden testowy mail na podany adres
+        if ($testMode && $testEmail && $sent === 0 && empty($errors)) {
+            try {
+                $email = strtolower(trim($testEmail));
+                $token = DataCompletionToken::generateForEmail($email, 30);
+                $course = Course::where('id', $courseId)->with('instructor')->first();
+                $coursesForMail = $course ? collect([$course]) : collect();
+                if ($coursesForMail->isEmpty()) {
+                    $errors[] = ['email' => $email, 'error' => 'Nie znaleziono kursu.'];
+                } else {
+                    $mail = new \App\Mail\DataCompletionRequestMail(
+                        $token,
+                        $coursesForMail,
+                        'Test Użytkownik',
+                        true
+                    );
+                    Mail::to($email)->send($mail);
+                    $sent = 1;
+                    Log::info('Wysłano testowy e-mail (bez uczestnika w bazie)', [
+                        'to' => $email,
+                        'course_id' => $courseId,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $errors[] = ['email' => strtolower(trim($testEmail)), 'error' => $e->getMessage()];
+                Log::error('Błąd wysyłki testowego emaila (tryb dummy)', [
+                    'test_email' => $testEmail,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }

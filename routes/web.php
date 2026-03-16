@@ -293,6 +293,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/', [ParticipantController::class, 'index'])->name('participants.index'); // Lista uczestników
         Route::get('/create', [ParticipantController::class, 'create'])->name('participants.create'); // Formularz dodawania
         Route::post('/', [ParticipantController::class, 'store'])->name('participants.store'); // Dodawanie uczestnika
+        Route::post('/{participant}/send-certificate-link', [ParticipantController::class, 'sendCertificateLink'])->name('participants.send-certificate-link'); // Wyślij e-mail z linkiem do zaświadczeń
         Route::post('/import', [ParticipantController::class, 'import'])->name('participants.import'); // Import CSV
         Route::post('/import-certificates', [CertificateController::class, 'importFromPubligo'])->name('certificates.import'); // Import certyfikatów z Publigo
         Route::get('/{participant}/edit', [ParticipantController::class, 'edit'])->name('participants.edit'); // Edycja uczestnika
@@ -303,9 +304,17 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     });
 
     Route::get('/certificates/generate/{participant}', [CertificateController::class, 'generate'])->name('certificates.generate');
+    Route::get('/certificates/{certificate}/download-pdf', [CertificateController::class, 'downloadCertificatePdf'])->name('certificates.download-pdf');
+    Route::post('/certificates/{certificate}/delete-pdf', [CertificateController::class, 'deleteCertificatePdf'])->name('certificates.delete-pdf');
     Route::delete('/certificates/{certificate}', [CertificateController::class, 'destroy'])->name('certificates.destroy');
     Route::get('/courses/{course}/certificates/bulk-generate', [CertificateController::class, 'bulkGenerate'])->name('certificates.bulk-generate');
     Route::get('/courses/{course}/certificates/bulk-generate-all', [CertificateController::class, 'bulkGenerateAll'])->name('certificates.bulk-generate-all');
+    Route::post('/courses/{course}/certificates/generate-all-pdfs', [CertificateController::class, 'generateAllPdfs'])->name('certificates.generate-all-pdfs');
+    Route::get('/courses/{course}/certificates/pdf-generation-progress', [CertificateController::class, 'pdfGenerationProgress'])->name('certificates.pdf-generation-progress');
+    Route::get('/courses/{course}/certificates/pdf-generation-status', [CertificateController::class, 'pdfGenerationStatus'])->name('certificates.pdf-generation-status');
+    Route::get('/certificates/pdf-generation-status-any', [CertificateController::class, 'pdfGenerationStatusAny'])->name('certificates.pdf-generation-status-any');
+    Route::post('/courses/{course}/certificates/cancel-pdf-generation', [CertificateController::class, 'cancelPdfGeneration'])->name('certificates.cancel-pdf-generation');
+    Route::post('/courses/{course}/certificates/delete-pdf-files', [CertificateController::class, 'deleteCertificatePdfFiles'])->name('certificates.delete-pdf-files');
     Route::get('/courses/{course}/certificates/bulk-delete', [CertificateController::class, 'bulkDelete'])->name('certificates.bulk-delete');
 
 
