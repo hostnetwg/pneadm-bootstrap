@@ -410,6 +410,8 @@ class CertificateController extends Controller
      */
     public function deleteCertificatePdf(Certificate $certificate)
     {
+        $course = Course::find($certificate->course_id);
+
         if (!empty($certificate->file_path)) {
             $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
             if ($relativePath !== '' && Storage::disk('public')->exists($relativePath)) {
@@ -418,7 +420,13 @@ class CertificateController extends Controller
             $certificate->update(['file_path' => null]);
         }
 
-        return redirect()->back()->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
+        if ($course) {
+            return redirect()->route('participants.index', $course)
+                ->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
+        }
+
+        return redirect()->back()
+            ->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
     }
 
     public function bulkDelete(Course $course)
