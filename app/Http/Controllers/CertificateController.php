@@ -143,7 +143,7 @@ class CertificateController extends Controller
             ->get();
 
         if ($participantsWithCompleteData->isEmpty()) {
-            return redirect()->back()->with('info', 'Brak uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia).');
+            return redirect()->route('participants.index', $course)->with('info', 'Brak uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia).');
         }
 
         $courseYear = $this->resolveCourseYear($course);
@@ -167,7 +167,7 @@ class CertificateController extends Controller
             $generatedCount++;
         }
 
-        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników z kompletnymi danymi.");
+        return redirect()->route('participants.index', $course)->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla uczestników z kompletnymi danymi.");
     }
 
     /**
@@ -181,7 +181,7 @@ class CertificateController extends Controller
             ->get();
 
         if ($allParticipants->isEmpty()) {
-            return redirect()->back()->with('info', 'Brak uczestników w tym szkoleniu.');
+            return redirect()->route('participants.index', $course)->with('info', 'Brak uczestników w tym szkoleniu.');
         }
 
         $courseYear = $this->resolveCourseYear($course);
@@ -205,7 +205,7 @@ class CertificateController extends Controller
             $generatedCount++;
         }
 
-        return redirect()->back()->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla wszystkich uczestników.");
+        return redirect()->route('participants.index', $course)->with('success', "Wygenerowano {$generatedCount} zaświadczeń dla wszystkich uczestników.");
     }
 
     /**
@@ -217,7 +217,7 @@ class CertificateController extends Controller
     {
         $certificates = Certificate::where('course_id', $course->id)->get();
         if ($certificates->isEmpty()) {
-            return redirect()->back()->with('info', 'Brak zaświadczeń dla tego szkolenia. Najpierw wygeneruj zaświadczenia (rekordy w bazie).');
+            return redirect()->route('participants.index', $course)->with('info', 'Brak zaświadczeń dla tego szkolenia. Najpierw wygeneruj zaświadczenia (rekordy w bazie).');
         }
 
         $count = $certificates->count();
@@ -250,7 +250,7 @@ class CertificateController extends Controller
                 }
             }
             Cache::put("certificate_pdf_generation_finished_{$course->id}", now()->toDateTimeString(), 86400);
-            return redirect()->back()->with('success', "Wygenerowano pliki PDF dla {$generated} zaświadczeń.");
+            return redirect()->route('participants.index', $course)->with('success', "Wygenerowano pliki PDF dla {$generated} zaświadczeń.");
         }
 
         // Duża liczba – batch w tle (wymaga queue workera)
@@ -267,7 +267,7 @@ class CertificateController extends Controller
             })
             ->dispatch();
 
-        return redirect()->back()->with('success', "Zlecono generowanie {$count} plików PDF. Pliki są generowane w tle. Po zakończeniu zobaczysz komunikat na tej stronie. Upewnij się, że worker kolejki działa (sail artisan queue:work).");
+        return redirect()->route('participants.index', $course)->with('success', "Zlecono generowanie {$count} plików PDF. Pliki są generowane w tle. Po zakończeniu zobaczysz komunikat na tej stronie. Upewnij się, że worker kolejki działa (sail artisan queue:work).");
     }
 
     /**
@@ -383,7 +383,7 @@ class CertificateController extends Controller
             $deleted++;
         }
 
-        return redirect()->back()->with('success', "Usunięto pliki PDF dla {$deleted} zaświadczeń. Numery zaświadczeń zostały zachowane. Możesz teraz wygenerować pliki ponownie (np. po edycji danych szkolenia).");
+        return redirect()->route('participants.index', $course)->with('success', "Usunięto pliki PDF dla {$deleted} zaświadczeń. Numery zaświadczeń zostały zachowane. Możesz teraz wygenerować pliki ponownie (np. po edycji danych szkolenia).");
     }
 
     /**
@@ -427,7 +427,7 @@ class CertificateController extends Controller
         $certificates = Certificate::where('course_id', $course->id)->get();
 
         if ($certificates->isEmpty()) {
-            return redirect()->back()->with('info', 'Brak zaświadczeń do usunięcia dla tego szkolenia.');
+            return redirect()->route('participants.index', $course)->with('info', 'Brak zaświadczeń do usunięcia dla tego szkolenia.');
         }
 
         $deletedCount = 0;
@@ -447,7 +447,7 @@ class CertificateController extends Controller
             $deletedCount++;
         }
 
-        return redirect()->back()->with('success', "Usunięto {$deletedCount} zaświadczeń dla szkolenia '{$course->title}'.");
+        return redirect()->route('participants.index', $course)->with('success', "Usunięto {$deletedCount} zaświadczeń dla szkolenia '{$course->title}'.");
     }
 
     public function importFromPubligo(Request $request, Course $course)
