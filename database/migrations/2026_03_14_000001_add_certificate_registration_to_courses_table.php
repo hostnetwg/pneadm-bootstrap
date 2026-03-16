@@ -9,10 +9,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('courses', function (Blueprint $table) {
-            $table->boolean('certificate_registration_open')->default(false)->after('certificate_download_status');
-            $table->dateTime('certificate_registration_starts_at')->nullable()->after('certificate_registration_open');
-            $table->dateTime('certificate_registration_ends_at')->nullable()->after('certificate_registration_starts_at');
-            $table->string('certificate_registration_token', 64)->nullable()->unique()->after('certificate_registration_ends_at');
+            if (!Schema::hasColumn('courses', 'certificate_registration_open')) {
+                $table->boolean('certificate_registration_open')->default(false);
+            }
+            if (!Schema::hasColumn('courses', 'certificate_registration_starts_at')) {
+                $table->dateTime('certificate_registration_starts_at')->nullable();
+            }
+            if (!Schema::hasColumn('courses', 'certificate_registration_ends_at')) {
+                $table->dateTime('certificate_registration_ends_at')->nullable();
+            }
+            if (!Schema::hasColumn('courses', 'certificate_registration_token')) {
+                $table->string('certificate_registration_token', 64)->nullable()->unique();
+            }
         });
     }
 
