@@ -37,7 +37,7 @@ class CertificateController extends Controller
             ['certificate_number' => $certificateNumber, 'generated_at' => now()]
         );
     
-        return redirect()->back()->with('success', "Certyfikat nr {$certificateNumber} został zapisany.");
+        return redirect()->route('participants.index', $course)->with('success', "Certyfikat nr {$certificateNumber} został zapisany.");
     }
     
     
@@ -58,7 +58,7 @@ class CertificateController extends Controller
     
         // Jeśli certyfikat nie istnieje, zwracamy błąd
         if (!$certificate) {
-            return redirect()->back()->with('error', 'Certyfikat dla tego uczestnika nie został znaleziony.');
+            return redirect()->route('participants.index', $course)->with('error', 'Certyfikat dla tego uczestnika nie został znaleziony.');
         }
     
         // Używamy istniejącego numeru certyfikatu
@@ -122,8 +122,13 @@ class CertificateController extends Controller
         }
     
         // Usunięcie certyfikatu z bazy danych
+        $course = Course::find($certificate->course_id);
         $certificate->delete();
-    
+
+        if ($course) {
+            return redirect()->route('participants.index', $course)->with('success', 'Certyfikat został usunięty.');
+        }
+
         return redirect()->back()->with('success', 'Certyfikat został usunięty.');
     }
 
@@ -391,13 +396,17 @@ class CertificateController extends Controller
      */
     public function downloadCertificatePdf(Certificate $certificate)
     {
+        $course = Course::find($certificate->course_id);
+
         if (empty($certificate->file_path)) {
-            return redirect()->back()->with('error', 'Brak pliku PDF na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
+            $redirect = $course ? redirect()->route('participants.index', $course) : redirect()->back();
+            return $redirect->with('error', 'Brak pliku PDF na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
         }
 
         $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
         if (!Storage::disk('public')->exists($relativePath)) {
-            return redirect()->back()->with('error', 'Plik PDF nie istnieje na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
+            $redirect = $course ? redirect()->route('participants.index', $course) : redirect()->back();
+            return $redirect->with('error', 'Plik PDF nie istnieje na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
         }
 
         $certificateNumber = $certificate->certificate_number;
