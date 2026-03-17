@@ -16,6 +16,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CertificateLinkMail;
+use App\Models\Certificate;
+use App\Models\CertificateEmailLog;
+use App\Jobs\SendCertificateLinkEmailJob;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 
 class ParticipantController extends Controller
 {
@@ -666,7 +672,18 @@ class ParticipantController extends Controller
             \Illuminate\Support\Facades\Cache::forget($cacheKey);
         }
 
-        return view('participants.index', compact('participants', 'course', 'pneduFrontendUrl', 'downloadTokensByEmail', 'certificatePdfGenerationCompletedAt'));
+        $totalCertificates = Certificate::where('course_id', $course->id)->count();
+        $downloadedCertificates = Certificate::where('course_id', $course->id)->where('download_count', '>', 0)->count();
+
+        return view('participants.index', compact(
+            'participants',
+            'course',
+            'pneduFrontendUrl',
+            'downloadTokensByEmail',
+            'certificatePdfGenerationCompletedAt',
+            'totalCertificates',
+            'downloadedCertificates'
+        ));
     }
 
     /**
@@ -683,16 +700,196 @@ class ParticipantController extends Controller
             return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma podanego adresu e-mail.');
         }
 
-        $token = ParticipantDownloadToken::getOrCreateTokenForEmail($email);
-        $certificatesUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/') . '/certificates/' . $token;
+        $createdBy = Auth::id();
 
         try {
-            Mail::to($email)->send(new CertificateLinkMail($participant, $course, $certificatesUrl));
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_LIST_LINK,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+            ]);
+
+            SendCertificateLinkEmailJob::dispatch(
+                $course->id,
+                $participant->id,
+                CertificateEmailLog::TYPE_LIST_LINK,
+                $log->id
+            );
         } catch (\Throwable $e) {
             return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: ' . $e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do zaświadczeń został wysłany na adres ' . $email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail został zlecony do wysyłki na adres ' . $email);
+    }
+
+    /**
+     * Masowa wysyłka e-maili z linkami do zaświadczeń (kolejka).
+     * Typy: list_link | single_certificate
+     * Tryby: unsent | resend_all | not_downloaded
+     */
+    public function sendCertificateLinksBulk(Request $request, Course $course)
+    {
+        $request->validate([
+            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'mode' => 'required|string|in:unsent,resend_all,not_downloaded',
+        ]);
+
+        $type = $request->string('type')->toString();
+        $mode = $request->string('mode')->toString();
+        $createdBy = Auth::id();
+
+        $participantsQuery = Participant::query()
+            ->where('course_id', $course->id)
+            ->whereNotNull('email')
+            ->where('email', '!=', '');
+
+        if ($mode === 'unsent') {
+            $participantsQuery->whereNotExists(function ($q) use ($course, $type) {
+                $q->selectRaw('1')
+                    ->from('certificate_email_logs')
+                    ->whereColumn('certificate_email_logs.participant_id', 'participants.id')
+                    ->where('certificate_email_logs.course_id', $course->id)
+                    ->where('certificate_email_logs.type', $type)
+                    ->where('certificate_email_logs.status', CertificateEmailLog::STATUS_SENT);
+            });
+        } elseif ($mode === 'not_downloaded') {
+            $participantsQuery->leftJoin('certificates', function ($join) use ($course) {
+                $join->on('certificates.participant_id', '=', 'participants.id')
+                    ->where('certificates.course_id', '=', $course->id);
+            })->whereRaw('COALESCE(certificates.download_count, 0) = 0')
+              ->select('participants.*');
+        }
+
+        $participants = $participantsQuery->get();
+        if ($participants->isEmpty()) {
+            return redirect()->route('participants.index', $course)->with('info', 'Brak uczestników spełniających warunki wysyłki.');
+        }
+
+        // Utwórz logi (queued) i joby
+        $jobs = [];
+        $logIds = [];
+        foreach ($participants as $participant) {
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => $type,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+            ]);
+            $logIds[] = $log->id;
+
+            $jobs[] = new SendCertificateLinkEmailJob(
+                $course->id,
+                $participant->id,
+                $type,
+                $log->id
+            );
+        }
+
+        $batch = Bus::batch($jobs)
+            ->name("certificate-emails-{$type}-course-{$course->id}")
+            ->dispatch();
+
+        CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            "Zlecono wysyłkę {$participants->count()} e-maili ({$type}). Wysyłka odbywa się w tle."
+        );
+    }
+
+    /**
+     * Status/progress aktywnej wysyłki e-maili (batch) dla kursu i typu.
+     */
+    public function certificateEmailBatchStatus(Request $request, Course $course)
+    {
+        $request->validate([
+            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+        ]);
+
+        $type = $request->string('type')->toString();
+        $connection = config('queue.batching.database');
+        $batchTable = config('queue.batching.table', 'job_batches');
+        $name = "certificate-emails-{$type}-course-{$course->id}";
+
+        $row = DB::connection($connection)->table($batchTable)
+            ->where('name', $name)
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$row) {
+            return response()->json([
+                'active' => false,
+                'state' => 'none',
+                'type' => $type,
+                'total' => 0,
+                'processed' => 0,
+                'pending' => 0,
+                'failed' => 0,
+            ]);
+        }
+
+        $total = (int) ($row->total_jobs ?? 0);
+        $pending = (int) ($row->pending_jobs ?? 0);
+        $failed = (int) ($row->failed_jobs ?? 0);
+        $processed = max(0, $total - $pending);
+
+        $state = 'active';
+        $active = true;
+        if (!empty($row->cancelled_at)) {
+            $state = 'cancelled';
+            $active = false;
+        } elseif (!empty($row->finished_at)) {
+            $state = 'finished';
+            $active = false;
+        }
+
+        return response()->json([
+            'active' => $active,
+            'state' => $state,
+            'batch_id' => $row->id,
+            'type' => $type,
+            'total' => $total,
+            'processed' => $processed,
+            'pending' => $pending,
+            'failed' => $failed,
+        ]);
+    }
+
+    /**
+     * Anuluje aktywną wysyłkę e-maili (batch) dla kursu i typu.
+     */
+    public function cancelCertificateEmailBatch(Request $request, Course $course)
+    {
+        $request->validate([
+            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+        ]);
+
+        $type = $request->string('type')->toString();
+        $connection = config('queue.batching.database');
+        $batchTable = config('queue.batching.table', 'job_batches');
+        $name = "certificate-emails-{$type}-course-{$course->id}";
+
+        $row = DB::connection($connection)->table($batchTable)
+            ->where('name', $name)
+            ->whereNull('finished_at')
+            ->whereNull('cancelled_at')
+            ->first();
+
+        if (!$row) {
+            return response()->json(['success' => false, 'message' => 'Brak aktywnej wysyłki.'], 404);
+        }
+
+        $batch = Bus::findBatch($row->id);
+        if ($batch && !$batch->cancelled()) {
+            $batch->cancel();
+        }
+
+        return response()->json(['success' => true]);
     }
     
     

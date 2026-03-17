@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class CertificateApiController extends Controller
 {
@@ -314,6 +315,57 @@ class CertificateApiController extends Controller
         }
 
         return $connection;
+    }
+
+    /**
+     * Oznacza pobranie zaświadczenia (pnedu -> pneadm) na podstawie tokenu i kursu.
+     * Zwiększa licznik i ustawia first/last_downloaded_at w tabeli certificates.
+     */
+    public function markDownloaded(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required|string',
+            'course_id' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => 'Validation failed', 'messages' => $validator->errors()], 422);
+        }
+
+        $token = (string) $request->input('token');
+        $courseId = (int) $request->input('course_id');
+
+        $tokenRecord = ParticipantDownloadToken::findByToken($token);
+        if (!$tokenRecord) {
+            return response()->json(['error' => 'Token not found'], 404);
+        }
+
+        $participant = Participant::whereRaw('LOWER(TRIM(email)) = ?', [$tokenRecord->email_normalized])
+            ->where('course_id', $courseId)
+            ->first();
+        if (!$participant) {
+            return response()->json(['error' => 'Participant not found for course'], 404);
+        }
+
+        $certificate = Certificate::where('participant_id', $participant->id)
+            ->where('course_id', $courseId)
+            ->first();
+        if (!$certificate) {
+            return response()->json(['error' => 'Certificate not found'], 404);
+        }
+
+        $now = now();
+        $updates = [
+            'download_count' => DB::raw('download_count + 1'),
+            'last_downloaded_at' => $now,
+        ];
+        if (empty($certificate->first_downloaded_at)) {
+            $updates['first_downloaded_at'] = $now;
+        }
+
+        Certificate::where('id', $certificate->id)->update($updates);
+
+        return response()->json(['success' => true]);
     }
 }
 

@@ -58,4 +58,16 @@ class ParticipantDownloadToken extends Model
         $record = self::where('email_normalized', $normalized)->first();
         return $record?->token;
     }
+
+    /**
+     * Znajdź rekord po tokenie. Zwraca null, jeśli nie istnieje.
+     */
+    public static function findByToken(string $token): ?self
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return null;
+        }
+        return self::where('token', $token)->first();
+    }
 }

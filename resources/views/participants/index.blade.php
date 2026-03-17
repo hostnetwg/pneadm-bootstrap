@@ -27,6 +27,18 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
             </div>
         @endif
+        @if(isset($totalCertificates) && isset($downloadedCertificates))
+            <div class="alert alert-light border d-flex align-items-center justify-content-between mb-4" role="alert">
+                <div>
+                    <i class="fas fa-download me-2"></i>
+                    <strong>Pobrania zaświadczeń:</strong>
+                    <span class="ms-1">Pobrało <strong>{{ $downloadedCertificates }}</strong> z <strong>{{ $totalCertificates }}</strong> (liczone po rekordach w `certificates`).</span>
+                </div>
+                <span class="badge {{ $downloadedCertificates > 0 ? 'bg-success' : 'bg-secondary' }} fs-6">
+                    {{ $downloadedCertificates }}/{{ $totalCertificates }}
+                </span>
+            </div>
+        @endif
         <div id="generatingPdfsAlert" class="alert alert-info d-none mb-4" role="alert"
              data-progress-url="{{ route('certificates.pdf-generation-progress', $course) }}"
              data-status-url="{{ route('certificates.pdf-generation-status', $course) }}"
@@ -35,6 +47,15 @@
             <span class="generating-pdfs-text"><strong>Trwa generowanie plików PDF.</strong> Na koniec zobaczysz komunikat z potwierdzeniem.</span>
             <span class="generating-pdfs-cancel-wrap d-none ms-2">
                 <button type="button" class="btn btn-sm btn-outline-danger" id="cancelPdfGenerationBtn">Przerwij generowanie</button>
+            </span>
+        </div>
+        <div id="sendingEmailsAlert" class="alert alert-info d-none mb-4" role="alert"
+             data-status-url="{{ route('participants.certificate-emails.status', $course) }}"
+             data-cancel-url="{{ route('participants.certificate-emails.cancel', $course) }}">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            <span class="sending-emails-text"><strong>Trwa wysyłanie e-maili.</strong> Na koniec zobaczysz komunikat z potwierdzeniem.</span>
+            <span class="sending-emails-cancel-wrap d-none ms-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="cancelEmailBatchBtn">Przerwij wysyłkę</button>
             </span>
         </div>
         <div id="otherCoursePdfGenerationAlert" class="alert alert-warning d-none mb-4" role="alert"
@@ -76,6 +97,12 @@
                     </button>
                     <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#bulkDeleteModal">
                         <i class="fas fa-trash me-1"></i> Usuń zaświadczenia
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkEmailListModal">
+                        <i class="fas fa-envelope me-1"></i> Wyślij e-maile: lista zaświadczeń
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkEmailSingleModal">
+                        <i class="fas fa-envelope me-1"></i> Wyślij e-maile: to zaświadczenie
                     </button>
                     <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
@@ -261,6 +288,16 @@
                                         <i class="bi bi-file-earmark-pdf"></i>
                                     </a>
                                 @endif
+                                @php
+                                    $downloadCount = (int) ($participant->certificate->download_count ?? 0);
+                                    $lastDownloadedAt = $participant->certificate->last_downloaded_at ?? null;
+                                @endphp
+                                <div class="mt-1">
+                                    <span class="badge {{ $downloadCount > 0 ? 'bg-success' : 'bg-secondary' }}"
+                                          title="{{ $downloadCount > 0 && $lastDownloadedAt ? 'Ostatnie pobranie: ' . $lastDownloadedAt->format('d.m.Y H:i') : '' }}">
+                                        Pobrane: {{ $downloadCount > 0 ? 'TAK' : 'NIE' }}@if($downloadCount > 0 && $lastDownloadedAt) ({{ $lastDownloadedAt->format('d.m.Y H:i') }})@endif
+                                    </span>
+                                </div>
                             @else
                                 Brak zaświadczenia
                             @endif
@@ -289,6 +326,7 @@
                                 @endphp
                                 @if($certToken)
                                     <a href="{{ $pneduFrontendUrl }}/certificates/{{ $certToken }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="Lista zaświadczeń (pnedu.pl)">Zaświadczenia (pnedu)</a>
+                                    <a href="{{ $pneduFrontendUrl }}/certificate/{{ $certToken }}/{{ $course->id }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="To konkretne zaświadczenie (pnedu.pl)">Zaświadczenie (pnedu)</a>
                                     <form action="{{ route('participants.send-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do zaświadczeń?');">
                                         @csrf
                                         <button type="submit" class="btn btn-outline-secondary btn-sm">Wyślij e-mail</button>
@@ -579,6 +617,96 @@
                 </div>
             </div>
         </div>
+
+        {{-- Modal: Masowa wysyłka e-maili – lista zaświadczeń --}}
+        <div class="modal fade" id="bulkEmailListModal" tabindex="-1" aria-labelledby="bulkEmailListModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title" id="bulkEmailListModalLabel">
+                            <i class="fas fa-envelope me-2"></i> Wyślij e-maile: lista zaświadczeń
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Wyśle e-mail do uczestników z linkiem do listy wszystkich ich zaświadczeń (pnedu).</p>
+                        <div class="mb-0">
+                            <label class="form-label fw-bold">Tryb wysyłki</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_list_mode" id="bulk_email_list_mode_unsent" value="unsent" checked>
+                                <label class="form-check-label" for="bulk_email_list_mode_unsent">Wyślij tylko do tych, do których jeszcze nie wysłano</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_list_mode" id="bulk_email_list_mode_resend" value="resend_all">
+                                <label class="form-check-label" for="bulk_email_list_mode_resend">Wyślij ponownie do wszystkich</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_list_mode" id="bulk_email_list_mode_not_downloaded" value="not_downloaded">
+                                <label class="form-check-label" for="bulk_email_list_mode_not_downloaded">Wyślij tylko do tych, którzy jeszcze nie pobrali</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('participants.send-certificate-links-bulk', $course) }}" method="POST" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="type" value="list_link">
+                            <input type="hidden" name="mode" id="bulk_email_list_mode_input" value="unsent">
+                            <button type="submit" class="btn btn-light">
+                                <i class="fas fa-paper-plane me-1"></i> Wyślij
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal: Masowa wysyłka e-maili – konkretne zaświadczenie --}}
+        <div class="modal fade" id="bulkEmailSingleModal" tabindex="-1" aria-labelledby="bulkEmailSingleModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title" id="bulkEmailSingleModalLabel">
+                            <i class="fas fa-envelope me-2"></i> Wyślij e-maile: to zaświadczenie
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Wyśle e-mail do uczestników z linkiem do zaświadczenia dla tego szkolenia (pnedu). W treści będzie tytuł szkolenia i prowadzący.</p>
+                        <div class="mb-0">
+                            <label class="form-label fw-bold">Tryb wysyłki</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_single_mode" id="bulk_email_single_mode_unsent" value="unsent" checked>
+                                <label class="form-check-label" for="bulk_email_single_mode_unsent">Wyślij tylko do tych, do których jeszcze nie wysłano</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_single_mode" id="bulk_email_single_mode_resend" value="resend_all">
+                                <label class="form-check-label" for="bulk_email_single_mode_resend">Wyślij ponownie do wszystkich</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_single_mode" id="bulk_email_single_mode_not_downloaded" value="not_downloaded">
+                                <label class="form-check-label" for="bulk_email_single_mode_not_downloaded">Wyślij tylko do tych, którzy jeszcze nie pobrali</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('participants.send-certificate-links-bulk', $course) }}" method="POST" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="type" value="single_certificate">
+                            <input type="hidden" name="mode" id="bulk_email_single_mode_input" value="unsent">
+                            <button type="submit" class="btn btn-light">
+                                <i class="fas fa-paper-plane me-1"></i> Wyślij
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Import CSV -->
@@ -685,12 +813,122 @@
     @push('scripts')
     <script>
         var pdfProgressIntervalId = null;
+        var emailProgressIntervalId = null;
+
+        // Bulk email modals: sync selected radio -> hidden input
+        (function() {
+            function bind(groupName, hiddenInputId) {
+                var hidden = document.getElementById(hiddenInputId);
+                if (!hidden) return;
+                document.querySelectorAll('input[name="' + groupName + '"]').forEach(function(radio) {
+                    radio.addEventListener('change', function() {
+                        hidden.value = this.value;
+                    });
+                });
+            }
+            bind('bulk_email_list_mode', 'bulk_email_list_mode_input');
+            bind('bulk_email_single_mode', 'bulk_email_single_mode_input');
+        })();
 
         function clearModalBackdrop() {
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
             document.body.classList.remove('modal-open');
             document.body.style.overflow = '';
             document.body.style.paddingRight = '';
+        }
+
+        function emailTypeLabel(type) {
+            if (type === 'single_certificate') return 'to zaświadczenie';
+            if (type === 'list_link') return 'lista zaświadczeń';
+            return type || 'e-maile';
+        }
+
+        function updateEmailProgress(alertEl, type) {
+            if (!alertEl) return;
+            var statusUrl = alertEl.getAttribute('data-status-url');
+            var textEl = alertEl.querySelector('.sending-emails-text');
+            var cancelWrap = alertEl.querySelector('.sending-emails-cancel-wrap');
+            if (!statusUrl || !textEl) return;
+
+            var url = new URL(statusUrl, window.location.origin);
+            url.searchParams.set('type', type);
+
+            fetch(url.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.active) {
+                        // zakończ polling i pokaż podsumowanie
+                        if (emailProgressIntervalId) { clearInterval(emailProgressIntervalId); emailProgressIntervalId = null; }
+                        if (cancelWrap) cancelWrap.classList.add('d-none');
+
+                        if (data.state === 'finished') {
+                            alertEl.classList.remove('alert-info', 'alert-warning', 'alert-danger');
+                            alertEl.classList.add('alert-success');
+                            textEl.innerHTML =
+                                '<strong>Wysyłka zakończona (' + emailTypeLabel(data.type) + ').</strong> ' +
+                                'Wysłano/obsłużono <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                                'błędów: <strong>' + data.failed + '</strong>.';
+                            setTimeout(function() { alertEl.classList.add('d-none'); }, 6000);
+                        } else if (data.state === 'cancelled') {
+                            alertEl.classList.remove('alert-info', 'alert-success', 'alert-danger');
+                            alertEl.classList.add('alert-warning');
+                            textEl.innerHTML =
+                                '<strong>Wysyłka przerwana (' + emailTypeLabel(data.type) + ').</strong> ' +
+                                'Wykonano <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                                'błędów: <strong>' + data.failed + '</strong>.';
+                            setTimeout(function() { alertEl.classList.add('d-none'); }, 6000);
+                        } else {
+                            // brak aktywnej wysyłki
+                            alertEl.classList.add('d-none');
+                        }
+                        return;
+                    }
+                    textEl.innerHTML =
+                        '<strong>Trwa wysyłanie e-maili (' + emailTypeLabel(data.type) + ').</strong> ' +
+                        'Wykonano <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
+                        'błędów: <strong>' + data.failed + '</strong>.';
+                })
+                .catch(function() {});
+        }
+
+        function showEmailCancelButtonAndWire(alertEl, type) {
+            var cancelWrap = alertEl && alertEl.querySelector('.sending-emails-cancel-wrap');
+            var textEl = alertEl && alertEl.querySelector('.sending-emails-text');
+            var cancelUrl = alertEl && alertEl.getAttribute('data-cancel-url');
+            if (!cancelWrap || !cancelUrl) return;
+            cancelWrap.classList.remove('d-none');
+            var btn = cancelWrap.querySelector('#cancelEmailBatchBtn');
+            if (!btn || btn.dataset.wired) return;
+            btn.dataset.wired = '1';
+            btn.addEventListener('click', function() {
+                btn.disabled = true;
+                var token = (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content')) || (document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value);
+                var headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                if (token) headers['X-CSRF-TOKEN'] = token;
+                headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                var body = new URLSearchParams({ type: type, _token: token || '' });
+
+                fetch(cancelUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: headers,
+                    body: body
+                }).then(function(r) { return r.json(); }).then(function(data) {
+                    if (emailProgressIntervalId) { clearInterval(emailProgressIntervalId); emailProgressIntervalId = null; }
+                    cancelWrap.classList.add('d-none');
+                    if (textEl) textEl.innerHTML = '<strong>Wysyłka przerwana.</strong>';
+                }).catch(function() {
+                    btn.disabled = false;
+                });
+            });
+        }
+
+        function startEmailPolling(alertEl, type) {
+            if (!alertEl) return;
+            alertEl.classList.remove('d-none');
+            updateEmailProgress(alertEl, type);
+            emailProgressIntervalId = setInterval(function() { updateEmailProgress(alertEl, type); }, 2000);
+            showEmailCancelButtonAndWire(alertEl, type);
         }
 
         function updateProgressText(alertEl) {
@@ -854,6 +1092,26 @@
             }
             update();
             setInterval(update, 10000);
+        })();
+
+        (function checkEmailBatchesOnLoad() {
+            var alertEl = document.getElementById('sendingEmailsAlert');
+            var statusUrl = alertEl && alertEl.getAttribute('data-status-url');
+            if (!alertEl || !statusUrl) return;
+
+            function check(type) {
+                var url = new URL(statusUrl, window.location.origin);
+                url.searchParams.set('type', type);
+                return fetch(url.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) { return data.active ? type : null; })
+                    .catch(function() { return null; });
+            }
+
+            Promise.all([check('single_certificate'), check('list_link')]).then(function(results) {
+                var activeType = results[0] || results[1];
+                if (activeType) startEmailPolling(alertEl, activeType);
+            });
         })();
     </script>
     @endpush

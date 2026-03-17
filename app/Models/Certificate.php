@@ -14,6 +14,9 @@ class Certificate extends Model
         'course_id',
         'certificate_number',
         'file_path',
+        'download_count',
+        'first_downloaded_at',
+        'last_downloaded_at',
         'issue_date',
         'generated_at'
     ];
@@ -21,6 +24,8 @@ class Certificate extends Model
     protected $casts = [
         'issue_date' => 'date',
         'generated_at' => 'datetime',
+        'first_downloaded_at' => 'datetime',
+        'last_downloaded_at' => 'datetime',
     ];
 
     public function participant()
