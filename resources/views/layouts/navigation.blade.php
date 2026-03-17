@@ -326,6 +326,11 @@
             </button>
             <div class="collapse {{ request()->routeIs('settings.*') ? 'show' : '' }}" id="settings-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('settings.pnedu-purchases.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.pnedu-purchases.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Zakupy pnedu.pl
+                        </a>
+                    </li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>
                 </ul>
             </div>

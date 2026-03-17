@@ -30,6 +30,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\UserPreferencesController;
 use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\AccountingController;
+use App\Http\Controllers\Settings\PneduPurchasesController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -380,6 +381,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::put('/{id}', [AccountingController::class, 'dataEntryUpdate'])->name('update');
             Route::delete('/{id}', [AccountingController::class, 'dataEntryDestroy'])->name('destroy');
         });
+    });
+
+    // Ustawienia
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('pnedu-zakupy', [PneduPurchasesController::class, 'index'])->name('pnedu-purchases.index');
+        Route::post('pnedu-zakupy', [PneduPurchasesController::class, 'store'])->name('pnedu-purchases.store');
     });
 });
 
