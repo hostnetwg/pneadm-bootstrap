@@ -151,16 +151,25 @@ class CertificateController extends Controller
             return redirect()->route('participants.index', $course)->with('info', 'Brak uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia).');
         }
 
+        $existingParticipantIds = Certificate::where('course_id', $course->id)
+            ->pluck('participant_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $existingParticipantIdSet = array_fill_keys($existingParticipantIds, true);
+
         $courseYear = $this->resolveCourseYear($course);
         $nextCertificateNumber = $this->determineNextSequence($course, $courseYear);
 
         $generatedCount = 0;
 
         foreach ($participantsWithCompleteData as $participant) {
+            if (isset($existingParticipantIdSet[(int) $participant->id])) {
+                continue; // już ma zaświadczenie w certificates dla tego kursu
+            }
+
             $certificateNumber = $this->formatCertificateNumber($course, $nextCertificateNumber, $courseYear);
 
             // Zapis numeru certyfikatu w bazie danych
-            // Uwaga: generujemy zaświadczenia również dla uczestników, którzy już mają zaświadczenia
             Certificate::create([
                 'participant_id' => $participant->id,
                 'course_id' => $course->id,
@@ -168,6 +177,7 @@ class CertificateController extends Controller
                 'generated_at' => now()
             ]);
 
+            $existingParticipantIdSet[(int) $participant->id] = true;
             $nextCertificateNumber++;
             $generatedCount++;
         }
@@ -189,16 +199,25 @@ class CertificateController extends Controller
             return redirect()->route('participants.index', $course)->with('info', 'Brak uczestników w tym szkoleniu.');
         }
 
+        $existingParticipantIds = Certificate::where('course_id', $course->id)
+            ->pluck('participant_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $existingParticipantIdSet = array_fill_keys($existingParticipantIds, true);
+
         $courseYear = $this->resolveCourseYear($course);
         $nextCertificateNumber = $this->determineNextSequence($course, $courseYear);
 
         $generatedCount = 0;
 
         foreach ($allParticipants as $participant) {
+            if (isset($existingParticipantIdSet[(int) $participant->id])) {
+                continue; // już ma zaświadczenie w certificates dla tego kursu
+            }
+
             $certificateNumber = $this->formatCertificateNumber($course, $nextCertificateNumber, $courseYear);
 
             // Zapis numeru certyfikatu w bazie danych
-            // Uwaga: generujemy zaświadczenia również dla uczestników, którzy już mają zaświadczenia
             Certificate::create([
                 'participant_id' => $participant->id,
                 'course_id' => $course->id,
@@ -206,6 +225,7 @@ class CertificateController extends Controller
                 'generated_at' => now()
             ]);
 
+            $existingParticipantIdSet[(int) $participant->id] = true;
             $nextCertificateNumber++;
             $generatedCount++;
         }
