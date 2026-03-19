@@ -726,6 +726,45 @@ class ParticipantController extends Controller
     }
 
     /**
+     * Wysyła e-mail z linkiem do konkretnego zaświadczenia (pnedu) dla jednego uczestnika.
+     */
+    public function sendSingleCertificateLink(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $email = $participant->email;
+        if ($email === null || trim($email) === '') {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma podanego adresu e-mail.');
+        }
+
+        $createdBy = Auth::id();
+
+        try {
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+            ]);
+
+            SendCertificateLinkEmailJob::dispatch(
+                $course->id,
+                $participant->id,
+                CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+                $log->id
+            );
+        } catch (\Throwable $e) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: ' . $e->getMessage());
+        }
+
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został zlecony do wysyłki na adres ' . $email);
+    }
+
+    /**
      * Masowa wysyłka e-maili z linkami do zaświadczeń (kolejka).
      * Typy: list_link | single_certificate
      * Tryby: unsent | resend_all | not_downloaded

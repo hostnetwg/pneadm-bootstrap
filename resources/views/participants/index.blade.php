@@ -329,7 +329,11 @@
                                     <a href="{{ $pneduFrontendUrl }}/certificate/{{ $certToken }}/{{ $course->id }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="To konkretne zaświadczenie (pnedu.pl)">Zaświadczenie (pnedu)</a>
                                     <form action="{{ route('participants.send-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do zaświadczeń?');">
                                         @csrf
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Wyślij e-mail</button>
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap">Wyślij e-mail</button>
+                                    </form>
+                                    <form action="{{ route('participants.send-single-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do tego konkretnego zaświadczenia?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap">Wyślij e-mail to</button>
                                     </form>
                                 @endif
                             </div>
