@@ -33,10 +33,11 @@
                         'show_deferred_order' => 'Formularz zamówienia z odroczonym terminem płatności',
                         'show_order_form' => 'Formularz zamówienia',
                         'show_order_form_alt' => 'Alternatywny formularz zamówienia',
+                        'order_form_auto_fill_test_data' => 'Automatyczne wypełnianie formularza zamówienia danymi testowymi (ułatwia testy)',
                     ] as $key => $label)
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="{{ $key }}" id="{{ $key }}" value="1"
-                                {{ (optional($options)->{$key} ?? true) ? 'checked' : '' }}>
+                                {{ (optional($options)->{$key} ?? ($key === 'order_form_auto_fill_test_data' ? false : true)) ? 'checked' : '' }}>
                             <label class="form-check-label" for="{{ $key }}">{{ $label }}</label>
                         </div>
                     @endforeach

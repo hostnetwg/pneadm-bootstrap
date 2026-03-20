@@ -28,12 +28,14 @@ class PneduPurchasesController extends Controller
             'show_deferred_order' => 'boolean',
             'show_order_form' => 'boolean',
             'show_order_form_alt' => 'boolean',
+            'order_form_auto_fill_test_data' => 'boolean',
         ], [], [
             'show_pay_publigo' => 'Zapłać online PUBLIGO',
             'show_pay_online' => 'Zapłać online',
             'show_deferred_order' => 'Formularz z odroczonym terminem',
             'show_order_form' => 'Formularz zamówienia',
             'show_order_form_alt' => 'Alternatywny formularz zamówienia',
+            'order_form_auto_fill_test_data' => 'Auto-wypełnianie formularza danymi testowymi',
         ]);
 
         $options = PaymentDisplayOption::getSettings();
@@ -43,6 +45,7 @@ class PneduPurchasesController extends Controller
             'show_deferred_order' => $request->boolean('show_deferred_order'),
             'show_order_form' => $request->boolean('show_order_form'),
             'show_order_form_alt' => $request->boolean('show_order_form_alt'),
+            'order_form_auto_fill_test_data' => $request->boolean('order_form_auto_fill_test_data'),
         ]);
 
         return redirect()

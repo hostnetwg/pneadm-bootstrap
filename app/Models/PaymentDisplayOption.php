@@ -18,6 +18,7 @@ class PaymentDisplayOption extends Model
         'show_deferred_order',
         'show_order_form',
         'show_order_form_alt',
+        'order_form_auto_fill_test_data',
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class PaymentDisplayOption extends Model
         'show_deferred_order' => 'boolean',
         'show_order_form' => 'boolean',
         'show_order_form_alt' => 'boolean',
+        'order_form_auto_fill_test_data' => 'boolean',
     ];
 
     /**
@@ -45,6 +47,7 @@ class PaymentDisplayOption extends Model
                 'show_deferred_order' => true,
                 'show_order_form' => true,
                 'show_order_form_alt' => true,
+                'order_form_auto_fill_test_data' => false,
             ]);
         } catch (\Throwable $e) {
             report($e);
@@ -54,6 +57,7 @@ class PaymentDisplayOption extends Model
             $fallback->show_deferred_order = true;
             $fallback->show_order_form = true;
             $fallback->show_order_form_alt = true;
+            $fallback->order_form_auto_fill_test_data = false;
             return $fallback;
         }
     }
