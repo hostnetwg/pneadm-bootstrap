@@ -53,11 +53,16 @@ class FormOrdersController extends Controller
             ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
         }
         
-        // Dodajemy wyszukiwanie jeśli podano frazę
+        // Dodajemy wyszukiwanie jeśli podano frazę (form_orders + form_order_participants)
         if (!empty($search)) {
             $query->where(function($q) use ($search) {
                 $q->where('participant_name', 'LIKE', "%{$search}%")
                   ->orWhere('participant_email', 'LIKE', "%{$search}%")
+                  ->orWhereHas('primaryParticipant', function($pq) use ($search) {
+                      $pq->where('participant_firstname', 'LIKE', "%{$search}%")
+                         ->orWhere('participant_lastname', 'LIKE', "%{$search}%")
+                         ->orWhere('participant_email', 'LIKE', "%{$search}%");
+                  })
                   ->orWhere('orderer_email', 'LIKE', "%{$search}%")
                   ->orWhere('product_name', 'LIKE', "%{$search}%")
                   ->orWhere('invoice_number', 'LIKE', "%{$search}%")
@@ -79,9 +84,9 @@ class FormOrdersController extends Controller
             });
         }
         
-        // Pobieramy dane z paginacją lub wszystkie rekordy
+        // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
-            $zamowienia = $query->with('marketingCampaign.sourceType')->orderByDesc('id')->get();
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant'])->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -91,7 +96,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->with('marketingCampaign.sourceType')->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant'])->orderByDesc('id')->paginate($perPage);
         }
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień
@@ -305,7 +310,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with('marketingCampaign.sourceType')->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant'])->find($id);
 
         if (!$zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -421,18 +426,25 @@ class FormOrdersController extends Controller
             $zamowienie->updated_manually_at = now();
             $zamowienie->save();
             
-            // Aktualizuj dane uczestnika w tabeli form_order_participants
+            // Aktualizuj lub utwórz dane uczestnika w tabeli form_order_participants (zawsze zapis w obu tabelach)
             if ($isFromEditPage) {
                 $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
                     ->where('is_primary', true)
                     ->first();
-                
+
+                $participantData = [
+                    'participant_firstname' => $request->input('participant_firstname'),
+                    'participant_lastname' => $request->input('participant_lastname'),
+                    'participant_email' => $request->input('participant_email'),
+                ];
+
                 if ($participant) {
-                    $participant->update([
-                        'participant_firstname' => $request->input('participant_firstname'),
-                        'participant_lastname' => $request->input('participant_lastname'),
-                        'participant_email' => $request->input('participant_email'),
-                    ]);
+                    $participant->update($participantData);
+                } else {
+                    \App\Models\FormOrderParticipant::create(array_merge($participantData, [
+                        'form_order_id' => $id,
+                        'is_primary' => true,
+                    ]));
                 }
             }
             
@@ -1878,19 +1890,30 @@ class FormOrdersController extends Controller
 
     /**
      * Wyświetla formularz edycji zamówienia
+     * Dane uczestnika: preferuje form_order_participants, fallback do form_orders
      */
     public function edit(Request $request, $id)
     {
         try {
             $zamowienie = FormOrder::findOrFail($id);
-            
-            // Pobierz dane uczestnika z tabeli form_order_participants
+
             $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
                 ->where('is_primary', true)
                 ->first();
-            
-            // Parametry filtrów są przekazywane przez URL i będą dostępne w widoku przez request()
-            return view('form-orders.edit', compact('zamowienie', 'participant'));
+
+            // Dane do formularza – z form_order_participants lub fallback z form_orders
+            $participantData = [
+                'firstname' => $participant?->participant_firstname ?? '',
+                'lastname' => $participant?->participant_lastname ?? '',
+                'email' => $participant?->participant_email ?? $zamowienie->participant_email ?? '',
+            ];
+            if (empty($participantData['firstname']) && empty($participantData['lastname']) && !empty(trim($zamowienie->participant_name ?? ''))) {
+                $parts = explode(' ', trim($zamowienie->participant_name), 2);
+                $participantData['firstname'] = $parts[0] ?? '';
+                $participantData['lastname'] = $parts[1] ?? '';
+            }
+
+            return view('form-orders.edit', compact('zamowienie', 'participant', 'participantData'));
         } catch (Exception $e) {
             return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
         }
@@ -2432,7 +2455,7 @@ class FormOrdersController extends Controller
         foreach ($duplicateGroups as $group) {
             $orderIds = explode(',', $group->order_ids);
             $orders = FormOrder::whereIn('id', $orderIds)
-                ->with('marketingCampaign.sourceType')
+                ->with(['marketingCampaign.sourceType', 'primaryParticipant'])
                 ->get()
                 ->sortByDesc('priority'); // Sortuj według priorytetu (najważniejsze pierwsze)
             

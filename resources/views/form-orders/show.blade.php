@@ -168,19 +168,19 @@ nowoczesna-edukacja.pl </div>
                         </div>
                         <div class="card-body py-2">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong>{{ $zamowienie->participant_name ?? '—' }}</strong>
+                                <strong>{{ $zamowienie->display_participant_name ?: '—' }}</strong>
                                 <button type="button" class="btn btn-outline-success btn-sm" onclick="copyUczestnikData()">
                                     <i class="bi bi-clipboard"></i> Uczestnik
                                 </button>
                             </div>
-                            @if($zamowienie->participant_email)
+                            @if($zamowienie->display_participant_email)
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>
                                         <i class="bi bi-envelope"></i> 
-                                        <a href="mailto:{{ $zamowienie->participant_email }}" 
-                                           class="text-decoration-none @if($zamowienie->participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->participant_email == $zamowienie->orderer_email) title="Ten sam email co do faktury" @endif>
-                                            {{ $zamowienie->participant_email }}
+                                        <a href="mailto:{{ $zamowienie->display_participant_email }}" 
+                                           class="text-decoration-none @if($zamowienie->display_participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->display_participant_email == $zamowienie->orderer_email) title="Ten sam email co do faktury" @endif>
+                                            {{ $zamowienie->display_participant_email }}
                                         </a>
                                     </small>
                                     <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika()">
@@ -233,7 +233,7 @@ nowoczesna-edukacja.pl </div>
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
                                     @endif
                                 </label>
                             </div>
@@ -250,7 +250,7 @@ nowoczesna-edukacja.pl </div>
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
                                     @endif
                                 </label>
                             </div>
@@ -266,7 +266,7 @@ nowoczesna-edukacja.pl </div>
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithReceiver">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
                                     @endif
                                 </label>
                             </div>
@@ -282,7 +282,7 @@ nowoczesna-edukacja.pl </div>
                                 <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithKsef">
                                     <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
                                     @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->participant_email)), {{ strtolower($zamowienie->participant_email) }}@endif)</small>
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
                                     @endif
                                 </label>
                             </div>
@@ -315,8 +315,8 @@ nowoczesna-edukacja.pl </div>
                                         <strong>Fakturę przesłać na:</strong>
                                         <br>
                                         <a href="mailto:{{ $zamowienie->orderer_email }}" 
-                                           class="text-decoration-none @if($zamowienie->participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->participant_email == $zamowienie->orderer_email) title="Ten sam email co uczestnika" @endif>
+                                           class="text-decoration-none @if($zamowienie->display_participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if($zamowienie->display_participant_email == $zamowienie->orderer_email) title="Ten sam email co uczestnika" @endif>
                                             <i class="bi bi-envelope"></i> {{ $zamowienie->orderer_email }}
                                         </a>
                                     </small>
@@ -554,12 +554,12 @@ nowoczesna-edukacja.pl `;
         }
 
         function copyUczestnikData() {
-            const uczestnikData = `{{ $zamowienie->participant_name ?? '—' }}`;
+            const uczestnikData = `{{ $zamowienie->display_participant_name ?? '—' }}`;
             copyToClipboard(uczestnikData, 'copyUczestnikData');
         }
 
         function copyEmailUczestnika() {
-            const emailData = `{{ $zamowienie->participant_email ?? '—' }}`;
+            const emailData = `{{ $zamowienie->display_participant_email ?? '—' }}`;
             copyToClipboard(emailData, 'copyEmailUczestnika');
         }
 
@@ -2135,8 +2135,8 @@ nowoczesna-edukacja.pl `;
                     <div class="bg-light p-3 rounded">
                         <h6 class="mb-2">Szczegóły zamówienia:</h6>
                         <ul class="mb-0">
-                            <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
-                            <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                            <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                             @if($zamowienie->publigo_sent_at)
                                 <li><strong>Data wysłania do Publigo:</strong> {{ $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
@@ -2176,8 +2176,8 @@ nowoczesna-edukacja.pl `;
                     <div class="bg-light p-3 rounded">
                         <h6 class="mb-2">Szczegóły zamówienia:</h6>
                         <ul class="mb-0">
-                            <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
-                            <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                            <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                             @php
                                 $orderDateRaw = $zamowienie->getRawOriginal('order_date');

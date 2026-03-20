@@ -156,7 +156,7 @@
                             $hasInvoice = $zamowienie->has_invoice;
                             $isDuplicate = isset($duplicateInfo[$zamowienie->id]) && $duplicateInfo[$zamowienie->id]['is_duplicate'];
                             $duplicateCount = $isDuplicate ? $duplicateInfo[$zamowienie->id]['count'] : 0;
-                            $participantEmailSame = $zamowienie->participant_email && $zamowienie->orderer_email && strcasecmp($zamowienie->participant_email, $zamowienie->orderer_email) === 0;
+                            $participantEmailSame = $zamowienie->display_participant_email && $zamowienie->orderer_email && strcasecmp($zamowienie->display_participant_email, $zamowienie->orderer_email) === 0;
                         @endphp
                         
                         <div class="card shadow-sm mb-4 @if($isDuplicate) border-danger @elseif($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
@@ -313,7 +313,7 @@
                                                     <button type="button" class="btn btn-outline-info btn-sm" onclick="copyUczestnik_{{ $zamowienie->id }}(this)">
                                                         <i class="bi bi-clipboard"></i> Uczestnik
                                                     </button>
-                                                    @if($zamowienie->participant_email)
+                                                    @if($zamowienie->display_participant_email)
                                                         <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika_{{ $zamowienie->id }}(this)">
                                                             <i class="bi bi-clipboard"></i> Email uczestnika
                                                         </button>
@@ -321,12 +321,12 @@
                                                 </div>
                                             </div>
                                             <div class="text-dark">
-                                                <div class="fw-semibold">{{ $zamowienie->participant_name ?? '—' }}</div>
-                                                @if($zamowienie->participant_email)
-                                                    <a href="mailto:{{ $zamowienie->participant_email }}" 
+                                                <div class="fw-semibold">{{ $zamowienie->display_participant_name ?: '—' }}</div>
+                                                @if($zamowienie->display_participant_email)
+                                                    <a href="mailto:{{ $zamowienie->display_participant_email }}" 
                                                        class="text-primary text-decoration-none @if($participantEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
                                                        @if($participantEmailSame) title="Ten sam email co do faktury" @endif>
-                                                        {{ $zamowienie->participant_email }}
+                                                        {{ $zamowienie->display_participant_email }}
                                                     </a>
                                                 @endif
                                             </div>
@@ -502,8 +502,8 @@
                                         <div class="bg-light p-3 rounded">
                                             <h6 class="mb-2">Szczegóły zamówienia:</h6>
                                             <ul class="mb-0">
-                                                <li><strong>Uczestnik:</strong> {{ $zamowienie->participant_name }}</li>
-                                                <li><strong>Email:</strong> {{ $zamowienie->participant_email }}</li>
+                                                <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
+                                                <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
                                                 <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                                                 @php
                                                     $orderDateRaw = $zamowienie->getRawOriginal('order_date');
@@ -646,12 +646,12 @@ nowoczesna-edukacja.pl `;
             }
 
             function copyUczestnik_{{ $zamowienie->id }}(button) {
-                const uczestnik = '{{ $zamowienie->participant_name ?? '' }}';
+                const uczestnik = '{{ $zamowienie->display_participant_name ?? '' }}';
                 copyToClipboard(uczestnik, button);
             }
 
             function copyEmailUczestnika_{{ $zamowienie->id }}(button) {
-                const email = '{{ $zamowienie->participant_email ?? '' }}';
+                const email = '{{ $zamowienie->display_participant_email ?? '' }}';
                 copyToClipboard(email, button);
             }
 

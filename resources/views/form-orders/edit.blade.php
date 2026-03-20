@@ -107,7 +107,7 @@
                                         <label for="participant_firstname" class="form-label">Imię <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('participant_firstname') is-invalid @enderror" 
                                                id="participant_firstname" name="participant_firstname" 
-                                               value="{{ old('participant_firstname', $participant->participant_firstname ?? '') }}" required>
+                                               value="{{ old('participant_firstname', $participantData['firstname']) }}" required>
                                         @error('participant_firstname')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -116,7 +116,7 @@
                                         <label for="participant_lastname" class="form-label">Nazwisko <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('participant_lastname') is-invalid @enderror" 
                                                id="participant_lastname" name="participant_lastname" 
-                                               value="{{ old('participant_lastname', $participant->participant_lastname ?? '') }}" required>
+                                               value="{{ old('participant_lastname', $participantData['lastname']) }}" required>
                                         @error('participant_lastname')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -125,7 +125,7 @@
                                         <label for="participant_email" class="form-label">Email uczestnika - tu zostaną wysłane dane dostępowe do szkolenia <span class="text-danger">*</span></label>
                                         <input type="email" class="form-control @error('participant_email') is-invalid @enderror" 
                                                id="participant_email" name="participant_email" 
-                                               value="{{ old('participant_email', $zamowienie->participant_email) }}" required>
+                                               value="{{ old('participant_email', $participantData['email']) }}" required>
                                         @error('participant_email')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror

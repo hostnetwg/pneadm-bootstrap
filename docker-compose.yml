@@ -45,6 +45,7 @@ services:
     volumes:
       - 'pne-mysql-shared:/var/lib/mysql'
       - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+      - './docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro'
     networks:
       - sail
       - pne-network
@@ -77,13 +78,20 @@ services:
 
   # phpMyAdmin dla pneadm-bootstrap na porcie 8084 (pnedu ma 8082)
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin
+    build:
+      context: .
+      dockerfile: Dockerfile.phpmyadmin
     depends_on:
       - mysql
     environment:
       PMA_HOST: mysql
       PMA_ARBITRARY: 1
-      UPLOAD_LIMIT: 256M
+      UPLOAD_LIMIT: 1536M
+      MAX_EXECUTION_TIME: 0
+      MEMORY_LIMIT: 1024M
+    volumes:
+      - './docker/phpmyadmin/config.user.inc.php:/etc/phpmyadmin/config.user.inc.php:ro'
+      - './docker/phpmyadmin/zzz-upload-override.ini:/usr/local/etc/php/conf.d/zzz-upload-override.ini:ro'
     ports:
       - '8084:80'
     networks:

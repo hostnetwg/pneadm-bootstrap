@@ -388,6 +388,30 @@ class FormOrder extends Model
     }
 
     /**
+     * Nazwa uczestnika do wyświetlenia – preferuje form_order_participants, fallback do form_orders
+     */
+    public function getDisplayParticipantNameAttribute(): string
+    {
+        $p = $this->primaryParticipant;
+        if ($p && (trim($p->participant_firstname . ' ' . $p->participant_lastname) !== '')) {
+            return trim($p->participant_firstname . ' ' . $p->participant_lastname);
+        }
+        return (string) ($this->participant_name ?? '');
+    }
+
+    /**
+     * E-mail uczestnika do wyświetlenia – preferuje form_order_participants, fallback do form_orders
+     */
+    public function getDisplayParticipantEmailAttribute(): ?string
+    {
+        $p = $this->primaryParticipant;
+        if ($p && !empty(trim($p->participant_email ?? ''))) {
+            return trim($p->participant_email);
+        }
+        return !empty(trim($this->participant_email ?? '')) ? trim($this->participant_email) : null;
+    }
+
+    /**
      * Accessor - liczba uczestników (z nowej tabeli)
      */
     public function getParticipantsCountAttribute(): int

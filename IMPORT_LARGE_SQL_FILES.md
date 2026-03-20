@@ -11,15 +11,17 @@ Script execution time limit exceeded
 
 ### Metoda 1: Zwiększone limity w phpMyAdmin (już skonfigurowane)
 
-Limity zostały zwiększone w `docker-compose.yml`:
-- **Upload limit**: 500M
-- **Max execution time**: 3600 sekund (1 godzina)
+Limity zostały zwiększone w `docker-compose.yml` i `Dockerfile.phpmyadmin`:
+- **Upload limit**: 512M
+- **Max execution time**: bez limitu (0 = unlimited)
 - **Memory limit**: 1024M
+- **ExecTimeLimit**: bez limitu (import może trwać dowolnie długo)
 
-**Aby zastosować zmiany:**
+**Aby zastosować zmiany (wymagany rebuild phpMyAdmin):**
 ```bash
 cd /home/hostnet/WEB-APP/pneadm-bootstrap
 ./vendor/bin/sail down
+./vendor/bin/sail build --no-cache phpmyadmin
 ./vendor/bin/sail up -d
 ```
 
@@ -146,6 +148,22 @@ cd /home/hostnet/WEB-APP/pneadm-bootstrap
 ./vendor/bin/sail mysql pnedu < ~/Downloads/users.sql
 ```
 
+## 🤖 Automatyczny import (skrypt)
+
+```bash
+cd /home/hostnet/WEB-APP/pneadm-bootstrap
+
+# Użycie: ./import-db.sh <plik.sql> <baza>
+./import-db.sh ~/Downloads/pneadm_prod.sql pneadm
+./import-db.sh ~/Downloads/pnedu_prod.sql pnedu
+./import-db.sh ~/Downloads/certgen_prod.sql certgen
+```
+
+Skrypt automatycznie:
+- Używa optymalizacji (FOREIGN_KEY_CHECKS=0, UNIQUE_CHECKS=0)
+- Pokazuje postęp i czas wykonania
+- Sprawdza czy plik i baza istnieją
+
 ## 📝 Checklist importu
 
 - [ ] Plik SQL jest dostępny lokalnie
@@ -209,6 +227,10 @@ cd /home/hostnet/WEB-APP/pneadm-bootstrap
 2. **Wyłącz sprawdzanie kluczy obcych** podczas importu - przyspiesza 10x
 3. **Podziel bardzo duże pliki** na części jeśli import nadal trwa długo
 4. **Sprawdź logi** jeśli coś nie działa: `./vendor/bin/sail logs mysql`
+
+
+
+
 
 
 

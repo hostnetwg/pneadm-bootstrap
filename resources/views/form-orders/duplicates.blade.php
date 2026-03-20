@@ -294,8 +294,8 @@
                                                     <div class="row">
                                                         <div class="col-6">
                                                             <strong>Uczestnik:</strong><br>
-                                                            {{ $order->participant_name }}<br>
-                                                            <small class="text-muted">{{ $order->participant_email }}</small>
+                                                            {{ $order->display_participant_name ?: '—' }}<br>
+                                                            <small class="text-muted">{{ $order->display_participant_email ?? '—' }}</small>
                                                         </div>
                                                         <div class="col-6">
                                                             <strong>Szkolenie:</strong><br>
