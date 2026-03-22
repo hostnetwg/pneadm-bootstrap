@@ -74,7 +74,24 @@ class PubligoApiService
                 ];
             }
 
-            Log::warning('Publigo API: HTTP sukces, ale nie rozpoznano formatu odpowiedzi (zamówienie mogło powstać po stronie Publigo)', [
+            // Publigo / wtyczka WP często zwraca HTTP 200 z „dziwnym” JSON (np. tylko ID zamówienia, pusty string, true).
+            // Jeśli nie ma wyraźnych sygnałów błędu — traktujemy jak sukces, żeby nie mylić użytkownika i nie dublować wysyłki.
+            if ($httpCode >= 200 && $httpCode < 300 && ! $this->responseIndicatesFailure($result, $responseBody)) {
+                Log::info('Publigo API: HTTP 2xx bez typowego pola status/success — uznano za powodzenie (kompatybilność z API)', [
+                    'http_code' => $httpCode,
+                    'response_preview' => mb_substr($responseBody, 0, 500),
+                    'json_decoded_type' => gettype($result),
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Zamówienie zostało przekazane do Publigo (odpowiedź w niestandardowym formacie).',
+                    'response' => is_array($result) ? $result : ['raw' => $responseBody],
+                    'http_code' => $httpCode,
+                ];
+            }
+
+            Log::warning('Publigo API: HTTP sukces, ale odpowiedź wygląda na błąd lub jest nieczytelna', [
                 'http_code' => $httpCode,
                 'response_preview' => mb_substr($responseBody, 0, 2000),
                 'json_decoded_type' => gettype($result),
@@ -82,7 +99,7 @@ class PubligoApiService
 
             return [
                 'success' => false,
-                'error' => 'Błąd podczas tworzenia zamówienia (nieznany format odpowiedzi API). Sprawdź logi i Publigo — zamówienie mogło zostać już utworzone.',
+                'error' => 'Błąd podczas tworzenia zamówienia (odpowiedź API niepotwierdzona). Sprawdź logi i Publigo.',
                 'response' => is_array($result) ? $result : $responseBody,
                 'http_code' => $httpCode,
             ];
@@ -128,6 +145,42 @@ class PubligoApiService
             return null;
         }
 
+        // JSON: true / liczba (np. ID zamówienia) / krótki string
+        if ($result === false) {
+            return null;
+        }
+
+        if ($result === true) {
+            return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+        }
+
+        if (is_int($result) || is_float($result)) {
+            if ((float) $result > 0) {
+                return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+            }
+
+            return null;
+        }
+
+        if (is_string($result)) {
+            $t = trim($result);
+            if ($t === '') {
+                return null;
+            }
+            $kind = $this->classifyPubligoStatusValue($t);
+            if ($kind === 'ok') {
+                return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+            }
+            if ($kind === 'duplicate') {
+                return ['message' => 'Zamówienie już istnieje w Publigo (duplikat)'];
+            }
+            if (is_numeric($t) && (float) $t > 0) {
+                return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+            }
+
+            return null;
+        }
+
         if (is_array($result)) {
             // WP REST: { "code": "success", ... } lub podobne
             if (isset($result['code']) && is_string($result['code'])) {
@@ -137,8 +190,19 @@ class PubligoApiService
                 }
             }
 
+            if (array_key_exists('success', $result) && $result['success'] === false) {
+                return null;
+            }
+
             if (array_key_exists('success', $result) && filter_var($result['success'], FILTER_VALIDATE_BOOLEAN)) {
                 return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+            }
+
+            // Pola z ID zamówienia (unikamy uznania dowolnego stringa za sukces)
+            foreach (['order_id', 'orderId', 'id', 'wc_order_id'] as $idKey) {
+                if ($this->looksLikePositiveOrderId($result[$idKey] ?? null)) {
+                    return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+                }
             }
 
             foreach (['status', 'state', 'result'] as $key) {
@@ -168,11 +232,90 @@ class PubligoApiService
                         return ['message' => 'Zamówienie już istnieje w Publigo (duplikat)'];
                     }
                 }
+
+                foreach (['order_id', 'orderId', 'id'] as $idKey) {
+                    if ($this->looksLikePositiveOrderId($result['data'][$idKey] ?? null)) {
+                        return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
+                    }
+                }
             }
         }
 
-        // Bardzo krótka odpowiedź 200 (np. "1" / "OK") — nie ustawiamy sukcesu bez pewności
+        // Pusty body HTTP 200 — często „cisza” po stronie serwera mimo utworzenia rekordu
+        if (trim($responseBody) === '') {
+            return ['message' => 'Zamówienie zostało przekazane do Publigo (pusta odpowiedź serwera).'];
+        }
+
         return null;
+    }
+
+    /**
+     * Czy odpowiedź wygląda na błąd (wtedy NIE stosujemy optymistycznego HTTP 2xx).
+     */
+    private function responseIndicatesFailure(mixed $result, string $responseBody): bool
+    {
+        if ($result === false) {
+            return true;
+        }
+
+        $trim = trim($responseBody);
+        if ($trim !== '' && (stripos($trim, '<html') !== false || stripos($trim, '<!doctype') !== false)) {
+            return true;
+        }
+
+        $trimLower = strtolower($trim);
+        if ($trimLower === 'null' || $trimLower === 'false') {
+            return true;
+        }
+
+        if (is_array($result)) {
+            if (array_key_exists('success', $result) && $result['success'] === false) {
+                return true;
+            }
+
+            if (! empty($result['error']) && is_string($result['error'])) {
+                return true;
+            }
+
+            if (isset($result['errors']) && is_array($result['errors']) && count($result['errors']) > 0) {
+                return true;
+            }
+
+            // WordPress REST: błąd z kodem HTTP w data.status (np. 400, 403)
+            if (isset($result['data']['status']) && is_numeric($result['data']['status']) && (int) $result['data']['status'] >= 400) {
+                return true;
+            }
+
+            // Typowy kształt błędu WP: code zaczyna się od rest_
+            if (isset($result['code']) && is_string($result['code'])) {
+                $c = strtolower($result['code']);
+                if (str_starts_with($c, 'rest_') && ! in_array($c, ['rest_success'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        // Nie-JSON lub uszkodzony JSON przy niepustym ciele — ostrożnie
+        if ($result === null && $trim !== '') {
+            if (str_starts_with($trim, '{') || str_starts_with($trim, '[')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function looksLikePositiveOrderId(mixed $value): bool
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value > 0;
+        }
+
+        if (is_string($value)) {
+            return (bool) preg_match('/^[1-9]\d*$/', trim($value));
+        }
+
+        return false;
     }
 
     /**
