@@ -8,6 +8,7 @@ use App\Services\PubligoApiService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class FormOrdersController extends Controller
@@ -542,88 +543,100 @@ class FormOrdersController extends Controller
     public function createPubligoOrder(Request $request, $id)
     {
         try {
-            $zamowienie = FormOrder::with('primaryParticipant')->find($id);
+            // Blokada wiersza: zapobiega równoległemu podwójnemu wysłaniu (wyścig → mylący błąd + duplikat w Publigo)
+            return DB::connection('mysql')->transaction(function () use ($id) {
+                $zamowienie = FormOrder::with('primaryParticipant')->lockForUpdate()->find($id);
 
-            if (! $zamowienie) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.',
-                ], 404);
-            }
-
-            // Sprawdzenie czy zamówienie ma dane Publigo
-            if (empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.',
-                ], 400);
-            }
-
-            // Sprawdzenie czy zamówienie już zostało wysłane do Publigo
-            if ($zamowienie->publigo_sent == 1) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'To zamówienie zostało już wysłane do Publigo.',
-                    'sent_at' => $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana data',
-                ], 400);
-            }
-
-            // Sprawdzenie czy ma wszystkie wymagane dane (uczestnik z form_order_participants)
-            $missingFields = [];
-            if (empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $missingFields[] = 'participant_email';
-            }
-            if (empty(trim($zamowienie->display_participant_name ?? ''))) {
-                $missingFields[] = 'participant_name';
-            }
-            foreach (['buyer_address', 'buyer_postal_code', 'buyer_city'] as $field) {
-                if (empty($zamowienie->$field)) {
-                    $missingFields[] = $field;
+                if (! $zamowienie) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Zamówienie nie zostało znalezione.',
+                    ], 404);
                 }
-            }
 
-            if (! empty($missingFields)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak wymaganych danych: '.implode(', ', $missingFields),
-                ], 400);
-            }
+                // Sprawdzenie czy zamówienie ma dane Publigo
+                if (empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.',
+                    ], 400);
+                }
 
-            // Przygotowanie obiektu zgodnego z oczekiwaniami PubligoApiService
-            // Musimy zmapować pola z nowego formatu na stary
-            // Używamy danych NABYWCY zamiast ODBIORCY dla adresu wysyłkowego
-            $orderDataForService = (object) [
-                'id' => $zamowienie->id, // Dodanie brakującego pola ID
-                'konto_email' => $zamowienie->display_participant_email,
-                'konto_imie_nazwisko' => $zamowienie->display_participant_name,
-                'odb_nazwa' => $zamowienie->buyer_name, // Używamy nazwy nabywcy
-                'odb_adres' => $zamowienie->buyer_address, // Używamy adresu nabywcy
-                'odb_kod' => $zamowienie->buyer_postal_code, // Używamy kodu pocztowego nabywcy
-                'odb_poczta' => $zamowienie->buyer_city, // Używamy miasta nabywcy
-                'idProdPubligo' => $zamowienie->publigo_product_id,
-                'price_idProdPubligo' => $zamowienie->publigo_price_id,
-            ];
+                // Sprawdzenie czy zamówienie już zostało wysłane do Publigo (po lock — aktualny stan)
+                if ($zamowienie->publigo_sent == 1) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'To zamówienie zostało już wysłane do Publigo.',
+                        'sent_at' => $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana data',
+                    ], 400);
+                }
 
-            // Przygotowanie i wysłanie zamówienia do Publigo
-            $publigoService = new PubligoApiService;
-            $orderData = $publigoService->prepareOrderData($orderDataForService);
-            $result = $publigoService->createOrder($orderData);
+                // Sprawdzenie czy ma wszystkie wymagane dane (uczestnik z form_order_participants)
+                $missingFields = [];
+                if (empty(trim($zamowienie->display_participant_email ?? ''))) {
+                    $missingFields[] = 'participant_email';
+                }
+                if (empty(trim($zamowienie->display_participant_name ?? ''))) {
+                    $missingFields[] = 'participant_name';
+                }
+                foreach (['buyer_address', 'buyer_postal_code', 'buyer_city'] as $field) {
+                    if (empty($zamowienie->$field)) {
+                        $missingFields[] = $field;
+                    }
+                }
 
-            // Zwrócenie odpowiedzi
-            if ($result['success']) {
-                // Aktualizacja statusu zamówienia po udanym wysłaniu
-                $zamowienie->publigo_sent = 1;
-                $zamowienie->publigo_sent_at = now();
-                $zamowienie->save();
+                if (! empty($missingFields)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Brak wymaganych danych: '.implode(', ', $missingFields),
+                    ], 400);
+                }
 
-                return response()->json([
-                    'success' => true,
-                    'message' => $result['message'],
-                    'order_data' => $orderData,
-                    'publigo_response' => $result['response'],
-                    'sent_at' => now()->format('d.m.Y H:i'),
-                ]);
-            } else {
+                // Przygotowanie obiektu zgodnego z oczekiwaniami PubligoApiService
+                // Musimy zmapować pola z nowego formatu na stary
+                // Używamy danych NABYWCY zamiast ODBIORCY dla adresu wysyłkowego
+                $orderDataForService = (object) [
+                    'id' => $zamowienie->id, // Dodanie brakującego pola ID
+                    'konto_email' => $zamowienie->display_participant_email,
+                    'konto_imie_nazwisko' => $zamowienie->display_participant_name,
+                    'odb_nazwa' => $zamowienie->buyer_name, // Używamy nazwy nabywcy
+                    'odb_adres' => $zamowienie->buyer_address, // Używamy adresu nabywcy
+                    'odb_kod' => $zamowienie->buyer_postal_code, // Używamy kodu pocztowego nabywcy
+                    'odb_poczta' => $zamowienie->buyer_city, // Używamy miasta nabywcy
+                    'idProdPubligo' => $zamowienie->publigo_product_id,
+                    'price_idProdPubligo' => $zamowienie->publigo_price_id,
+                ];
+
+                // Przygotowanie i wysłanie zamówienia do Publigo
+                $publigoService = new PubligoApiService;
+                $orderData = $publigoService->prepareOrderData($orderDataForService);
+                $result = $publigoService->createOrder($orderData);
+
+                // Zwrócenie odpowiedzi
+                if ($result['success']) {
+                    // Aktualizacja statusu zamówienia po udanym wysłaniu
+                    $zamowienie->publigo_sent = 1;
+                    $zamowienie->publigo_sent_at = now();
+                    if (! $zamowienie->save()) {
+                        Log::error('FormOrdersController: publigo_sent — save() zwróciło false', ['form_order_id' => $zamowienie->id]);
+
+                        return response()->json([
+                            'success' => false,
+                            'error' => 'Publigo przyjęło zamówienie, ale nie udało się zapisać statusu w bazie. Skontaktuj się z administratorem.',
+                            'order_data' => $orderData,
+                            'publigo_response' => $result['response'] ?? null,
+                        ], 500);
+                    }
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => $result['message'],
+                        'order_data' => $orderData,
+                        'publigo_response' => $result['response'],
+                        'sent_at' => now()->format('d.m.Y H:i'),
+                    ]);
+                }
+
                 return response()->json([
                     'success' => false,
                     'error' => $result['error'],
@@ -631,8 +644,7 @@ class FormOrdersController extends Controller
                     'publigo_response' => $result['response'],
                     'http_code' => $result['http_code'],
                 ]);
-            }
-
+            });
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
