@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 
 class MigrateFormOrderParticipants extends Command
 {
@@ -23,7 +23,7 @@ class MigrateFormOrderParticipants extends Command
      *
      * @var string
      */
-    protected $description = 'Migruje dane uczestników z form_orders.participant_name do form_order_participants z normalizacją (imię/nazwisko, wielkie litery)';
+    protected $description = 'Jednorazowa migracja: z legacy kolumn form_orders (participant_name itd.) do form_order_participants — uruchamiaj tylko na starej bazie; po DROP kolumn polecenie kończy się komunikatem i nic nie robi';
 
     protected $stats = [
         'total' => 0,
@@ -41,14 +41,20 @@ class MigrateFormOrderParticipants extends Command
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
 
         $this->info('🚀 Start migracji uczestników z form_orders do form_order_participants');
-        
+
+        if (! Schema::hasColumn('form_orders', 'participant_name')) {
+            $this->warn('Brak kolumny form_orders.participant_name — polecenie ma sens tylko przy starej strukturze tabeli.');
+
+            return self::SUCCESS;
+        }
+
         if ($isDryRun) {
             $this->warn('⚠️  TRYB SYMULACJI - żadne dane nie będą zapisane');
         }
 
         // Pobierz zamówienia z form_orders, które mają dane uczestnika
         $query = FormOrder::whereNotNull('participant_name')
-                          ->where('participant_name', '!=', '');
+            ->where('participant_name', '!=', '');
 
         if ($limit) {
             $query->limit($limit);
@@ -68,23 +74,25 @@ class MigrateFormOrderParticipants extends Command
             try {
                 // Sprawdź czy uczestnik już istnieje w nowej tabeli
                 $existingParticipant = FormOrderParticipant::where('form_order_id', $order->id)
-                                                           ->where('is_primary', 1)
-                                                           ->first();
+                    ->where('is_primary', 1)
+                    ->first();
 
                 if ($existingParticipant) {
                     $this->stats['skipped']++;
                     $progressBar->advance();
+
                     continue;
                 }
 
                 // Rozbij i znormalizuj imię i nazwisko
                 $result = $this->parseAndNormalizeName($order->participant_name);
 
-                if (!$result) {
+                if (! $result) {
                     $this->stats['errors']++;
                     $this->newLine();
                     $this->error("❌ ID {$order->id}: Nie udało się przetworzyć nazwy: '{$order->participant_name}'");
                     $progressBar->advance();
+
                     continue;
                 }
 
@@ -98,7 +106,7 @@ class MigrateFormOrderParticipants extends Command
                 ];
 
                 // Zapisz do nowej tabeli (jeśli nie tryb symulacji)
-                if (!$isDryRun) {
+                if (! $isDryRun) {
                     FormOrderParticipant::create([
                         'form_order_id' => $order->id,
                         'participant_firstname' => $result['firstname'],
@@ -131,7 +139,7 @@ class MigrateFormOrderParticipants extends Command
             } catch (\Exception $e) {
                 $this->stats['errors']++;
                 $this->newLine();
-                $this->error("❌ Błąd dla ID {$order->id}: " . $e->getMessage());
+                $this->error("❌ Błąd dla ID {$order->id}: ".$e->getMessage());
             }
 
             $progressBar->advance();
@@ -148,7 +156,7 @@ class MigrateFormOrderParticipants extends Command
 
     /**
      * Rozbija i normalizuje imię i nazwisko
-     * 
+     *
      * Zasady:
      * - Pierwsze słowo/słowa to imię, ostatnie to nazwisko
      * - Usuwa zbędne spacje
@@ -191,7 +199,7 @@ class MigrateFormOrderParticipants extends Command
 
     /**
      * Normalizuje część imienia/nazwiska
-     * 
+     *
      * Zasady:
      * - ADAM → Adam
      * - KOWALSKI → Kowalski
@@ -207,15 +215,15 @@ class MigrateFormOrderParticipants extends Command
         $segments = explode('-', $part);
 
         // Normalizuj każdy segment
-        $normalized = array_map(function($segment) {
+        $normalized = array_map(function ($segment) {
             // Rozbij po spacjach (dla imion złożonych)
             $words = explode(' ', $segment);
-            
-            $capitalizedWords = array_map(function($word) {
+
+            $capitalizedWords = array_map(function ($word) {
                 // Konwertuj na małe litery, potem pierwsza wielka
                 return mb_convert_case(mb_strtolower($word), MB_CASE_TITLE, 'UTF-8');
             }, $words);
-            
+
             return implode(' ', $capitalizedWords);
         }, $segments);
 
@@ -231,7 +239,7 @@ class MigrateFormOrderParticipants extends Command
         $this->info('═══════════════════════════════════════════════════════════');
         $this->info('                    📊 PODSUMOWANIE                        ');
         $this->info('═══════════════════════════════════════════════════════════');
-        
+
         $this->table(
             ['Statystyka', 'Liczba'],
             [
@@ -244,7 +252,7 @@ class MigrateFormOrderParticipants extends Command
 
         if ($isDryRun) {
             $this->warn("\n⚠️  To była SYMULACJA - żadne dane nie zostały zapisane");
-            $this->info("💡 Uruchom bez --dry-run aby zapisać dane do bazy");
+            $this->info('💡 Uruchom bez --dry-run aby zapisać dane do bazy');
         } else {
             if ($this->stats['migrated'] > 0) {
                 $this->info("\n✅ Migracja zakończona pomyślnie!");
@@ -256,7 +264,7 @@ class MigrateFormOrderParticipants extends Command
 
         if ($this->stats['errors'] > 0) {
             $this->error("\n❌ Wystąpiły błędy: {$this->stats['errors']}");
-            $this->warn("Sprawdź logi powyżej");
+            $this->warn('Sprawdź logi powyżej');
         }
 
         $this->info('═══════════════════════════════════════════════════════════');

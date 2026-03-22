@@ -2,23 +2,25 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\LogsActivity;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Model FormOrder
- * 
+ *
  * Odpowiednik tabeli zamowienia_FORM z bazy certgen
  * Używa bazy pneadm (głównej bazy aplikacji)
- * 
+ *
  * Przechowuje zamówienia złożone przez formularz na stronie
  */
 class FormOrder extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     /**
      * Nazwa tabeli
@@ -41,30 +43,26 @@ class FormOrder extends Model
     protected $fillable = [
         // ID - umożliwiamy ustawianie podczas migracji
         'id',
-        
+
         // Identyfikatory
         'ident',
         'ptw',
-        
+
         // Dane zamówienia
         'order_date',
-        
+
         // Produkt/szkolenie
         'product_id',
         'product_name',
         'product_price',
         'product_description',
-        
+
         // Integracja z Publigo
         'publigo_product_id',
         'publigo_price_id',
         'publigo_sent',
         'publigo_sent_at',
-        
-        // Dane uczestnika
-        'participant_name',
-        'participant_email',
-        
+
         // Dane zamawiającego (kontaktowe)
         'orderer_name',
         'orderer_address',
@@ -72,37 +70,37 @@ class FormOrder extends Model
         'orderer_city',
         'orderer_phone',
         'orderer_email',
-        
+
         // Dane nabywcy (do faktury)
         'buyer_name',
         'buyer_address',
         'buyer_postal_code',
         'buyer_city',
         'buyer_nip',
-        
+
         // Dane odbiorcy
         'recipient_name',
         'recipient_address',
         'recipient_postal_code',
         'recipient_city',
         'recipient_nip',
-        
+
         // Dane do faktury
         'invoice_number',
         'invoice_notes',
         'invoice_payment_delay',
-        
+
         // Dane KSeF
         'ksef_number',
         'ksef_sent_at',
         'ksef_status',
         'ksef_error',
-        
+
         // Status i notatki
         'status_completed',
         'notes',
         'updated_manually_at',
-        
+
         // Dane techniczne
         'ip_address',
         'fb_source',
@@ -160,12 +158,14 @@ class FormOrder extends Model
             // Konwertuj na UTC przed zapisem
             $carbon = Carbon::instance($value)->utc();
             $this->attributes['order_date'] = $carbon->format('Y-m-d H:i:s');
+
             return;
         }
 
         if (is_numeric($value)) {
             // Timestamp zawsze jest w UTC
             $this->attributes['order_date'] = Carbon::createFromTimestamp($value, 'UTC')->format('Y-m-d H:i:s');
+
             return;
         }
 
@@ -180,13 +180,13 @@ class FormOrder extends Model
      */
     public function scopeNew($query)
     {
-        return $query->where(function($q) {
+        return $query->where(function ($q) {
             $q->whereNull('invoice_number')
-              ->orWhere('invoice_number', '')
-              ->orWhere('invoice_number', '0');
-        })->where(function($q) {
+                ->orWhere('invoice_number', '')
+                ->orWhere('invoice_number', '0');
+        })->where(function ($q) {
             $q->where('status_completed', '!=', 1)
-              ->orWhereNull('status_completed');
+                ->orWhereNull('status_completed');
         });
     }
 
@@ -204,8 +204,8 @@ class FormOrder extends Model
     public function scopeWithInvoice($query)
     {
         return $query->whereNotNull('invoice_number')
-                     ->where('invoice_number', '!=', '')
-                     ->where('invoice_number', '!=', '0');
+            ->where('invoice_number', '!=', '')
+            ->where('invoice_number', '!=', '0');
     }
 
     /**
@@ -222,22 +222,51 @@ class FormOrder extends Model
     public function scopeNotSentToPubligo($query)
     {
         return $query->where('publigo_sent', 0)
-                     ->whereNotNull('publigo_product_id')
-                     ->whereNotNull('publigo_price_id');
+            ->whereNotNull('publigo_product_id')
+            ->whereNotNull('publigo_price_id');
     }
 
     /**
-     * Scope - wykrywanie duplikatów (ten sam email + to samo szkolenie)
+     * Scope - wykrywanie duplikatów (ten sam email głównego uczestnika + to samo szkolenie)
+     * Źródło e-maila: form_order_participants (is_primary), nie kolumny form_orders.
      */
     public function scopeDuplicates($query)
     {
-        return $query->select('participant_email', 'publigo_product_id')
-                     ->selectRaw('COUNT(*) as duplicate_count')
-                     ->selectRaw('GROUP_CONCAT(id ORDER BY id) as order_ids')
-                     ->whereNotNull('participant_email')
-                     ->whereNotNull('publigo_product_id')
-                     ->groupBy('participant_email', 'publigo_product_id')
-                     ->having('duplicate_count', '>', 1);
+        $table = $query->getModel()->getTable();
+
+        return $query
+            ->join('form_order_participants as fop', function ($join) use ($table) {
+                $join->on($table.'.id', '=', 'fop.form_order_id')
+                    ->where('fop.is_primary', '=', 1)
+                    ->whereNull('fop.deleted_at');
+            })
+            ->selectRaw('LOWER(TRIM(fop.participant_email)) as participant_email')
+            ->addSelect($table.'.publigo_product_id')
+            ->selectRaw('COUNT(*) as duplicate_count')
+            ->selectRaw('GROUP_CONCAT('.$table.'.id ORDER BY '.$table.'.id) as order_ids')
+            ->whereNotNull('fop.participant_email')
+            ->where('fop.participant_email', '!=', '')
+            ->whereNotNull($table.'.publigo_product_id')
+            ->groupByRaw('LOWER(TRIM(fop.participant_email)), '.$table.'.publigo_product_id')
+            ->having('duplicate_count', '>', 1);
+    }
+
+    /**
+     * Zamówienia, których główny uczestnik ma podany e-mail (porównanie bez uwagi na wielkość liter).
+     */
+    public function scopeWherePrimaryParticipantEmailMatches(Builder $query, string $email): Builder
+    {
+        $ordersTable = $query->getModel()->getTable();
+        $normalized = strtolower(trim($email));
+
+        return $query->whereExists(function ($q) use ($normalized, $ordersTable) {
+            $q->select(DB::raw('1'))
+                ->from('form_order_participants as fop')
+                ->whereColumn('fop.form_order_id', $ordersTable.'.id')
+                ->where('fop.is_primary', 1)
+                ->whereNull('fop.deleted_at')
+                ->whereRaw('LOWER(TRIM(fop.participant_email)) = ?', [$normalized]);
+        });
     }
 
     /**
@@ -247,12 +276,12 @@ class FormOrder extends Model
     {
         $duplicateGroups = self::duplicates()->get();
         $orderIds = [];
-        
+
         foreach ($duplicateGroups as $group) {
             $ids = explode(',', $group->order_ids);
             $orderIds = array_merge($orderIds, $ids);
         }
-        
+
         return $query->whereIn('id', $orderIds);
     }
 
@@ -261,14 +290,16 @@ class FormOrder extends Model
      */
     public function scopeFindDuplicatesFor($query, $orderId)
     {
-        $order = self::find($orderId);
-        if (!$order || !$order->participant_email || !$order->publigo_product_id) {
+        $order = self::with('primaryParticipant')->find($orderId);
+        $email = $order?->display_participant_email;
+        if (! $order || empty(trim((string) $email)) || ! $order->publigo_product_id) {
             return $query->where('id', -1); // Pusty wynik
         }
-        
-        return $query->where('participant_email', $order->participant_email)
-                     ->where('publigo_product_id', $order->publigo_product_id)
-                     ->where('id', '!=', $orderId);
+
+        return $query
+            ->where('publigo_product_id', $order->publigo_product_id)
+            ->where('id', '!=', $orderId)
+            ->wherePrimaryParticipantEmailMatches($email);
     }
 
     /**
@@ -276,7 +307,7 @@ class FormOrder extends Model
      */
     public function getIsNewAttribute(): bool
     {
-        return (empty($this->invoice_number) || $this->invoice_number == '0') 
+        return (empty($this->invoice_number) || $this->invoice_number == '0')
                && $this->status_completed != 1;
     }
 
@@ -285,7 +316,7 @@ class FormOrder extends Model
      */
     public function getHasInvoiceAttribute(): bool
     {
-        return !empty($this->invoice_number) 
+        return ! empty($this->invoice_number)
                && $this->invoice_number != '0';
     }
 
@@ -297,7 +328,6 @@ class FormOrder extends Model
         return $this->publigo_sent == 1;
     }
 
-
     /**
      * Accessor - sformatowany NIP (tylko cyfry)
      */
@@ -306,6 +336,7 @@ class FormOrder extends Model
         if (empty($this->buyer_nip)) {
             return null;
         }
+
         return preg_replace('/[^0-9]/', '', $this->buyer_nip);
     }
 
@@ -317,9 +348,9 @@ class FormOrder extends Model
         $parts = array_filter([
             $this->orderer_name,
             $this->orderer_address,
-            trim(($this->orderer_postal_code ?? '') . ' ' . ($this->orderer_city ?? '')),
+            trim(($this->orderer_postal_code ?? '').' '.($this->orderer_city ?? '')),
         ]);
-        
+
         return implode("\n", $parts);
     }
 
@@ -331,13 +362,13 @@ class FormOrder extends Model
         $parts = array_filter([
             $this->buyer_name,
             $this->buyer_address,
-            trim(($this->buyer_postal_code ?? '') . ' ' . ($this->buyer_city ?? '')),
+            trim(($this->buyer_postal_code ?? '').' '.($this->buyer_city ?? '')),
         ]);
-        
-        if (!empty($this->buyer_nip)) {
-            $parts[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $this->buyer_nip);
+
+        if (! empty($this->buyer_nip)) {
+            $parts[] = 'NIP: '.preg_replace('/[^0-9]/', '', $this->buyer_nip);
         }
-        
+
         return implode("\n", $parts);
     }
 
@@ -349,13 +380,13 @@ class FormOrder extends Model
         $parts = array_filter([
             $this->recipient_name,
             $this->recipient_address,
-            trim(($this->recipient_postal_code ?? '') . ' ' . ($this->recipient_city ?? '')),
+            trim(($this->recipient_postal_code ?? '').' '.($this->recipient_city ?? '')),
         ]);
-        
-        if (!empty($this->recipient_nip)) {
-            $parts[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $this->recipient_nip);
+
+        if (! empty($this->recipient_nip)) {
+            $parts[] = 'NIP: '.preg_replace('/[^0-9]/', '', $this->recipient_nip);
         }
-        
+
         return implode("\n", $parts);
     }
 
@@ -367,6 +398,7 @@ class FormOrder extends Model
         if (empty($this->recipient_nip)) {
             return null;
         }
+
         return preg_replace('/[^0-9]/', '', $this->recipient_nip);
     }
 
@@ -384,31 +416,34 @@ class FormOrder extends Model
     public function primaryParticipant()
     {
         return $this->hasOne(FormOrderParticipant::class, 'form_order_id')
-                    ->where('is_primary', 1);
+            ->where('is_primary', 1)
+            ->whereNull('deleted_at');
     }
 
     /**
-     * Nazwa uczestnika do wyświetlenia – preferuje form_order_participants, fallback do form_orders
+     * Nazwa uczestnika do wyświetlenia (form_order_participants – główny uczestnik).
      */
     public function getDisplayParticipantNameAttribute(): string
     {
         $p = $this->primaryParticipant;
-        if ($p && (trim($p->participant_firstname . ' ' . $p->participant_lastname) !== '')) {
-            return trim($p->participant_firstname . ' ' . $p->participant_lastname);
+        if ($p && trim(($p->participant_firstname ?? '').' '.($p->participant_lastname ?? '')) !== '') {
+            return trim($p->participant_firstname.' '.$p->participant_lastname);
         }
-        return (string) ($this->participant_name ?? '');
+
+        return '';
     }
 
     /**
-     * E-mail uczestnika do wyświetlenia – preferuje form_order_participants, fallback do form_orders
+     * E-mail uczestnika do wyświetlenia (form_order_participants – główny uczestnik).
      */
     public function getDisplayParticipantEmailAttribute(): ?string
     {
         $p = $this->primaryParticipant;
-        if ($p && !empty(trim($p->participant_email ?? ''))) {
-            return trim($p->participant_email);
+        if ($p && ! empty(trim((string) ($p->participant_email ?? '')))) {
+            return trim((string) $p->participant_email);
         }
-        return !empty(trim($this->participant_email ?? '')) ? trim($this->participant_email) : null;
+
+        return null;
     }
 
     /**
@@ -426,27 +461,27 @@ class FormOrder extends Model
     public function getPriorityAttribute(): int
     {
         $priority = 0;
-        
+
         // NAJWYŻSZY PRIORYTET - ma fakturę (zawsze zachowaj)
         if ($this->has_invoice) {
             $priority += 10000000;
         }
-        
+
         // WYSOKI PRIORYTET - nie jest zakończone (aktywne) - wyższy niż zakończone bez faktury
-        if (!$this->is_completed) {
+        if (! $this->is_completed) {
             $priority += 5000000;
         }
-        
+
         // NISKI PRIORYTET - jest zakończone (ale bez faktury) - najniższy priorytet
         if ($this->is_completed) {
             $priority += 1000000;
         }
-        
+
         // BARDZO NISKI PRIORYTET - ma notatkę "duplikat"
         if (stripos($this->notes ?? '', 'duplikat') !== false) {
             $priority -= 10000000;
         }
-        
+
         // PRIORYTET CHRONOLOGICZNY - zależy od statusu przetworzenia
         if ($this->has_invoice) {
             // Dla zamówień z fakturą - starsze mają wyższy priorytet
@@ -459,7 +494,7 @@ class FormOrder extends Model
             // (klient mógł poprawić dane w kolejnym formularzu)
             $priority += $this->id; // Im wyższe ID, tym wyższy priorytet
         }
-        
+
         return $priority;
     }
 
@@ -485,40 +520,40 @@ class FormOrder extends Model
     public function getPriorityReasonAttribute(): string
     {
         $reasons = [];
-        
+
         if ($this->has_invoice) {
-            $reasons[] = "✅ Ma fakturę (najwyższy priorytet)";
-        } elseif (!$this->is_completed) {
-            $reasons[] = "✅ Aktywne zamówienie (wymaga przetworzenia)";
+            $reasons[] = '✅ Ma fakturę (najwyższy priorytet)';
+        } elseif (! $this->is_completed) {
+            $reasons[] = '✅ Aktywne zamówienie (wymaga przetworzenia)';
         } elseif ($this->is_marked_as_duplicate) {
-            $reasons[] = "❌ Oznaczone jako duplikat";
+            $reasons[] = '❌ Oznaczone jako duplikat';
         } else {
-            $reasons[] = "⚠️ Zakończone bez faktury (najniższy priorytet)";
+            $reasons[] = '⚠️ Zakończone bez faktury (najniższy priorytet)';
         }
-        
+
         // Dodaj informację o wieku zamówienia i logice chronologicznej
         if ($this->created_at) {
             $daysOld = $this->created_at->diffInDays(now());
             if ($daysOld == 0) {
-                $reasons[] = "🕐 Zamówienie z dzisiaj";
+                $reasons[] = '🕐 Zamówienie z dzisiaj';
             } elseif ($daysOld == 1) {
-                $reasons[] = "🕐 Zamówienie z wczoraj";
+                $reasons[] = '🕐 Zamówienie z wczoraj';
             } elseif ($daysOld < 7) {
                 $reasons[] = "🕐 Zamówienie sprzed {$daysOld} dni";
             } else {
                 $reasons[] = "🕐 Zamówienie sprzed {$daysOld} dni";
             }
         }
-        
+
         // Dodaj informację o logice chronologicznej
         if ($this->has_invoice) {
-            $reasons[] = "📅 Starsze zamówienie (z fakturą)";
+            $reasons[] = '📅 Starsze zamówienie (z fakturą)';
         } elseif ($this->is_completed) {
-            $reasons[] = "📅 Starsze zamówienie (zakończone)";
+            $reasons[] = '📅 Starsze zamówienie (zakończone)';
         } else {
-            $reasons[] = "🆕 Najnowsze zamówienie (może mieć poprawione dane)";
+            $reasons[] = '🆕 Najnowsze zamówienie (może mieć poprawione dane)';
         }
-        
+
         return implode("\n", $reasons);
     }
 

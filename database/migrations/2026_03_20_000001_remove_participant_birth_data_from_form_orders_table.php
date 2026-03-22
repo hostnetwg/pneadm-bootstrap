@@ -30,7 +30,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('form_orders', function (Blueprint $table) {
-            $table->date('participant_birth_date')->nullable()->after('participant_email');
+            // Po usunięciu participant_* z form_orders (osobna migracja) kolumna participant_email może nie istnieć
+            $after = Schema::hasColumn('form_orders', 'participant_email')
+                ? 'participant_email'
+                : 'publigo_sent_at';
+            $table->date('participant_birth_date')->nullable()->after($after);
             $table->string('participant_birth_place', 255)->nullable()->after('participant_birth_date');
         });
     }

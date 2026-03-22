@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\FormOrder;
+use App\Services\IfirmaApiService;
+use App\Services\PubligoApiService;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Services\PubligoApiService;
-use App\Services\IfirmaApiService;
 
 class FormOrdersController extends Controller
 {
@@ -21,69 +21,67 @@ class FormOrdersController extends Controller
         $perPage = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $filter = $request->get('filter', ''); // nowy parametr dla filtra
-        
+
         // Budujemy zapytanie używając modelu Eloquent
         $query = FormOrder::query();
-        
+
         // Dodajemy filtr dla wszystkich nieprzetworzonych zamówień (nowe + archiwalne)
         // Nieprzetworzone = bez numeru faktury i nie ukończone
         if ($filter === 'new') {
             $query->new(); // Używamy scope z modelu - pokazuje wszystkie nieprzetworzone
         }
-        
+
         // Dodajemy filtr dla archiwalnych zamówień (nieprzetworzone dla zakończonych szkoleń)
         if ($filter === 'archival') {
-            $query->join('courses', function($join) {
+            $query->join('courses', function ($join) {
                 $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
-                     ->where('courses.source_id_old', '=', 'certgen_Publigo');
+                    ->where('courses.source_id_old', '=', 'certgen_Publigo');
             })
-            ->where(function($q) {
-                // Bez numeru faktury
-                $q->whereNull('form_orders.invoice_number')
-                  ->orWhere('form_orders.invoice_number', '')
-                  ->orWhere('form_orders.invoice_number', '0');
-            })
-            ->where(function($q) {
-                // Nie ukończone (status_completed = 0 lub null)
-                $q->where('form_orders.status_completed', '=', 0)
-                  ->orWhereNull('form_orders.status_completed');
-            })
-            ->whereNotNull('form_orders.publigo_product_id')
-            ->where('courses.end_date', '<', \Carbon\Carbon::today())
-            ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
+                ->where(function ($q) {
+                    // Bez numeru faktury
+                    $q->whereNull('form_orders.invoice_number')
+                        ->orWhere('form_orders.invoice_number', '')
+                        ->orWhere('form_orders.invoice_number', '0');
+                })
+                ->where(function ($q) {
+                    // Nie ukończone (status_completed = 0 lub null)
+                    $q->where('form_orders.status_completed', '=', 0)
+                        ->orWhereNull('form_orders.status_completed');
+                })
+                ->whereNotNull('form_orders.publigo_product_id')
+                ->where('courses.end_date', '<', \Carbon\Carbon::today())
+                ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
         }
-        
-        // Dodajemy wyszukiwanie jeśli podano frazę (form_orders + form_order_participants)
-        if (!empty($search)) {
-            $query->where(function($q) use ($search) {
-                $q->where('participant_name', 'LIKE', "%{$search}%")
-                  ->orWhere('participant_email', 'LIKE', "%{$search}%")
-                  ->orWhereHas('primaryParticipant', function($pq) use ($search) {
-                      $pq->where('participant_firstname', 'LIKE', "%{$search}%")
-                         ->orWhere('participant_lastname', 'LIKE', "%{$search}%")
-                         ->orWhere('participant_email', 'LIKE', "%{$search}%");
-                  })
-                  ->orWhere('orderer_email', 'LIKE', "%{$search}%")
-                  ->orWhere('product_name', 'LIKE', "%{$search}%")
-                  ->orWhere('invoice_number', 'LIKE', "%{$search}%")
-                  ->orWhere('notes', 'LIKE', "%{$search}%")
-                  ->orWhere('id', 'LIKE', "%{$search}%")
-                  ->orWhere('publigo_product_id', 'LIKE', "%{$search}%")
+
+        // Dodajemy wyszukiwanie jeśli podano frazę (m.in. uczestnicy z form_order_participants)
+        if (! empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('primaryParticipant', function ($pq) use ($search) {
+                    $pq->where('participant_firstname', 'LIKE', "%{$search}%")
+                        ->orWhere('participant_lastname', 'LIKE', "%{$search}%")
+                        ->orWhere('participant_email', 'LIKE', "%{$search}%");
+                })
+                    ->orWhere('orderer_email', 'LIKE', "%{$search}%")
+                    ->orWhere('product_name', 'LIKE', "%{$search}%")
+                    ->orWhere('invoice_number', 'LIKE', "%{$search}%")
+                    ->orWhere('notes', 'LIKE', "%{$search}%")
+                    ->orWhere('id', 'LIKE', "%{$search}%")
+                    ->orWhere('publigo_product_id', 'LIKE', "%{$search}%")
                   // Wyszukiwanie po danych nabywcy
-                  ->orWhere('buyer_name', 'LIKE', "%{$search}%")
-                  ->orWhere('buyer_address', 'LIKE', "%{$search}%")
-                  ->orWhere('buyer_postal_code', 'LIKE', "%{$search}%")
-                  ->orWhere('buyer_city', 'LIKE', "%{$search}%")
-                  ->orWhere('buyer_nip', 'LIKE', "%{$search}%")
+                    ->orWhere('buyer_name', 'LIKE', "%{$search}%")
+                    ->orWhere('buyer_address', 'LIKE', "%{$search}%")
+                    ->orWhere('buyer_postal_code', 'LIKE', "%{$search}%")
+                    ->orWhere('buyer_city', 'LIKE', "%{$search}%")
+                    ->orWhere('buyer_nip', 'LIKE', "%{$search}%")
                   // Wyszukiwanie po danych odbiorcy
-                  ->orWhere('recipient_name', 'LIKE', "%{$search}%")
-                  ->orWhere('recipient_address', 'LIKE', "%{$search}%")
-                  ->orWhere('recipient_postal_code', 'LIKE', "%{$search}%")
-                  ->orWhere('recipient_city', 'LIKE', "%{$search}%")
-                  ->orWhere('recipient_nip', 'LIKE', "%{$search}%");
+                    ->orWhere('recipient_name', 'LIKE', "%{$search}%")
+                    ->orWhere('recipient_address', 'LIKE', "%{$search}%")
+                    ->orWhere('recipient_postal_code', 'LIKE', "%{$search}%")
+                    ->orWhere('recipient_city', 'LIKE', "%{$search}%")
+                    ->orWhere('recipient_nip', 'LIKE', "%{$search}%");
             });
         }
-        
+
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
             $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant'])->orderByDesc('id')->get();
@@ -109,7 +107,7 @@ class FormOrdersController extends Controller
                     'count' => $group->duplicate_count,
                     'is_duplicate' => true,
                     'group_email' => $group->participant_email,
-                    'group_product_id' => $group->publigo_product_id
+                    'group_product_id' => $group->publigo_product_id,
                 ];
             }
         }
@@ -119,23 +117,23 @@ class FormOrdersController extends Controller
         foreach ($duplicateGroups as $duplicate) {
             $orderIds = array_map('trim', explode(',', $duplicate->order_ids));
             $orders = FormOrder::whereIn('id', $orderIds)->get();
-            
+
             $activeCount = 0;
             $mainCount = 0;
-            
+
             foreach ($orders as $order) {
                 if ($order->has_invoice) {
                     $mainCount++;
-                } else if (!$order->is_completed) {
+                } elseif (! $order->is_completed) {
                     $activeCount++;
                 }
             }
-            
+
             // Wymaga akcji = więcej niż 1 aktywne LUB ma fakturę ale są jeszcze aktywne duplikaty
             $needsAction = ($activeCount > 1) || ($mainCount > 0 && $activeCount > 0);
             // Za dużo faktur = więcej niż 1 zamówienie z fakturą w grupie
             $hasMultipleInvoices = ($mainCount > 1);
-            
+
             if ($needsAction || $hasMultipleInvoices) {
                 $urgentDuplicatesCount++;
             }
@@ -144,20 +142,20 @@ class FormOrdersController extends Controller
         // Policz nieprzetworzone zamówienia dla zakończonych szkoleń (Archiwalne)
         // Nieprzetworzone = bez numeru faktury (invoice_number) i nie ukończone (status_completed = 0 lub null)
         $archivalCount = \DB::table('form_orders')
-            ->join('courses', function($join) {
+            ->join('courses', function ($join) {
                 $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
-                     ->where('courses.source_id_old', '=', 'certgen_Publigo');
+                    ->where('courses.source_id_old', '=', 'certgen_Publigo');
             })
-            ->where(function($q) {
+            ->where(function ($q) {
                 // Bez numeru faktury
                 $q->whereNull('form_orders.invoice_number')
-                  ->orWhere('form_orders.invoice_number', '')
-                  ->orWhere('form_orders.invoice_number', '0');
+                    ->orWhere('form_orders.invoice_number', '')
+                    ->orWhere('form_orders.invoice_number', '0');
             })
-            ->where(function($q) {
+            ->where(function ($q) {
                 // Nie ukończone (status_completed = 0 lub null)
                 $q->where('form_orders.status_completed', '=', 0)
-                  ->orWhereNull('form_orders.status_completed');
+                    ->orWhereNull('form_orders.status_completed');
             })
             ->whereNotNull('form_orders.publigo_product_id')
             ->where('courses.end_date', '<', \Carbon\Carbon::today())
@@ -172,7 +170,7 @@ class FormOrdersController extends Controller
         // Używamy UTC dla zapytań, ponieważ dane w bazie są w UTC
         $todayUTC = Carbon::today('UTC');
         $yesterdayUTC = Carbon::yesterday('UTC');
-        
+
         $stats = [
             'total' => FormOrder::count(),
             'new' => $newCount,
@@ -195,7 +193,7 @@ class FormOrdersController extends Controller
         $courses = \App\Models\Course::where('source_id_old', 'certgen_Publigo')
             ->orderBy('start_date', 'desc')
             ->get();
-            
+
         return view('form-orders.create', compact('courses'));
     }
 
@@ -212,46 +210,46 @@ class FormOrdersController extends Controller
                 'product_name' => 'nullable|string|max:255',
                 'product_price' => 'nullable|numeric|min:0',
                 'product_description' => 'nullable|string',
-                
+
                 // Dane uczestnika
                 'participant_firstname' => 'required|string|max:100',
                 'participant_lastname' => 'required|string|max:100',
                 'participant_email' => 'required|email|max:255',
-                
+
                 // Dane zamawiającego
                 'orderer_name' => 'required|string|max:255',
                 'orderer_phone' => 'required|string|max:20',
                 'orderer_email' => 'required|email|max:255',
-                
+
                 // Dane nabywcy
                 'buyer_name' => 'required|string|max:255',
                 'buyer_address' => 'required|string|max:255',
                 'buyer_postal_code' => 'required|string|max:10',
                 'buyer_city' => 'required|string|max:100',
                 'buyer_nip' => 'nullable|string|max:20',
-                
+
                 // Dane odbiorcy
                 'recipient_name' => 'nullable|string|max:255',
                 'recipient_address' => 'nullable|string|max:255',
                 'recipient_postal_code' => 'nullable|string|max:10',
                 'recipient_city' => 'nullable|string|max:100',
                 'recipient_nip' => 'nullable|string|max:20',
-                
+
                 // Dane Publigo (opcjonalne)
                 'publigo_product_id' => 'nullable|integer',
                 'publigo_price_id' => 'nullable|integer',
-                
+
                 // Uwagi do faktury
                 'invoice_notes' => 'nullable|string',
                 'invoice_payment_delay' => 'nullable|integer|min:0|max:31',
-                
+
                 // Notatki
                 'notes' => 'nullable|string',
             ]);
 
             // Pobierz dane kursu
             $course = \App\Models\Course::findOrFail($request->course_id);
-            
+
             // Ustaw dane Publigo na podstawie kursu
             $publigoProductId = $course->id_old; // ID produktu z Publigo
             $publigoPriceId = 1; // Domyślny price_id
@@ -263,8 +261,6 @@ class FormOrdersController extends Controller
                 'product_name' => $course->title,
                 'product_price' => $request->product_price ?? 0, // Można ustawić ręcznie
                 'product_description' => $course->description,
-                'participant_name' => $request->participant_firstname . ' ' . $request->participant_lastname,
-                'participant_email' => $request->participant_email,
                 'orderer_name' => $request->orderer_name,
                 'orderer_phone' => $request->orderer_phone,
                 'orderer_email' => $request->orderer_email,
@@ -301,7 +297,7 @@ class FormOrdersController extends Controller
         } catch (Exception $e) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas tworzenia zamówienia: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas tworzenia zamówienia: '.$e->getMessage());
         }
     }
 
@@ -312,13 +308,13 @@ class FormOrdersController extends Controller
     {
         $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant'])->find($id);
 
-        if (!$zamowienie) {
+        if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
         }
 
         // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
         $filterNew = $request->has('filter_new') && $request->input('filter_new') == '1';
-        
+
         // Sprawdzamy czy mamy filtrować po ID szkolenia
         $courseId = $request->input('course_id');
 
@@ -327,34 +323,34 @@ class FormOrdersController extends Controller
             // Filtrujemy zamówienia
             $prevQuery = FormOrder::where('id', '<', $id);
             $nextQuery = FormOrder::where('id', '>', $id);
-            
+
             // Dodajemy filtr dla niewprowadzonych zamówień
             if ($filterNew) {
-                $prevQuery->where(function($q) {
+                $prevQuery->where(function ($q) {
                     $q->whereNull('invoice_number')
-                      ->orWhere('invoice_number', '')
-                      ->orWhere('invoice_number', '0');
-                })->where(function($q) {
+                        ->orWhere('invoice_number', '')
+                        ->orWhere('invoice_number', '0');
+                })->where(function ($q) {
                     $q->where('status_completed', '!=', 1)
-                      ->orWhereNull('status_completed');
+                        ->orWhereNull('status_completed');
                 });
-                
-                $nextQuery->where(function($q) {
+
+                $nextQuery->where(function ($q) {
                     $q->whereNull('invoice_number')
-                      ->orWhere('invoice_number', '')
-                      ->orWhere('invoice_number', '0');
-                })->where(function($q) {
+                        ->orWhere('invoice_number', '')
+                        ->orWhere('invoice_number', '0');
+                })->where(function ($q) {
                     $q->where('status_completed', '!=', 1)
-                      ->orWhereNull('status_completed');
+                        ->orWhereNull('status_completed');
                 });
             }
-            
+
             // Dodajemy filtr po ID szkolenia
             if ($courseId) {
                 $prevQuery->where('publigo_product_id', $courseId);
                 $nextQuery->where('publigo_product_id', $courseId);
             }
-            
+
             $prevOrder = $prevQuery->orderByDesc('id')->first();
             $nextOrder = $nextQuery->orderBy('id')->first();
         } else {
@@ -378,25 +374,20 @@ class FormOrdersController extends Controller
     {
         try {
             $zamowienie = FormOrder::find($id);
-            
-            if (!$zamowienie) {
+
+            if (! $zamowienie) {
                 return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
             }
-            
+
             // Sprawdzamy, skąd użytkownik przyszedł
             $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             $isFromEditPage = $request->has('from_edit_page') && $request->input('from_edit_page') == '1';
-            
+
             // Jeśli przychodzi z pełnej strony edycji, aktualizuj wszystkie pola
             if ($isFromEditPage) {
-                // Łączymy imię i nazwisko dla pola participant_name w form_orders
-                $participantName = trim($request->input('participant_firstname') . ' ' . $request->input('participant_lastname'));
-                
                 $zamowienie->fill([
                     'product_name' => $request->input('product_name'),
                     'product_price' => $request->input('product_price'),
-                    'participant_name' => $participantName,
-                    'participant_email' => $request->input('participant_email'),
                     'orderer_name' => $request->input('orderer_name'),
                     'orderer_phone' => $request->input('orderer_phone'),
                     'orderer_email' => $request->input('orderer_email'),
@@ -422,11 +413,11 @@ class FormOrdersController extends Controller
                 $zamowienie->notes = $request->input('notes');
                 $zamowienie->status_completed = $request->has('status_completed') ? 1 : 0;
             }
-            
+
             $zamowienie->updated_manually_at = now();
             $zamowienie->save();
-            
-            // Aktualizuj lub utwórz dane uczestnika w tabeli form_order_participants (zawsze zapis w obu tabelach)
+
+            // Aktualizuj lub utwórz głównego uczestnika w form_order_participants (bez zapisu do form_orders)
             if ($isFromEditPage) {
                 $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
                     ->where('is_primary', true)
@@ -447,71 +438,99 @@ class FormOrdersController extends Controller
                     ]));
                 }
             }
-            
+
             // Jeśli nie ma ukrytego pola, sprawdzamy referer (fallback)
-            if (!$isFromShowPage && !$isFromEditPage) {
+            if (! $isFromShowPage && ! $isFromEditPage) {
                 $referer = $request->header('referer');
                 if ($referer) {
                     $refererPath = parse_url($referer, PHP_URL_PATH);
-                    $showPagePath = '/form-orders/' . $id;
+                    $showPagePath = '/form-orders/'.$id;
                     $isFromShowPage = $refererPath === $showPagePath;
                 }
             }
-            
+
             // Przekierowanie w zależności od źródła
             if ($isFromEditPage) {
                 // Zachowujemy parametry filtrów przy przekierowaniu z formularza edycji
                 $redirectParams = [];
-                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
-                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
-                
+                if ($request->has('filter_new')) {
+                    $redirectParams['filter_new'] = $request->input('filter_new');
+                }
+                if ($request->has('course_id')) {
+                    $redirectParams['course_id'] = $request->input('course_id');
+                }
+
                 return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
             } elseif ($isFromShowPage) {
                 // Zachowujemy parametry filtrów przy przekierowaniu
                 $redirectParams = [];
-                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
-                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
-                
+                if ($request->has('filter_new')) {
+                    $redirectParams['filter_new'] = $request->input('filter_new');
+                }
+                if ($request->has('course_id')) {
+                    $redirectParams['course_id'] = $request->input('course_id');
+                }
+
                 return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
             } else {
                 // Wracamy do listy z zachowaniem parametrów
                 $redirectParams = [];
-                if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
-                if ($request->has('search')) $redirectParams['search'] = $request->input('search');
-                if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
-                if ($request->has('page')) $redirectParams['page'] = $request->input('page');
-                
+                if ($request->has('per_page')) {
+                    $redirectParams['per_page'] = $request->input('per_page');
+                }
+                if ($request->has('search')) {
+                    $redirectParams['search'] = $request->input('search');
+                }
+                if ($request->has('filter')) {
+                    $redirectParams['filter'] = $request->input('filter');
+                }
+                if ($request->has('page')) {
+                    $redirectParams['page'] = $request->input('page');
+                }
+
                 return redirect()->route('form-orders.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
             }
         } catch (Exception $e) {
             $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             $isFromEditPage = $request->has('from_edit_page') && $request->input('from_edit_page') == '1';
-            
-            if (!$isFromShowPage && !$isFromEditPage) {
+
+            if (! $isFromShowPage && ! $isFromEditPage) {
                 $referer = $request->header('referer');
                 if ($referer) {
                     $refererPath = parse_url($referer, PHP_URL_PATH);
-                    $showPagePath = '/form-orders/' . $id;
+                    $showPagePath = '/form-orders/'.$id;
                     $isFromShowPage = $refererPath === $showPagePath;
                 }
             }
-            
+
             if ($isFromEditPage) {
                 // Zachowujemy parametry filtrów przy przekierowaniu z błędem
                 $redirectParams = [];
-                if ($request->has('filter_new')) $redirectParams['filter_new'] = $request->input('filter_new');
-                if ($request->has('course_id')) $redirectParams['course_id'] = $request->input('course_id');
-                
-                return redirect()->route('form-orders.edit', array_merge(['id' => $id], $redirectParams))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: ' . $e->getMessage());
+                if ($request->has('filter_new')) {
+                    $redirectParams['filter_new'] = $request->input('filter_new');
+                }
+                if ($request->has('course_id')) {
+                    $redirectParams['course_id'] = $request->input('course_id');
+                }
+
+                return redirect()->route('form-orders.edit', array_merge(['id' => $id], $redirectParams))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: '.$e->getMessage());
             } elseif ($isFromShowPage) {
                 return redirect()->route('form-orders.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
             } else {
                 $redirectParams = [];
-                if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
-                if ($request->has('search')) $redirectParams['search'] = $request->input('search');
-                if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
-                if ($request->has('page')) $redirectParams['page'] = $request->input('page');
-                
+                if ($request->has('per_page')) {
+                    $redirectParams['per_page'] = $request->input('per_page');
+                }
+                if ($request->has('search')) {
+                    $redirectParams['search'] = $request->input('search');
+                }
+                if ($request->has('filter')) {
+                    $redirectParams['filter'] = $request->input('filter');
+                }
+                if ($request->has('page')) {
+                    $redirectParams['page'] = $request->input('page');
+                }
+
                 return redirect()->route('form-orders.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
             }
         }
@@ -523,12 +542,12 @@ class FormOrdersController extends Controller
     public function createPubligoOrder(Request $request, $id)
     {
         try {
-            $zamowienie = FormOrder::find($id);
+            $zamowienie = FormOrder::with('primaryParticipant')->find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -536,7 +555,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.'
+                    'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.',
                 ], 400);
             }
 
@@ -545,35 +564,38 @@ class FormOrdersController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'To zamówienie zostało już wysłane do Publigo.',
-                    'sent_at' => $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana data'
+                    'sent_at' => $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->format('d.m.Y H:i') : 'Nieznana data',
                 ], 400);
             }
 
-            // Sprawdzenie czy ma wszystkie wymagane dane
-            // Sprawdzamy dane uczestnika oraz dane adresowe NABYWCY (używane jako adres wysyłkowy)
-            $requiredFields = ['participant_email', 'participant_name', 'buyer_address', 'buyer_postal_code', 'buyer_city'];
+            // Sprawdzenie czy ma wszystkie wymagane dane (uczestnik z form_order_participants)
             $missingFields = [];
-            
-            foreach ($requiredFields as $field) {
+            if (empty(trim($zamowienie->display_participant_email ?? ''))) {
+                $missingFields[] = 'participant_email';
+            }
+            if (empty(trim($zamowienie->display_participant_name ?? ''))) {
+                $missingFields[] = 'participant_name';
+            }
+            foreach (['buyer_address', 'buyer_postal_code', 'buyer_city'] as $field) {
                 if (empty($zamowienie->$field)) {
                     $missingFields[] = $field;
                 }
             }
 
-            if (!empty($missingFields)) {
+            if (! empty($missingFields)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak wymaganych danych: ' . implode(', ', $missingFields)
+                    'error' => 'Brak wymaganych danych: '.implode(', ', $missingFields),
                 ], 400);
             }
 
             // Przygotowanie obiektu zgodnego z oczekiwaniami PubligoApiService
             // Musimy zmapować pola z nowego formatu na stary
             // Używamy danych NABYWCY zamiast ODBIORCY dla adresu wysyłkowego
-            $orderDataForService = (object)[
+            $orderDataForService = (object) [
                 'id' => $zamowienie->id, // Dodanie brakującego pola ID
-                'konto_email' => $zamowienie->participant_email,
-                'konto_imie_nazwisko' => $zamowienie->participant_name,
+                'konto_email' => $zamowienie->display_participant_email,
+                'konto_imie_nazwisko' => $zamowienie->display_participant_name,
                 'odb_nazwa' => $zamowienie->buyer_name, // Używamy nazwy nabywcy
                 'odb_adres' => $zamowienie->buyer_address, // Używamy adresu nabywcy
                 'odb_kod' => $zamowienie->buyer_postal_code, // Używamy kodu pocztowego nabywcy
@@ -583,7 +605,7 @@ class FormOrdersController extends Controller
             ];
 
             // Przygotowanie i wysłanie zamówienia do Publigo
-            $publigoService = new PubligoApiService();
+            $publigoService = new PubligoApiService;
             $orderData = $publigoService->prepareOrderData($orderDataForService);
             $result = $publigoService->createOrder($orderData);
 
@@ -599,7 +621,7 @@ class FormOrdersController extends Controller
                     'message' => $result['message'],
                     'order_data' => $orderData,
                     'publigo_response' => $result['response'],
-                    'sent_at' => now()->format('d.m.Y H:i')
+                    'sent_at' => now()->format('d.m.Y H:i'),
                 ]);
             } else {
                 return response()->json([
@@ -607,14 +629,14 @@ class FormOrdersController extends Controller
                     'error' => $result['error'],
                     'order_data' => $orderData,
                     'publigo_response' => $result['response'],
-                    'http_code' => $result['http_code']
+                    'http_code' => $result['http_code'],
                 ]);
             }
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -625,20 +647,20 @@ class FormOrdersController extends Controller
     public function resetPubligoStatus(Request $request, $id)
     {
         // Sprawdzenie uprawnień - tylko admin i super_admin
-        if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('super_admin')) {
+        if (! auth()->user()->hasRole('admin') && ! auth()->user()->hasRole('super_admin')) {
             return response()->json([
                 'success' => false,
-                'error' => 'Brak uprawnień do resetowania statusu Publigo.'
+                'error' => 'Brak uprawnień do resetowania statusu Publigo.',
             ], 403);
         }
 
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -651,19 +673,19 @@ class FormOrdersController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Status Publigo został zresetowany. Zamówienie może być ponownie wysłane.',
-                    'reset_at' => now()->format('d.m.Y H:i')
+                    'reset_at' => now()->format('d.m.Y H:i'),
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie udało się zresetować statusu Publigo.'
+                    'error' => 'Nie udało się zresetować statusu Publigo.',
                 ], 500);
             }
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas resetowania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas resetowania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -676,10 +698,10 @@ class FormOrdersController extends Controller
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -687,7 +709,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->buyer_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -695,7 +717,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -709,28 +731,28 @@ class FormOrdersController extends Controller
             } else {
                 // Pole nie było przesłane w request - generuj automatycznie dane odbiorcy
                 $recipientData = [];
-                if (!empty($zamowienie->recipient_name)) {
+                if (! empty($zamowienie->recipient_name)) {
                     $recipientData[] = $zamowienie->recipient_name;
                 }
-                if (!empty($zamowienie->recipient_address)) {
+                if (! empty($zamowienie->recipient_address)) {
                     $recipientData[] = $zamowienie->recipient_address;
                 }
-                if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
-                    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+                if (! empty($zamowienie->recipient_postal_code) && ! empty($zamowienie->recipient_city)) {
+                    $recipientData[] = $zamowienie->recipient_postal_code.' '.$zamowienie->recipient_city;
                 }
-                if (!empty($zamowienie->recipient_nip)) {
-                    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
+                if (! empty($zamowienie->recipient_nip)) {
+                    $recipientData[] = 'NIP: '.preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
                 }
 
                 $uwagi = "ODBIORCA:\n";
-                if (!empty($recipientData)) {
+                if (! empty($recipientData)) {
                     $uwagi .= implode("\n", $recipientData);
                 }
             }
-            
+
             // ZAWSZE na końcu dodaj identyfikator zamówienia
             // Dzięki temu każda faktura pro-forma będzie miała powiązanie z zamówieniem
-            if (!empty(trim($uwagi))) {
+            if (! empty(trim($uwagi))) {
                 $uwagi .= "\npnedu.pl #{$zamowienie->id}";
             } else {
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
@@ -739,40 +761,40 @@ class FormOrdersController extends Controller
             // Przygotowanie danych kontrahenta - tylko pola z wartościami
             $kontrahent = [
                 'Nazwa' => $zamowienie->buyer_name,
-                'Kraj' => 'PL'
+                'Kraj' => 'PL',
             ];
-            
+
             // Dodajemy tylko pola, które mają wartości (nie wysyłamy pustych stringów)
-            if (!empty($zamowienie->buyer_address)) {
+            if (! empty($zamowienie->buyer_address)) {
                 $kontrahent['Ulica'] = $zamowienie->buyer_address;
             }
-            
-            if (!empty($zamowienie->buyer_postal_code)) {
+
+            if (! empty($zamowienie->buyer_postal_code)) {
                 $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
             }
-            
-            if (!empty($zamowienie->buyer_city)) {
+
+            if (! empty($zamowienie->buyer_city)) {
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
-            
+
             // NIP tylko jeśli jest podany (nie wysyłamy pustego string)
-            if (!empty($zamowienie->buyer_nip)) {
+            if (! empty($zamowienie->buyer_nip)) {
                 $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (!empty($nip)) {
+                if (! empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
             }
-            
+
             // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
             // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
             $emailToSave = null;
-            if (!empty($zamowienie->orderer_email)) {
+            if (! empty($zamowienie->orderer_email)) {
                 $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (!empty($zamowienie->participant_email)) {
-                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
             }
-            
-            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+
+            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
                 $kontrahent['Email'] = $emailToSave;
             }
 
@@ -789,10 +811,10 @@ class FormOrdersController extends Controller
             $pozycja = [
                 'NazwaPelna' => $zamowienie->product_name,
                 'Ilosc' => 1.0,
-                'CenaJednostkowa' => round((float)$zamowienie->product_price, 2),
+                'CenaJednostkowa' => round((float) $zamowienie->product_price, 2),
                 'Jednostka' => 'sztuk',
                 'StawkaVat' => 0.23,
-                'TypStawkiVat' => 'PRC'
+                'TypStawkiVat' => 'PRC',
             ];
 
             // Jeśli konto jest zwolnione z VAT (nievatowiec) – dostosuj stawkę
@@ -812,7 +834,7 @@ class FormOrdersController extends Controller
             // - SposobZaplaty - TAK (wartości: GTK, POB, PRZ, KAR, PZA, CZK, KOM, BAR, DOT, PAL, ALG, P24, TPA, ELE)
             // - RodzajPodpisuOdbiorcy (OUP/UPO/BPO/BWO) - TAK
             // UWAGA: DataSprzedazy NIE jest używana w fakturach pro forma (tylko w zwykłych fakturach)!
-            
+
             $invoiceData = [
                 'LiczOd' => 'NET',
                 'TypFakturyKrajowej' => 'SPRZ', // SPRZ = krajowa sprzedaż
@@ -820,24 +842,24 @@ class FormOrdersController extends Controller
                 // DataSprzedazy - NIE używamy dla pro forma (powoduje błąd walidacji)
                 'SposobZaplaty' => 'PRZ', // PRZ = przelew
                 'RodzajPodpisuOdbiorcy' => 'BWO', // brak podpisu odbiorcy i wystawcy
-                'NumerZamowienia' => (string)$zamowienie->id,
+                'NumerZamowienia' => (string) $zamowienie->id,
                 'Kontrahent' => $kontrahent,
-                'Pozycje' => [$pozycja]
+                'Pozycje' => [$pozycja],
             ];
-            
+
             // Termin płatności - opcjonalne
             $invoiceData['TerminPlatnosci'] = now()->addDays(
-                !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14
+                ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14
             )->format('Y-m-d');
 
             // Uwagi - dodajemy tylko jeśli są (nie pusty string)
-            if (!empty(trim($uwagi ?? ''))) {
+            if (! empty(trim($uwagi ?? ''))) {
                 $invoiceData['Uwagi'] = trim($uwagi);
             }
 
             // Numer konta bankowego - dodajemy tylko jeśli jest skonfigurowany
             $bankAccount = config('services.ifirma.bank_account', '');
-            if (!empty(trim($bankAccount))) {
+            if (! empty(trim($bankAccount))) {
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
@@ -845,11 +867,11 @@ class FormOrdersController extends Controller
             Log::info('iFirma Pro Forma Request Data', [
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
-                'invoice_data_json' => json_encode($invoiceData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                'invoice_data_json' => json_encode($invoiceData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             ]);
 
             // Wystawienie faktury pro forma przez API iFirma
-            $ifirmaService = new IfirmaApiService();
+            $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createProFormaInvoice($invoiceData);
 
             // Logowanie pełnej odpowiedzi dla debugowania
@@ -858,7 +880,7 @@ class FormOrdersController extends Controller
                 'status' => $result['status'] ?? 'unknown',
                 'status_code' => $result['status_code'] ?? null,
                 'message' => $result['message'] ?? null,
-                'full_response' => $result
+                'full_response' => $result,
             ]);
 
             // Zwrócenie odpowiedzi
@@ -874,15 +896,15 @@ class FormOrdersController extends Controller
                 // Pobierz pełny numer faktury (np. "1/11/2025/ProForma") zamiast samego ID
                 $invoiceNumber = null;
                 $fullInvoiceData = null;
-                
-                if (!empty($invoiceId)) {
+
+                if (! empty($invoiceId)) {
                     try {
                         // Pobierz szczegóły faktury z iFirma, aby uzyskać PelnyNumer
                         $invoiceDetails = $ifirmaService->getProFormaInvoice($invoiceId);
-                        
+
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
-                            
+
                             // Pełny numer faktury jest w polu "PelnyNumer"
                             if (isset($fullInvoiceData['PelnyNumer'])) {
                                 $invoiceNumber = $fullInvoiceData['PelnyNumer'];
@@ -890,16 +912,16 @@ class FormOrdersController extends Controller
                                 $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
                             }
                         }
-                        
+
                         Log::info('iFirma Pro Forma - szczegóły pobrane', [
                             'invoice_id' => $invoiceId,
                             'invoice_number' => $invoiceNumber,
-                            'details' => $fullInvoiceData
+                            'details' => $fullInvoiceData,
                         ]);
                     } catch (Exception $e) {
                         Log::warning('Nie udało się pobrać pełnego numeru faktury', [
                             'invoice_id' => $invoiceId,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                         // Jeśli nie udało się pobrać, użyj Identyfikatora jako fallback
                         $invoiceNumber = $invoiceId;
@@ -908,15 +930,15 @@ class FormOrdersController extends Controller
 
                 // Aktualizacja numeru PRO-FORMA w polu notes (Notatki)
                 // PRO-FORMA zapisuje się w notes, nie w invoice_number!
-                if (!empty($invoiceNumber)) {
+                if (! empty($invoiceNumber)) {
                     // Dodaj numer PRO-FORMA na początku (na górze), spychając poprzednie wpisy w dół
-                    $existingNotes = !empty($zamowienie->notes) ? trim($zamowienie->notes) : '';
+                    $existingNotes = ! empty($zamowienie->notes) ? trim($zamowienie->notes) : '';
                     $proFormaNote = "PRO-FORMA: {$invoiceNumber}";
-                    
+
                     // Sprawdź czy numer PRO-FORMA już nie jest w notatkach
                     if (strpos($zamowienie->notes ?? '', $invoiceNumber) === false) {
                         // Nowy wpis na górze, poprzednie wpisy poniżej
-                        $zamowienie->notes = $existingNotes 
+                        $zamowienie->notes = $existingNotes
                             ? "{$proFormaNote}\n{$existingNotes}"
                             : $proFormaNote;
                         $zamowienie->save();
@@ -927,60 +949,60 @@ class FormOrdersController extends Controller
                 $sendEmail = $request->input('send_email', false);
                 $emailsSent = [];
                 $emailErrors = [];
-                
-                if ($sendEmail && !empty($invoiceId)) {
+
+                if ($sendEmail && ! empty($invoiceId)) {
                     // Zbierz unikalne adresy e-mail (małe litery, bez duplikatów)
                     $emails = [];
-                    
+
                     // E-mail zamawiającego
-                    if (!empty($zamowienie->orderer_email)) {
+                    if (! empty($zamowienie->orderer_email)) {
                         $emails[] = strtolower(trim($zamowienie->orderer_email));
                     }
-                    
+
                     // E-mail uczestnika (jeśli różny od zamawiającego)
-                    if (!empty($zamowienie->participant_email)) {
-                        $participantEmail = strtolower(trim($zamowienie->participant_email));
-                        if (!in_array($participantEmail, $emails)) {
+                    if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                        $participantEmail = strtolower(trim($zamowienie->display_participant_email));
+                        if (! in_array($participantEmail, $emails)) {
                             $emails[] = $participantEmail;
                         }
                     }
-                    
+
                     // Wysyłka do wszystkich adresów
                     foreach ($emails as $email) {
                         try {
                             $sendResult = $ifirmaService->sendProFormaByEmail(
-                                $invoiceId, 
-                                $email, 
-                                $invoiceNumber, 
+                                $invoiceId,
+                                $email,
+                                $invoiceNumber,
                                 $zamowienie->id
                             );
-                            
+
                             if ($sendResult['status'] === 'success') {
                                 $emailsSent[] = $email;
                                 Log::info('Faktura pro forma wysłana e-mailem', [
                                     'invoice_id' => $invoiceId,
-                                    'email' => $email
+                                    'email' => $email,
                                 ]);
                             } else {
                                 $emailErrors[] = [
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ];
                                 Log::warning('Błąd wysyłki faktury pro forma', [
                                     'invoice_id' => $invoiceId,
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ]);
                             }
                         } catch (Exception $e) {
                             $emailErrors[] = [
                                 'email' => $email,
-                                'error' => $e->getMessage()
+                                'error' => $e->getMessage(),
                             ];
                             Log::error('Exception podczas wysyłki faktury pro forma', [
                                 'invoice_id' => $invoiceId,
                                 'email' => $email,
-                                'exception' => $e->getMessage()
+                                'exception' => $e->getMessage(),
                             ]);
                         }
                     }
@@ -988,11 +1010,11 @@ class FormOrdersController extends Controller
 
                 // Przygotuj wiadomość dla użytkownika
                 $message = 'Faktura pro forma została pomyślnie wystawiona w iFirma.pl';
-                if (!empty($emailsSent)) {
-                    $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+                if (! empty($emailsSent)) {
+                    $message .= ' i wysłana na: '.implode(', ', $emailsSent);
                 }
-                if (!empty($emailErrors)) {
-                    $message .= ' (Błędy wysyłki: ' . count($emailErrors) . ')';
+                if (! empty($emailErrors)) {
+                    $message .= ' (Błędy wysyłki: '.count($emailErrors).')';
                 }
 
                 return response()->json([
@@ -1004,7 +1026,7 @@ class FormOrdersController extends Controller
                     'ifirma_response' => $result['data'] ?? $result['raw_response'] ?? null,
                     'emails_sent' => $emailsSent,
                     'email_errors' => $emailErrors,
-                    'created_at' => now()->format('d.m.Y H:i')
+                    'created_at' => now()->format('d.m.Y H:i'),
                 ]);
             } else {
                 return response()->json([
@@ -1012,14 +1034,14 @@ class FormOrdersController extends Controller
                     'error' => $result['message'] ?? 'Nie udało się wystawić faktury pro forma',
                     'invoice_data' => $invoiceData,
                     'ifirma_response' => $result['raw_response'] ?? null,
-                    'status_code' => $result['status_code'] ?? null
+                    'status_code' => $result['status_code'] ?? null,
                 ], 500);
             }
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1032,10 +1054,10 @@ class FormOrdersController extends Controller
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -1047,13 +1069,13 @@ class FormOrdersController extends Controller
                 'success' => true,
                 'has_invoice' => $hasInvoice,
                 'invoice_number' => $invoiceNumber ?: null,
-                'order_id' => $zamowienie->id
+                'order_id' => $zamowienie->id,
             ]);
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas sprawdzania statusu faktury: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas sprawdzania statusu faktury: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1066,10 +1088,10 @@ class FormOrdersController extends Controller
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -1079,7 +1101,7 @@ class FormOrdersController extends Controller
             $force = $request->input('force', false);
 
             // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
-            if ($hasInvoice && !$force) {
+            if ($hasInvoice && ! $force) {
                 // Logowanie próby ponownego wystawienia faktury
                 \App\Models\ActivityLog::logCustom(
                     'Próba ponownego wystawienia faktury',
@@ -1096,7 +1118,7 @@ class FormOrdersController extends Controller
                     'success' => false,
                     'error' => 'Faktura dla tego zamówienia została już wystawiona.',
                     'existing_invoice_number' => $existingInvoiceNumber,
-                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.'
+                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.',
                 ], 409); // 409 Conflict
             }
 
@@ -1104,7 +1126,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->buyer_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1112,7 +1134,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1126,27 +1148,27 @@ class FormOrdersController extends Controller
             } else {
                 // Pole nie było przesłane w request - generuj automatycznie dane odbiorcy
                 $recipientData = [];
-                if (!empty($zamowienie->recipient_name)) {
+                if (! empty($zamowienie->recipient_name)) {
                     $recipientData[] = $zamowienie->recipient_name;
                 }
-                if (!empty($zamowienie->recipient_address)) {
+                if (! empty($zamowienie->recipient_address)) {
                     $recipientData[] = $zamowienie->recipient_address;
                 }
-                if (!empty($zamowienie->recipient_postal_code) && !empty($zamowienie->recipient_city)) {
-                    $recipientData[] = $zamowienie->recipient_postal_code . ' ' . $zamowienie->recipient_city;
+                if (! empty($zamowienie->recipient_postal_code) && ! empty($zamowienie->recipient_city)) {
+                    $recipientData[] = $zamowienie->recipient_postal_code.' '.$zamowienie->recipient_city;
                 }
-                if (!empty($zamowienie->recipient_nip)) {
-                    $recipientData[] = 'NIP: ' . preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
+                if (! empty($zamowienie->recipient_nip)) {
+                    $recipientData[] = 'NIP: '.preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
                 }
 
                 $uwagi = "ODBIORCA:\n";
-                if (!empty($recipientData)) {
+                if (! empty($recipientData)) {
                     $uwagi .= implode("\n", $recipientData);
                 }
             }
-            
+
             // ZAWSZE na końcu dodaj identyfikator zamówienia
-            if (!empty(trim($uwagi))) {
+            if (! empty(trim($uwagi))) {
                 $uwagi .= "\npnedu.pl #{$zamowienie->id}";
             } else {
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
@@ -1168,50 +1190,50 @@ class FormOrdersController extends Controller
                 'OsobaFizyczna' => false,
                 'Email' => null,
             ];
-            
+
             // NIP
-            if (!empty($zamowienie->buyer_nip)) {
+            if (! empty($zamowienie->buyer_nip)) {
                 $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (!empty($nip)) {
+                if (! empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
             }
-            
+
             // Adres
-            if (!empty($zamowienie->buyer_address)) {
+            if (! empty($zamowienie->buyer_address)) {
                 $kontrahent['Ulica'] = $zamowienie->buyer_address;
             }
-            if (!empty($zamowienie->buyer_postal_code)) {
+            if (! empty($zamowienie->buyer_postal_code)) {
                 $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
             }
-            if (!empty($zamowienie->buyer_city)) {
+            if (! empty($zamowienie->buyer_city)) {
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
-            
+
             // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
             // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
             $emailToSave = null;
-            if (!empty($zamowienie->orderer_email)) {
+            if (! empty($zamowienie->orderer_email)) {
                 $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (!empty($zamowienie->participant_email)) {
-                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
             }
-            
-            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+
+            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
                 $kontrahent['Email'] = $emailToSave;
             }
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
             $vatExempt = config('services.ifirma.vat_exempt', false);
-            
+
             // Przygotowanie pozycji faktury krajowej
             // OBSERWACJA: W formularzu iFirma.pl (UI) NIE MA pola dla StawkaRyczaltu w pozycji faktury
             // To sugeruje, że dla nievatowców na ryczałcie StawkaRyczaltu jest automatycznie
             // pobierane z konfiguracji konta i NIE powinno być podawane explicite w pozycji!
             // Zgodnie z dokumentacją API iFirma dla nievatowców:
             // https://api.ifirma.pl/wystawianie-faktury-sprzedazy-krajowej-dla-nievatowca/
-            
+
             // Przygotowanie pozycji faktury
             // WAŻNE: Na podstawie działającego kodu PHP kolejność pól jest kluczowa!
             // Kolejność z działającego kodu:
@@ -1222,11 +1244,11 @@ class FormOrdersController extends Controller
             // 5. NazwaPelna
             // 6. Jednostka
             // 7. TypStawkiVat (na końcu!)
-            
-            $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
-            
+
+            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+
             $pozycja = [];
-            
+
             // Dla zwolnionych z VAT: NAJPIERW PodstawaPrawna, POTEM StawkaVat = null
             if ($vatExempt) {
                 $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
@@ -1237,16 +1259,15 @@ class FormOrdersController extends Controller
                     $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
                 }
             }
-            
+
             // Pozostałe pola w dokładnej kolejności jak w działającym kodzie
             $pozycja['Ilosc'] = (float) 1.0;
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
             $pozycja['NazwaPelna'] = $zamowienie->product_name;
             $pozycja['Jednostka'] = 'sztuk';
-            
+
             // TypStawkiVat NA KOŃCU!
             $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
-            
 
             // Przygotowanie danych faktury krajowej dla iFirma
             // Zgodnie z dokumentacją: https://api.ifirma.pl/wystawianie-faktury-krajowej/
@@ -1255,13 +1276,13 @@ class FormOrdersController extends Controller
             // - DataSprzedazy jest WYMAGANA (w pro-forma jej nie ma)
             // - BRAK pola TypFakturyKrajowej (to pole jest TYLKO dla pro-forma!)
             // - RodzajPodpisuOdbiorcy może być opcjonalne
-            
+
             // Przygotowanie danych faktury - DOKŁADNA KOLEJNOŚĆ z działającego kodu PHP!
             // WAŻNE: Na podstawie działającego kodu:
             // - LiczOd: 'BRT' dla nievatowców (nie 'NET'!)
             // - RodzajPodpisuOdbiorcy: 'BPO' (nie 'BWO'!)
             // - Kolejność pól jest ważna!
-            
+
             $invoiceData = [
                 'Zaplacono' => 0.00, // PIERWSZA - dokładnie 0.00
                 'ZaplaconoNaDokumencie' => 0.00, // DRUGA - dokładnie 0.00
@@ -1278,30 +1299,30 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
             ];
-            
+
             // Termin płatności - ODROCZONA PŁATNOŚĆ zgodnie z invoice_payment_delay
-            $paymentDelay = !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14;
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
             $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
 
             // Uwagi
-            if (!empty(trim($uwagi))) {
+            if (! empty(trim($uwagi))) {
                 $invoiceData['Uwagi'] = trim($uwagi);
             }
 
             // Numer konta bankowego
             $bankAccount = config('services.ifirma.bank_account', '');
-            if (!empty(trim($bankAccount))) {
+            if (! empty(trim($bankAccount))) {
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
             Log::info('iFirma Invoice Request Data', [
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
-                'payment_delay_days' => $paymentDelay
+                'payment_delay_days' => $paymentDelay,
             ]);
 
             // Wystawienie faktury przez API iFirma
-            $ifirmaService = new IfirmaApiService();
+            $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createInvoice($invoiceData);
 
             Log::info('iFirma Invoice Response', [
@@ -1309,7 +1330,7 @@ class FormOrdersController extends Controller
                 'status' => $result['status'] ?? 'unknown',
                 'status_code' => $result['status_code'] ?? null,
                 'message' => $result['message'] ?? null,
-                'full_response' => $result
+                'full_response' => $result,
             ]);
 
             if ($result['status'] === 'success') {
@@ -1324,30 +1345,30 @@ class FormOrdersController extends Controller
                 // Pobierz pełny numer faktury
                 $invoiceNumber = null;
                 $fullInvoiceData = null;
-                
-                if (!empty($invoiceId)) {
+
+                if (! empty($invoiceId)) {
                     try {
                         $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
-                        
+
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
-                            
+
                             if (isset($fullInvoiceData['PelnyNumer'])) {
                                 $invoiceNumber = $fullInvoiceData['PelnyNumer'];
                             } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
                                 $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
                             }
                         }
-                        
+
                         Log::info('iFirma Invoice - szczegóły pobrane', [
                             'invoice_id' => $invoiceId,
                             'invoice_number' => $invoiceNumber,
-                            'details' => $fullInvoiceData
+                            'details' => $fullInvoiceData,
                         ]);
                     } catch (Exception $e) {
                         Log::warning('Nie udało się pobrać pełnego numeru faktury', [
                             'invoice_id' => $invoiceId,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                         $invoiceNumber = $invoiceId;
                     }
@@ -1355,16 +1376,16 @@ class FormOrdersController extends Controller
 
                 // Aktualizacja numeru faktury w zamówieniu (pole invoice_number)
                 // Faktura krajowa zapisuje się w invoice_number (nie w invoice_notes!)
-                if (!empty($invoiceNumber)) {
+                if (! empty($invoiceNumber)) {
                     $oldInvoiceNumber = $zamowienie->invoice_number;
-                    
+
                     // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
                     if (empty($oldInvoiceNumber) || $force) {
                         $zamowienie->invoice_number = $invoiceNumber;
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
-                        $logDescription = $force && !empty($oldInvoiceNumber)
+                        $logDescription = $force && ! empty($oldInvoiceNumber)
                             ? "Wystawiono nową fakturę {$invoiceNumber} dla zamówienia #{$zamowienie->id} (nadpisano poprzednią fakturę: {$oldInvoiceNumber})"
                             : "Wystawiono fakturę {$invoiceNumber} dla zamówienia #{$zamowienie->id}";
 
@@ -1386,68 +1407,68 @@ class FormOrdersController extends Controller
                 $sendEmail = $request->input('send_email', false);
                 $emailsSent = [];
                 $emailErrors = [];
-                
-                if ($sendEmail && !empty($invoiceId)) {
+
+                if ($sendEmail && ! empty($invoiceId)) {
                     $emails = [];
-                    
-                    if (!empty($zamowienie->orderer_email)) {
+
+                    if (! empty($zamowienie->orderer_email)) {
                         $emails[] = strtolower(trim($zamowienie->orderer_email));
                     }
-                    
-                    if (!empty($zamowienie->participant_email)) {
-                        $participantEmail = strtolower(trim($zamowienie->participant_email));
-                        if (!in_array($participantEmail, $emails)) {
+
+                    if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                        $participantEmail = strtolower(trim($zamowienie->display_participant_email));
+                        if (! in_array($participantEmail, $emails)) {
                             $emails[] = $participantEmail;
                         }
                     }
-                    
+
                     foreach ($emails as $email) {
                         try {
                             $sendResult = $ifirmaService->sendInvoiceByEmail(
-                                $invoiceId, 
-                                $email, 
-                                $invoiceNumber, 
+                                $invoiceId,
+                                $email,
+                                $invoiceNumber,
                                 $zamowienie->id,
                                 'invoice'
                             );
-                            
+
                             if ($sendResult['status'] === 'success') {
                                 $emailsSent[] = $email;
                                 Log::info('Faktura wysłana e-mailem', [
                                     'invoice_id' => $invoiceId,
-                                    'email' => $email
+                                    'email' => $email,
                                 ]);
                             } else {
                                 $emailErrors[] = [
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ];
                                 Log::warning('Błąd wysyłki faktury', [
                                     'invoice_id' => $invoiceId,
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ]);
                             }
                         } catch (Exception $e) {
                             $emailErrors[] = [
                                 'email' => $email,
-                                'error' => $e->getMessage()
+                                'error' => $e->getMessage(),
                             ];
                             Log::error('Exception podczas wysyłki faktury', [
                                 'invoice_id' => $invoiceId,
                                 'email' => $email,
-                                'exception' => $e->getMessage()
+                                'exception' => $e->getMessage(),
                             ]);
                         }
                     }
                 }
 
                 $message = 'Faktura została pomyślnie wystawiona w iFirma.pl';
-                if (!empty($emailsSent)) {
-                    $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+                if (! empty($emailsSent)) {
+                    $message .= ' i wysłana na: '.implode(', ', $emailsSent);
                 }
-                if (!empty($emailErrors)) {
-                    $message .= ' (Błędy wysyłki: ' . count($emailErrors) . ')';
+                if (! empty($emailErrors)) {
+                    $message .= ' (Błędy wysyłki: '.count($emailErrors).')';
                 }
 
                 return response()->json([
@@ -1459,7 +1480,7 @@ class FormOrdersController extends Controller
                     'ifirma_response' => $result['data'] ?? $result['raw_response'] ?? null,
                     'emails_sent' => $emailsSent,
                     'email_errors' => $emailErrors,
-                    'created_at' => now()->format('d.m.Y H:i')
+                    'created_at' => now()->format('d.m.Y H:i'),
                 ]);
             } else {
                 return response()->json([
@@ -1467,14 +1488,14 @@ class FormOrdersController extends Controller
                     'error' => $result['message'] ?? 'Nie udało się wystawić faktury',
                     'invoice_data' => $invoiceData,
                     'ifirma_response' => $result['raw_response'] ?? null,
-                    'status_code' => $result['status_code'] ?? null
+                    'status_code' => $result['status_code'] ?? null,
                 ], 500);
             }
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1483,9 +1504,8 @@ class FormOrdersController extends Controller
      * Wystawia fakturę w iFirma z nabywcą i odbiorcą jako osobne podmioty
      * Nabywca (buyer) - podmiot 2 (Kontrahent)
      * Odbiorca (recipient) - podmiot 3 (DodatkowyPodmiot)
-     * 
-     * @param Request $request
-     * @param int $id ID zamówienia
+     *
+     * @param  int  $id  ID zamówienia
      * @return \Illuminate\Http\JsonResponse
      */
     public function createIfirmaInvoiceWithReceiver(Request $request, $id)
@@ -1493,10 +1513,10 @@ class FormOrdersController extends Controller
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -1506,7 +1526,7 @@ class FormOrdersController extends Controller
             $force = $request->input('force', false);
 
             // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
-            if ($hasInvoice && !$force) {
+            if ($hasInvoice && ! $force) {
                 // Logowanie próby ponownego wystawienia faktury
                 \App\Models\ActivityLog::logCustom(
                     'Próba ponownego wystawienia faktury z odbiorcą',
@@ -1523,7 +1543,7 @@ class FormOrdersController extends Controller
                     'success' => false,
                     'error' => 'Faktura dla tego zamówienia została już wystawiona.',
                     'existing_invoice_number' => $existingInvoiceNumber,
-                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.'
+                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.',
                 ], 409); // 409 Conflict
             }
 
@@ -1531,7 +1551,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->buyer_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1539,13 +1559,13 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->recipient_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.',
                 ], 400);
             }
             if (empty($zamowienie->recipient_postal_code) || empty($zamowienie->recipient_city)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.',
                 ], 400);
             }
 
@@ -1553,7 +1573,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1572,36 +1592,36 @@ class FormOrdersController extends Controller
                 'OsobaFizyczna' => false,
                 'Email' => null,
             ];
-            
+
             // NIP nabywcy
-            if (!empty($zamowienie->buyer_nip)) {
+            if (! empty($zamowienie->buyer_nip)) {
                 $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (!empty($nip)) {
+                if (! empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
             }
-            
+
             // Adres nabywcy
-            if (!empty($zamowienie->buyer_address)) {
+            if (! empty($zamowienie->buyer_address)) {
                 $kontrahent['Ulica'] = $zamowienie->buyer_address;
             }
-            if (!empty($zamowienie->buyer_postal_code)) {
+            if (! empty($zamowienie->buyer_postal_code)) {
                 $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
             }
-            if (!empty($zamowienie->buyer_city)) {
+            if (! empty($zamowienie->buyer_city)) {
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
-            
+
             // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
             // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
             $emailToSave = null;
-            if (!empty($zamowienie->orderer_email)) {
+            if (! empty($zamowienie->orderer_email)) {
                 $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (!empty($zamowienie->participant_email)) {
-                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
             }
-            
-            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+
+            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
                 $kontrahent['Email'] = $emailToSave;
             }
 
@@ -1613,14 +1633,14 @@ class FormOrdersController extends Controller
                 'KodPocztowy' => $zamowienie->recipient_postal_code,
                 'Miejscowosc' => $zamowienie->recipient_city,
             ];
-            
+
             // Opcjonalne pola odbiorcy
-            if (!empty($zamowienie->recipient_address)) {
+            if (! empty($zamowienie->recipient_address)) {
                 $odbiorcaNaFakturze['Ulica'] = $zamowienie->recipient_address;
             }
-            if (!empty($zamowienie->recipient_nip)) {
+            if (! empty($zamowienie->recipient_nip)) {
                 $recipientNip = preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
-                if (!empty($recipientNip)) {
+                if (! empty($recipientNip)) {
                     $odbiorcaNaFakturze['NIP'] = $recipientNip;
                 }
             }
@@ -1632,12 +1652,12 @@ class FormOrdersController extends Controller
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
             $vatExempt = config('services.ifirma.vat_exempt', false);
-            
+
             // Przygotowanie pozycji faktury
-            $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
-            
+            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+
             $pozycja = [];
-            
+
             // Dla zwolnionych z VAT: NAJPIERW PodstawaPrawna, POTEM StawkaVat = null
             if ($vatExempt) {
                 $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
@@ -1648,7 +1668,7 @@ class FormOrdersController extends Controller
                     $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
                 }
             }
-            
+
             // Pozostałe pola
             $pozycja['Ilosc'] = (float) 1.0;
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
@@ -1673,9 +1693,9 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
             ];
-            
+
             // Termin płatności
-            $paymentDelay = !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14;
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
             $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
 
             // Uwagi - tylko identyfikator zamówienia
@@ -1683,7 +1703,7 @@ class FormOrdersController extends Controller
 
             // Numer konta bankowego - dodaj tylko jeśli istnieje
             $bankAccount = config('services.ifirma.bank_account', '');
-            if (!empty(trim($bankAccount))) {
+            if (! empty(trim($bankAccount))) {
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
@@ -1694,11 +1714,11 @@ class FormOrdersController extends Controller
                 'kontrahent' => $kontrahent,
                 'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
                 'payment_delay_days' => $paymentDelay,
-                'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
             ]);
 
             // Wystawienie faktury przez API iFirma
-            $ifirmaService = new IfirmaApiService();
+            $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createInvoice($invoiceData);
 
             Log::info('iFirma Invoice With Receiver Response', [
@@ -1707,7 +1727,7 @@ class FormOrdersController extends Controller
                 'status_code' => $result['status_code'] ?? null,
                 'message' => $result['message'] ?? null,
                 'full_response' => $result,
-                'parsed_data' => $result['parsed_data'] ?? null
+                'parsed_data' => $result['parsed_data'] ?? null,
             ]);
 
             // Sprawdź czy odpowiedź zawiera błąd (nawet jeśli status_code=200)
@@ -1715,14 +1735,14 @@ class FormOrdersController extends Controller
             $hasError = false;
             if (isset($result['parsed_data']['response'])) {
                 $apiResponse = $result['parsed_data']['response'];
-                if (isset($apiResponse['Informacja']) && 
+                if (isset($apiResponse['Informacja']) &&
                     (stripos($apiResponse['Informacja'], 'niepoprawna') !== false ||
                      stripos($apiResponse['Informacja'], 'nie można') !== false)) {
                     $hasError = true;
                 }
             }
 
-            if ($result['status'] === 'success' && !$hasError) {
+            if ($result['status'] === 'success' && ! $hasError) {
                 // Pobierz Identyfikator z odpowiedzi
                 $invoiceId = null;
                 if (isset($result['data']['response']['Identyfikator'])) {
@@ -1734,46 +1754,46 @@ class FormOrdersController extends Controller
                 // Pobierz pełny numer faktury
                 $invoiceNumber = null;
                 $fullInvoiceData = null;
-                
-                if (!empty($invoiceId)) {
+
+                if (! empty($invoiceId)) {
                     try {
                         $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
-                        
+
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
-                            
+
                             if (isset($fullInvoiceData['PelnyNumer'])) {
                                 $invoiceNumber = $fullInvoiceData['PelnyNumer'];
                             } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
                                 $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
                             }
                         }
-                        
+
                         Log::info('iFirma Invoice With Receiver - szczegóły pobrane', [
                             'invoice_id' => $invoiceId,
                             'invoice_number' => $invoiceNumber,
-                            'details' => $fullInvoiceData
+                            'details' => $fullInvoiceData,
                         ]);
                     } catch (Exception $e) {
                         Log::warning('Nie udało się pobrać pełnego numeru faktury', [
                             'invoice_id' => $invoiceId,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                         $invoiceNumber = $invoiceId;
                     }
                 }
 
                 // Aktualizacja numeru faktury w zamówieniu
-                if (!empty($invoiceNumber)) {
+                if (! empty($invoiceNumber)) {
                     $oldInvoiceNumber = $zamowienie->invoice_number;
-                    
+
                     // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
                     if (empty($oldInvoiceNumber) || $force) {
                         $zamowienie->invoice_number = $invoiceNumber;
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
-                        $logDescription = $force && !empty($oldInvoiceNumber)
+                        $logDescription = $force && ! empty($oldInvoiceNumber)
                             ? "Wystawiono nową fakturę z odbiorcą {$invoiceNumber} dla zamówienia #{$zamowienie->id} (nadpisano poprzednią fakturę: {$oldInvoiceNumber})"
                             : "Wystawiono fakturę z odbiorcą {$invoiceNumber} dla zamówienia #{$zamowienie->id}";
 
@@ -1795,68 +1815,68 @@ class FormOrdersController extends Controller
                 $sendEmail = $request->input('send_email', false);
                 $emailsSent = [];
                 $emailErrors = [];
-                
-                if ($sendEmail && !empty($invoiceId)) {
+
+                if ($sendEmail && ! empty($invoiceId)) {
                     $emails = [];
-                    
-                    if (!empty($zamowienie->orderer_email)) {
+
+                    if (! empty($zamowienie->orderer_email)) {
                         $emails[] = strtolower(trim($zamowienie->orderer_email));
                     }
-                    
-                    if (!empty($zamowienie->participant_email)) {
-                        $participantEmail = strtolower(trim($zamowienie->participant_email));
-                        if (!in_array($participantEmail, $emails)) {
+
+                    if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                        $participantEmail = strtolower(trim($zamowienie->display_participant_email));
+                        if (! in_array($participantEmail, $emails)) {
                             $emails[] = $participantEmail;
                         }
                     }
-                    
+
                     foreach ($emails as $email) {
                         try {
                             $sendResult = $ifirmaService->sendInvoiceByEmail(
-                                $invoiceId, 
-                                $email, 
-                                $invoiceNumber, 
+                                $invoiceId,
+                                $email,
+                                $invoiceNumber,
                                 $zamowienie->id,
                                 'invoice'
                             );
-                            
+
                             if ($sendResult['status'] === 'success') {
                                 $emailsSent[] = $email;
                                 Log::info('Faktura z odbiorcą wysłana e-mailem', [
                                     'invoice_id' => $invoiceId,
-                                    'email' => $email
+                                    'email' => $email,
                                 ]);
                             } else {
                                 $emailErrors[] = [
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ];
                                 Log::warning('Błąd wysyłki faktury z odbiorcą', [
                                     'invoice_id' => $invoiceId,
                                     'email' => $email,
-                                    'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                    'error' => $sendResult['message'] ?? 'Nieznany błąd',
                                 ]);
                             }
                         } catch (Exception $e) {
                             $emailErrors[] = [
                                 'email' => $email,
-                                'error' => $e->getMessage()
+                                'error' => $e->getMessage(),
                             ];
                             Log::error('Exception podczas wysyłki faktury z odbiorcą', [
                                 'invoice_id' => $invoiceId,
                                 'email' => $email,
-                                'exception' => $e->getMessage()
+                                'exception' => $e->getMessage(),
                             ]);
                         }
                     }
                 }
 
                 $message = 'Faktura z odbiorcą została pomyślnie wystawiona w iFirma.pl';
-                if (!empty($emailsSent)) {
-                    $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+                if (! empty($emailsSent)) {
+                    $message .= ' i wysłana na: '.implode(', ', $emailsSent);
                 }
-                if (!empty($emailErrors)) {
-                    $message .= ' (Błędy wysyłki: ' . count($emailErrors) . ')';
+                if (! empty($emailErrors)) {
+                    $message .= ' (Błędy wysyłki: '.count($emailErrors).')';
                 }
 
                 return response()->json([
@@ -1868,7 +1888,7 @@ class FormOrdersController extends Controller
                     'ifirma_response' => $result['data'] ?? $result['raw_response'] ?? null,
                     'emails_sent' => $emailsSent,
                     'email_errors' => $emailErrors,
-                    'created_at' => now()->format('d.m.Y H:i')
+                    'created_at' => now()->format('d.m.Y H:i'),
                 ]);
             } else {
                 return response()->json([
@@ -1876,14 +1896,14 @@ class FormOrdersController extends Controller
                     'error' => $result['message'] ?? 'Nie udało się wystawić faktury',
                     'invoice_data' => $invoiceData,
                     'ifirma_response' => $result['raw_response'] ?? null,
-                    'status_code' => $result['status_code'] ?? null
+                    'status_code' => $result['status_code'] ?? null,
                 ], 500);
             }
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1895,20 +1915,20 @@ class FormOrdersController extends Controller
     public function edit(Request $request, $id)
     {
         try {
-            $zamowienie = FormOrder::findOrFail($id);
+            $zamowienie = FormOrder::with('primaryParticipant')->findOrFail($id);
 
             $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
                 ->where('is_primary', true)
                 ->first();
 
-            // Dane do formularza – z form_order_participants lub fallback z form_orders
+            // Dane do formularza – z form_order_participants; display_* daje spójny fallback przy starych kolumnach
             $participantData = [
                 'firstname' => $participant?->participant_firstname ?? '',
                 'lastname' => $participant?->participant_lastname ?? '',
-                'email' => $participant?->participant_email ?? $zamowienie->participant_email ?? '',
+                'email' => $participant?->participant_email ?? $zamowienie->display_participant_email ?? '',
             ];
-            if (empty($participantData['firstname']) && empty($participantData['lastname']) && !empty(trim($zamowienie->participant_name ?? ''))) {
-                $parts = explode(' ', trim($zamowienie->participant_name), 2);
+            if (empty($participantData['firstname']) && empty($participantData['lastname']) && ! empty(trim($zamowienie->display_participant_name ?? ''))) {
+                $parts = explode(' ', trim($zamowienie->display_participant_name), 2);
                 $participantData['firstname'] = $parts[0] ?? '';
                 $participantData['lastname'] = $parts[1] ?? '';
             }
@@ -1921,9 +1941,8 @@ class FormOrdersController extends Controller
 
     /**
      * Wystawia fakturę w iFirma, przesyła do KSeF i opcjonalnie wysyła na e-mail
-     * 
-     * @param Request $request
-     * @param int $id ID zamówienia
+     *
+     * @param  int  $id  ID zamówienia
      * @return \Illuminate\Http\JsonResponse
      */
     public function createIfirmaInvoiceWithKsef(Request $request, $id)
@@ -1931,10 +1950,10 @@ class FormOrdersController extends Controller
         try {
             $zamowienie = FormOrder::find($id);
 
-            if (!$zamowienie) {
+            if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Zamówienie nie zostało znalezione.'
+                    'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
             }
 
@@ -1944,12 +1963,12 @@ class FormOrdersController extends Controller
             $force = $request->input('force', false);
 
             // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
-            if ($hasInvoice && !$force) {
+            if ($hasInvoice && ! $force) {
                 return response()->json([
                     'success' => false,
                     'error' => 'Faktura dla tego zamówienia została już wystawiona.',
                     'existing_invoice_number' => $existingInvoiceNumber,
-                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.'
+                    'message' => 'Aby wystawić nową fakturę, użyj opcji "Mimo to wystaw fakturę" w modalu ostrzeżenia.',
                 ], 409);
             }
 
@@ -1957,7 +1976,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->buyer_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.'
+                    'error' => 'Brak danych nabywcy. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1965,13 +1984,13 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->recipient_name)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.',
                 ], 400);
             }
             if (empty($zamowienie->recipient_postal_code) || empty($zamowienie->recipient_city)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.'
+                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.',
                 ], 400);
             }
 
@@ -1979,7 +1998,7 @@ class FormOrdersController extends Controller
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.'
+                    'error' => 'Brak danych produktu lub ceny. Nie można wystawić faktury.',
                 ], 400);
             }
 
@@ -1998,35 +2017,35 @@ class FormOrdersController extends Controller
                 'OsobaFizyczna' => false,
                 'Email' => null,
             ];
-            
+
             // NIP nabywcy
-            if (!empty($zamowienie->buyer_nip)) {
+            if (! empty($zamowienie->buyer_nip)) {
                 $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (!empty($nip)) {
+                if (! empty($nip)) {
                     $kontrahent['NIP'] = $nip;
                 }
             }
-            
+
             // Adres nabywcy
-            if (!empty($zamowienie->buyer_address)) {
+            if (! empty($zamowienie->buyer_address)) {
                 $kontrahent['Ulica'] = $zamowienie->buyer_address;
             }
-            if (!empty($zamowienie->buyer_postal_code)) {
+            if (! empty($zamowienie->buyer_postal_code)) {
                 $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
             }
-            if (!empty($zamowienie->buyer_city)) {
+            if (! empty($zamowienie->buyer_city)) {
                 $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
             }
-            
+
             // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
             $emailToSave = null;
-            if (!empty($zamowienie->orderer_email)) {
+            if (! empty($zamowienie->orderer_email)) {
                 $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (!empty($zamowienie->participant_email)) {
-                $emailToSave = strtolower(trim($zamowienie->participant_email));
+            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
             }
-            
-            if (!empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
+
+            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
                 $kontrahent['Email'] = $emailToSave;
             }
 
@@ -2037,14 +2056,14 @@ class FormOrdersController extends Controller
                 'KodPocztowy' => $zamowienie->recipient_postal_code,
                 'Miejscowosc' => $zamowienie->recipient_city,
             ];
-            
+
             // Opcjonalne pola odbiorcy
-            if (!empty($zamowienie->recipient_address)) {
+            if (! empty($zamowienie->recipient_address)) {
                 $odbiorcaNaFakturze['Ulica'] = $zamowienie->recipient_address;
             }
-            if (!empty($zamowienie->recipient_nip)) {
+            if (! empty($zamowienie->recipient_nip)) {
                 $recipientNip = preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
-                if (!empty($recipientNip)) {
+                if (! empty($recipientNip)) {
                     $odbiorcaNaFakturze['NIP'] = $recipientNip;
                 }
             }
@@ -2056,12 +2075,12 @@ class FormOrdersController extends Controller
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
             $vatExempt = config('services.ifirma.vat_exempt', false);
-            
+
             // Przygotowanie pozycji faktury
-            $cenaJednostkowa = (float) round((float)$zamowienie->product_price, 2);
-            
+            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+
             $pozycja = [];
-            
+
             // Dla zwolnionych z VAT: NAJPIERW PodstawaPrawna, POTEM StawkaVat = null
             if ($vatExempt) {
                 $pozycja['PodstawaPrawna'] = (string) config('services.ifirma.vat_exemption_basis', 'Art. 43 ust. 1 pkt 29 lit. b)');
@@ -2072,7 +2091,7 @@ class FormOrdersController extends Controller
                     $pozycja['StawkaRyczaltu'] = (float) config('services.ifirma.lump_sum_rate', 0.085);
                 }
             }
-            
+
             // Pozostałe pola
             $pozycja['Ilosc'] = (float) 1.0;
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
@@ -2097,9 +2116,9 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
             ];
-            
+
             // Termin płatności
-            $paymentDelay = !empty($zamowienie->invoice_payment_delay) ? (int)$zamowienie->invoice_payment_delay : 14;
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
             $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
 
             // Uwagi - tylko identyfikator zamówienia
@@ -2107,7 +2126,7 @@ class FormOrdersController extends Controller
 
             // Numer konta bankowego - dodaj tylko jeśli istnieje
             $bankAccount = config('services.ifirma.bank_account', '');
-            if (!empty(trim($bankAccount))) {
+            if (! empty(trim($bankAccount))) {
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
@@ -2121,7 +2140,7 @@ class FormOrdersController extends Controller
             ]);
 
             // KROK 1: Wystawienie faktury pro forma przez API iFirma
-            $ifirmaService = new IfirmaApiService();
+            $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createInvoice($invoiceData);
 
             Log::info('iFirma Invoice With KSeF Response', [
@@ -2137,7 +2156,7 @@ class FormOrdersController extends Controller
                     'success' => false,
                     'error' => $result['message'] ?? 'Nie udało się wystawić faktury',
                     'step' => 'invoice_creation',
-                    'details' => $result
+                    'details' => $result,
                 ], $result['status_code'] ?? 500);
             }
 
@@ -2152,13 +2171,14 @@ class FormOrdersController extends Controller
             if (empty($invoiceId)) {
                 Log::error('iFirma Invoice With KSeF: Brak Identyfikatora w odpowiedzi', [
                     'order_id' => $zamowienie->id,
-                    'response' => $result
+                    'response' => $result,
                 ]);
+
                 return response()->json([
                     'success' => false,
                     'error' => 'Nie udało się uzyskać identyfikatora faktury z odpowiedzi iFirma',
                     'step' => 'invoice_creation',
-                    'details' => $result
+                    'details' => $result,
                 ], 500);
             }
 
@@ -2177,7 +2197,7 @@ class FormOrdersController extends Controller
             } catch (Exception $e) {
                 Log::warning('Nie udało się pobrać pełnego numeru faktury', [
                     'invoice_id' => $invoiceId,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
 
@@ -2189,7 +2209,7 @@ class FormOrdersController extends Controller
             Log::info('iFirma Invoice With KSeF: Przesyłanie do KSeF', [
                 'order_id' => $zamowienie->id,
                 'invoice_id' => $invoiceId,
-                'invoice_number' => $invoiceNumber
+                'invoice_number' => $invoiceNumber,
             ]);
 
             $ksefResult = $ifirmaService->sendInvoiceToKsef($invoiceId, 'fakturakraj');
@@ -2204,14 +2224,14 @@ class FormOrdersController extends Controller
                 } elseif (isset($ksefResult['data']['NumerKSeF'])) {
                     $ksefNumber = $ksefResult['data']['NumerKSeF'];
                 }
-                
+
                 // Jeśli numer KSeF nie jest w bezpośredniej odpowiedzi, pobierz szczegóły faktury
                 if (empty($ksefNumber)) {
                     try {
                         $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
-                            
+
                             // Sprawdź różne możliwe lokalizacje numeru KSeF w odpowiedzi
                             if (isset($fullInvoiceData['NumerKSeF'])) {
                                 $ksefNumber = $fullInvoiceData['NumerKSeF'];
@@ -2220,23 +2240,23 @@ class FormOrdersController extends Controller
                             } elseif (isset($fullInvoiceData['Ksef']['NumerKSeF'])) {
                                 $ksefNumber = $fullInvoiceData['Ksef']['NumerKSeF'];
                             } elseif (isset($fullInvoiceData['KSeF'])) {
-                                $ksefNumber = is_array($fullInvoiceData['KSeF']) 
+                                $ksefNumber = is_array($fullInvoiceData['KSeF'])
                                     ? ($fullInvoiceData['KSeF']['Numer'] ?? $fullInvoiceData['KSeF']['numer'] ?? null)
                                     : $fullInvoiceData['KSeF'];
                             }
-                            
+
                             Log::info('iFirma Invoice With KSeF: Pobrano szczegóły faktury po przesłaniu do KSeF', [
                                 'order_id' => $zamowienie->id,
                                 'invoice_id' => $invoiceId,
-                                'ksef_number_found' => !empty($ksefNumber),
+                                'ksef_number_found' => ! empty($ksefNumber),
                                 'invoice_data_keys' => array_keys($fullInvoiceData),
-                                'full_response_sample' => json_encode($fullInvoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                                'full_response_sample' => json_encode($fullInvoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
                             ]);
                         }
                     } catch (Exception $e) {
                         Log::warning('Nie udało się pobrać szczegółów faktury po przesłaniu do KSeF', [
                             'invoice_id' => $invoiceId,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                     }
                 }
@@ -2248,23 +2268,23 @@ class FormOrdersController extends Controller
                     'ksef_sent_at' => now(),
                     'ksef_error' => null,
                 ];
-                
-                if (!empty($ksefNumber)) {
+
+                if (! empty($ksefNumber)) {
                     $updateData['ksef_number'] = $ksefNumber;
                 }
-                
+
                 // Zapis z pełnym logowaniem przed i po
                 Log::info('iFirma Invoice With KSeF: Przed zapisem do bazy', [
                     'order_id' => $zamowienie->id,
                     'update_data' => $updateData,
                     'ksef_number_from_response' => $ksefNumber,
                 ]);
-                
+
                 $zamowienie->update($updateData);
-                
+
                 // Odśwież model z bazy, aby sprawdzić zapisane wartości
                 $zamowienie->refresh();
-                
+
                 Log::info('iFirma Invoice With KSeF: Po zapisie do bazy', [
                     'order_id' => $zamowienie->id,
                     'ksef_status' => $zamowienie->ksef_status,
@@ -2276,12 +2296,12 @@ class FormOrdersController extends Controller
                 Log::info('iFirma Invoice With KSeF: Przesłane do KSeF', [
                     'order_id' => $zamowienie->id,
                     'invoice_id' => $invoiceId,
-                    'ksef_number' => $ksefNumber
+                    'ksef_number' => $ksefNumber,
                 ]);
             } else {
                 // Błąd przesyłania do KSeF - zapisz fakturę, ale oznacz błąd KSeF
                 $ksefError = $ksefResult['message'] ?? 'Nieznany błąd przesyłania do KSeF';
-                
+
                 $zamowienie->ksef_status = 'failed';
                 $zamowienie->ksef_error = $ksefError;
                 $zamowienie->save();
@@ -2290,7 +2310,7 @@ class FormOrdersController extends Controller
                     'order_id' => $zamowienie->id,
                     'invoice_id' => $invoiceId,
                     'error' => $ksefError,
-                    'ksef_response' => $ksefResult
+                    'ksef_response' => $ksefResult,
                 ]);
 
                 // Jeśli KSeF się nie powiódł, nie wysyłamy e-mail (faktura bez numeru KSeF)
@@ -2301,7 +2321,7 @@ class FormOrdersController extends Controller
                     'invoice_id' => $invoiceId,
                     'invoice_number' => $invoiceNumber,
                     'ksef_error' => $ksefError,
-                    'can_retry' => true
+                    'can_retry' => true,
                 ], 500);
             }
 
@@ -2309,22 +2329,22 @@ class FormOrdersController extends Controller
             $sendEmail = $request->input('send_email', false);
             $emailsSent = [];
             $emailErrors = [];
-            
-            if ($sendEmail && !empty($invoiceId)) {
+
+            if ($sendEmail && ! empty($invoiceId)) {
                 // Zbierz unikalne adresy e-mail
                 $emails = [];
-                
-                if (!empty($zamowienie->orderer_email)) {
+
+                if (! empty($zamowienie->orderer_email)) {
                     $emails[] = strtolower(trim($zamowienie->orderer_email));
                 }
-                
-                if (!empty($zamowienie->participant_email)) {
-                    $participantEmail = strtolower(trim($zamowienie->participant_email));
-                    if (!in_array($participantEmail, $emails)) {
+
+                if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+                    $participantEmail = strtolower(trim($zamowienie->display_participant_email));
+                    if (! in_array($participantEmail, $emails)) {
                         $emails[] = $participantEmail;
                     }
                 }
-                
+
                 // Wysyłka do wszystkich adresów
                 foreach ($emails as $email) {
                     try {
@@ -2336,40 +2356,40 @@ class FormOrdersController extends Controller
                         $emailMessage .= " dotyczącą zamówienia nr {$zamowienie->id}.";
 
                         $sendResult = $ifirmaService->sendInvoiceByEmail(
-                            $invoiceId, 
-                            $email, 
-                            $invoiceNumber, 
+                            $invoiceId,
+                            $email,
+                            $invoiceNumber,
                             $zamowienie->id,
                             'invoice'
                         );
-                        
+
                         if ($sendResult['status'] === 'success') {
                             $emailsSent[] = $email;
                             Log::info('Faktura z KSeF wysłana e-mailem', [
                                 'invoice_id' => $invoiceId,
                                 'email' => $email,
-                                'ksef_number' => $ksefNumber
+                                'ksef_number' => $ksefNumber,
                             ]);
                         } else {
                             $emailErrors[] = [
                                 'email' => $email,
-                                'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                'error' => $sendResult['message'] ?? 'Nieznany błąd',
                             ];
                             Log::warning('Błąd wysyłki faktury z KSeF', [
                                 'invoice_id' => $invoiceId,
                                 'email' => $email,
-                                'error' => $sendResult['message'] ?? 'Nieznany błąd'
+                                'error' => $sendResult['message'] ?? 'Nieznany błąd',
                             ]);
                         }
                     } catch (Exception $e) {
                         $emailErrors[] = [
                             'email' => $email,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ];
                         Log::error('Exception podczas wysyłki faktury z KSeF', [
                             'invoice_id' => $invoiceId,
                             'email' => $email,
-                            'exception' => $e->getMessage()
+                            'exception' => $e->getMessage(),
                         ]);
                     }
                 }
@@ -2380,11 +2400,11 @@ class FormOrdersController extends Controller
             if ($ksefNumber) {
                 $message .= " i przesłana do KSeF (nr: {$ksefNumber})";
             }
-            if (!empty($emailsSent)) {
-                $message .= ' i wysłana na: ' . implode(', ', $emailsSent);
+            if (! empty($emailsSent)) {
+                $message .= ' i wysłana na: '.implode(', ', $emailsSent);
             }
-            if (!empty($emailErrors)) {
-                $message .= ' (Błędy wysyłki e-mail: ' . count($emailErrors) . ')';
+            if (! empty($emailErrors)) {
+                $message .= ' (Błędy wysyłki e-mail: '.count($emailErrors).')';
             }
 
             return response()->json([
@@ -2394,7 +2414,7 @@ class FormOrdersController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'ksef_number' => $ksefNumber,
                 'ksef_sent_at' => $zamowienie->ksef_sent_at ? $zamowienie->ksef_sent_at->toDateTimeString() : null,
-                'email_sent' => !empty($emailsSent),
+                'email_sent' => ! empty($emailsSent),
                 'emails_sent' => $emailsSent,
                 'email_errors' => $emailErrors,
             ]);
@@ -2403,12 +2423,12 @@ class FormOrdersController extends Controller
             Log::error('Exception podczas wystawiania faktury z KSeF', [
                 'order_id' => $id,
                 'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przetwarzania: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -2420,22 +2440,30 @@ class FormOrdersController extends Controller
     {
         try {
             $zamowienie = FormOrder::findOrFail($id);
-            
+
             // Soft delete (przeniesienie do kosza)
             $zamowienie->delete();
-            
+
             // Parametry przekierowania
             $redirectParams = [];
-            if ($request->has('per_page')) $redirectParams['per_page'] = $request->input('per_page');
-            if ($request->has('search')) $redirectParams['search'] = $request->input('search');
-            if ($request->has('filter')) $redirectParams['filter'] = $request->input('filter');
-            if ($request->has('page')) $redirectParams['page'] = $request->input('page');
-            
+            if ($request->has('per_page')) {
+                $redirectParams['per_page'] = $request->input('per_page');
+            }
+            if ($request->has('search')) {
+                $redirectParams['search'] = $request->input('search');
+            }
+            if ($request->has('filter')) {
+                $redirectParams['filter'] = $request->input('filter');
+            }
+            if ($request->has('page')) {
+                $redirectParams['page'] = $request->input('page');
+            }
+
             return redirect()->route('form-orders.index', $redirectParams)
                 ->with('success', 'Zamówienie zostało usunięte i przeniesione do kosza.');
         } catch (Exception $e) {
             return redirect()->back()
-                ->with('error', 'Wystąpił błąd podczas usuwania zamówienia: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas usuwania zamówienia: '.$e->getMessage());
         }
     }
 
@@ -2446,10 +2474,10 @@ class FormOrdersController extends Controller
     {
         // Liczba rekordów na stronę
         $perPage = $request->get('per_page', 25);
-        
+
         // Pobierz grupy duplikatów
         $duplicateGroups = FormOrder::duplicates()->get();
-        
+
         // Przygotuj dane do wyświetlenia
         $duplicates = collect();
         foreach ($duplicateGroups as $group) {
@@ -2458,7 +2486,7 @@ class FormOrdersController extends Controller
                 ->with(['marketingCampaign.sourceType', 'primaryParticipant'])
                 ->get()
                 ->sortByDesc('priority'); // Sortuj według priorytetu (najważniejsze pierwsze)
-            
+
             $duplicates->push([
                 'email' => $group->participant_email,
                 'product_id' => $group->publigo_product_id,
@@ -2469,13 +2497,13 @@ class FormOrdersController extends Controller
                 'newest_order' => $orders->sortBy('id')->last(),
             ]);
         }
-        
+
         // Paginacja dla grup duplikatów
         $currentPage = $request->get('page', 1);
         $perPage = min($perPage, 50); // Maksymalnie 50 grup na stronę
         $offset = ($currentPage - 1) * $perPage;
         $paginatedDuplicates = $duplicates->slice($offset, $perPage);
-        
+
         // Tworzenie obiektu paginacji
         $duplicatesPaginated = new \Illuminate\Pagination\LengthAwarePaginator(
             $paginatedDuplicates,
@@ -2484,22 +2512,22 @@ class FormOrdersController extends Controller
             $currentPage,
             [
                 'path' => request()->url(),
-                'pageName' => 'page'
+                'pageName' => 'page',
             ]
         );
-        
+
         // Statystyki
         $totalDuplicates = $duplicates->sum('count');
         $totalGroups = $duplicates->count();
-        $totalOrders = $duplicates->sum(function($group) {
+        $totalOrders = $duplicates->sum(function ($group) {
             return $group['count'];
         });
-        
+
         return view('form-orders.duplicates', compact(
-            'duplicatesPaginated', 
-            'perPage', 
-            'totalDuplicates', 
-            'totalGroups', 
+            'duplicatesPaginated',
+            'perPage',
+            'totalDuplicates',
+            'totalGroups',
             'totalOrders'
         ));
     }
@@ -2510,32 +2538,32 @@ class FormOrdersController extends Controller
     public function destroyDuplicate(Request $request, $id)
     {
         try {
-            $zamowienie = FormOrder::findOrFail($id);
-            
+            $zamowienie = FormOrder::with('primaryParticipant')->findOrFail($id);
+
             // Sprawdź czy to rzeczywiście duplikat
             $duplicates = FormOrder::findDuplicatesFor($id)->get();
             if ($duplicates->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'To zamówienie nie ma duplikatów.'
+                    'error' => 'To zamówienie nie ma duplikatów.',
                 ], 400);
             }
-            
+
             // Soft delete
             $zamowienie->delete();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Duplikat został usunięty.',
                 'remaining_duplicates' => $duplicates->count(),
-                'email' => $zamowienie->participant_email,
-                'product_id' => $zamowienie->publigo_product_id
+                'email' => $zamowienie->display_participant_email,
+                'product_id' => $zamowienie->publigo_product_id,
             ]);
-            
+
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas usuwania duplikatu: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas usuwania duplikatu: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -2546,39 +2574,39 @@ class FormOrdersController extends Controller
     public function destroyAllDuplicatesForGroup(Request $request, $email, $productId)
     {
         try {
-            // Znajdź wszystkie zamówienia w grupie duplikatów
-            $orders = FormOrder::where('participant_email', $email)
-                ->where('publigo_product_id', $productId)
+            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail głównego uczestnika)
+            $orders = FormOrder::where('publigo_product_id', $productId)
+                ->wherePrimaryParticipantEmailMatches($email)
                 ->orderBy('id')
                 ->get();
-            
+
             if ($orders->count() < 2) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie znaleziono duplikatów dla tej grupy.'
+                    'error' => 'Nie znaleziono duplikatów dla tej grupy.',
                 ], 400);
             }
-            
+
             // Zostaw najstarsze zamówienie, usuń resztę
             $oldestOrder = $orders->first();
             $duplicatesToDelete = $orders->skip(1);
-            
+
             $deletedCount = 0;
             foreach ($duplicatesToDelete as $duplicate) {
                 $duplicate->delete();
                 $deletedCount++;
             }
-            
+
             return response()->json([
                 'success' => true,
                 'message' => "Usunięto {$deletedCount} duplikatów. Zachowano najstarsze zamówienie #{$oldestOrder->id}.",
-                'kept_order_id' => $oldestOrder->id
+                'kept_order_id' => $oldestOrder->id,
             ]);
-            
+
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas usuwania duplikatów: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas usuwania duplikatów: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -2589,46 +2617,46 @@ class FormOrdersController extends Controller
     public function destroyDuplicatesKeepSelected(Request $request, $email, $productId, $keepOrderId)
     {
         try {
-            // Znajdź wszystkie zamówienia w grupie duplikatów
-            $orders = FormOrder::where('participant_email', $email)
-                ->where('publigo_product_id', $productId)
+            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail głównego uczestnika)
+            $orders = FormOrder::where('publigo_product_id', $productId)
+                ->wherePrimaryParticipantEmailMatches($email)
                 ->get();
-            
+
             if ($orders->count() < 2) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie znaleziono duplikatów dla tej grupy.'
+                    'error' => 'Nie znaleziono duplikatów dla tej grupy.',
                 ], 400);
             }
-            
+
             // Znajdź zamówienie do zachowania
             $keepOrder = $orders->where('id', $keepOrderId)->first();
-            if (!$keepOrder) {
+            if (! $keepOrder) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie znaleziono zamówienia do zachowania.'
+                    'error' => 'Nie znaleziono zamówienia do zachowania.',
                 ], 400);
             }
-            
+
             // Usuń wszystkie oprócz wybranego
             $duplicatesToDelete = $orders->where('id', '!=', $keepOrderId);
-            
+
             $deletedCount = 0;
             foreach ($duplicatesToDelete as $duplicate) {
                 $duplicate->delete();
                 $deletedCount++;
             }
-            
+
             return response()->json([
                 'success' => true,
                 'message' => "Usunięto {$deletedCount} duplikatów. Zachowano zamówienie #{$keepOrder->id}.",
-                'kept_order_id' => $keepOrder->id
+                'kept_order_id' => $keepOrder->id,
             ]);
-            
+
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas usuwania duplikatów: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas usuwania duplikatów: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -2640,36 +2668,36 @@ class FormOrdersController extends Controller
     {
         try {
             $zamowienie = FormOrder::findOrFail($id);
-            
+
             // Sprawdź czy to rzeczywiście duplikat
             $duplicates = FormOrder::findDuplicatesFor($id)->get();
             if ($duplicates->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'To zamówienie nie ma duplikatów.'
+                    'error' => 'To zamówienie nie ma duplikatów.',
                 ], 400);
             }
-            
+
             // Oznacz jako zakończone
             $zamowienie->status_completed = 1;
-            
+
             // Dodaj notatkę jeśli podana
             $notes = $request->input('notes');
             if ($notes) {
                 $zamowienie->notes = $notes;
             }
-            
+
             $zamowienie->save();
-            
+
             return response()->json([
                 'success' => true,
-                'message' => "Zamówienie #{$id} zostało oznaczone jako zakończone (duplikat)."
+                'message' => "Zamówienie #{$id} zostało oznaczone jako zakończone (duplikat).",
             ]);
-            
+
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas oznaczania jako zakończone: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas oznaczania jako zakończone: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -2681,20 +2709,20 @@ class FormOrdersController extends Controller
     {
         try {
             $zamowienie = FormOrder::findOrFail($id);
-            
+
             $notes = $request->input('notes');
             $zamowienie->notes = $notes;
             $zamowienie->save();
-            
+
             return response()->json([
                 'success' => true,
-                'message' => "Notatka dla zamówienia #{$id} została zaktualizowana."
+                'message' => "Notatka dla zamówienia #{$id} została zaktualizowana.",
             ]);
-            
+
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas zapisywania notatki: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas zapisywania notatki: '.$e->getMessage(),
             ], 500);
         }
     }

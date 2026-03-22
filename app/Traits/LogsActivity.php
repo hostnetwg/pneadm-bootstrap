@@ -142,7 +142,7 @@ trait LogsActivity
      */
     protected static function getRecordName($model): ?string
     {
-        $nameFields = ['title', 'name', 'nazwa', 'participant_name', 'first_name', 'product_name'];
+        $nameFields = ['title', 'name', 'nazwa', 'first_name', 'product_name'];
         
         foreach ($nameFields as $field) {
             if (isset($model->$field) && !empty($model->$field)) {

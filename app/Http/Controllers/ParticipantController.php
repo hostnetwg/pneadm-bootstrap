@@ -2,26 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Participant;
-use App\Models\Course;
-use App\Models\ParticipantEmail;
-use App\Models\ParticipantDownloadToken;
-use App\Models\FormOrder;
-use App\Models\FormOrderParticipant;
-use Illuminate\Http\Request;
-use Carbon\Carbon;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\CertificateLinkMail;
+use App\Jobs\SendCertificateLinkEmailJob;
 use App\Models\Certificate;
 use App\Models\CertificateEmailLog;
-use App\Jobs\SendCertificateLinkEmailJob;
+use App\Models\Course;
+use App\Models\Participant;
+use App\Models\ParticipantDownloadToken;
+use App\Models\ParticipantEmail;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class ParticipantController extends Controller
 {
@@ -31,15 +27,15 @@ class ParticipantController extends Controller
     public function all(Request $request)
     {
         $query = Participant::with('course');
-        
+
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -48,7 +44,7 @@ class ParticipantController extends Controller
             if ($request->get('filter_email') === 'has') {
                 $query->whereNotNull('email')->where('email', '!=', '');
             } elseif ($request->get('filter_email') === 'missing') {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->whereNull('email')->orWhere('email', '');
                 });
             }
@@ -68,16 +64,16 @@ class ParticipantController extends Controller
             if ($request->get('filter_birth_place') === 'has') {
                 $query->whereNotNull('birth_place')->where('birth_place', '!=', '');
             } elseif ($request->get('filter_birth_place') === 'missing') {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->whereNull('birth_place')->orWhere('birth_place', '');
                 });
             }
         }
-        
+
         // Sortowanie
         $sortBy = $request->get('sort_by', 'last_name');
         $sortDirection = $request->get('sort_direction', 'asc');
-        
+
         if ($sortBy === 'last_name') {
             $query->orderByRaw("CONVERT(last_name USING utf8mb4) COLLATE utf8mb4_polish_ci {$sortDirection}");
         } elseif ($sortBy === 'first_name') {
@@ -87,10 +83,10 @@ class ParticipantController extends Controller
         } else {
             $query->orderBy($sortBy, $sortDirection);
         }
-        
+
         // Paginacja
         $perPage = $request->get('per_page', 50);
-        
+
         if ($perPage === 'all') {
             $participants = $query->get();
             $participants = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -103,10 +99,10 @@ class ParticipantController extends Controller
         } else {
             $participants = $query->paginate($perPage)->withQueryString();
         }
-        
+
         // Eager load relacje dla modali
         $participants->load(['course', 'certificate']);
-        
+
         return view('participants.all', compact('participants'));
     }
 
@@ -116,7 +112,7 @@ class ParticipantController extends Controller
     public function emailsList(Request $request)
     {
         // Usunięto nieużywane zapytanie coursesCount - dane są obliczane w subquery
-        
+
         // Usunięto eager loading 'participants.course' - nie jest używane w głównej liście, tylko w modalu
         $query = ParticipantEmail::with('firstParticipant')
             ->select('participant_emails.*')
@@ -144,7 +140,7 @@ class ParticipantController extends Controller
                 AND c.is_paid = 0
                 AND c.deleted_at IS NULL
             ), 0) as free_courses_count');
-        
+
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
@@ -165,7 +161,7 @@ class ParticipantController extends Controller
             if ($request->get('filter_verified') === 'verified') {
                 $query->where('is_verified', true);
             } elseif ($request->get('filter_verified') === 'unverified') {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->where('is_verified', false)->orWhereNull('is_verified');
                 });
             }
@@ -205,11 +201,11 @@ class ParticipantController extends Controller
             if ($request->get('filter_invalid_email') === 'invalid') {
                 // Wyświetl tylko nieprawidłowe e-maile
                 // Użyj REGEXP do walidacji - wykrywa również e-maile z BOM na początku
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     // Nieprawidłowy format e-maila
                     $q->whereRaw("email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'")
                       // Lub e-maile z BOM (UTF-8 BOM: EFBBBF) - sprawdź pierwsze 3 bajty
-                      ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
+                        ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
                 });
             } elseif ($request->get('filter_invalid_email') === 'valid') {
                 // Wyświetl tylko prawidłowe e-maile (bez BOM)
@@ -221,25 +217,25 @@ class ParticipantController extends Controller
         // Sortowanie - domyślnie sortuj malejąco według ID
         $sortBy = $request->get('sort_by', 'id');
         $sortDirection = $request->get('sort_direction', 'desc');
-        
+
         // Obsługa sortowania po courses_count, paid_courses_count, free_courses_count
         if (in_array($sortBy, ['courses_count', 'paid_courses_count', 'free_courses_count'])) {
             $query->orderByRaw("{$sortBy} {$sortDirection}");
         } else {
             $query->orderBy($sortBy, $sortDirection);
         }
-        
+
         // Paginacja - zawsze używaj paginacji dla wydajności
         $perPage = $request->get('per_page', 50);
-        
+
         // Ograniczenie maksymalnej liczby rekordów na stronę dla bezpieczeństwa
         $maxPerPage = 500;
         if ($perPage === 'all' || $perPage > $maxPerPage) {
             $perPage = $maxPerPage;
         }
-        
+
         $emails = $query->paginate($perPage)->withQueryString();
-        
+
         return view('participants.emails-list', compact('emails'));
     }
 
@@ -251,10 +247,10 @@ class ParticipantController extends Controller
         try {
             // Zwiększ limit czasu dla dużych zbiorów danych
             set_time_limit(300);
-            
+
             // Użyj tych samych filtrów co w emailsList
             $query = ParticipantEmail::query();
-            
+
             // Obsługa wyszukiwania
             if ($request->filled('search')) {
                 $searchTerm = $request->get('search');
@@ -275,7 +271,7 @@ class ParticipantController extends Controller
                 if ($request->get('filter_verified') === 'verified') {
                     $query->where('is_verified', true);
                 } elseif ($request->get('filter_verified') === 'unverified') {
-                    $query->where(function($q) {
+                    $query->where(function ($q) {
                         $q->where('is_verified', false)->orWhereNull('is_verified');
                     });
                 }
@@ -309,25 +305,25 @@ class ParticipantController extends Controller
             // Filtr: Nieprawidłowe adresy e-mail
             if ($request->filled('filter_invalid_email')) {
                 if ($request->get('filter_invalid_email') === 'invalid') {
-                    $query->where(function($q) {
+                    $query->where(function ($q) {
                         $q->whereRaw("email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'")
-                          ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
+                            ->orWhereRaw("HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF'");
                     });
                 } elseif ($request->get('filter_invalid_email') === 'valid') {
                     $query->whereRaw("email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'");
                     $query->whereRaw("NOT (HEX(LEFT(email, 1)) = 'EF' AND HEX(SUBSTRING(email, 2, 1)) = 'BB' AND HEX(SUBSTRING(email, 3, 1)) = 'BF')");
                 }
             }
-            
+
             // Pobierz wszystkie emaile (bez paginacji dla eksportu)
             $emails = $query->get();
-            
+
             // Przygotuj dane CSV
             $csvData = [];
-            
+
             // Nagłówek CSV
             $csvData[] = ['Name', 'Email', 'Sername', 'data', 'id_szkolenia'];
-            
+
             foreach ($emails as $emailRecord) {
                 // Znajdź ostatniego uczestnika (najnowszy po start_date kursu lub created_at)
                 $lastParticipant = DB::table('participants')
@@ -339,68 +335,68 @@ class ParticipantController extends Controller
                     ->orderBy('participants.created_at', 'desc')
                     ->select('participants.first_name', 'participants.last_name', 'courses.id as course_id', 'courses.start_date')
                     ->first();
-                
+
                 // Pobierz dane (obsługa przypadku gdy nie ma uczestnika)
                 $firstName = $lastParticipant ? ($lastParticipant->first_name ?? '') : '';
                 $lastName = $lastParticipant ? ($lastParticipant->last_name ?? '') : '';
                 $courseDate = '';
                 $courseId = '';
-                
+
                 if ($lastParticipant) {
                     if ($lastParticipant->start_date) {
                         // Konwertuj datę na format Y-m-d
-                        $courseDate = is_string($lastParticipant->start_date) 
+                        $courseDate = is_string($lastParticipant->start_date)
                             ? date('Y-m-d', strtotime($lastParticipant->start_date))
-                            : (is_object($lastParticipant->start_date) 
+                            : (is_object($lastParticipant->start_date)
                                 ? $lastParticipant->start_date->format('Y-m-d')
                                 : '');
                     }
                     $courseId = $lastParticipant->course_id ?? '';
                 }
-                
+
                 // Dodaj wiersz do CSV
                 $csvData[] = [
                     $firstName,                    // Name - imię
                     $emailRecord->email,           // Email
                     $lastName,                     // Sername - nazwisko
                     $courseDate,                   // data - data ostatniego szkolenia (RRRR-MM-DD)
-                    $courseId                      // id_szkolenia - ID ostatniego szkolenia
+                    $courseId,                      // id_szkolenia - ID ostatniego szkolenia
                 ];
             }
-            
+
             // Generuj plik CSV
-            $filename = 'participants_export_' . date('Y-m-d_His') . '.csv';
-            
+            $filename = 'participants_export_'.date('Y-m-d_His').'.csv';
+
             $headers = [
                 'Content-Type' => 'text/csv; charset=UTF-8',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             ];
-            
+
             // Funkcja do generowania CSV z właściwym formatowaniem (z cudzysłowami)
-            $callback = function() use ($csvData) {
+            $callback = function () use ($csvData) {
                 $file = fopen('php://output', 'w');
-                
+
                 // Dodaj BOM dla UTF-8 (żeby Excel poprawnie otwierał polskie znaki)
                 fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-                
+
                 foreach ($csvData as $row) {
                     // Formatuj każdy wiersz z cudzysłowami i escapowaniem
                     fputcsv($file, $row, ',', '"');
                 }
-                
+
                 fclose($file);
             };
-            
+
             return response()->stream($callback, 200, $headers);
-            
+
         } catch (\Exception $e) {
             \Log::error('Error exporting participants to CSV', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return redirect()->route('participants.emails-list', $request->query())
-                ->with('error', 'Błąd podczas eksportu do CSV: ' . $e->getMessage());
+                ->with('error', 'Błąd podczas eksportu do CSV: '.$e->getMessage());
         }
     }
 
@@ -412,7 +408,7 @@ class ParticipantController extends Controller
         try {
             // Zwiększ limit czasu wykonania do 5 minut
             set_time_limit(300);
-            
+
             // Pobierz wszystkie unikalne e-maile z uczestników (tylko niepuste) używając surowego zapytania SQL dla lepszej wydajności
             $uniqueEmails = DB::table('participants')
                 ->select('email', DB::raw('MIN(id) as first_participant_id'), DB::raw('COUNT(*) as count'))
@@ -431,27 +427,29 @@ class ParticipantController extends Controller
             $skipped = 0;
 
             // Funkcja pomocnicza do normalizacji e-maila
-            $normalizeEmail = function($email) {
+            $normalizeEmail = function ($email) {
                 // Usuń BOM (Byte Order Mark) UTF-8
                 $email = ltrim($email, "\xEF\xBB\xBF");
                 // Trim i lowercase
                 $email = trim(strtolower($email));
+
                 return $email;
             };
 
             // Użyj upsert dla każdego e-maila (w partiach po 500 dla wydajności)
             $emailsToUpsert = [];
-            
+
             foreach ($uniqueEmails as $emailData) {
                 $rawEmail = $emailData->email;
                 $normalizedEmail = $normalizeEmail($rawEmail);
-                
+
                 // Pomiń puste e-maile po normalizacji
                 if (empty($normalizedEmail)) {
                     $skipped++;
+
                     continue;
                 }
-                
+
                 $firstParticipantId = $emailData->first_participant_id;
                 $count = $emailData->count;
 
@@ -467,7 +465,7 @@ class ParticipantController extends Controller
             }
 
             // Bulk upsert (w partiach po 500)
-            if (!empty($emailsToUpsert)) {
+            if (! empty($emailsToUpsert)) {
                 foreach (array_chunk($emailsToUpsert, 500) as $chunk) {
                     DB::transaction(function () use ($chunk, &$added, &$updated, &$skipped) {
                         foreach ($chunk as $emailData) {
@@ -476,7 +474,7 @@ class ParticipantController extends Controller
                                 $existing = ParticipantEmail::where('email', $emailData['email'])
                                     ->whereNull('deleted_at')
                                     ->first();
-                                
+
                                 if ($existing) {
                                     // Aktualizuj istniejący rekord
                                     $existing->update([
@@ -490,7 +488,7 @@ class ParticipantController extends Controller
                                         ->where('email', $emailData['email'])
                                         ->whereNotNull('deleted_at')
                                         ->first();
-                                    
+
                                     if ($softDeleted) {
                                         // Przywróć i zaktualizuj soft deleted rekord
                                         $softDeleted->restore();
@@ -516,7 +514,7 @@ class ParticipantController extends Controller
                                                 'updated_at' => $emailData['updated_at'],
                                             ]
                                         );
-                                        
+
                                         // Sprawdź czy został utworzony nowy rekord czy zaktualizowany
                                         if ($result->wasRecentlyCreated) {
                                             $added++;
@@ -532,7 +530,7 @@ class ParticipantController extends Controller
                                     $existing = ParticipantEmail::where('email', $emailData['email'])
                                         ->whereNull('deleted_at')
                                         ->first();
-                                    
+
                                     if ($existing) {
                                         $existing->update([
                                             'participants_count' => $emailData['participants_count'],
@@ -555,10 +553,10 @@ class ParticipantController extends Controller
 
             // Przygotuj komunikat zależnie od wyników
             if ($added == 0 && $updated == 0 && $skipped == 0) {
-                $message = "Nie znaleziono żadnych e-maili do przetworzenia.";
+                $message = 'Nie znaleziono żadnych e-maili do przetworzenia.';
                 $messageType = 'info';
             } elseif ($added == 0 && $updated == 0) {
-                $message = "Zaimportowano 0 rekordów. Wszystkie e-maile z tabeli participants już znajdują się w bazie participant_emails.";
+                $message = 'Zaimportowano 0 rekordów. Wszystkie e-maile z tabeli participants już znajdują się w bazie participant_emails.';
                 if ($skipped > 0) {
                     $message .= " Pominięto {$skipped} nieprawidłowych e-maili.";
                 }
@@ -568,16 +566,17 @@ class ParticipantController extends Controller
                 if ($skipped > 0) {
                     $message .= ", pominięto: {$skipped}";
                 }
-                $message .= ".";
+                $message .= '.';
                 $messageType = 'success';
             }
-            
+
             return redirect()->route('participants.all')->with($messageType, $message);
         } catch (\Exception $e) {
-            \Log::error('Błąd podczas zbierania e-maili: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+            \Log::error('Błąd podczas zbierania e-maili: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
             ]);
-            return redirect()->route('participants.all')->with('error', 'Błąd podczas zbierania e-maili: ' . $e->getMessage());
+
+            return redirect()->route('participants.all')->with('error', 'Błąd podczas zbierania e-maili: '.$e->getMessage());
         }
     }
 
@@ -587,35 +586,35 @@ class ParticipantController extends Controller
     public function index(Request $request, Course $course)
     {
         $query = Participant::with('certificate')->where('participants.course_id', $course->id);
-        
+
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
             });
         }
-    
+
         if ($request->query('sort') === 'asc') {
             // Pobranie posortowanych uczestników
             $sortedParticipants = $query
-                ->orderByRaw("CONVERT(last_name USING utf8mb4) COLLATE utf8mb4_polish_ci")
-                ->orderByRaw("CONVERT(first_name USING utf8mb4) COLLATE utf8mb4_polish_ci")
+                ->orderByRaw('CONVERT(last_name USING utf8mb4) COLLATE utf8mb4_polish_ci')
+                ->orderByRaw('CONVERT(first_name USING utf8mb4) COLLATE utf8mb4_polish_ci')
                 ->get();
-    
+
             // Aktualizacja numeracji w bazie danych
             foreach ($sortedParticipants as $index => $participant) {
                 $participant->update(['order' => $index + 1]);
             }
-    
+
             // Przekierowanie na stronę bez parametru sort, aby uniknąć ponownego sortowania
             return redirect()->route('participants.index', ['course' => $course->id])
                 ->with('success', 'Lista uczestników została posortowana i zapisana.');
         }
-    
+
         $sortCertificate = $request->get('sort_certificate');
         $sortCertificate = in_array($sortCertificate, ['asc', 'desc']) ? $sortCertificate : null;
 
@@ -627,17 +626,17 @@ class ParticipantController extends Controller
                 $join->on('certificates.participant_id', '=', 'participants.id')
                     ->where('certificates.course_id', $course->id);
             })
-            ->select('participants.*')
-            ->orderByRaw("CASE WHEN certificates.certificate_number IS NULL OR certificates.certificate_number = '' THEN 1 ELSE 0 END")
-            ->orderByRaw("{$numericExpr} {$direction}")
-            ->orderBy('participants.order');
+                ->select('participants.*')
+                ->orderByRaw("CASE WHEN certificates.certificate_number IS NULL OR certificates.certificate_number = '' THEN 1 ELSE 0 END")
+                ->orderByRaw("{$numericExpr} {$direction}")
+                ->orderBy('participants.order');
         } else {
             $query->orderBy('order');
         }
 
         // Pobranie uczestników z wybraną kolejnością
         $perPage = $request->get('per_page', 50);
-        
+
         // Obsługa opcji "wszyscy" - jeśli per_page to 'all', pobierz wszystkie rekordy
         if ($perPage === 'all') {
             $participants = $query->get();
@@ -659,14 +658,14 @@ class ParticipantController extends Controller
             $email = $p->email;
             if ($email !== null && $email !== '') {
                 $norm = ParticipantDownloadToken::normalizeEmail($email);
-                if (!isset($downloadTokensByEmail[$norm])) {
+                if (! isset($downloadTokensByEmail[$norm])) {
                     $downloadTokensByEmail[$norm] = ParticipantDownloadToken::getOrCreateTokenForEmail($email);
                 }
             }
         }
 
         $certificatePdfGenerationCompletedAt = null;
-        $cacheKey = 'certificate_pdf_generation_finished_' . $course->id;
+        $cacheKey = 'certificate_pdf_generation_finished_'.$course->id;
         if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
             $certificatePdfGenerationCompletedAt = \Illuminate\Support\Facades\Cache::get($cacheKey);
             \Illuminate\Support\Facades\Cache::forget($cacheKey);
@@ -719,10 +718,10 @@ class ParticipantController extends Controller
                 $log->id
             );
         } catch (\Throwable $e) {
-            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: ' . $e->getMessage());
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail został zlecony do wysyłki na adres ' . $email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail został zlecony do wysyłki na adres '.$email);
     }
 
     /**
@@ -758,10 +757,10 @@ class ParticipantController extends Controller
                 $log->id
             );
         } catch (\Throwable $e) {
-            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: ' . $e->getMessage());
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został zlecony do wysyłki na adres ' . $email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został zlecony do wysyłki na adres '.$email);
     }
 
     /**
@@ -772,7 +771,7 @@ class ParticipantController extends Controller
     public function sendCertificateLinksBulk(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
             'mode' => 'required|string|in:unsent,resend_all,not_downloaded',
         ]);
 
@@ -799,7 +798,7 @@ class ParticipantController extends Controller
                 $join->on('certificates.participant_id', '=', 'participants.id')
                     ->where('certificates.course_id', '=', $course->id);
             })->whereRaw('COALESCE(certificates.download_count, 0) = 0')
-              ->select('participants.*');
+                ->select('participants.*');
         }
 
         $participants = $participantsQuery->get();
@@ -847,7 +846,7 @@ class ParticipantController extends Controller
     public function certificateEmailBatchStatus(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
         ]);
 
         $type = $request->string('type')->toString();
@@ -860,7 +859,7 @@ class ParticipantController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
-        if (!$row) {
+        if (! $row) {
             return response()->json([
                 'active' => false,
                 'state' => 'none',
@@ -879,10 +878,10 @@ class ParticipantController extends Controller
 
         $state = 'active';
         $active = true;
-        if (!empty($row->cancelled_at)) {
+        if (! empty($row->cancelled_at)) {
             $state = 'cancelled';
             $active = false;
-        } elseif (!empty($row->finished_at)) {
+        } elseif (! empty($row->finished_at)) {
             $state = 'finished';
             $active = false;
         }
@@ -905,7 +904,7 @@ class ParticipantController extends Controller
     public function cancelCertificateEmailBatch(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:' . CertificateEmailLog::TYPE_LIST_LINK . ',' . CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
         ]);
 
         $type = $request->string('type')->toString();
@@ -919,19 +918,17 @@ class ParticipantController extends Controller
             ->whereNull('cancelled_at')
             ->first();
 
-        if (!$row) {
+        if (! $row) {
             return response()->json(['success' => false, 'message' => 'Brak aktywnej wysyłki.'], 404);
         }
 
         $batch = Bus::findBatch($row->id);
-        if ($batch && !$batch->cancelled()) {
+        if ($batch && ! $batch->cancelled()) {
             $batch->cancel();
         }
 
         return response()->json(['success' => true]);
     }
-    
-    
 
     /**
      * Formularz dodawania nowego uczestnika do kursu.
@@ -954,30 +951,29 @@ class ParticipantController extends Controller
             'birth_place' => 'nullable|string|max:255',
             'access_expires_at' => 'nullable|date',
         ]);
-    
+
         $data = $request->all();
-        
+
         // Obsługa daty wygaśnięcia dostępu
-        if (!empty($data['access_expires_at'])) {
+        if (! empty($data['access_expires_at'])) {
             // Input datetime-local zwraca format: YYYY-MM-DDTHH:MM
             // Traktujemy wprowadzony czas jako czas lokalny (Europe/Warsaw)
             $localTime = Carbon::createFromFormat('Y-m-d\TH:i', $data['access_expires_at'], 'Europe/Warsaw');
             // NIE konwertujemy na UTC - Laravel zrobi to automatycznie
             $data['access_expires_at'] = $localTime;
         }
-    
+
         // Pobranie ostatniego numeru porządkowego w danym kursie
         $lastOrder = $course->participants()->max('order') ?? 0;
-    
+
         // Tworzenie nowego uczestnika z przypisanym numerem porządkowym
         $course->participants()->create(array_merge(
             $data,
             ['order' => $lastOrder + 1]
         ));
-    
+
         return redirect()->route('participants.index', $course)->with('success', 'Uczestnik dodany.');
     }
-    
 
     /**
      * Formularz edycji uczestnika.
@@ -1002,9 +998,9 @@ class ParticipantController extends Controller
         ]);
 
         $data = $request->all();
-        
+
         // Obsługa daty wygaśnięcia dostępu
-        if (!empty($data['access_expires_at'])) {
+        if (! empty($data['access_expires_at'])) {
             // Input datetime-local zwraca format: YYYY-MM-DDTHH:MM
             // Traktujemy wprowadzony czas jako czas lokalny (Europe/Warsaw)
             $localTime = Carbon::createFromFormat('Y-m-d\TH:i', $data['access_expires_at'], 'Europe/Warsaw');
@@ -1033,7 +1029,7 @@ class ParticipantController extends Controller
 
         try {
             $handle = fopen($file->getPathname(), 'r');
-            
+
             // Pomiń nagłówek i znormalizuj nazwy kolumn (małe litery, bez cudzysłowów)
             $header = fgetcsv($handle);
             if ($header === false) {
@@ -1047,20 +1043,22 @@ class ParticipantController extends Controller
                     ->trim()
                     ->toString();
             }, $header);
-            
+
             while (($row = fgetcsv($handle)) !== false) {
                 try {
                     if (count($row) !== count($normalizedHeader)) {
-                        $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - Nieprawidłowa liczba kolumn.";
+                        $errors[] = 'Błąd w wierszu: '.implode(',', $row).' - Nieprawidłowa liczba kolumn.';
                         $skippedCount++;
+
                         continue;
                     }
 
                     // Mapowanie kolumn CSV do ujednoliconych kluczy
                     $csvData = array_combine($normalizedHeader, $row);
                     if ($csvData === false) {
-                        $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - Nie udało się sparsować wiersza.";
+                        $errors[] = 'Błąd w wierszu: '.implode(',', $row).' - Nie udało się sparsować wiersza.';
                         $skippedCount++;
+
                         continue;
                     }
 
@@ -1069,14 +1067,15 @@ class ParticipantController extends Controller
                     if (empty($email)) {
                         throw new \RuntimeException('Brak kolumny E-mail uczestnika/Email lub pusty email.');
                     }
-                    
+
                     // Sprawdź czy uczestnik już istnieje
                     $existingParticipant = Participant::where('email', $email)
-                                                     ->where('course_id', $course->id)
-                                                     ->first();
-                    
+                        ->where('course_id', $course->id)
+                        ->first();
+
                     if ($existingParticipant) {
                         $skippedCount++;
+
                         continue;
                     }
 
@@ -1095,7 +1094,7 @@ class ParticipantController extends Controller
                     $existingProfile = Participant::where('email', $email)
                         ->where(function ($q) {
                             $q->whereNotNull('birth_date')
-                              ->orWhereNotNull('birth_place');
+                                ->orWhereNotNull('birth_place');
                         })
                         ->orderByDesc('updated_at')
                         ->first();
@@ -1108,7 +1107,7 @@ class ParticipantController extends Controller
                     // Parsowanie daty wygaśnięcia dostępu
                     $accessExpiresAt = null;
                     $expiresDateRaw = $csvData['dostęp wygasa'] ?? $csvData['dostep wygasa'] ?? null;
-                    if (!empty($expiresDateRaw)) {
+                    if (! empty($expiresDateRaw)) {
                         $expiresDate = trim($expiresDateRaw, '"');
                         if ($expiresDate && $expiresDate !== '') {
                             // Próbuj różne formaty daty
@@ -1122,7 +1121,7 @@ class ParticipantController extends Controller
                                 }
                             }
                         }
-                    } elseif (!empty($course->start_date)) {
+                    } elseif (! empty($course->start_date)) {
                         // Domyślnie: 2 miesiące od daty rozpoczęcia szkolenia
                         $accessExpiresAt = $course->start_date->copy()->addMonthsNoOverflow(2);
                     }
@@ -1143,29 +1142,29 @@ class ParticipantController extends Controller
                     ]);
 
                     $importedCount++;
-                    
+
                 } catch (\Exception $e) {
-                    $errors[] = "Błąd w wierszu: " . implode(',', $row) . " - " . $e->getMessage();
+                    $errors[] = 'Błąd w wierszu: '.implode(',', $row).' - '.$e->getMessage();
                     $skippedCount++;
                 }
             }
-            
+
             fclose($handle);
 
             $message = "Zaimportowano {$importedCount} uczestników.";
             if ($skippedCount > 0) {
                 $message .= " Pominięto {$skippedCount} uczestników (już istnieją lub błąd).";
             }
-            if (!empty($errors)) {
-                $message .= " Błędy: " . implode('; ', array_slice($errors, 0, 5));
+            if (! empty($errors)) {
+                $message .= ' Błędy: '.implode('; ', array_slice($errors, 0, 5));
             }
 
             return redirect()->route('participants.index', $course)
-                           ->with('success', $message);
+                ->with('success', $message);
 
         } catch (\Exception $e) {
             return redirect()->route('participants.index', $course)
-                           ->with('error', 'Błąd podczas importu: ' . $e->getMessage());
+                ->with('error', 'Błąd podczas importu: '.$e->getMessage());
         }
     }
 
@@ -1185,15 +1184,15 @@ class ParticipantController extends Controller
     public function downloadParticipantsList(Request $request, Course $course)
     {
         $query = Participant::where('course_id', $course->id);
-        
+
         // Obsługa wyszukiwania (jeśli jest aktywne)
         if ($request->filled('search')) {
             $searchTerm = $request->get('search');
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -1206,31 +1205,31 @@ class ParticipantController extends Controller
             'course' => $course,
             'participants' => $participants,
             'searchTerm' => $request->get('search'),
-            'totalCount' => $participants->count()
+            'totalCount' => $participants->count(),
         ])->setPaper('A4', 'portrait')
-          ->setOptions([
-              'defaultFont' => 'DejaVu Sans',
-              'isHtml5ParserEnabled' => true,
-              'isRemoteEnabled' => false,
-              'isPhpEnabled' => true,
-              'defaultPaperSize' => 'a4',
-              'defaultPaperOrientation' => 'portrait',
-              'enable_font_subsetting' => true,
-              'dpi' => 150,
-              'isFontSubsettingEnabled' => true,
-          ]);
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'isPhpEnabled' => true,
+                'defaultPaperSize' => 'a4',
+                'defaultPaperOrientation' => 'portrait',
+                'enable_font_subsetting' => true,
+                'dpi' => 150,
+                'isFontSubsettingEnabled' => true,
+            ]);
 
         // Nazwa pliku
         $courseDate = $course->start_date ? Carbon::parse($course->start_date)->format('Y-m-d_H_i') : date('Y-m-d_H_i');
-        
+
         // Zamiana polskich znaków na odpowiedniki bez ogonków
         $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
-                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
-        
+            'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
+
         $courseTitle = strtr($course->title, $polishChars);
-        $searchInfo = $request->filled('search') ? "_WYSZUKIWANIE_" . Str::slug($request->get('search')) : "";
-        
-        $fileName = $courseDate . '_Lista_uczestnikow_' . $courseTitle . $searchInfo . '.pdf';
+        $searchInfo = $request->filled('search') ? '_WYSZUKIWANIE_'.Str::slug($request->get('search')) : '';
+
+        $fileName = $courseDate.'_Lista_uczestnikow_'.$courseTitle.$searchInfo.'.pdf';
         $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
 
         return $pdf->download($fileName);
@@ -1253,7 +1252,7 @@ class ParticipantController extends Controller
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
-        
+
         $course->load('instructor');
 
         // Generowanie PDF
@@ -1261,22 +1260,22 @@ class ParticipantController extends Controller
             'course' => $course,
             'participants' => $participants,
         ])->setPaper('A4', 'landscape')
-          ->setOptions([
-              'defaultFont' => 'DejaVu Sans',
-              'isHtml5ParserEnabled' => true,
-              'isRemoteEnabled' => false,
-              'isPhpEnabled' => true,
-              'enable_font_subsetting' => true,
-          ]);
+            ->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'isPhpEnabled' => true,
+                'enable_font_subsetting' => true,
+            ]);
 
         // Nazwa pliku
         $courseDate = $course->start_date ? Carbon::parse($course->start_date)->format('Y-m-d') : date('Y-m-d');
-        
+
         $polishChars = ['ą' => 'a', 'ć' => 'c', 'ę' => 'e', 'ł' => 'l', 'ń' => 'n', 'ó' => 'o', 'ś' => 's', 'ź' => 'z', 'ż' => 'z',
-                       'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
-        
+            'Ą' => 'A', 'Ć' => 'C', 'Ę' => 'E', 'Ł' => 'L', 'Ń' => 'N', 'Ó' => 'O', 'Ś' => 'S', 'Ź' => 'Z', 'Ż' => 'Z'];
+
         $courseTitle = strtr($course->title, $polishChars);
-        $fileName = 'Rejestr_zaswiadczen_' . $courseDate . '_' . $courseTitle . '.pdf';
+        $fileName = 'Rejestr_zaswiadczen_'.$courseDate.'_'.$courseTitle.'.pdf';
         $fileName = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $fileName);
 
         return $pdf->download($fileName);
@@ -1302,9 +1301,10 @@ class ParticipantController extends Controller
         if ($validator->fails()) {
             // Zachowaj filtry przy powrocie
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)
                 ->withErrors($validator)
                 ->withInput();
@@ -1320,9 +1320,10 @@ class ParticipantController extends Controller
         // Jeśli e-mail się nie zmienił, nie rób nic
         if ($oldEmail === $newEmail) {
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)
                 ->with('info', 'Adres e-mail nie uległ zmianie.');
         }
@@ -1345,42 +1346,20 @@ class ParticipantController extends Controller
             // Jeśli nowy e-mail już istnieje w participant_emails, scal rekordy
             if ($existingEmailRecord) {
                 // SCALANIE REKORDÓW - nowy e-mail już istnieje
-                
+
                 // 1. Zaktualizuj wszystkie tabele używając obu wariantów e-maila (stary błędny i nowy poprawny)
                 //    Wszystkie wystąpienia starego e-maila zostaną zaktualizowane na nowy
-                
+
                 // 2. Aktualizuj participants (używając obu wariantów starego e-maila)
                 $participantsUpdated = DB::table('participants')
                     ->whereIn('email', $oldEmailsToSearch)
                     ->whereNull('deleted_at')
                     ->update(['email' => $newEmail]);
 
-                // 3. Aktualizuj form_orders
-                $formOrdersUpdated = 0;
-                $formOrdersToUpdate = DB::table('form_orders')
-                    ->where(function($query) use ($oldEmailsToSearch) {
-                        $query->whereIn('participant_email', $oldEmailsToSearch)
-                              ->orWhereIn('orderer_email', $oldEmailsToSearch);
-                    })
-                    ->get();
-
-                foreach ($formOrdersToUpdate as $order) {
-                    $updateData = ['updated_at' => now()];
-                    
-                    if (in_array($order->participant_email, $oldEmailsToSearch)) {
-                        $updateData['participant_email'] = $newEmail;
-                    }
-                    
-                    if (in_array($order->orderer_email, $oldEmailsToSearch)) {
-                        $updateData['orderer_email'] = $newEmail;
-                    }
-                    
-                    DB::table('form_orders')
-                        ->where('id', $order->id)
-                        ->update($updateData);
-                    
-                    $formOrdersUpdated++;
-                }
+                // 3. Aktualizuj form_orders (tylko orderer_email — e-mail uczestnika jest w form_order_participants)
+                $formOrdersUpdated = (int) DB::table('form_orders')
+                    ->whereIn('orderer_email', $oldEmailsToSearch)
+                    ->update(['orderer_email' => $newEmail, 'updated_at' => now()]);
 
                 // 4. Aktualizuj form_order_participants
                 $formOrderParticipantsUpdated = DB::table('form_order_participants')
@@ -1396,35 +1375,35 @@ class ParticipantController extends Controller
                 //    - Zachowaj lepsze wartości dla is_verified i is_active (jeśli istniejący ma lepsze)
                 $existingEmailRecord->participants_count = $existingEmailRecord->participants_count + $participantEmail->participants_count;
                 // Jeśli istniejący rekord nie ma first_participant_id, użyj z błędnego
-                if (!$existingEmailRecord->first_participant_id && $participantEmail->first_participant_id) {
+                if (! $existingEmailRecord->first_participant_id && $participantEmail->first_participant_id) {
                     $existingEmailRecord->first_participant_id = $participantEmail->first_participant_id;
                 }
                 // Zachowaj lepsze wartości dla is_verified i is_active
-                if (!$existingEmailRecord->is_verified && $participantEmail->is_verified) {
+                if (! $existingEmailRecord->is_verified && $participantEmail->is_verified) {
                     $existingEmailRecord->is_verified = true;
                 }
-                if (!$existingEmailRecord->is_active && $participantEmail->is_active) {
+                if (! $existingEmailRecord->is_active && $participantEmail->is_active) {
                     $existingEmailRecord->is_active = true;
                 }
                 // Scal notatki jeśli istnieją
-                if ($participantEmail->notes && !$existingEmailRecord->notes) {
+                if ($participantEmail->notes && ! $existingEmailRecord->notes) {
                     $existingEmailRecord->notes = $participantEmail->notes;
                 } elseif ($participantEmail->notes && $existingEmailRecord->notes) {
-                    $existingEmailRecord->notes = $existingEmailRecord->notes . "\n\n[Merged from: {$oldEmail}]\n" . $participantEmail->notes;
+                    $existingEmailRecord->notes = $existingEmailRecord->notes."\n\n[Merged from: {$oldEmail}]\n".$participantEmail->notes;
                 }
                 $existingEmailRecord->save();
 
                 // 6. Usuń błędny rekord (soft delete)
                 $participantEmail->delete();
-                
+
                 $merged = true;
             } else {
                 // NORMALNA AKTUALIZACJA - nowy e-mail nie istnieje
-                
+
                 // 1. Aktualizuj participant_emails (upewnij się, że nie ma BOM)
                 $participantEmail->email = $newEmail;
                 $participantEmail->save();
-                
+
                 $merged = false;
 
                 // 2. Aktualizuj participants (szukaj zarówno z BOM jak i bez BOM)
@@ -1433,34 +1412,10 @@ class ParticipantController extends Controller
                     ->whereNull('deleted_at')
                     ->update(['email' => $newEmail]);
 
-                // 3. Aktualizuj form_orders (participant_email i orderer_email) - szukaj zarówno z BOM jak i bez BOM
-                $formOrdersUpdated = 0;
-                $formOrdersToUpdate = DB::table('form_orders')
-                    ->where(function($query) use ($oldEmailsToSearch) {
-                        $query->whereIn('participant_email', $oldEmailsToSearch)
-                              ->orWhereIn('orderer_email', $oldEmailsToSearch);
-                    })
-                    ->get();
-
-                foreach ($formOrdersToUpdate as $order) {
-                    $updateData = ['updated_at' => now()];
-                    
-                    // Sprawdź czy participant_email pasuje do któregoś ze starych e-maili
-                    if (in_array($order->participant_email, $oldEmailsToSearch)) {
-                        $updateData['participant_email'] = $newEmail;
-                    }
-                    
-                    // Sprawdź czy orderer_email pasuje do któregoś ze starych e-maili
-                    if (in_array($order->orderer_email, $oldEmailsToSearch)) {
-                        $updateData['orderer_email'] = $newEmail;
-                    }
-                    
-                    DB::table('form_orders')
-                        ->where('id', $order->id)
-                        ->update($updateData);
-                    
-                    $formOrdersUpdated++;
-                }
+                // 3. Aktualizuj form_orders (tylko orderer_email)
+                $formOrdersUpdated = (int) DB::table('form_orders')
+                    ->whereIn('orderer_email', $oldEmailsToSearch)
+                    ->update(['orderer_email' => $newEmail, 'updated_at' => now()]);
 
                 // 4. Aktualizuj form_order_participants - szukaj zarówno z BOM jak i bez BOM
                 $formOrderParticipantsUpdated = DB::table('form_order_participants')
@@ -1505,14 +1460,15 @@ class ParticipantController extends Controller
 
             // Zachowaj filtry z query string (nie z formularza)
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             \Log::error('Błąd podczas aktualizacji e-maila', [
                 'old_email' => $oldEmail,
                 'new_email' => $newEmail,
@@ -1521,11 +1477,12 @@ class ParticipantController extends Controller
             ]);
 
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)
-                ->with('error', 'Błąd podczas aktualizacji e-maila: ' . $e->getMessage())
+                ->with('error', 'Błąd podczas aktualizacji e-maila: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -1546,9 +1503,10 @@ class ParticipantController extends Controller
 
             // Zachowaj filtry z query string
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)
                 ->with('success', "Adres e-mail \"{$email}\" został usunięty.");
 
@@ -1560,12 +1518,12 @@ class ParticipantController extends Controller
             ]);
 
             $queryParams = $request->only(['search', 'filter_active', 'filter_verified', 'filter_invalid_email', 'filter_course_type', 'sort_by', 'sort_direction', 'per_page', 'page']);
-            $queryParams = array_filter($queryParams, function($value) {
+            $queryParams = array_filter($queryParams, function ($value) {
                 return $value !== null && $value !== '';
             });
+
             return redirect()->route('participants.emails-list', $queryParams)
-                ->with('error', 'Błąd podczas usuwania e-maila: ' . $e->getMessage());
+                ->with('error', 'Błąd podczas usuwania e-maila: '.$e->getMessage());
         }
     }
 }
-

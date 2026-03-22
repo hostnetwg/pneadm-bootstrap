@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use App\Models\User;
-use App\Models\Instructor;
+use App\Models\CertificateTemplate;
 use App\Models\Course;
-use App\Models\Participant;
-use App\Models\ParticipantEmail;
-use App\Models\FormOrder;
-use App\Models\FormOrderParticipant;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
-use App\Models\CertificateTemplate;
+use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
+use App\Models\Instructor;
+use App\Models\Participant;
+use App\Models\ParticipantEmail;
+use App\Models\User;
+use Illuminate\Http\Request;
 
 class TrashController extends Controller
 {
@@ -29,23 +28,23 @@ class TrashController extends Controller
         $trashData = [];
 
         // Funkcja pomocnicza do pobierania usuniętych rekordów
-        $getTrashedRecords = function($modelClass, $tableName, $displayFields) use ($search) {
+        $getTrashedRecords = function ($modelClass, $tableName, $displayFields) use ($search) {
             $query = $modelClass::onlyTrashed();
-            
+
             if ($search) {
                 foreach ($displayFields as $field) {
                     $query->orWhere($field, 'LIKE', "%{$search}%");
                 }
             }
-            
-            return $query->orderBy('deleted_at', 'desc')->get()->map(function($record) use ($tableName, $displayFields) {
+
+            return $query->orderBy('deleted_at', 'desc')->get()->map(function ($record) use ($tableName, $displayFields) {
                 return [
                     'id' => $record->id,
                     'table' => $tableName,
                     'model_class' => get_class($record),
                     'deleted_at' => $record->deleted_at,
                     'display_data' => $this->getDisplayData($record, $displayFields),
-                    'record' => $record
+                    'record' => $record,
                 ];
             });
         };
@@ -55,61 +54,61 @@ class TrashController extends Controller
             'users' => [
                 'model' => User::class,
                 'display_fields' => ['name', 'email'],
-                'label' => 'Użytkownicy'
+                'label' => 'Użytkownicy',
             ],
             'instructors' => [
                 'model' => Instructor::class,
                 'display_fields' => ['first_name', 'last_name', 'email'],
-                'label' => 'Instruktorzy'
+                'label' => 'Instruktorzy',
             ],
             'courses' => [
                 'model' => Course::class,
                 'display_fields' => ['title', 'description'],
-                'label' => 'Kursy'
+                'label' => 'Kursy',
             ],
             'participants' => [
                 'model' => Participant::class,
                 'display_fields' => ['first_name', 'last_name', 'email'],
-                'label' => 'Uczestnicy'
+                'label' => 'Uczestnicy',
             ],
             'participant_emails' => [
                 'model' => ParticipantEmail::class,
                 'display_fields' => ['email', 'first_participant_id'],
-                'label' => 'E-maile uczestników'
+                'label' => 'E-maile uczestników',
             ],
             'form_orders' => [
                 'model' => FormOrder::class,
-                'display_fields' => ['participant_name', 'product_name', 'orderer_name'],
-                'label' => 'Zamówienia formularzy'
+                'display_fields' => ['id', 'product_name', 'orderer_name'],
+                'label' => 'Zamówienia formularzy',
             ],
             'form_order_participants' => [
                 'model' => FormOrderParticipant::class,
                 'display_fields' => ['participant_firstname', 'participant_lastname', 'participant_email'],
-                'label' => 'Uczestnicy zamówień'
+                'label' => 'Uczestnicy zamówień',
             ],
             'course_locations' => [
                 'model' => CourseLocation::class,
                 'display_fields' => ['location_name', 'address', 'post_office'],
-                'label' => 'Lokalizacje kursów'
+                'label' => 'Lokalizacje kursów',
             ],
             'course_online_details' => [
                 'model' => CourseOnlineDetails::class,
                 'display_fields' => ['platform', 'meeting_link'],
-                'label' => 'Szczegóły kursów online'
+                'label' => 'Szczegóły kursów online',
             ],
             'certificate_templates' => [
                 'model' => CertificateTemplate::class,
                 'display_fields' => ['name', 'slug', 'description'],
-                'label' => 'Szablony certyfikatów'
-            ]
+                'label' => 'Szablony certyfikatów',
+            ],
         ];
 
         // Pobieranie danych dla wybranej tabeli lub wszystkich
         if ($table === 'all') {
             foreach ($tableDefinitions as $tableName => $definition) {
                 $trashData = array_merge($trashData, $getTrashedRecords(
-                    $definition['model'], 
-                    $tableName, 
+                    $definition['model'],
+                    $tableName,
                     $definition['display_fields']
                 )->toArray());
             }
@@ -117,15 +116,15 @@ class TrashController extends Controller
             if (isset($tableDefinitions[$table])) {
                 $definition = $tableDefinitions[$table];
                 $trashData = $getTrashedRecords(
-                    $definition['model'], 
-                    $table, 
+                    $definition['model'],
+                    $table,
                     $definition['display_fields']
                 )->toArray();
             }
         }
 
         // Sortowanie po dacie usunięcia (najnowsze pierwsze)
-        usort($trashData, function($a, $b) {
+        usort($trashData, function ($a, $b) {
             return $b['deleted_at'] <=> $a['deleted_at'];
         });
 
@@ -156,8 +155,8 @@ class TrashController extends Controller
     {
         try {
             $modelClass = $this->getModelClass($table);
-            
-            if (!$modelClass) {
+
+            if (! $modelClass) {
                 return redirect()->back()->with('error', 'Nieprawidłowy typ rekordu.');
             }
 
@@ -167,7 +166,7 @@ class TrashController extends Controller
             return redirect()->back()->with('success', 'Rekord został przywrócony pomyślnie!');
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Wystąpił błąd podczas przywracania rekordu: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Wystąpił błąd podczas przywracania rekordu: '.$e->getMessage());
         }
     }
 
@@ -178,8 +177,8 @@ class TrashController extends Controller
     {
         try {
             $modelClass = $this->getModelClass($table);
-            
-            if (!$modelClass) {
+
+            if (! $modelClass) {
                 return redirect()->back()->with('error', 'Nieprawidłowy typ rekordu.');
             }
 
@@ -189,7 +188,7 @@ class TrashController extends Controller
             return redirect()->back()->with('success', 'Rekord został trwale usunięty!');
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Wystąpił błąd podczas trwałego usuwania rekordu: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Wystąpił błąd podczas trwałego usuwania rekordu: '.$e->getMessage());
         }
     }
 
@@ -200,8 +199,8 @@ class TrashController extends Controller
     {
         try {
             $modelClass = $this->getModelClass($table);
-            
-            if (!$modelClass) {
+
+            if (! $modelClass) {
                 return redirect()->back()->with('error', 'Nieprawidłowy typ tabeli.');
             }
 
@@ -211,7 +210,7 @@ class TrashController extends Controller
             return redirect()->back()->with('success', "Kosz dla tabeli '{$table}' został opróżniony. Usunięto {$count} rekordów.");
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Wystąpił błąd podczas opróżniania kosza: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Wystąpił błąd podczas opróżniania kosza: '.$e->getMessage());
         }
     }
 
@@ -244,7 +243,7 @@ class TrashController extends Controller
             return redirect()->back()->with('success', "Cały kosz został opróżniony. Usunięto {$totalDeleted} rekordów.");
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Wystąpił błąd podczas opróżniania całego kosza: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Wystąpił błąd podczas opróżniania całego kosza: '.$e->getMessage());
         }
     }
 
@@ -280,6 +279,7 @@ class TrashController extends Controller
                 $data[$field] = $record->$field;
             }
         }
+
         return $data;
     }
 }
