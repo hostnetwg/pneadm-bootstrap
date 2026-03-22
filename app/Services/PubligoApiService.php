@@ -69,7 +69,7 @@ class PubligoApiService
                 return [
                     'success' => true,
                     'message' => $interpreted['message'],
-                    'response' => is_array($result) ? $result : ['raw' => $responseBody],
+                    'response' => $this->buildSuccessResponsePayload($result, $responseBody, $httpCode),
                     'http_code' => $httpCode,
                 ];
             }
@@ -85,8 +85,8 @@ class PubligoApiService
 
                 return [
                     'success' => true,
-                    'message' => 'Zamówienie zostało przekazane do Publigo (odpowiedź w niestandardowym formacie).',
-                    'response' => is_array($result) ? $result : ['raw' => $responseBody],
+                    'message' => 'Zamówienie zostało pomyślnie utworzone w Publigo',
+                    'response' => $this->buildSuccessResponsePayload($result, $responseBody, $httpCode),
                     'http_code' => $httpCode,
                 ];
             }
@@ -241,12 +241,33 @@ class PubligoApiService
             }
         }
 
-        // Pusty body HTTP 200 — często „cisza” po stronie serwera mimo utworzenia rekordu
+        // Pusty body HTTP 200 — norma dla części wdrożeń Publigo / WP (zamówienie i tak powstaje)
         if (trim($responseBody) === '') {
-            return ['message' => 'Zamówienie zostało przekazane do Publigo (pusta odpowiedź serwera).'];
+            return ['message' => 'Zamówienie zostało pomyślnie utworzone w Publigo'];
         }
 
         return null;
+    }
+
+    /**
+     * Odpowiedź do panelu (np. „Pokaż szczegóły”) — bez mylącego {"raw":""}.
+     *
+     * @param  mixed  $result  json_decode(..., true)
+     */
+    private function buildSuccessResponsePayload(mixed $result, string $responseBody, int $httpCode): array
+    {
+        if (is_array($result) && $result !== []) {
+            return $result;
+        }
+
+        if (trim($responseBody) === '') {
+            return [
+                'http_status' => $httpCode,
+                'informacja' => 'Serwer Publigo zwrócił pustą treść odpowiedzi (HTTP '.$httpCode.'). To jest typowe dla tego endpointu — zamówienie zostało przyjęte.',
+            ];
+        }
+
+        return ['surowa_odpowiedz' => $responseBody];
     }
 
     /**

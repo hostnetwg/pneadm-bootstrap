@@ -189,7 +189,7 @@ nowoczesna-edukacja.pl </div>
                                 </div>
                             @endif
 
-                    {{-- Button Dodaj zamówienie PUBLIGO --}}
+                    {{-- Button Dodaj zamówienie PUBLIGO (wymaga: product_id + price_id + publigo_sent != 1) --}}
                             <div class="mt-3 pt-3 border-top">
                     @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
                                     <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
@@ -216,7 +216,22 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                 @endif
                             </div>
+                    @else
+                        {{-- Brak przycisku: zwykle brak publigo_price_id lub publigo_product_id (badge może pokazywać sam produkt) --}}
+                        @if(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
+                            <div class="alert alert-warning mb-0 py-2 small">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Przycisk Publigo jest ukryty</strong> — do wysyłki potrzebne są <strong>ID produktu</strong> i <strong>ID ceny</strong> Publigo w tym zamówieniu.
+                                @if(!empty($zamowienie->publigo_product_id) && empty($zamowienie->publigo_price_id))
+                                    <span class="d-block mt-1 mb-0">Masz produkt <code>#{{ $zamowienie->publigo_product_id }}</code>, ale <strong>brak <code>publigo_price_id</code></strong> (ID ceny w Publigo). Uzupełnij w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a> lub w danych kursu.</span>
+                                @elseif(empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id))
+                                    <span class="d-block mt-1 mb-0">Brak <strong><code>publigo_product_id</code></strong> — uzupełnij w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a>.</span>
+                                @else
+                                    <span class="d-block mt-1 mb-0">Uzupełnij oba pola w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a>.</span>
                                 @endif
+                            </div>
+                        @endif
+                    @endif
                         </div>
                         </div>
                     </div>
