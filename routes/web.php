@@ -58,6 +58,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics.index');
 
         Route::get('pnedu-users', [PneduUsersController::class, 'index'])->name('pnedu-users.index');
+        Route::post('pnedu-users/{pnedu_user}/send-password-reset', [PneduUsersController::class, 'sendPasswordReset'])->name('pnedu-users.send-password-reset');
+        Route::post('pnedu-users/{pnedu_user}/set-password', [PneduUsersController::class, 'setPassword'])->name('pnedu-users.set-password');
+        Route::post('pnedu-users/{pnedu_user}/verify-email', [PneduUsersController::class, 'verifyEmail'])->name('pnedu-users.verify-email');
         Route::get('pnedu-users/{pnedu_user}', [PneduUsersController::class, 'show'])->name('pnedu-users.show');
 
         // Zarządzanie szablonami certyfikatów

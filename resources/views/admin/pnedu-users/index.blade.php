@@ -31,7 +31,7 @@
     </x-slot>
 
     <div class="px-3 py-3">
-        <div class="container-fluid" style="max-width: 1200px;">
+        <div class="container-fluid" style="max-width: 1400px;">
             <p class="text-muted small mb-3">
                 Konta zarejestrowane na stronie pnedu.pl (baza <code>pnedu</code>, tabela <code>users</code>).
             </p>
@@ -112,6 +112,11 @@
                                         </a>
                                     </th>
                                     <th scope="col">
+                                        <a href="{{ $sortLink('birth_date') }}" class="text-decoration-none text-dark" title="Sort po dacie urodzenia">
+                                            Urodzenie @if($sortIcon('birth_date'))<i class="bi {{ $sortIcon('birth_date') }}"></i>@endif
+                                        </a>
+                                    </th>
+                                    <th scope="col">
                                         <a href="{{ $sortLink('email_verified_at') }}" class="text-decoration-none text-dark">
                                             Zweryfikowany @if($sortIcon('email_verified_at'))<i class="bi {{ $sortIcon('email_verified_at') }}"></i>@endif
                                         </a>
@@ -130,6 +135,12 @@
                                         <td class="text-muted">{{ $user->id }}</td>
                                         <td>{{ $user->email }}</td>
                                         <td>{{ $user->full_name }}</td>
+                                        <td class="align-middle py-2">
+                                            <div class="text-muted lh-sm" style="font-size: 0.8125rem;">
+                                                <div>{{ $user->birth_date?->format('d.m.Y') ?? '—' }}</div>
+                                                <div>{{ $user->birth_place ?: '—' }}</div>
+                                            </div>
+                                        </td>
                                         <td>
                                             @if($user->email_verified_at)
                                                 <span class="badge text-bg-success">Tak</span>
@@ -149,7 +160,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">
+                                        <td colspan="7" class="text-center text-muted py-4">
                                             Brak użytkowników spełniających kryteria.
                                         </td>
                                     </tr>

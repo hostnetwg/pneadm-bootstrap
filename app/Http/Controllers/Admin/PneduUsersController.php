@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\PneduUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -15,7 +19,7 @@ class PneduUsersController extends Controller
     private const PER_PAGE = 25;
 
     /** @var list<string> */
-    private const SORT_COLUMNS = ['id', 'email', 'created_at', 'first_name', 'last_name', 'email_verified_at'];
+    private const SORT_COLUMNS = ['id', 'email', 'created_at', 'first_name', 'last_name', 'birth_date', 'email_verified_at'];
 
     public function index(Request $request): View
     {
@@ -57,9 +61,103 @@ class PneduUsersController extends Controller
         return view('admin.pnedu-users.show', ['user' => $pnedu_user]);
     }
 
-    /**
-     * @return array{email: ?string, name: ?string, registered_from: ?string, registered_to: ?string, verified: string, sort: string, dir: string}
-     */
+    public function sendPasswordReset(PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $status = Password::broker('pnedu_users')->sendResetLink(
+            ['email' => $pnedu_user->email]
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            ActivityLog::logCustom(
+                'Użytkownik pnedu.pl: wysłano reset hasła (e-mail)',
+                'Wysłano wiadomość z linkiem resetu hasła na adres '.$pnedu_user->email.' (ID użytkownika: '.$pnedu_user->id.').',
+                [
+                    'new_values' => [
+                        'pnedu_user_id' => $pnedu_user->id,
+                        'email' => $pnedu_user->email,
+                    ],
+                ]
+            );
+
+            return back()->with('success', 'Wysłano e-mail z linkiem resetu hasła (pnedu.pl).');
+        }
+
+        if ($status === Password::RESET_THROTTLED) {
+            return back()->with('error', 'Zbyt wiele prób. Odczekaj chwilę przed ponownym wysłaniem linku resetu.');
+        }
+
+        if ($status === Password::INVALID_USER) {
+            return back()->with('error', 'Nie znaleziono użytkownika o tym adresie e-mail w bazie pnedu.');
+        }
+
+        return back()->with('error', 'Nie udało się wysłać linku resetu hasła. Spróbuj ponownie.');
+    }
+
+    public function setPassword(Request $request, PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $validated = $request->validate([
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ]);
+
+        $pnedu_user->password = $validated['password'];
+        $pnedu_user->save();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: ustawienie hasła z panelu',
+            'Hasło zostało ustawione administracyjnie dla użytkownika ID '.$pnedu_user->id.' ('.$pnedu_user->email.').',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'email' => $pnedu_user->email,
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Nowe hasło zostało zapisane.');
+    }
+
+    public function verifyEmail(Request $request, PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $request->validate([
+            'confirm_verify' => ['accepted'],
+        ], [
+            'confirm_verify.accepted' => 'Zaznacz potwierdzenie, aby ręcznie zweryfikować adres e-mail.',
+        ]);
+
+        if ($pnedu_user->email_verified_at !== null) {
+            return back()->with('error', 'Ten adres e-mail jest już zweryfikowany.');
+        }
+
+        $pnedu_user->forceFill(['email_verified_at' => now()])->save();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: ręczna weryfikacja e-maila',
+            'Ręcznie zweryfikowano e-mail użytkownika ID '.$pnedu_user->id.' ('.$pnedu_user->email.').',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'email' => $pnedu_user->email,
+                    'email_verified_at' => $pnedu_user->email_verified_at?->toIso8601String(),
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Adres e-mail został oznaczony jako zweryfikowany.');
+    }
+
+    private function authorizePneduUserManage(): void
+    {
+        if (! auth()->user()->hasPermission('users.edit')) {
+            abort(403, 'Brak uprawnień do zarządzania użytkownikami pnedu.pl.');
+        }
+    }
+
     private function normalizeListQuery(Request $request): void
     {
         foreach (['email', 'name', 'registered_from', 'registered_to'] as $key) {

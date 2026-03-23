@@ -2,13 +2,20 @@
 
 namespace App\Models;
 
+use App\Notifications\PneduFrontendResetPassword;
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 
 /**
  * Użytkownik zarejestrowany na pnedu.pl (baza pnedu, tabela users).
  */
-class PneduUser extends Model
+class PneduUser extends Model implements CanResetPasswordContract
 {
+    use CanResetPassword;
+    use Notifiable;
+
     protected $connection = 'pnedu';
 
     protected $table = 'users';
@@ -34,5 +41,10 @@ class PneduUser extends Model
         $combined = trim($first.' '.$last);
 
         return $combined !== '' ? $combined : '—';
+    }
+
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new PneduFrontendResetPassword($token));
     }
 }
