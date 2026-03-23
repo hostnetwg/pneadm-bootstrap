@@ -22,6 +22,7 @@ use App\Http\Controllers\ZamowieniaProdController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\StatisticsController;
+use App\Http\Controllers\Admin\PneduUsersController;
 use App\Http\Controllers\SendyController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
@@ -55,7 +56,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         
         // Statystyki
         Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics.index');
-        
+
+        Route::get('pnedu-users', [PneduUsersController::class, 'index'])->name('pnedu-users.index');
+
         // Zarządzanie szablonami certyfikatów
         Route::resource('certificate-templates', CertificateTemplateController::class);
         Route::get('certificate-templates/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('certificate-templates.preview');

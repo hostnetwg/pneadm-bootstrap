@@ -355,6 +355,13 @@
                         <i class="bi bi-bar-chart me-1"></i>Statystyki
                     </a></li>
                     <li><a href="{{ route('admin.users.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Użytkownicy</a></li>
+                    <li>
+                        <a href="{{ route('admin.pnedu-users.index') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('admin.pnedu-users.*') ? 'active' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Użytkownicy pnedu
+                        </a>
+                    </li>
                     <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>
                     <li><a href="{{ route('activity-logs.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                         <i class="bi bi-activity me-1"></i>Logi aktywności
