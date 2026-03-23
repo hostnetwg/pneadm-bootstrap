@@ -4,21 +4,142 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PneduUser;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PneduUsersController extends Controller
 {
-    public function index(): View
+    private const PER_PAGE = 25;
+
+    /** @var list<string> */
+    private const SORT_COLUMNS = ['id', 'email', 'created_at', 'first_name', 'last_name', 'email_verified_at'];
+
+    public function index(Request $request): View
     {
         if (! auth()->user()->hasPermission('users.view')) {
             abort(403, 'Brak uprawnień do przeglądania użytkowników.');
         }
 
-        $users = PneduUser::query()
-            ->orderByDesc('id')
-            ->paginate(25)
-            ->withQueryString();
+        $this->normalizeListQuery($request);
 
-        return view('admin.pnedu-users.index', compact('users'));
+        $filters = $this->validatedFilters($request);
+
+        session(['pnedu_users_list_query' => $request->query()]);
+
+        $query = PneduUser::query();
+        $this->applyFilters($query, $filters);
+
+        $sort = $filters['sort'];
+        $dir = $filters['dir'];
+        $query->orderBy($sort, $dir);
+
+        if ($sort !== 'id') {
+            $query->orderBy('id', $dir);
+        }
+
+        $users = $query->paginate(self::PER_PAGE)->withQueryString();
+
+        return view('admin.pnedu-users.index', [
+            'users' => $users,
+            'filters' => $filters,
+        ]);
+    }
+
+    public function show(PneduUser $pnedu_user): View
+    {
+        if (! auth()->user()->hasPermission('users.view')) {
+            abort(403, 'Brak uprawnień do przeglądania użytkowników.');
+        }
+
+        return view('admin.pnedu-users.show', ['user' => $pnedu_user]);
+    }
+
+    /**
+     * @return array{email: ?string, name: ?string, registered_from: ?string, registered_to: ?string, verified: string, sort: string, dir: string}
+     */
+    private function normalizeListQuery(Request $request): void
+    {
+        foreach (['email', 'name', 'registered_from', 'registered_to'] as $key) {
+            if ($request->query($key) === '') {
+                $request->query->remove($key);
+            }
+        }
+    }
+
+    private function validatedFilters(Request $request): array
+    {
+        $data = $request->validate([
+            'email' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'registered_from' => ['nullable', 'date'],
+            'registered_to' => ['nullable', 'date'],
+            'verified' => ['nullable', 'in:all,yes,no'],
+            'sort' => ['nullable', 'string', 'in:'.implode(',', self::SORT_COLUMNS)],
+            'dir' => ['nullable', 'in:asc,desc'],
+        ]);
+
+        if (! empty($data['registered_from']) && ! empty($data['registered_to'])) {
+            $from = Carbon::parse($data['registered_from'])->startOfDay();
+            $to = Carbon::parse($data['registered_to'])->endOfDay();
+            if ($to->lt($from)) {
+                throw ValidationException::withMessages([
+                    'registered_to' => 'Data „do” nie może być wcześniejsza niż data „od”.',
+                ]);
+            }
+        }
+
+        $sort = in_array($data['sort'] ?? '', self::SORT_COLUMNS, true)
+            ? $data['sort']
+            : 'created_at';
+        $dir = ($data['dir'] ?? '') === 'asc' ? 'asc' : 'desc';
+
+        return [
+            'email' => isset($data['email']) ? trim($data['email']) : null,
+            'name' => isset($data['name']) ? trim($data['name']) : null,
+            'registered_from' => $data['registered_from'] ?? null,
+            'registered_to' => $data['registered_to'] ?? null,
+            'verified' => in_array($data['verified'] ?? '', ['yes', 'no'], true) ? $data['verified'] : 'all',
+            'sort' => $sort,
+            'dir' => $dir,
+        ];
+    }
+
+    /**
+     * @param  array{email: ?string, name: ?string, registered_from: ?string, registered_to: ?string, verified: string, sort: string, dir: string}  $filters
+     */
+    private function applyFilters(Builder $query, array $filters): void
+    {
+        if ($filters['email'] !== null && $filters['email'] !== '') {
+            $term = '%'.addcslashes($filters['email'], '%_\\').'%';
+            $query->where('email', 'like', $term);
+        }
+
+        if ($filters['name'] !== null && $filters['name'] !== '') {
+            $term = '%'.addcslashes($filters['name'], '%_\\').'%';
+            $query->where(function (Builder $q) use ($term) {
+                $q->where('first_name', 'like', $term)
+                    ->orWhere('last_name', 'like', $term)
+                    ->orWhereRaw(
+                        "CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?",
+                        [$term]
+                    );
+            });
+        }
+
+        if (! empty($filters['registered_from'])) {
+            $query->where('created_at', '>=', Carbon::parse($filters['registered_from'])->startOfDay());
+        }
+        if (! empty($filters['registered_to'])) {
+            $query->where('created_at', '<=', Carbon::parse($filters['registered_to'])->endOfDay());
+        }
+
+        if ($filters['verified'] === 'yes') {
+            $query->whereNotNull('email_verified_at');
+        } elseif ($filters['verified'] === 'no') {
+            $query->whereNull('email_verified_at');
+        }
     }
 }

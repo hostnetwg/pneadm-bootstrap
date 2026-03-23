@@ -58,6 +58,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics.index');
 
         Route::get('pnedu-users', [PneduUsersController::class, 'index'])->name('pnedu-users.index');
+        Route::get('pnedu-users/{pnedu_user}', [PneduUsersController::class, 'show'])->name('pnedu-users.show');
 
         // Zarządzanie szablonami certyfikatów
         Route::resource('certificate-templates', CertificateTemplateController::class);
