@@ -359,7 +359,7 @@
                         <a href="{{ route('admin.pnedu-users.index') }}"
                            class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('admin.pnedu-users.*') ? 'active' : '' }}"
                            onclick="event.stopPropagation();">
-                            Użytkownicy pnedu
+                            Użytkownicy pnedu.pl
                         </a>
                     </li>
                     <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>

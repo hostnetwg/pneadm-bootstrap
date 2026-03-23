@@ -2,7 +2,7 @@
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
             <i class="bi bi-people me-2"></i>
-            Użytkownicy pnedu
+            Użytkownicy pnedu.pl
         </h2>
     </x-slot>
 
