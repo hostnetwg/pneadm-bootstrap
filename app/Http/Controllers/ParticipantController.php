@@ -780,9 +780,9 @@ class ParticipantController extends Controller
         $createdBy = Auth::id();
 
         $participantsQuery = Participant::query()
-            ->where('course_id', $course->id)
-            ->whereNotNull('email')
-            ->where('email', '!=', '');
+            ->where('participants.course_id', $course->id)
+            ->whereNotNull('participants.email')
+            ->where('participants.email', '!=', '');
 
         if ($mode === 'unsent') {
             $participantsQuery->whereNotExists(function ($q) use ($course, $type) {
