@@ -1240,17 +1240,25 @@ class ParticipantController extends Controller
      */
     public function downloadCertificateRegistry(Request $request, Course $course)
     {
-        // Filtrowanie uczestników z pełnymi danymi
-        $query = Participant::where('course_id', $course->id)
-            ->whereNotNull('first_name')->where('first_name', '!=', '')
-            ->whereNotNull('last_name')->where('last_name', '!=', '')
-            ->whereNotNull('birth_date')
-            ->whereNotNull('birth_place')->where('birth_place', '!=', '');
+        // Ta sama kolejność co przy ?sort_certificate=asc: numerycznie wg pierwszego segmentu numeru (np. 1,2,…10,11),
+        // brak numeru na końcu, potem stabilnie wg participants.order.
+        $numericExpr = "CAST(IFNULL(NULLIF(REGEXP_SUBSTR(certificates.certificate_number, '[0-9]+'), ''), '0') AS UNSIGNED)";
 
-        // Pobranie uczestników
+        $query = Participant::where('participants.course_id', $course->id)
+            ->whereNotNull('participants.first_name')->where('participants.first_name', '!=', '')
+            ->whereNotNull('participants.last_name')->where('participants.last_name', '!=', '')
+            ->whereNotNull('participants.birth_date')
+            ->whereNotNull('participants.birth_place')->where('participants.birth_place', '!=', '');
+
         $participants = $query->with('certificate')
-            ->orderBy('last_name')
-            ->orderBy('first_name')
+            ->leftJoin('certificates', function ($join) use ($course) {
+                $join->on('certificates.participant_id', '=', 'participants.id')
+                    ->where('certificates.course_id', $course->id);
+            })
+            ->select('participants.*')
+            ->orderByRaw("CASE WHEN certificates.certificate_number IS NULL OR certificates.certificate_number = '' THEN 1 ELSE 0 END")
+            ->orderByRaw("{$numericExpr} ASC")
+            ->orderBy('participants.order')
             ->get();
 
         $course->load('instructor');
