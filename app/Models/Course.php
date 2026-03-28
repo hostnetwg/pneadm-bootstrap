@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\LogsActivity;
 
 class Course extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'title',
@@ -36,11 +36,11 @@ class Course extends Model
         'access_notes',
         'notatki',
         'id_old',
-        'source_id_old'
+        'source_id_old',
     ];
 
     protected $casts = [
-        'is_paid' => 'boolean', // ✅ Konwersja na boolean dla poprawnego odczytu        
+        'is_paid' => 'boolean', // ✅ Konwersja na boolean dla poprawnego odczytu
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'issue_date_certyficates' => 'date',
@@ -78,15 +78,16 @@ class Course extends Model
     public function series()
     {
         return $this->belongsToMany(CourseSeries::class, 'course_series_course', 'course_id', 'course_series_id')
-                    ->withPivot('order_in_series')
-                    ->withTimestamps()
-                    ->orderByPivot('order_in_series');
+            ->withPivot('order_in_series')
+            ->withTimestamps()
+            ->orderByPivot('order_in_series');
     }
-        
+
     public function participants()
     {
         return $this->hasMany(Participant::class);
     }
+
     public function certificates()
     {
         return $this->hasMany(Certificate::class);
@@ -131,5 +132,12 @@ class Course extends Model
     {
         return $this->hasMany(CourseVideo::class)->orderBy('order');
     }
-        
+
+    /**
+     * Linki do materiałów (np. udostępnione pliki na Dysku Google).
+     */
+    public function fileLinks()
+    {
+        return $this->hasMany(CourseFileLink::class)->orderBy('order');
+    }
 }

@@ -300,6 +300,13 @@
                                             <i class="bi bi-display"></i>
                                         </button>
                                     @endif
+                                    <button type="button"
+                                            class="btn btn-link p-0 border-0 {{ ($course->fileLinks?->count() ?? 0) > 0 ? 'text-primary' : 'text-secondary' }}"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#fileLinkModal{{ $course->id }}"
+                                            title="Materiały / linki do plików ({{ $course->fileLinks?->count() ?? 0 }})">
+                                        <i class="bi bi-folder2-open"></i>
+                                    </button>
                                 </div>
                             </div>
                             <br>
@@ -642,6 +649,54 @@
     @endif
     @endforeach
 
+    @foreach($courses as $course)
+    <div class="modal fade" id="fileLinkModal{{ $course->id }}" tabindex="-1" aria-labelledby="fileLinkModalLabel{{ $course->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fileLinkModalLabel{{ $course->id }}">
+                        <i class="bi bi-link-45deg me-2"></i>
+                        Materiały do pobrania (pliki) — {{ $course->title }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Wklej adres udostępniony z Dysku Google lub inny publiczny link HTTPS.</p>
+                    <div id="fileLinksList{{ $course->id }}">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Ładowanie...</span></div>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6 class="mb-3">Dodaj nowy link</h6>
+                    <form id="fileLinkForm{{ $course->id }}" class="needs-validation" novalidate>
+                        @csrf
+                        <div class="mb-3">
+                            <label for="file_link_url{{ $course->id }}" class="form-label">URL <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="file_link_url{{ $course->id }}" name="url" required placeholder="https://drive.google.com/...">
+                            <div class="invalid-feedback">Podaj prawidłowy adres URL (https).</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="file_link_title{{ $course->id }}" class="form-label">Opis (opcjonalnie)</label>
+                            <input type="text" class="form-control" id="file_link_title{{ $course->id }}" name="title" placeholder="Np. Slajdy">
+                        </div>
+                        <div class="mb-3">
+                            <label for="file_link_order{{ $course->id }}" class="form-label">Kolejność</label>
+                            <input type="number" class="form-control" id="file_link_order{{ $course->id }}" name="order" value="1" min="0">
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Dodaj link</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endforeach
+
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -982,6 +1037,117 @@
                     console.error('Błąd:', error);
                     alert('Wystąpił błąd podczas usuwania nagrania.');
                 });
+            };
+
+            const fileLinkModalIdx{{ $course->id }} = document.getElementById('fileLinkModal{{ $course->id }}');
+            if (fileLinkModalIdx{{ $course->id }}) {
+                fileLinkModalIdx{{ $course->id }}.addEventListener('show.bs.modal', function() {
+                    loadFileLinks{{ $course->id }}();
+                });
+            }
+
+            function loadFileLinks{{ $course->id }}() {
+                fetch('{{ route('courses.file-links.index', $course->id) }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        const listEl = document.getElementById('fileLinksList{{ $course->id }}');
+                        const orderInput = document.getElementById('file_link_order{{ $course->id }}');
+                        if (!listEl) return;
+                        if (data.success && data.file_links && data.file_links.length > 0) {
+                            if (orderInput) orderInput.value = data.file_links.length + 1;
+                            let html = '<div class="list-group mb-3">';
+                            data.file_links.forEach(link => {
+                                const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                                const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                                const title = escHtml(link.title || '');
+                                const urlRaw = link.url || '';
+                                const urlHref = escAttr(urlRaw);
+                                const urlText = escHtml(urlRaw);
+                                html += `<div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1 me-2"><strong>${title || 'Bez tytułu'}</strong><br><small class="text-break"><a href="${urlHref}" target="_blank" rel="noopener noreferrer" class="text-muted">${urlText}</a></small>
+                                    <span class="badge bg-light text-dark border ms-2">Nr ${link.order}</span></div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteFileLink{{ $course->id }}(${link.id})"><i class="bi bi-trash"></i></button>
+                                </div>`;
+                            });
+                            html += '</div>';
+                            listEl.innerHTML = html;
+                        } else {
+                            listEl.innerHTML = '<p class="text-muted text-center">Brak linków. Dodaj pierwszy poniżej.</p>';
+                            if (orderInput) orderInput.value = 1;
+                        }
+                    })
+                    .catch(() => {
+                        const listEl = document.getElementById('fileLinksList{{ $course->id }}');
+                        if (listEl) listEl.innerHTML = '<div class="alert alert-danger">Nie udało się załadować listy.</div>';
+                    });
+            }
+
+            const fileLinkFormIdx{{ $course->id }} = document.getElementById('fileLinkForm{{ $course->id }}');
+            if (fileLinkFormIdx{{ $course->id }}) {
+                fileLinkFormIdx{{ $course->id }}.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    if (!fileLinkFormIdx{{ $course->id }}.checkValidity()) {
+                        fileLinkFormIdx{{ $course->id }}.classList.add('was-validated');
+                        return;
+                    }
+                    const fd = new FormData(fileLinkFormIdx{{ $course->id }});
+                    fetch('{{ route('courses.file-links.store', $course->id) }}', {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            fileLinkFormIdx{{ $course->id }}.reset();
+                            fileLinkFormIdx{{ $course->id }}.classList.remove('was-validated');
+                            loadFileLinks{{ $course->id }}();
+                            const folderBtn = document.querySelector('[data-bs-target="#fileLinkModal{{ $course->id }}"]');
+                            if (folderBtn && data.file_link) {
+                                fetch('{{ route('courses.file-links.index', $course->id) }}').then(r => r.json()).then(d => {
+                                    if (d.success && d.file_links) {
+                                        folderBtn.setAttribute('title', 'Materiały / linki do plików (' + d.file_links.length + ')');
+                                        folderBtn.classList.remove('text-primary', 'text-secondary');
+                                        folderBtn.classList.add(d.file_links.length > 0 ? 'text-primary' : 'text-secondary');
+                                    }
+                                });
+                            }
+                        } else {
+                            alert('Błąd: ' + (data.message || ''));
+                        }
+                    })
+                    .catch(() => alert('Błąd dodawania linku.'));
+                });
+            }
+
+            window.deleteFileLink{{ $course->id }} = function(linkId) {
+                if (!confirm('Usunąć ten link?')) return;
+                fetch('{{ route('courses.file-links.destroy', [$course->id, ':fileLinkId']) }}'.replace(':fileLinkId', linkId), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadFileLinks{{ $course->id }}();
+                        const folderBtn = document.querySelector('[data-bs-target="#fileLinkModal{{ $course->id }}"]');
+                        if (folderBtn) {
+                            fetch('{{ route('courses.file-links.index', $course->id) }}').then(r => r.json()).then(d => {
+                                if (d.success && d.file_links) {
+                                    folderBtn.setAttribute('title', 'Materiały / linki do plików (' + d.file_links.length + ')');
+                                    folderBtn.classList.remove('text-primary', 'text-secondary');
+                                    folderBtn.classList.add(d.file_links.length > 0 ? 'text-primary' : 'text-secondary');
+                                }
+                            });
+                        }
+                    } else {
+                        alert('Błąd: ' + data.message);
+                    }
+                })
+                .catch(() => alert('Błąd usuwania.'));
             };
 
             // Obsługa modala z odtwarzaniem wideo - zatrzymywanie przy zamykaniu
