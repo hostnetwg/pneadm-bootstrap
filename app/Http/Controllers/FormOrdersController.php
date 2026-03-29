@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FormOrder;
+use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
 use App\Services\PubligoApiService;
 use Carbon\Carbon;
@@ -651,6 +652,19 @@ class FormOrdersController extends Controller
                 'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Dodaje uczestnika w pneadm, konto (lub powiązanie) w pnedu.users oraz wysyła e-mail do uczestnika.
+     */
+    public function provisionPneduAccess(Request $request, int $id)
+    {
+        $result = app(FormOrderPneduProvisionService::class)->provision($id);
+
+        $http = (int) ($result['http_code'] ?? 500);
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
     }
 
     /**

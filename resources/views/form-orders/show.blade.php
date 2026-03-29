@@ -189,12 +189,42 @@ nowoczesna-edukacja.pl </div>
                                 </div>
                             @endif
 
-                    {{-- Button Dodaj zamówienie PUBLIGO (wymaga: product_id + price_id + publigo_sent != 1) --}}
+                    {{-- Button Dodaj zamówienie przez PUBLIGO (wymaga: product_id + price_id + publigo_sent != 1) + Dodaj tylko do PNEDU --}}
                             <div class="mt-3 pt-3 border-top">
+                    @if($zamowienie->pnedu_provisioned_at)
+                                    <div class="alert alert-success mb-3">
+                                        <i class="bi bi-check-circle"></i>
+                                        <strong>Dostęp PNEDU został przyznany.</strong>
+                                        <small class="d-block text-muted mt-1">
+                                            Data: {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}
+                                            @if($zamowienie->pnedu_user_existed_before === true)
+                                                — konto na pnedu.pl już istniało (ten sam e-mail).
+                                            @elseif($zamowienie->pnedu_user_existed_before === false)
+                                                — utworzono nowe konto na pnedu.pl.
+                                            @endif
+                                        </small>
+                                    </div>
+                    @endif
+                            <div id="pneduResult" class="mt-2"></div>
                     @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
-                                    <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
-                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO
-                            </button>
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
+                                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
+                                            </button>
+                                        </div>
+                                        <div class="col-md-6">
+                                            @unless($zamowienie->pnedu_provisioned_at)
+                                            <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
+                                                <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
+                                            </button>
+                                            @else
+                                            <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
+                                                <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
+                                            </div>
+                                            @endunless
+                                        </div>
+                                    </div>
                             <div id="publigoResult" class="mt-2"></div>
                     @elseif($zamowienie->publigo_sent == 1)
                                     {{-- Informacja o statusie Publigo --}}
@@ -216,6 +246,29 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                 @endif
                             </div>
+                                    {{-- Ten sam układ co przy aktywnym Publigo: przycisk widoczny, lecz nieaktywny (jak „PNEDU — wykonano”) --}}
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-md-6">
+                                            <button type="button"
+                                                    class="btn btn-primary w-100"
+                                                    disabled
+                                                    title="Zamówienie zostało już wysłane do Publigo">
+                                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
+                                            </button>
+                                        </div>
+                                        <div class="col-md-6">
+                                            @unless($zamowienie->pnedu_provisioned_at)
+                                            <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtnSent" onclick="provisionPnedu({{ $zamowienie->id }})">
+                                                <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
+                                            </button>
+                                            @else
+                                            <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
+                                                <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
+                                            </div>
+                                            @endunless
+                                        </div>
+                                    </div>
+                                    <div id="publigoResult" class="mt-2"></div>
                     @else
                         {{-- Brak przycisku: zwykle brak publigo_price_id lub publigo_product_id (badge może pokazywać sam produkt) --}}
                         @if(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
@@ -231,6 +284,19 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             </div>
                         @endif
+                        <div class="row g-2 mt-2">
+                            <div class="col-12 col-md-6 ms-md-auto">
+                                @unless($zamowienie->pnedu_provisioned_at)
+                                <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtnFallback" onclick="provisionPnedu({{ $zamowienie->id }})">
+                                    <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
+                                </button>
+                                @else
+                                <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light">
+                                    <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
+                                </div>
+                                @endunless
+                            </div>
+                        </div>
                     @endif
                         </div>
                         </div>
@@ -711,8 +777,72 @@ nowoczesna-edukacja.pl `;
             .finally(() => {
                 // Przywrócenie stanu przycisku
                 button.disabled = false;
-                button.innerHTML = '<i class="bi bi-plus-circle"></i> Dodaj zamówienie PUBLIGO';
+                button.innerHTML = '<i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO';
             });
+        }
+
+        function provisionPnedu(orderId) {
+            const buttons = document.querySelectorAll('.js-pnedu-provision-btn');
+            const resultDiv = document.getElementById('pneduResult');
+            buttons.forEach((btn) => {
+                btn.disabled = true;
+                if (!btn.dataset.pneduOriginalHtml) {
+                    btn.dataset.pneduOriginalHtml = btn.innerHTML;
+                }
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            });
+            if (resultDiv) {
+                resultDiv.innerHTML = '';
+            }
+            fetch(`/form-orders/${orderId}/pnedu/provision`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+                .then((response) => response.json().then((data) => ({ ok: response.ok, status: response.status, data })))
+                .then(({ ok, data }) => {
+                    if (!resultDiv) {
+                        return;
+                    }
+                    if (data.success) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Sukces.</strong> ${data.message || ''}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                        window.location.reload();
+                        return;
+                    }
+                    const extra = data.sent_at ? ` (wcześniej: ${data.sent_at})` : '';
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${data.error || 'Nieznany błąd'}${extra}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                })
+                .catch(() => {
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd połączenia</strong> z serwerem.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                    }
+                })
+                .finally(() => {
+                    buttons.forEach((btn) => {
+                        btn.disabled = false;
+                        if (btn.dataset.pneduOriginalHtml) {
+                            btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                        }
+                    });
+                });
         }
 
         // Funkcja do wystawiania faktury pro forma w iFirma
@@ -1822,7 +1952,7 @@ nowoczesna-edukacja.pl `;
                     if (modal) {
                         modal.hide();
                     }
-                    // Sukces - przeładowanie strony aby pokazać przycisk "Dodaj zamówienie PUBLIGO"
+                    // Sukces - przeładowanie strony aby pokazać przycisk "Dodaj zamówienie przez PUBLIGO"
                     location.reload();
                 } else {
                     // Błąd - pokaż komunikat

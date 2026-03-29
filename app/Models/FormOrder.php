@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\DB;
  * Używa bazy pneadm (głównej bazy aplikacji)
  *
  * Przechowuje zamówienia złożone przez formularz na stronie
+ *
+ * @property \Carbon\Carbon|null $pnedu_provisioned_at Kolumna z komentarzem w DB: data przyznania dostępu PNEDU; null = akcja nie wykonana.
+ * @property bool|null $pnedu_user_existed_before Kolumna z komentarzem w DB: czy konto w pnedu.users istniało przed akcją (null przed pierwszym użyciem).
  */
 class FormOrder extends Model
 {
@@ -62,6 +65,8 @@ class FormOrder extends Model
         'publigo_price_id',
         'publigo_sent',
         'publigo_sent_at',
+        'pnedu_provisioned_at',
+        'pnedu_user_existed_before',
 
         // Dane zamawiającego (kontaktowe)
         'orderer_name',
@@ -118,6 +123,8 @@ class FormOrder extends Model
         'publigo_sent' => 'integer',
         'order_date' => 'datetime',
         'publigo_sent_at' => 'datetime',
+        'pnedu_provisioned_at' => 'datetime',
+        'pnedu_user_existed_before' => 'boolean',
         'invoice_payment_delay' => 'integer',
         'status_completed' => 'integer',
         'updated_manually_at' => 'datetime',

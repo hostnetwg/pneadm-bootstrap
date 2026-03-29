@@ -107,7 +107,8 @@ return [
             'provider' => 'pnedu_users',
             'connection' => 'pnedu',
             'table' => 'password_reset_tokens',
-            'expire' => 60,
+            // Minuty ważności tokenu resetu hasła dla kont pnedu.pl (domyślnie 1 rok; zgodnie z PASSWORD_RESET_EXPIRE_MINUTES w pnedu)
+            'expire' => (int) env('PASSWORD_RESET_EXPIRE_MINUTES', 525_600),
             'throttle' => 60,
         ],
     ],

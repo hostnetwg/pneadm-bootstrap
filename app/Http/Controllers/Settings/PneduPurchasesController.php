@@ -14,6 +14,7 @@ class PneduPurchasesController extends Controller
     public function index()
     {
         $options = PaymentDisplayOption::getSettings();
+
         return view('settings.pnedu-purchases', compact('options'));
     }
 
@@ -30,11 +31,11 @@ class PneduPurchasesController extends Controller
             'show_order_form_alt' => 'boolean',
             'order_form_auto_fill_test_data' => 'boolean',
         ], [], [
-            'show_pay_publigo' => 'Zapłać online PUBLIGO',
-            'show_pay_online' => 'Zapłać online',
-            'show_deferred_order' => 'Formularz z odroczonym terminem',
-            'show_order_form' => 'Formularz zamówienia',
-            'show_order_form_alt' => 'Alternatywny formularz zamówienia',
+            'show_pay_publigo' => 'Zapłać online (Publigo)',
+            'show_pay_online' => 'Zapłać online (PayU / PayNow)',
+            'show_deferred_order' => 'Formularz z odroczonym terminem (PNEDU)',
+            'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz)',
+            'show_order_form_alt' => 'Formularz z odroczonym terminem (zdalna-lekcja.pl)',
             'order_form_auto_fill_test_data' => 'Auto-wypełnianie formularza danymi testowymi',
         ]);
 

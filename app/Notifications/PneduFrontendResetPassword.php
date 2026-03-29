@@ -20,13 +20,11 @@ class PneduFrontendResetPassword extends ResetPassword
 
     public function toMail($notifiable): MailMessage
     {
-        $expire = (int) config('auth.passwords.pnedu_users.expire', 60);
-
         return (new MailMessage)
             ->subject(Lang::get('Reset Password Notification'))
             ->line(Lang::get('You are receiving this email because we received a password reset request for your account.'))
             ->action(Lang::get('Reset Password'), $this->resetUrl($notifiable))
-            ->line(Lang::get('This password reset link will expire in :count minutes.', ['count' => $expire]))
+            ->line('Link do ustawienia nowego hasła możesz wykorzystać w dowolnym momencie.')
             ->line(Lang::get('If you did not request a password reset, no further action is required.'));
     }
 }

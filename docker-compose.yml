@@ -71,7 +71,8 @@ services:
   mailpit:
     image: 'axllent/mailpit:latest'
     ports:
-      - '1027:1026'
+      # Mailpit SMTP domyślnie :1025 w kontenerze (nie 1026)
+      - '1027:1025'
       - '8026:8025'
     networks:
       - sail
