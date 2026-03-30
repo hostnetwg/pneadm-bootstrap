@@ -86,7 +86,7 @@ class FormOrdersController extends Controller
 
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant'])->orderByDesc('id')->get();
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course'])->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -96,7 +96,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant'])->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course'])->orderByDesc('id')->paginate($perPage);
         }
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień
@@ -308,7 +308,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');

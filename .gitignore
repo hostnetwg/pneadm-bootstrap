@@ -22,6 +22,12 @@ yarn-error.log
 /.vscode
 /.zed
 
+# Windows / WSL: pliki *:Zone.Identifier przy pobranych zasobach
+*Zone.Identifier
+*:Zone.Identifier
+**/*Zone.Identifier
+**/*:Zone.Identifier
+
 # Temporary/working SQL files
 *_production.sql
 *.sql.backup*

@@ -6,8 +6,34 @@
         </h2>
     </x-slot>
 
+    @php
+        $formOrderPaymentHighlightClass = match ($zamowienie->payment_mode) {
+            \App\Models\FormOrder::PAYMENT_MODE_ONLINE_GATEWAY => 'form-order-detail--online-gateway',
+            \App\Models\FormOrder::PAYMENT_MODE_DEFERRED_INVOICE => 'form-order-detail--deferred-invoice',
+            default => null,
+        };
+    @endphp
+
+    <style>
+        /* Spójnie z listą /form-orders: zamówienia z bramką płatności */
+        .form-order-detail--online-gateway {
+            border-left: 5px solid #0d47a1;
+            background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 35%, #e8f4fc 100%);
+            box-shadow: 0 4px 14px rgba(13, 71, 161, 0.12);
+        }
+        /* Ten sam schemat (obramowanie + gradient + cień), inna paleta — faktura z odroczonym terminem */
+        .form-order-detail--deferred-invoice {
+            border-left: 5px solid #e65100;
+            background: linear-gradient(145deg, #fff8e1 0%, #ffe0b2 35%, #fff3e0 100%);
+            box-shadow: 0 4px 14px rgba(230, 81, 0, 0.12);
+        }
+    </style>
+
     <div class="py-3">
         <div class="container-fluid px-4">
+            @if($formOrderPaymentHighlightClass)
+                <div class="{{ $formOrderPaymentHighlightClass }} px-3 py-3 rounded-3">
+            @endif
 
             {{-- Breadcrumb --}}
             <nav aria-label="breadcrumb" class="mb-4">
@@ -23,7 +49,9 @@
 
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="@if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                <div>
+                    <h2 class="d-inline-block @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                </div>
                 <div class="d-flex align-items-center gap-3">
                     {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
                     <div class="form-check">
@@ -111,6 +139,13 @@
                         @endif
                     </h5>
                 </div>
+                @if($zamowienie->payment_mode)
+                    <div class="card-body py-2 border-top border-primary border-opacity-25 bg-white bg-opacity-75">
+                        <span class="text-muted small me-2">Rozliczenie:</span>
+                        <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6">{{ $zamowienie->paymentModeLabelWithGateway() }}</span>
+                        <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
+                    </div>
+                @endif
             </div>
 
             {{-- Dane kontaktowe w dwóch kolumnach --}}
@@ -613,6 +648,9 @@ nowoczesna-edukacja.pl </div>
                 </div>
             </div>
 
+            @if($formOrderPaymentHighlightClass)
+                </div>
+            @endif
         </div>
     </div>
 

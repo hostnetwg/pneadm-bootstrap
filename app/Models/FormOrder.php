@@ -25,6 +25,20 @@ class FormOrder extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
+    public const PAYMENT_MODE_DEFERRED_INVOICE = 'deferred_invoice';
+
+    public const PAYMENT_MODE_ONLINE_GATEWAY = 'online_gateway';
+
+    public const PAYMENT_STATUS_SUBMITTED = 'submitted';
+
+    public const PAYMENT_STATUS_AWAITING_PAYMENT = 'awaiting_payment';
+
+    public const PAYMENT_STATUS_PAID = 'paid';
+
+    public const PAYMENT_STATUS_CANCELLED = 'cancelled';
+
+    public const PAYMENT_STATUS_FAILED = 'failed';
+
     /**
      * Nazwa tabeli
      */
@@ -94,6 +108,8 @@ class FormOrder extends Model
         'invoice_number',
         'invoice_notes',
         'invoice_payment_delay',
+        'payment_mode',
+        'payment_status',
 
         // Dane KSeF
         'ksef_number',
@@ -570,5 +586,82 @@ class FormOrder extends Model
     public function marketingCampaign()
     {
         return $this->belongsTo(MarketingCampaign::class, 'fb_source', 'campaign_code');
+    }
+
+    /**
+     * Szkolenie z tabeli courses (form_orders.product_id → courses.id).
+     */
+    public function course()
+    {
+        return $this->belongsTo(Course::class, 'product_id');
+    }
+
+    /**
+     * Rekordy płatności online (PayU / Paynow) powiązane z tym zamówieniem z formularza.
+     */
+    public function onlinePaymentOrders()
+    {
+        return $this->hasMany(OnlinePaymentOrder::class, 'form_order_id');
+    }
+
+    /**
+     * Etykieta trybu rozliczenia; dla online z nazwą bramki z online_payment_orders.
+     */
+    public function paymentModeLabelWithGateway(): string
+    {
+        $gatewayCode = null;
+        if ($this->payment_mode === self::PAYMENT_MODE_ONLINE_GATEWAY) {
+            $opo = $this->relationLoaded('onlinePaymentOrders')
+                ? $this->onlinePaymentOrders->sortByDesc('id')->first()
+                : $this->onlinePaymentOrders()->orderByDesc('id')->first();
+            $gatewayCode = $opo?->payment_gateway;
+        }
+
+        return self::paymentModeLabel($this->payment_mode, $gatewayCode);
+    }
+
+    public static function paymentModeLabel(?string $mode, ?string $onlinePaymentGateway = null): string
+    {
+        return match ($mode) {
+            self::PAYMENT_MODE_ONLINE_GATEWAY => match (strtolower((string) $onlinePaymentGateway)) {
+                'payu' => 'Płatność online (bramka: PayU)',
+                'paynow' => 'Płatność online (bramka: Paynow)',
+                default => 'Płatność online (bramka)',
+            },
+            self::PAYMENT_MODE_DEFERRED_INVOICE => 'Faktura z odroczonym terminem',
+            default => $mode ? (string) $mode : '—',
+        };
+    }
+
+    public static function paymentStatusLabel(?string $status): string
+    {
+        return match ($status) {
+            self::PAYMENT_STATUS_SUBMITTED => 'Złożone (odroczona)',
+            self::PAYMENT_STATUS_AWAITING_PAYMENT => 'Oczekuje na płatność',
+            self::PAYMENT_STATUS_PAID => 'Opłacone',
+            self::PAYMENT_STATUS_CANCELLED => 'Anulowane',
+            self::PAYMENT_STATUS_FAILED => 'Błąd płatności',
+            default => $status ? (string) $status : '—',
+        };
+    }
+
+    public function paymentModeBadgeClass(): string
+    {
+        return match ($this->payment_mode) {
+            self::PAYMENT_MODE_ONLINE_GATEWAY => 'info',
+            self::PAYMENT_MODE_DEFERRED_INVOICE => 'secondary',
+            default => 'light text-dark',
+        };
+    }
+
+    public function paymentStatusBadgeClass(): string
+    {
+        return match ($this->payment_status) {
+            self::PAYMENT_STATUS_PAID => 'success',
+            self::PAYMENT_STATUS_AWAITING_PAYMENT => 'warning text-dark',
+            self::PAYMENT_STATUS_CANCELLED, self::PAYMENT_STATUS_FAILED => 'danger',
+            self::PAYMENT_STATUS_SUBMITTED => 'primary',
+            default => 'light text-dark',
+        };
     }
 }

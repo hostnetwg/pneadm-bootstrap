@@ -6,6 +6,26 @@
         </h2>
     </x-slot>
 
+    <style>
+        /* Zamówienia z płatnością online (bramka) — wyraźniejsze niż same badge’e statusu */
+        .form-order-card--online-gateway {
+            border-left: 5px solid #0d47a1 !important;
+            background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 35%, #e8f4fc 100%);
+            box-shadow: 0 4px 14px rgba(13, 71, 161, 0.12);
+        }
+        .form-order-card--online-gateway > .card-header.bg-light {
+            background: linear-gradient(90deg, rgba(25, 118, 210, 0.14) 0%, rgba(227, 242, 253, 0.6) 100%) !important;
+            border-bottom: 1px solid rgba(13, 71, 161, 0.2);
+        }
+        .form-order-card--online-gateway > .card-body {
+            background: rgba(255, 255, 255, 0.45);
+        }
+        /* Duplikat nadal ma pierwszeństwo obramowania — tylko subtelniejsze tło online */
+        .form-order-card--online-gateway.border-danger {
+            background: linear-gradient(145deg, #ffebee 0%, #e3f2fd 40%, #fce4ec 100%);
+        }
+    </style>
+
     <div class="py-3">
         <div class="container-fluid px-4">
 
@@ -157,16 +177,22 @@
                             $isDuplicate = isset($duplicateInfo[$zamowienie->id]) && $duplicateInfo[$zamowienie->id]['is_duplicate'];
                             $duplicateCount = $isDuplicate ? $duplicateInfo[$zamowienie->id]['count'] : 0;
                             $participantEmailSame = $zamowienie->display_participant_email && $zamowienie->orderer_email && strcasecmp($zamowienie->display_participant_email, $zamowienie->orderer_email) === 0;
+                            $isOnlineGateway = $zamowienie->payment_mode === \App\Models\FormOrder::PAYMENT_MODE_ONLINE_GATEWAY;
                         @endphp
                         
-                        <div class="card shadow-sm mb-4 @if($isDuplicate) border-danger @elseif($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif">
+                        <div class="card shadow-sm mb-4 @if($isDuplicate) border-danger @elseif($isOnlineGateway) border-info border-2 @elseif($isNew) border-warning @elseif($isCompleted) border-secondary @else border-primary @endif @if($isOnlineGateway) form-order-card--online-gateway @endif">
                             <div class="card-header bg-light">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h5 class="mb-1">
                                             <span class="badge bg-dark fs-6">ID: #{{ $zamowienie->id }}</span>
-                                            @if($zamowienie->publigo_product_id)
-                                                <span class="badge bg-info fs-6 ms-2">Produkt Publigo ID: #{{ $zamowienie->publigo_product_id }}</span>
+                                            @if($zamowienie->payment_mode)
+                                                <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6 ms-1" title="Tryb rozliczenia">
+                                                    {{ $zamowienie->paymentModeLabelWithGateway() }}
+                                                </span>
+                                                <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1" title="Status płatności / zamówienia">
+                                                    {{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}
+                                                </span>
                                             @endif
                                             @if($zamowienie->fb_source)
                                                 <span class="badge fs-6 ms-2" 
@@ -243,6 +269,18 @@
                                         <i class="bi bi-calendar-event"></i> SZKOLENIE
                                     </h6>
                                     <div class="fs-5 fw-semibold text-dark">{{ $zamowienie->product_name ?? '—' }}</div>
+                                    @if($zamowienie->course)
+                                        <div class="small text-muted mt-1">
+                                            ID szkolenia (courses): <span class="fw-semibold text-body">{{ $zamowienie->course->id }}</span>
+                                            @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
+                                                <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-body">{{ $zamowienie->course->id_old }}</span>
+                                            @endif
+                                        </div>
+                                    @elseif($zamowienie->product_id)
+                                        <div class="small text-muted mt-1">
+                                            <span class="text-warning">Brak rekordu courses</span> dla <code>product_id</code> = {{ $zamowienie->product_id }}
+                                        </div>
+                                    @endif
                                     @if($zamowienie->product_price)
                                         <div class="text-success fw-bold fs-6">
                                             {{ number_format($zamowienie->product_price, 2) }} PLN

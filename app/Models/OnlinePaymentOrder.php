@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 /**
  * Zamówienia płatności online (PayU, Paynow) – widoczne w panelu adm.pnedu.pl
@@ -17,6 +16,7 @@ class OnlinePaymentOrder extends Model
     protected $table = 'online_payment_orders';
 
     protected $fillable = [
+        'form_order_id',
         'ident',
         'course_id',
         'payment_gateway',
@@ -42,10 +42,19 @@ class OnlinePaymentOrder extends Model
     ];
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_CREATED = 'created';
+
     public const STATUS_PAID = 'paid';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_FAILED = 'failed';
+
+    public function formOrder(): BelongsTo
+    {
+        return $this->belongsTo(FormOrder::class, 'form_order_id');
+    }
 
     public function course(): BelongsTo
     {
