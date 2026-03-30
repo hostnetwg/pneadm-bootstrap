@@ -308,7 +308,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -347,10 +347,10 @@ class FormOrdersController extends Controller
                 });
             }
 
-            // Dodajemy filtr po ID szkolenia
-            if ($courseId) {
-                $prevQuery->where('publigo_product_id', $courseId);
-                $nextQuery->where('publigo_product_id', $courseId);
+            // Filtr po courses.id (form_orders.product_id), nie po Publigo (id_old)
+            if ($courseId !== null && $courseId !== '') {
+                $prevQuery->where('product_id', (int) $courseId);
+                $nextQuery->where('product_id', (int) $courseId);
             }
 
             $prevOrder = $prevQuery->orderByDesc('id')->first();
@@ -873,10 +873,8 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
             ];
 
-            // Termin płatności - opcjonalne
-            $invoiceData['TerminPlatnosci'] = now()->addDays(
-                ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14
-            )->format('Y-m-d');
+            // Termin płatności pro forma wg trybu rozliczenia (online opłacone vs odroczona vs domyślnie)
+            $this->applyIfirmaProFormaPaymentTerms($invoiceData, $zamowienie);
 
             // Uwagi - dodajemy tylko jeśli są (nie pusty string)
             if (! empty(trim($uwagi ?? ''))) {
@@ -1326,9 +1324,7 @@ class FormOrdersController extends Controller
                 'Kontrahent' => $kontrahent,
             ];
 
-            // Termin płatności - ODROCZONA PŁATNOŚĆ zgodnie z invoice_payment_delay
-            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
-            $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+            $this->applyIfirmaPaymentSettlementToInvoiceData($invoiceData, $zamowienie);
 
             // Uwagi
             if (! empty(trim($uwagi))) {
@@ -1341,10 +1337,13 @@ class FormOrdersController extends Controller
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
+
             Log::info('iFirma Invoice Request Data', [
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
-                'payment_delay_days' => $paymentDelay,
+                'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
+                'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
 
             // Wystawienie faktury przez API iFirma
@@ -1720,9 +1719,7 @@ class FormOrdersController extends Controller
                 'Kontrahent' => $kontrahent,
             ];
 
-            // Termin płatności
-            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
-            $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+            $this->applyIfirmaPaymentSettlementToInvoiceData($invoiceData, $zamowienie);
 
             // Uwagi - tylko identyfikator zamówienia
             $invoiceData['Uwagi'] = $uwagi;
@@ -1733,13 +1730,16 @@ class FormOrdersController extends Controller
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
+
             // Logowanie szczegółowej struktury danych przed wysłaniem
             Log::info('iFirma Invoice With Receiver Request Data', [
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
                 'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
-                'payment_delay_days' => $paymentDelay,
+                'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
+                'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
                 'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
             ]);
 
@@ -2143,9 +2143,7 @@ class FormOrdersController extends Controller
                 'Kontrahent' => $kontrahent,
             ];
 
-            // Termin płatności
-            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
-            $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+            $this->applyIfirmaPaymentSettlementToInvoiceData($invoiceData, $zamowienie);
 
             // Uwagi - tylko identyfikator zamówienia
             $invoiceData['Uwagi'] = $uwagi;
@@ -2156,13 +2154,16 @@ class FormOrdersController extends Controller
                 $invoiceData['NumerKontaBankowego'] = trim($bankAccount);
             }
 
+            $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
+
             // Logowanie szczegółowej struktury danych przed wysłaniem
             Log::info('iFirma Invoice With KSeF Request Data', [
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
                 'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
-                'payment_delay_days' => $paymentDelay,
+                'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
+                'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
 
             // KROK 1: Wystawienie faktury pro forma przez API iFirma
@@ -2509,7 +2510,7 @@ class FormOrdersController extends Controller
         foreach ($duplicateGroups as $group) {
             $orderIds = explode(',', $group->order_ids);
             $orders = FormOrder::whereIn('id', $orderIds)
-                ->with(['marketingCampaign.sourceType', 'primaryParticipant'])
+                ->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders'])
                 ->get()
                 ->sortByDesc('priority'); // Sortuj według priorytetu (najważniejsze pierwsze)
 
@@ -2751,5 +2752,63 @@ class FormOrdersController extends Controller
                 'error' => 'Wystąpił błąd podczas zapisywania notatki: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Kwota brutto dokumentu (LiczOd=BRT, ilość 1) – zgodna z CenaJednostkowa i product_price.
+     */
+    private function ifirmaBruttoTotalForOrder(FormOrder $zamowienie): float
+    {
+        return round((float) $zamowienie->product_price, 2);
+    }
+
+    /**
+     * Faktura jako opłacona: płatność online (bramka) + status opłacone.
+     */
+    private function ifirmaShouldMarkInvoiceAsPaid(FormOrder $zamowienie): bool
+    {
+        return $zamowienie->payment_mode === FormOrder::PAYMENT_MODE_ONLINE_GATEWAY
+            && $zamowienie->payment_status === FormOrder::PAYMENT_STATUS_PAID;
+    }
+
+    /**
+     * Ustawia Zaplacono, ZaplaconoNaDokumencie, TerminPlatnosci wg trybu rozliczenia (faktura krajowa / fakturakraj.json).
+     *
+     * @param  array<string, mixed>  $invoiceData
+     */
+    private function applyIfirmaPaymentSettlementToInvoiceData(array &$invoiceData, FormOrder $zamowienie): void
+    {
+        $brutto = $this->ifirmaBruttoTotalForOrder($zamowienie);
+
+        if ($this->ifirmaShouldMarkInvoiceAsPaid($zamowienie)) {
+            $invoiceData['Zaplacono'] = $brutto;
+            $invoiceData['ZaplaconoNaDokumencie'] = $brutto;
+            $invoiceData['TerminPlatnosci'] = now()->format('Y-m-d');
+
+            return;
+        }
+
+        $invoiceData['Zaplacono'] = 0.0;
+        $invoiceData['ZaplaconoNaDokumencie'] = 0.0;
+
+        $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
+        $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+    }
+
+    /**
+     * Termin płatności pro forma (endpoint pro formy – bez pól Zaplacono jak przy fakturze VAT).
+     *
+     * @param  array<string, mixed>  $invoiceData
+     */
+    private function applyIfirmaProFormaPaymentTerms(array &$invoiceData, FormOrder $zamowienie): void
+    {
+        if ($this->ifirmaShouldMarkInvoiceAsPaid($zamowienie)) {
+            $invoiceData['TerminPlatnosci'] = now()->format('Y-m-d');
+
+            return;
+        }
+
+        $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
+        $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
     }
 }

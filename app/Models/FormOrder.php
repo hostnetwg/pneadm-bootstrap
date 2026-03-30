@@ -478,12 +478,38 @@ class FormOrder extends Model
     }
 
     /**
+     * Płatność online przez PayU ze statusem „opłacone” – najwyższy priorytet przy wyborze zamówienia w grupie duplikatów.
+     */
+    public function isPayuPaidOnlineOrder(): bool
+    {
+        if ($this->payment_mode !== self::PAYMENT_MODE_ONLINE_GATEWAY) {
+            return false;
+        }
+        if ($this->payment_status !== self::PAYMENT_STATUS_PAID) {
+            return false;
+        }
+        $gatewayCode = null;
+        if ($this->relationLoaded('onlinePaymentOrders')) {
+            $gatewayCode = $this->onlinePaymentOrders->sortByDesc('id')->first()?->payment_gateway;
+        } else {
+            $gatewayCode = $this->onlinePaymentOrders()->orderByDesc('id')->value('payment_gateway');
+        }
+
+        return strtolower((string) $gatewayCode) === 'payu';
+    }
+
+    /**
      * Accessor - priorytet zamówienia (im wyższy, tym ważniejsze)
      * Używane do określenia które zamówienie zachować w grupie duplikatów
      */
     public function getPriorityAttribute(): int
     {
         $priority = 0;
+
+        // Najwyższy priorytet w duplikatach: PayU + opłacone (powyżej dotychczasowej hierarchii, w tym „ma fakturę”)
+        if ($this->isPayuPaidOnlineOrder()) {
+            $priority += 25000000;
+        }
 
         // NAJWYŻSZY PRIORYTET - ma fakturę (zawsze zachowaj)
         if ($this->has_invoice) {
@@ -543,6 +569,10 @@ class FormOrder extends Model
     public function getPriorityReasonAttribute(): string
     {
         $reasons = [];
+
+        if ($this->isPayuPaidOnlineOrder()) {
+            $reasons[] = '🏆 Płatność online (PayU) – opłacone (najwyższy priorytet w duplikatach)';
+        }
 
         if ($this->has_invoice) {
             $reasons[] = '✅ Ma fakturę (najwyższy priorytet)';

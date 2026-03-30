@@ -111,6 +111,7 @@
                 <div class="row">
                     <div class="col-md-6">
                         <p class="fw-bold mb-2 text-success">🎯 Priorytet chronologiczny:</p>
+                        <strong class="text-primary">PayU + opłacone:</strong> najwyżej w grupie duplikatów<br>
                         <strong>Z fakturą:</strong> Starsze &gt; Nowsze<br>
                         <strong>Zakończone:</strong> Starsze &gt; Nowsze<br>
                         <strong class="text-success">Aktywne: Nowsze &gt; Starsze ✨</strong><br>
@@ -328,6 +329,19 @@
                                                             @endif
                                                             @if($order->is_marked_as_duplicate)
                                                                 <span class="badge bg-danger ms-1">DUPLIKAT</span>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                    <div class="row mt-2">
+                                                        <div class="col-12">
+                                                            <strong>Rozliczenie:</strong><br>
+                                                            @if($order->payment_mode)
+                                                                <span class="badge bg-{{ $order->paymentModeBadgeClass() }}" title="Forma rozliczenia">{{ $order->paymentModeLabelWithGateway() }}</span>
+                                                                @if($order->payment_status)
+                                                                    <span class="badge bg-{{ $order->paymentStatusBadgeClass() }} ms-1" title="Status płatności / zamówienia">{{ \App\Models\FormOrder::paymentStatusLabel($order->payment_status) }}</span>
+                                                                @endif
+                                                            @else
+                                                                <span class="text-muted">—</span>
                                                             @endif
                                                         </div>
                                                     </div>

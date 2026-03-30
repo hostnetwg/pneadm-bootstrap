@@ -62,7 +62,7 @@
                         </label>
                     </div>
                     
-                    {{-- Pole input do filtrowania po ID szkolenia --}}
+                    {{-- Pole input do filtrowania po courses.id (Poprzednie/Następne) --}}
                     <div class="input-group" style="width: 200px;">
                         <span class="input-group-text">
                             <i class="bi bi-search"></i>
@@ -70,9 +70,9 @@
                         <input type="text" 
                                class="form-control form-control-sm" 
                                id="courseIdFilter" 
-                               placeholder="ID szkolenia Publigo"
+                               placeholder="ID szkolenia courses"
                                value="{{ request('course_id') }}"
-                               title="Wprowadź ID szkolenia (id_old) do filtrowania">
+                               title="Wprowadź ID szkolenia (courses.id) do filtrowania zamówień przy Poprzednie/Następne">
                     </div>
                     
                     <div class="btn-group me-2" role="group">
@@ -132,12 +132,24 @@
                                 {{ number_format($zamowienie->product_price, 2) }} PLN
                             </span>
                         @endif
-                        @if($zamowienie->publigo_product_id)
-                            <span class="badge bg-info ms-2 fs-6">
-                                Produkt Publigo ID: #{{ $zamowienie->publigo_product_id }}
-                            </span>
-                        @endif
                     </h5>
+                    @if($zamowienie->course)
+                        <div class="small text-white-50 mt-2 mb-0">
+                            ID szkolenia (courses): <span class="fw-semibold text-white">{{ $zamowienie->course->id }}</span>
+                            @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
+                                <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->course->id_old }}</span>
+                            @endif
+                        </div>
+                    @elseif($zamowienie->product_id)
+                        <div class="small text-warning mt-2 mb-0">
+                            <span>Brak rekordu courses</span> dla <code class="text-white">product_id</code> = {{ $zamowienie->product_id }}
+                        </div>
+                    @elseif($zamowienie->publigo_product_id)
+                        <div class="small text-white-50 mt-2 mb-0">
+                            Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->publigo_product_id }}</span>
+                            <span class="ms-1">(brak powiązania z courses)</span>
+                        </div>
+                    @endif
                 </div>
                 @if($zamowienie->payment_mode)
                     <div class="card-body py-2 border-top border-primary border-opacity-25 bg-white bg-opacity-75">
@@ -2009,7 +2021,7 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // Obsługa checkboxa filtrowania i pola ID szkolenia
+        // Checkbox „tylko niewprowadzone” + pole course_id (filtr po courses.id / form_orders.product_id)
         document.addEventListener('DOMContentLoaded', function() {
             const filterCheckbox = document.getElementById('filterNewOnly');
             const courseIdInput = document.getElementById('courseIdFilter');
@@ -2057,7 +2069,7 @@ nowoczesna-edukacja.pl `;
                 window.location.href = currentUrl.toString();
             });
             
-            // Obsługa pola ID szkolenia
+            // Pole: courses.id → query course_id (prev/next po product_id)
             courseIdInput.addEventListener('input', function() {
                 const courseId = this.value.trim();
                 const currentUrl = new URL(window.location);
