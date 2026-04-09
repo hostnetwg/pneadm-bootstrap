@@ -80,6 +80,7 @@ class FormOrder extends Model
         // Integracja z Publigo
         'publigo_product_id',
         'publigo_price_id',
+        'course_price_variant_id',
         'publigo_sent',
         'publigo_sent_at',
         'pnedu_provisioned_at',
@@ -142,6 +143,7 @@ class FormOrder extends Model
         'product_price' => 'decimal:2',
         'publigo_product_id' => 'integer',
         'publigo_price_id' => 'integer',
+        'course_price_variant_id' => 'integer',
         'publigo_sent' => 'integer',
         'order_date' => 'datetime',
         'publigo_sent_at' => 'datetime',
@@ -631,6 +633,14 @@ class FormOrder extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'product_id');
+    }
+
+    /**
+     * Wariant cenowy zapisany w momencie składania zamówienia (reguły dostępu do kursu).
+     */
+    public function coursePriceVariant()
+    {
+        return $this->belongsTo(CoursePriceVariant::class, 'course_price_variant_id')->withTrashed();
     }
 
     /**

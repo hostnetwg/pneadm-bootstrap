@@ -309,7 +309,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course', 'coursePriceVariant'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');

@@ -3,13 +3,13 @@
 namespace App\Services;
 
 use App\Models\Course;
+use App\Models\CoursePriceVariant;
 use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\Participant;
 use App\Models\PneduUser;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -93,7 +93,15 @@ class FormOrderPneduProvisionService
                 }
 
                 $birthData = $this->copyBirthDataFromPreviousParticipant($email);
-                $accessExpiresAt = $this->computeAccessExpiresAtForCourse($course);
+                $variant = null;
+                if ($order->course_price_variant_id) {
+                    $variant = CoursePriceVariant::query()
+                        ->where('id', $order->course_price_variant_id)
+                        ->where('course_id', $course->id)
+                        ->first();
+                }
+                $accessExpiresAt = app(ParticipantAccessExpiryService::class)
+                    ->resolveAccessExpiresAtForFormOrderProvisioning($variant, $course, now());
 
                 Participant::query()->create([
                     'course_id' => $course->id,
@@ -280,26 +288,6 @@ class FormOrderPneduProvisionService
         return 'Data rozpoczęcia: '.$formatted;
     }
 
-    private function computeAccessExpiresAtForCourse(Course $course): ?Carbon
-    {
-        $now = now();
-
-        if ($course->start_date) {
-            $startDate = $course->start_date;
-            if ($now->lt($startDate)) {
-                return $startDate->copy()->addMonths(2);
-            }
-
-            return $now->copy()->addMonths(2);
-        }
-
-        if ($course->access_duration_days) {
-            return $now->copy()->addDays((int) $course->access_duration_days);
-        }
-
-        return null;
-    }
-
     /**
      * @param array{
      *   email: string,
@@ -364,7 +352,7 @@ class FormOrderPneduProvisionService
     }
 
     /**
-     * @param array{status?: string, detail?: string} $clickMeetingResult
+     * @param  array{status?: string, detail?: string}  $clickMeetingResult
      */
     private function persistClickMeetingProvisionResult(int $formOrderId, array $clickMeetingResult): void
     {

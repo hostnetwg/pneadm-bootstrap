@@ -150,6 +150,27 @@
                             <span class="ms-1">(brak powiązania z courses)</span>
                         </div>
                     @endif
+                    @if($zamowienie->coursePriceVariant)
+                        @php
+                            $priceVariant = $zamowienie->coursePriceVariant;
+                            $variantLabel = filled($priceVariant->name) ? $priceVariant->name : 'Wariant #'.$priceVariant->id;
+                        @endphp
+                        <div class="small text-white-50 mt-2 mb-0">
+                            Wariant cenowy:
+                            <span class="fw-semibold text-white">{{ $variantLabel }}</span>
+                            <span class="text-white-50">(ID {{ $priceVariant->id }})</span>
+                            @if($priceVariant->trashed())
+                                <span class="badge bg-secondary ms-1">usunięty</span>
+                            @endif
+                            <a href="{{ route('courses.price-variants.edit', ['courseId' => $priceVariant->course_id, 'id' => $priceVariant->id]) }}"
+                               class="link-light link-underline-opacity-50 link-underline-opacity-100-hover ms-1"
+                               target="_blank" rel="noopener">edycja wariantu</a>
+                        </div>
+                    @elseif($zamowienie->course_price_variant_id)
+                        <div class="small text-warning mt-2 mb-0">
+                            Wariant cenowy: zapisane ID {{ $zamowienie->course_price_variant_id }} — brak rekordu w bazie (np. twardo usunięty).
+                        </div>
+                    @endif
                 </div>
                 @if($zamowienie->payment_mode)
                     <div class="card-body py-2 border-top border-primary border-opacity-25 bg-white bg-opacity-75">
