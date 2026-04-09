@@ -234,11 +234,17 @@
                                         </thead>
                                         <tbody>
                                             @foreach($course->priceVariants as $variant)
+                                                @php
+                                                    $variantOrderCount = (int) ($priceVariantOrderCounts[$variant->id] ?? 0);
+                                                @endphp
                                                 <tr class="{{ !$variant->is_active ? 'table-secondary' : '' }}">
                                                     <td>
                                                         <strong>{{ $variant->name }}</strong>
                                                         @if($variant->description)
                                                             <br><small class="text-muted">{{ Str::limit($variant->description, 50) }}</small>
+                                                        @endif
+                                                        @if($variantOrderCount > 0)
+                                                            <br><small class="text-muted"><i class="fas fa-link"></i> W zamówieniach: {{ $variantOrderCount }}</small>
                                                         @endif
                                                     </td>
                                                     <td>
@@ -280,13 +286,31 @@
                                                                title="Edytuj">
                                                                 <i class="fas fa-edit"></i>
                                                             </a>
-                                                            <button type="button" 
-                                                                    class="btn btn-outline-danger" 
-                                                                    data-bs-toggle="modal" 
-                                                                    data-bs-target="#deleteVariantModal{{ $variant->id }}"
-                                                                    title="Usuń">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
+                                                            @if($variantOrderCount === 0)
+                                                                <button type="button" 
+                                                                        class="btn btn-outline-danger" 
+                                                                        data-bs-toggle="modal" 
+                                                                        data-bs-target="#deleteVariantModal{{ $variant->id }}"
+                                                                        title="Usuń (brak powiązań z zamówieniami)">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            @elseif($variant->is_active)
+                                                                <button type="button" 
+                                                                        class="btn btn-outline-secondary" 
+                                                                        data-bs-toggle="modal" 
+                                                                        data-bs-target="#deactivateVariantModal{{ $variant->id }}"
+                                                                        title="Ukryj przed nowymi zamówieniami">
+                                                                    <i class="fas fa-eye-slash"></i>
+                                                                </button>
+                                                            @else
+                                                                <button type="button" 
+                                                                        class="btn btn-outline-success" 
+                                                                        data-bs-toggle="modal" 
+                                                                        data-bs-target="#activateVariantModal{{ $variant->id }}"
+                                                                        title="Przywróć do wyboru na stronie">
+                                                                    <i class="fas fa-eye"></i>
+                                                                </button>
+                                                            @endif
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -631,8 +655,10 @@
         </div>
     </div>
 
-    {{-- Modale usuwania wariantów cenowych --}}
+    {{-- Modale usuwania wariantów cenowych (tylko gdy brak zamówień z tym wariantem) --}}
     @foreach($course->priceVariants as $variant)
+        @php $variantOrderCountModal = (int) ($priceVariantOrderCounts[$variant->id] ?? 0); @endphp
+        @if($variantOrderCountModal === 0)
         <div class="modal fade" id="deleteVariantModal{{ $variant->id }}" tabindex="-1" aria-labelledby="deleteVariantModalLabel{{ $variant->id }}" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -675,6 +701,65 @@
                 </div>
             </div>
         </div>
+        @endif
+    @endforeach
+
+    {{-- Dezaktywacja / aktywacja gdy wariant występuje w zamówieniach --}}
+    @foreach($course->priceVariants as $variant)
+        @php $variantOrderCountModal = (int) ($priceVariantOrderCounts[$variant->id] ?? 0); @endphp
+        @if($variantOrderCountModal > 0 && $variant->is_active)
+        <div class="modal fade" id="deactivateVariantModal{{ $variant->id }}" tabindex="-1" aria-labelledby="deactivateVariantModalLabel{{ $variant->id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title" id="deactivateVariantModalLabel{{ $variant->id }}">
+                            <i class="bi bi-eye-slash"></i> Dezaktywacja wariantu
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Wariant <strong>"{{ $variant->name }}"</strong> jest powiązany z <strong>{{ $variantOrderCountModal }}</strong> {{ $variantOrderCountModal === 1 ? 'zamówieniem' : 'zamówieniami' }} — nie można go usunąć.</p>
+                        <p class="mb-0">Możesz go <strong>dezaktywować</strong>: zniknie z wyboru na stronie publicznej (nowe zamówienia), a dane w istniejących zamówieniach pozostaną bez zmian.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <form action="{{ route('courses.price-variants.deactivate', [$course->id, $variant->id]) }}" method="POST" class="d-inline" id="deactivateVariantForm{{ $variant->id }}">
+                            @csrf
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="bi bi-eye-slash"></i> Dezaktywuj
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+        @if($variantOrderCountModal > 0 && ! $variant->is_active)
+        <div class="modal fade" id="activateVariantModal{{ $variant->id }}" tabindex="-1" aria-labelledby="activateVariantModalLabel{{ $variant->id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title" id="activateVariantModalLabel{{ $variant->id }}">
+                            <i class="bi bi-eye"></i> Aktywacja wariantu
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy ponownie aktywować wariant <strong>"{{ $variant->name }}"</strong>? Będzie znów dostępny do wyboru przy składaniu zamówień na stronie.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <form action="{{ route('courses.price-variants.activate', [$course->id, $variant->id]) }}" method="POST" class="d-inline" id="activateVariantForm{{ $variant->id }}">
+                            @csrf
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-eye"></i> Aktywuj
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
     @endforeach
 
     {{-- Modal zarządzania nagraniami --}}
@@ -882,38 +967,114 @@
                 if (form{{ $variant->id }}) {
                     form{{ $variant->id }}.addEventListener('submit', function(e) {
                         e.preventDefault();
-                        
-                        fetch(form{{ $variant->id }}.action, {
+
+                        const formEl = form{{ $variant->id }};
+                        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+
+                        fetch(formEl.action, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                'X-Requested-With': 'XMLHttpRequest'
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                                ...(csrfMeta ? { 'X-CSRF-TOKEN': csrfMeta.getAttribute('content') } : {}),
                             },
-                            body: JSON.stringify({
-                                _method: 'DELETE'
-                            })
+                            body: new FormData(formEl),
                         })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                // Zamknij modal
+                        .then(async function(response) {
+                            const data = await response.json().catch(function() { return {}; });
+                            if (response.ok && data.success) {
                                 const modal = bootstrap.Modal.getInstance(document.getElementById('deleteVariantModal{{ $variant->id }}'));
                                 if (modal) {
                                     modal.hide();
                                 }
-                                // Przeładuj stronę
                                 window.location.reload();
-                            } else {
-                                alert('Błąd: ' + (data.error || 'Nie udało się usunąć wariantu cenowego.'));
+                                return;
                             }
+                            const msg = data.error
+                                || data.message
+                                || (data.errors && typeof data.errors === 'object'
+                                    ? Object.values(data.errors).flat().join(' ')
+                                    : null)
+                                || 'Nie udało się usunąć wariantu cenowego.';
+                            alert('Błąd: ' + msg);
                         })
-                        .catch(error => {
+                        .catch(function(error) {
                             console.error('Error:', error);
                             alert('Wystąpił błąd podczas usuwania wariantu cenowego.');
                         });
                     });
                 }
+            @endforeach
+
+            @foreach($course->priceVariants as $variant)
+                (function() {
+                    const dForm = document.getElementById('deactivateVariantForm{{ $variant->id }}');
+                    if (dForm) {
+                        dForm.addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                            fetch(dForm.action, {
+                                method: 'POST',
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'Accept': 'application/json',
+                                    ...(csrfMeta ? { 'X-CSRF-TOKEN': csrfMeta.getAttribute('content') } : {}),
+                                },
+                                body: new FormData(dForm),
+                            })
+                            .then(async function(response) {
+                                const data = await response.json().catch(function() { return {}; });
+                                if (response.ok && data.success) {
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('deactivateVariantModal{{ $variant->id }}'));
+                                    if (modal) {
+                                        modal.hide();
+                                    }
+                                    window.location.reload();
+                                    return;
+                                }
+                                const msg = data.error || data.message || 'Nie udało się dezaktywować wariantu.';
+                                alert('Błąd: ' + msg);
+                            })
+                            .catch(function(error) {
+                                console.error('Error:', error);
+                                alert('Wystąpił błąd podczas dezaktywacji wariantu.');
+                            });
+                        });
+                    }
+                    const aForm = document.getElementById('activateVariantForm{{ $variant->id }}');
+                    if (aForm) {
+                        aForm.addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                            fetch(aForm.action, {
+                                method: 'POST',
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'Accept': 'application/json',
+                                    ...(csrfMeta ? { 'X-CSRF-TOKEN': csrfMeta.getAttribute('content') } : {}),
+                                },
+                                body: new FormData(aForm),
+                            })
+                            .then(async function(response) {
+                                const data = await response.json().catch(function() { return {}; });
+                                if (response.ok && data.success) {
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('activateVariantModal{{ $variant->id }}'));
+                                    if (modal) {
+                                        modal.hide();
+                                    }
+                                    window.location.reload();
+                                    return;
+                                }
+                                const msg = data.error || data.message || 'Nie udało się aktywować wariantu.';
+                                alert('Błąd: ' + msg);
+                            })
+                            .catch(function(error) {
+                                console.error('Error:', error);
+                                alert('Wystąpił błąd podczas aktywacji wariantu.');
+                            });
+                        });
+                    }
+                })();
             @endforeach
 
             // ---------- Obsługa wideo ----------

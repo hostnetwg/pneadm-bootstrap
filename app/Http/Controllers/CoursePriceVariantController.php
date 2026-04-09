@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
-use Illuminate\Support\Facades\DB;
+use App\Models\FormOrder;
 use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CoursePriceVariantController extends Controller
 {
@@ -16,6 +17,7 @@ class CoursePriceVariantController extends Controller
     public function create($courseId)
     {
         $course = Course::findOrFail($courseId);
+
         return view('course-price-variants.create', compact('course'));
     }
 
@@ -57,9 +59,10 @@ class CoursePriceVariantController extends Controller
 
         } catch (Exception $e) {
             DB::rollBack();
+
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas tworzenia wariantu cenowego: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas tworzenia wariantu cenowego: '.$e->getMessage());
         }
     }
 
@@ -70,7 +73,7 @@ class CoursePriceVariantController extends Controller
     {
         $course = Course::findOrFail($courseId);
         $variant = CoursePriceVariant::where('course_id', $courseId)->findOrFail($id);
-        
+
         return view('course-price-variants.edit', compact('course', 'variant'));
     }
 
@@ -112,9 +115,10 @@ class CoursePriceVariantController extends Controller
 
         } catch (Exception $e) {
             DB::rollBack();
+
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas aktualizacji wariantu cenowego: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas aktualizacji wariantu cenowego: '.$e->getMessage());
         }
     }
 
@@ -128,24 +132,32 @@ class CoursePriceVariantController extends Controller
 
         try {
             // Sprawdź czy kurs istnieje i nie jest usunięty (soft delete)
-            if ($course->trashed() || !$course->exists) {
+            if ($course->trashed() || ! $course->exists) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie można usunąć wariantu cenowego - kurs nie istnieje lub został usunięty.'
+                    'error' => 'Nie można usunąć wariantu cenowego - kurs nie istnieje lub został usunięty.',
                 ], 400);
+            }
+
+            if (FormOrder::withTrashed()->where('course_price_variant_id', $variant->id)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Nie można usunąć tego wariantu — występuje w co najmniej jednym zamówieniu (form_orders). Użyj dezaktywacji: wariant pozostanie w bazie dla historii zamówień, ale nie będzie dostępny do wyboru na stronie.',
+                    'can_deactivate_only' => true,
+                ], 422);
             }
 
             $variant->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Wariant cenowy został usunięty.'
+                'message' => 'Wariant cenowy został usunięty.',
             ]);
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas usuwania wariantu cenowego: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas usuwania wariantu cenowego: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -156,13 +168,13 @@ class CoursePriceVariantController extends Controller
     public function restore($courseId, $id)
     {
         $course = Course::findOrFail($courseId);
-        
+
         try {
             // Sprawdź czy kurs istnieje i nie jest usunięty (soft delete)
-            if ($course->trashed() || !$course->exists) {
+            if ($course->trashed() || ! $course->exists) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Nie można przywrócić wariantu cenowego - kurs nie istnieje lub został usunięty.'
+                    'error' => 'Nie można przywrócić wariantu cenowego - kurs nie istnieje lub został usunięty.',
                 ], 400);
             }
 
@@ -174,13 +186,75 @@ class CoursePriceVariantController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Wariant cenowy został przywrócony.'
+                'message' => 'Wariant cenowy został przywrócony.',
             ]);
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'error' => 'Wystąpił błąd podczas przywracania wariantu cenowego: ' . $e->getMessage()
+                'error' => 'Wystąpił błąd podczas przywracania wariantu cenowego: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Dezaktywuje wariant (niewidoczny w wyborze na stronie publicznej), gdy nie można go usunąć z powodu zamówień.
+     */
+    public function deactivate($courseId, $id)
+    {
+        $course = Course::findOrFail($courseId);
+        $variant = CoursePriceVariant::where('course_id', $courseId)->findOrFail($id);
+
+        if ($course->trashed() || ! $course->exists) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Nie można zmienić wariantu — kurs nie istnieje lub został usunięty.',
+            ], 400);
+        }
+
+        try {
+            $variant->is_active = false;
+            $variant->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Wariant został dezaktywowany i nie jest dostępny do wyboru przy nowych zamówieniach.',
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas dezaktywacji wariantu: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Ponowna aktywacja wariantu cenowego.
+     */
+    public function activate($courseId, $id)
+    {
+        $course = Course::findOrFail($courseId);
+        $variant = CoursePriceVariant::where('course_id', $courseId)->findOrFail($id);
+
+        if ($course->trashed() || ! $course->exists) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Nie można zmienić wariantu — kurs nie istnieje lub został usunięty.',
+            ], 400);
+        }
+
+        try {
+            $variant->is_active = true;
+            $variant->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Wariant został ponownie aktywowany i jest dostępny do wyboru.',
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas aktywacji wariantu: '.$e->getMessage(),
             ], 500);
         }
     }

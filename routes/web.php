@@ -280,6 +280,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::put('/{id}', [CoursePriceVariantController::class, 'update'])->name('update');
         Route::delete('/{id}', [CoursePriceVariantController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/restore', [CoursePriceVariantController::class, 'restore'])->name('restore');
+        Route::post('/{id}/deactivate', [CoursePriceVariantController::class, 'deactivate'])->name('deactivate');
+        Route::post('/{id}/activate', [CoursePriceVariantController::class, 'activate'])->name('activate');
     });
 
     // Uzupełnienie danych uczestników

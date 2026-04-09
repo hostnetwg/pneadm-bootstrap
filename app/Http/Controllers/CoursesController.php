@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
 use App\Models\CourseSeries;
+use App\Models\FormOrder;
 use App\Models\Instructor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -679,6 +680,18 @@ class CoursesController extends Controller
             ->whereNotNull('deleted_at')
             ->get();
 
+        $variantIds = $course->priceVariants->pluck('id');
+        $priceVariantOrderCounts = [];
+        if ($variantIds->isNotEmpty()) {
+            $priceVariantOrderCounts = FormOrder::withTrashed()
+                ->whereIn('course_price_variant_id', $variantIds)
+                ->groupBy('course_price_variant_id')
+                ->selectRaw('course_price_variant_id, COUNT(*) as cnt')
+                ->pluck('cnt', 'course_price_variant_id')
+                ->mapWithKeys(fn ($count, $id) => [(int) $id => (int) $count])
+                ->all();
+        }
+
         // Pobranie poprzedniego szkolenia (według daty, pokazuj również nieaktywne)
         $previousCourse = Course::where('start_date', '<', $course->start_date)
             ->orderBy('start_date', 'desc')
@@ -689,7 +702,7 @@ class CoursesController extends Controller
             ->orderBy('start_date', 'asc')
             ->first();
 
-        return view('courses.show', compact('course', 'previousCourse', 'nextCourse', 'deletedVariants'));
+        return view('courses.show', compact('course', 'previousCourse', 'nextCourse', 'deletedVariants', 'priceVariantOrderCounts'));
     }
 
     /**
