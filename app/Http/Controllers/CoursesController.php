@@ -729,6 +729,7 @@ class CoursesController extends Controller
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
+            'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
@@ -752,6 +753,7 @@ class CoursesController extends Controller
 
             // Dodanie is_active
             $validated['is_active'] = $request->has('is_active');
+            $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
 
             \Log::info('Przed utworzeniem kursu:', $validated);
 
@@ -892,12 +894,14 @@ class CoursesController extends Controller
             'certificate_registration_ends_at' => 'nullable|date|after_or_equal:certificate_registration_starts_at',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
+            'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
         ]);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
+        $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
         $validated['certificate_download_status'] = $request->input('certificate_download_status', 'in_preparation');
 
         // Rejestracja zaświadczenia: checkbox + daty; token generowany przy pierwszym włączeniu

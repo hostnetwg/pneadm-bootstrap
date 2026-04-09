@@ -37,6 +37,7 @@ class Course extends Model
         'notatki',
         'id_old',
         'source_id_old',
+        'show_on_pnedu',
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Course extends Model
         'end_date' => 'datetime',
         'issue_date_certyficates' => 'date',
         'is_active' => 'boolean',
+        'show_on_pnedu' => 'boolean',
         'certificate_registration_open' => 'boolean',
         'certificate_registration_starts_at' => 'datetime',
         'certificate_registration_ends_at' => 'datetime',

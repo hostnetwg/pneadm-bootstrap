@@ -346,6 +346,12 @@
                     <label class="form-check-label" for="is_active">Aktywny</label>
                 </div>
 
+                <div class="form-check mb-3">
+                    <input type="hidden" name="show_on_pnedu" value="0">
+                    <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu', $course->show_on_pnedu) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="show_on_pnedu">Pokaż na stronie głównej pnedu.pl</label>
+                </div>
+
                 <!-- Pola dla integracji z zewnętrznymi systemami -->
                 <div class="row mb-3">
                     <div class="col-md-6">
