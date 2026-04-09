@@ -14,7 +14,8 @@ class CourseOnlineDetails extends Model
         'course_id',
         'platform',
         'meeting_link',
-        'meeting_password'
+        'meeting_password',
+        'clickmeeting_event_id',
     ];
 
     public function course()

@@ -20,11 +20,12 @@ use Throwable;
 class FormOrderPneduProvisionService
 {
     /**
-     * @return array{success: bool, error?: string, message?: string, http_code: int, email_warning?: string}
+     * @return array{success: bool, error?: string, message?: string, http_code: int, email_warning?: string, clickmeeting_warning?: string}
      */
     public function provision(int $formOrderId): array
     {
         $emailWarning = null;
+        $clickMeetingWarning = null;
 
         try {
             $afterCommit = null;
@@ -113,8 +114,13 @@ class FormOrderPneduProvisionService
 
                 $afterCommit = [
                     'email' => $email,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
                     'user_existed' => $userExisted,
                     'course_title' => (string) $course->title,
+                    'course_id' => (int) $course->id,
+                    'platform' => trim((string) optional($course->onlineDetails)->platform),
+                    'clickmeeting_event_id' => trim((string) optional($course->onlineDetails)->clickmeeting_event_id),
                     'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
                     'start_date_line' => $this->startDateLineForProvisionEmail($course),
                 ];
@@ -146,6 +152,12 @@ class FormOrderPneduProvisionService
                 ]);
             }
 
+            $clickMeetingResult = $this->provisionClickMeetingIfConfigured($afterCommit);
+            $this->persistClickMeetingProvisionResult($formOrderId, $clickMeetingResult);
+            if (! $clickMeetingResult['success']) {
+                $clickMeetingWarning = $clickMeetingResult['warning'];
+            }
+
             try {
                 if ($afterCommit['user_existed']) {
                     $pneduUser->notify(new PneduFormOrderProvisionedExistingUser(
@@ -174,6 +186,11 @@ class FormOrderPneduProvisionService
             if ($emailWarning !== null) {
                 $payload['message'] = ($payload['message'] ?? '').' '.$emailWarning;
                 $payload['email_warning'] = $emailWarning;
+            }
+
+            if ($clickMeetingWarning !== null) {
+                $payload['message'] = ($payload['message'] ?? '').' '.$clickMeetingWarning;
+                $payload['clickmeeting_warning'] = $clickMeetingWarning;
             }
 
             Log::info('FormOrderPneduProvisionService: sukces', [
@@ -281,5 +298,87 @@ class FormOrderPneduProvisionService
         }
 
         return null;
+    }
+
+    /**
+     * @param array{
+     *   email: string,
+     *   first_name: string,
+     *   last_name: string,
+     *   course_id: int,
+     *   platform: string,
+     *   clickmeeting_event_id: string
+     * } $afterCommit
+     * @return array{success: bool, warning?: string, status: string, detail: string}
+     */
+    private function provisionClickMeetingIfConfigured(array $afterCommit): array
+    {
+        $platform = strtolower(trim($afterCommit['platform'] ?? ''));
+        $eventId = trim($afterCommit['clickmeeting_event_id'] ?? '');
+
+        if ($platform !== 'clickmeeting') {
+            return [
+                'success' => true,
+                'status' => 'skipped_not_clickmeeting',
+                'detail' => 'Krok ClickMeeting pominięty: platforma kursu nie jest ustawiona na ClickMeeting.',
+            ];
+        }
+
+        if ($eventId === '') {
+            return [
+                'success' => false,
+                'status' => 'skipped_missing_event_id',
+                'detail' => 'Brak ID wydarzenia ClickMeeting w konfiguracji kursu online.',
+                'warning' => 'Uwaga: uczestnik zapisany, ale nie dodano do ClickMeeting (brak ID wydarzenia w konfiguracji kursu online).',
+            ];
+        }
+
+        $result = app(ClickMeetingService::class)->registerParticipant(
+            $eventId,
+            $afterCommit['first_name'],
+            $afterCommit['last_name'],
+            $afterCommit['email']
+        );
+
+        if ($result['success'] ?? false) {
+            return [
+                'success' => true,
+                'status' => 'success',
+                'detail' => 'Uczestnik został dodany do ClickMeeting (event_id: '.$eventId.').',
+            ];
+        }
+
+        Log::warning('FormOrderPneduProvisionService: ClickMeeting best-effort failed', [
+            'course_id' => $afterCommit['course_id'],
+            'event_id' => $eventId,
+            'email' => $afterCommit['email'],
+            'error' => $result['error'] ?? 'unknown',
+        ]);
+
+        return [
+            'success' => false,
+            'status' => 'failed',
+            'detail' => (string) ($result['error'] ?? 'Nieznany błąd ClickMeeting.'),
+            'warning' => 'Uwaga: uczestnik zapisany, ale nieudane dodanie do ClickMeeting. '.($result['error'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array{status?: string, detail?: string} $clickMeetingResult
+     */
+    private function persistClickMeetingProvisionResult(int $formOrderId, array $clickMeetingResult): void
+    {
+        try {
+            FormOrder::query()->whereKey($formOrderId)->update([
+                'pnedu_clickmeeting_status' => $clickMeetingResult['status'] ?? null,
+                'pnedu_clickmeeting_synced_at' => now(),
+                'pnedu_clickmeeting_message' => $clickMeetingResult['detail'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('FormOrderPneduProvisionService: błąd zapisu statusu ClickMeeting', [
+                'form_order_id' => $formOrderId,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 }

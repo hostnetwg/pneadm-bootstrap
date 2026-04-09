@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  *
  * @property \Carbon\Carbon|null $pnedu_provisioned_at Kolumna z komentarzem w DB: data przyznania dostępu PNEDU; null = akcja nie wykonana.
  * @property bool|null $pnedu_user_existed_before Kolumna z komentarzem w DB: czy konto w pnedu.users istniało przed akcją (null przed pierwszym użyciem).
+ * @property string|null $pnedu_clickmeeting_status Status kroku ClickMeeting po akcji „Dodaj tylko do PNEDU”.
+ * @property \Carbon\Carbon|null $pnedu_clickmeeting_synced_at Data ostatniej próby integracji z ClickMeeting.
+ * @property string|null $pnedu_clickmeeting_message Szczegóły wyniku integracji ClickMeeting.
  */
 class FormOrder extends Model
 {
@@ -81,6 +84,9 @@ class FormOrder extends Model
         'publigo_sent_at',
         'pnedu_provisioned_at',
         'pnedu_user_existed_before',
+        'pnedu_clickmeeting_status',
+        'pnedu_clickmeeting_synced_at',
+        'pnedu_clickmeeting_message',
 
         // Dane zamawiającego (kontaktowe)
         'orderer_name',
@@ -141,6 +147,7 @@ class FormOrder extends Model
         'publigo_sent_at' => 'datetime',
         'pnedu_provisioned_at' => 'datetime',
         'pnedu_user_existed_before' => 'boolean',
+        'pnedu_clickmeeting_synced_at' => 'datetime',
         'invoice_payment_delay' => 'integer',
         'status_completed' => 'integer',
         'updated_manually_at' => 'datetime',

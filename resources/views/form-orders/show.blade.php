@@ -250,6 +250,71 @@ nowoczesna-edukacja.pl </div>
                                                 — utworzono nowe konto na pnedu.pl.
                                             @endif
                                         </small>
+                                        <div class="mt-2 p-2 rounded border bg-white small">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <strong>Krok 1: Uczestnik w szkoleniu</strong>
+                                                    <div class="text-muted">Dodano rekord do tabeli participants.</div>
+                                                </div>
+                                                <span class="badge bg-success">Wykonano</span>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <strong>Krok 2: Konto na pnedu.pl + e-mail</strong>
+                                                    <div class="text-muted">
+                                                        @if($zamowienie->pnedu_user_existed_before === true)
+                                                            Konto już istniało; wysłano e-mail informacyjny.
+                                                        @elseif($zamowienie->pnedu_user_existed_before === false)
+                                                            Utworzono konto i wysłano e-mail do uczestnika.
+                                                        @else
+                                                            Konto PNEDU zostało obsłużone.
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-success">Wykonano</span>
+                                            </div>
+
+                                            @php
+                                                $cmStatus = $zamowienie->pnedu_clickmeeting_status;
+                                                $cmBadgeClass = match($cmStatus) {
+                                                    'success' => 'bg-success',
+                                                    'failed' => 'bg-danger',
+                                                    'skipped_missing_event_id' => 'bg-warning text-dark',
+                                                    'skipped_not_clickmeeting' => 'bg-secondary',
+                                                    default => 'bg-secondary',
+                                                };
+                                                $cmLabel = match($cmStatus) {
+                                                    'success' => 'Dodano',
+                                                    'failed' => 'Błąd',
+                                                    'skipped_missing_event_id' => 'Pominięto (brak ID)',
+                                                    'skipped_not_clickmeeting' => 'Pominięto (inna platforma)',
+                                                    default => 'Brak informacji',
+                                                };
+                                                $cmDetail = !empty($zamowienie->pnedu_clickmeeting_message)
+                                                    ? $zamowienie->pnedu_clickmeeting_message
+                                                    : 'Status kroku ClickMeeting będzie widoczny po wykonaniu akcji w nowej wersji procesu.';
+                                            @endphp
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong>Krok 3: ClickMeeting</strong>
+                                                    @if($zamowienie->pnedu_clickmeeting_synced_at)
+                                                        <div class="text-muted">Ostatnia próba: {{ $zamowienie->pnedu_clickmeeting_synced_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</div>
+                                                    @endif
+                                                    <div class="text-muted">{{ $cmDetail }}</div>
+                                                </div>
+                                                <span class="badge {{ $cmBadgeClass }}">{{ $cmLabel }}</span>
+                                            </div>
+                                        </div>
+                                        @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#resetPneduModal">
+                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU
+                                                </button>
+                                            </div>
+                                        @endif
                                     </div>
                     @endif
                             <div id="pneduResult" class="mt-2"></div>
@@ -2021,6 +2086,42 @@ nowoczesna-edukacja.pl `;
             });
         }
 
+        // Funkcja do resetowania statusu PNEDU (tylko dla administratorów)
+        function resetPneduStatus(orderId) {
+            const button = document.getElementById('resetPneduConfirmBtn');
+
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
+
+            fetch(`/form-orders/${orderId}/pnedu/reset`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('resetPneduModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    location.reload();
+                } else {
+                    alert('Błąd: ' + data.error);
+                    button.disabled = false;
+                    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Wystąpił błąd podczas resetowania statusu PNEDU.');
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
+            });
+        }
+
         // Checkbox „tylko niewprowadzone” + pole course_id (filtr po courses.id / form_orders.product_id)
         document.addEventListener('DOMContentLoaded', function() {
             const filterCheckbox = document.getElementById('filterNewOnly');
@@ -2350,6 +2451,46 @@ nowoczesna-edukacja.pl `;
                     </button>
                     <button type="button" class="btn btn-warning" id="resetPubligoConfirmBtn" onclick="resetPubligoStatus({{ $zamowienie->id }})">
                         <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal potwierdzenia resetowania statusu PNEDU --}}
+    <div class="modal fade" id="resetPneduModal" tabindex="-1" aria-labelledby="resetPneduModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="resetPneduModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Resetowanie statusu PNEDU
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Czy na pewno chcesz zresetować status PNEDU dla zamówienia <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły zamówienia:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
+                            <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            @if($zamowienie->pnedu_provisioned_at)
+                                <li><strong>Data przyznania dostępu PNEDU:</strong> {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
+                            @endif
+                        </ul>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> Resetowanie statusu odblokuje przycisk „Dodaj tylko do PNEDU” dla tego zamówienia.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning" id="resetPneduConfirmBtn" onclick="resetPneduStatus({{ $zamowienie->id }})">
+                        <i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU
                     </button>
                 </div>
             </div>

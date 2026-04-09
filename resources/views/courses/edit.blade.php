@@ -176,6 +176,12 @@
                                 <input type="text" name="meeting_password" class="form-control" id="meeting_password" 
                                     value="{{ $course->onlineDetails->meeting_password ?? '' }}">
                             </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
+                                <input type="text" name="clickmeeting_event_id" class="form-control" id="clickmeeting_event_id"
+                                    value="{{ old('clickmeeting_event_id', $course->onlineDetails->clickmeeting_event_id ?? '') }}">
+                                <small class="text-muted">Wypełnij dla kursów online prowadzonych na ClickMeeting.</small>
+                            </div>
                         </div>
                     </div>
                     

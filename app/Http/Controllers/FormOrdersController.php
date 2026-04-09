@@ -11,6 +11,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class FormOrdersController extends Controller
 {
@@ -708,6 +709,61 @@ class FormOrdersController extends Controller
                 ], 500);
             }
 
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas resetowania: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Resetuje status PNEDU dla zamówienia (tylko dla administratorów)
+     */
+    public function resetPneduStatus(Request $request, $id)
+    {
+        if (! auth()->user()->hasRole('admin') && ! auth()->user()->hasRole('super_admin')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Brak uprawnień do resetowania statusu PNEDU.',
+            ], 403);
+        }
+
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (! $zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.',
+                ], 404);
+            }
+
+            $zamowienie->pnedu_provisioned_at = null;
+            $zamowienie->pnedu_user_existed_before = null;
+            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_status')) {
+                $zamowienie->pnedu_clickmeeting_status = null;
+            }
+            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_synced_at')) {
+                $zamowienie->pnedu_clickmeeting_synced_at = null;
+            }
+            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_message')) {
+                $zamowienie->pnedu_clickmeeting_message = null;
+            }
+            $updated = $zamowienie->save();
+
+            if ($updated) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Status PNEDU został zresetowany. Zamówienie może być ponownie dodane do PNEDU.',
+                    'reset_at' => now()->format('d.m.Y H:i'),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Nie udało się zresetować statusu PNEDU.',
+            ], 500);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,

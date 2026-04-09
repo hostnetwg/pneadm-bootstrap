@@ -130,6 +130,11 @@
                         <label for="meeting_password" class="form-label">Hasło do spotkania</label>
                         <input type="text" name="meeting_password" id="meeting_password" class="form-control">
                     </div>
+                    <div class="col-md-4 mt-2">
+                        <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
+                        <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
+                        <small class="text-muted">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
+                    </div>
                 </div>
 
 

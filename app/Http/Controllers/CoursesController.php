@@ -731,6 +731,7 @@ class CoursesController extends Controller
             'source_id_old' => 'nullable|string|max:255',
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
+            'clickmeeting_event_id' => 'nullable|string|max:255',
         ]);
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
 
@@ -812,6 +813,9 @@ class CoursesController extends Controller
                     'platform' => $request->platform,
                     'meeting_link' => $request->meeting_link,
                     'meeting_password' => $request->meeting_password,
+                    'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
+                        ? trim((string) $request->clickmeeting_event_id)
+                        : null,
                 ];
 
                 \Log::info('Dane kursu online:', $onlineData);
@@ -896,6 +900,7 @@ class CoursesController extends Controller
             'source_id_old' => 'nullable|string|max:255',
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
+            'clickmeeting_event_id' => 'nullable|string|max:255',
         ]);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
@@ -990,6 +995,9 @@ class CoursesController extends Controller
                     'platform' => $request->platform,
                     'meeting_link' => $request->meeting_link,
                     'meeting_password' => $request->meeting_password,
+                    'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
+                        ? trim((string) $request->clickmeeting_event_id)
+                        : null,
                 ]
             );
 
