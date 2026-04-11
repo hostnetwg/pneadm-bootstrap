@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\FormOrder;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
@@ -9,6 +10,7 @@ use App\Services\PubligoApiService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -23,7 +25,17 @@ class FormOrdersController extends Controller
         // Liczba rekordów na stronę (domyślnie 50)
         $perPage = $request->get('per_page', 50);
         $search = $request->get('search', '');
+        $orderIdFilter = trim((string) $request->get('order_id', ''));
+        $courseIdFilter = trim((string) $request->get('course_id', ''));
         $filter = $request->get('filter', ''); // nowy parametr dla filtra
+
+        $orderIdForExact = (ctype_digit($orderIdFilter) && $orderIdFilter !== '' && (int) $orderIdFilter > 0)
+            ? (int) $orderIdFilter
+            : null;
+
+        $courseIdForPanel = (ctype_digit($courseIdFilter) && $courseIdFilter !== '' && (int) $courseIdFilter > 0)
+            ? (int) $courseIdFilter
+            : null;
 
         // Budujemy zapytanie używając modelu Eloquent
         $query = FormOrder::query();
@@ -56,9 +68,15 @@ class FormOrdersController extends Controller
                 ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
         }
 
-        // Dodajemy wyszukiwanie jeśli podano frazę (m.in. uczestnicy z form_order_participants)
-        if (! empty($search)) {
-            $query->where(function ($q) use ($search) {
+        // Konkretne ID zamówienia (priorytet nad polem „Wyszukaj”) — dokładnie jeden rekord lub brak
+        if ($orderIdForExact !== null) {
+            $query->whereKey($orderIdForExact);
+        } elseif (! empty($search)) {
+            // Wyszukiwanie jeśli podano frazę (m.in. uczestnicy z form_order_participants)
+            $searchTrimmed = trim($search);
+            $searchAsCourseId = (ctype_digit($searchTrimmed) && $searchTrimmed !== '') ? (int) $searchTrimmed : null;
+
+            $query->where(function ($q) use ($search, $searchAsCourseId) {
                 $q->whereHas('primaryParticipant', function ($pq) use ($search) {
                     $pq->where('participant_firstname', 'LIKE', "%{$search}%")
                         ->orWhere('participant_lastname', 'LIKE', "%{$search}%")
@@ -70,18 +88,37 @@ class FormOrdersController extends Controller
                     ->orWhere('notes', 'LIKE', "%{$search}%")
                     ->orWhere('id', 'LIKE', "%{$search}%")
                     ->orWhere('publigo_product_id', 'LIKE', "%{$search}%")
-                  // Wyszukiwanie po danych nabywcy
+                    ->when($searchAsCourseId !== null, function ($sub) use ($searchAsCourseId) {
+                        return $sub->orWhere('product_id', $searchAsCourseId);
+                    })
+                    // Wyszukiwanie po danych nabywcy
                     ->orWhere('buyer_name', 'LIKE', "%{$search}%")
                     ->orWhere('buyer_address', 'LIKE', "%{$search}%")
                     ->orWhere('buyer_postal_code', 'LIKE', "%{$search}%")
                     ->orWhere('buyer_city', 'LIKE', "%{$search}%")
                     ->orWhere('buyer_nip', 'LIKE', "%{$search}%")
-                  // Wyszukiwanie po danych odbiorcy
+                    // Wyszukiwanie po danych odbiorcy
                     ->orWhere('recipient_name', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_address', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_postal_code', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_city', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_nip', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // ID szkolenia w panelu (courses.id): form_orders.product_id lub publigo_product_id = courses.id_old
+        if ($courseIdForPanel !== null) {
+            $ot = (new FormOrder)->getTable();
+            $query->where(function ($q) use ($courseIdForPanel, $ot) {
+                $q->where($ot.'.product_id', $courseIdForPanel)
+                    ->orWhereExists(function ($sub) use ($courseIdForPanel, $ot) {
+                        $sub->select(DB::raw(1))
+                            ->from('courses')
+                            ->where('courses.id', $courseIdForPanel)
+                            ->whereNotNull('courses.id_old')
+                            ->where('courses.id_old', '!=', '')
+                            ->whereColumn('courses.id_old', $ot.'.publigo_product_id');
+                    });
             });
         }
 
@@ -110,37 +147,13 @@ class FormOrdersController extends Controller
                     'count' => $group->duplicate_count,
                     'is_duplicate' => true,
                     'group_email' => $group->participant_email,
-                    'group_product_id' => $group->publigo_product_id,
+                    'group_product_id' => $group->duplicate_course_key,
                 ];
             }
         }
 
-        // Policz grupy wymagające interwencji (needs-action + multiple-invoices)
-        $urgentDuplicatesCount = 0;
-        foreach ($duplicateGroups as $duplicate) {
-            $orderIds = array_map('trim', explode(',', $duplicate->order_ids));
-            $orders = FormOrder::whereIn('id', $orderIds)->get();
-
-            $activeCount = 0;
-            $mainCount = 0;
-
-            foreach ($orders as $order) {
-                if ($order->has_invoice) {
-                    $mainCount++;
-                } elseif (! $order->is_completed) {
-                    $activeCount++;
-                }
-            }
-
-            // Wymaga akcji = więcej niż 1 aktywne LUB ma fakturę ale są jeszcze aktywne duplikaty
-            $needsAction = ($activeCount > 1) || ($mainCount > 0 && $activeCount > 0);
-            // Za dużo faktur = więcej niż 1 zamówienie z fakturą w grupie
-            $hasMultipleInvoices = ($mainCount > 1);
-
-            if ($needsAction || $hasMultipleInvoices) {
-                $urgentDuplicatesCount++;
-            }
-        }
+        $totalDuplicateGroupsCount = $duplicateGroups->count();
+        $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
         // Policz nieprzetworzone zamówienia dla zakończonych szkoleń (Archiwalne)
         // Nieprzetworzone = bez numeru faktury (invoice_number) i nie ukończone (status_completed = 0 lub null)
@@ -184,7 +197,7 @@ class FormOrdersController extends Controller
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
         ];
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'filter', 'duplicateInfo', 'urgentDuplicatesCount', 'stats', 'newCount', 'archivalCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
     }
 
     /**
@@ -367,7 +380,9 @@ class FormOrdersController extends Controller
                 ->first();
         }
 
-        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew'));
+        $duplicateSiblingsCount = FormOrder::findDuplicatesFor($id)->count();
+
+        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'duplicateSiblingsCount'));
     }
 
     /**
@@ -490,6 +505,12 @@ class FormOrdersController extends Controller
                 if ($request->has('page')) {
                     $redirectParams['page'] = $request->input('page');
                 }
+                if ($request->filled('order_id')) {
+                    $redirectParams['order_id'] = $request->input('order_id');
+                }
+                if ($request->filled('course_id')) {
+                    $redirectParams['course_id'] = $request->input('course_id');
+                }
 
                 return redirect()->route('form-orders.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
             }
@@ -532,6 +553,12 @@ class FormOrdersController extends Controller
                 }
                 if ($request->has('page')) {
                     $redirectParams['page'] = $request->input('page');
+                }
+                if ($request->filled('order_id')) {
+                    $redirectParams['order_id'] = $request->input('order_id');
+                }
+                if ($request->filled('course_id')) {
+                    $redirectParams['course_id'] = $request->input('course_id');
                 }
 
                 return redirect()->route('form-orders.index', $redirectParams)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
@@ -2541,6 +2568,12 @@ class FormOrdersController extends Controller
             if ($request->has('page')) {
                 $redirectParams['page'] = $request->input('page');
             }
+            if ($request->filled('order_id')) {
+                $redirectParams['order_id'] = $request->input('order_id');
+            }
+            if ($request->filled('course_id')) {
+                $redirectParams['course_id'] = $request->input('course_id');
+            }
 
             return redirect()->route('form-orders.index', $redirectParams)
                 ->with('success', 'Zamówienie zostało usunięte i przeniesione do kosza.');
@@ -2572,7 +2605,7 @@ class FormOrdersController extends Controller
 
             $duplicates->push([
                 'email' => $group->participant_email,
-                'product_id' => $group->publigo_product_id,
+                'product_id' => $group->duplicate_course_key,
                 'count' => $group->duplicate_count,
                 'orders' => $orders,
                 'recommended_order' => $orders->first(), // Najwyższy priorytet
@@ -2605,13 +2638,15 @@ class FormOrdersController extends Controller
         $totalOrders = $duplicates->sum(function ($group) {
             return $group['count'];
         });
+        $urgentDuplicatesTotal = $this->countUrgentDuplicateGroups($duplicateGroups);
 
         return view('form-orders.duplicates', compact(
             'duplicatesPaginated',
             'perPage',
             'totalDuplicates',
             'totalGroups',
-            'totalOrders'
+            'totalOrders',
+            'urgentDuplicatesTotal'
         ));
     }
 
@@ -2640,7 +2675,7 @@ class FormOrdersController extends Controller
                 'message' => 'Duplikat został usunięty.',
                 'remaining_duplicates' => $duplicates->count(),
                 'email' => $zamowienie->display_participant_email,
-                'product_id' => $zamowienie->publigo_product_id,
+                'product_id' => $zamowienie->resolveDuplicateGroupingCourseKey(),
             ]);
 
         } catch (Exception $e) {
@@ -2657,8 +2692,10 @@ class FormOrdersController extends Controller
     public function destroyAllDuplicatesForGroup(Request $request, $email, $productId)
     {
         try {
-            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail głównego uczestnika)
-            $orders = FormOrder::where('publigo_product_id', $productId)
+            $courseKey = $this->resolveDuplicateGroupCourseKeyForUrlParameter($productId);
+
+            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail + ten sam klucz szkolenia co na /duplicates)
+            $orders = FormOrder::whereDuplicateGroupingCourseKey($courseKey)
                 ->wherePrimaryParticipantEmailMatches($email)
                 ->orderBy('id')
                 ->get();
@@ -2700,8 +2737,10 @@ class FormOrdersController extends Controller
     public function destroyDuplicatesKeepSelected(Request $request, $email, $productId, $keepOrderId)
     {
         try {
-            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail głównego uczestnika)
-            $orders = FormOrder::where('publigo_product_id', $productId)
+            $courseKey = $this->resolveDuplicateGroupCourseKeyForUrlParameter($productId);
+
+            // Znajdź wszystkie zamówienia w grupie duplikatów (e-mail + ten sam klucz szkolenia co na /duplicates)
+            $orders = FormOrder::whereDuplicateGroupingCourseKey($courseKey)
                 ->wherePrimaryParticipantEmailMatches($email)
                 ->get();
 
@@ -2808,6 +2847,60 @@ class FormOrdersController extends Controller
                 'error' => 'Wystąpił błąd podczas zapisywania notatki: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Grupy „pilne” — jak filtr „Wymaga oznaczenia duplikatów” / „za dużo faktur” na stronie duplikatów.
+     *
+     * @param  Collection<int, object>  $duplicateGroups
+     */
+    private function countUrgentDuplicateGroups(Collection $duplicateGroups): int
+    {
+        $urgent = 0;
+        foreach ($duplicateGroups as $duplicate) {
+            $orderIds = array_map('trim', explode(',', $duplicate->order_ids));
+            $orders = FormOrder::whereIn('id', $orderIds)->get();
+
+            $activeCount = 0;
+            $mainCount = 0;
+
+            foreach ($orders as $order) {
+                if ($order->has_invoice) {
+                    $mainCount++;
+                } elseif (! $order->is_completed) {
+                    $activeCount++;
+                }
+            }
+
+            $needsAction = ($activeCount > 1) || ($mainCount > 0 && $activeCount > 0);
+            $hasMultipleInvoices = ($mainCount > 1);
+
+            if ($needsAction || $hasMultipleInvoices) {
+                $urgent++;
+            }
+        }
+
+        return $urgent;
+    }
+
+    /**
+     * Parametr {productId} z URL akcji na duplikatach: zwykle courses.id z widoku /duplicates;
+     * obsługa starych odwołań po samym id_old Publigo (np. 84075 zamiast 476).
+     */
+    private function resolveDuplicateGroupCourseKeyForUrlParameter(string|int $productId): int
+    {
+        $asInt = (int) $productId;
+        if ($asInt < 0) {
+            return 0;
+        }
+        if ($asInt > 0 && Course::query()->whereKey($asInt)->exists()) {
+            return $asInt;
+        }
+        $byOld = Course::query()
+            ->where('id_old', $productId)
+            ->value('id');
+
+        return $byOld !== null ? (int) $byOld : $asInt;
     }
 
     /**

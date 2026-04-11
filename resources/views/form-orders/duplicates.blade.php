@@ -38,8 +38,8 @@
                         </a>
                     </div>
                     <div>
-                        <span class="badge bg-danger fs-6">
-                            <i class="bi bi-files"></i> {{ $totalGroups }} grup duplikatów
+                        <span class="badge bg-danger fs-6" id="duplicates-nav-groups-badge">
+                            <i class="bi bi-files"></i> {{ $totalGroups }} grup (wszystkie)
                         </span>
                     </div>
                 </div>
@@ -57,11 +57,11 @@
                         <div class="col-md-3">
                             <label for="filterStatus" class="form-label">Status duplikatów:</label>
                             <select class="form-select" id="filterStatus" onchange="updateFilterDescription(); applyFilters();">
-                                <option value="needs-action" selected>⚠️ Wymaga oznaczenia duplikatów</option>
+                                <option value="all" selected>📋 Wszystkie duplikaty</option>
+                                <option value="needs-action">⚠️ Wymaga oznaczenia duplikatów</option>
                                 <option value="multiple-invoices">🚨 UWAGA! za dużo faktur</option>
                                 <option value="ready">✅ Gotowe do przetworzenia</option>
                                 <option value="processed">✔️ Przetworzone duplikaty</option>
-                                <option value="all">📋 Wszystkie duplikaty</option>
                             </select>
                             <div id="filterDescription" class="form-text mt-2"></div>
                         </div>
@@ -112,9 +112,9 @@
                     <div class="col-md-6">
                         <p class="fw-bold mb-2 text-success">🎯 Priorytet chronologiczny:</p>
                         <strong class="text-primary">PayU + opłacone:</strong> najwyżej w grupie duplikatów<br>
-                        <strong>Z fakturą:</strong> Starsze &gt; Nowsze<br>
+                        <strong>Z fakturą:</strong> ważniejsze niż bez faktury; przy kilku z fakturą — <strong>nowsze &gt; starsze</strong> (wyższe ID)<br>
                         <strong>Zakończone:</strong> Starsze &gt; Nowsze<br>
-                        <strong class="text-success">Aktywne: Nowsze &gt; Starsze ✨</strong><br>
+                        <strong class="text-success">Aktywne (bez faktury): Nowsze &gt; Starsze ✨</strong><br>
                         <small class="text-muted mt-1 d-block">💡 Klient mógł poprawić dane w kolejnym zgłoszeniu</small>
                     </div>
                     <div class="col-md-6">
@@ -143,6 +143,8 @@
                         <div class="card-body">
                             <h5 class="card-title">Grupy duplikatów</h5>
                             <h3 class="card-text">{{ $totalGroups }}</h3>
+                            <small class="opacity-75">W całej bazie (email + kurs)</small>
+                            <small class="d-block mt-1 opacity-90">Z tego pilnych: {{ $urgentDuplicatesTotal ?? 0 }} (jak przycisk na liście zamówień)</small>
                         </div>
                     </div>
                 </div>
@@ -151,6 +153,7 @@
                         <div class="card-body">
                             <h5 class="card-title">Wszystkie zamówienia</h5>
                             <h3 class="card-text">{{ $totalOrders }}</h3>
+                            <small class="text-muted">W powyższych grupach</small>
                         </div>
                     </div>
                 </div>
@@ -166,17 +169,25 @@
                     <div class="card bg-success text-white">
                         <div class="card-body">
                             <h5 class="card-title">Oszczędność</h5>
-                            <h3 class="card-text">{{ round((($totalDuplicates - $totalGroups) / $totalDuplicates) * 100, 1) }}%</h3>
+                            <h3 class="card-text">{{ $totalDuplicates > 0 ? round((($totalDuplicates - $totalGroups) / $totalDuplicates) * 100, 1) : 0 }}%</h3>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="alert alert-secondary mb-4">
+                <strong>Dlaczego liczby się różniły?</strong>
+                Na liście zamówień przycisk pokazywał <strong>pilne {{ $urgentDuplicatesTotal ?? 0 }}</strong> grup (wiele aktywnych lub faktura + aktywne duplikaty),
+                a statystyki powyżej — <strong>{{ $totalGroups }}</strong> wszystkich grup z co najmniej dwoma zamówieniami.
+                Domyślnie poniżej włączono widok <strong>„Wszystkie duplikaty”</strong>, żeby paginacja ({{ $duplicatesPaginated->total() }} grup, {{ $duplicatesPaginated->lastPage() }} str.)
+                odpowiadała liczbie widocznych kart. Filtr „Wymaga oznaczenia” celowo ukrywa część grup — wtedy widzisz mniej kart przy tej samej paginacji.
             </div>
 
             {{-- Lista duplikatów --}}
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Grupy duplikatów (email + szkolenie)</h5>
-                    <div class="text-muted">
+                    <div class="text-muted" id="duplicate-groups-pagination-line">
                         Wyświetlanie {{ $duplicatesPaginated->firstItem() ?? 0 }}-{{ $duplicatesPaginated->lastItem() ?? 0 }} z {{ $duplicatesPaginated->total() }} grup
                     </div>
                 </div>
@@ -192,7 +203,7 @@
                                         </h5>
                                         <div class="small">
                                             <strong>Email:</strong> {{ $duplicate['email'] }}<br>
-                                            <strong>Szkolenie ID:</strong> {{ $duplicate['product_id'] }}
+                                            <strong>ID kursu (panel):</strong> {{ $duplicate['product_id'] }}
                                         </div>
                                     </div>
                                     <div>
@@ -301,7 +312,12 @@
                                                         <div class="col-6">
                                                             <strong>Szkolenie:</strong><br>
                                                             {{ $order->product_name }}<br>
-                                                            <small class="text-muted">ID: {{ $order->publigo_product_id }}</small>
+                                                            <small class="text-muted">
+                                                                ID kursu: {{ $order->product_id ?? '—' }}
+                                                                @if($order->publigo_product_id)
+                                                                    · Publigo: {{ $order->publigo_product_id }}
+                                                                @endif
+                                                            </small>
                                                         </div>
                                                     </div>
                                                     <div class="row mt-2">
@@ -395,6 +411,11 @@
 
     {{-- JavaScript dla usuwania duplikatów --}}
     <script>
+        window.duplicatesPageMeta = {
+            totalGroups: {{ (int) $totalGroups }},
+            paginationDefault: {!! json_encode('Wyświetlanie '.($duplicatesPaginated->firstItem() ?? 0).'-'.($duplicatesPaginated->lastItem() ?? 0).' z '.$duplicatesPaginated->total().' grup') !!},
+        };
+
         let currentDeleteOrderId = null;
         let currentKeepEmail = null;
         let currentKeepProductId = null;
@@ -524,11 +545,25 @@
                     group.style.display = 'none';
                 }
             });
-            
-            // Zaktualizuj licznik
-            const counter = document.querySelector('.badge.bg-danger.fs-6');
-            if (counter) {
-                counter.innerHTML = `<i class="bi bi-files"></i> ${visibleCount} grup duplikatów`;
+
+            const navBadge = document.getElementById('duplicates-nav-groups-badge');
+            if (navBadge && window.duplicatesPageMeta) {
+                const onlyStatusAll = status === 'all' && !email && !product;
+                if (onlyStatusAll) {
+                    navBadge.innerHTML = '<i class="bi bi-files"></i> ' + window.duplicatesPageMeta.totalGroups + ' grup (wszystkie)';
+                } else {
+                    navBadge.innerHTML = '<i class="bi bi-files"></i> Widocznych na tej stronie: ' + visibleCount;
+                }
+            }
+
+            const pagLine = document.getElementById('duplicate-groups-pagination-line');
+            if (pagLine && window.duplicatesPageMeta) {
+                const onlyStatusAll = status === 'all' && !email && !product;
+                if (onlyStatusAll) {
+                    pagLine.textContent = window.duplicatesPageMeta.paginationDefault;
+                } else {
+                    pagLine.textContent = 'Widocznych grup na tej stronie: ' + visibleCount + ' (tekst paginacji dotyczy wszystkich ' + window.duplicatesPageMeta.totalGroups + ' grup — wyczyść filtry, by zsynchronizować widok)';
+                }
             }
         }
 
@@ -541,7 +576,7 @@
         }
 
         function clearFilters() {
-            document.getElementById('filterStatus').value = 'needs-action';
+            document.getElementById('filterStatus').value = 'all';
             document.getElementById('filterEmail').value = '';
             document.getElementById('filterProduct').value = '';
             updateFilterDescription();
@@ -694,7 +729,7 @@
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
 
-            // Automatycznie zastosuj domyślny filtr "Wymaga oznaczenia duplikatów"
+            // Domyślnie „Wszystkie” — applyFilters zsynchronizuje badge z paginacją
             updateFilterCounts();
             updateFilterDescription();
             applyFilters();

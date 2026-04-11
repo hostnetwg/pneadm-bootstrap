@@ -403,9 +403,9 @@
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $completeDataCount }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
                             @if($course->orders_count > 0)
-                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'search' => $course->id_old]) }}" 
+                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'search' => $course->id]) }}" 
                                    class="badge bg-danger text-decoration-none" 
-                                   title="Kliknij, aby zobaczyć nie wprowadzone zamówienia dla tego szkolenia">
+                                   title="Kliknij, aby zobaczyć nie wprowadzone zamówienia dla tego szkolenia (filtr po ID kursu / product_id)">
                                     {{ $course->orders_count }}
                                 </a>
                             @else

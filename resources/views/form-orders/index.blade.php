@@ -63,10 +63,14 @@
                             <span class="badge bg-success text-white ms-1">{{ $archivalCount ?? 0 }}</span>
                         </a>
                         <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
-                           class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif">
-                            <i class="bi bi-files"></i> DUPLIKATY 
-                            @if($urgentDuplicatesCount > 0)
-                                <span class="badge bg-white text-danger fw-bold">({{ $urgentDuplicatesCount }})</span>
+                           class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif"
+                           title="Łącznie {{ $totalDuplicateGroupsCount ?? 0 }} grup (ten sam e-mail uczestnika + ten sam kurs). Liczba w nawiasie to tylko grupy „pilne”: wiele aktywnych zamówień albo faktura i nadal aktywne duplikaty — jak filtr „Wymaga oznaczenia” na stronie duplikatów.">
+                            <i class="bi bi-files"></i> DUPLIKATY
+                            @if(($totalDuplicateGroupsCount ?? 0) > 0)
+                                <span class="badge bg-light text-dark ms-1">{{ $totalDuplicateGroupsCount }} grup</span>
+                            @endif
+                            @if(($urgentDuplicatesCount ?? 0) > 0)
+                                <span class="badge bg-white text-danger fw-bold ms-1">pilnych {{ $urgentDuplicatesCount }}</span>
                             @endif
                         </a>
                     </div>
@@ -110,7 +114,33 @@
                 <div class="card-body">
                     <form method="GET" action="{{ route('form-orders.index') }}" class="row g-3">
                         <input type="hidden" name="filter" value="{{ $filter }}">
-                        <div class="col-md-6">
+                        <div class="col-6 col-md-1">
+                            <label for="order_id" class="form-label small mb-1">ID zam.</label>
+                            <input type="text"
+                                   inputmode="numeric"
+                                   pattern="[0-9]*"
+                                   class="form-control form-control-sm"
+                                   id="order_id"
+                                   name="order_id"
+                                   value="{{ $orderIdFilter }}"
+                                   placeholder="—"
+                                   autocomplete="off"
+                                   title="ID zamówienia — tylko cyfry; po Szukaj tylko to zamówienie (Wyszukaj jest wtedy ignorowane)">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label for="course_id" class="form-label small mb-1">ID szkol.</label>
+                            <input type="text"
+                                   inputmode="numeric"
+                                   pattern="[0-9]*"
+                                   class="form-control form-control-sm"
+                                   id="course_id"
+                                   name="course_id"
+                                   value="{{ $courseIdFilter }}"
+                                   placeholder="—"
+                                   autocomplete="off"
+                                   title="ID szkolenia w panelu (courses.id); product_id lub Publigo id_old">
+                        </div>
+                        <div class="col-12 col-md-5">
                             <label for="search" class="form-label">Wyszukaj:</label>
                             <input type="text" 
                                    class="form-control" 
@@ -119,7 +149,7 @@
                                    value="{{ $search }}" 
                                    placeholder="Imię, email uczestnika, email zamawiającego, produkt, numer faktury, notatki, ID, Publigo ID...">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label for="per_page" class="form-label">Rekordów na stronę:</label>
                             <select id="per_page" name="per_page" class="form-select">
                                 <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
@@ -134,7 +164,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search)
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index', ['filter' => $filter]) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -380,6 +410,8 @@
                                                 @method('PUT')
                                                 <input type="hidden" name="per_page" value="{{ $perPage }}">
                                                 <input type="hidden" name="search" value="{{ $search }}">
+                                                <input type="hidden" name="order_id" value="{{ $orderIdFilter ?? '' }}">
+                                                <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
                                                 <input type="hidden" name="filter" value="{{ $filter }}">
                                                 <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
                                                 <div class="row g-2">
@@ -570,6 +602,8 @@
                                             @method('DELETE')
                                             <input type="hidden" name="per_page" value="{{ $perPage }}">
                                             <input type="hidden" name="search" value="{{ $search }}">
+                                            <input type="hidden" name="order_id" value="{{ $orderIdFilter ?? '' }}">
+                                            <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
                                             <input type="hidden" name="filter" value="{{ $filter }}">
                                             <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
                                             <button type="submit" class="btn btn-danger">
@@ -599,7 +633,16 @@
                                     Strona {{ $zamowienia->currentPage() }} z {{ $zamowienia->lastPage() }}
                                 </div>
                                 <div>
-                                    {{ $zamowienia->appends(['per_page' => $perPage, 'search' => $search, 'filter' => $filter])->links() }}
+                                    @php
+                                        $paginationQuery = ['per_page' => $perPage, 'search' => $search, 'filter' => $filter];
+                                        if (($orderIdFilter ?? '') !== '') {
+                                            $paginationQuery['order_id'] = $orderIdFilter;
+                                        }
+                                        if (($courseIdFilter ?? '') !== '') {
+                                            $paginationQuery['course_id'] = $courseIdFilter;
+                                        }
+                                    @endphp
+                                    {{ $zamowienia->appends($paginationQuery)->links() }}
                                 </div>
                             </div>
                         </div>

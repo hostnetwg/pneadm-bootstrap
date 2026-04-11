@@ -185,47 +185,45 @@ class CoursesController extends Controller
             }]);
         }
 
-        // Dodanie liczby zamówień bez numeru faktury i ze statusem niezakończonym
-        // Optymalizacja: pobierz wszystkie zamówienia jednym zapytaniem zamiast dla każdego kursu osobno
-        $courseIdsWithPubligo = $courses->getCollection()
-            ->filter(function ($course) {
-                return $course->source_id_old === 'certgen_Publigo' && $course->id_old;
-            })
-            ->pluck('id_old', 'id')
-            ->toArray();
+        // Liczba „niewprowadzonych” zamówień (jak scope FormOrder::new): po product_id = courses.id
+        // (formularz uniwersalny pnedu) oraz — wsteczna zgodność Publigo — po publigo_product_id = courses.id_old.
+        $courseIdsOnPage = $courses->getCollection()->pluck('id')->all();
 
-        if (! empty($courseIdsWithPubligo)) {
-            $ordersCounts = DB::connection('mysql')
-                ->table('form_orders')
-                ->whereIn('publigo_product_id', array_values($courseIdsWithPubligo))
-                ->whereNull('deleted_at')
-                ->where(function ($query) {
-                    $query->whereNull('invoice_number')
-                        ->orWhere('invoice_number', '')
-                        ->orWhere('invoice_number', '0');
+        if (! empty($courseIdsOnPage)) {
+            $ordersCountsByCourseId = DB::connection('mysql')
+                ->table('courses as c')
+                ->join('form_orders as fo', function ($join) {
+                    $join->whereNull('fo.deleted_at')
+                        ->where(function ($q) {
+                            $q->whereColumn('fo.product_id', 'c.id')
+                                ->orWhere(function ($q2) {
+                                    $q2->whereNotNull('c.id_old')
+                                        ->where('c.id_old', '!=', '')
+                                        ->whereColumn('fo.publigo_product_id', 'c.id_old');
+                                });
+                        })
+                        ->where(function ($q) {
+                            $q->whereNull('fo.invoice_number')
+                                ->orWhere('fo.invoice_number', '')
+                                ->orWhere('fo.invoice_number', '0');
+                        })
+                        ->where(function ($q) {
+                            $q->whereNull('fo.status_completed')
+                                ->orWhere('fo.status_completed', 0);
+                        });
                 })
-                ->where(function ($query) {
-                    $query->whereNull('status_completed')
-                        ->orWhere('status_completed', 0);
-                })
-                ->select('publigo_product_id', DB::raw('count(*) as count'))
-                ->groupBy('publigo_product_id')
-                ->pluck('count', 'publigo_product_id')
+                ->whereIn('c.id', $courseIdsOnPage)
+                ->groupBy('c.id')
+                ->select('c.id as course_id', DB::raw('COUNT(DISTINCT fo.id) as cnt'))
+                ->pluck('cnt', 'course_id')
                 ->toArray();
 
-            // Przypisz liczniki do kursów
-            $courses->getCollection()->transform(function ($course) use ($courseIdsWithPubligo, $ordersCounts) {
-                if (isset($courseIdsWithPubligo[$course->id])) {
-                    $idOld = $courseIdsWithPubligo[$course->id];
-                    $course->orders_count = $ordersCounts[$idOld] ?? 0;
-                } else {
-                    $course->orders_count = 0;
-                }
+            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId) {
+                $course->orders_count = (int) ($ordersCountsByCourseId[$course->id] ?? 0);
 
                 return $course;
             });
         } else {
-            // Jeśli nie ma kursów z Publigo, ustaw wszystkim 0
             $courses->getCollection()->transform(function ($course) {
                 $course->orders_count = 0;
 

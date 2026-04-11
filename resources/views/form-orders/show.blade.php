@@ -115,6 +115,24 @@
                 </div>
             @endif
 
+            @if(($duplicateSiblingsCount ?? 0) > 0)
+                <div class="rounded-3 px-3 py-3 mb-4 bg-danger text-white d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-2 shadow-sm" role="alert">
+                    <div class="flex-grow-1">
+                        <i class="bi bi-files"></i>
+                        <strong>Duplikaty.</strong>
+                        To zamówienie jest w grupie duplikatów (ten sam e-mail głównego uczestnika i to samo szkolenie w panelu).
+                        @if($duplicateSiblingsCount === 1)
+                            Jest jeszcze <strong>jedno</strong> powiązane zamówienie.
+                        @else
+                            Są jeszcze <strong>{{ $duplicateSiblingsCount }}</strong> powiązane zamówienia.
+                        @endif
+                    </div>
+                    <a href="{{ route('form-orders.duplicates') }}" class="btn btn-sm btn-light text-dark text-nowrap align-self-md-center">
+                        <i class="bi bi-ui-checks-grid"></i> Zarządzanie duplikatami
+                    </a>
+                </div>
+            @endif
+
             {{-- Status zamówienia --}}
             @if($zamowienie->is_new)
                 <div class="text-center mb-3" id="orderStatusAlert">

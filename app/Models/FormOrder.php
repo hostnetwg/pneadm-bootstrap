@@ -259,28 +259,86 @@ class FormOrder extends Model
     }
 
     /**
-     * Scope - wykrywanie duplikatów (ten sam email głównego uczestnika + to samo szkolenie)
-     * Źródło e-maila: form_order_participants (is_primary), nie kolumny form_orders.
+     * Scope - wykrywanie duplikatów: ten sam courses.id + ten sam e-mail głównego uczestnika (>1 zamówienie).
+     * E-mail z form_order_participants (is_primary).
+     *
+     * courses.id = COALESCE(dopasowanie po form_orders.product_id, dopasowanie po publigo_product_id = courses.id_old).
+     * Zamówienia bez rozpoznanego kursu w ogóle nie wchodzą do analizy duplikatów.
+     *
+     * Zapytanie jest dwupoziomowe (podzapytanie + GROUP BY), żeby uniknąć błędu MySQL ONLY_FULL_GROUP_BY
+     * przy skorelowanych podzapytaniach w SELECT.
      */
     public function scopeDuplicates($query)
     {
-        $table = $query->getModel()->getTable();
+        $model = $query->getModel();
+        $table = $model->getTable();
+        $connection = $model->getConnectionName();
 
-        return $query
+        $resolvedCourseId = 'COALESCE(
+            (SELECT dc.id FROM courses AS dc WHERE dc.id = '.$table.'.product_id LIMIT 1),
+            (SELECT dc.id FROM courses AS dc WHERE dc.id_old IS NOT NULL AND dc.id_old != \'\' AND dc.id_old = '.$table.'.publigo_product_id LIMIT 1)
+        )';
+
+        $inner = DB::connection($connection)
+            ->table($table)
             ->join('form_order_participants as fop', function ($join) use ($table) {
                 $join->on($table.'.id', '=', 'fop.form_order_id')
                     ->where('fop.is_primary', '=', 1)
                     ->whereNull('fop.deleted_at');
             })
-            ->selectRaw('LOWER(TRIM(fop.participant_email)) as participant_email')
-            ->addSelect($table.'.publigo_product_id')
-            ->selectRaw('COUNT(*) as duplicate_count')
-            ->selectRaw('GROUP_CONCAT('.$table.'.id ORDER BY '.$table.'.id) as order_ids')
             ->whereNotNull('fop.participant_email')
             ->where('fop.participant_email', '!=', '')
-            ->whereNotNull($table.'.publigo_product_id')
-            ->groupByRaw('LOWER(TRIM(fop.participant_email)), '.$table.'.publigo_product_id')
-            ->having('duplicate_count', '>', 1);
+            ->whereRaw($resolvedCourseId.' IS NOT NULL')
+            ->whereNull($table.'.deleted_at')
+            ->selectRaw($table.'.id as form_order_id')
+            ->selectRaw('LOWER(TRIM(fop.participant_email)) as participant_email')
+            ->selectRaw($resolvedCourseId.' as duplicate_course_key');
+
+        return $model->newQueryWithoutScopes()
+            ->fromSub($inner, 'dup_rows')
+            ->selectRaw('dup_rows.participant_email as participant_email')
+            ->selectRaw('dup_rows.duplicate_course_key as duplicate_course_key')
+            // DISTINCT: jeden form_order mógłby się powtórzyć przez zdublowane wiersze fop (np. dwa is_primary=1)
+            ->selectRaw('COUNT(DISTINCT dup_rows.form_order_id) as duplicate_count')
+            ->selectRaw('GROUP_CONCAT(DISTINCT dup_rows.form_order_id ORDER BY dup_rows.form_order_id) as order_ids')
+            ->groupBy('dup_rows.participant_email', 'dup_rows.duplicate_course_key')
+            ->havingRaw('COUNT(DISTINCT dup_rows.form_order_id) > 1');
+    }
+
+    /**
+     * Zamówienia należące do tego samego courses.id co w grupie duplikatów (scopeDuplicates).
+     */
+    public function scopeWhereDuplicateGroupingCourseKey(Builder $query, int $courseKey): Builder
+    {
+        $t = $query->getModel()->getTable();
+
+        return $query->whereRaw(
+            'COALESCE(
+                (SELECT dc.id FROM courses AS dc WHERE dc.id = '.$t.'.product_id LIMIT 1),
+                (SELECT dc.id FROM courses AS dc WHERE dc.id_old IS NOT NULL AND dc.id_old != \'\' AND dc.id_old = '.$t.'.publigo_product_id LIMIT 1)
+            ) = ?',
+            [$courseKey]
+        );
+    }
+
+    /**
+     * courses.id dla tego zamówienia (tylko jeśli da się powiązać z wierszem courses), inaczej 0.
+     */
+    public function resolveDuplicateGroupingCourseKey(): int
+    {
+        if ($this->product_id && Course::query()->whereKey($this->product_id)->exists()) {
+            return (int) $this->product_id;
+        }
+        if ($this->publigo_product_id !== null && $this->publigo_product_id !== '') {
+            $courseId = Course::query()
+                ->where('id_old', $this->publigo_product_id)
+                ->value('id');
+            if ($courseId !== null) {
+                return (int) $courseId;
+            }
+        }
+
+        return 0;
     }
 
     /**
@@ -324,14 +382,15 @@ class FormOrder extends Model
     {
         $order = self::with('primaryParticipant')->find($orderId);
         $email = $order?->display_participant_email;
-        if (! $order || empty(trim((string) $email)) || ! $order->publigo_product_id) {
+        $courseKey = $order?->resolveDuplicateGroupingCourseKey() ?? 0;
+        if (! $order || empty(trim((string) $email)) || $courseKey <= 0) {
             return $query->where('id', -1); // Pusty wynik
         }
 
         return $query
-            ->where('publigo_product_id', $order->publigo_product_id)
             ->where('id', '!=', $orderId)
-            ->wherePrimaryParticipantEmailMatches($email);
+            ->wherePrimaryParticipantEmailMatches($email)
+            ->whereDuplicateGroupingCourseKey($courseKey);
     }
 
     /**
@@ -542,8 +601,9 @@ class FormOrder extends Model
 
         // PRIORYTET CHRONOLOGICZNY - zależy od statusu przetworzenia
         if ($this->has_invoice) {
-            // Dla zamówień z fakturą - starsze mają wyższy priorytet
-            $priority += (1000000 - $this->id);
+            // Z fakturą: najpierw duży bonus wyżej (+10M), potem jak przy aktywnych — NOWSZE (wyższe ID) wyżej
+            // (późniejsze zgłoszenie / zwykle właściwszy numer faktury niż wcześniejszy duplikat)
+            $priority += $this->id;
         } elseif ($this->is_completed) {
             // Dla zakończonych zamówień - starsze mają wyższy priorytet (ale niski)
             $priority += (100000 - $this->id);
@@ -609,7 +669,7 @@ class FormOrder extends Model
 
         // Dodaj informację o logice chronologicznej
         if ($this->has_invoice) {
-            $reasons[] = '📅 Starsze zamówienie (z fakturą)';
+            $reasons[] = '📅 Nowsze zamówienie (z fakturą) — wyższy priorytet niż starsze z tą samą fakturą';
         } elseif ($this->is_completed) {
             $reasons[] = '📅 Starsze zamówienie (zakończone)';
         } else {
