@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zaświadczenie</title>
+    @php
+        // Obsługa tła - konwersja do base64 dla PDF
+        $backgroundImageCss = '';
+        $showBackground = $templateSettings['show_background'] ?? false;
+        if ($showBackground && !empty($templateSettings['background_image'] ?? null)) {
+            $backgroundPath = storage_path('app/public/' . $templateSettings['background_image']);
+            if (file_exists($backgroundPath)) {
+                $imageData = file_get_contents($backgroundPath);
+                $imageBase64 = base64_encode($imageData);
+                $imageMime = mime_content_type($backgroundPath);
+                $backgroundImageCss = "background-image: url('data:{$imageMime};base64,{$imageBase64}'); background-size: cover; background-position: center; background-repeat: no-repeat;";
+            }
+        }
+    @endphp
     <style>
         @page {
             margin: 0;
@@ -16,6 +30,7 @@
             padding: 10px 50px 10px 50px;
             height: 100%;
             line-height: 1;
+            {!! $backgroundImageCss ?? '' !!}
         }
         h1, h2, h3, p, ol, ul, li {
             margin: 0;
