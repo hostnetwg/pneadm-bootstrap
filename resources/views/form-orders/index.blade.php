@@ -112,59 +112,82 @@
             {{-- Wyszukiwanie --}}
             <div class="card mb-3">
                 <div class="card-body">
-                    <form method="GET" action="{{ route('form-orders.index') }}" class="row g-3">
+                    <form method="GET" action="{{ route('form-orders.index') }}">
                         <input type="hidden" name="filter" value="{{ $filter }}">
-                        <div class="col-6 col-md-1">
-                            <label for="order_id" class="form-label small mb-1">ID zam.</label>
-                            <input type="text"
-                                   inputmode="numeric"
-                                   pattern="[0-9]*"
-                                   class="form-control form-control-sm"
-                                   id="order_id"
-                                   name="order_id"
-                                   value="{{ $orderIdFilter }}"
-                                   placeholder="—"
-                                   autocomplete="off"
-                                   title="ID zamówienia — tylko cyfry; po Szukaj tylko to zamówienie (Wyszukaj jest wtedy ignorowane)">
+                        {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Rekordów na stronę --}}
+                        <div class="row g-3 align-items-end">
+                            <div class="col-6 col-md-1">
+                                <label for="order_id" class="form-label small mb-1">ID zam.</label>
+                                <input type="text"
+                                       inputmode="numeric"
+                                       pattern="[0-9]*"
+                                       class="form-control form-control-sm"
+                                       id="order_id"
+                                       name="order_id"
+                                       value="{{ $orderIdFilter }}"
+                                       placeholder="—"
+                                       autocomplete="off"
+                                       title="ID zamówienia — tylko cyfry; po Szukaj tylko to zamówienie (Wyszukaj jest wtedy ignorowane)">
+                            </div>
+                            <div class="col-6 col-md-1">
+                                <label for="course_id" class="form-label small mb-1">ID szkol.</label>
+                                <input type="text"
+                                       inputmode="numeric"
+                                       pattern="[0-9]*"
+                                       class="form-control form-control-sm"
+                                       id="course_id"
+                                       name="course_id"
+                                       value="{{ $courseIdFilter }}"
+                                       placeholder="—"
+                                       autocomplete="off"
+                                       title="ID szkolenia w panelu (courses.id); product_id lub Publigo id_old">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="settlement" class="form-label small mb-1">Rozliczenie</label>
+                                <select id="settlement" name="settlement" class="form-select form-select-sm" title="Filtr po form_orders.payment_mode: odroczona faktura (w tym NULL) vs płatność online">
+                                    <option value="" {{ ($settlementFilter ?? '') === '' ? 'selected' : '' }}>Wszystkie</option>
+                                    <option value="deferred" {{ ($settlementFilter ?? '') === 'deferred' ? 'selected' : '' }}>Odroczona faktura</option>
+                                    <option value="online" {{ ($settlementFilter ?? '') === 'online' ? 'selected' : '' }}>Płatność online</option>
+                                </select>
+                            </div>
+                            <div id="opo-status-filter-column" class="col-6 col-md-2 @if(($settlementFilter ?? '') !== 'online') d-none @endif">
+                                <label for="opo_status" class="form-label small mb-1">Status bramki</label>
+                                <select id="opo_status" name="opo_status" class="form-select form-select-sm"
+                                        title="online_payment_orders.status — W trakcie = pending + created; zamknięte bez sukcesu = cancelled + failed."
+                                        @disabled(($settlementFilter ?? '') !== 'online')>
+                                    <option value="" {{ ($opoStatusFilter ?? '') === '' ? 'selected' : '' }}>Wszystkie</option>
+                                    <option value="in_progress" {{ ($opoStatusFilter ?? '') === 'in_progress' ? 'selected' : '' }}>W trakcie (oczek./utworzone)</option>
+                                    <option value="paid" {{ ($opoStatusFilter ?? '') === 'paid' ? 'selected' : '' }}>Opłacone</option>
+                                    <option value="cancelled_or_failed" {{ ($opoStatusFilter ?? '') === 'cancelled_or_failed' ? 'selected' : '' }}>Anulowane lub błąd</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="per_page" class="form-label small mb-1">Rekordów na stronę:</label>
+                                <select id="per_page" name="per_page" class="form-select form-select-sm w-100">
+                                    <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                                    <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                                    <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                                    <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
+                                    <option value="all" {{ $perPage == 'all' ? 'selected' : '' }}>Wszystkie</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-6 col-md-1">
-                            <label for="course_id" class="form-label small mb-1">ID szkol.</label>
-                            <input type="text"
-                                   inputmode="numeric"
-                                   pattern="[0-9]*"
-                                   class="form-control form-control-sm"
-                                   id="course_id"
-                                   name="course_id"
-                                   value="{{ $courseIdFilter }}"
-                                   placeholder="—"
-                                   autocomplete="off"
-                                   title="ID szkolenia w panelu (courses.id); product_id lub Publigo id_old">
-                        </div>
-                        <div class="col-12 col-md-5">
-                            <label for="search" class="form-label">Wyszukaj:</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="search" 
-                                   name="search" 
-                                   value="{{ $search }}" 
-                                   placeholder="Imię, email uczestnika, email zamawiającego, produkt, numer faktury, notatki, ID, Publigo ID...">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="per_page" class="form-label">Rekordów na stronę:</label>
-                            <select id="per_page" name="per_page" class="form-select">
-                                <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
-                                <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
-                                <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
-                                <option value="200" {{ $perPage == 200 ? 'selected' : '' }}>200</option>
-                                <option value="all" {{ $perPage == 'all' ? 'selected' : '' }}>Wszystkie</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 d-flex align-items-end">
-                            <div class="d-flex gap-2">
+                        {{-- Wiersz 2: Wyszukaj + akcje --}}
+                        <div class="row g-3 mt-1 align-items-end">
+                            <div class="col-12 col-md-8">
+                                <label for="search" class="form-label">Wyszukaj:</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="search"
+                                       name="search"
+                                       value="{{ $search }}"
+                                       placeholder="Imię, email uczestnika, email zamawiającego, produkt, numer faktury, notatki, ID, Publigo ID...">
+                            </div>
+                            <div class="col-12 col-md-4 d-flex align-items-end gap-2 flex-wrap">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '')
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index', ['filter' => $filter]) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -299,16 +322,29 @@
                                         <i class="bi bi-calendar-event"></i> SZKOLENIE
                                     </h6>
                                     <div class="fs-5 fw-semibold text-dark">{{ $zamowienie->product_name ?? '—' }}</div>
+                                    @php
+                                        $submissionTitle = \App\Models\FormOrder::submissionSourceLabel($zamowienie->submission_source);
+                                        if (filled($zamowienie->submission_source)) {
+                                            $submissionTitle .= ' ('.$zamowienie->submission_source.')';
+                                        }
+                                        $submissionTitle .= ' — form_orders.submission_source';
+                                    @endphp
                                     @if($zamowienie->course)
-                                        <div class="small text-muted mt-1">
+                                        <div class="small text-muted mt-1" title="{{ $submissionTitle }}">
                                             ID szkolenia (courses): <span class="fw-semibold text-body">{{ $zamowienie->course->id }}</span>
                                             @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
                                                 <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-body">{{ $zamowienie->course->id_old }}</span>
                                             @endif
+                                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-body">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                                         </div>
                                     @elseif($zamowienie->product_id)
-                                        <div class="small text-muted mt-1">
+                                        <div class="small text-muted mt-1" title="{{ $submissionTitle }}">
                                             <span class="text-warning">Brak rekordu courses</span> dla <code>product_id</code> = {{ $zamowienie->product_id }}
+                                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-body">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
+                                        </div>
+                                    @else
+                                        <div class="small text-muted mt-1" title="{{ $submissionTitle }}">
+                                            zapis: <span class="fw-semibold text-body">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                                         </div>
                                     @endif
                                     @if($zamowienie->product_price)
@@ -641,6 +677,12 @@
                                         if (($courseIdFilter ?? '') !== '') {
                                             $paginationQuery['course_id'] = $courseIdFilter;
                                         }
+                                        if (($settlementFilter ?? '') !== '') {
+                                            $paginationQuery['settlement'] = $settlementFilter;
+                                        }
+                                        if (($opoStatusFilter ?? '') !== '') {
+                                            $paginationQuery['opo_status'] = $opoStatusFilter;
+                                        }
                                     @endphp
                                     {{ $zamowienia->appends($paginationQuery)->links() }}
                                 </div>
@@ -742,12 +784,31 @@ nowoczesna-edukacja.pl `;
             }
         @endforeach
 
-        // Inicjalizacja tooltipów Bootstrap
+        // Inicjalizacja tooltipów Bootstrap + pokazywanie „Status bramki” tylko przy Płatność online
         document.addEventListener('DOMContentLoaded', function() {
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
+
+            var settlementEl = document.getElementById('settlement');
+            var opoColumn = document.getElementById('opo-status-filter-column');
+            var opoSelect = document.getElementById('opo_status');
+            function syncOpoStatusFilterVisibility() {
+                if (!settlementEl || !opoColumn || !opoSelect) {
+                    return;
+                }
+                var online = settlementEl.value === 'online';
+                opoColumn.classList.toggle('d-none', !online);
+                opoSelect.disabled = !online;
+                if (!online) {
+                    opoSelect.value = '';
+                }
+            }
+            if (settlementEl) {
+                settlementEl.addEventListener('change', syncOpoStatusFilterVisibility);
+            }
+            syncOpoStatusFilterVisibility();
         });
     </script>
 

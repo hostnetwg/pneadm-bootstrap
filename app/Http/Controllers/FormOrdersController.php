@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\FormOrder;
+use App\Models\OnlinePaymentOrder;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
 use App\Services\PubligoApiService;
@@ -122,6 +123,50 @@ class FormOrdersController extends Controller
             });
         }
 
+        $settlementRaw = (string) $request->get('settlement', '');
+        $settlementFilter = in_array($settlementRaw, ['deferred', 'online'], true) ? $settlementRaw : '';
+        $formOrdersTable = (new FormOrder)->getTable();
+        if ($settlementFilter === 'deferred') {
+            $query->where(function ($q) use ($formOrdersTable) {
+                $q->where($formOrdersTable.'.payment_mode', FormOrder::PAYMENT_MODE_DEFERRED_INVOICE)
+                    ->orWhereNull($formOrdersTable.'.payment_mode');
+            });
+        } elseif ($settlementFilter === 'online') {
+            $query->where($formOrdersTable.'.payment_mode', FormOrder::PAYMENT_MODE_ONLINE_GATEWAY);
+        }
+
+        /*
+         * Podfiltr statusu płatności online — wyłącznie przy settlement=online.
+         * Źródło: online_payment_orders.status (odpowiedź bramki), spójnie z /online-payment-orders.
+         * - in_progress: pending + created (jeszcze możliwa dokończenie wpłaty)
+         * - paid: opłacone
+         * - cancelled_or_failed: anulowane lub błąd (zamknięte bez sukcesu)
+         */
+        $opoStatusRaw = (string) $request->get('opo_status', '');
+        $allowedOpo = ['in_progress', 'paid', 'cancelled_or_failed'];
+        $opoStatusFilter = ($settlementFilter === 'online' && in_array($opoStatusRaw, $allowedOpo, true))
+            ? $opoStatusRaw
+            : '';
+        if ($opoStatusFilter === 'in_progress') {
+            $query->whereHas('onlinePaymentOrders', function ($q) {
+                $q->whereIn('status', [
+                    OnlinePaymentOrder::STATUS_PENDING,
+                    OnlinePaymentOrder::STATUS_CREATED,
+                ]);
+            });
+        } elseif ($opoStatusFilter === 'paid') {
+            $query->whereHas('onlinePaymentOrders', function ($q) {
+                $q->where('status', OnlinePaymentOrder::STATUS_PAID);
+            });
+        } elseif ($opoStatusFilter === 'cancelled_or_failed') {
+            $query->whereHas('onlinePaymentOrders', function ($q) {
+                $q->whereIn('status', [
+                    OnlinePaymentOrder::STATUS_CANCELLED,
+                    OnlinePaymentOrder::STATUS_FAILED,
+                ]);
+            });
+        }
+
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
             $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course'])->orderByDesc('id')->get();
@@ -197,7 +242,7 @@ class FormOrdersController extends Controller
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
         ];
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
     }
 
     /**
@@ -295,6 +340,7 @@ class FormOrdersController extends Controller
                 'invoice_notes' => $request->invoice_notes,
                 'invoice_payment_delay' => $request->invoice_payment_delay,
                 'notes' => $request->notes,
+                'submission_source' => FormOrder::SUBMISSION_SOURCE_PNEADM_MANUAL,
                 'ip_address' => $request->ip(),
             ]);
 

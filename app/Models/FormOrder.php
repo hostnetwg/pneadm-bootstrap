@@ -23,10 +23,17 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $pnedu_clickmeeting_status Status kroku ClickMeeting po akcji „Dodaj tylko do PNEDU”.
  * @property \Carbon\Carbon|null $pnedu_clickmeeting_synced_at Data ostatniej próby integracji z ClickMeeting.
  * @property string|null $pnedu_clickmeeting_message Szczegóły wyniku integracji ClickMeeting.
+ * @property string|null $submission_source Kanał zapisu (pnedu_order_form, pneadm_manual); null = historia / inny kanał.
  */
 class FormOrder extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
+
+    /** Zamówienie z publicznego formularza na stronie PNEDU (odroczona faktura lub płatność online). */
+    public const SUBMISSION_SOURCE_PNEDU_ORDER_FORM = 'pnedu_order_form';
+
+    /** Zamówienie utworzone ręcznie w panelu pneadm-bootstrap. */
+    public const SUBMISSION_SOURCE_PNEADM_MANUAL = 'pneadm_manual';
 
     public const PAYMENT_MODE_DEFERRED_INVOICE = 'deferred_invoice';
 
@@ -117,6 +124,7 @@ class FormOrder extends Model
         'invoice_payment_delay',
         'payment_mode',
         'payment_status',
+        'submission_source',
 
         // Dane KSeF
         'ksef_number',
@@ -749,6 +757,27 @@ class FormOrder extends Model
             self::PAYMENT_STATUS_CANCELLED => 'Anulowane',
             self::PAYMENT_STATUS_FAILED => 'Błąd płatności',
             default => $status ? (string) $status : '—',
+        };
+    }
+
+    public static function submissionSourceLabel(?string $source): string
+    {
+        return match ($source) {
+            self::SUBMISSION_SOURCE_PNEDU_ORDER_FORM => 'Formularz publiczny (PNEDU)',
+            self::SUBMISSION_SOURCE_PNEADM_MANUAL => 'Panel pneadm (ręcznie)',
+            null, '' => 'Nie określono (historia / inny kanał)',
+            default => (string) $source,
+        };
+    }
+
+    /** Krótka etykieta kanału zapisu (lista zamówień, kompaktowy widok). */
+    public static function submissionSourceShortLabel(?string $source): string
+    {
+        return match ($source) {
+            self::SUBMISSION_SOURCE_PNEDU_ORDER_FORM => 'PNEDU',
+            self::SUBMISSION_SOURCE_PNEADM_MANUAL => 'Panel',
+            null, '' => '—',
+            default => (string) $source,
         };
     }
 

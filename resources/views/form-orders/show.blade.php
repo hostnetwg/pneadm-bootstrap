@@ -151,21 +151,35 @@
                             </span>
                         @endif
                     </h5>
+                    @php
+                        $submissionTitleShow = \App\Models\FormOrder::submissionSourceLabel($zamowienie->submission_source);
+                        if (filled($zamowienie->submission_source)) {
+                            $submissionTitleShow .= ' ('.$zamowienie->submission_source.')';
+                        }
+                        $submissionTitleShow .= ' — form_orders.submission_source';
+                    @endphp
                     @if($zamowienie->course)
-                        <div class="small text-white-50 mt-2 mb-0">
+                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
                             ID szkolenia (courses): <span class="fw-semibold text-white">{{ $zamowienie->course->id }}</span>
                             @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
                                 <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->course->id_old }}</span>
                             @endif
+                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                         </div>
                     @elseif($zamowienie->product_id)
-                        <div class="small text-warning mt-2 mb-0">
+                        <div class="small text-warning mt-2 mb-0" title="{{ $submissionTitleShow }}">
                             <span>Brak rekordu courses</span> dla <code class="text-white">product_id</code> = {{ $zamowienie->product_id }}
+                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                         </div>
                     @elseif($zamowienie->publigo_product_id)
-                        <div class="small text-white-50 mt-2 mb-0">
+                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
                             Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->publigo_product_id }}</span>
                             <span class="ms-1">(brak powiązania z courses)</span>
+                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
+                        </div>
+                    @else
+                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
+                            zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                         </div>
                     @endif
                     @if($zamowienie->coursePriceVariant)

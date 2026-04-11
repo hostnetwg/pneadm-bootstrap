@@ -694,23 +694,26 @@
             document.getElementById('orderDetailsLink').href = `/form-orders/${orderId}`;
             
             // Załaduj szczegóły zamówienia
-            fetch(`/form-orders/${orderId}`)
-                .then(response => response.text())
+            fetch(`/form-orders/${orderId}`, { credentials: 'same-origin' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.text();
+                })
                 .then(html => {
-                    // Wyciągnij tylko zawartość body z odpowiedzi
+                    // Pełna strona layoutu nie ma .container — treść jest w #main-content (nagłówek + main) lub main.main-content
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
-                    const bodyContent = doc.querySelector('.container');
-                    
+                    const bodyContent = doc.querySelector('#main-content')
+                        || doc.querySelector('main.main-content')
+                        || doc.querySelector('.container-fluid')
+                        || doc.querySelector('.container');
+
                     if (bodyContent) {
-                        // Usuń nagłówek i nawigację, zostaw tylko zawartość
-                        const header = bodyContent.querySelector('x-slot[name="header"]');
-                        if (header) header.remove();
-                        
-                        // Zastąp zawartość modala
                         document.getElementById('orderDetailsContent').innerHTML = bodyContent.innerHTML;
                     } else {
-                        document.getElementById('orderDetailsContent').innerHTML = 
+                        document.getElementById('orderDetailsContent').innerHTML =
                             '<div class="alert alert-danger">Nie udało się załadować szczegółów zamówienia.</div>';
                     }
                 })
