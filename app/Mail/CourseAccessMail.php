@@ -28,6 +28,16 @@ class CourseAccessMail extends Mailable
         $participantFirstName = trim((string) $this->participant->first_name) ?: 'Uczestniku';
         $courseTitle = $this->course->title ?? 'szkolenie';
 
+        $hasLimitedAccess = $this->participant->hasLimitedAccess();
+        $accessExpired = $hasLimitedAccess ? $this->participant->hasExpiredAccess() : false;
+        $accessExpiresAtFormatted = null;
+        if ($hasLimitedAccess && $this->participant->access_expires_at) {
+            $accessExpiresAtFormatted = $this->participant->access_expires_at
+                ->copy()
+                ->setTimezone('Europe/Warsaw')
+                ->format('d.m.Y H:i');
+        }
+
         return $this->subject('Dostęp do materiałów i nagrania – '.$courseTitle.' – '.config('app.name'))
             ->view('emails.course-access')
             ->with([
@@ -39,6 +49,9 @@ class CourseAccessMail extends Mailable
                 'hasCertificate' => $this->hasCertificate,
                 'accountCreatedNow' => $this->accountCreatedNow,
                 'setPasswordUrl' => $this->setPasswordUrl,
+                'hasLimitedAccess' => $hasLimitedAccess,
+                'accessExpired' => $accessExpired,
+                'accessExpiresAtFormatted' => $accessExpiresAtFormatted,
             ]);
     }
 }
