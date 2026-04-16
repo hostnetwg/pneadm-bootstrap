@@ -14,10 +14,6 @@
         .meta { margin: 12px 0 0; padding: 12px; background: #fff; border: 1px solid #e9ecef; border-radius: 5px; }
         .meta p { margin: 0 0 6px; }
         .meta p:last-child { margin-bottom: 0; }
-        .access-box { margin: 12px 0 0; padding: 12px; border-radius: 5px; border: 1px solid #e9ecef; background: #fff; }
-        .access-badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-weight: bold; font-size: 0.95em; }
-        .access-badge--active { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-        .access-badge--expired { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
         .wrap-link { overflow-wrap: anywhere; word-break: break-word; }
         .footer { margin-top: 20px; font-size: 0.9em; color: #6c757d; }
     </style>
@@ -37,17 +33,6 @@
         @endif
 
         <p>Na Twoim koncie pnedu.pl zostały udostępnione:</p>
-
-        @if(!empty($hasLimitedAccess) && !empty($accessExpiresAtFormatted))
-            <div class="access-box">
-                <p style="margin: 0 0 8px;"><strong>Dostęp do szkolenia</strong></p>
-                @if(!empty($accessExpired))
-                    <span class="access-badge access-badge--expired">Dostęp wygasł: {{ $accessExpiresAtFormatted }}</span>
-                @else
-                    <span class="access-badge access-badge--active">Dostęp wygaśnie: {{ $accessExpiresAtFormatted }}</span>
-                @endif
-            </div>
-        @endif
 
         <div class="meta">
             @if($hasVideos)
