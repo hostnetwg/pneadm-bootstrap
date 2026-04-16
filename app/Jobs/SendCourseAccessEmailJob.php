@@ -84,8 +84,8 @@ class SendCourseAccessEmailJob implements ShouldQueue
         }
 
         $pneduFrontendUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/');
-        $pneduCourseId = $this->resolvePneduCourseId($course);
-        $courseUrl = $pneduFrontendUrl.'/dashboard/szkolenia/'.rawurlencode((string) $pneduCourseId).'/wideo';
+        // pnedu.pl: /dashboard/szkolenia/{participant}/wideo — parametr to ID rekordu participants (w bazie pneadm).
+        $courseUrl = $pneduFrontendUrl.'/dashboard/szkolenia/'.rawurlencode((string) $participant->id).'/wideo';
 
         $normalizedEmail = strtolower(trim($email));
         $pneduUser = PneduUser::query()
@@ -132,7 +132,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'has_materials' => $hasMaterials,
                     'has_certificate' => $hasCertificate,
                     'pnedu_course_url' => $courseUrl,
-                    'pnedu_course_id' => (string) $pneduCourseId,
+                    'pnedu_participant_id' => (int) $participant->id,
                     'account_created_now' => $accountCreatedNow,
                     'set_password_url_generated' => $setPasswordUrl !== null,
                 ],
@@ -153,21 +153,12 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'has_materials' => $hasMaterials,
                     'has_certificate' => $hasCertificate,
                     'pnedu_course_url' => $courseUrl,
+                    'pnedu_participant_id' => (int) $participant->id,
                     'account_created_now' => $accountCreatedNow,
                 ],
             ]);
 
             throw $e;
         }
-    }
-
-    private function resolvePneduCourseId(Course $course): string
-    {
-        $idOld = trim((string) ($course->id_old ?? ''));
-        if ($idOld !== '') {
-            return $idOld;
-        }
-
-        return (string) $course->id;
     }
 }
