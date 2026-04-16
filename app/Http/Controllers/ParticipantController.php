@@ -6,6 +6,8 @@ use App\Jobs\SendCertificateLinkEmailJob;
 use App\Models\Certificate;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
+use App\Models\CourseFileLink;
+use App\Models\CourseVideo;
 use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
@@ -761,6 +763,60 @@ class ParticipantController extends Controller
         }
 
         return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został zlecony do wysyłki na adres '.$email);
+    }
+
+    /**
+     * Wysyła e-mail o dostępnych zasobach kursu na pnedu.pl (wymaga logowania).
+     */
+    public function sendCourseAccessEmail(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $email = $participant->email;
+        if ($email === null || trim($email) === '') {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma podanego adresu e-mail.');
+        }
+
+        $hasVideos = CourseVideo::query()->where('course_id', $course->id)->exists();
+        $hasMaterials = CourseFileLink::query()->where('course_id', $course->id)->exists();
+        $hasCertificate = ($course->certificate_download_status === 'download_enabled');
+
+        if (! $hasVideos && ! $hasMaterials && ! $hasCertificate) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Nie wysłano e-maila: dla tego szkolenia nie ma nagrań, materiałów ani aktywnego zaświadczenia.'
+            );
+        }
+
+        $createdBy = Auth::id();
+
+        try {
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_COURSE_ACCESS,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+                'meta' => [
+                    'has_videos' => $hasVideos,
+                    'has_materials' => $hasMaterials,
+                    'has_certificate' => $hasCertificate,
+                ],
+            ]);
+
+            \App\Jobs\SendCourseAccessEmailJob::dispatch(
+                $course->id,
+                $participant->id,
+                $log->id
+            );
+        } catch (\Throwable $e) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
+        }
+
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail o dostępie do szkolenia został zlecony do wysyłki na adres '.$email);
     }
 
     /**

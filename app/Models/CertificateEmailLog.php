@@ -11,6 +11,7 @@ class CertificateEmailLog extends Model
 
     public const TYPE_LIST_LINK = 'list_link';
     public const TYPE_SINGLE_CERTIFICATE = 'single_certificate';
+    public const TYPE_COURSE_ACCESS = 'course_access';
 
     public const STATUS_QUEUED = 'queued';
     public const STATUS_SENT = 'sent';
@@ -27,12 +28,14 @@ class CertificateEmailLog extends Model
         'sent_at',
         'failed_at',
         'error_message',
+        'meta',
     ];
 
     protected $casts = [
         'queued_at' => 'datetime',
         'sent_at' => 'datetime',
         'failed_at' => 'datetime',
+        'meta' => 'array',
     ];
 
     public function course()

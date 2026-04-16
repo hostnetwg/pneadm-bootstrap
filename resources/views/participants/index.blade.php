@@ -336,6 +336,12 @@
                                         <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap">Wyślij e-mail to</button>
                                     </form>
                                 @endif
+                                @if(!empty($participant->email))
+                                    <form action="{{ route('participants.send-course-access-email', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail o dostępie do nagrania/materiałów na pnedu.pl?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap">E-mail: nagranie</button>
+                                    </form>
+                                @endif
                             </div>
                         </td>                         
                         <td>

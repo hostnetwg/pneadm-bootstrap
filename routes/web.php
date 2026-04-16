@@ -310,6 +310,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/', [ParticipantController::class, 'store'])->name('participants.store'); // Dodawanie uczestnika
         Route::post('/{participant}/send-certificate-link', [ParticipantController::class, 'sendCertificateLink'])->name('participants.send-certificate-link'); // Wyślij e-mail z linkiem do zaświadczeń
         Route::post('/{participant}/send-single-certificate-link', [ParticipantController::class, 'sendSingleCertificateLink'])->name('participants.send-single-certificate-link'); // Wyślij e-mail z linkiem do konkretnego zaświadczenia
+        Route::post('/{participant}/send-course-access-email', [ParticipantController::class, 'sendCourseAccessEmail'])->name('participants.send-course-access-email'); // Wyślij e-mail o dostępie do nagrań/materiałów
         Route::post('/send-certificate-links-bulk', [ParticipantController::class, 'sendCertificateLinksBulk'])->name('participants.send-certificate-links-bulk'); // Masowa wysyłka linków do zaświadczeń
         Route::get('/certificate-emails/status', [ParticipantController::class, 'certificateEmailBatchStatus'])->name('participants.certificate-emails.status'); // Status wysyłki e-maili (batch)
         Route::post('/certificate-emails/cancel', [ParticipantController::class, 'cancelCertificateEmailBatch'])->name('participants.certificate-emails.cancel'); // Anulowanie wysyłki e-maili (batch)
