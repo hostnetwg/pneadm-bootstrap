@@ -38,7 +38,12 @@
         </p>
 
         <div class="footer">
-            <p>Z poważaniem,<br>{{ config('app.name') }}</p>
+            <p>
+                Z poważaniem,<br>
+                Waldemar Grabowski<br>
+                Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>
+                "Platforma Nowoczesnej Edukacji"
+            </p>
         </div>
     </div>
 </body>

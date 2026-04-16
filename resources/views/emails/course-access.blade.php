@@ -26,13 +26,17 @@
     <div class="content">
         <p>Dzień dobry {{ $participantFirstName }},</p>
 
-        @if($accountCreatedNow)
-            <p>Na platformie pnedu.pl utworzyliśmy dla Ciebie konto i dodaliśmy dostęp do szkolenia: <strong>{{ $courseTitle }}</strong>.</p>
-            <p>Aby skorzystać z dostępu, ustaw hasło i zaloguj się.</p>
+        @php
+            $courseTitleQuoted = '„' . $courseTitle . '”';
+        @endphp
+
+        @if(!empty($courseDateLong))
+            <p>Dziękujemy za udział w szkoleniu {{ $courseTitleQuoted }}, które odbyło się {{ $courseDateLong }} Wszystkie materiały są już dla Ciebie dostępne online.</p>
         @else
-            <p>Na Twoim koncie pnedu.pl zostały udostępnione nowe elementy szkolenia: <strong>{{ $courseTitle }}</strong>.</p>
-            <p>Zaloguj się na konto, aby skorzystać z dostępu.</p>
+            <p>Dziękujemy za udział w szkoleniu {{ $courseTitleQuoted }}. Wszystkie materiały są już dla Ciebie dostępne online.</p>
         @endif
+
+        <p>Na Twoim koncie pnedu.pl zostały udostępnione:</p>
 
         @if(!empty($hasLimitedAccess) && !empty($accessExpiresAtFormatted))
             <div class="access-box">
@@ -46,7 +50,6 @@
         @endif
 
         <div class="meta">
-            <p><strong>Dostępne teraz:</strong></p>
             @if($hasVideos)
                 <p>- nagranie szkolenia</p>
             @endif
@@ -57,6 +60,18 @@
                 <p>- zaświadczenie do pobrania</p>
             @endif
         </div>
+
+        @if($accountCreatedNow)
+            <p>Aby skorzystać z dostępu, ustaw hasło i zaloguj się na konto.</p>
+        @else
+            <p>Zaloguj się na konto, aby skorzystać z dostępu.</p>
+        @endif
+
+        @if(!empty($hasLimitedAccess) && !empty($accessExpiresAtFormatted) && empty($accessExpired))
+            <p><strong>UWAGA!</strong><br>Dostęp do nagrania oraz materiałów wygaśnie: {{ $accessExpiresAtFormatted }}</p>
+        @elseif(!empty($hasLimitedAccess) && !empty($accessExpiresAtFormatted) && !empty($accessExpired))
+            <p><strong>UWAGA!</strong><br>Dostęp do nagrania oraz materiałów wygasł: {{ $accessExpiresAtFormatted }}</p>
+        @endif
 
         <p>
             <a href="{{ $courseUrl }}" class="btn-link">Przejdź do szkolenia na pnedu.pl</a>
@@ -76,7 +91,12 @@
         @endif
 
         <div class="footer">
-            <p>Z poważaniem,<br>{{ config('app.name') }}</p>
+            <p>
+                Z poważaniem,<br>
+                Waldemar Grabowski<br>
+                Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>
+                "Platforma Nowoczesnej Edukacji"
+            </p>
         </div>
     </div>
 </body>

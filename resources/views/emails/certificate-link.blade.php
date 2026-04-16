@@ -26,7 +26,12 @@
         </p>
         <p>Link jest przypisany do Twojego adresu e-mail i umożliwia dostęp do zaświadczeń z wszystkich szkoleń, w których uczestniczyłeś/aś.</p>
         <div class="footer">
-            <p>Z poważaniem,<br>{{ config('app.name') }}</p>
+            <p>
+                Z poważaniem,<br>
+                Waldemar Grabowski<br>
+                Akredytowany Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>
+                "Platforma Nowoczesnej Edukacji"
+            </p>
         </div>
     </div>
 </body>
