@@ -676,6 +676,22 @@ class ParticipantController extends Controller
         $totalCertificates = Certificate::where('course_id', $course->id)->count();
         $downloadedCertificates = Certificate::where('course_id', $course->id)->where('download_count', '>', 0)->count();
 
+        $participantIds = $participants->getCollection()->pluck('id')->filter()->values();
+        $trainingPageViewsByParticipantId = [];
+        if ($participantIds->isNotEmpty()) {
+            $rows = DB::table('participant_training_page_views')
+                ->whereIn('participant_id', $participantIds)
+                ->get(['participant_id', 'open_count', 'first_opened_at', 'last_opened_at']);
+
+            foreach ($rows as $r) {
+                $trainingPageViewsByParticipantId[(int) $r->participant_id] = [
+                    'open_count' => (int) ($r->open_count ?? 0),
+                    'first_opened_at' => $r->first_opened_at ? Carbon::parse($r->first_opened_at) : null,
+                    'last_opened_at' => $r->last_opened_at ? Carbon::parse($r->last_opened_at) : null,
+                ];
+            }
+        }
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -683,7 +699,8 @@ class ParticipantController extends Controller
             'downloadTokensByEmail',
             'certificatePdfGenerationCompletedAt',
             'totalCertificates',
-            'downloadedCertificates'
+            'downloadedCertificates',
+            'trainingPageViewsByParticipantId'
         ));
     }
 

@@ -301,6 +301,22 @@
                             @else
                                 Brak zaświadczenia
                             @endif
+
+                            @php
+                                $tpv = $trainingPageViewsByParticipantId[$participant->id] ?? null;
+                            @endphp
+                            @if($tpv && ($tpv['open_count'] ?? 0) > 0)
+                                <div class="mt-1 small text-muted">
+                                    <span class="badge bg-success" title="Liczba wejść na stronę szkolenia (pnedu): {{ $tpv['open_count'] }}">
+                                        Otworzył: {{ $tpv['open_count'] }}×
+                                    </span>
+                                    @if(!empty($tpv['last_opened_at']))
+                                        <span class="ms-1" title="Ostatnie wejście">
+                                            {{ $tpv['last_opened_at']->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
                         </td>
                         <td>
                             <div class="d-flex flex-column gap-1">
