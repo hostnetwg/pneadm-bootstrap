@@ -692,6 +692,13 @@ nowoczesna-edukacja.pl </div>
                                     </h6>
                                 </div>
                                 <div class="card-body py-2">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" value="1"
+                                               id="ifirma_prefix_szkolenie_in_product_name" checked>
+                                        <label class="form-check-label small" for="ifirma_prefix_szkolenie_in_product_name">
+                                            Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
+                                        </label>
+                                    </div>
                                     <div class="mb-2">
                                         <label for="invoice_api_remarks" class="form-label small mb-1">
                                             <strong>Uwagi, które pojawią się na fakturze:</strong>
@@ -1013,6 +1020,11 @@ nowoczesna-edukacja.pl `;
                 });
         }
 
+        function ifirmaPrefixSzkolenieInProductName() {
+            const el = document.getElementById('ifirma_prefix_szkolenie_in_product_name');
+            return !!(el && el.checked);
+        }
+
         // Funkcja do wystawiania faktury pro forma w iFirma
         function createIfirmaProForma(orderId) {
             const button = document.getElementById('ifirmaProFormaBtn');
@@ -1039,7 +1051,8 @@ nowoczesna-edukacja.pl `;
             // Jeśli pole ma wartość, wyślij ją - backend użyje dokładnie tego co jest w polu
             const requestData = {
                 custom_remarks: customRemarks, // Zawsze wyślij (nawet jeśli pusty string)
-                send_email: sendEmail
+                send_email: sendEmail,
+                prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
             
             // Wysłanie zapytania AJAX z niestandardowymi uwagami i opcją wysyłki e-mail
@@ -1275,7 +1288,8 @@ nowoczesna-edukacja.pl `;
             // Jeśli customRemarks ma wartość, wyślij ją - backend użyje dokładnie tego co jest w polu
             const requestData = {
                 custom_remarks: customRemarks, // Zawsze wyślij (nawet jeśli pusty string) - backend użyje dokładnie tego co jest w polu
-                send_email: sendEmail
+                send_email: sendEmail,
+                prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
             
             // Dodaj parametr force tylko jeśli jest true
@@ -1577,7 +1591,8 @@ nowoczesna-edukacja.pl `;
             
             // Przygotuj dane do wysłania
             const requestData = {
-                send_email: sendEmail
+                send_email: sendEmail,
+                prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
             
             // Dodaj parametr force tylko jeśli jest true
@@ -1843,7 +1858,8 @@ nowoczesna-edukacja.pl `;
             
             // Przygotuj dane do wysłania
             const requestData = {
-                send_email: sendEmail
+                send_email: sendEmail,
+                prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
             
             // Dodaj parametr force tylko jeśli jest true
