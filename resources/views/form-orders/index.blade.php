@@ -330,6 +330,17 @@
                                         $submissionTitle .= ' — form_orders.submission_source';
                                     @endphp
                                     @if($zamowienie->course)
+                                        @php
+                                            $courseDateTime = $zamowienie->course->start_date
+                                                ? $zamowienie->course->start_date->setTimezone(config('app.timezone', 'Europe/Warsaw'))->format('d.m.Y H:i')
+                                                : 'brak daty';
+                                            $courseInstructor = trim(($zamowienie->course->instructor->first_name ?? '').' '.($zamowienie->course->instructor->last_name ?? ''));
+                                            $courseInstructor = $courseInstructor !== '' ? $courseInstructor : 'brak prowadzącego';
+                                        @endphp
+                                        <div class="small text-muted mt-1">
+                                            Data i godzina szkolenia: <span class="fw-semibold text-body">{{ $courseDateTime }}</span>
+                                            <span class="ms-1">·</span> prowadzący: <span class="fw-semibold text-body">{{ $courseInstructor }}</span>
+                                        </div>
                                         <div class="small text-muted mt-1" title="{{ $submissionTitle }}">
                                             ID szkolenia (courses): <span class="fw-semibold text-body">{{ $zamowienie->course->id }}</span>
                                             @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
