@@ -302,6 +302,9 @@
                             </div>
                         </div>
 
+                        {{-- KSeF – Podmiot3 (metadane) — ETAP 1 --}}
+                        @include('form-orders.partials.ksef-additional-entity-form', ['zamowienie' => $zamowienie])
+
                         {{-- UWAGI DO FAKTURY --}}
                         <div class="card mb-4">
                             <div class="card-header bg-info text-white">

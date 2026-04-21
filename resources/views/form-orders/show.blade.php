@@ -267,6 +267,9 @@ nowoczesna-edukacja.pl </div>
                                     </button>
                                 @endif
                             </div>
+
+                            {{-- KSeF – Podmiot3 (metadane) — widok tylko do odczytu --}}
+                            @include('form-orders.partials.ksef-additional-entity-show', ['zamowienie' => $zamowienie])
                         </div>
                     </div>
 
@@ -494,6 +497,12 @@ nowoczesna-edukacja.pl </div>
                                     @endif
                                 </label>
                             </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturaproformakraj.json</code>, bez wysyłki do KSeF.
+                                <strong>Nie wysyła</strong> bloku <code>OdbiorcaNaFakturze</code> (Podmiot3) — publiczna dokumentacja iFirma
+                                nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF.
+                            </div>
                         </div>
 
                         {{-- Button Wystaw Fakturę iFirma --}}
@@ -511,6 +520,14 @@ nowoczesna-edukacja.pl </div>
                                     @endif
                                 </label>
                             </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
+                                Ta ścieżka <strong>nigdy</strong> nie dołącza bloku <code>OdbiorcaNaFakturze</code>
+                                (Podmiot3), niezależnie od metadanych KSeF w zamówieniu.
+                                Do faktury z Podmiotem3 użyj „Wystaw Fakturę iFirma z Odbiorcą” (bez KSeF)
+                                lub czerwonego przycisku (z KSeF).
+                            </div>
                             
                             {{-- Button Wystaw Fakturę iFirma z Odbiorcą --}}
                             <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithReceiverBtn" 
@@ -527,6 +544,14 @@ nowoczesna-edukacja.pl </div>
                                     @endif
                                 </label>
                             </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
+                                Domyślnie nabywca + odbiorca z pól <code>recipient_*</code>, jeśli podano
+                                co najmniej nazwę, kod i miejscowość; inaczej tylko nabywca.
+                                Gdy w sekcji KSeF – Podmiot3 ustawiono źródło <code>recipient</code>,
+                                stosowane są pełne metadane (rola, NIP, fail-fast).
+                            </div>
 
                             {{-- Button Wystaw fakturę i prześlij do KSeF --}}
                             <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithKsefBtn" 
@@ -542,6 +567,14 @@ nowoczesna-edukacja.pl </div>
                                         <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
                                     @endif
                                 </label>
+                            </div>
+                            <div class="small text-danger mt-1">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                Pełny flow: <code>fakturakraj.json</code> + <code>sendInvoiceToKsef</code>.
+                                Budowa nabywcy / odbiorcy (Podmiot3) jak przy „Wystaw Fakturę iFirma z Odbiorcą”.
+                                Zaznaczenie „Wyślij automatycznie na e-mail” wysyła wiadomość <strong>dopiero po
+                                udanym</strong> przesłaniu faktury do KSeF (przy błędzie KSeF e-mail nie jest wysyłany).
+                                <strong>Uwaga:</strong> faktura trafia do rządowego KSeF — używaj świadomie.
                             </div>
                         </div>
                     </div>

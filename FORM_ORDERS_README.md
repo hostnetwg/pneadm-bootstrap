@@ -1,5 +1,39 @@
 # Tabela form_orders - Szybki start
 
+## KSeF — Podmiot3 (ETAP 3)
+
+Od wdrożenia migracji
+`2026_04_20_000001_add_ksef_additional_entity_metadata_to_form_orders_table.php`
+(ETAP 1) i
+`2026_04_20_000002_document_podmiot3_and_extend_ksef_role_comments_on_form_orders.php`
+(ETAP 2) tabela `form_orders` ma 4+1 kolumn sterujących dodatkowym podmiotem
+na fakturze (Podmiot3 / `OdbiorcaNaFakturze` w iFirma): `ksef_entity_source`,
+`ksef_additional_entity_role`, `ksef_additional_entity_id_type`,
+`ksef_additional_entity_identifier` oraz `ksef_admin_note`.
+
+ETAP 3 integruje te metadane z czterema przyciskami wystawiania dokumentu na
+stronie szczegółów zamówienia i wprowadza wspólny builder
+`App\Services\IfirmaKontrahentBuilder` dla wszystkich ścieżek.
+
+Reguły, mapowanie do iFirma, backfill, odrzucone role, integracja z
+przyciskami i plan ETAPU 4 opisuje dedykowany dokument:
+
+**[docs/KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md)**
+
+Kluczowe założenia ETAPU 3:
+
+- trzy obsługiwane role: `odbiorca` (iFirma `ODBIORCA`), `jst_recipient` (iFirma `JEDN_SAMORZADU_TERYT`, KSeF rola 8), `vat_group_member` (iFirma `CZLONEK_GRUPY_VAT`, KSeF rola 9),
+- tylko istniejące kolumny `recipient_*` + 4+1 pól metadanych (bez wariantu `custom`, bez duplikacji danych),
+- **nota nazewnicza:** kolumny `recipient_*` są historyczne — semantycznie trzymają dane Podmiotu3 niezależnie od wybranej roli. Nazwa pozostaje dla zgodności wstecznej z publicznym formularzem `pnedu.pl` (wariant C, szczegóły w [docs/KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md)),
+- kanoniczne kody ról w bazie (lowercase) — UI/mapowanie iFirma przeliczają na etykiety/wartości docelowe,
+- reguła **fail-fast**: nieobsługiwana rola (np. `employee`, `factor`), `id_type` inny niż `NIP`, niekompletne `recipient_*` lub pusty NIP przy roli JST/grupy VAT → HTTP 422 zamiast wysyłki do iFirma. Nigdy nie robimy cichego fallbacku do `recipient_nip`,
+- **mapa przycisków** (szczegóły w [docs/KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md#etap-3--integracja-z-przyciskami-ifirma-na-stronie-zamówienia)):
+  - „Wystaw PRO-FORMA iFirma” → `fakturaproformakraj.json`, **nigdy** `OdbiorcaNaFakturze`, bez KSeF,
+  - „Wystaw Fakturę iFirma” → `fakturakraj.json`, **nigdy** `OdbiorcaNaFakturze` (`podmiot3_mode=ignore`), bez KSeF — faktura tylko z nabywcą,
+  - „Wystaw Fakturę iFirma z Odbiorcą” → `fakturakraj.json`, `podmiot3_mode=invoice_with_receiver`: nabywca + odbiorca z `recipient_*` gdy kompletne nazwa/kod/miasto; przy źródle KSeF `recipient` — pełne metadane (mapper), bez KSeF,
+  - „Wystaw fakturę i prześlij do KSeF” (czerwony) → `fakturakraj.json` + `sendInvoiceToKsef`, `podmiot3_mode=invoice_with_receiver` (jak „z Odbiorcą”); e-mail z checkboxu dopiero po sukcesie KSeF,
+- pro forma świadomie **nie otrzymuje** bloku `OdbiorcaNaFakturze` ani technicznych dopisków w `Uwagi` — publiczna dokumentacja iFirma nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF. Do testowania Podmiotu3 bez KSeF służy **„Wystaw Fakturę iFirma z Odbiorcą”** (niebieski przycisk zawsze bez Podmiotu3).
+
 ## Co zostało zrobione?
 
 Stworzono odpowiednik tabeli `zamowienia_FORM` z bazy **certgen** w bazie **pneadm** pod nazwą `form_orders`.

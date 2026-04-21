@@ -50,6 +50,95 @@ class FormOrder extends Model
     public const PAYMENT_STATUS_FAILED = 'failed';
 
     /**
+     * KSeF Podmiot3 (ETAP 1) — źródło danych dodatkowego podmiotu.
+     * Brak dodatkowego podmiotu; iFirma otrzymuje tylko Nabywcę (Kontrahent bez OdbiorcaNaFakturze).
+     */
+    public const KSEF_ENTITY_SOURCE_NONE = 'none';
+
+    /**
+     * KSeF Podmiot3 (ETAP 1) — Podmiot3 budowany z istniejących kolumn recipient_*.
+     * Jedyny obsługiwany wariant w ETAP 1 (brak custom).
+     */
+    public const KSEF_ENTITY_SOURCE_RECIPIENT = 'recipient';
+
+    /**
+     * KSeF Podmiot3 — kanoniczny kod roli ODBIORCA.
+     * Mapowany w iFirma do OdbiorcaNaFakturze.Rola = 'ODBIORCA'.
+     * Obsługiwany od ETAP 1 (NULL traktujemy jako domyślną wartość 'odbiorca').
+     */
+    public const KSEF_ROLE_ODBIORCA = 'odbiorca';
+
+    /**
+     * KSeF Podmiot3 — kanoniczny kod roli JST (rola 8 w KSeF / FA(2)).
+     * Mapowany w iFirma do OdbiorcaNaFakturze.Rola = 'JEDN_SAMORZADU_TERYT'.
+     * Obsługiwany od ETAP 2. Semantyka: Odbiorca JEST jednostką samorządu terytorialnego.
+     */
+    public const KSEF_ROLE_JST_RECIPIENT = 'jst_recipient';
+
+    /**
+     * KSeF Podmiot3 — kanoniczny kod roli „członek grupy VAT — odbiorca” (rola 9 w KSeF / FA(2)).
+     * Mapowany w iFirma do OdbiorcaNaFakturze.Rola = 'CZLONEK_GRUPY_VAT'.
+     * Obsługiwany od ETAP 2. Semantyka: Odbiorca jest członkiem grupy VAT (grupa figuruje jako Nabywca).
+     */
+    public const KSEF_ROLE_VAT_GROUP_MEMBER = 'vat_group_member';
+
+    /**
+     * KSeF Podmiot3 — kanoniczny typ identyfikatora NIP.
+     * Jedyny typ, dla którego mapowanie do iFirma jest potwierdzone w ETAP 1/2.
+     */
+    public const KSEF_ID_TYPE_NIP = 'NIP';
+
+    /**
+     * Wszystkie kanoniczne kody ról KSeF Podmiot3 dozwolone do zapisu w bazie (walidacja).
+     * Mapowanie na UI i iFirma realizowane osobno (nigdy nie odwrotnie).
+     *
+     * @var array<int, string>
+     */
+    public const KSEF_ADDITIONAL_ENTITY_ROLES = [
+        self::KSEF_ROLE_ODBIORCA,
+        self::KSEF_ROLE_JST_RECIPIENT,
+        self::KSEF_ROLE_VAT_GROUP_MEMBER,
+    ];
+
+    /**
+     * Kanoniczne kody ról, dla których mapowanie w ETAP 2 WYMAGA niepustego NIP
+     * (patrz IfirmaAdditionalEntityMapper::build()): w praktyce KSeF nie przyjmie
+     * JST ani członka grupy VAT bez NIP podmiotu, więc odrzucamy fail-fast
+     * zanim uderzymy do iFirma.
+     *
+     * @var array<int, string>
+     */
+    public const KSEF_ROLES_REQUIRING_NIP = [
+        self::KSEF_ROLE_JST_RECIPIENT,
+        self::KSEF_ROLE_VAT_GROUP_MEMBER,
+    ];
+
+    /**
+     * Wszystkie dozwolone typy identyfikatorów KSeF Podmiot3 (walidacja).
+     *
+     * W ETAP 1 tylko NIP jest mapowany do iFirma; pozostałe wartości są zapisywane, ale
+     * blokują wystawienie faktury z Podmiotem3 (fail-fast) — patrz docs/KSEF_FORM_ORDERS.md.
+     *
+     * @var array<int, string>
+     */
+    public const KSEF_ADDITIONAL_ENTITY_ID_TYPES = [
+        self::KSEF_ID_TYPE_NIP,
+        'PESEL',
+        'IDWew',
+        'BrakID',
+    ];
+
+    /**
+     * Wszystkie dozwolone wartości kolumny ksef_entity_source (walidacja).
+     *
+     * @var array<int, string>
+     */
+    public const KSEF_ENTITY_SOURCES = [
+        self::KSEF_ENTITY_SOURCE_NONE,
+        self::KSEF_ENTITY_SOURCE_RECIPIENT,
+    ];
+
+    /**
      * Nazwa tabeli
      */
     protected $table = 'form_orders';
@@ -131,6 +220,13 @@ class FormOrder extends Model
         'ksef_sent_at',
         'ksef_status',
         'ksef_error',
+
+        // Metadane KSeF Podmiot3 (ETAP 1) — patrz docs/KSEF_FORM_ORDERS.md
+        'ksef_entity_source',
+        'ksef_additional_entity_role',
+        'ksef_additional_entity_id_type',
+        'ksef_additional_entity_identifier',
+        'ksef_admin_note',
 
         // Status i notatki
         'status_completed',
@@ -799,5 +895,140 @@ class FormOrder extends Model
             self::PAYMENT_STATUS_SUBMITTED => 'primary',
             default => 'light text-dark',
         };
+    }
+
+    /**
+     * Czy zamówienie ma być wystawione do iFirma z blokiem OdbiorcaNaFakturze (Podmiot3).
+     *
+     * Jedyne "aktywujące" ustawienie w ETAP 1: ksef_entity_source = 'recipient'.
+     * Wartość 'none' (default) oraz brak kolumny => Podmiot3 nieaktywny, mimo że w bazie
+     * mogą istnieć wypełnione ksef_additional_entity_* (metadane są ignorowane,
+     * ale świadomie nie kasowane podczas edycji).
+     */
+    public function isKsefAdditionalEntityEnabled(): bool
+    {
+        return $this->ksef_entity_source === self::KSEF_ENTITY_SOURCE_RECIPIENT;
+    }
+
+    /**
+     * Czy w kolumnach recipient_* jest komplet minimum do zbudowania bloku
+     * `OdbiorcaNaFakturze` jako zwykły odbiorca fizyczny (bez aktywnych metadanych KSeF).
+     *
+     * To samo minimum co w `IfirmaAdditionalEntityMapper::build()` i historyczny
+     * backfill ETAP 1: recipient_name, recipient_postal_code, recipient_city — wszystkie
+     * niepuste po trim. Używane przez ścieżkę „Wystaw Fakturę iFirma z Odbiorcą”
+     * przy `ksef_entity_source = 'none'`.
+     */
+    public function hasPhysicalRecipientDataComplete(): bool
+    {
+        return trim((string) $this->recipient_name) !== ''
+            && trim((string) $this->recipient_postal_code) !== ''
+            && trim((string) $this->recipient_city) !== '';
+    }
+
+    /**
+     * Etykieta użytkowa dla kanonicznego kodu źródła Podmiotu3.
+     *
+     * Uwaga nazewnicza: kolumny `recipient_*` pełnią rolę danych Podmiotu3 niezależnie od
+     * wybranej roli (ETAP 2: odbiorca / JST / członek grupy VAT). Nazwa `recipient_*`
+     * pozostaje dla zgodności wstecznej z kontraktem publicznego formularza pnedu.pl.
+     * Szczegóły: docs/KSEF_FORM_ORDERS.md — sekcja „Nota nazewnicza”.
+     */
+    public static function ksefEntitySourceLabel(?string $source): string
+    {
+        return match ($source) {
+            self::KSEF_ENTITY_SOURCE_NONE, null, '' => 'Brak dodatkowego podmiotu',
+            self::KSEF_ENTITY_SOURCE_RECIPIENT => 'Dane Podmiotu3 (kolumny recipient_*)',
+            default => (string) $source,
+        };
+    }
+
+    /**
+     * Etykieta użytkowa (UI) dla kanonicznego kodu roli Podmiotu3.
+     *
+     * Mapowanie nigdy nie działa w drugą stronę — w bazie trzymamy tylko kanoniczny kod.
+     */
+    public static function ksefAdditionalEntityRoleLabel(?string $role): string
+    {
+        return match ($role) {
+            self::KSEF_ROLE_ODBIORCA => 'Odbiorca (iFirma: ODBIORCA)',
+            self::KSEF_ROLE_JST_RECIPIENT => 'JST — rola 8 (iFirma: JEDN_SAMORZADU_TERYT)',
+            self::KSEF_ROLE_VAT_GROUP_MEMBER => 'Członek grupy VAT — rola 9 (iFirma: CZLONEK_GRUPY_VAT)',
+            null, '' => 'Nie ustawiono (domyślnie: Odbiorca)',
+            default => (string) $role,
+        };
+    }
+
+    /**
+     * Czy kanoniczny kod roli jest obsługiwany przez mapowanie do iFirma (ETAP 2).
+     *
+     * NULL traktujemy jako domyślną rolę 'odbiorca' (zgodność wsteczna dla rekordów
+     * historycznych po backfillu, które nie mają jeszcze ręcznie wybranej roli).
+     */
+    public static function isKsefRoleSupported(?string $role): bool
+    {
+        return in_array($role, [null, '', ...self::KSEF_ADDITIONAL_ENTITY_ROLES], true);
+    }
+
+    /**
+     * Czy kanoniczny kod roli wymaga niepustego NIP w payloadzie iFirma (fail-fast).
+     *
+     * Dla ról JST (rola 8) i członka grupy VAT (rola 9) KSeF wymaga identyfikacji
+     * podmiotu po NIP — pusty NIP oznaczałby błąd walidacyjny po stronie iFirma/KSeF.
+     * Odrzucamy taki request jeszcze przed wywołaniem API.
+     */
+    public static function isKsefRoleRequiringNip(?string $role): bool
+    {
+        return in_array($role, self::KSEF_ROLES_REQUIRING_NIP, true);
+    }
+
+    /**
+     * Nazwa roli oczekiwana przez iFirma w polu OdbiorcaNaFakturze.Rola.
+     *
+     * Źródło: https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/
+     * Zwraca `null` dla ról nieobsługiwanych (wtedy mapper rzuca RuntimeException).
+     */
+    public static function ksefRoleIfirmaCode(?string $role): ?string
+    {
+        return match ($role) {
+            null, '', self::KSEF_ROLE_ODBIORCA => 'ODBIORCA',
+            self::KSEF_ROLE_JST_RECIPIENT => 'JEDN_SAMORZADU_TERYT',
+            self::KSEF_ROLE_VAT_GROUP_MEMBER => 'CZLONEK_GRUPY_VAT',
+            default => null,
+        };
+    }
+
+    /**
+     * Czy typ identyfikatora jest obsługiwany przez mapowanie do iFirma.
+     *
+     * NULL traktujemy jako "brak nadpisania" — payload używa wtedy recipient_nip
+     * (o ile istnieje). Tylko explicit 'NIP' pozwala na użycie własnej wartości.
+     */
+    public static function isKsefIdTypeSupported(?string $idType): bool
+    {
+        return in_array($idType, [null, '', self::KSEF_ID_TYPE_NIP], true);
+    }
+
+    /**
+     * Alias zgodności wstecznej (ETAP 1) — używany w testach i szablonach.
+     *
+     * Semantycznie od ETAP 2 to już nie jest „tylko ETAP 1”, ale lista obsługiwanych
+     * ról się rozrosła. Nowy kod powinien używać isKsefRoleSupported().
+     *
+     * @deprecated od ETAP 2 — używaj isKsefRoleSupported().
+     */
+    public static function isKsefRoleSupportedInEtap1(?string $role): bool
+    {
+        return in_array($role, [null, '', self::KSEF_ROLE_ODBIORCA], true);
+    }
+
+    /**
+     * Alias zgodności wstecznej (ETAP 1).
+     *
+     * @deprecated od ETAP 2 — używaj isKsefIdTypeSupported().
+     */
+    public static function isKsefIdTypeSupportedInEtap1(?string $idType): bool
+    {
+        return self::isKsefIdTypeSupported($idType);
     }
 }

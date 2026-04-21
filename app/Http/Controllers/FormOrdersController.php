@@ -296,6 +296,13 @@ class FormOrdersController extends Controller
                 'recipient_city' => 'nullable|string|max:100',
                 'recipient_nip' => 'nullable|string|max:20',
 
+                // Metadane KSeF Podmiot3 (ETAP 1) — patrz docs/KSEF_FORM_ORDERS.md
+                'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
+                'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
+                'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
+                'ksef_additional_entity_identifier' => 'nullable|string|max:50',
+                'ksef_admin_note' => 'nullable|string',
+
                 // Dane Publigo (opcjonalne)
                 'publigo_product_id' => 'nullable|integer',
                 'publigo_price_id' => 'nullable|integer',
@@ -335,6 +342,11 @@ class FormOrdersController extends Controller
                 'recipient_postal_code' => $request->recipient_postal_code,
                 'recipient_city' => $request->recipient_city,
                 'recipient_nip' => $request->recipient_nip,
+                'ksef_entity_source' => $request->input('ksef_entity_source', FormOrder::KSEF_ENTITY_SOURCE_NONE),
+                'ksef_additional_entity_role' => $request->input('ksef_additional_entity_role') ?: null,
+                'ksef_additional_entity_id_type' => $request->input('ksef_additional_entity_id_type') ?: null,
+                'ksef_additional_entity_identifier' => $request->input('ksef_additional_entity_identifier') ?: null,
+                'ksef_admin_note' => $request->input('ksef_admin_note') ?: null,
                 'publigo_product_id' => $publigoProductId,
                 'publigo_price_id' => $publigoPriceId,
                 'invoice_notes' => $request->invoice_notes,
@@ -449,6 +461,18 @@ class FormOrdersController extends Controller
 
             // Jeśli przychodzi z pełnej strony edycji, aktualizuj wszystkie pola
             if ($isFromEditPage) {
+                // Walidacja metadanych KSeF Podmiot3 — ETAP 1.
+                // Uwaga: nie czyścimy automatycznie role / id_type / identifier
+                // kiedy ksef_entity_source = 'none' — admin może świadomie trzymać
+                // wartości (np. jst_recipient) do czasu ETAPU 2. Mapowanie i tak je ignoruje.
+                $request->validate([
+                    'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
+                    'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
+                    'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
+                    'ksef_additional_entity_identifier' => 'nullable|string|max:50',
+                    'ksef_admin_note' => 'nullable|string',
+                ]);
+
                 $zamowienie->fill([
                     'product_name' => $request->input('product_name'),
                     'product_price' => $request->input('product_price'),
@@ -465,6 +489,11 @@ class FormOrdersController extends Controller
                     'recipient_postal_code' => $request->input('recipient_postal_code'),
                     'recipient_city' => $request->input('recipient_city'),
                     'recipient_nip' => $request->input('recipient_nip'),
+                    'ksef_entity_source' => $request->input('ksef_entity_source', FormOrder::KSEF_ENTITY_SOURCE_NONE),
+                    'ksef_additional_entity_role' => $request->input('ksef_additional_entity_role') ?: null,
+                    'ksef_additional_entity_id_type' => $request->input('ksef_additional_entity_id_type') ?: null,
+                    'ksef_additional_entity_identifier' => $request->input('ksef_additional_entity_identifier') ?: null,
+                    'ksef_admin_note' => $request->input('ksef_admin_note') ?: null,
                     'invoice_number' => $request->input('invoice_number'),
                     'invoice_payment_delay' => $request->input('invoice_payment_delay'),
                     'invoice_notes' => $request->input('invoice_notes'),
@@ -913,45 +942,11 @@ class FormOrdersController extends Controller
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
             }
 
-            // Przygotowanie danych kontrahenta - tylko pola z wartościami
-            $kontrahent = [
-                'Nazwa' => $zamowienie->buyer_name,
-                'Kraj' => 'PL',
-            ];
-
-            // Dodajemy tylko pola, które mają wartości (nie wysyłamy pustych stringów)
-            if (! empty($zamowienie->buyer_address)) {
-                $kontrahent['Ulica'] = $zamowienie->buyer_address;
-            }
-
-            if (! empty($zamowienie->buyer_postal_code)) {
-                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
-            }
-
-            if (! empty($zamowienie->buyer_city)) {
-                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
-            }
-
-            // NIP tylko jeśli jest podany (nie wysyłamy pustego string)
-            if (! empty($zamowienie->buyer_nip)) {
-                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (! empty($nip)) {
-                    $kontrahent['NIP'] = $nip;
-                }
-            }
-
-            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
-            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
-            $emailToSave = null;
-            if (! empty($zamowienie->orderer_email)) {
-                $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
-            }
-
-            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
-                $kontrahent['Email'] = $emailToSave;
-            }
+            // Przygotowanie danych kontrahenta (PRO-FORMA) — wspólny builder (ETAP 3).
+            // Pro forma NIE dokleja OdbiorcaNaFakturze (publiczna dokumentacja iFirma
+            // nie potwierdza obsługi tego pola dla fakturaproformakraj; pro forma nie
+            // podlega też KSeF). Patrz docs/KSEF_FORM_ORDERS.md — sekcja „ETAP 3”.
+            $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)->buildForProForma($zamowienie);
 
             // Przygotowanie pozycji faktury
             // Zgodnie z dokumentacją API iFirma - pozycja powinna zawierać:
@@ -1327,53 +1322,20 @@ class FormOrdersController extends Controller
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
             }
 
-            // Przygotowanie danych kontrahenta
-            // KLUCZOWE ZMIANY na podstawie działającego kodu PHP:
-            // 1. Kraj: "Polska" (nie "PL"!)
-            // 2. Dodane: PrefiksUE, OsobaFizyczna, Email
-            // 3. NIP jako null jeśli pusty (nie pomijamy pola)
-            $kontrahent = [
-                'Nazwa' => $zamowienie->buyer_name,
-                'NIP' => null,
-                'Ulica' => '',
-                'KodPocztowy' => '',
-                'Miejscowosc' => '',
-                'Kraj' => 'Polska', // WAŻNE: "Polska", nie "PL"!
-                'PrefiksUE' => 'PL',
-                'OsobaFizyczna' => false,
-                'Email' => null,
-            ];
-
-            // NIP
-            if (! empty($zamowienie->buyer_nip)) {
-                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (! empty($nip)) {
-                    $kontrahent['NIP'] = $nip;
-                }
-            }
-
-            // Adres
-            if (! empty($zamowienie->buyer_address)) {
-                $kontrahent['Ulica'] = $zamowienie->buyer_address;
-            }
-            if (! empty($zamowienie->buyer_postal_code)) {
-                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
-            }
-            if (! empty($zamowienie->buyer_city)) {
-                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
-            }
-
-            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
-            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
-            $emailToSave = null;
-            if (! empty($zamowienie->orderer_email)) {
-                $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
-            }
-
-            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
-                $kontrahent['Email'] = $emailToSave;
+            // Przygotowanie danych kontrahenta (FAKTURA KRAJOWA) — ETAP 3.
+            // Przycisk „Wystaw Fakturę iFirma”: zawsze faktura BEZ Podmiotu3 (`podmiot3_mode=ignore`),
+            // nawet gdy w zamówieniu są metadane KSeF / niekompletne recipient_* — mapper nie jest wołany.
+            try {
+                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
+                    ->buildForInvoice($zamowienie, [
+                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_IGNORE,
+                    ]);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            } catch (\App\Services\IfirmaKontrahentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+            } catch (\RuntimeException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
             }
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
@@ -1709,20 +1671,6 @@ class FormOrdersController extends Controller
                 ], 400);
             }
 
-            // Sprawdzenie czy zamówienie ma dane odbiorcy
-            if (empty($zamowienie->recipient_name)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.',
-                ], 400);
-            }
-            if (empty($zamowienie->recipient_postal_code) || empty($zamowienie->recipient_city)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.',
-                ], 400);
-            }
-
             // Sprawdzenie czy zamówienie ma produkt i cenę
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
@@ -1734,74 +1682,22 @@ class FormOrdersController extends Controller
             // Uwagi - TYLKO identyfikator zamówienia
             $uwagi = "pnedu.pl #{$zamowienie->id}";
 
-            // Przygotowanie danych kontrahenta (NABYWCA - podmiot 2)
-            $kontrahent = [
-                'Nazwa' => $zamowienie->buyer_name,
-                'NIP' => null,
-                'Ulica' => '',
-                'KodPocztowy' => '',
-                'Miejscowosc' => '',
-                'Kraj' => 'Polska',
-                'PrefiksUE' => 'PL',
-                'OsobaFizyczna' => false,
-                'Email' => null,
-            ];
-
-            // NIP nabywcy
-            if (! empty($zamowienie->buyer_nip)) {
-                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (! empty($nip)) {
-                    $kontrahent['NIP'] = $nip;
-                }
+            // Wspólny builder (ETAP 3) — `podmiot3_mode=invoice_with_receiver`:
+            // przy KSeF źródle `recipient` pełny mapper (role, NIP, fail-fast);
+            // przy `none` — legacy `OdbiorcaNaFakturze` z recipient_* jeśli nazwa+kod+miasto
+            // kompletne, w przeciwnym razie faktura tylko z nabywcą (bez 400).
+            try {
+                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
+                    ->buildForInvoice($zamowienie, [
+                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
+                    ]);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            } catch (\App\Services\IfirmaKontrahentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+            } catch (\RuntimeException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
             }
-
-            // Adres nabywcy
-            if (! empty($zamowienie->buyer_address)) {
-                $kontrahent['Ulica'] = $zamowienie->buyer_address;
-            }
-            if (! empty($zamowienie->buyer_postal_code)) {
-                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
-            }
-            if (! empty($zamowienie->buyer_city)) {
-                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
-            }
-
-            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
-            // Preferujemy orderer_email, jeśli nie ma, używamy participant_email
-            $emailToSave = null;
-            if (! empty($zamowienie->orderer_email)) {
-                $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
-            }
-
-            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
-                $kontrahent['Email'] = $emailToSave;
-            }
-
-            // Odbiorca na fakturze (podmiot 3) - wewnątrz Kontrahenta
-            // Zgodnie z dokumentacją API iFirma: https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/
-            $odbiorcaNaFakturze = [
-                'UzywajDanychOdbiorcyNaFakturach' => true,
-                'Nazwa' => $zamowienie->recipient_name,
-                'KodPocztowy' => $zamowienie->recipient_postal_code,
-                'Miejscowosc' => $zamowienie->recipient_city,
-            ];
-
-            // Opcjonalne pola odbiorcy
-            if (! empty($zamowienie->recipient_address)) {
-                $odbiorcaNaFakturze['Ulica'] = $zamowienie->recipient_address;
-            }
-            if (! empty($zamowienie->recipient_nip)) {
-                $recipientNip = preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
-                if (! empty($recipientNip)) {
-                    $odbiorcaNaFakturze['NIP'] = $recipientNip;
-                }
-            }
-            $odbiorcaNaFakturze['Kraj'] = 'Polska';
-            $odbiorcaNaFakturze['Rola'] = 'ODBIORCA';
-
-            $kontrahent['OdbiorcaNaFakturze'] = $odbiorcaNaFakturze;
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
@@ -1866,7 +1762,7 @@ class FormOrdersController extends Controller
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
-                'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
+                'odbiorca_na_fakturze' => $kontrahent['OdbiorcaNaFakturze'] ?? null,
                 'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
                 'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
@@ -2135,20 +2031,6 @@ class FormOrdersController extends Controller
                 ], 400);
             }
 
-            // Sprawdzenie czy zamówienie ma dane odbiorcy
-            if (empty($zamowienie->recipient_name)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak danych odbiorcy. Nie można wystawić faktury z odbiorcą.',
-                ], 400);
-            }
-            if (empty($zamowienie->recipient_postal_code) || empty($zamowienie->recipient_city)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Brak kodu pocztowego lub miejscowości odbiorcy. Nie można wystawić faktury z odbiorcą.',
-                ], 400);
-            }
-
             // Sprawdzenie czy zamówienie ma produkt i cenę
             if (empty($zamowienie->product_name) || empty($zamowienie->product_price)) {
                 return response()->json([
@@ -2160,72 +2042,22 @@ class FormOrdersController extends Controller
             // Uwagi - TYLKO identyfikator zamówienia
             $uwagi = "pnedu.pl #{$zamowienie->id}";
 
-            // Przygotowanie danych kontrahenta (NABYWCA - podmiot 2)
-            $kontrahent = [
-                'Nazwa' => $zamowienie->buyer_name,
-                'NIP' => null,
-                'Ulica' => '',
-                'KodPocztowy' => '',
-                'Miejscowosc' => '',
-                'Kraj' => 'Polska',
-                'PrefiksUE' => 'PL',
-                'OsobaFizyczna' => false,
-                'Email' => null,
-            ];
-
-            // NIP nabywcy
-            if (! empty($zamowienie->buyer_nip)) {
-                $nip = preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip);
-                if (! empty($nip)) {
-                    $kontrahent['NIP'] = $nip;
-                }
+            // Wspólny builder (ETAP 3) — ten sam tryb co „Wystaw Fakturę iFirma z Odbiorcą”
+            // (`podmiot3_mode=invoice_with_receiver`): KSeF metadane → mapper; `none` + kompletne
+            // recipient_* → legacy OdbiorcaNaFakturze; inaczej tylko nabywca. Różnica względem
+            // fioletowego przycisku: po udanym wystawieniu faktury następuje sendInvoiceToKsef.
+            try {
+                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
+                    ->buildForInvoice($zamowienie, [
+                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
+                    ]);
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            } catch (\App\Services\IfirmaKontrahentException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+            } catch (\RuntimeException $e) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
             }
-
-            // Adres nabywcy
-            if (! empty($zamowienie->buyer_address)) {
-                $kontrahent['Ulica'] = $zamowienie->buyer_address;
-            }
-            if (! empty($zamowienie->buyer_postal_code)) {
-                $kontrahent['KodPocztowy'] = $zamowienie->buyer_postal_code;
-            }
-            if (! empty($zamowienie->buyer_city)) {
-                $kontrahent['Miejscowosc'] = $zamowienie->buyer_city;
-            }
-
-            // Email - zawsze zapisujemy adres e-mail w dokumencie iFirma (niezależnie od checkboxa)
-            $emailToSave = null;
-            if (! empty($zamowienie->orderer_email)) {
-                $emailToSave = strtolower(trim($zamowienie->orderer_email));
-            } elseif (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $emailToSave = strtolower(trim($zamowienie->display_participant_email));
-            }
-
-            if (! empty($emailToSave) && filter_var($emailToSave, FILTER_VALIDATE_EMAIL)) {
-                $kontrahent['Email'] = $emailToSave;
-            }
-
-            // Odbiorca na fakturze (podmiot 3) - wewnątrz Kontrahenta
-            $odbiorcaNaFakturze = [
-                'UzywajDanychOdbiorcyNaFakturach' => true,
-                'Nazwa' => $zamowienie->recipient_name,
-                'KodPocztowy' => $zamowienie->recipient_postal_code,
-                'Miejscowosc' => $zamowienie->recipient_city,
-            ];
-
-            // Opcjonalne pola odbiorcy
-            if (! empty($zamowienie->recipient_address)) {
-                $odbiorcaNaFakturze['Ulica'] = $zamowienie->recipient_address;
-            }
-            if (! empty($zamowienie->recipient_nip)) {
-                $recipientNip = preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip);
-                if (! empty($recipientNip)) {
-                    $odbiorcaNaFakturze['NIP'] = $recipientNip;
-                }
-            }
-            $odbiorcaNaFakturze['Kraj'] = 'Polska';
-            $odbiorcaNaFakturze['Rola'] = 'ODBIORCA';
-
-            $kontrahent['OdbiorcaNaFakturze'] = $odbiorcaNaFakturze;
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
@@ -2290,12 +2122,12 @@ class FormOrdersController extends Controller
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
-                'odbiorca_na_fakturze' => $odbiorcaNaFakturze,
+                'odbiorca_na_fakturze' => $kontrahent['OdbiorcaNaFakturze'] ?? null,
                 'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
 
-            // KROK 1: Wystawienie faktury pro forma przez API iFirma
+            // KROK 1: Wystawienie faktury krajowej przez API iFirma
             $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createInvoice($invoiceData);
 
@@ -2481,7 +2313,8 @@ class FormOrdersController extends Controller
                 ], 500);
             }
 
-            // KROK 3: Wysyłka e-mailem (jeśli zaznaczono checkbox)
+            // KROK 3: Wysyłka e-mailem (jeśli zaznaczono checkbox) — tylko po udanym KSeF
+            // (powyżej przy błędzie KSeF jest return; ten kod nie wykona się przy niepowodzeniu).
             $sendEmail = $request->input('send_email', false);
             $emailsSent = [];
             $emailErrors = [];
