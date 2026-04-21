@@ -104,6 +104,9 @@
                     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkEmailSingleModal">
                         <i class="fas fa-envelope me-1"></i> Wyślij e-maile: to zaświadczenie
                     </button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#bulkEmailCourseAccessModal">
+                        <i class="fas fa-video me-1"></i> Wyślij e-mail nagranie
+                    </button>
                     <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
                     </a>
@@ -174,6 +177,14 @@
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if(session('info'))
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                {{ session('info') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
@@ -733,6 +744,51 @@
                 </div>
             </div>
         </div>
+
+        {{-- Modal: Masowa wysyłka e-maili – dostęp do nagrania/materiałów --}}
+        <div class="modal fade" id="bulkEmailCourseAccessModal" tabindex="-1" aria-labelledby="bulkEmailCourseAccessModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="bulkEmailCourseAccessModalLabel">
+                            <i class="fas fa-video me-2"></i> Wyślij e-mail nagranie
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Wyśle e-mail o dostępie do nagrania/materiałów/zaświadczenia na pnedu (treść jak w przycisku „E-mail: nagranie” przy uczestniku).</p>
+                        <div class="mb-0">
+                            <label class="form-label fw-bold">Tryb wysyłki</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_course_access_mode" id="bulk_email_course_access_mode_unsent" value="unsent" checked>
+                                <label class="form-check-label" for="bulk_email_course_access_mode_unsent">Wyślij tylko do tych, do których jeszcze nie wysłano</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_course_access_mode" id="bulk_email_course_access_mode_resend" value="resend_all">
+                                <label class="form-check-label" for="bulk_email_course_access_mode_resend">Wyślij ponownie do wszystkich</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="bulk_email_course_access_mode" id="bulk_email_course_access_mode_not_opened" value="not_opened">
+                                <label class="form-check-label" for="bulk_email_course_access_mode_not_opened">Wyślij tylko do tych, którzy nigdy nie weszli w nagranie</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('participants.send-certificate-links-bulk', $course) }}" method="POST" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="type" value="course_access">
+                            <input type="hidden" name="mode" id="bulk_email_course_access_mode_input" value="unsent">
+                            <button type="submit" class="btn btn-light">
+                                <i class="fas fa-paper-plane me-1"></i> Wyślij
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Import CSV -->
@@ -854,6 +910,7 @@
             }
             bind('bulk_email_list_mode', 'bulk_email_list_mode_input');
             bind('bulk_email_single_mode', 'bulk_email_single_mode_input');
+            bind('bulk_email_course_access_mode', 'bulk_email_course_access_mode_input');
         })();
 
         function clearModalBackdrop() {
@@ -866,6 +923,7 @@
         function emailTypeLabel(type) {
             if (type === 'single_certificate') return 'to zaświadczenie';
             if (type === 'list_link') return 'lista zaświadczeń';
+            if (type === 'course_access') return 'nagranie/materiały';
             return type || 'e-maile';
         }
 
@@ -1134,8 +1192,8 @@
                     .catch(function() { return null; });
             }
 
-            Promise.all([check('single_certificate'), check('list_link')]).then(function(results) {
-                var activeType = results[0] || results[1];
+            Promise.all([check('single_certificate'), check('list_link'), check('course_access')]).then(function(results) {
+                var activeType = results[0] || results[1] || results[2];
                 if (activeType) startEmailPolling(alertEl, activeType);
             });
         })();

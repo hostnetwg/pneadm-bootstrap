@@ -9,6 +9,7 @@ use App\Models\CourseFileLink;
 use App\Models\CourseVideo;
 use App\Models\Participant;
 use App\Models\PneduUser;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,7 +23,7 @@ use Illuminate\Support\Str;
 
 class SendCourseAccessEmailJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
     public int $timeout = 60;

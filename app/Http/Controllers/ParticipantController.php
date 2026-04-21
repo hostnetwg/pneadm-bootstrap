@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendCertificateLinkEmailJob;
+use App\Jobs\SendCourseAccessEmailJob;
 use App\Models\Certificate;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
@@ -837,20 +838,31 @@ class ParticipantController extends Controller
     }
 
     /**
-     * Masowa wysyłka e-maili z linkami do zaświadczeń (kolejka).
-     * Typy: list_link | single_certificate
-     * Tryby: unsent | resend_all | not_downloaded
+     * Masowa wysyłka e-maili (kolejka).
+     * Typy: list_link | single_certificate | course_access
+     * Tryby:
+     * - list_link/single_certificate: unsent | resend_all | not_downloaded
+     * - course_access: unsent | resend_all | not_opened
      */
     public function sendCertificateLinksBulk(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
-            'mode' => 'required|string|in:unsent,resend_all,not_downloaded',
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE.','.CertificateEmailLog::TYPE_COURSE_ACCESS,
+            'mode' => 'required|string|in:unsent,resend_all,not_downloaded,not_opened',
         ]);
 
         $type = $request->string('type')->toString();
         $mode = $request->string('mode')->toString();
         $createdBy = Auth::id();
+
+        if ($type === CertificateEmailLog::TYPE_COURSE_ACCESS && ! in_array($mode, ['unsent', 'resend_all', 'not_opened'], true)) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nieprawidłowy tryb wysyłki dla e-maila nagraniowego.');
+        }
+
+        if (in_array($type, [CertificateEmailLog::TYPE_LIST_LINK, CertificateEmailLog::TYPE_SINGLE_CERTIFICATE], true)
+            && ! in_array($mode, ['unsent', 'resend_all', 'not_downloaded'], true)) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nieprawidłowy tryb wysyłki.');
+        }
 
         $participantsQuery = Participant::query()
             ->where('participants.course_id', $course->id)
@@ -872,6 +884,24 @@ class ParticipantController extends Controller
                     ->where('certificates.course_id', '=', $course->id);
             })->whereRaw('COALESCE(certificates.download_count, 0) = 0')
                 ->select('participants.*');
+        } elseif ($mode === 'not_opened') {
+            $participantsQuery->leftJoin('participant_training_page_views as tpv', function ($join) {
+                $join->on('tpv.participant_id', '=', 'participants.id');
+            })->whereRaw('COALESCE(tpv.open_count, 0) = 0')
+                ->select('participants.*');
+        }
+
+        if ($type === CertificateEmailLog::TYPE_COURSE_ACCESS) {
+            $hasVideos = CourseVideo::query()->where('course_id', $course->id)->exists();
+            $hasMaterials = CourseFileLink::query()->where('course_id', $course->id)->exists();
+            $hasCertificate = ($course->certificate_download_status === 'download_enabled');
+
+            if (! $hasVideos && ! $hasMaterials && ! $hasCertificate) {
+                return redirect()->route('participants.index', $course)->with(
+                    'info',
+                    'Nie wysłano e-maili: dla tego szkolenia nie ma nagrań, materiałów ani aktywnego zaświadczenia.'
+                );
+            }
         }
 
         $participants = $participantsQuery->get();
@@ -893,12 +923,20 @@ class ParticipantController extends Controller
             ]);
             $logIds[] = $log->id;
 
-            $jobs[] = new SendCertificateLinkEmailJob(
-                $course->id,
-                $participant->id,
-                $type,
-                $log->id
-            );
+            if ($type === CertificateEmailLog::TYPE_COURSE_ACCESS) {
+                $jobs[] = new SendCourseAccessEmailJob(
+                    $course->id,
+                    $participant->id,
+                    $log->id
+                );
+            } else {
+                $jobs[] = new SendCertificateLinkEmailJob(
+                    $course->id,
+                    $participant->id,
+                    $type,
+                    $log->id
+                );
+            }
         }
 
         $batch = Bus::batch($jobs)
@@ -919,7 +957,7 @@ class ParticipantController extends Controller
     public function certificateEmailBatchStatus(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE.','.CertificateEmailLog::TYPE_COURSE_ACCESS,
         ]);
 
         $type = $request->string('type')->toString();
@@ -977,7 +1015,7 @@ class ParticipantController extends Controller
     public function cancelCertificateEmailBatch(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE.','.CertificateEmailLog::TYPE_COURSE_ACCESS,
         ]);
 
         $type = $request->string('type')->toString();
