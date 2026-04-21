@@ -49,11 +49,7 @@ class FormOrdersController extends Controller
 
         // Dodajemy filtr dla archiwalnych zamówień (nieprzetworzone dla zakończonych szkoleń)
         if ($filter === 'archival') {
-            $query->join('courses', function ($join) {
-                $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
-                    ->where('courses.source_id_old', '=', 'certgen_Publigo');
-            })
-                ->where(function ($q) {
+            $query->where(function ($q) {
                     // Bez numeru faktury
                     $q->whereNull('form_orders.invoice_number')
                         ->orWhere('form_orders.invoice_number', '')
@@ -64,9 +60,20 @@ class FormOrdersController extends Controller
                     $q->where('form_orders.status_completed', '=', 0)
                         ->orWhereNull('form_orders.status_completed');
                 })
-                ->whereNotNull('form_orders.publigo_product_id')
-                ->where('courses.end_date', '<', \Carbon\Carbon::today())
-                ->select('form_orders.*'); // Wybieramy tylko kolumny z form_orders
+                ->whereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('courses')
+                        ->where('courses.end_date', '<', \Carbon\Carbon::today())
+                        ->where(function ($match) {
+                            $match->whereColumn('courses.id', 'form_orders.product_id')
+                                ->orWhere(function ($legacy) {
+                                    $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
+                                        ->whereNotNull('courses.id_old')
+                                        ->where('courses.id_old', '!=', '')
+                                        ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
+                                });
+                        });
+                });
         }
 
         // Konkretne ID zamówienia (priorytet nad polem „Wyszukaj”) — dokładnie jeden rekord lub brak
@@ -203,10 +210,6 @@ class FormOrdersController extends Controller
         // Policz nieprzetworzone zamówienia dla zakończonych szkoleń (Archiwalne)
         // Nieprzetworzone = bez numeru faktury (invoice_number) i nie ukończone (status_completed = 0 lub null)
         $archivalCount = \DB::table('form_orders')
-            ->join('courses', function ($join) {
-                $join->on('courses.id_old', '=', 'form_orders.publigo_product_id')
-                    ->where('courses.source_id_old', '=', 'certgen_Publigo');
-            })
             ->where(function ($q) {
                 // Bez numeru faktury
                 $q->whereNull('form_orders.invoice_number')
@@ -218,8 +221,20 @@ class FormOrdersController extends Controller
                 $q->where('form_orders.status_completed', '=', 0)
                     ->orWhereNull('form_orders.status_completed');
             })
-            ->whereNotNull('form_orders.publigo_product_id')
-            ->where('courses.end_date', '<', \Carbon\Carbon::today())
+            ->whereExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('courses')
+                    ->where('courses.end_date', '<', \Carbon\Carbon::today())
+                    ->where(function ($match) {
+                        $match->whereColumn('courses.id', 'form_orders.product_id')
+                            ->orWhere(function ($legacy) {
+                                $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
+                                    ->whereNotNull('courses.id_old')
+                                    ->where('courses.id_old', '!=', '')
+                                    ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
+                            });
+                    });
+            })
             ->whereNull('form_orders.deleted_at')
             ->count();
 

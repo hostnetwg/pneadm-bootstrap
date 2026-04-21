@@ -60,7 +60,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "pne/certificate-generator"
+            ]
         }
     },
     "config": {
