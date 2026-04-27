@@ -272,6 +272,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::delete('/{fileLink}', [\App\Http\Controllers\CourseFileLinkController::class, 'destroy'])->name('destroy');
     });
 
+    // Linki do zewnętrznych ankiet (np. Google Forms) dla kursów
+    Route::prefix('courses/{course}/survey-links')->name('courses.survey-links.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CourseSurveyLinkController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\CourseSurveyLinkController::class, 'store'])->name('store');
+        Route::put('/{surveyLink}', [\App\Http\Controllers\CourseSurveyLinkController::class, 'update'])->name('update');
+        Route::delete('/{surveyLink}', [\App\Http\Controllers\CourseSurveyLinkController::class, 'destroy'])->name('destroy');
+    });
+
     // Warianty cenowe kursów
     Route::prefix('courses/{courseId}/price-variants')->name('courses.price-variants.')->group(function () {
         Route::get('/create', [CoursePriceVariantController::class, 'create'])->name('create');

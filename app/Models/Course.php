@@ -142,4 +142,12 @@ class Course extends Model
     {
         return $this->hasMany(CourseFileLink::class)->orderBy('order');
     }
+
+    /**
+     * Linki do zewnętrznych ankiet (np. Google Forms, Microsoft Forms, Typeform).
+     */
+    public function surveyLinks()
+    {
+        return $this->hasMany(CourseSurveyLink::class)->orderBy('order');
+    }
 }

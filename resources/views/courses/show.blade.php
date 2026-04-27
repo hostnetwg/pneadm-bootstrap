@@ -581,6 +581,51 @@
                         </div>
                     </div>
 
+                    <!-- Ankiety zewnętrzne (np. Google Forms) -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-clipboard-list {{ $course->surveyLinks->count() > 0 ? 'text-primary' : 'text-secondary' }}"></i> Ankiety ({{ $course->surveyLinks->count() }})
+                            </h5>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#surveyLinkModal{{ $course->id }}"
+                                    title="Zarządzaj linkami do ankiet">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="surveyLinksListPreview{{ $course->id }}">
+                                @if($course->surveyLinks->count() > 0)
+                                    <ul class="list-group list-group-flush">
+                                        @foreach($course->surveyLinks->take(3) as $sl)
+                                            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                                <div class="me-2">
+                                                    <i class="{{ $sl->providerIconClass() }} me-2"></i>
+                                                    {{ \Illuminate\Support\Str::limit($sl->title ?: $sl->url, 38) }}
+                                                    @if(! $sl->isAvailableNow())
+                                                        <span class="badge bg-warning text-dark ms-1" title="Ankieta nieaktywna lub poza oknem czasowym">
+                                                            <i class="fas fa-clock"></i>
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <span class="badge bg-light text-dark border">Nr {{ $sl->order }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                    @if($course->surveyLinks->count() > 3)
+                                        <div class="text-center mt-2">
+                                            <small class="text-muted">... i {{ $course->surveyLinks->count() - 3 }} więcej</small>
+                                        </div>
+                                    @endif
+                                @else
+                                    <p class="text-muted mb-0">Brak ankiet. Kliknij ikonkę ustawień, aby dodać link np. do Google Forms.</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Akcje -->
                     <div class="card">
                         <div class="card-header">
@@ -888,6 +933,86 @@
         </div>
     </div>
 
+    {{-- Modal zarządzania linkami do ankiet zewnętrznych --}}
+    <div class="modal fade" id="surveyLinkModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkModalLabel{{ $course->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="surveyLinkModalLabel{{ $course->id }}">
+                        <i class="fas fa-clipboard-list me-2"></i>
+                        Ankiety zewnętrzne — {{ $course->title }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Wklej publiczny link do formularza, np. Google Forms (<code>docs.google.com/forms/...</code> lub <code>forms.gle/...</code>),
+                        Microsoft Forms, Typeform itp. Możesz opcjonalnie ustawić okno czasowe — ankieta będzie oznaczona jako dostępna tylko między datą otwarcia i zamknięcia.
+                    </p>
+                    <div id="surveyLinksList{{ $course->id }}">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Ładowanie...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6 class="mb-3">Dodaj nową ankietę</h6>
+                    <form id="surveyLinkForm{{ $course->id }}" class="needs-validation" novalidate>
+                        @csrf
+                        <div class="mb-3">
+                            <label for="survey_link_url{{ $course->id }}" class="form-label">URL ankiety <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="survey_link_url{{ $course->id }}" name="url" required
+                                   placeholder="https://docs.google.com/forms/d/e/.../viewform">
+                            <div class="invalid-feedback">Podaj prawidłowy adres URL (https).</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="survey_link_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
+                            <input type="text" class="form-control" id="survey_link_title{{ $course->id }}" name="title"
+                                   placeholder="Np. Ankieta ewaluacyjna po szkoleniu">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_opens_at{{ $course->id }}" class="form-label">Otwarcie (opcjonalnie)</label>
+                                <input type="datetime-local" class="form-control" id="survey_link_opens_at{{ $course->id }}" name="opens_at">
+                                <small class="form-text text-muted">Od kiedy ankieta jest aktywna</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_closes_at{{ $course->id }}" class="form-label">Zamknięcie (opcjonalnie)</label>
+                                <input type="datetime-local" class="form-control" id="survey_link_closes_at{{ $course->id }}" name="closes_at">
+                                <small class="form-text text-muted">Do kiedy ankieta jest aktywna</small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_order{{ $course->id }}" class="form-label">Kolejność</label>
+                                <input type="number" class="form-control" id="survey_link_order{{ $course->id }}" name="order" value="1" min="0">
+                                <small class="form-text text-muted">Niższa liczba = wyżej na liście</small>
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="survey_link_is_active{{ $course->id }}" name="is_active" value="1" checked>
+                                    <label class="form-check-label" for="survey_link_is_active{{ $course->id }}">
+                                        Aktywna
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                Dodaj ankietę
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal odtwarzania nagrań --}}
     @if(isset($course->videos) && $course->videos->isNotEmpty())
     <div class="modal fade" id="videoPlayerModal{{ $course->id }}" tabindex="-1" aria-labelledby="videoPlayerModalLabel{{ $course->id }}" aria-hidden="true">
@@ -1094,6 +1219,13 @@
             if (fileLinkModalEl{{ $course->id }}) {
                 fileLinkModalEl{{ $course->id }}.addEventListener('show.bs.modal', function() {
                     loadFileLinks{{ $course->id }}();
+                });
+            }
+
+            const surveyLinkModalEl{{ $course->id }} = document.getElementById('surveyLinkModal{{ $course->id }}');
+            if (surveyLinkModalEl{{ $course->id }}) {
+                surveyLinkModalEl{{ $course->id }}.addEventListener('show.bs.modal', function() {
+                    loadSurveyLinks{{ $course->id }}();
                 });
             }
         });
@@ -1343,6 +1475,158 @@
                 }
             })
             .catch(() => alert('Wystąpił błąd podczas usuwania linku.'));
+        };
+
+        // ---------- Obsługa linków do ankiet zewnętrznych ----------
+        function loadSurveyLinks{{ $course->id }}() {
+            fetch('{{ route('courses.survey-links.index', $course->id) }}')
+                .then(response => response.json())
+                .then(data => {
+                    const listEl = document.getElementById('surveyLinksList{{ $course->id }}');
+                    const orderInput = document.getElementById('survey_link_order{{ $course->id }}');
+                    if (!listEl) return;
+
+                    if (data.success && data.survey_links && data.survey_links.length > 0) {
+                        if (orderInput) {
+                            orderInput.value = data.survey_links.length + 1;
+                        }
+                        const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                        const escHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                        const fmt = (iso) => {
+                            if (!iso) return '';
+                            const d = new Date(iso);
+                            if (isNaN(d.getTime())) return '';
+                            const pad = n => String(n).padStart(2, '0');
+                            return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        };
+
+                        let html = '<div class="list-group mb-3">';
+                        data.survey_links.forEach(link => {
+                            const title = escHtml(link.title || '');
+                            const urlHref = escAttr(link.url || '');
+                            const urlText = escHtml(link.url || '');
+                            const providerLabel = escHtml(link.provider_label || '');
+                            const providerIcon = escAttr(link.provider_icon || 'fas fa-clipboard-list text-secondary');
+
+                            let badges = `<span class="badge bg-light text-dark border ms-2">Nr ${link.order}</span>`;
+                            badges += link.is_active
+                                ? '<span class="badge bg-success ms-1">Aktywna</span>'
+                                : '<span class="badge bg-secondary ms-1">Wyłączona</span>';
+                            if (!link.is_available_now && link.is_active) {
+                                badges += '<span class="badge bg-warning text-dark ms-1" title="Poza oknem czasowym"><i class="fas fa-clock"></i></span>';
+                            }
+
+                            let timing = '';
+                            if (link.opens_at || link.closes_at) {
+                                timing = '<br><small class="text-muted">';
+                                if (link.opens_at) timing += `<i class="fas fa-play me-1"></i>${fmt(link.opens_at)}`;
+                                if (link.opens_at && link.closes_at) timing += ' &nbsp;–&nbsp; ';
+                                if (link.closes_at) timing += `<i class="fas fa-stop me-1"></i>${fmt(link.closes_at)}`;
+                                timing += '</small>';
+                            }
+
+                            html += `
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1 me-2">
+                                        <div>
+                                            <i class="${providerIcon} me-1"></i>
+                                            <strong>${title || 'Bez tytułu'}</strong>
+                                            <small class="text-muted ms-1">(${providerLabel})</small>
+                                        </div>
+                                        <small class="text-break"><a href="${urlHref}" target="_blank" rel="noopener noreferrer" class="text-muted">${urlText}</a></small>
+                                        ${timing}
+                                        <div class="mt-1">${badges}</div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSurveyLink{{ $course->id }}(${link.id})" title="Usuń">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>`;
+                        });
+                        html += '</div>';
+                        listEl.innerHTML = html;
+                    } else {
+                        listEl.innerHTML = '<p class="text-muted text-center">Brak ankiet. Dodaj pierwszą poniżej.</p>';
+                        if (orderInput) {
+                            orderInput.value = 1;
+                        }
+                    }
+                })
+                .catch(() => {
+                    const listEl = document.getElementById('surveyLinksList{{ $course->id }}');
+                    if (listEl) {
+                        listEl.innerHTML = '<div class="alert alert-danger">Nie udało się załadować listy ankiet.</div>';
+                    }
+                });
+        }
+
+        const surveyLinkForm{{ $course->id }} = document.getElementById('surveyLinkForm{{ $course->id }}');
+        if (surveyLinkForm{{ $course->id }}) {
+            surveyLinkForm{{ $course->id }}.addEventListener('submit', function(e) {
+                e.preventDefault();
+                if (!surveyLinkForm{{ $course->id }}.checkValidity()) {
+                    surveyLinkForm{{ $course->id }}.classList.add('was-validated');
+                    return;
+                }
+                const fd = new FormData(surveyLinkForm{{ $course->id }});
+                if (!fd.has('is_active')) {
+                    fd.append('is_active', '0');
+                }
+                fetch('{{ route('courses.survey-links.store', $course->id) }}', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        surveyLinkForm{{ $course->id }}.reset();
+                        const cb = document.getElementById('survey_link_is_active{{ $course->id }}');
+                        if (cb) cb.checked = true;
+                        surveyLinkForm{{ $course->id }}.classList.remove('was-validated');
+                        loadSurveyLinks{{ $course->id }}();
+                        const alert = document.createElement('div');
+                        alert.className = 'alert alert-success alert-dismissible fade show';
+                        alert.innerHTML = data.message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                        surveyLinkForm{{ $course->id }}.parentElement.insertBefore(alert, surveyLinkForm{{ $course->id }});
+                        setTimeout(() => {
+                            alert.remove();
+                            window.location.reload();
+                        }, 1200);
+                    } else {
+                        let msg = data.message || 'Walidacja nie powiodła się.';
+                        if (data.errors) {
+                            msg += '\n' + Object.values(data.errors).flat().join('\n');
+                        }
+                        alert('Błąd: ' + msg);
+                    }
+                })
+                .catch(() => alert('Wystąpił błąd podczas dodawania ankiety.'));
+            });
+        }
+
+        window.deleteSurveyLink{{ $course->id }} = function(linkId) {
+            if (!confirm('Czy na pewno chcesz usunąć ten link do ankiety?')) {
+                return;
+            }
+            fetch('{{ route('courses.survey-links.destroy', [$course->id, ':surveyLinkId']) }}'.replace(':surveyLinkId', linkId), {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSurveyLinks{{ $course->id }}();
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    alert('Błąd: ' + data.message);
+                }
+            })
+            .catch(() => alert('Wystąpił błąd podczas usuwania ankiety.'));
         };
 
         // Funkcja konfiguracji event listenerów dla modala odtwarzania

@@ -155,6 +155,9 @@ class CoursesController extends Controller
             $eagerLoads['fileLinks'] = function ($query) {
                 $query->select('id', 'course_id', 'url', 'title', 'order')->orderBy('order');
             };
+            $eagerLoads['surveyLinks'] = function ($query) {
+                $query->select('id', 'course_id', 'url', 'title', 'provider', 'is_active', 'opens_at', 'closes_at', 'order')->orderBy('order');
+            };
             $eagerLoads['priceVariants'] = function ($query) {
                 $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active', 'is_promotion', 'promotion_price', 'promotion_type', 'promotion_start', 'promotion_end');
             };
@@ -179,6 +182,9 @@ class CoursesController extends Controller
             }]);
             $courses->getCollection()->load(['fileLinks' => function ($query) {
                 $query->select('id', 'course_id', 'url', 'title', 'order')->orderBy('order');
+            }]);
+            $courses->getCollection()->load(['surveyLinks' => function ($query) {
+                $query->select('id', 'course_id', 'url', 'title', 'provider', 'is_active', 'opens_at', 'closes_at', 'order')->orderBy('order');
             }]);
             $courses->getCollection()->load(['priceVariants' => function ($query) {
                 $query->where('is_active', true)->select('id', 'course_id', 'name', 'price', 'is_active', 'is_promotion', 'promotion_price', 'promotion_type', 'promotion_start', 'promotion_end');
@@ -669,6 +675,8 @@ class CoursesController extends Controller
         $course = Course::with(['instructor', 'location', 'onlineDetails', 'participants', 'surveys', 'priceVariants', 'videos' => function ($query) {
             $query->orderBy('order');
         }, 'fileLinks' => function ($query) {
+            $query->orderBy('order');
+        }, 'surveyLinks' => function ($query) {
             $query->orderBy('order');
         }])->findOrFail($id);
 
