@@ -485,6 +485,13 @@ nowoczesna-edukacja.pl </div>
                     <div class="mb-3 d-flex flex-column gap-2">
                         {{-- Button Wystaw PRO-FORMA iFirma --}}
                         <div class="w-100">
+                            <div class="form-check mb-2" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" value="1"
+                                       id="ifirma_prefix_szkolenie_in_product_name" checked>
+                                <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
+                                    Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
+                                </label>
+                            </div>
                             <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
                                 <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
                             </button>
@@ -553,11 +560,11 @@ nowoczesna-edukacja.pl </div>
                                 stosowane są pełne metadane (rola, NIP, fail-fast).
                             </div>
 
-                            {{-- Button Wystaw fakturę i prześlij do KSeF --}}
+                            {{-- Button Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF --}}
                             <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithKsefBtn" 
                                     style="background-color: #dc3545; border-color: #dc3545; color: white;"
                                     onclick="checkAndCreateInvoiceWithKsef({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF
+                                <i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF
                             </button>
                             <div class="form-check mt-1" style="font-size: 0.875rem;">
                                 <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithKsef">
@@ -736,13 +743,23 @@ nowoczesna-edukacja.pl </div>
                                     </h6>
                                 </div>
                                 <div class="card-body py-2">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" value="1"
-                                               id="ifirma_prefix_szkolenie_in_product_name" checked>
-                                        <label class="form-check-label small" for="ifirma_prefix_szkolenie_in_product_name">
-                                            Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
-                                        </label>
-                                    </div>
+                                    @php
+                                        // Prefiks liczony od LICZBY REKORDÓW uczestników, nie od liczby niepustych
+                                        // imion — przy 2 wierszach w bazie zawsze "UCZESTNICY:", nawet gdy
+                                        // drugi ma jeszcze puste dane (wcześniej filter() dawał count=1 → błędnie UCZESTNIK).
+                                        $invoiceParticipantModels = $zamowienie->participants()
+                                            ->orderByDesc('is_primary')
+                                            ->orderBy('id')
+                                            ->get();
+                                        $invoiceParticipantRowsCount = $invoiceParticipantModels->count();
+                                        $invoiceParticipantLabels = $invoiceParticipantModels->map(function ($p) {
+                                            $n = trim((string) $p->full_name);
+
+                                            return $n !== '' ? $n : ('uczestnik #'.$p->id);
+                                        })->all();
+                                        $invoiceParticipantsCsv = implode(', ', $invoiceParticipantLabels);
+                                        $invoiceParticipantsPrefix = $invoiceParticipantRowsCount > 1 ? 'UCZESTNICY:' : 'UCZESTNIK:';
+                                    @endphp
                                     <div class="mb-2">
                                         <label for="invoice_api_remarks" class="form-label small mb-1">
                                             <strong>Uwagi, które pojawią się na fakturze:</strong>
@@ -754,6 +771,21 @@ nowoczesna-edukacja.pl </div>
                                                   rows="4" 
                                                   placeholder="Wpisz uwagi do faktury..."
                                                   style="font-family: monospace; font-size: 12px;"></textarea>
+                                        <div class="form-check mt-2 mb-1">
+                                            <input class="form-check-input" type="checkbox" value="1"
+                                                   id="ifirma_include_participant_in_remarks"
+                                                   data-participants-prefix="{{ $invoiceParticipantsPrefix }}"
+                                                   data-participants-names="{{ $invoiceParticipantsCsv }}"
+                                                   {{ $invoiceParticipantRowsCount === 0 ? 'disabled' : '' }}>
+                                            <label class="form-check-label small" for="ifirma_include_participant_in_remarks">
+                                                Dodaj w uwagach faktury <strong>UCZESTNIKÓW</strong>
+                                                @if($invoiceParticipantRowsCount > 0)
+                                                    <span class="text-muted">(„{{ $invoiceParticipantsPrefix }} {{ $invoiceParticipantsCsv }}")</span>
+                                                @else
+                                                    <span class="text-muted">(brak danych uczestników)</span>
+                                                @endif
+                                            </label>
+                                        </div>
                                         <small class="text-muted">
                                             <i class="bi bi-info-circle"></i> Ten tekst zostanie użyty jako "Uwagi" na fakturze. 
                                             <strong>Na końcu automatycznie dodamy: "pnedu.pl #{{ $zamowienie->id }}"</strong>
@@ -1071,6 +1103,37 @@ nowoczesna-edukacja.pl `;
             const el = document.getElementById('ifirma_prefix_szkolenie_in_product_name');
             return !!(el && el.checked);
         }
+
+        // Toggle linii "UCZESTNIK: ..." / "UCZESTNICY: ..." w polu "Uwagi, ktore pojawia sie
+        // na fakturze". Rucznie wpisane uwagi zostaja na gorze; linia uczestnika jest doklejana
+        // na koncu pola (nad automatycznym "pnedu.pl #ID" dodawanym przez backend).
+        // Filtrujemy istniejace wystapienia obu wariantow, zeby przelaczanie nie duplikowalo
+        // wpisu i zeby zmiana liczby uczestnikow nie zostawiala starej linii.
+        function applyParticipantInRemarks() {
+            const cb = document.getElementById('ifirma_include_participant_in_remarks');
+            const ta = document.getElementById('invoice_api_remarks');
+            if (!cb || !ta) {
+                return;
+            }
+            const prefix = (cb.dataset.participantsPrefix || 'UCZESTNIK:').trim();
+            const names = (cb.dataset.participantsNames || '').trim();
+            const filtered = ta.value
+                .split('\n')
+                .filter(function (line) { return !/^UCZESTNI(?:K|CY):\s*/i.test(line.trim()); });
+            let body = filtered.join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
+            if (cb.checked && names !== '') {
+                const tail = prefix + ' ' + names;
+                body = body.length > 0 ? (body + '\n' + tail) : tail;
+            }
+            ta.value = body;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const cb = document.getElementById('ifirma_include_participant_in_remarks');
+            if (cb) {
+                cb.addEventListener('change', applyParticipantInRemarks);
+            }
+        });
 
         // Funkcja do wystawiania faktury pro forma w iFirma
         function createIfirmaProForma(orderId) {
@@ -1624,7 +1687,11 @@ nowoczesna-edukacja.pl `;
         function createIfirmaInvoiceWithReceiver(orderId, force = false) {
             const button = document.getElementById('ifirmaInvoiceWithReceiverBtn');
             const resultDiv = document.getElementById('ifirmaResult');
-            
+
+            // Pobierz edytowalne uwagi do faktury (m.in. linia "UCZESTNIK: ...").
+            const invoiceRemarksTextarea = document.getElementById('invoice_api_remarks');
+            const customRemarks = invoiceRemarksTextarea ? invoiceRemarksTextarea.value.trim() : '';
+
             // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
             const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoiceWithReceiver');
             const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
@@ -1638,6 +1705,7 @@ nowoczesna-edukacja.pl `;
             
             // Przygotuj dane do wysłania
             const requestData = {
+                custom_remarks: customRemarks,
                 send_email: sendEmail,
                 prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
@@ -1855,7 +1923,7 @@ nowoczesna-edukacja.pl `;
             .finally(() => {
                 // Przywrócenie stanu przycisku
                 button.disabled = false;
-                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF';
+                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF';
             });
         }
 
@@ -1874,7 +1942,11 @@ nowoczesna-edukacja.pl `;
         function createIfirmaInvoiceWithKsef(orderId, force = false) {
             const button = document.getElementById('ifirmaInvoiceWithKsefBtn');
             const resultDiv = document.getElementById('ifirmaResult');
-            
+
+            // Pobierz edytowalne uwagi do faktury (m.in. linia "UCZESTNIK: ...").
+            const invoiceRemarksTextarea = document.getElementById('invoice_api_remarks');
+            const customRemarks = invoiceRemarksTextarea ? invoiceRemarksTextarea.value.trim() : '';
+
             // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
             const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoiceWithKsef');
             const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
@@ -1905,6 +1977,7 @@ nowoczesna-edukacja.pl `;
             
             // Przygotuj dane do wysłania
             const requestData = {
+                custom_remarks: customRemarks,
                 send_email: sendEmail,
                 prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
@@ -2044,7 +2117,7 @@ nowoczesna-edukacja.pl `;
             .finally(() => {
                 // Przywrócenie stanu przycisku
                 button.disabled = false;
-                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw fakturę i prześlij do KSeF';
+                button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF';
             });
         }
 

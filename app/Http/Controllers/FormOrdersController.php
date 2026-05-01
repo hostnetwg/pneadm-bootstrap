@@ -1854,8 +1854,9 @@ class FormOrdersController extends Controller
                 ], 400);
             }
 
-            // Uwagi - TYLKO identyfikator zamówienia
-            $uwagi = "pnedu.pl #{$zamowienie->id}";
+            // Uwagi - edytowalna textarea z UI + automatyczny identyfikator zamówienia.
+            // Pozwala m.in. dodać linię „UCZESTNIK: …” / „UCZESTNICY: …” do faktury.
+            $uwagi = $this->ifirmaCustomRemarksFromRequest($request, $zamowienie);
 
             // Wspólny builder (ETAP 3) — `podmiot3_mode=invoice_with_receiver`:
             // przy KSeF źródle `recipient` pełny mapper (role, NIP, fail-fast);
@@ -2214,8 +2215,9 @@ class FormOrdersController extends Controller
                 ], 400);
             }
 
-            // Uwagi - TYLKO identyfikator zamówienia
-            $uwagi = "pnedu.pl #{$zamowienie->id}";
+            // Uwagi - edytowalna textarea z UI + automatyczny identyfikator zamówienia.
+            // Pozwala m.in. dodać linię "UCZESTNIK: ..." / "UCZESTNICY: ..." do faktury.
+            $uwagi = $this->ifirmaCustomRemarksFromRequest($request, $zamowienie);
 
             // Wspólny builder (ETAP 3) — ten sam tryb co „Wystaw Fakturę iFirma z Odbiorcą”
             // (`podmiot3_mode=invoice_with_receiver`): KSeF metadane → mapper; `none` + kompletne
@@ -3029,5 +3031,28 @@ class FormOrdersController extends Controller
         }
 
         return 'SZKOLENIE: '.$productName;
+    }
+
+    /**
+     * Buduje pole „Uwagi” iFirma na podstawie edytowalnej textarei z UI, dokleja
+     * na końcu identyfikator zamówienia (`pnedu.pl #ID`). Używane przez ścieżki
+     * „Wystaw Fakturę iFirma z Odbiorcą” i „… z Odbiorcą i prześlij do KSeF”,
+     * gdzie wcześniej uwagi były na sztywno (frontend wysyłał `custom_remarks`,
+     * a backend ignorował). Patrz issue: faktura bez „UCZESTNIK: …”.
+     *
+     * Gdy request nie zawiera `custom_remarks` (np. wywołanie API bez UI),
+     * zachowujemy dotychczasowe minimalne zachowanie — same `pnedu.pl #ID`.
+     */
+    private function ifirmaCustomRemarksFromRequest(Request $request, FormOrder $zamowienie): string
+    {
+        $uwagi = $request->has('custom_remarks')
+            ? trim((string) $request->input('custom_remarks', ''))
+            : '';
+
+        if ($uwagi !== '') {
+            return $uwagi."\npnedu.pl #{$zamowienie->id}";
+        }
+
+        return "pnedu.pl #{$zamowienie->id}";
     }
 }

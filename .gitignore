@@ -33,3 +33,6 @@ yarn-error.log
 *.sql.backup*
 *.sql.OLD
 backup_*.sql
+
+# Lokalna konfiguracja deploya (zawiera hosty/ścieżki)
+/scripts/deploy-assets.env
