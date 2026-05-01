@@ -1,1 +1,12 @@
-@import "bootstrap/dist/css/bootstrap.min.css"; 
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "tom-select/dist/css/tom-select.bootstrap5.min.css";
+
+/* Spójna wysokość TomSelect z input/form-control Bootstrap 5 */
+.ts-wrapper.form-control,
+.ts-wrapper.form-select {
+    padding: 0;
+}
+
+.ts-wrapper .ts-control {
+    min-height: calc(1.5em + 0.75rem + 2px);
+}

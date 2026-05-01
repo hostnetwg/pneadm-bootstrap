@@ -112,6 +112,35 @@ class Course extends Model
     }
 
     /**
+     * Cykl życia kursu na potrzeby UI (dropdown wyboru szkolenia w form-orders).
+     * Zwraca jedną z wartości:
+     *  - upcoming  → start_date > now
+     *  - ongoing   → start_date <= now AND end_date is not null AND end_date >= now
+     *  - archived  → end_date < now LUB (end_date is null AND start_date < now)
+     *  - unknown   → brak start_date
+     */
+    public function getLifecycleStatus(?\DateTimeInterface $now = null): string
+    {
+        if (! $this->start_date) {
+            return 'unknown';
+        }
+
+        $now = $now ? \Carbon\Carbon::instance($now) : now();
+        $start = \Carbon\Carbon::parse($this->start_date);
+        $end = $this->end_date ? \Carbon\Carbon::parse($this->end_date) : null;
+
+        if ($start->greaterThan($now)) {
+            return 'upcoming';
+        }
+
+        if ($end && $end->greaterThanOrEqualTo($now)) {
+            return 'ongoing';
+        }
+
+        return 'archived';
+    }
+
+    /**
      * Relacja do wariantów cenowych
      */
     public function priceVariants()

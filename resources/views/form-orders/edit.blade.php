@@ -72,18 +72,65 @@
                                 </h6>
                             </div>
                             <div class="card-body">
+                                @php
+                                    $editPreselectedCourseId = old('course_id', $zamowienie->product_id);
+                                    $editPreselectedCourse = $editPreselectedCourseId
+                                        ? \App\Models\Course::find($editPreselectedCourseId)
+                                        : null;
+                                    $hasPubligoSent = (int) ($zamowienie->publigo_sent ?? 0) === 1;
+                                    $hasPneduProvisioned = ! empty($zamowienie->pnedu_provisioned_at);
+                                @endphp
+
+                                @if($hasPubligoSent || $hasPneduProvisioned)
+                                    <div class="alert alert-warning small mb-3">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        <strong>Uwaga:</strong> dla tego zamówienia
+                                        @if($hasPubligoSent) zostało wysłane zamówienie do <strong>Publigo</strong> @endif
+                                        @if($hasPubligoSent && $hasPneduProvisioned) i @endif
+                                        @if($hasPneduProvisioned) został przyznany dostęp <strong>PNEDU</strong> @endif.
+                                        Zmiana szkolenia tutaj <u>nie cofa</u> tych operacji ani nie aktualizuje uczestnika w bazie pnedu.
+                                        Jeśli musisz przepiąć kurs, najpierw rozważ użycie przycisków „Resetuj status…”.
+                                    </div>
+                                @endif
+
                                 <div class="row">
                                     <div class="col-md-8">
-                                        <label for="product_name" class="form-label">Nazwa szkolenia</label>
-                                        <input type="text" class="form-control" 
-                                               id="product_name" name="product_name" 
-                                               value="{{ old('product_name', $zamowienie->product_name) }}" readonly>
+                                        <label for="course_id" class="form-label">Szkolenie <span class="text-danger">*</span></label>
+                                        <select class="form-control @error('course_id') is-invalid @enderror"
+                                                id="course_id" name="course_id" required>
+                                            @if($editPreselectedCourse)
+                                                <option value="{{ $editPreselectedCourse->id }}" selected>
+                                                    #{{ $editPreselectedCourse->id }} · {{ strip_tags($editPreselectedCourse->title) }}
+                                                    @if($editPreselectedCourse->start_date) [{{ $editPreselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
+                                                </option>
+                                            @endif
+                                        </select>
+                                        @error('course_id')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
+                                            <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum. Zmiana zaktualizuje nazwę i ID Publigo zamówienia.</small>
+                                            <div class="form-check form-check-inline mb-0">
+                                                <input class="form-check-input" type="checkbox" id="course_include_archived">
+                                                <label class="form-check-label small" for="course_include_archived">
+                                                    Pokaż również archiwalne
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="product_price" class="form-label">Cena (PLN)</label>
-                                        <input type="number" step="0.01" min="0" class="form-control" 
-                                               id="product_price" name="product_price" 
+                                        <input type="number" step="0.01" min="0" class="form-control"
+                                               id="product_price" name="product_price"
                                                value="{{ old('product_price', $zamowienie->product_price) }}">
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <label for="product_name" class="form-label">Nazwa szkolenia (z bazy kursów, aktualizowana automatycznie)</label>
+                                        <input type="text" class="form-control"
+                                               id="product_name" name="product_name"
+                                               value="{{ old('product_name', $zamowienie->product_name) }}" readonly>
                                     </div>
                                 </div>
                                 @if($zamowienie->publigo_product_id)
@@ -410,6 +457,59 @@
             </div>
         </div>
     </div>
+
+    {{-- TomSelect dla wyboru szkolenia w edycji --}}
+    @php
+        $courseSearchUrl = route('form-orders.courses.search');
+        $courseSelectPreselected = $editPreselectedCourse ? [
+            'id' => $editPreselectedCourse->id,
+            'id_old' => $editPreselectedCourse->id_old,
+            'title_text' => trim(strip_tags((string) $editPreselectedCourse->title)),
+            'start_date' => $editPreselectedCourse->start_date ? $editPreselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
+            'end_date' => $editPreselectedCourse->end_date ? $editPreselectedCourse->end_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
+            'status' => $editPreselectedCourse->getLifecycleStatus(),
+            'instructor' => optional($editPreselectedCourse->instructor)->full_title_name ?? '',
+        ] : null;
+    @endphp
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchUrl = @json($courseSearchUrl);
+            const preselected = @json($courseSelectPreselected);
+
+            const priceInput = document.getElementById('product_price');
+            const archivedToggle = document.getElementById('course_include_archived');
+
+            const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
+            let includeArchived = false;
+            try {
+                includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
+            } catch (e) {}
+            if (archivedToggle) {
+                archivedToggle.checked = includeArchived;
+            }
+
+            const ts = window.initCourseSelect && window.initCourseSelect('course_id', {
+                searchUrl,
+                preselected,
+                includeArchived,
+                onCourseChanged: function (item) {
+                    if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
+                        priceInput.value = item.default_price;
+                    }
+                },
+            });
+
+            if (ts && archivedToggle) {
+                archivedToggle.addEventListener('change', function () {
+                    const checked = !!archivedToggle.checked;
+                    try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
+                    if (typeof ts.setIncludeArchived === 'function') {
+                        ts.setIncludeArchived(checked);
+                    }
+                });
+            }
+        });
+    </script>
 </x-app-layout>
 
 

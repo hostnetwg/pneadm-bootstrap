@@ -26,6 +26,7 @@ class FormOrderPneduProvisionService
     {
         $emailWarning = null;
         $clickMeetingWarning = null;
+        $sendyWarning = null;
 
         try {
             $afterCommit = null;
@@ -166,6 +167,15 @@ class FormOrderPneduProvisionService
                 $clickMeetingWarning = $clickMeetingResult['warning'];
             }
 
+            $sendyResult = app(FormOrderSendySyncService::class)->syncByFormOrderId($formOrderId);
+            if (($sendyResult['failed'] ?? 0) > 0) {
+                $sendyWarning = 'Uwaga: nie wszystkie kontakty zostały dodane do listy Sendy.';
+                Log::warning('FormOrderPneduProvisionService: problem sync Sendy', [
+                    'form_order_id' => $formOrderId,
+                    'sendy_result' => $sendyResult,
+                ]);
+            }
+
             try {
                 if ($afterCommit['user_existed']) {
                     $pneduUser->notify(new PneduFormOrderProvisionedExistingUser(
@@ -199,6 +209,11 @@ class FormOrderPneduProvisionService
             if ($clickMeetingWarning !== null) {
                 $payload['message'] = ($payload['message'] ?? '').' '.$clickMeetingWarning;
                 $payload['clickmeeting_warning'] = $clickMeetingWarning;
+            }
+
+            if ($sendyWarning !== null) {
+                $payload['message'] = ($payload['message'] ?? '').' '.$sendyWarning;
+                $payload['sendy_warning'] = $sendyWarning;
             }
 
             Log::info('FormOrderPneduProvisionService: sukces', [

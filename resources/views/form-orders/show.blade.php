@@ -818,6 +818,9 @@ nowoczesna-edukacja.pl </div>
             {{-- Przyciski akcji na dole strony --}}
             <div class="d-flex justify-content-end mt-4 mb-4">
                 <div class="btn-group" role="group">
+                    <a href="{{ route('form-orders.create', ['clone_from' => $zamowienie->id]) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-files"></i> Kopiuj zamówienie
+                    </a>
                     <a href="{{ route('form-orders.edit', array_merge(['id' => $zamowienie->id], array_filter(['filter_new' => request('filter_new'), 'course_id' => request('course_id')]))) }}" class="btn btn-warning">
                         <i class="bi bi-pencil"></i> Edytuj
                     </a>

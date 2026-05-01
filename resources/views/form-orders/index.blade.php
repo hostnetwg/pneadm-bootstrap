@@ -499,6 +499,11 @@
                                                         <i class="bi bi-check-circle"></i> Zapisz zmiany
                                                     </button>
                                                     <div class="btn-group" role="group">
+                                                        <a href="{{ route('form-orders.create', ['clone_from' => $zamowienie->id]) }}"
+                                                           class="btn btn-sm btn-outline-secondary"
+                                                           title="Utwórz nowe zamówienie na podstawie tego rekordu">
+                                                            <i class="bi bi-files"></i> Kopiuj
+                                                        </a>
                                                         <a href="{{ route('form-orders.edit', $zamowienie->id) }}" 
                                                            class="btn btn-sm btn-outline-warning" 
                                                            title="Edytuj zamówienie">

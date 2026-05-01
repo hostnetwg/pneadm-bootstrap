@@ -30,6 +30,11 @@ return [
         'gdpr_compliant' => true,
         'silent_subscription' => false,
     ],
+
+    'lists' => [
+        // Lista: "UCZESTNICY PŁATNYCH SZKOLEŃ"
+        'paid_participants' => env('SENDY_PAID_TRAININGS_LIST_ID', 'dncdl0kfUMnk43BysMa892NQ'),
+    ],
     
     /*
     |--------------------------------------------------------------------------

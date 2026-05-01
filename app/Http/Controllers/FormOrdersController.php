@@ -261,16 +261,159 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Endpoint AJAX do wyszukiwania kursów dla selecta szkolenia.
+     * Zwraca listę kursów filtrowanych do źródła Publigo (spójność z create/store).
+     */
+    public function searchCourses(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('limit', 30);
+        $limit = max(1, min($limit, 100));
+        $includeArchived = filter_var($request->input('include_archived', false), FILTER_VALIDATE_BOOLEAN);
+
+        // Filtr archiwalnych kursów ignorujemy gdy admin coś wpisał — wyszukiwanie zawsze
+        // przeszukuje pełen zbiór (inaczej szukanie po tytule/ID kursu z przeszłości
+        // dawałoby pustą listę i frustrację).
+        $applyArchivedFilter = ! $includeArchived && $q === '';
+
+        $query = \App\Models\Course::query()
+            ->with([
+                'instructor:id,title,first_name,last_name',
+                'priceVariants' => function ($q) {
+                    $q->orderByDesc('is_active')->orderBy('id');
+                },
+            ])
+            // Form-orders dotyczą płatnych szkoleń (zarówno nowych pneadm,
+            // jak i historycznych z Publigo). Nie filtrujemy po source_id_old,
+            // żeby były widoczne także nadchodzące kursy bez powiązania z Publigo.
+            ->where('is_paid', 1)
+            ->select('id', 'id_old', 'title', 'start_date', 'end_date', 'instructor_id');
+
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $query->where(function ($w) use ($q, $like) {
+                $w->where('title', 'LIKE', $like)
+                    ->orWhere('id_old', 'LIKE', $like);
+
+                if (ctype_digit($q)) {
+                    $w->orWhere('id', (int) $q);
+                }
+            });
+        }
+
+        $now = now();
+
+        if ($applyArchivedFilter) {
+            // Tylko upcoming (start w przyszłości) + ongoing (start w przeszłości,
+            // end jeszcze nie minął). Brak start_date traktujemy jako bez kategorii.
+            $query->where(function ($w) use ($now) {
+                $w->where('start_date', '>=', $now)
+                    ->orWhere(function ($w2) use ($now) {
+                        $w2->whereNotNull('end_date')
+                            ->where('start_date', '<=', $now)
+                            ->where('end_date', '>=', $now);
+                    });
+            });
+        }
+
+        // Sortowanie: nadchodzące kursy najpierw (start_date >= dziś), potem najnowsze archiwalne,
+        // na końcu te bez daty.
+        $today = $now->format('Y-m-d');
+        $courses = $query
+            ->orderByRaw('start_date IS NULL')
+            ->orderByRaw("CASE WHEN start_date >= ? THEN 0 ELSE 1 END", [$today])
+            ->orderByRaw("CASE WHEN start_date >= ? THEN start_date END ASC", [$today])
+            ->orderByRaw("CASE WHEN start_date <  ? THEN start_date END DESC", [$today])
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'items' => $courses->map(function ($c) {
+                $variants = $c->priceVariants ?? collect();
+                $defaultVariant = $variants->firstWhere('is_active', true);
+                if (! $defaultVariant && $variants->count() === 1) {
+                    $defaultVariant = $variants->first();
+                }
+
+                $tz = config('app.timezone');
+
+                return [
+                    'value' => (string) $c->id,
+                    'id' => (int) $c->id,
+                    'id_old' => (string) ($c->id_old ?? ''),
+                    'title_text' => trim(strip_tags((string) $c->title)),
+                    'title_html' => (string) $c->title,
+                    'start_date' => $c->start_date ? $c->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+                    'end_date' => $c->end_date ? $c->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+                    'status' => $c->getLifecycleStatus(),
+                    'instructor' => $c->instructor
+                        ? trim(($c->instructor->title ? $c->instructor->title.' ' : '').$c->instructor->first_name.' '.$c->instructor->last_name)
+                        : '',
+                    'default_price' => $defaultVariant
+                        ? number_format((float) $defaultVariant->getCurrentPrice(), 2, '.', '')
+                        : null,
+                    'default_variant_name' => $defaultVariant?->name,
+                    'default_variant_active' => $defaultVariant ? (bool) $defaultVariant->is_active : null,
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
      * Wyświetla formularz tworzenia nowego zamówienia.
      */
-    public function create()
+    public function create(Request $request)
     {
         // Pobierz kursy z Publigo (source_id_old = 'certgen_Publigo')
         $courses = \App\Models\Course::where('source_id_old', 'certgen_Publigo')
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return view('form-orders.create', compact('courses'));
+        $prefill = [];
+        $cloneSourceId = null;
+        $cloneWarning = null;
+
+        $cloneFrom = (int) $request->integer('clone_from');
+        if ($cloneFrom > 0) {
+            $sourceOrder = FormOrder::with('primaryParticipant')->find($cloneFrom);
+
+            if (! $sourceOrder) {
+                $cloneWarning = 'Nie znaleziono zamówienia do skopiowania.';
+            } else {
+                $cloneSourceId = $sourceOrder->id;
+                $prefill = [
+                    'course_id' => $sourceOrder->product_id,
+                    'product_price' => $sourceOrder->product_price,
+                    'participant_firstname' => $sourceOrder->primaryParticipant?->participant_firstname,
+                    'participant_lastname' => $sourceOrder->primaryParticipant?->participant_lastname,
+                    'participant_email' => $sourceOrder->primaryParticipant?->participant_email,
+                    'orderer_name' => $sourceOrder->orderer_name,
+                    'orderer_phone' => $sourceOrder->orderer_phone,
+                    'orderer_email' => $sourceOrder->orderer_email,
+                    'buyer_name' => $sourceOrder->buyer_name,
+                    'buyer_address' => $sourceOrder->buyer_address,
+                    'buyer_postal_code' => $sourceOrder->buyer_postal_code,
+                    'buyer_city' => $sourceOrder->buyer_city,
+                    'buyer_nip' => $sourceOrder->buyer_nip,
+                    'recipient_name' => $sourceOrder->recipient_name,
+                    'recipient_address' => $sourceOrder->recipient_address,
+                    'recipient_postal_code' => $sourceOrder->recipient_postal_code,
+                    'recipient_city' => $sourceOrder->recipient_city,
+                    'recipient_nip' => $sourceOrder->recipient_nip,
+                    'invoice_notes' => $sourceOrder->invoice_notes,
+                    'invoice_payment_delay' => $sourceOrder->invoice_payment_delay,
+                    'notes' => $sourceOrder->notes,
+                ];
+            }
+        }
+
+        $selectedCourse = null;
+        if (! empty($prefill['course_id'])) {
+            $selectedCourse = $courses->firstWhere('id', (int) $prefill['course_id']);
+        }
+
+        return view('form-orders.create', compact('courses', 'prefill', 'cloneSourceId', 'cloneWarning', 'selectedCourse'));
     }
 
     /**
@@ -481,6 +624,7 @@ class FormOrdersController extends Controller
                 // kiedy ksef_entity_source = 'none' — admin może świadomie trzymać
                 // wartości (np. jst_recipient) do czasu ETAPU 2. Mapowanie i tak je ignoruje.
                 $request->validate([
+                    'course_id' => 'nullable|integer|exists:courses,id',
                     'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
                     'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
                     'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
@@ -488,8 +632,24 @@ class FormOrdersController extends Controller
                     'ksef_admin_note' => 'nullable|string',
                 ]);
 
+                // Jeżeli zmieniono szkolenie, przepnij powiązane pola produktu (id/nazwa/publigo).
+                $newCourseId = (int) $request->input('course_id');
+                if ($newCourseId > 0 && $newCourseId !== (int) $zamowienie->product_id) {
+                    $newCourse = \App\Models\Course::find((int) $newCourseId);
+                    if ($newCourse) {
+                        $zamowienie->product_id = (int) $newCourse->id;
+                        $zamowienie->product_name = (string) $newCourse->title;
+                        $zamowienie->product_description = $newCourse->description;
+                        $zamowienie->publigo_product_id = $newCourse->id_old ? (int) $newCourse->id_old : null;
+                        if (empty($zamowienie->publigo_price_id)) {
+                            $zamowienie->publigo_price_id = 1;
+                        }
+                    }
+                }
+
                 $zamowienie->fill([
-                    'product_name' => $request->input('product_name'),
+                    // product_name nadpisujemy tylko jeśli nie nastąpiła zmiana kursu — w przeciwnym razie wartość ustawiona powyżej.
+                    'product_name' => $zamowienie->product_name,
                     'product_price' => $request->input('product_price'),
                     'orderer_name' => $request->input('orderer_name'),
                     'orderer_phone' => $request->input('orderer_phone'),

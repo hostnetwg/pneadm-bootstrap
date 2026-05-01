@@ -36,6 +36,21 @@
                 </div>
             @endif
 
+            @if(!empty($cloneWarning))
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-circle"></i>
+                    {{ $cloneWarning }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+
+            @if(!empty($cloneSourceId))
+                <div class="alert alert-info">
+                    <i class="bi bi-files"></i>
+                    Tworzysz nowe zamówienie na podstawie rekordu #{{ $cloneSourceId }}. Przed zapisem możesz zmienić szkolenie, cenę i dowolne pola.
+                </div>
+            @endif
+
             {{-- Formularz --}}
             <div class="card">
                 <div class="card-header bg-primary text-white">
@@ -58,31 +73,37 @@
                                 <div class="row">
                                     <div class="col-md-8">
                                         <label for="course_id" class="form-label">Wybierz szkolenie <span class="text-danger">*</span></label>
-                                        <select class="form-control @error('course_id') is-invalid @enderror" 
+                                        @php
+                                            $selectedCourseId = old('course_id', $prefill['course_id'] ?? '');
+                                            $preselectedCourse = $selectedCourse ?? ($selectedCourseId ? \App\Models\Course::find($selectedCourseId) : null);
+                                        @endphp
+                                        <select class="form-control @error('course_id') is-invalid @enderror"
                                                 id="course_id" name="course_id" required>
-                                            <option value="">-- Wybierz szkolenie --</option>
-                                            @foreach($courses as $course)
-                                                <option value="{{ $course->id }}" 
-                                                        {{ old('course_id') == $course->id ? 'selected' : '' }}
-                                                        data-title="{{ $course->title }}"
-                                                        data-description="{{ $course->description }}"
-                                                        data-start-date="{{ $course->start_date->format('Y-m-d') }}">
-                                                    {{ $course->id_old }} - {!! $course->title !!} 
-                                                    @if($course->start_date)
-                                                        [{{ $course->start_date->format('Y-m-d') }}]
-                                                    @endif
+                                            @if($preselectedCourse)
+                                                <option value="{{ $preselectedCourse->id }}" selected>
+                                                    #{{ $preselectedCourse->id }} · {{ strip_tags($preselectedCourse->title) }}
+                                                    @if($preselectedCourse->start_date) [{{ $preselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
                                                 </option>
-                                            @endforeach
+                                            @endif
                                         </select>
                                         @error('course_id')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
+                                            <small class="form-text text-muted mb-0">Domyślnie pokazujemy nadchodzące i trwające. Wpisz tytuł / ID / Publigo ID, by szukać też w archiwum.</small>
+                                            <div class="form-check form-check-inline mb-0">
+                                                <input class="form-check-input" type="checkbox" id="course_include_archived">
+                                                <label class="form-check-label small" for="course_include_archived">
+                                                    Pokaż również archiwalne
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="product_price" class="form-label">Cena (PLN)</label>
                                         <input type="number" step="0.01" min="0" class="form-control @error('product_price') is-invalid @enderror" 
                                                id="product_price" name="product_price" 
-                                               value="{{ old('product_price') }}" 
+                                               value="{{ old('product_price', $prefill['product_price'] ?? '') }}" 
                                                placeholder="Opcjonalnie">
                                         @error('product_price')
                                             <div class="invalid-feedback">{{ $message }}</div>
@@ -113,7 +134,7 @@
                                         <label for="participant_firstname" class="form-label">Imię <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('participant_firstname') is-invalid @enderror" 
                                                id="participant_firstname" name="participant_firstname" 
-                                               value="{{ old('participant_firstname') }}" required>
+                                               value="{{ old('participant_firstname', $prefill['participant_firstname'] ?? '') }}" required>
                                         @error('participant_firstname')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -122,7 +143,7 @@
                                         <label for="participant_lastname" class="form-label">Nazwisko <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('participant_lastname') is-invalid @enderror" 
                                                id="participant_lastname" name="participant_lastname" 
-                                               value="{{ old('participant_lastname') }}" required>
+                                               value="{{ old('participant_lastname', $prefill['participant_lastname'] ?? '') }}" required>
                                         @error('participant_lastname')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -131,7 +152,7 @@
                                         <label for="participant_email" class="form-label">Email uczestnika - tu zostaną wysłane dane dostępowe do szkolenia <span class="text-danger">*</span></label>
                                         <input type="email" class="form-control @error('participant_email') is-invalid @enderror" 
                                                id="participant_email" name="participant_email" 
-                                               value="{{ old('participant_email') }}" required>
+                                               value="{{ old('participant_email', $prefill['participant_email'] ?? '') }}" required>
                                         @error('participant_email')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -153,7 +174,7 @@
                                         <label for="orderer_name" class="form-label">Nazwa / Imię i nazwisko <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('orderer_name') is-invalid @enderror" 
                                                id="orderer_name" name="orderer_name" 
-                                               value="{{ old('orderer_name') }}" required>
+                                               value="{{ old('orderer_name', $prefill['orderer_name'] ?? '') }}" required>
                                         @error('orderer_name')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -162,7 +183,7 @@
                                         <label for="orderer_phone" class="form-label">Telefon kontaktowy <span class="text-danger">*</span></label>
                                         <input type="tel" class="form-control @error('orderer_phone') is-invalid @enderror" 
                                                id="orderer_phone" name="orderer_phone" 
-                                               value="{{ old('orderer_phone') }}" required>
+                                               value="{{ old('orderer_phone', $prefill['orderer_phone'] ?? '') }}" required>
                                         @error('orderer_phone')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -171,7 +192,7 @@
                                         <label for="orderer_email" class="form-label">E-mail - tu prześlemy fakturę <span class="text-danger">*</span></label>
                                         <input type="email" class="form-control @error('orderer_email') is-invalid @enderror" 
                                                id="orderer_email" name="orderer_email" 
-                                               value="{{ old('orderer_email') }}" required>
+                                               value="{{ old('orderer_email', $prefill['orderer_email'] ?? '') }}" required>
                                         @error('orderer_email')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -193,7 +214,7 @@
                                         <label for="buyer_name" class="form-label">Nazwa / Imię i nazwisko <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('buyer_name') is-invalid @enderror" 
                                                id="buyer_name" name="buyer_name" 
-                                               value="{{ old('buyer_name') }}" required>
+                                               value="{{ old('buyer_name', $prefill['buyer_name'] ?? '') }}" required>
                                         @error('buyer_name')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -204,7 +225,7 @@
                                         <label for="buyer_postal_code" class="form-label">Kod pocztowy <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('buyer_postal_code') is-invalid @enderror" 
                                                id="buyer_postal_code" name="buyer_postal_code" 
-                                               value="{{ old('buyer_postal_code') }}" required>
+                                               value="{{ old('buyer_postal_code', $prefill['buyer_postal_code'] ?? '') }}" required>
                                         @error('buyer_postal_code')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -213,7 +234,7 @@
                                         <label for="buyer_city" class="form-label">Miasto <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('buyer_city') is-invalid @enderror" 
                                                id="buyer_city" name="buyer_city" 
-                                               value="{{ old('buyer_city') }}" required>
+                                               value="{{ old('buyer_city', $prefill['buyer_city'] ?? '') }}" required>
                                         @error('buyer_city')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -224,7 +245,7 @@
                                         <label for="buyer_address" class="form-label">Adres <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control @error('buyer_address') is-invalid @enderror" 
                                                id="buyer_address" name="buyer_address" 
-                                               value="{{ old('buyer_address') }}" required>
+                                               value="{{ old('buyer_address', $prefill['buyer_address'] ?? '') }}" required>
                                         @error('buyer_address')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -235,7 +256,7 @@
                                         <label for="buyer_nip" class="form-label">NIP</label>
                                         <input type="text" class="form-control @error('buyer_nip') is-invalid @enderror" 
                                                id="buyer_nip" name="buyer_nip" 
-                                               value="{{ old('buyer_nip') }}">
+                                               value="{{ old('buyer_nip', $prefill['buyer_nip'] ?? '') }}">
                                         @error('buyer_nip')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -257,7 +278,7 @@
                                         <label for="recipient_name" class="form-label">Nazwa / Imię i nazwisko</label>
                                         <input type="text" class="form-control @error('recipient_name') is-invalid @enderror" 
                                                id="recipient_name" name="recipient_name" 
-                                               value="{{ old('recipient_name') }}">
+                                               value="{{ old('recipient_name', $prefill['recipient_name'] ?? '') }}">
                                         @error('recipient_name')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -268,7 +289,7 @@
                                         <label for="recipient_postal_code" class="form-label">Kod pocztowy</label>
                                         <input type="text" class="form-control @error('recipient_postal_code') is-invalid @enderror" 
                                                id="recipient_postal_code" name="recipient_postal_code" 
-                                               value="{{ old('recipient_postal_code') }}">
+                                               value="{{ old('recipient_postal_code', $prefill['recipient_postal_code'] ?? '') }}">
                                         @error('recipient_postal_code')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -277,7 +298,7 @@
                                         <label for="recipient_city" class="form-label">Miasto</label>
                                         <input type="text" class="form-control @error('recipient_city') is-invalid @enderror" 
                                                id="recipient_city" name="recipient_city" 
-                                               value="{{ old('recipient_city') }}">
+                                               value="{{ old('recipient_city', $prefill['recipient_city'] ?? '') }}">
                                         @error('recipient_city')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -288,7 +309,7 @@
                                         <label for="recipient_address" class="form-label">Adres</label>
                                         <input type="text" class="form-control @error('recipient_address') is-invalid @enderror" 
                                                id="recipient_address" name="recipient_address" 
-                                               value="{{ old('recipient_address') }}">
+                                               value="{{ old('recipient_address', $prefill['recipient_address'] ?? '') }}">
                                         @error('recipient_address')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -299,7 +320,7 @@
                                         <label for="recipient_nip" class="form-label">NIP (opcjonalnie) - proszę podać tylko jeżeli ma znaleźć się na fakturze</label>
                                         <input type="text" class="form-control @error('recipient_nip') is-invalid @enderror" 
                                                id="recipient_nip" name="recipient_nip" 
-                                               value="{{ old('recipient_nip') }}">
+                                               value="{{ old('recipient_nip', $prefill['recipient_nip'] ?? '') }}">
                                         @error('recipient_nip')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -323,7 +344,7 @@
                                     <div class="col-12">
                                         <label for="invoice_notes" class="form-label">Uwagi do faktury</label>
                                         <textarea class="form-control @error('invoice_notes') is-invalid @enderror" 
-                                                  id="invoice_notes" name="invoice_notes" rows="3">{{ old('invoice_notes') }}</textarea>
+                                                  id="invoice_notes" name="invoice_notes" rows="3">{{ old('invoice_notes', $prefill['invoice_notes'] ?? '') }}</textarea>
                                         @error('invoice_notes')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -335,7 +356,7 @@
                                         <div class="input-group">
                                             <input type="number" min="0" max="31" class="form-control @error('invoice_payment_delay') is-invalid @enderror" 
                                                    id="invoice_payment_delay" name="invoice_payment_delay" 
-                                                   value="{{ old('invoice_payment_delay', 14) }}">
+                                                   value="{{ old('invoice_payment_delay', $prefill['invoice_payment_delay'] ?? 14) }}">
                                             <span class="input-group-text">dni</span>
                                         </div>
                                         @error('invoice_payment_delay')
@@ -360,7 +381,7 @@
                                         <label for="notes" class="form-label">Dodatkowe notatki</label>
                                         <textarea class="form-control @error('notes') is-invalid @enderror" 
                                                   id="notes" name="notes" rows="3" 
-                                                  placeholder="Dodaj notatki dotyczące zamówienia...">{{ old('notes') }}</textarea>
+                                                  placeholder="Dodaj notatki dotyczące zamówienia...">{{ old('notes', $prefill['notes'] ?? '') }}</textarea>
                                         @error('notes')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -384,48 +405,86 @@
         </div>
     </div>
 
-    {{-- JavaScript dla wyświetlania informacji o kursie --}}
+    {{-- TomSelect wyboru szkolenia + lekki podgląd informacji o kursie --}}
+    @php
+        $courseSearchUrl = route('form-orders.courses.search');
+        $courseSelectPreselected = $preselectedCourse ? [
+            'id' => $preselectedCourse->id,
+            'id_old' => $preselectedCourse->id_old,
+            'title_text' => trim(strip_tags((string) $preselectedCourse->title)),
+            'start_date' => $preselectedCourse->start_date ? $preselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
+            'end_date' => $preselectedCourse->end_date ? $preselectedCourse->end_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
+            'status' => $preselectedCourse->getLifecycleStatus(),
+            'instructor' => optional($preselectedCourse->instructor)->full_title_name ?? '',
+        ] : null;
+    @endphp
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const courseSelect = document.getElementById('course_id');
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchUrl = @json($courseSearchUrl);
+            const preselected = @json($courseSelectPreselected);
+
             const courseInfo = document.getElementById('course-info');
             const courseDetails = document.getElementById('course-details');
+            const priceInput = document.getElementById('product_price');
+            const archivedToggle = document.getElementById('course_include_archived');
 
-            courseSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                
-                if (this.value) {
-                    const title = selectedOption.getAttribute('data-title');
-                    const description = selectedOption.getAttribute('data-description');
-                    const startDate = selectedOption.getAttribute('data-start-date');
-                    
-                    courseDetails.innerHTML = `
-                        <div class="row">
-                            <div class="col-md-6">
-                                <strong>Tytuł:</strong> ${title}
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Data rozpoczęcia:</strong> [${startDate}]
-                            </div>
-                        </div>
-                        ${description ? `
-                            <div class="row mt-2">
-                                <div class="col-12">
-                                    <strong>Opis:</strong><br>
-                                    <small class="text-muted">${description}</small>
-                                </div>
-                            </div>
-                        ` : ''}
-                    `;
-                    courseInfo.style.display = 'block';
-                } else {
+            const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
+            let includeArchived = false;
+            try {
+                includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
+            } catch (e) {}
+            if (archivedToggle) {
+                archivedToggle.checked = includeArchived;
+            }
+
+            function escapeHtml(value) {
+                return String(value == null ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function renderInfo(item) {
+                if (!item) {
                     courseInfo.style.display = 'none';
+                    return;
                 }
+                const instructor = item.instructor ? escapeHtml(item.instructor) : '<span class="text-muted">—</span>';
+                courseDetails.innerHTML =
+                    '<div class="row g-2">' +
+                        '<div class="col-md-6"><strong>Tytuł:</strong> ' + escapeHtml(item.title_text || '') + '</div>' +
+                        '<div class="col-md-6"><strong>Data rozpoczęcia:</strong> ' + (item.start_date ? '[' + escapeHtml(item.start_date) + ']' : '—') + '</div>' +
+                        '<div class="col-md-6"><strong>Prowadzący:</strong> ' + instructor + '</div>' +
+                    '</div>';
+                courseInfo.style.display = 'block';
+            }
+
+            const ts = window.initCourseSelect && window.initCourseSelect('course_id', {
+                searchUrl,
+                preselected,
+                includeArchived,
+                onCourseChanged: function (item) {
+                    renderInfo(item);
+                    if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
+                        priceInput.value = item.default_price;
+                    }
+                },
             });
 
-            // Wyświetl informacje jeśli kurs jest już wybrany (przy błędach walidacji)
-            if (courseSelect.value) {
-                courseSelect.dispatchEvent(new Event('change'));
+            if (ts && preselected) {
+                renderInfo(preselected);
+            }
+
+            if (ts && archivedToggle) {
+                archivedToggle.addEventListener('change', function () {
+                    const checked = !!archivedToggle.checked;
+                    try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
+                    if (typeof ts.setIncludeArchived === 'function') {
+                        ts.setIncludeArchived(checked);
+                    }
+                });
             }
         });
     </script>
