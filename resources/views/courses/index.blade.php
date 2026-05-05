@@ -393,6 +393,14 @@
                                        title="{{ e($course->notatki) }}" 
                                        style="font-size: 1.2em; cursor: help;"></i>
                                 @endif
+                                @if(!empty(trim($course->sendy_suppression_list_id ?? '')))
+                                    <img src="{{ asset('sendy-avatar.webp') }}"
+                                         width="22"
+                                         height="22"
+                                         class="rounded mt-1"
+                                         alt=""
+                                         title="Lista Sendy (wykluczenia) — ID przypisany do szkolenia">
+                                @endif
                             </div>
                         </td>
                         <td class="text-center align-middle">
