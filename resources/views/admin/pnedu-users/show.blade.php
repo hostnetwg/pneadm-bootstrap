@@ -85,7 +85,8 @@
                                 Wysyła standardową wiadomość Laravel z linkiem do formularza resetu na stronie pnedu.pl
                                 (<code>{{ rtrim(config('services.pnedu_frontend_url'), '/') }}/reset-password/…</code>).
                             </p>
-                            <form method="POST" action="{{ route('admin.pnedu-users.send-password-reset', $user) }}"
+                            <form method="post"
+                                  action="{{ route('admin.pnedu-users.send-password-reset', ['pnedu_user' => $user->getKey()]) }}"
                                   onsubmit="return confirm('Wysłać e-mail z linkiem resetu hasła na adres {{ e($user->email) }}?');">
                                 @csrf
                                 <button type="submit" class="btn btn-outline-primary btn-sm">
@@ -97,20 +98,27 @@
                         <div class="mb-4 pb-4 border-bottom">
                             <h6 class="fw-semibold">Ustaw hasło z panelu</h6>
                             <p class="text-muted small mb-2">Nadpisuje hasło w bazie pnedu (użyj tylko gdy jest to uzasadnione procedurą).</p>
-                            <form method="POST" action="{{ route('admin.pnedu-users.set-password', $user) }}"
+                            <form method="post"
+                                  id="pnedu-user-set-password-form"
+                                  action="{{ route('admin.pnedu-users.set-password', ['pnedu_user' => $user->getKey()]) }}"
                                   class="row g-2 align-items-end"
                                   onsubmit="return confirm('Nadpisać hasło tego użytkownika nowym hasłem z formularza?');">
                                 @csrf
                                 <div class="col-md-5">
-                                    <label class="form-label small mb-0" for="password">Nowe hasło</label>
-                                    <input type="password" name="password" id="password" class="form-control form-control-sm" required autocomplete="new-password">
+                                    <label class="form-label small mb-0" for="pnedu_admin_set_password">Nowe hasło</label>
+                                    <input type="password" name="password" id="pnedu_admin_set_password" class="form-control form-control-sm" required autocomplete="new-password">
                                 </div>
                                 <div class="col-md-5">
-                                    <label class="form-label small mb-0" for="password_confirmation">Powtórz hasło</label>
-                                    <input type="password" name="password_confirmation" id="password_confirmation" class="form-control form-control-sm" required autocomplete="new-password">
+                                    <label class="form-label small mb-0" for="pnedu_admin_set_password_confirmation">Powtórz hasło</label>
+                                    <input type="password" name="password_confirmation" id="pnedu_admin_set_password_confirmation" class="form-control form-control-sm" required autocomplete="new-password">
                                 </div>
                                 <div class="col-md-2">
-                                    <button type="submit" class="btn btn-warning btn-sm w-100">Zapisz hasło</button>
+                                    <button type="submit"
+                                            class="btn btn-warning btn-sm w-100"
+                                            formaction="{{ route('admin.pnedu-users.set-password', ['pnedu_user' => $user->getKey()]) }}"
+                                            formmethod="post">
+                                        Zapisz hasło
+                                    </button>
                                 </div>
                             </form>
                             @error('password')
@@ -124,7 +132,7 @@
                                 <p class="text-muted small mb-0">Adres jest już zweryfikowany — akcja niedostępna.</p>
                             @else
                                 <p class="text-muted small mb-2">Oznacza adres jako zweryfikowany (np. po weryfikacji poza systemem).</p>
-                                <form method="POST" action="{{ route('admin.pnedu-users.verify-email', $user) }}">
+                                <form method="post" action="{{ route('admin.pnedu-users.verify-email', ['pnedu_user' => $user->getKey()]) }}">
                                     @csrf
                                     <div class="form-check mb-3">
                                         <input class="form-check-input" type="checkbox" name="confirm_verify" id="confirm_verify" value="1" required>
