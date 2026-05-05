@@ -130,13 +130,28 @@
                         <label for="meeting_password" class="form-label">Hasło do spotkania</label>
                         <input type="text" name="meeting_password" id="meeting_password" class="form-control">
                     </div>
-                    <div class="col-md-4 mt-2">
-                        <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
-                        <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
-                        <small class="text-muted">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
-                    </div>
                 </div>
 
+                <div class="row mb-2">
+                    <div class="col-md-4 mb-3" id="clickmeeting-event-wrapper">
+                        <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
+                        <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
+                        <small class="text-muted d-block">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="sendy_suppression_list_id" class="form-label">ID listy na SENDY</label>
+                        <input type="text" name="sendy_suppression_list_id" id="sendy_suppression_list_id"
+                            class="form-control font-monospace @error('sendy_suppression_list_id') is-invalid @enderror"
+                            value="{{ old('sendy_suppression_list_id') }}"
+                            maxlength="255" autocomplete="off">
+                        @error('sendy_suppression_list_id')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <div class="form-text">
+                            Wpisz ID listy z Sendy dla tego szkolenia. Na tej liście przygotuj segment dla tego terminu — np. nazwa „2026-05-07 Roman Lorens”, a jako warunek ustaw (data is 2026-05-07 - pamiętaj że pole data jest typu TEXT). W kampanii dodaj ten segment do wykluczeń, żeby nie wysyłać ponownie oferty już zapisanym osobom.
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Pola dla kursów stacjonarnych -->
                 <div id="offlineFields" style="display: none;">
@@ -265,9 +280,13 @@
                     <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu') ? 'checked' : '' }}>
                     <label class="form-check-label" for="show_on_pnedu">Pokaż na stronie głównej pnedu.pl</label>
                 </div>
+                <p class="text-muted small mb-3">Po pierwszym zapisie szkolenia link do podglądu strony oferty na pnedu.pl pojawi się na stronie edycji przy tym ustawieniu.</p>
 
-                <button type="submit" class="btn btn-primary">Dodaj kurs</button>
-                <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" name="save_action" value="stay_editing" class="btn btn-primary">Dodaj kurs</button>
+                    <button type="submit" name="save_action" value="close" class="btn btn-outline-secondary">Dodaj kurs i zamknij formularz</button>
+                    <a href="{{ route('courses.index') }}" class="btn btn-secondary">Anuluj</a>
+                </div>
             </form>
         </div>
     </div>
@@ -275,8 +294,13 @@
     <script>
         function toggleCourseFields() {
             const type = document.getElementById('type').value;
-            document.getElementById('onlineFields').style.display = (type === 'online') ? 'flex' : 'none';
+            const online = type === 'online';
+            document.getElementById('onlineFields').style.display = online ? 'flex' : 'none';
             document.getElementById('offlineFields').style.display = (type === 'offline') ? 'block' : 'none';
+            const cm = document.getElementById('clickmeeting-event-wrapper');
+            if (cm) {
+                cm.style.display = online ? '' : 'none';
+            }
         }
 
         // Funkcje edytora HTML

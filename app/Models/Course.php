@@ -38,6 +38,7 @@ class Course extends Model
         'id_old',
         'source_id_old',
         'show_on_pnedu',
+        'sendy_suppression_list_id',
     ];
 
     protected $casts = [

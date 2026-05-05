@@ -159,7 +159,7 @@
                         </div>
                     </div>
 
-                    <div id="online-fields" style="display: {{ $course->type == 'online' ? 'block' : 'none' }};">
+                    <div id="online-fields" style="display: {{ old('type', $course->type) == 'online' ? 'block' : 'none' }};">
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="platform" class="form-label">Platforma</label>
@@ -176,18 +176,32 @@
                                 <input type="text" name="meeting_password" class="form-control" id="meeting_password" 
                                     value="{{ $course->onlineDetails->meeting_password ?? '' }}">
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
-                                <input type="text" name="clickmeeting_event_id" class="form-control" id="clickmeeting_event_id"
-                                    value="{{ old('clickmeeting_event_id', $course->onlineDetails->clickmeeting_event_id ?? '') }}">
-                                <small class="text-muted">Wypełnij dla kursów online prowadzonych na ClickMeeting.</small>
-                            </div>
                         </div>
                     </div>
-                    
-                
 
-                <div id="offline-fields" style="display: {{ $course->type == 'offline' ? 'block' : 'none' }};">
+                <div class="row">
+                    <div class="col-md-4 mb-3" id="clickmeeting-event-wrapper" style="display: {{ old('type', $course->type) == 'online' ? 'block' : 'none' }};">
+                        <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
+                        <input type="text" name="clickmeeting_event_id" class="form-control" id="clickmeeting_event_id"
+                            value="{{ old('clickmeeting_event_id', $course->onlineDetails->clickmeeting_event_id ?? '') }}">
+                        <small class="text-muted d-block">Wypełnij dla kursów online prowadzonych na ClickMeeting.</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="sendy_suppression_list_id" class="form-label">ID listy na SENDY</label>
+                        <input type="text" name="sendy_suppression_list_id" id="sendy_suppression_list_id"
+                            class="form-control font-monospace @error('sendy_suppression_list_id') is-invalid @enderror"
+                            value="{{ old('sendy_suppression_list_id', $course->sendy_suppression_list_id) }}"
+                            maxlength="255" autocomplete="off">
+                        @error('sendy_suppression_list_id')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <div class="form-text">
+                            Wpisz ID listy z Sendy dla tego szkolenia. Na tej liście przygotuj segment dla tego terminu — np. nazwa „2026-05-07 Roman Lorens”, a jako warunek ustaw (data is 2026-05-07 - pamiętaj że pole data jest typu TEXT). W kampanii dodaj ten segment do wykluczeń, żeby nie wysyłać ponownie oferty już zapisanym osobom.
+                        </div>
+                    </div>
+                </div>
+
+                <div id="offline-fields" style="display: {{ old('type', $course->type) == 'offline' ? 'block' : 'none' }};">
                         <div class="row">
                             <div class="col-md-6">
                                 <label for="location_name">Nazwa lokalizacji</label>
@@ -357,6 +371,15 @@
                     <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu', $course->show_on_pnedu) ? 'checked' : '' }}>
                     <label class="form-check-label" for="show_on_pnedu">Pokaż na stronie głównej pnedu.pl</label>
                 </div>
+                @php
+                    $pneduOfferUrl = rtrim(config('services.pnedu_frontend_url', ''), '/') . '/courses/' . $course->id;
+                @endphp
+                <div class="small mb-3">
+                    <a href="{{ $pneduOfferUrl }}" target="_blank" rel="noopener noreferrer" class="link-primary">
+                        Podgląd oferty na pnedu.pl <i class="fas fa-external-link-alt ms-1" aria-hidden="true"></i>
+                    </a>
+                    <span class="text-muted">(nie zależy od checkboxa powyżej)</span>
+                </div>
 
                 <!-- Pola dla integracji z zewnętrznymi systemami -->
                 <div class="row mb-3">
@@ -384,11 +407,14 @@
                     <div class="form-text">Pole przeznaczone na dodatkowe informacje techniczne związane z danym szkoleniem</div>
                 </div>
 
-                <button type="submit" class="btn btn-success">Zapisz zmiany</button>
-                <a href="{{ route('courses.index', request()->query()) }}" class="btn btn-secondary">Anuluj</a>
-                <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">
-                    <i class="fas fa-users me-1"></i> Uczestnicy ({{ $course->participants->count() }})
-                </a>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" name="save_action" value="stay_editing" class="btn btn-primary">Zapisz zmiany</button>
+                    <button type="submit" name="save_action" value="close" class="btn btn-outline-secondary">Zapisz i zamknij formularz</button>
+                    <a href="{{ route('courses.index', request()->query()) }}" class="btn btn-secondary">Anuluj</a>
+                    <a href="{{ route('participants.index', $course) }}" class="btn btn-primary">
+                        <i class="fas fa-users me-1"></i> Uczestnicy ({{ $course->participants->count() }})
+                    </a>
+                </div>
             </form>
         </div>
     </div>
@@ -397,8 +423,13 @@
 <script>
 function toggleCourseFields() {
     const type = document.getElementById('type').value;
-    document.getElementById('online-fields').style.display = type === 'online' ? 'block' : 'none';
+    const online = type === 'online';
+    document.getElementById('online-fields').style.display = online ? 'block' : 'none';
     document.getElementById('offline-fields').style.display = type === 'offline' ? 'block' : 'none';
+    const cm = document.getElementById('clickmeeting-event-wrapper');
+    if (cm) {
+        cm.style.display = online ? 'block' : 'none';
+    }
 }
 
 // Funkcje edytora HTML

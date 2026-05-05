@@ -10,6 +10,7 @@ use App\Models\CourseSeries;
 use App\Models\FormOrder;
 use App\Models\Instructor;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -751,8 +752,16 @@ class CoursesController extends Controller
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
+            'sendy_suppression_list_id' => 'nullable|string|max:255',
+            'save_action' => 'required|in:close,stay_editing',
         ]);
+        $saveAction = $validated['save_action'];
+        unset($validated['save_action']);
+
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
+        $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
+            ? trim((string) $validated['sendy_suppression_list_id'])
+            : null;
 
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (! empty($validated['offer_description_html'])) {
@@ -845,6 +854,11 @@ class CoursesController extends Controller
             DB::commit();
             \Log::info('Transakcja zatwierdzona');
 
+            if ($saveAction === 'stay_editing') {
+                return $this->redirectToCourseEdit($course->id)
+                    ->with('success', 'Szkolenie zostało dodane. Możesz kontynuować edycję.');
+            }
+
             return redirect()->route('courses.index')
                 ->with('success', 'Szkolenie zostało dodane!');
 
@@ -920,9 +934,17 @@ class CoursesController extends Controller
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
+            'sendy_suppression_list_id' => 'nullable|string|max:255',
+            'save_action' => 'required|in:close,stay_editing',
         ]);
 
+        $saveAction = $validated['save_action'];
+        unset($validated['save_action']);
+
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
+        $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
+            ? trim((string) $validated['sendy_suppression_list_id'])
+            : null;
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
         $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
@@ -1025,12 +1047,11 @@ class CoursesController extends Controller
         }
 
         // Zachowaj parametry filtrów przekazane z formularza
-        $queryParams = [];
-        foreach ($request->all() as $key => $value) {
-            if (str_starts_with($key, 'filter_') && ! empty($value)) {
-                $filterKey = str_replace('filter_', '', $key);
-                $queryParams[$filterKey] = $value;
-            }
+        $queryParams = $this->extractFilterQueryParamsFromRequest($request);
+
+        if ($saveAction === 'stay_editing') {
+            return $this->redirectToCourseEdit((int) $course->id, $queryParams)
+                ->with('success', 'Szkolenie zaktualizowane.');
         }
 
         return redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
@@ -1120,4 +1141,39 @@ class CoursesController extends Controller
 
     /* =========importFromPubligo=========== */
 
+    /**
+     * @return array<string, scalar>
+     */
+    private function extractFilterQueryParamsFromRequest(Request $request): array
+    {
+        $queryParams = [];
+
+        foreach ($request->all() as $key => $value) {
+            if (! str_starts_with($key, 'filter_') || $value === '' || $value === null) {
+                continue;
+            }
+
+            $filterKey = str_replace('filter_', '', $key);
+            if (is_array($value)) {
+                continue;
+            }
+
+            $queryParams[$filterKey] = $value;
+        }
+
+        return $queryParams;
+    }
+
+    /**
+     * @param  array<string, scalar>  $queryParams
+     */
+    private function redirectToCourseEdit(int|string $courseId, array $queryParams = []): RedirectResponse
+    {
+        $url = route('courses.edit', ['id' => $courseId]);
+        if ($queryParams !== []) {
+            $url .= (str_contains($url, '?') ? '&' : '?').http_build_query($queryParams);
+        }
+
+        return redirect($url);
+    }
 }
