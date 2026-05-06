@@ -626,7 +626,8 @@ class IfirmaApiService
     }
 
     /**
-     * Wyodrębnia numer KSeF z payloadu faktury (GET JSON), przeszukując drzewo pod kluczem „NumerKSeF”.
+     * Wyodrębnia numer KSeF z payloadu faktury (GET JSON).
+     * API może zwracać inne warianty nazwy pola lub wartość liczbową — obsługujemy kilka wariantów i heurystykę kluczy.
      *
      * @param  array<string,mixed>|null  $payload
      */
@@ -636,7 +637,134 @@ class IfirmaApiService
             return null;
         }
 
-        return $this->findFirstNonEmptyStringByKeyRecursive($payload, 'NumerKSeF');
+        $preferredNormalized = [
+            'numerksef',
+            'nrksef',
+            'numerfakturyksef',
+            'numerreferencyjnyksef',
+            'identyfikatorksef',
+            'idksef',
+        ];
+
+        foreach ($preferredNormalized as $norm) {
+            $raw = $this->findScalarByNormalizedKeyRecursive($payload, $norm);
+            $s = $this->normalizeKsefNumberScalar($raw);
+            if ($s !== null) {
+                return $s;
+            }
+        }
+
+        $fromHeuristicKeys = $this->collectKsefNumbersFromHeuristicKeys($payload);
+
+        return $fromHeuristicKeys[0] ?? null;
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return array<int, string>
+     */
+    private function collectKsefNumbersFromHeuristicKeys(array $data): array
+    {
+        $found = [];
+
+        foreach ($data as $key => $value) {
+            if (is_string($key) && $this->keyLooksLikeKsefInvoiceNumberField($key)) {
+                $s = $this->normalizeKsefNumberScalar($value);
+                if ($s !== null) {
+                    $found[] = $s;
+                }
+            }
+            if (is_array($value)) {
+                $found = array_merge($found, $this->collectKsefNumbersFromHeuristicKeys($value));
+            }
+        }
+
+        return $found;
+    }
+
+    private function keyLooksLikeKsefInvoiceNumberField(string $key): bool
+    {
+        $n = $this->normalizeJsonPropertyName($key);
+
+        if ($n === '' || ! str_contains($n, 'ksef')) {
+            return false;
+        }
+
+        if (str_contains($n, 'odrzuc') || str_contains($n, 'blad') || str_contains($n, 'error') || str_contains($n, 'status')) {
+            return false;
+        }
+
+        return str_contains($n, 'numer')
+            || str_contains($n, 'nr')
+            || str_contains($n, 'ident')
+            || str_contains($n, 'reference');
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return mixed
+     */
+    private function findScalarByNormalizedKeyRecursive(array $data, string $normalizedNeedle)
+    {
+        foreach ($data as $key => $value) {
+            if (is_string($key) && $this->normalizeJsonPropertyName($key) === $normalizedNeedle && ! is_array($value)) {
+                return $value;
+            }
+            if (is_array($value)) {
+                $inner = $this->findScalarByNormalizedKeyRecursive($value, $normalizedNeedle);
+                if ($inner !== self::KSEF_SCALAR_NOT_FOUND) {
+                    return $inner;
+                }
+            }
+        }
+
+        return self::KSEF_SCALAR_NOT_FOUND;
+    }
+
+    private const KSEF_SCALAR_NOT_FOUND = '__ksef_scalar_not_found__';
+
+    private function normalizeJsonPropertyName(string $key): string
+    {
+        return strtolower(str_replace(['_', '-', ' ', '.'], '', $key));
+    }
+
+    private function normalizeKsefNumberScalar(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value === self::KSEF_SCALAR_NOT_FOUND) {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $t = trim($value);
+
+            return $t !== '' ? $t : null;
+        }
+
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        if (is_float($value)) {
+            if (! is_finite($value)) {
+                return null;
+            }
+            $rounded = round($value);
+            if (abs($value - $rounded) < 1e-9) {
+                return (string) (int) $rounded;
+            }
+
+            return trim(sprintf('%.12g', $value));
+        }
+
+        return null;
     }
 
     /**
@@ -652,7 +780,7 @@ class IfirmaApiService
      */
     public function waitForKsefInvoiceAccepted(int|string $invoiceId): array
     {
-        $maxSeconds = max(5, (int) config('services.ifirma.ksef_poll_max_seconds', 90));
+        $maxSeconds = max(5, (int) config('services.ifirma.ksef_poll_max_seconds', 300));
         $interval = max(1, (int) config('services.ifirma.ksef_poll_interval_seconds', 3));
         $deadline = microtime(true) + $maxSeconds;
         $attempts = 0;
@@ -674,6 +802,14 @@ class IfirmaApiService
             }
 
             $full = $invoiceDetails['data'];
+
+            if ($attempts === 1) {
+                Log::info('iFirma KSeF poll: pierwsza odpowiedź GET faktury (klucze główne)', [
+                    'invoice_id' => $invoiceId,
+                    'top_level_keys' => array_keys($full),
+                ]);
+            }
+
             $numer = $this->extractNumerKSeFFromInvoicePayload($full);
 
             if ($numer !== null && $numer !== '') {
@@ -721,26 +857,6 @@ class IfirmaApiService
             'rejection_message' => $lastRejection,
             'attempts' => $attempts,
         ];
-    }
-
-    /**
-     * @param  array<string,mixed>  $data
-     */
-    private function findFirstNonEmptyStringByKeyRecursive(array $data, string $needleKey): ?string
-    {
-        foreach ($data as $key => $value) {
-            if ($key === $needleKey && is_string($value) && trim($value) !== '') {
-                return trim($value);
-            }
-            if (is_array($value)) {
-                $found = $this->findFirstNonEmptyStringByKeyRecursive($value, $needleKey);
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-
-        return null;
     }
 
     /**
