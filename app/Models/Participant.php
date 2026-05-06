@@ -41,6 +41,31 @@ class Participant extends Model
     }
 
     /**
+     * Normalizacja e-maila do porównywania duplikatów (trim + małe litery).
+     */
+    public static function normalizeEmail(?string $email): ?string
+    {
+        if ($email === null) {
+            return null;
+        }
+        $t = strtolower(trim($email));
+
+        return $t === '' ? null : $t;
+    }
+
+    /**
+     * Normalizacja imienia lub nazwiska przy porównaniu rekordów.
+     */
+    public static function normalizeNamePart(?string $name): string
+    {
+        if ($name === null) {
+            return '';
+        }
+
+        return mb_strtolower(preg_replace('/\s+/u', ' ', trim($name)));
+    }
+
+    /**
      * Sprawdź czy dostęp wygasł
      */
     public function hasExpiredAccess(): bool

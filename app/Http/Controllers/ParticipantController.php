@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ParticipantController extends Controller
 {
@@ -1097,7 +1098,38 @@ class ParticipantController extends Controller
      */
     public function edit(Course $course, Participant $participant)
     {
-        return view('participants.edit', compact('course', 'participant'));
+        $normalizedEmailAnchor = Participant::normalizeEmail($participant->email);
+
+        $duplicateParticipants = collect();
+        if ($normalizedEmailAnchor !== null) {
+            $duplicateParticipants = Participant::query()
+                ->with(['course:id,title,start_date'])
+                ->whereKeyNot($participant->id)
+                ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmailAnchor])
+                ->orderByDesc('updated_at')
+                ->get();
+        }
+
+        $duplicateNameMismatchAmongOthers = false;
+        if ($duplicateParticipants->isNotEmpty()) {
+            $selfFn = Participant::normalizeNamePart($participant->first_name);
+            $selfLn = Participant::normalizeNamePart($participant->last_name);
+            foreach ($duplicateParticipants as $other) {
+                if (Participant::normalizeNamePart($other->first_name) !== $selfFn
+                    || Participant::normalizeNamePart($other->last_name) !== $selfLn
+                ) {
+                    $duplicateNameMismatchAmongOthers = true;
+                    break;
+                }
+            }
+        }
+
+        return view('participants.edit', compact(
+            'course',
+            'participant',
+            'duplicateParticipants',
+            'duplicateNameMismatchAmongOthers'
+        ));
     }
 
     /**
@@ -1114,9 +1146,44 @@ class ParticipantController extends Controller
             'phone' => 'nullable|string|max:50',
             'notes' => 'nullable|string|max:10000',
             'access_expires_at' => 'nullable|date',
+            'sync_duplicate_email_profiles' => 'sometimes|boolean',
+            'sync_duplicate_email_confirm_mismatch' => 'sometimes|boolean',
         ]);
 
-        $data = $request->all();
+        $anchorNormalized = Participant::normalizeEmail($participant->email);
+        $wantsProfileSync = $request->boolean('sync_duplicate_email_profiles');
+
+        if ($wantsProfileSync && $anchorNormalized === null) {
+            throw ValidationException::withMessages([
+                'sync_duplicate_email_profiles' => 'Synchronizacja jest możliwa tylko gdy uczestnik ma zapisany adres e-mail (przed zapisem).',
+            ]);
+        }
+
+        $otherIdsForSync = collect();
+        if ($wantsProfileSync && $anchorNormalized !== null) {
+            $otherIdsForSync = Participant::query()
+                ->whereKeyNot($participant->id)
+                ->whereRaw('LOWER(TRIM(email)) = ?', [$anchorNormalized])
+                ->pluck('id');
+
+            if ($otherIdsForSync->isNotEmpty()) {
+                $reqFn = Participant::normalizeNamePart($request->input('first_name'));
+                $reqLn = Participant::normalizeNamePart($request->input('last_name'));
+                $hasNameMismatch = Participant::query()
+                    ->whereIn('id', $otherIdsForSync)
+                    ->get(['id', 'first_name', 'last_name'])
+                    ->contains(fn (Participant $other) => Participant::normalizeNamePart($other->first_name) !== $reqFn
+                        || Participant::normalizeNamePart($other->last_name) !== $reqLn);
+
+                if ($hasNameMismatch && ! $request->boolean('sync_duplicate_email_confirm_mismatch')) {
+                    throw ValidationException::withMessages([
+                        'sync_duplicate_email_confirm_mismatch' => 'Inni uczestnicy z tym e-mailem mają inne imię lub nazwisko — zaznacz potwierdzenie poniżej, aby mimo to zsynchronizować pola profilowe we wszystkich rekordach.',
+                    ]);
+                }
+            }
+        }
+
+        $data = $request->except(['sync_duplicate_email_profiles', 'sync_duplicate_email_confirm_mismatch']);
 
         // Obsługa daty wygaśnięcia dostępu
         if (! empty($data['access_expires_at'])) {
@@ -1127,9 +1194,38 @@ class ParticipantController extends Controller
             $data['access_expires_at'] = $localTime;
         }
 
-        $participant->update($data);
+        $profilePayload = [
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'email' => ! empty($data['email']) ? $data['email'] : null,
+            'phone' => ! empty($data['phone']) ? $data['phone'] : null,
+            'birth_date' => ! empty($data['birth_date']) ? $data['birth_date'] : null,
+            'birth_place' => ! empty($data['birth_place']) ? $data['birth_place'] : null,
+        ];
 
-        return redirect()->route('participants.index', $course)->with('success', 'Uczestnik zaktualizowany.');
+        $syncedCount = 0;
+        DB::transaction(function () use ($participant, $data, $wantsProfileSync, $otherIdsForSync, $profilePayload, &$syncedCount) {
+            $participant->update($data);
+
+            if ($wantsProfileSync && $otherIdsForSync->isNotEmpty()) {
+                $rows = Participant::query()->whereIn('id', $otherIdsForSync)->get();
+                foreach ($rows as $row) {
+                    $row->update($profilePayload);
+                }
+                $syncedCount = $rows->count();
+            }
+        });
+
+        $message = 'Uczestnik zaktualizowany.';
+        if ($wantsProfileSync && $syncedCount > 0) {
+            $message .= sprintf(
+                ' Zsynchronizowano dane profilowe (imię, nazwisko, e-mail, telefon, data i miejsce urodzenia) w %d %s.',
+                $syncedCount,
+                $syncedCount === 1 ? 'innym rekordzie' : 'innych rekordach'
+            );
+        }
+
+        return redirect()->route('participants.index', $course)->with('success', $message);
     }
 
     /**
