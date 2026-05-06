@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InstructorTrainingLinksMail;
 use App\Models\CertificateTemplate;
 use App\Models\Course;
 use App\Models\CourseLocation;
@@ -9,10 +10,13 @@ use App\Models\CourseOnlineDetails;
 use App\Models\CourseSeries;
 use App\Models\FormOrder;
 use App\Models\Instructor;
+use App\Support\CourseInstructorLinksEmailBody;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class CoursesController extends Controller
 {
@@ -709,7 +713,65 @@ class CoursesController extends Controller
             ->orderBy('start_date', 'asc')
             ->first();
 
-        return view('courses.show', compact('course', 'previousCourse', 'nextCourse', 'deletedVariants', 'priceVariantOrderCounts'));
+        $instructorLinksEmailBody = CourseInstructorLinksEmailBody::build($course);
+
+        return view('courses.show', compact(
+            'course',
+            'previousCourse',
+            'nextCourse',
+            'deletedVariants',
+            'priceVariantOrderCounts',
+            'instructorLinksEmailBody'
+        ));
+    }
+
+    /**
+     * Wysyłka wiadomości z linkami nagraniów / materiałów / ankiet do prowadzącego szkolenie.
+     */
+    public function emailInstructorTrainingLinks(Request $request, int $id): RedirectResponse
+    {
+        $course = Course::with(['instructor', 'videos' => fn ($q) => $q->orderBy('order'),
+            'fileLinks' => fn ($q) => $q->orderBy('order'),
+            'surveyLinks' => fn ($q) => $q->orderBy('order')])
+            ->findOrFail($id);
+
+        $rules = [
+            'body' => 'required|string|max:20000',
+            'send_target' => 'required|string|in:instructor,test',
+        ];
+        if ($request->input('send_target') === 'test') {
+            $rules['test_email'] = 'required|email|max:255';
+            $rules['instructor_email'] = 'sometimes|nullable|email|max:255';
+        } else {
+            $rules['instructor_email'] = 'required|email|max:255';
+            $rules['test_email'] = 'sometimes|nullable|email|max:255';
+        }
+
+        $validated = $request->validate($rules);
+        $toEmail = trim($validated['send_target'] === 'test'
+            ? (string) $validated['test_email']
+            : (string) $validated['instructor_email']);
+
+        try {
+            $subjectLine = CourseInstructorLinksEmailBody::subjectLine($course);
+            Mail::to($toEmail)->send(new InstructorTrainingLinksMail($course, $validated['body'], $subjectLine));
+        } catch (\Throwable $e) {
+            Log::error('emailInstructorTrainingLinks failed', [
+                'course_id' => $course->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('courses.show', $course->id)
+                ->withInput()
+                ->with('error', 'Nie udało się wysłać wiadomości. Sprawdź konfigurację poczty lub spróbuj ponownie później.');
+        }
+
+        $successMsg = $request->input('send_target') === 'test'
+            ? 'Wiadomość testowa została wysłana na adres '.$toEmail.'.'
+            : 'Wiadomość została wysłana na adres '.$toEmail.'.';
+
+        return redirect()->route('courses.show', $course->id)
+            ->with('success', $successMsg);
     }
 
     /**

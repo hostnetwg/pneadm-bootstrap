@@ -12,6 +12,11 @@
                     {!! session('success') !!}
                 </div>
             @endif
+            @if(session('error'))
+                <div class="alert alert-danger">
+                    {{ session('error') }}
+                </div>
+            @endif
 
             <!-- Nawigacja -->
             <div class="mb-4 d-flex justify-content-end align-items-center gap-2">
@@ -626,6 +631,22 @@
                         </div>
                     </div>
 
+                    @php
+                        $defaultInstructorTrainingTestEmail = 'waldemar.grabowski@hostnet.pl';
+                        $instructorEmailTrimmed = trim($course->instructor->email ?? '');
+                    @endphp
+                    <!-- Przesłanie linków prowadzącemu -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <button type="button"
+                                    class="btn btn-outline-primary w-100"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#instructorTrainingLinksModal">
+                                <i class="fas fa-paper-plane me-1"></i> Prześlij linki prowadzącemu
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Akcje -->
                     <div class="card">
                         <div class="card-header">
@@ -650,6 +671,74 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: treść wiadomości do prowadzącego --}}
+    <div class="modal fade" id="instructorTrainingLinksModal" tabindex="-1" aria-labelledby="instructorTrainingLinksModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="instructorTrainingLinksModalLabel">
+                        <i class="fas fa-paper-plane me-2"></i>Prześlij linki prowadzącemu
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formInstructorTrainingLinks" method="post" action="{{ route('courses.email-instructor-training-links', $course->id) }}">
+                        @csrf
+                        <label class="form-label fw-bold" for="instructorTrainingLinksBody">Treść wiadomości (możesz edytować przed wysłaniem)</label>
+                        <textarea class="form-control font-monospace mb-3 @error('body') is-invalid @enderror"
+                                  id="instructorTrainingLinksBody"
+                                  name="body"
+                                  rows="15"
+                                  spellcheck="false">{{ old('body', $instructorLinksEmailBody ?? '') }}</textarea>
+                        @error('body')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                        <hr>
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold" for="instructorTrainingLinksInstructorEmail">E-mail prowadzącego</label>
+                                <input type="email"
+                                       class="form-control @error('instructor_email') is-invalid @enderror"
+                                       id="instructorTrainingLinksInstructorEmail"
+                                       name="instructor_email"
+                                       value="{{ old('instructor_email', $instructorEmailTrimmed) }}"
+                                       autocomplete="email"
+                                       placeholder="adres@przykład.pl">
+                                @error('instructor_email')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold" for="instructorTrainingLinksTestEmail">E-mail testowy</label>
+                                <input type="email"
+                                       class="form-control @error('test_email') is-invalid @enderror"
+                                       id="instructorTrainingLinksTestEmail"
+                                       name="test_email"
+                                       value="{{ old('test_email', $defaultInstructorTrainingTestEmail) }}"
+                                       autocomplete="email"
+                                       placeholder="adres@przykład.pl">
+                                @error('test_email')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" name="send_target" value="instructor" class="btn btn-primary">
+                                <i class="fas fa-envelope me-1"></i>Prześlij e-mail do prowadzącego
+                            </button>
+                            <button type="submit" name="send_target" value="test" class="btn btn-outline-primary">
+                                <i class="fas fa-flask me-1"></i>Prześlij e-mail testowy
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
                 </div>
             </div>
         </div>
@@ -1682,4 +1771,14 @@
             });
         }
     </script>
+    @if($errors->has('body') || $errors->has('instructor_email') || $errors->has('test_email') || $errors->has('send_target'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var el = document.getElementById('instructorTrainingLinksModal');
+                if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                }
+            });
+        </script>
+    @endif
 </x-app-layout>

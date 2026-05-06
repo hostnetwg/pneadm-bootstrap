@@ -253,6 +253,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::post('/courses', [CoursesController::class, 'store'])->name('courses.store');
     // Trasy z parametrem {id} ograniczamy do wartości numerycznych
     Route::get('/courses/{id}', [CoursesController::class, 'show'])->whereNumber('id')->name('courses.show');
+    Route::post('/courses/{id}/email-instructor-training-links', [CoursesController::class, 'emailInstructorTrainingLinks'])
+        ->whereNumber('id')
+        ->name('courses.email-instructor-training-links');
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');
