@@ -39,10 +39,11 @@ class PlainTextEmailHtml
     }
 
     /**
-     * HTML dla wiadomości „linki do szkolenia”: jak {@see linkifyForEmail()}, ale dwie linie po
-     * „poniżej przesyłam linki na szkolenie:” (tytuł i data) są w &lt;strong&gt;.
-     * Dwie pierwsze niepuste linie po tym zdaniu traktowane są jako tytuł i data (puste linie pomijane).
-     * Nagłówki sekcji „N) MATERIAŁY:” oraz „N) ANKIETA:” (N – numer) też są pogrubione.
+     * HTML dla wiadomości „linki do szkolenia”: jak {@see linkifyForEmail()}, linia z tytułem –
+     * w całości w &lt;strong&gt;. W linii z datą pogrubiona jest sama wartość (np. godziny),
+     * napis „Termin szkolenia:” (lub stare „Data szkolenia:”) jest zwykły (bez pogrubienia).
+     * Dwie pierwsze niepuste linie po „poniżej przesyłam linki na szkolenie:” to tytuł i ta linia daty.
+     * Nagłówki sekcji „N) MATERIAŁY:” oraz „N) ANKIETA:” (N – numer) też są w całości pogrubione.
      */
     public static function formatTrainingLinksEmailHtml(string $plainBody): string
     {
@@ -57,9 +58,12 @@ class PlainTextEmailHtml
         $last = count($lines) - 1;
         foreach ($lines as $idx => $line) {
             $trimmed = trim($line);
-            if ($titleIdx !== null && $dateIdx !== null && ($idx === $titleIdx || $idx === $dateIdx)) {
+            if ($titleIdx !== null && $dateIdx !== null && $idx === $titleIdx) {
                 $safe = htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 $out .= '<strong style="font-weight:700;">'.$safe.'</strong>';
+            } elseif ($titleIdx !== null && $dateIdx !== null && $idx === $dateIdx) {
+                $dateHtml = self::trainingLinksDateLineHtml($line);
+                $out .= $dateHtml !== null ? $dateHtml : self::linkifyForEmail($line);
             } elseif (self::isMaterialOrSurveySectionHeading($trimmed)) {
                 $safe = htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 $out .= '<strong style="font-weight:700;">'.$safe.'</strong>';
@@ -72,6 +76,29 @@ class PlainTextEmailHtml
         }
 
         return $out;
+    }
+
+    /**
+     * Napis „Termin szkolenia:” albo „Data szkolenia:” (z opcjonalnymi spacjami po dwukropku) bez pogrubienia;
+     * wartość po spacjach w &lt;strong&gt; (URL-e w wartości nadal przez {@see linkifyForEmail()}).
+     */
+    private static function trainingLinksDateLineHtml(string $line): ?string
+    {
+        $patterns = [
+            '/^(\s*)(Termin szkolenia:)( *)(.*)$/u',
+            '/^(\s*)(Data szkolenia:)( *)(.*)$/u',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $line, $m)) {
+                $before = htmlspecialchars($m[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $prefix = htmlspecialchars($m[2].$m[3], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $valueHtml = self::linkifyForEmail($m[4]);
+
+                return $before.$prefix.'<strong style="font-weight:700;">'.$valueHtml.'</strong>';
+            }
+        }
+
+        return null;
     }
 
     /**

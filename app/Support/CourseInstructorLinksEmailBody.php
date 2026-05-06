@@ -29,9 +29,9 @@ class CourseInstructorLinksEmailBody
         $title = strip_tags(html_entity_decode((string) ($course->title ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $title = trim(preg_replace('/\s+/u', ' ', $title));
 
-        $dateLine = 'Data szkolenia: brak w systemie.';
+        $dateLine = 'Termin szkolenia: brak w systemie.';
         if ($course->start_date) {
-            $dateLine = 'Data szkolenia: '.$course->start_date->format('d.m.Y H:i').'.';
+            $dateLine = 'Termin szkolenia: '.$course->start_date->format('d.m.Y H:i').'.';
         }
 
         $lines = [
