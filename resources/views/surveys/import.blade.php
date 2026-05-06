@@ -22,7 +22,28 @@
             <!-- Nawigacja -->
             <div class="mb-4 d-flex justify-content-between align-items-center">
                 <div>
-                    <h4>Import ankiety dla: <strong>{!! $course->title !!}</strong></h4>
+                    <h4 class="mb-2">Import ankiety dla: <strong>{!! $course->title !!}</strong></h4>
+                    <div class="small d-flex flex-wrap column-gap-3 row-gap-1 align-items-center text-secondary mb-2">
+                        <span>
+                            <i class="far fa-calendar-alt me-1"></i>
+                            <span class="fw-semibold text-body">Data rozpoczęcia:</span>
+                            @if($course->start_date)
+                                {{ $course->start_date->format('d.m.Y H:i') }}
+                            @else
+                                brak w systemie
+                            @endif
+                        </span>
+                        <span class="d-none d-sm-inline text-secondary opacity-50" aria-hidden="true">|</span>
+                        <span>
+                            <i class="fas fa-user-tie me-1"></i>
+                            <span class="fw-semibold text-body">Instruktor:</span>
+                            @if($course->instructor)
+                                {{ $course->instructor->getFullTitleNameAttribute() }}
+                            @else
+                                brak przypisanego instruktora
+                            @endif
+                        </span>
+                    </div>
                     <p class="text-muted mb-0">Zaimportuj wyniki ankiety z pliku CSV pobranego z Google Forms</p>
                 </div>
                 <a href="{{ route('courses.show', $course->id) }}" class="btn btn-secondary">
