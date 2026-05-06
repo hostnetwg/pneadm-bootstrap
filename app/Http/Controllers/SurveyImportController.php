@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Survey;
 use App\Models\Course;
+use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SurveyImportController extends Controller
 {
@@ -18,7 +19,30 @@ class SurveyImportController extends Controller
      */
     public function showImportForm(Course $course)
     {
-        return view('surveys.import', compact('course'));
+        $course->loadMissing('instructor');
+        $defaultImportSurveyTitle = $this->defaultImportSurveyTitle($course);
+
+        return view('surveys.import', compact('course', 'defaultImportSurveyTitle'));
+    }
+
+    /**
+     * Domyślny tytuł ankiety przy imporcie z kartą szkolenia.
+     */
+    private function defaultImportSurveyTitle(Course $course): string
+    {
+        $plainTitle = strip_tags(html_entity_decode((string) ($course->title ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $plainTitle = trim(preg_replace('/\s+/u', ' ', $plainTitle));
+        if ($plainTitle === '') {
+            $plainTitle = 'Szkolenie';
+        }
+
+        $datePart = $course->start_date
+            ? $course->start_date->format('d.m.Y H:i')
+            : 'brak daty';
+
+        $assembled = 'ANKIETA: '.$plainTitle.' ('.$datePart.')';
+
+        return Str::limit($assembled, 255, '');
     }
 
     /**
@@ -30,7 +54,7 @@ class SurveyImportController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'csv_file' => 'required|file|mimes:csv,txt|max:10240', // 10MB max
-            'instructor_id' => 'nullable|exists:instructors,id'
+            'instructor_id' => 'nullable|exists:instructors,id',
         ]);
 
         try {
@@ -38,7 +62,7 @@ class SurveyImportController extends Controller
 
             // Zapisz plik CSV na serwerze z prefiksem ID szkolenia
             $originalFileName = $request->file('csv_file')->getClientOriginalName();
-            $fileName = $course->id . '_' . $originalFileName;
+            $fileName = $course->id.'_'.$originalFileName;
             $filePath = $request->file('csv_file')->storeAs('surveys/imports', $fileName, 'private');
 
             // Utwórz ankietę
@@ -51,12 +75,12 @@ class SurveyImportController extends Controller
                 'imported_at' => now(),
                 'imported_by' => Auth::id(),
                 'total_responses' => 0,
-                'original_file_path' => $filePath
+                'original_file_path' => $filePath,
             ]);
 
             // Przetwórz plik CSV
             $csvData = $this->parseCsvFile($request->file('csv_file'));
-            
+
             if (empty($csvData)) {
                 throw new \Exception('Plik CSV jest pusty lub nieprawidłowy.');
             }
@@ -72,13 +96,13 @@ class SurveyImportController extends Controller
                 }
 
                 $questionType = $this->detectQuestionType($header, $csvData);
-                
+
                 $question = SurveyQuestion::create([
                     'survey_id' => $survey->id,
                     'question_text' => $header,
                     'question_type' => $questionType,
                     'question_order' => $index,
-                    'options' => $this->extractOptions($header, $csvData, $questionType)
+                    'options' => $this->extractOptions($header, $csvData, $questionType),
                 ]);
 
                 $questions[] = $question;
@@ -93,19 +117,20 @@ class SurveyImportController extends Controller
                 foreach ($row as $question => $answer) {
                     if ($question === 'Sygnatura czasowa') {
                         $submittedAt = $this->parseTimestamp($answer);
+
                         continue;
                     }
 
-                    if (!empty($answer)) {
+                    if (! empty($answer)) {
                         $responseData[$question] = $this->cleanAnswer($answer);
                     }
                 }
 
-                if (!empty($responseData) && $submittedAt) {
+                if (! empty($responseData) && $submittedAt) {
                     SurveyResponse::create([
                         'survey_id' => $survey->id,
                         'response_data' => $responseData,
-                        'submitted_at' => $submittedAt
+                        'submitted_at' => $submittedAt,
                     ]);
                     $responseCount++;
                 }
@@ -121,11 +146,11 @@ class SurveyImportController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Błąd importu ankiety: ' . $e->getMessage());
-            
+            Log::error('Błąd importu ankiety: '.$e->getMessage());
+
             return back()
                 ->withInput()
-                ->with('error', 'Wystąpił błąd podczas importu ankiety: ' . $e->getMessage());
+                ->with('error', 'Wystąpił błąd podczas importu ankiety: '.$e->getMessage());
         }
     }
 
@@ -136,13 +161,13 @@ class SurveyImportController extends Controller
     {
         $data = [];
         $handle = fopen($file->getPathname(), 'r');
-        
+
         if ($handle === false) {
             throw new \Exception('Nie można otworzyć pliku CSV.');
         }
 
         $headers = fgetcsv($handle, 0, ',', '"');
-        
+
         if ($headers === false) {
             fclose($handle);
             throw new \Exception('Nie można odczytać nagłówków z pliku CSV.');
@@ -155,6 +180,7 @@ class SurveyImportController extends Controller
         }
 
         fclose($handle);
+
         return $data;
     }
 
@@ -165,7 +191,7 @@ class SurveyImportController extends Controller
     {
         // Sprawdź czy to pytanie ratingowe (1-5)
         $sampleAnswers = array_slice(array_column($data, $header), 0, 10);
-        $numericAnswers = array_filter($sampleAnswers, function($answer) {
+        $numericAnswers = array_filter($sampleAnswers, function ($answer) {
             return is_numeric($answer) && $answer >= 1 && $answer <= 5;
         });
 
@@ -180,10 +206,10 @@ class SurveyImportController extends Controller
 
         // Sprawdź czy to pytanie jednokrotnego wyboru
         // Analizuj unikalne odpowiedzi - jeśli jest mało unikalnych wartości, to prawdopodobnie single_choice
-        $uniqueAnswers = array_unique(array_filter($sampleAnswers, function($answer) {
-            return !empty(trim($answer));
+        $uniqueAnswers = array_unique(array_filter($sampleAnswers, function ($answer) {
+            return ! empty(trim($answer));
         }));
-        
+
         if (count($uniqueAnswers) <= 15 && count($uniqueAnswers) >= 2) {
             // Sprawdź czy odpowiedzi wyglądają jak opcje wyboru
             $choicePatterns = [
@@ -196,9 +222,9 @@ class SurveyImportController extends Controller
                 '/^(dyrekcja|szkoła|nauczyciel|kolega|koleżanka|przełożony|szef)$/i',
                 '/^(e-mail|mail|wiadomość|newsletter|strona internetowa|www)$/i',
                 '/^(radio|telewizja|gazeta|czasopismo|ulotka|plakat)$/i',
-                '/^(inne|inny|inna|inne źródło|inne miejsce)$/i'
+                '/^(inne|inny|inna|inne źródło|inne miejsce)$/i',
             ];
-            
+
             $matchesChoicePattern = false;
             foreach ($choicePatterns as $pattern) {
                 $matches = 0;
@@ -212,19 +238,19 @@ class SurveyImportController extends Controller
                     break;
                 }
             }
-            
+
             // Sprawdź czy to może być single_choice na podstawie charakterystyk odpowiedzi
-            if (!$matchesChoicePattern) {
+            if (! $matchesChoicePattern) {
                 // Sprawdź czy odpowiedzi są krótkie i mają podobną strukturę
-                $shortAnswers = array_filter($uniqueAnswers, function($answer) {
+                $shortAnswers = array_filter($uniqueAnswers, function ($answer) {
                     return strlen(trim($answer)) <= 50;
                 });
-                
+
                 // Sprawdź czy większość odpowiedzi to pojedyncze słowa lub krótkie frazy
-                $singleWordAnswers = array_filter($uniqueAnswers, function($answer) {
+                $singleWordAnswers = array_filter($uniqueAnswers, function ($answer) {
                     return str_word_count(trim($answer)) <= 3;
                 });
-                
+
                 // Sprawdź czy odpowiedzi zawierają typowe słowa kluczowe dla opcji wyboru
                 $choiceKeywords = ['portal', 'facebook', 'instagram', 'dyrekcja', 'szkoła', 'e-mail', 'mail', 'wiadomość', 'radio', 'telewizja', 'gazeta', 'ulotka', 'inne', 'inny', 'inna'];
                 $hasChoiceKeywords = false;
@@ -236,10 +262,10 @@ class SurveyImportController extends Controller
                         }
                     }
                 }
-                
+
                 // Jeśli spełnia kryteria single_choice
-                if (count($shortAnswers) >= count($uniqueAnswers) * 0.7 && 
-                    count($singleWordAnswers) >= count($uniqueAnswers) * 0.5 && 
+                if (count($shortAnswers) >= count($uniqueAnswers) * 0.7 &&
+                    count($singleWordAnswers) >= count($uniqueAnswers) * 0.5 &&
                     (count($uniqueAnswers) <= 10 || $hasChoiceKeywords)) {
                     return 'single_choice';
                 }
@@ -249,8 +275,8 @@ class SurveyImportController extends Controller
         }
 
         // Sprawdź czy to pytanie z datą/czasem
-        $dateAnswers = array_filter($sampleAnswers, function($answer) {
-            return !empty($answer) && (strtotime($answer) !== false || preg_match('/\d{4}\/\d{2}\/\d{2}/', $answer));
+        $dateAnswers = array_filter($sampleAnswers, function ($answer) {
+            return ! empty($answer) && (strtotime($answer) !== false || preg_match('/\d{4}\/\d{2}\/\d{2}/', $answer));
         });
 
         if (count($dateAnswers) >= count($sampleAnswers) * 0.8) {
@@ -272,21 +298,21 @@ class SurveyImportController extends Controller
 
         $options = [];
         $sampleAnswers = array_slice(array_column($data, $header), 0, 20);
-        
+
         foreach ($sampleAnswers as $answer) {
-            if (!empty($answer)) {
+            if (! empty($answer)) {
                 // Podziel odpowiedzi po średniku lub przecinku
                 $parts = preg_split('/[;,]/', $answer);
                 foreach ($parts as $part) {
                     $part = trim($part);
-                    if (!empty($part) && !in_array($part, $options)) {
+                    if (! empty($part) && ! in_array($part, $options)) {
                         $options[] = $part;
                     }
                 }
             }
         }
 
-        return !empty($options) ? $options : null;
+        return ! empty($options) ? $options : null;
     }
 
     /**
@@ -298,7 +324,7 @@ class SurveyImportController extends Controller
             // Google Forms używa formatu: "2025/08/18 1:56:47 PM EEST"
             $timestamp = str_replace(' EEST', '', $timestamp);
             $timestamp = str_replace(' CEST', '', $timestamp);
-            
+
             return new \DateTime($timestamp);
         } catch (\Exception $e) {
             return now();

@@ -53,9 +53,30 @@
                     <!-- Główne informacje o kursie -->
                     <div class="card mb-4">
                         <div class="card-header bg-primary text-white">
-                            <h4 class="mb-0">
+                            <h4 class="mb-1 fw-semibold">
                                 <i class="fas fa-graduation-cap"></i> {!! $course->title !!}
                             </h4>
+                            <div class="small d-flex flex-wrap column-gap-3 row-gap-1 align-items-center text-white text-opacity-90">
+                                <span>
+                                    <i class="far fa-calendar-alt me-1"></i>
+                                    <span class="fw-semibold text-white">Data rozpoczęcia:</span>
+                                    @if($course->start_date)
+                                        {{ $course->start_date->format('d.m.Y H:i') }}
+                                    @else
+                                        brak w systemie
+                                    @endif
+                                </span>
+                                <span class="d-none d-sm-inline text-white text-opacity-50" aria-hidden="true">|</span>
+                                <span>
+                                    <i class="fas fa-user-tie me-1"></i>
+                                    <span class="fw-semibold text-white">Instruktor:</span>
+                                    @if($course->instructor)
+                                        {{ $course->instructor->getFullTitleNameAttribute() }}
+                                    @else
+                                        brak przypisanego instruktora
+                                    @endif
+                                </span>
+                            </div>
                         </div>
                         <div class="card-body">
                             @if($course->description)

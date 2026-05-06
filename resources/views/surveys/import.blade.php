@@ -44,8 +44,8 @@
                                 
                                 <div class="mb-3">
                                     <label for="title" class="form-label">Tytuł ankiety <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('title') is-invalid @enderror" 
-                                           id="title" name="title" value="{{ old('title') }}" required>
+                                    <input type="text" class="form-control @error('title') is-invalid @enderror"
+                                           id="title" name="title" value="{{ old('title', $defaultImportSurveyTitle ?? '') }}" required>
                                     @error('title')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -66,8 +66,8 @@
                                             id="instructor_id" name="instructor_id">
                                         <option value="">Wybierz instruktora (opcjonalnie)</option>
                                         @foreach(\App\Models\Instructor::orderBy('first_name')->get() as $instructor)
-                                            <option value="{{ $instructor->id }}" 
-                                                    {{ old('instructor_id') == $instructor->id ? 'selected' : '' }}>
+                                            <option value="{{ $instructor->id }}"
+                                                    {{ (string) old('instructor_id', $course->instructor_id) === (string) $instructor->id ? 'selected' : '' }}>
                                                 {{ $instructor->getFullTitleNameAttribute() }}
                                             </option>
                                         @endforeach
