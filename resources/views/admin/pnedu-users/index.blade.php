@@ -32,6 +32,19 @@
 
     <div class="px-3 py-3">
         <div class="container-fluid" style="max-width: 1400px;">
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+
             <p class="text-muted small mb-3">
                 Konta zarejestrowane na stronie pnedu.pl (baza <code>pnedu</code>, tabela <code>users</code>).
             </p>

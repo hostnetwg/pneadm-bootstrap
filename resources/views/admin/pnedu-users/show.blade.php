@@ -13,7 +13,7 @@
     </x-slot>
 
     <div class="px-3 py-3">
-        <div class="container" style="max-width: 720px;">
+        <div class="container" style="max-width: 960px;">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ session('success') }}
@@ -68,6 +68,12 @@
 
                         <dt class="col-sm-4 text-muted">Ostatnia aktualizacja</dt>
                         <dd class="col-sm-8 text-muted">{{ $user->updated_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
+
+                        <dt class="col-sm-4 text-muted">Udział w szkoleniach płatnych</dt>
+                        <dd class="col-sm-8"><span class="fw-semibold">{{ $participationsPaidCount }}</span></dd>
+
+                        <dt class="col-sm-4 text-muted">Udział w szkoleniach bezpłatnych</dt>
+                        <dd class="col-sm-8"><span class="fw-semibold">{{ $participationsFreeCount }}</span></dd>
                     </dl>
                 </div>
             </div>
@@ -150,9 +156,128 @@
                                 </form>
                             @endif
                         </div>
+
+                        <div class="pt-4 mt-4 border-top border-danger">
+                            <h6 class="fw-semibold text-danger mb-2">
+                                <i class="bi bi-trash3 me-1"></i>Usunięcie konta (pnedu.pl)
+                            </h6>
+                            <p class="text-muted small mb-3">
+                                Deaktywuje konto tak jak przy usunięciu przez użytkownika: <strong>soft delete</strong> (<code>deleted_at</code> w bazie pnedu),
+                                brak możliwości logowania. Adres e-mail może zostać ponownie użyty przy nowej rejestracji.
+                                Uprawnienie: edycja użytkowników — akcja trafia do logu aktywności.
+                            </p>
+                            <form method="post"
+                                  action="{{ route('admin.pnedu-users.destroy', ['pnedu_user' => $user->getKey()]) }}"
+                                  onsubmit="return confirm('Na pewno usunąć to konto pnedu.pl? Operacji nie cofniesz z tego panelu (wymagany dostęp do bazy / procedura odzyskiwania).');">
+                                @csrf
+                                @method('DELETE')
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input @error('confirm_delete') is-invalid @enderror"
+                                           type="checkbox"
+                                           name="confirm_delete"
+                                           id="pnedu_user_confirm_delete"
+                                           value="1"
+                                           required>
+                                    <label class="form-check-label small" for="pnedu_user_confirm_delete">
+                                        Potwierdzam usunięcie (soft delete) konta <strong>{{ $user->email }}</strong> (ID {{ $user->id }}).
+                                    </label>
+                                    @error('confirm_delete')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash3 me-1"></i>Usuń konto
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             @endif
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light py-3">
+                    <h5 class="mb-1"><i class="bi bi-mortarboard me-2"></i>Szkolenia (uczestnictwo)</h5>
+                    <small class="text-muted mb-0 d-block">
+                        Wpisy z tabeli uczestników w PNEADM — dopasowanie po adresie e-mail (ta sama wartość co na koncie pnedu; bez rozróżniania małych/wielkich liter).
+                    </small>
+                </div>
+                <div class="card-body">
+                    @if($participations->isEmpty())
+                        <p class="text-muted small mb-0">Brak zarejestrowanego uczestnictwa dla tego adresu e-mail.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col">Data rozpoczęcia</th>
+                                        <th scope="col">Szkolenie</th>
+                                        <th scope="col" class="text-center">Wpisy</th>
+                                        <th scope="col">Dostęp do</th>
+                                        <th scope="col" class="text-end">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($participations as $participant)
+                                        @php
+                                            $course = $participant->course;
+                                            $courseTitlePlain = $course
+                                                ? strip_tags(html_entity_decode((string) $course->title, ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+                                                : '—';
+                                        @endphp
+                                        <tr>
+                                            <td class="text-nowrap">
+                                                @if($course?->start_date)
+                                                    {{ $course->start_date->format('d.m.Y H:i') }}
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($course)
+                                                    @if($course->trashed())
+                                                        <span class="badge bg-secondary text-wrap">Szkolenie w koszu</span>
+                                                    @endif
+                                                    <span title="{{ $courseTitlePlain }}">{{ \Illuminate\Support\Str::limit($courseTitlePlain, 80) }}</span>
+                                                    <span class="text-muted small">#{{ $course->id }}</span>
+                                                @else
+                                                    <span class="text-muted">Brak szkolenia (ID {{ $participant->course_id }})</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-center text-nowrap">
+                                                @if($participant->trashed())
+                                                    <span class="badge text-bg-secondary">Archiwum</span>
+                                                @else
+                                                    <span class="badge text-bg-success">Aktywny</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-nowrap small">
+                                                @if($participant->access_expires_at)
+                                                    {{ $participant->access_expires_at->format('d.m.Y H:i') }}
+                                                @else
+                                                    <span class="text-muted">Bez wygaśnięcia</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-end text-nowrap">
+                                                @if($course)
+                                                    <a href="{{ route('courses.show', $course->id) }}" class="btn btn-outline-primary btn-sm">
+                                                        Szczegóły
+                                                    </a>
+                                                    @unless($participant->trashed())
+                                                        <a href="{{ route('participants.edit', ['course' => $course->id, 'participant' => $participant->id]) }}"
+                                                           class="btn btn-outline-secondary btn-sm">
+                                                            Uczestnik
+                                                        </a>
+                                                    @endunless
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>

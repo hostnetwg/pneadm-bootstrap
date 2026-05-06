@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Participant;
 use App\Models\PneduUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
@@ -58,7 +60,15 @@ class PneduUsersController extends Controller
             abort(403, 'Brak uprawnień do przeglądania użytkowników.');
         }
 
-        return view('admin.pnedu-users.show', ['user' => $pnedu_user]);
+        $participations = $this->participationsForPneduEmail($pnedu_user->email);
+        [$participationsPaidCount, $participationsFreeCount] = $this->participationPaidFreeCounts($participations);
+
+        return view('admin.pnedu-users.show', [
+            'user' => $pnedu_user,
+            'participations' => $participations,
+            'participationsPaidCount' => $participationsPaidCount,
+            'participationsFreeCount' => $participationsFreeCount,
+        ]);
     }
 
     public function sendPasswordReset(PneduUser $pnedu_user): RedirectResponse
@@ -151,11 +161,97 @@ class PneduUsersController extends Controller
         return back()->with('success', 'Adres e-mail został oznaczony jako zweryfikowany.');
     }
 
+    public function destroy(Request $request, PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $request->validate([
+            'confirm_delete' => ['accepted'],
+        ], [
+            'confirm_delete.accepted' => 'Zaznacz potwierdzenie, aby usunąć konto.',
+        ]);
+
+        if ($pnedu_user->trashed()) {
+            return redirect()
+                ->route('admin.pnedu-users.index', session('pnedu_users_list_query', []))
+                ->with('error', 'To konto jest już usunięte (soft delete).');
+        }
+
+        $userId = $pnedu_user->id;
+        $userEmail = $pnedu_user->email;
+
+        $pnedu_user->remember_token = null;
+        $pnedu_user->save();
+        $pnedu_user->delete();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: usunięcie konta (soft delete)',
+            'Zdezaktywowano konto użytkownika ID '.$userId.' ('.$userEmail.') — ustawiono deleted_at w bazie pnedu.',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $userId,
+                    'email' => $userEmail,
+                ],
+            ]
+        );
+
+        return redirect()
+            ->route('admin.pnedu-users.index', session('pnedu_users_list_query', []))
+            ->with('success', 'Konto pnedu.pl ('.$userEmail.') zostało usunięte (soft delete). Użytkownik nie zaloguje się ponownie na ten adres do czasu ewentualnej ponownej rejestracji.');
+    }
+
     private function authorizePneduUserManage(): void
     {
         if (! auth()->user()->hasPermission('users.edit')) {
             abort(403, 'Brak uprawnień do zarządzania użytkownikami pnedu.pl.');
         }
+    }
+
+    /**
+     * Pozycje z tabeli {@see Participant} (PNEADM), dopasowane po znormalizowanym e-mailu.
+     *
+     * @return Collection<int, Participant>
+     */
+    private function participationsForPneduEmail(?string $email): Collection
+    {
+        $norm = Participant::normalizeEmail($email);
+        if ($norm === null) {
+            return collect();
+        }
+
+        return Participant::query()
+            ->withTrashed()
+            ->with(['course' => fn ($q) => $q->withTrashed()])
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$norm])
+            ->get()
+            ->sortByDesc(fn (Participant $p) => $p->course?->start_date?->getTimestamp() ?? 0)
+            ->values();
+    }
+
+    /**
+     * Liczba rekordów uczestnictwa dla szkoleń płatnych / bezpłatnych (według {@see Course::is_paid}).
+     *
+     * @return array{0: int, 1: int} [paid, free]
+     */
+    private function participationPaidFreeCounts(Collection $participations): array
+    {
+        $paid = 0;
+        $free = 0;
+
+        foreach ($participations as $participant) {
+            $course = $participant->course;
+            if ($course === null) {
+                continue;
+            }
+
+            if ($course->is_paid) {
+                $paid++;
+            } else {
+                $free++;
+            }
+        }
+
+        return [$paid, $free];
     }
 
     private function normalizeListQuery(Request $request): void

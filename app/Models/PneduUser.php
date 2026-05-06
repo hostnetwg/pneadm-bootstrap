@@ -7,6 +7,7 @@ use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
 /**
@@ -16,6 +17,7 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
 {
     use CanResetPassword;
     use Notifiable;
+    use SoftDeletes;
 
     protected $connection = 'pnedu';
 
