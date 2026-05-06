@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\MarketingCampaign;
 use App\Models\MarketingSourceType;
+use Illuminate\Http\Request;
 
 class MarketingCampaignController extends Controller
 {
@@ -14,49 +14,49 @@ class MarketingCampaignController extends Controller
     public function index(Request $request)
     {
         $query = MarketingCampaign::with('sourceType')->withCount('formOrders');
-        
+
         // Wyszukiwanie
         if ($request->filled('search')) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('campaign_code', 'LIKE', "%{$search}%")
-                  ->orWhere('name', 'LIKE', "%{$search}%")
-                  ->orWhere('description', 'LIKE', "%{$search}%");
+                    ->orWhere('name', 'LIKE', "%{$search}%")
+                    ->orWhere('description', 'LIKE', "%{$search}%");
             });
         }
-        
+
         // Filtr według typu źródła
         if ($request->filled('source_type_id')) {
             $query->where('source_type_id', $request->get('source_type_id'));
         }
-        
+
         // Filtr według statusu
         if ($request->filled('is_active')) {
             $query->where('is_active', $request->get('is_active'));
         }
-        
+
         // Sortowanie
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
-        
+
         // Obsługa sortowania według relacji
         if ($sortBy === 'source_type') {
             $query->join('marketing_source_types', 'marketing_campaigns.source_type_id', '=', 'marketing_source_types.id')
-                  ->orderBy('marketing_source_types.name', $sortOrder)
-                  ->select('marketing_campaigns.*');
+                ->orderBy('marketing_source_types.name', $sortOrder)
+                ->select('marketing_campaigns.*');
         } elseif ($sortBy === 'orders_count') {
             $query->orderBy('form_orders_count', $sortOrder);
         } else {
             $query->orderBy($sortBy, $sortOrder);
         }
-        
+
         // Paginacja
         $perPage = $request->get('per_page', 20);
         $campaigns = $query->paginate($perPage)->withQueryString();
-        
+
         // Pobierz typy źródeł dla filtra
         $sourceTypes = MarketingSourceType::active()->ordered()->get();
-        
+
         return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes'));
     }
 
@@ -67,6 +67,7 @@ class MarketingCampaignController extends Controller
     {
         $sourceTypes = MarketingSourceType::active()->ordered()->get();
         $nextCampaignCode = $this->getNextCampaignCode();
+
         return view('marketing-campaigns.create', compact('sourceTypes', 'nextCampaignCode'));
     }
 
@@ -83,15 +84,15 @@ class MarketingCampaignController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        // Sprawdź czy kod kampanii już istnieje
+        // Sprawdź czy kod kampanii już istnieje (także wśród soft-deleted — unikalny indeks w BD obejmuje wszystkie wiersze)
         $campaignCode = $request->get('campaign_code');
-        
+
         // Jeśli kod jest numeryczny i już istnieje, znajdź następny wolny numer
-        if (is_numeric($campaignCode) && MarketingCampaign::where('campaign_code', $campaignCode)->exists()) {
+        if (is_numeric($campaignCode) && MarketingCampaign::withTrashed()->where('campaign_code', $campaignCode)->exists()) {
             $campaignCode = $this->findNextAvailableNumericCode($campaignCode);
         } else {
             // Sprawdź unikalność dla kodów nie-numerycznych
-            if (MarketingCampaign::where('campaign_code', $campaignCode)->exists()) {
+            if (MarketingCampaign::withTrashed()->where('campaign_code', $campaignCode)->exists()) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['campaign_code' => 'Kod kampanii już istnieje.']);
@@ -112,23 +113,23 @@ class MarketingCampaignController extends Controller
      */
     private function getNextCampaignCode(): string
     {
-        // Pobierz wszystkie kody kampanii
-        $allCodes = MarketingCampaign::pluck('campaign_code')->toArray();
-        
+        // Pobierz wszystkie kody kampanii (w tym kosz — zbiór kodów musi być spójny z indeksem unique w BD)
+        $allCodes = MarketingCampaign::withTrashed()->pluck('campaign_code')->toArray();
+
         // Filtruj tylko numeryczne kody
-        $numericCodes = array_filter($allCodes, function($code) {
+        $numericCodes = array_filter($allCodes, function ($code) {
             return is_numeric($code) && ctype_digit($code);
         });
-        
+
         if (empty($numericCodes)) {
             // Jeśli nie ma numerycznych kodów, zacznij od 1
             return '1';
         }
-        
+
         // Znajdź największy numeryczny kod
         $maxCode = max(array_map('intval', $numericCodes));
-        
-        return (string)($maxCode + 1);
+
+        return (string) ($maxCode + 1);
     }
 
     /**
@@ -136,12 +137,12 @@ class MarketingCampaignController extends Controller
      */
     private function findNextAvailableNumericCode(string $startCode): string
     {
-        $code = (int)$startCode;
-        
+        $code = (int) $startCode;
+
         // Szukaj wolnego numeru (maksymalnie 100 prób)
         for ($i = 0; $i < 100; $i++) {
-            $testCode = (string)$code;
-            if (!MarketingCampaign::where('campaign_code', $testCode)->exists()) {
+            $testCode = (string) $code;
+            if (! MarketingCampaign::withTrashed()->where('campaign_code', $testCode)->exists()) {
                 return $testCode;
             }
             $code++;
@@ -158,7 +159,7 @@ class MarketingCampaignController extends Controller
     {
         $marketingCampaign->load('sourceType');
         $formOrders = $marketingCampaign->formOrders()->with('primaryParticipant')->paginate(20);
-        
+
         return view('marketing-campaigns.show', compact('marketingCampaign', 'formOrders'));
     }
 
@@ -168,6 +169,7 @@ class MarketingCampaignController extends Controller
     public function edit(MarketingCampaign $marketingCampaign)
     {
         $sourceTypes = MarketingSourceType::active()->ordered()->get();
+
         return view('marketing-campaigns.edit', compact('marketingCampaign', 'sourceTypes'));
     }
 
@@ -177,7 +179,20 @@ class MarketingCampaignController extends Controller
     public function update(Request $request, MarketingCampaign $marketingCampaign)
     {
         $request->validate([
-            'campaign_code' => 'required|string|max:50|unique:marketing_campaigns,campaign_code,' . $marketingCampaign->id,
+            'campaign_code' => [
+                'required',
+                'string',
+                'max:50',
+                function (string $attribute, mixed $value, \Closure $fail) use ($marketingCampaign): void {
+                    if (MarketingCampaign::withTrashed()
+                        ->where('campaign_code', (string) $value)
+                        ->whereKeyNot($marketingCampaign->id)
+                        ->exists()
+                    ) {
+                        $fail('Ten kod kampanii jest już zajęty (również w rekordzie usuniętym miękkim). Wybierz inny kod.');
+                    }
+                },
+            ],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'source_type_id' => 'required|exists:marketing_source_types,id',
