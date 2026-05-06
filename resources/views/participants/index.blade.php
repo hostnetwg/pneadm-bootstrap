@@ -201,7 +201,7 @@
                             <input type="text" 
                                    name="search" 
                                    class="form-control" 
-                                   placeholder="Szukaj po imieniu, nazwisku, email lub miejscu urodzenia..."
+                                   placeholder="Szukaj po imieniu, nazwisku, email, telefonie, miejscu urodzenia lub notatkach..."
                                    value="{{ request('search') }}"
                                    autocomplete="off">
                             @if(request('search'))
@@ -238,8 +238,10 @@
                     <th>Nazwisko</th>                    
                     <th>Imię</th>
                     <th>Email</th>
+                    <th>Telefon</th>
                     <th>Data urodzenia</th>
                     <th>Miejsce urodzenia</th>
+                    <th>Notatki</th>
                     <th>Data wygaśnięcia dostępu</th>
                     <th>
                         @php
@@ -271,8 +273,18 @@
                         <td>{{ $participant->last_name }}</td>                        
                         <td>{{ $participant->first_name }}</td>
                         <td>{{ $participant->email ?? 'Brak' }}</td>
+                        <td>{{ $participant->phone ? $participant->phone : 'Brak' }}</td>
                         <td>{{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : 'Brak' }}</td>
                         <td>{{ $participant->birth_place ?? 'Brak' }}</td>
+                        <td class="small" style="max-width: 12rem;">
+                            @if ($participant->notes)
+                                <span class="text-body" title="{{ e(str_replace(["\r", "\n"], ' ', $participant->notes)) }}">
+                                    {{ \Illuminate\Support\Str::limit($participant->notes, 48) }}
+                                </span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td>
                             @if ($participant->access_expires_at)
                                 <span class="badge {{ $participant->hasExpiredAccess() ? 'bg-danger' : ($participant->hasActiveAccess() ? 'bg-success' : 'bg-warning') }}" title="UTC: {{ $participant->access_expires_at->format('d.m.Y H:i') }} | Lokalny: {{ $participant->access_expires_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}">
@@ -425,8 +437,12 @@
                             <ul class="mb-0">
                                 <li><strong>Imię i nazwisko:</strong> {{ $participant->first_name }} {{ $participant->last_name }}</li>
                                 <li><strong>Email:</strong> {{ $participant->email ?? 'Brak' }}</li>
+                                <li><strong>Telefon:</strong> {{ $participant->phone ?? 'Brak' }}</li>
                                 <li><strong>Data urodzenia:</strong> {{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : 'Brak' }}</li>
                                 <li><strong>Miejsce urodzenia:</strong> {{ $participant->birth_place ?? 'Brak' }}</li>
+                                @if($participant->notes)
+                                    <li><strong>Notatki:</strong> {{ $participant->notes }}</li>
+                                @endif
                                 <li><strong>Szkolenie:</strong> {!! $course->title !!}</li>
                                 <li><strong>Data wygaśnięcia dostępu:</strong> {{ $participant->access_expires_at ? $participant->access_expires_at->format('d.m.Y H:i') : 'Bezterminowy' }}</li>
                             </ul>

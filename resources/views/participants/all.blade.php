@@ -42,7 +42,7 @@
                             <input type="text" 
                                    name="search" 
                                    class="form-control" 
-                                   placeholder="Nazwisko, imię, email, miejsce urodzenia..."
+                                   placeholder="Nazwisko, imię, email, telefon, notatki, miejsce urodzenia..."
                                    value="{{ request('search') }}"
                                    autocomplete="off">
                             @if(request('search'))
@@ -244,6 +244,13 @@
                                             <i class="fas fa-eye"></i>
                                         </button>
                                         @if($participant->course)
+                                        <a href="{{ route('participants.edit', [$participant->course, $participant]) }}" 
+                                           class="btn btn-sm btn-outline-info"
+                                           title="Edytuj dane uczestnika">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        @endif
+                                        @if($participant->course)
                                         <button type="button" 
                                                 class="btn btn-sm btn-outline-danger" 
                                                 data-bs-toggle="modal" 
@@ -341,6 +348,10 @@
                                         <p class="mb-0">{{ $participant->email ?: '-' }}</p>
                                     </div>
                                     <div class="col-md-6 mb-3">
+                                        <strong>Telefon:</strong>
+                                        <p class="mb-0">{{ $participant->phone ?: '-' }}</p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
                                         <strong>Data urodzenia:</strong>
                                         <p class="mb-0">{{ $participant->birth_date ? $participant->birth_date->format('Y-m-d') : '-' }}</p>
                                     </div>
@@ -348,6 +359,12 @@
                                         <strong>Miejsce urodzenia:</strong>
                                         <p class="mb-0">{{ $participant->birth_place ?: '-' }}</p>
                                     </div>
+                                    @if($participant->notes)
+                                    <div class="col-md-12 mb-3">
+                                        <strong>Notatki:</strong>
+                                        <p class="mb-0 text-break">{{ $participant->notes }}</p>
+                                    </div>
+                                    @endif
                                     @if($participant->course)
                                     <div class="col-md-12 mb-3">
                                         <strong>Szkolenie:</strong>
@@ -379,6 +396,9 @@
                             </div>
                             <div class="modal-footer">
                                 @if($participant->course)
+                                <a href="{{ route('participants.edit', [$participant->course, $participant]) }}" class="btn btn-info">
+                                    <i class="fas fa-edit"></i> Edytuj dane
+                                </a>
                                 <a href="{{ route('participants.index', $participant->course->id) }}" class="btn btn-primary">
                                     <i class="fas fa-list"></i> Lista uczestników kursu
                                 </a>

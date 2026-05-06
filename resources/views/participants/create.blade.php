@@ -20,9 +20,15 @@
                 </div>
             </div>
 
-            <div class="mb-3">
-                <label for="email" class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" id="email">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" id="email">
+                </div>
+                <div class="col-md-6">
+                    <label for="phone" class="form-label">Telefon</label>
+                    <input type="text" name="phone" class="form-control" id="phone" maxlength="50" autocomplete="tel">
+                </div>
             </div>
 
             <div class="row mb-3">
@@ -34,6 +40,11 @@
                     <label for="birth_place" class="form-label">Miejsce urodzenia</label>
                     <input type="text" name="birth_place" class="form-control" id="birth_place">
                 </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="notes" class="form-label">Notatki</label>
+                <textarea name="notes" class="form-control" id="notes" rows="4" maxlength="10000" placeholder="Uwagi wewnętrzne, kontekst rejestracji itd."></textarea>
             </div>
 
             <div class="mb-3">

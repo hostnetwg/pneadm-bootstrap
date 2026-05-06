@@ -170,8 +170,9 @@
                 <th style="width: 18%;">Imię</th>
                 <th style="width: 18%;">Nazwisko</th>
                 <th style="width: 13%;">Data urodzenia</th>
-                <th style="width: 15%;">Miejsce urodzenia</th>
-                <th style="width: 23%;">Nr certyfikatu</th>
+                <th style="width: 14%;">Miejsce urodzenia</th>
+                <th style="width: 13%;">Telefon</th>
+                <th style="width: 18%;">Nr certyfikatu</th>
             </tr>
         </thead>
         <tbody>
@@ -189,6 +190,7 @@
                         @endif
                     </td>
                     <td>{{ $participant->birth_place ?? '-' }}</td>
+                    <td>{{ $participant->phone ?? '-' }}</td>
                     <td>
                         @if($participant->certificate)
                             <strong>{{ $participant->certificate->certificate_number }}</strong>

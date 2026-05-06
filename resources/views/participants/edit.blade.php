@@ -25,9 +25,15 @@
                     </div>
                 </div>
     
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" name="email" id="email" class="form-control" value="{{ old('email', $participant->email) }}">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" name="email" id="email" class="form-control" value="{{ old('email', $participant->email) }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="phone" class="form-label">Telefon</label>
+                        <input type="text" name="phone" id="phone" class="form-control" value="{{ old('phone', $participant->phone) }}" maxlength="50" autocomplete="tel">
+                    </div>
                 </div>
     
                 <div class="row mb-3">
@@ -39,6 +45,11 @@
                         <label for="birth_place" class="form-label">Miejsce urodzenia</label>
                         <input type="text" name="birth_place" id="birth_place" class="form-control" value="{{ old('birth_place', $participant->birth_place) }}">
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notatki</label>
+                    <textarea name="notes" class="form-control" id="notes" rows="4" maxlength="10000" placeholder="Uwagi wewnętrzne, kontekst rejestracji itd.">{{ old('notes', $participant->notes) }}</textarea>
                 </div>
 
                 <div class="mb-3">

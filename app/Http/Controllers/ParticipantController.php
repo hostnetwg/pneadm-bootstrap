@@ -38,7 +38,9 @@ class ParticipantController extends Controller
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('notes', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -597,7 +599,9 @@ class ParticipantController extends Controller
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('notes', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -1060,6 +1064,8 @@ class ParticipantController extends Controller
             'email' => 'nullable|email|max:255',
             'birth_date' => 'nullable|date',
             'birth_place' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:50',
+            'notes' => 'nullable|string|max:10000',
             'access_expires_at' => 'nullable|date',
         ]);
 
@@ -1105,6 +1111,8 @@ class ParticipantController extends Controller
             'email' => 'nullable|email|max:255',
             'birth_date' => 'nullable|date',
             'birth_place' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:50',
+            'notes' => 'nullable|string|max:10000',
             'access_expires_at' => 'nullable|date',
         ]);
 
@@ -1237,6 +1245,19 @@ class ParticipantController extends Controller
                         $accessExpiresAt = $course->start_date->copy()->addMonthsNoOverflow(2);
                     }
 
+                    $phoneRaw = $csvData['telefon'] ?? $csvData['telephone'] ?? $csvData['phone'] ?? $csvData['numer telefonu'] ?? $csvData['nr telefonu'] ?? null;
+                    $phone = null;
+                    if (! empty($phoneRaw)) {
+                        $phone = mb_substr(trim($phoneRaw, "\" \t"), 0, 50) ?: null;
+                    }
+
+                    $notesRaw = $csvData['notatki'] ?? $csvData['notes'] ?? $csvData['uwagi'] ?? null;
+                    $notes = null;
+                    if (! empty($notesRaw)) {
+                        $notesTrimmed = trim($notesRaw, "\" \t");
+                        $notes = mb_substr($notesTrimmed, 0, 10000) ?: null;
+                    }
+
                     // Pobranie ostatniego numeru porządkowego
                     $lastOrder = $course->participants()->max('order') ?? 0;
 
@@ -1248,6 +1269,8 @@ class ParticipantController extends Controller
                         'email' => $email,
                         'birth_date' => $birthDate,
                         'birth_place' => $birthPlace,
+                        'phone' => $phone,
+                        'notes' => $notes,
                         'access_expires_at' => $accessExpiresAt,
                         'order' => $lastOrder + 1,
                     ]);
@@ -1303,7 +1326,9 @@ class ParticipantController extends Controller
                 $q->where('first_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('last_name', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('birth_place', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('notes', 'LIKE', "%{$searchTerm}%");
             });
         }
 

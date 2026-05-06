@@ -2,25 +2,27 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
-use App\Traits\LogsActivity;
 
 class Participant extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'course_id',
-        'order',        
+        'order',
         'first_name',
         'last_name',
         'email',
         'birth_date',
         'birth_place',
-        'access_expires_at'
+        'phone',
+        'notes',
+        'access_expires_at',
     ];
 
     protected $casts = [
@@ -43,14 +45,14 @@ class Participant extends Model
      */
     public function hasExpiredAccess(): bool
     {
-        if (!$this->access_expires_at) {
+        if (! $this->access_expires_at) {
             return false; // Bezterminowy dostęp
         }
-        
+
         // Porównujemy w UTC - czas w bazie jest zawsze w UTC
         $now = Carbon::now('UTC');
         $expiresAt = $this->access_expires_at->setTimezone('UTC');
-        
+
         return $expiresAt->lt($now); // lt = less than (mniejsze niż)
     }
 
@@ -59,7 +61,7 @@ class Participant extends Model
      */
     public function hasActiveAccess(): bool
     {
-        return !$this->hasExpiredAccess();
+        return ! $this->hasExpiredAccess();
     }
 
     /**
@@ -75,7 +77,7 @@ class Participant extends Model
      */
     public function getRemainingAccessTime(): ?string
     {
-        if (!$this->access_expires_at) {
+        if (! $this->access_expires_at) {
             return null; // Bezterminowy dostęp
         }
 
@@ -91,13 +93,13 @@ class Participant extends Model
      */
     public function getAccessDebugInfo(): array
     {
-        if (!$this->access_expires_at) {
+        if (! $this->access_expires_at) {
             return [
                 'has_expires' => false,
                 'expires_at' => null,
                 'now' => now()->format('Y-m-d H:i:s'),
                 'is_past' => false,
-                'has_expired' => false
+                'has_expired' => false,
             ];
         }
 
@@ -106,8 +108,7 @@ class Participant extends Model
             'expires_at' => $this->access_expires_at->format('Y-m-d H:i:s'),
             'now' => now()->format('Y-m-d H:i:s'),
             'is_past' => $this->access_expires_at->isPast(),
-            'has_expired' => $this->hasExpiredAccess()
+            'has_expired' => $this->hasExpiredAccess(),
         ];
     }
-    
 }
