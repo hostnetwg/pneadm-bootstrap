@@ -71,6 +71,9 @@ return [
         // Stawka ryczałtu (np. 0.085 = 8.5%)
         // UWAGA: Dokumentacja iFirma podaje 0.85 zamiast 0.085 - testujemy wartość z dokumentacji
         'lump_sum_rate' => env('IFIRMA_LUMP_SUM_RATE', 0.85),
+        // Po POST .../ksef/send/ MF przetwarza dokument asynchronicznie — polling GET faktury aż NumerKSeF lub odrzucenie
+        'ksef_poll_max_seconds' => (int) env('IFIRMA_KSEF_POLL_MAX_SECONDS', 90),
+        'ksef_poll_interval_seconds' => (int) env('IFIRMA_KSEF_POLL_INTERVAL_SECONDS', 3),
     ],
 
     'pneadm' => [

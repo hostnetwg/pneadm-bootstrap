@@ -577,10 +577,11 @@ nowoczesna-edukacja.pl </div>
                             </div>
                             <div class="small text-danger mt-1">
                                 <i class="bi bi-exclamation-triangle-fill"></i>
-                                Pełny flow: <code>fakturakraj.json</code> + <code>sendInvoiceToKsef</code>.
+                                Pełny flow: <code>fakturakraj.json</code> + <code>sendInvoiceToKsef</code> + oczekiwanie na <strong>NumerKSeF</strong> (asynchroniczne przetwarzanie przez MF).
                                 Budowa nabywcy / odbiorcy (Podmiot3) jak przy „Wystaw Fakturę iFirma z Odbiorcą”.
-                                Zaznaczenie „Wyślij automatycznie na e-mail” wysyła wiadomość <strong>dopiero po
-                                udanym</strong> przesłaniu faktury do KSeF (przy błędzie KSeF e-mail nie jest wysyłany).
+                                „Wyślij automatycznie na e-mail” wysyła fakturę <strong>dopiero</strong>, gdy iFirma zwróci
+                                nadany numer KSeF (przy błędzie wysyłki, odrzuceniu przez MF lub przekroczeniu czasu
+                                oczekiwania e-mail <strong>nie</strong> zostanie wysłany).
                                 <strong>Uwaga:</strong> faktura trafia do rządowego KSeF — używaj świadomie.
                             </div>
                         </div>
@@ -2074,6 +2075,16 @@ nowoczesna-edukacja.pl `;
                         stepInfo = '<br><small class="text-muted">Faktura została wystawiona, ale nie udało się przesłać do KSeF.</small>';
                         if (data.can_retry) {
                             stepInfo += '<br><small class="text-muted">Możesz spróbować ponownie później.</small>';
+                        }
+                    } else if (data.step === 'ksef_acceptance_timeout') {
+                        stepInfo = '<br><small class="text-muted">Przekroczono czas oczekiwania na nadanie numeru KSeF przez Ministerstwo Finansów. Sprawdź status dokumentu w iFirma. <strong>E-mail z fakturą nie został wysłany.</strong></small>';
+                        if (typeof data.poll_attempts !== 'undefined') {
+                            stepInfo += `<br><small class="text-muted">Próby odświeżenia statusu: ${data.poll_attempts}</small>`;
+                        }
+                    } else if (data.step === 'ksef_rejected') {
+                        stepInfo = '<br><small class="text-muted">Faktura jest w iFirma, ale nie została zaakceptowana w KSeF. <strong>E-mail nie został wysłany.</strong></small>';
+                        if (data.can_retry) {
+                            stepInfo += '<br><small class="text-muted">Możesz skorygować dane lub ponowić proces po konsultacji z księgowością.</small>';
                         }
                     }
                     
