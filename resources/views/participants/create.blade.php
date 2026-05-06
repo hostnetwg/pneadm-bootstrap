@@ -1,8 +1,25 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark">
-            Dodaj uczestnika do kursu - {!! $course->title !!}
-        </h2>
+        <div>
+            <h2 class="fw-semibold fs-4 text-dark mb-1">
+                <i class="fas fa-user-plus me-2"></i>Dodaj uczestnika
+            </h2>
+            <p class="text-muted mb-0">
+                <strong>{!! $course->title !!}</strong>
+                <span class="ms-2">
+                    <i class="fas fa-calendar me-1"></i>
+                    @if($course->start_date)
+                        {{ date('d.m.Y H:i', strtotime($course->start_date)) }}
+                    @else
+                        Brak daty rozpoczęcia
+                    @endif
+                </span>
+                <span class="ms-2">
+                    <i class="fas fa-chalkboard-teacher me-1"></i>
+                    {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
+                </span>
+            </p>
+        </div>
     </x-slot>
 
     <div class="container py-3">

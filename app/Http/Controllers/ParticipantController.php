@@ -1051,6 +1051,8 @@ class ParticipantController extends Controller
      */
     public function create(Course $course)
     {
+        $course->loadMissing('instructor');
+
         return view('participants.create', compact('course'));
     }
 
@@ -1123,6 +1125,8 @@ class ParticipantController extends Controller
                 }
             }
         }
+
+        $course->loadMissing('instructor');
 
         return view('participants.edit', compact(
             'course',
