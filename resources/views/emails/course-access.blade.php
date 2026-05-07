@@ -60,7 +60,7 @@
 
         @if(!empty($surveyLinks) && count($surveyLinks) > 0)
             <div class="meta" style="margin-top: 14px;">
-                <p style="margin-bottom: 8px;"><strong>Ankiety (pomoc w rozwoju zawodowym)</strong></p>
+                <p style="margin-bottom: 8px;">Pomóż nam doskonalić nasze szkolenia. Wypełnij krótką ankietę poszkoleniową — Twoja opinia pozwoli nam jeszcze lepiej odpowiadać na potrzeby dyrektorów i nauczycieli.</p>
                 @foreach($surveyLinks as $sl)
                     <p style="margin: 0 0 6px;">
                         <a class="wrap-link" href="{{ $sl['url'] }}">{{ $sl['title'] }}</a>
