@@ -830,7 +830,8 @@ class ParticipantController extends Controller
                 ],
             ]);
 
-            \App\Jobs\SendCourseAccessEmailJob::dispatch(
+            // Pojedyncza wysyłka synchronicznie — działa na dev bez queue:work; natychmiastowy błąd SMTP/BD zamiast „zlecenia w próżnię”.
+            SendCourseAccessEmailJob::dispatchSync(
                 $course->id,
                 $participant->id,
                 $log->id
@@ -839,7 +840,7 @@ class ParticipantController extends Controller
             return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail o dostępie do szkolenia został zlecony do wysyłki na adres '.$email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail o dostępie do szkolenia został wysłany na adres '.$email);
     }
 
     /**

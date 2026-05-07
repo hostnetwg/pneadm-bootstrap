@@ -93,16 +93,16 @@ class CourseInstructorLinksEmailBody
         // Ankiety zewnętrzne (Formularze)
         $surveyLines = [];
         foreach ($course->surveyLinks->sortBy('order') as $sl) {
-            $url = trim((string) ($sl->url ?? ''));
-            if ($url === '') {
+            $participantUrl = trim((string) $sl->participantFacingSurveyUrl());
+            if ($participantUrl === '') {
                 continue;
             }
             $label = trim((string) ($sl->title ?? ''));
             $suffix = $sl->isAvailableNow() ? '' : ' (ankieta nieaktywna lub poza terminem dostępu w systemie)';
             if ($label !== '') {
-                $surveyLines[] = '   '.$label.': '.$url.$suffix;
+                $surveyLines[] = '   '.$label.': '.$participantUrl.$suffix;
             } else {
-                $surveyLines[] = '   '.$url.$suffix;
+                $surveyLines[] = '   '.$participantUrl.$suffix;
             }
         }
         if ($surveyLines !== []) {

@@ -25,6 +25,7 @@ class CourseSurveyLinkController extends Controller
                 'closes_at' => optional($link->closes_at)->format('Y-m-d\TH:i'),
                 'is_available_now' => $link->isAvailableNow(),
                 'order' => $link->order,
+                'participant_facing_url' => $link->participantFacingSurveyUrl(),
             ];
         });
 
@@ -67,7 +68,7 @@ class CourseSurveyLinkController extends Controller
 
     public function update(Request $request, Course $course, CourseSurveyLink $surveyLink)
     {
-        if ($surveyLink->course_id !== $course->id) {
+        if ((int) $surveyLink->course_id !== (int) $course->id) {
             abort(404);
         }
 
@@ -99,7 +100,7 @@ class CourseSurveyLinkController extends Controller
 
     public function destroy(Course $course, CourseSurveyLink $surveyLink)
     {
-        if ($surveyLink->course_id !== $course->id) {
+        if ((int) $surveyLink->course_id !== (int) $course->id) {
             abort(404);
         }
 

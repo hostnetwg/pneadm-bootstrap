@@ -739,6 +739,63 @@
         </div>
     </div>
 
+    {{-- Modal edycji ankiety zewnętrznej --}}
+    <div class="modal fade" id="surveyLinkEditModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkEditModalLabel{{ $course->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="surveyLinkEditModalLabel{{ $course->id }}">
+                        <i class="bi bi-pencil-square me-2"></i>
+                        Edycja ankiety
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="surveyLinkEditForm{{ $course->id }}" class="needs-validation" novalidate>
+                        @csrf
+                        <input type="hidden" name="_method" value="PUT">
+                        <input type="hidden" id="survey_link_edit_id{{ $course->id }}" value="">
+                        <div class="mb-3">
+                            <label for="survey_link_edit_url{{ $course->id }}" class="form-label">URL ankiety <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="survey_link_edit_url{{ $course->id }}" name="url" required placeholder="https://...">
+                            <div class="invalid-feedback">Podaj prawidłowy adres URL (https).</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="survey_link_edit_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
+                            <input type="text" class="form-control" id="survey_link_edit_title{{ $course->id }}" name="title">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_edit_opens_at{{ $course->id }}" class="form-label">Otwarcie (opcjonalnie)</label>
+                                <input type="datetime-local" class="form-control" id="survey_link_edit_opens_at{{ $course->id }}" name="opens_at">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_edit_closes_at{{ $course->id }}" class="form-label">Zamknięcie (opcjonalnie)</label>
+                                <input type="datetime-local" class="form-control" id="survey_link_edit_closes_at{{ $course->id }}" name="closes_at">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="survey_link_edit_order{{ $course->id }}" class="form-label">Kolejność</label>
+                                <input type="number" class="form-control" id="survey_link_edit_order{{ $course->id }}" name="order" min="0" value="1">
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="survey_link_edit_is_active{{ $course->id }}" name="is_active" value="1" checked>
+                                    <label class="form-check-label" for="survey_link_edit_is_active{{ $course->id }}">Aktywna</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Zapisz zmiany</button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="fileLinkModal{{ $course->id }}" tabindex="-1" aria-labelledby="fileLinkModalLabel{{ $course->id }}" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -1267,6 +1324,11 @@
                         const orderInput = document.getElementById('survey_link_order{{ $course->id }}');
                         if (!listEl) return;
 
+                        window.courseSurveyLinksCache{{ $course->id }} = [];
+                        if (data.success && data.survey_links) {
+                            window.courseSurveyLinksCache{{ $course->id }} = data.survey_links;
+                        }
+
                         if (data.success && data.survey_links && data.survey_links.length > 0) {
                             if (orderInput) orderInput.value = data.survey_links.length + 1;
                             const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -1286,6 +1348,8 @@
                                 const urlText = escHtml(link.url || '');
                                 const providerLabel = escHtml(link.provider_label || '');
                                 const providerIcon = escAttr(link.provider_icon || 'fas fa-clipboard-list text-secondary');
+                                const gateHref = escAttr(link.participant_facing_url || '');
+                                const gateText = escHtml(link.participant_facing_url || '');
 
                                 let badges = `<span class="badge bg-light text-dark border ms-2">Nr ${link.order}</span>`;
                                 badges += link.is_active
@@ -1308,10 +1372,14 @@
                                     <div class="flex-grow-1 me-2">
                                         <div><i class="${providerIcon} me-1"></i><strong>${title || 'Bez tytułu'}</strong> <small class="text-muted ms-1">(${providerLabel})</small></div>
                                         <small class="text-break"><a href="${urlHref}" target="_blank" rel="noopener noreferrer" class="text-muted">${urlText}</a></small>
+                                        ${gateHref ? `<br><small class="text-primary text-break"><i class="fas fa-user-check me-1"></i>Uczestnik (pnedu): <a href="${gateHref}" target="_blank" rel="noopener noreferrer">${gateText}</a></small>` : ''}
                                         ${timing}
                                         <div class="mt-1">${badges}</div>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSurveyLink{{ $course->id }}(${link.id})" title="Usuń"><i class="bi bi-trash"></i></button>
+                                    <div class="d-flex flex-column gap-1 align-items-end flex-shrink-0">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.openSurveyLinkEditModal{{ $course->id }}(${link.id})" title="Edytuj"><i class="bi bi-pencil"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteSurveyLink{{ $course->id }}(${link.id})" title="Usuń"><i class="bi bi-trash"></i></button>
+                                    </div>
                                 </div>`;
                             });
                             html += '</div>';
@@ -1358,6 +1426,133 @@
                         }
                     })
                     .catch(() => alert('Błąd dodawania ankiety.'));
+                });
+            }
+
+            window.openSurveyLinkEditModal{{ $course->id }} = function(linkId) {
+                const list = window.courseSurveyLinksCache{{ $course->id }} || [];
+                const link = list.find(function(l) {
+                    return Number(l.id) === Number(linkId);
+                });
+                if (!link) {
+                    alert('Nie znaleziono ankiety na liście. Zamknij i otwórz okno ankiet ponownie.');
+                    return;
+                }
+                const idInput = document.getElementById('survey_link_edit_id{{ $course->id }}');
+                const urlEl = document.getElementById('survey_link_edit_url{{ $course->id }}');
+                const titleEl = document.getElementById('survey_link_edit_title{{ $course->id }}');
+                const opensEl = document.getElementById('survey_link_edit_opens_at{{ $course->id }}');
+                const closesEl = document.getElementById('survey_link_edit_closes_at{{ $course->id }}');
+                const orderEl = document.getElementById('survey_link_edit_order{{ $course->id }}');
+                const activeEl = document.getElementById('survey_link_edit_is_active{{ $course->id }}');
+                if (!idInput || !urlEl || !titleEl || !opensEl || !closesEl || !orderEl || !activeEl) {
+                    return;
+                }
+                idInput.value = String(link.id);
+                urlEl.value = link.url || '';
+                titleEl.value = link.title || '';
+                opensEl.value = link.opens_at || '';
+                closesEl.value = link.closes_at || '';
+                orderEl.value = typeof link.order === 'number' ? link.order : parseInt(link.order || '0', 10);
+                activeEl.checked = !!link.is_active;
+                const form = document.getElementById('surveyLinkEditForm{{ $course->id }}');
+                if (form) {
+                    form.classList.remove('was-validated');
+                }
+                const modalEl = document.getElementById('surveyLinkEditModal{{ $course->id }}');
+                if (!modalEl) {
+                    return;
+                }
+                const editModalBootstrap = bootstrap.Modal.getOrCreateInstance(modalEl);
+                const listModalEl = document.getElementById('surveyLinkModal{{ $course->id }}');
+
+                window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
+
+                const showEdit = function () {
+                    editModalBootstrap.show();
+                };
+
+                if (listModalEl && listModalEl.classList.contains('show')) {
+                    window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = true;
+                    const listBootstrap = bootstrap.Modal.getInstance(listModalEl);
+                    const openEditWhenListClosed = function () {
+                        listModalEl.removeEventListener('hidden.bs.modal', openEditWhenListClosed);
+                        showEdit();
+                    };
+                    listModalEl.addEventListener('hidden.bs.modal', openEditWhenListClosed);
+                    if (listBootstrap) {
+                        listBootstrap.hide();
+                    } else {
+                        showEdit();
+                    }
+                } else {
+                    showEdit();
+                }
+            };
+
+            const editSurveyLinkModalIdxEl{{ $course->id }} = document.getElementById('surveyLinkEditModal{{ $course->id }}');
+            if (editSurveyLinkModalIdxEl{{ $course->id }}) {
+                editSurveyLinkModalIdxEl{{ $course->id }}.addEventListener('hidden.bs.modal', function () {
+                    if (!window.surveyLinkReopenListModalAfterEdit{{ $course->id }}) {
+                        return;
+                    }
+                    window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
+                    const listModalEl = document.getElementById('surveyLinkModal{{ $course->id }}');
+                    if (listModalEl) {
+                        bootstrap.Modal.getOrCreateInstance(listModalEl).show();
+                        loadSurveyLinks{{ $course->id }}();
+                    }
+                });
+            }
+
+            const surveyLinkEditFormIdx{{ $course->id }} = document.getElementById('surveyLinkEditForm{{ $course->id }}');
+            if (surveyLinkEditFormIdx{{ $course->id }}) {
+                surveyLinkEditFormIdx{{ $course->id }}.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    if (!surveyLinkEditFormIdx{{ $course->id }}.checkValidity()) {
+                        surveyLinkEditFormIdx{{ $course->id }}.classList.add('was-validated');
+                        return;
+                    }
+                    const pk = document.getElementById('survey_link_edit_id{{ $course->id }}').value.trim();
+                    if (!pk) {
+                        alert('Brak identyfikatora ankiety.');
+                        return;
+                    }
+                    const fd = new FormData(surveyLinkEditFormIdx{{ $course->id }});
+                    if (!fd.has('is_active')) {
+                        fd.append('is_active', '0');
+                    }
+                    fd.set('_method', 'PUT');
+                    const url = "{{ route('courses.survey-links.update', [$course->id, ':surveyLinkId']) }}".replace(':surveyLinkId', pk);
+                    fetch(url, {
+                        method: 'POST',
+                        body: fd,
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const editModalEl = document.getElementById('surveyLinkEditModal{{ $course->id }}');
+                            if (editModalEl) {
+                                const inst = bootstrap.Modal.getInstance(editModalEl);
+                                if (inst) {
+                                    inst.hide();
+                                }
+                            }
+                            surveyLinkEditFormIdx{{ $course->id }}.classList.remove('was-validated');
+                            loadSurveyLinks{{ $course->id }}();
+                            refreshSurveyLinkBtn{{ $course->id }}();
+                        } else {
+                            let msg = data.message || 'Walidacja nie powiodła się.';
+                            if (data.errors) {
+                                msg += '\n' + Object.values(data.errors).flat().join('\n');
+                            }
+                            alert('Błąd: ' + msg);
+                        }
+                    })
+                    .catch(() => alert('Błąd zapisu zmian.'));
                 });
             }
 

@@ -12,6 +12,9 @@ class CourseAccessMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    /**
+     * @param  list<array{title: string, url: string}>  $surveyLinks
+     */
     public function __construct(
         public Participant $participant,
         public Course $course,
@@ -20,7 +23,8 @@ class CourseAccessMail extends Mailable
         public bool $hasMaterials,
         public bool $hasCertificate,
         public bool $accountCreatedNow,
-        public ?string $setPasswordUrl = null
+        public ?string $setPasswordUrl = null,
+        public array $surveyLinks = []
     ) {}
 
     public function build()
@@ -62,6 +66,7 @@ class CourseAccessMail extends Mailable
                 'hasLimitedAccess' => $hasLimitedAccess,
                 'accessExpired' => $accessExpired,
                 'accessExpiresAtFormatted' => $accessExpiresAtFormatted,
+                'surveyLinks' => $this->surveyLinks,
             ]);
     }
 }

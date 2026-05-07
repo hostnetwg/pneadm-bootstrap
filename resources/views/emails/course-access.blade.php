@@ -58,6 +58,17 @@
             <p><strong>UWAGA!</strong><br>Dostęp do nagrania oraz materiałów wygasł: {{ $accessExpiresAtFormatted }}</p>
         @endif
 
+        @if(!empty($surveyLinks) && count($surveyLinks) > 0)
+            <div class="meta" style="margin-top: 14px;">
+                <p style="margin-bottom: 8px;"><strong>Ankiety (pomoc w rozwoju zawodowym)</strong></p>
+                @foreach($surveyLinks as $sl)
+                    <p style="margin: 0 0 6px;">
+                        <a class="wrap-link" href="{{ $sl['url'] }}">{{ $sl['title'] }}</a>
+                    </p>
+                @endforeach
+            </div>
+        @endif
+
         <p>
             <a href="{{ $courseUrl }}" class="btn-link">Przejdź do szkolenia na pnedu.pl</a>
             @if($accountCreatedNow && !empty($setPasswordUrl))

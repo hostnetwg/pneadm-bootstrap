@@ -6,6 +6,7 @@ use App\Mail\CourseAccessMail;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
 use App\Models\CourseFileLink;
+use App\Models\CourseSurveyLink;
 use App\Models\CourseVideo;
 use App\Models\Participant;
 use App\Models\PneduUser;
@@ -26,6 +27,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
     use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 60;
 
     public function __construct(
@@ -88,6 +90,17 @@ class SendCourseAccessEmailJob implements ShouldQueue
         // pnedu.pl: /dashboard/szkolenia/{participant}/wideo — parametr to ID rekordu participants (w bazie pneadm).
         $courseUrl = $pneduFrontendUrl.'/dashboard/szkolenia/'.rawurlencode((string) $participant->id).'/wideo';
 
+        $surveyLinks = CourseSurveyLink::query()
+            ->where('course_id', $course->id)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (CourseSurveyLink $link) => [
+                'title' => trim((string) ($link->title ?? '')) !== '' ? trim((string) $link->title) : 'Ankieta szkoleniowa',
+                'url' => $link->participantFacingSurveyUrl(),
+            ])
+            ->all();
+
         $normalizedEmail = strtolower(trim($email));
         $pneduUser = PneduUser::query()
             ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
@@ -121,7 +134,8 @@ class SendCourseAccessEmailJob implements ShouldQueue
                 hasMaterials: $hasMaterials,
                 hasCertificate: $hasCertificate,
                 accountCreatedNow: $accountCreatedNow,
-                setPasswordUrl: $setPasswordUrl
+                setPasswordUrl: $setPasswordUrl,
+                surveyLinks: $surveyLinks
             ));
 
             $log->update([
@@ -136,6 +150,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'pnedu_participant_id' => (int) $participant->id,
                     'account_created_now' => $accountCreatedNow,
                     'set_password_url_generated' => $setPasswordUrl !== null,
+                    'survey_links_count' => count($surveyLinks),
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -156,6 +171,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'pnedu_course_url' => $courseUrl,
                     'pnedu_participant_id' => (int) $participant->id,
                     'account_created_now' => $accountCreatedNow,
+                    'survey_links_count' => count($surveyLinks),
                 ],
             ]);
 

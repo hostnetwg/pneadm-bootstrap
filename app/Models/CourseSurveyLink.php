@@ -5,10 +5,48 @@ namespace App\Models;
 use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class CourseSurveyLink extends Model
 {
     use HasFactory, LogsActivity;
+
+    protected static function booted(): void
+    {
+        static::creating(function (CourseSurveyLink $link) {
+            if (blank($link->public_token)) {
+                $link->public_token = static::generateUniquePublicToken();
+            }
+        });
+    }
+
+    /**
+     * Jednorazowy publiczny fragment URL dla bramki ankiet na pnedu.pl.
+     */
+    public static function generateUniquePublicToken(): string
+    {
+        do {
+            $token = Str::lower(Str::random(40));
+        } while (static::where('public_token', $token)->exists());
+
+        return $token;
+    }
+
+    /**
+     * Adres przez bramkę {@see https://pnedu.pl/ankieta/{token}} gdy ustawione {@see PNEDU_FRONTEND_URL}; w przeciwnym razie surowy URL ankiety.
+     */
+    public function participantFacingSurveyUrl(): string
+    {
+        $raw = trim((string) ($this->url ?? ''));
+        $base = rtrim((string) config('services.pnedu_frontend_url', ''), '/');
+        $tok = trim((string) ($this->public_token ?? ''));
+
+        if ($base !== '' && $tok !== '') {
+            return $base.'/ankieta/'.$tok;
+        }
+
+        return $raw;
+    }
 
     protected $fillable = [
         'course_id',
@@ -18,6 +56,7 @@ class CourseSurveyLink extends Model
         'is_active',
         'opens_at',
         'closes_at',
+        'public_token',
         'order',
     ];
 
