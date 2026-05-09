@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class CoursesController extends Controller
 {
@@ -806,7 +807,7 @@ class CoursesController extends Controller
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'certificate_format' => 'nullable|string|max:255',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'id_old' => 'nullable|string|max:255',
@@ -818,7 +819,7 @@ class CoursesController extends Controller
             'save_action' => 'required|in:close,stay_editing',
         ]);
         $saveAction = $validated['save_action'];
-        unset($validated['save_action']);
+        unset($validated['save_action'], $validated['image']);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -848,35 +849,24 @@ class CoursesController extends Controller
 
             \Log::info('Przed utworzeniem kursu:', $validated);
 
-            // ✅ Tworzymy kurs **bez grafiki**, grafikę dodamy później
+            // Kurs bez pliku w $validated — obraz zapisujemy osobno (walidacja zwraca UploadedFile, nie ścieżkę).
             $course = Course::create($validated);
 
-            // ✅ Tworzenie folderu `courses/images`, jeśli nie istnieje
-            $storageDirectory = storage_path('app/public/courses/images');
-            if (! file_exists($storageDirectory)) {
-                mkdir($storageDirectory, 0777, true);
-                \Log::info("Utworzono folder: {$storageDirectory}");
-            }
-
-            // ✅ Obsługa przesłanego pliku obrazka
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
-                $extension = $file->getClientOriginalExtension(); // Pobieramy oryginalne rozszerzenie pliku
-
-                // Generowanie nowej nazwy pliku
-                $randomSuffix = substr(md5(uniqid(mt_rand(), true)), 0, 6);
+                $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg';
+                $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
                 $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
-                $imagePath = "courses/images/{$imageFileName}"; // ✅ Ścieżka w bazie
+                $imagePath = $file->storeAs('courses/images', $imageFileName, 'public');
 
-                // ✅ Zapis pliku w `storage/app/public/courses/images`
-                $saved = $file->move($storageDirectory, $imageFileName);
-
-                if ($saved) {
-                    // ✅ Aktualizacja rekordu kursu o ścieżkę do pliku
+                if ($imagePath) {
                     $course->update(['image' => $imagePath]);
-                    \Log::info("Plik zapisany jako: {$imagePath}");
+                    Log::info("Plik zapisany jako: {$imagePath}");
                 } else {
-                    \Log::error("Błąd zapisu pliku: {$imageFileName}");
+                    Log::error('Błąd zapisu pliku grafiki kursu (store)', [
+                        'course_id' => $course->id,
+                        'filename' => $imageFileName,
+                    ]);
                 }
             }
 
@@ -953,13 +943,8 @@ class CoursesController extends Controller
         $course = Course::findOrFail($id);
 
         // Sprawdzenie, czy instruktor ma zdjęcie
-        if ($course->image) {
-            $photoPath = public_path('storage/'.$course->image);
-
-            // Usunięcie pliku, jeśli istnieje
-            if (file_exists($photoPath)) {
-                unlink($photoPath);
-            }
+        if ($course->image && Storage::disk('public')->exists($course->image)) {
+            Storage::disk('public')->delete($course->image);
         }
         // Usunięcie kursu z bazy danych
         $course->delete();
@@ -983,7 +968,7 @@ class CoursesController extends Controller
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'nullable|string',
             'certificate_format' => 'nullable|string|max:255',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
@@ -1001,7 +986,7 @@ class CoursesController extends Controller
         ]);
 
         $saveAction = $validated['save_action'];
-        unset($validated['save_action']);
+        unset($validated['save_action'], $validated['image']);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -1036,37 +1021,31 @@ class CoursesController extends Controller
                 '<style><link><meta><noscript><script><template><slot>');
         }
 
-        // ✅ Tworzymy folder `courses/images`, jeśli nie istnieje
-        $storageDirectory = storage_path('app/public/courses/images');
-        if (! file_exists($storageDirectory)) {
-            mkdir($storageDirectory, 0777, true);
-        }
-
-        // ✅ Usunięcie starego obrazka, jeśli użytkownik zaznaczył "Usuń obrazek"
+        // Usunięcie starego obrazka, jeśli użytkownik zaznaczył "Usuń obrazek"
         if ($request->has('remove_image')) {
-            if ($course->image && \Storage::disk('public')->exists($course->image)) {
-                \Storage::disk('public')->delete($course->image);
+            if ($course->image && Storage::disk('public')->exists($course->image)) {
+                Storage::disk('public')->delete($course->image);
             }
-            $validated['image'] = null; // Usunięcie ścieżki pliku w bazie danych
+            $validated['image'] = null;
         }
 
-        // ✅ Obsługa nowego pliku graficznego
         if ($request->hasFile('image')) {
-            // ✅ Usunięcie starego pliku, jeśli istnieje
-            if ($course->image && \Storage::disk('public')->exists($course->image)) {
-                \Storage::disk('public')->delete($course->image);
-            }
-
             $file = $request->file('image');
-            $extension = $file->getClientOriginalExtension(); // Pobieramy rozszerzenie pliku
-            $randomSuffix = substr(md5(uniqid(mt_rand(), true)), 0, 6);
+            $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg';
+            $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
             $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
-            $imagePath = "courses/images/{$imageFileName}";
+            $imagePath = $file->storeAs('courses/images', $imageFileName, 'public');
 
-            // ✅ Zapis pliku na serwerze
-            $saved = $file->move($storageDirectory, $imageFileName);
-            if ($saved) {
-                $validated['image'] = $imagePath; // Zapis do bazy tylko jeśli zapis pliku się powiódł
+            if ($imagePath) {
+                if ($course->image && Storage::disk('public')->exists($course->image)) {
+                    Storage::disk('public')->delete($course->image);
+                }
+                $validated['image'] = $imagePath;
+            } else {
+                Log::error('Błąd zapisu pliku grafiki kursu (update)', [
+                    'course_id' => $course->id,
+                    'filename' => $imageFileName,
+                ]);
             }
         }
 
