@@ -61,6 +61,17 @@ This directory contains documentation specifically designed to provide context f
 
 **Best for**: Understanding the complete documentation system, onboarding, getting started.
 
+### [DOMAIN_MIGRATION_STRATEGY.md](./DOMAIN_MIGRATION_STRATEGY.md)
+**Business and technical migration strategy for domains/platform**
+
+- Why migration from Publigo is needed
+- Current transition state between `pnedu.pl` and `nowoczesna-edukacja.pl`
+- Target architecture and domain strategy
+- Phase-by-phase implementation and SEO migration plan
+- Risks, safeguards, and open decisions
+
+**Best for**: Preserving long-term strategy context across AI sessions and developer handovers.
+
 ## 🎯 For AI Assistants
 
 ### Critical Rules
