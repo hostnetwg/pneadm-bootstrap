@@ -28,14 +28,25 @@ class OnlineCourseLessonEmbed extends Model
         return $this->belongsTo(OnlineCourseLesson::class, 'online_course_lesson_id');
     }
 
-    public function getEmbedUrl(): string
+    /**
+     * @param  bool  $enablePlayerApi  YouTube: enablejsapi=1 + origin; Vimeo: api=1 (Vimeo Player SDK)
+     */
+    public function getEmbedUrl(bool $enablePlayerApi = false, ?string $playerParentOrigin = null): string
     {
         $raw = $this->normalizedVideoUrl();
 
         if ($this->platform === 'youtube') {
             $videoId = $this->extractYouTubeId($raw);
             if ($videoId) {
-                return "https://www.youtube.com/embed/{$videoId}";
+                $base = "https://www.youtube.com/embed/{$videoId}";
+                if ($enablePlayerApi) {
+                    return $this->mergeEmbedQueryString($base, array_filter([
+                        'enablejsapi' => '1',
+                        'origin' => $playerParentOrigin !== null && $playerParentOrigin !== '' ? $playerParentOrigin : null,
+                    ]));
+                }
+
+                return $base;
             }
 
             return $raw;
@@ -44,13 +55,54 @@ class OnlineCourseLessonEmbed extends Model
         if ($this->platform === 'vimeo') {
             $videoId = $this->extractVimeoId($raw);
             if ($videoId) {
-                return "https://player.vimeo.com/video/{$videoId}?badge=0&autopause=0&player_id=0&app_id=58479";
+                $base = 'https://player.vimeo.com/video/'.$videoId.'?badge=0&autopause=0&player_id=0&app_id=58479';
+                if ($enablePlayerApi) {
+                    return $this->mergeEmbedQueryString($base, ['api' => '1']);
+                }
+
+                return $base;
             }
 
             return $raw;
         }
 
         return $raw;
+    }
+
+    private function mergeEmbedQueryString(string $url, array $add): string
+    {
+        $parsed = parse_url($url);
+        if ($parsed === false) {
+            return $url;
+        }
+        $query = [];
+        if (! empty($parsed['query'])) {
+            parse_str($parsed['query'], $query);
+        }
+        foreach ($add as $key => $value) {
+            if ($value !== null && $value !== '') {
+                $query[$key] = $value;
+            }
+        }
+        $parsed['query'] = http_build_query($query);
+
+        return $this->rebuildHttpUrl($parsed);
+    }
+
+    /** @param  array{scheme?:string,user?:string,pass?:string,host?:string,port?:int,path?:string,query?:string,fragment?:string}  $parts */
+    private function rebuildHttpUrl(array $parts): string
+    {
+        $scheme = isset($parts['scheme']) ? $parts['scheme'].'://' : '';
+        $user = $parts['user'] ?? '';
+        $pass = isset($parts['pass']) ? ':'.$parts['pass'] : '';
+        $pass = ($user !== '' || $pass !== '') ? "{$pass}@" : '';
+        $host = $parts['host'] ?? '';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        $path = $parts['path'] ?? '';
+        $query = isset($parts['query']) && $parts['query'] !== '' ? '?'.$parts['query'] : '';
+        $fragment = isset($parts['fragment']) ? '#'.$parts['fragment'] : '';
+
+        return "{$scheme}{$user}{$pass}{$host}{$port}{$path}{$query}{$fragment}";
     }
 
     private function normalizedVideoUrl(): string
