@@ -16,18 +16,18 @@ class NoIndexMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
-        
+
         // Dodaj nagłówki zabezpieczające przed indeksowaniem
         $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
-        
+
         // Dodatkowe nagłówki bezpieczeństwa
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; frame-src 'self' https://www.youtube.com https://player.vimeo.com; media-src 'self' https://www.youtube.com https://player.vimeo.com");
-        
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.bunny.net https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: https: http: blob:; connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; frame-src 'self' blob: data: https://www.youtube.com https://player.vimeo.com; frame-ancestors 'self'; media-src 'self' https://www.youtube.com https://player.vimeo.com");
+
         return $response;
     }
 }

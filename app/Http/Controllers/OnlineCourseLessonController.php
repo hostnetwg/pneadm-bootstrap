@@ -30,14 +30,14 @@ class OnlineCourseLessonController extends Controller
         $max = (int) $module->lessons()->max('sort_order');
 
         DB::transaction(function () use ($module, $validated, $max, $request) {
-            $lesson = OnlineCourseLesson::query()->create([
+            $created = OnlineCourseLesson::query()->create([
                 'online_course_module_id' => $module->id,
                 'title' => $validated['title'],
                 'body_html' => $validated['body_html'],
                 'is_published' => $request->boolean('is_published'),
                 'sort_order' => $max + 1,
             ]);
-            $this->syncEmbedsAndLinks($lesson, $request);
+            $this->syncEmbedsAndLinks($created, $request);
         });
 
         return redirect()->route('online-courses.edit', $online_course)->with('success', 'Lekcja dodana.');

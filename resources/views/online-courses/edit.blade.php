@@ -5,7 +5,10 @@
     <div class="py-3">
         <div class="container-fluid px-4">
             @if(session('success'))
-                <div class="alert alert-success">{{ session('success') }}</div>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
             @endif
 
             <ul class="nav nav-tabs mb-3">
@@ -42,6 +45,10 @@
                         </div>
                     </div>
 
+                    @if($course->modules->isEmpty())
+                        <p class="text-muted small">Brak modułów — najpierw utwórz moduł powyżej, potem dodasz lekcje.</p>
+                    @endif
+
                     @foreach($course->modules as $module)
                         <div class="card mb-3">
                             <div class="card-body">
@@ -77,7 +84,14 @@
                                         </li>
                                     @endforeach
                                 </ul>
-                                <a href="{{ route('online-courses.lessons.create', [$course, $module]) }}" class="btn btn-sm btn-primary">Nowa lekcja</a>
+                                <a href="{{ route('online-courses.lessons.create', [$course, $module]) }}"
+                                   class="btn btn-sm btn-primary"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   title="Pełny formularz lekcji (TinyMCE, wideo, linki) — otwiera się na nowej karcie">
+                                    Dodaj lekcję
+                                </a>
+                                <span class="small text-muted ms-2">Nowa karta — po zapisie wróć tutaj i odśwież listę.</span>
                             </div>
                         </div>
                     @endforeach
