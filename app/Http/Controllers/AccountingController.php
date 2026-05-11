@@ -259,17 +259,27 @@ class AccountingController extends Controller
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:100'],
+            'match_mode' => ['nullable', 'string', 'in:exact,partial'],
         ]);
 
         $query = trim((string) $validated['q']);
+        $matchMode = (string) ($validated['match_mode'] ?? 'partial');
 
-        $matches = FormOrder::query()
+        $matchesQuery = FormOrder::query()
             ->with(['primaryParticipant', 'onlinePaymentOrders'])
             ->whereNotNull('invoice_number')
             ->where('invoice_number', '!=', '')
-            ->where('invoice_number', '!=', '0')
-            ->where('invoice_number', 'LIKE', '%'.$query.'%')
-            ->orderByRaw('CASE WHEN invoice_number = ? THEN 0 ELSE 1 END', [$query])
+            ->where('invoice_number', '!=', '0');
+
+        if ($matchMode === 'exact') {
+            $matchesQuery->where('invoice_number', $query);
+        } else {
+            $matchesQuery
+                ->where('invoice_number', 'LIKE', '%'.$query.'%')
+                ->orderByRaw('CASE WHEN invoice_number = ? THEN 0 ELSE 1 END', [$query]);
+        }
+
+        $matches = $matchesQuery
             ->orderByDesc('id')
             ->limit(15)
             ->get();
@@ -431,7 +441,9 @@ class AccountingController extends Controller
                 'email_matches' => $ordersByEmails->count(),
             ],
             'stats' => $stats,
-            'orders' => $allOrders->map(function (FormOrder $order) {
+            'orders' => $allOrders->map(function (FormOrder $order) use ($recipientNip, $buyerNip, $emails) {
+                $linkReasons = $this->resolveLinkReasons($order, $recipientNip, $buyerNip, $emails->all());
+
                 return [
                     'id' => $order->id,
                     'invoice_number' => $order->invoice_number,
@@ -444,6 +456,10 @@ class AccountingController extends Controller
                     'overdue_days' => $this->overdueDays($order),
                     'orderer_email' => $order->orderer_email,
                     'participant_email' => $order->display_participant_email,
+                    'orderer_name' => $order->orderer_name,
+                    'participant_name' => $order->display_participant_name,
+                    'buyer_name' => $order->buyer_name,
+                    'recipient_name' => $order->recipient_name,
                     'recipient_nip' => $order->recipient_formatted_nip,
                     'buyer_nip' => $order->formatted_nip,
                     'payment_mode' => $order->payment_mode,
@@ -451,6 +467,8 @@ class AccountingController extends Controller
                     'payment_status_label' => FormOrder::paymentStatusLabel($order->payment_status),
                     'payment_status_hint' => $this->buildPaymentStatusHint($order),
                     'latest_gateway_status' => $this->latestGatewayStatus($order),
+                    'link_reasons' => $linkReasons,
+                    'link_reasons_label' => implode(', ', array_column($linkReasons, 'label')),
                 ];
             })->values(),
         ];
@@ -538,5 +556,53 @@ class AccountingController extends Controller
         }
 
         return $value->format('Y-m-d');
+    }
+
+    private function resolveLinkReasons(FormOrder $order, ?string $selectedRecipientNip, ?string $selectedBuyerNip, array $selectedEmails): array
+    {
+        $reasons = [];
+
+        $orderRecipientNip = preg_replace('/\D+/', '', (string) ($order->recipient_nip ?? '')) ?: null;
+        $orderBuyerNip = preg_replace('/\D+/', '', (string) ($order->buyer_nip ?? '')) ?: null;
+        $ordererEmail = strtolower(trim((string) ($order->orderer_email ?? ''))) ?: null;
+        $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? ''))) ?: null;
+
+        if (! empty($orderRecipientNip) && $selectedRecipientNip !== null && $orderRecipientNip === $selectedRecipientNip) {
+            $reasons[] = [
+                'key' => 'recipient_nip',
+                'label' => 'NIP odbiorcy',
+                'value' => $orderRecipientNip,
+                'strength' => 'high',
+            ];
+        }
+
+        if (! empty($participantEmail) && in_array($participantEmail, $selectedEmails, true)) {
+            $reasons[] = [
+                'key' => 'participant_email',
+                'label' => 'E-mail uczestnika',
+                'value' => $participantEmail,
+                'strength' => 'high',
+            ];
+        }
+
+        if (! empty($ordererEmail) && in_array($ordererEmail, $selectedEmails, true)) {
+            $reasons[] = [
+                'key' => 'orderer_email',
+                'label' => 'E-mail zamawiającego',
+                'value' => $ordererEmail,
+                'strength' => 'high',
+            ];
+        }
+
+        if (! empty($orderBuyerNip) && $selectedBuyerNip !== null && $orderBuyerNip === $selectedBuyerNip) {
+            $reasons[] = [
+                'key' => 'buyer_nip',
+                'label' => 'NIP nabywcy',
+                'value' => $orderBuyerNip,
+                'strength' => 'low',
+            ];
+        }
+
+        return $reasons;
     }
 }

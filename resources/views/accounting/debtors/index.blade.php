@@ -17,6 +17,12 @@
                         placeholder="Wpisz numer faktury (np. FV/12/05/2026)"
                         autocomplete="off"
                     >
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="exactInvoiceMatch" checked>
+                        <label class="form-check-label" for="exactInvoiceMatch">
+                            Szukaj dokładnie wpisanego numeru (bez dopasowania fragmentu)
+                        </label>
+                    </div>
                     <div class="form-text mt-2">
                         Wyszukiwanie działa na żywo, bez przeładowania strony.
                     </div>
@@ -62,6 +68,28 @@
 
                 <div class="card">
                     <div class="card-header fw-semibold">Historia zamówień powiązanych</div>
+                    <div class="card-body border-bottom">
+                        <div class="small fw-semibold mb-2">Bierz pod uwagę powiązanie po:</div>
+                        <div class="d-flex flex-wrap gap-3" id="historyLinkFilters">
+                            <div class="form-check">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterRecipientNip" value="recipient_nip" checked>
+                                <label class="form-check-label" for="filterRecipientNip">NIP odbiorcy</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterBuyerNip" value="buyer_nip">
+                                <label class="form-check-label" for="filterBuyerNip">NIP nabywcy</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterOrdererEmail" value="orderer_email" checked>
+                                <label class="form-check-label" for="filterOrdererEmail">E-mail zamawiającego</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterParticipantEmail" value="participant_email" checked>
+                                <label class="form-check-label" for="filterParticipantEmail">E-mail uczestnika</label>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2" id="historyFilterInfo"></div>
+                    </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
@@ -73,6 +101,11 @@
                                         <th>Termin płatności</th>
                                         <th>Po terminie</th>
                                         <th>Szkolenie</th>
+                                        <th>Zamawiający</th>
+                                        <th>Uczestnik</th>
+                                        <th>Nabywca</th>
+                                        <th>Odbiorca</th>
+                                        <th>Powiązano po</th>
                                         <th class="text-end">Kwota</th>
                                         <th>Status płatności</th>
                                     </tr>
@@ -90,15 +123,26 @@
         (function () {
             const input = document.getElementById('invoiceLookup');
             const statusEl = document.getElementById('debtorsStatus');
+            const exactInvoiceMatch = document.getElementById('exactInvoiceMatch');
             const resultsEl = document.getElementById('debtorsResults');
             const matchesContainer = document.getElementById('matchesContainer');
             const ordererParticipantCard = document.getElementById('ordererParticipantCard');
             const buyerRecipientCard = document.getElementById('buyerRecipientCard');
             const historyStats = document.getElementById('historyStats');
             const historyRows = document.getElementById('historyRows');
+            const historyFilterInfo = document.getElementById('historyFilterInfo');
+            const linkFilterInputs = Array.from(document.querySelectorAll('.history-link-filter'));
+            const linkFilterStorageKey = 'accounting_debtors_link_filters_v2';
+            const invoiceMatchModeStorageKey = 'accounting_debtors_invoice_match_mode_v2';
 
             let debounceTimer = null;
             let activeRequest = null;
+            let latestHistoryOrders = [];
+            let latestHistoryIdentity = {
+                recipient_nip: null,
+                buyer_nip: null,
+                emails: [],
+            };
 
             const escapeHtml = (value) => {
                 if (value === null || value === undefined || value === '') {
@@ -117,12 +161,25 @@
                 return `${numeric.toFixed(2)} zł`;
             };
 
-                const overdueLabel = (record) => {
-                    if (record.payment_mode === 'online_gateway') {
-                        return '—';
-                    }
-                    return `${record.overdue_days || 0} dni`;
-                };
+            const overdueLabel = (record) => {
+                if (record.payment_mode === 'online_gateway') {
+                    return '—';
+                }
+                return `${record.overdue_days || 0} dni`;
+            };
+
+            const linkReasonBadges = (order) => {
+                const reasons = Array.isArray(order.link_reasons) ? order.link_reasons : [];
+                if (reasons.length === 0) {
+                    return '<span class="text-muted">—</span>';
+                }
+
+                return reasons.map((reason) => {
+                    const isWeak = reason.strength === 'low';
+                    const badgeClass = isWeak ? 'text-bg-warning' : 'text-bg-light border';
+                    return `<span class="badge ${badgeClass} me-1 mb-1" title="${escapeHtml(reason.value)}">${escapeHtml(reason.label)}</span>`;
+                }).join('');
+            };
 
             const setStatus = (message, level = 'info') => {
                 statusEl.className = `alert alert-${level} mb-3`;
@@ -136,6 +193,159 @@
                 buyerRecipientCard.innerHTML = '';
                 historyStats.innerHTML = '';
                 historyRows.innerHTML = '';
+                historyFilterInfo.textContent = '';
+                latestHistoryOrders = [];
+            };
+
+            const getActiveLinkFilters = () => {
+                return new Set(
+                    linkFilterInputs
+                        .filter((input) => input.checked)
+                        .map((input) => input.value)
+                );
+            };
+
+            const saveLinkFilters = () => {
+                const selected = linkFilterInputs
+                    .filter((input) => input.checked)
+                    .map((input) => input.value);
+                localStorage.setItem(linkFilterStorageKey, JSON.stringify(selected));
+            };
+
+            const restoreLinkFilters = () => {
+                try {
+                    const raw = localStorage.getItem(linkFilterStorageKey);
+                    if (!raw) {
+                        return;
+                    }
+                    const selected = JSON.parse(raw);
+                    if (!Array.isArray(selected)) {
+                        return;
+                    }
+                    const selectedSet = new Set(selected);
+                    linkFilterInputs.forEach((input) => {
+                        input.checked = selectedSet.has(input.value);
+                    });
+                } catch (error) {
+                    // Ignore localStorage parse errors and keep defaults.
+                }
+            };
+
+            const restoreInvoiceMatchMode = () => {
+                const mode = localStorage.getItem(invoiceMatchModeStorageKey);
+                if (!mode) {
+                    exactInvoiceMatch.checked = true;
+                    return;
+                }
+                exactInvoiceMatch.checked = mode === 'exact';
+            };
+
+            const saveInvoiceMatchMode = () => {
+                localStorage.setItem(invoiceMatchModeStorageKey, exactInvoiceMatch.checked ? 'exact' : 'partial');
+            };
+
+            const renderHistoryRows = () => {
+                const activeFilters = getActiveLinkFilters();
+
+                const visibleOrders = latestHistoryOrders.filter((order) => {
+                    const reasons = Array.isArray(order.link_reasons) ? order.link_reasons : [];
+                    if (activeFilters.size === 0) {
+                        return false;
+                    }
+                    return reasons.some((reason) => activeFilters.has(reason.key));
+                });
+
+                historyFilterInfo.textContent = `Widoczne rekordy: ${visibleOrders.length} z ${latestHistoryOrders.length}.`;
+
+                const totalValue = visibleOrders.reduce((sum, order) => sum + Number(order.product_price || 0), 0);
+                const deferredCount = visibleOrders.filter((order) => order.payment_mode === 'deferred_invoice').length;
+                const onlineCount = visibleOrders.filter((order) => order.payment_mode === 'online_gateway').length;
+                const onlinePaidCount = visibleOrders.filter((order) => order.latest_gateway_status === 'paid').length;
+                const onlinePendingCount = visibleOrders.filter((order) => ['pending', 'created'].includes(order.latest_gateway_status)).length;
+                const onlineFailedCount = visibleOrders.filter((order) => ['failed', 'cancelled'].includes(order.latest_gateway_status)).length;
+
+                historyStats.innerHTML = `
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Liczba zamówień (po filtrze)</div>
+                                <div class="fs-5 fw-semibold">${escapeHtml(visibleOrders.length)}</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Łączna wartość (po filtrze)</div>
+                                <div class="fs-5 fw-semibold">${money(totalValue)}</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted">Klucz identyfikacji</div>
+                                <div class="small">
+                                    Odbiorca NIP: <strong>${escapeHtml(latestHistoryIdentity.recipient_nip)}</strong><br>
+                                    Nabywca NIP: <strong>${escapeHtml(latestHistoryIdentity.buyer_nip)}</strong><br>
+                                    E-maile: <strong>${escapeHtml((latestHistoryIdentity.emails || []).join(', '))}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 small">
+                        <span class="badge text-bg-secondary me-1 mb-1">Odroczone: ${escapeHtml(deferredCount)}</span>
+                        <span class="badge text-bg-info me-1 mb-1">Online: ${escapeHtml(onlineCount)}</span>
+                        <span class="badge text-bg-success me-1 mb-1">Online opłacone: ${escapeHtml(onlinePaidCount)}</span>
+                        <span class="badge text-bg-warning me-1 mb-1">Online oczekujące: ${escapeHtml(onlinePendingCount)}</span>
+                        <span class="badge text-bg-danger me-1 mb-1">Online nieudane/anulowane: ${escapeHtml(onlineFailedCount)}</span>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0 py-2 small">
+                        Powiązanie po <strong>NIP nabywcy</strong> traktuj pomocniczo (np. gmina może być nabywcą dla wielu szkół).
+                    </div>
+                `;
+
+                if (visibleOrders.length === 0) {
+                    historyRows.innerHTML = `
+                        <tr>
+                            <td colspan="13" class="text-center text-muted py-3">
+                                Brak rekordów dla wybranych typów powiązań.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                historyRows.innerHTML = visibleOrders.map((order) => {
+                    return `
+                        <tr>
+                            <td>#${escapeHtml(order.id)}</td>
+                            <td>${escapeHtml(order.invoice_number)}</td>
+                            <td>${escapeHtml(order.invoice_date)}</td>
+                            <td>${escapeHtml(order.payment_due_date)}</td>
+                            <td>${escapeHtml(overdueLabel(order))}</td>
+                            <td>${escapeHtml(order.product_name)}</td>
+                            <td>
+                                <div>${escapeHtml(order.orderer_name)}</div>
+                                <div class="small text-muted">${escapeHtml(order.orderer_email)}</div>
+                            </td>
+                            <td>
+                                <div>${escapeHtml(order.participant_name)}</div>
+                                <div class="small text-muted">${escapeHtml(order.participant_email)}</div>
+                            </td>
+                            <td>
+                                <div>${escapeHtml(order.buyer_name)}</div>
+                                <div class="small text-muted">NIP: ${escapeHtml(order.buyer_nip)}</div>
+                            </td>
+                            <td>
+                                <div>${escapeHtml(order.recipient_name)}</div>
+                                <div class="small text-muted">NIP: ${escapeHtml(order.recipient_nip)}</div>
+                            </td>
+                            <td>${linkReasonBadges(order)}</td>
+                            <td class="text-end">${money(order.product_price)}</td>
+                            <td>
+                                <div>${escapeHtml(order.payment_mode_label)}</div>
+                                <div class="small text-muted">${escapeHtml(order.payment_status_hint)}</div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             };
 
             const renderPayload = (payload) => {
@@ -182,59 +392,13 @@
                     <p class="mb-0"><strong>Adres odbiorcy:</strong> ${escapeHtml(selected.recipient.address)}, ${escapeHtml(selected.recipient.postal_code)} ${escapeHtml(selected.recipient.city)}</p>
                 `;
 
-                const stats = payload.history.stats;
-                const identity = payload.history.identity;
-                historyStats.innerHTML = `
-                    <div class="row g-3">
-                        <div class="col-12 col-md-4">
-                            <div class="border rounded p-2 h-100">
-                                <div class="small text-muted">Liczba zamówień</div>
-                                <div class="fs-5 fw-semibold">${escapeHtml(stats.total_orders)}</div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <div class="border rounded p-2 h-100">
-                                <div class="small text-muted">Łączna wartość</div>
-                                <div class="fs-5 fw-semibold">${money(stats.total_value)}</div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <div class="border rounded p-2 h-100">
-                                <div class="small text-muted">Klucz identyfikacji</div>
-                                <div class="small">
-                                    Odbiorca NIP: <strong>${escapeHtml(identity.recipient_nip)}</strong><br>
-                                    Nabywca NIP: <strong>${escapeHtml(identity.buyer_nip)}</strong><br>
-                                    E-maile: <strong>${escapeHtml((identity.emails || []).join(', '))}</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3 small">
-                        <span class="badge text-bg-secondary me-1 mb-1">Odroczone: ${escapeHtml(stats.deferred_invoice_orders)}</span>
-                        <span class="badge text-bg-info me-1 mb-1">Online: ${escapeHtml(stats.online_gateway_orders)}</span>
-                        <span class="badge text-bg-success me-1 mb-1">Online opłacone: ${escapeHtml(stats.online_paid_orders)}</span>
-                        <span class="badge text-bg-warning me-1 mb-1">Online oczekujące: ${escapeHtml(stats.online_pending_orders)}</span>
-                        <span class="badge text-bg-danger me-1 mb-1">Online nieudane/anulowane: ${escapeHtml(stats.online_failed_or_cancelled_orders)}</span>
-                    </div>
-                `;
-
-                historyRows.innerHTML = (payload.history.orders || []).map((order) => {
-                    return `
-                        <tr>
-                            <td>#${escapeHtml(order.id)}</td>
-                            <td>${escapeHtml(order.invoice_number)}</td>
-                            <td>${escapeHtml(order.invoice_date)}</td>
-                            <td>${escapeHtml(order.payment_due_date)}</td>
-                            <td>${escapeHtml(overdueLabel(order))}</td>
-                            <td>${escapeHtml(order.product_name)}</td>
-                            <td class="text-end">${money(order.product_price)}</td>
-                            <td>
-                                <div>${escapeHtml(order.payment_mode_label)}</div>
-                                <div class="small text-muted">${escapeHtml(order.payment_status_hint)}</div>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+                latestHistoryOrders = payload.history.orders || [];
+                latestHistoryIdentity = payload.history.identity || {
+                    recipient_nip: null,
+                    buyer_nip: null,
+                    emails: [],
+                };
+                renderHistoryRows();
             };
 
             const performLookup = async (q) => {
@@ -246,7 +410,8 @@
                 setStatus('Wyszukiwanie...', 'info');
 
                 try {
-                    const response = await fetch(`{{ route('accounting.debtors.lookup') }}?q=${encodeURIComponent(q)}`, {
+                    const matchMode = exactInvoiceMatch.checked ? 'exact' : 'partial';
+                    const response = await fetch(`{{ route('accounting.debtors.lookup') }}?q=${encodeURIComponent(q)}&match_mode=${matchMode}`, {
                         headers: {
                             'Accept': 'application/json',
                         },
@@ -284,6 +449,22 @@
                 debounceTimer = setTimeout(() => {
                     performLookup(q);
                 }, 300);
+            });
+
+            restoreLinkFilters();
+            restoreInvoiceMatchMode();
+            linkFilterInputs.forEach((input) => {
+                input.addEventListener('change', () => {
+                    saveLinkFilters();
+                    renderHistoryRows();
+                });
+            });
+            exactInvoiceMatch.addEventListener('change', () => {
+                saveInvoiceMatchMode();
+                const q = input.value.trim();
+                if (q.length >= 2) {
+                    performLookup(q);
+                }
             });
         })();
     </script>
