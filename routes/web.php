@@ -17,6 +17,10 @@ use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\MarketingCampaignController;
 use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\NODNSzkoleniaController;
+use App\Http\Controllers\OnlineCourseEnrollmentController;
+use App\Http\Controllers\OnlineCourseLessonController;
+use App\Http\Controllers\OnlineCourseModuleController;
+use App\Http\Controllers\OnlineCoursesController;
 use App\Http\Controllers\OnlinePaymentOrderController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\ProfileController;
@@ -297,6 +301,25 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/activate', [CoursePriceVariantController::class, 'activate'])->name('activate');
     });
 
+    // Kursy online nagraniowe (LMS) — oddzielnie od szkoleń (courses).
+    Route::resource('online-courses', OnlineCoursesController::class);
+    Route::post('online-courses/{online_course}/modules/reorder', [OnlineCoursesController::class, 'reorderModules'])
+        ->name('online-courses.modules.reorder');
+    Route::post('online-courses/{online_course}/modules', [OnlineCourseModuleController::class, 'store'])->name('online-courses.modules.store');
+    Route::put('online-courses/{online_course}/modules/{module}', [OnlineCourseModuleController::class, 'update'])->name('online-courses.modules.update');
+    Route::delete('online-courses/{online_course}/modules/{module}', [OnlineCourseModuleController::class, 'destroy'])->name('online-courses.modules.destroy');
+    Route::get('online-courses/{online_course}/modules/{module}/lessons/create', [OnlineCourseLessonController::class, 'create'])->name('online-courses.lessons.create');
+    Route::post('online-courses/{online_course}/modules/{module}/lessons', [OnlineCourseLessonController::class, 'store'])->name('online-courses.lessons.store');
+    Route::get('online-courses/{online_course}/modules/{module}/lessons/{lesson}/edit', [OnlineCourseLessonController::class, 'edit'])->name('online-courses.lessons.edit');
+    Route::put('online-courses/{online_course}/modules/{module}/lessons/{lesson}', [OnlineCourseLessonController::class, 'update'])->name('online-courses.lessons.update');
+    Route::delete('online-courses/{online_course}/modules/{module}/lessons/{lesson}', [OnlineCourseLessonController::class, 'destroy'])->name('online-courses.lessons.destroy');
+    Route::get('online-courses/{online_course}/enrollments', [OnlineCourseEnrollmentController::class, 'index'])->name('online-courses.enrollments.index');
+    Route::get('online-courses/{online_course}/enrollments/create', [OnlineCourseEnrollmentController::class, 'create'])->name('online-courses.enrollments.create');
+    Route::post('online-courses/{online_course}/enrollments', [OnlineCourseEnrollmentController::class, 'store'])->name('online-courses.enrollments.store');
+    Route::get('online-courses/{online_course}/enrollments/{enrollment}/edit', [OnlineCourseEnrollmentController::class, 'edit'])->name('online-courses.enrollments.edit');
+    Route::put('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'update'])->name('online-courses.enrollments.update');
+    Route::delete('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'destroy'])->name('online-courses.enrollments.destroy');
+
     // Uzupełnienie danych uczestników
     Route::prefix('data-completion')->name('data-completion.')->group(function () {
         Route::get('/test', [\App\Http\Controllers\DataCompletionController::class, 'test'])->name('test');
@@ -408,6 +431,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/', [AccountingController::class, 'dataEntryStore'])->name('store');
             Route::put('/{id}', [AccountingController::class, 'dataEntryUpdate'])->name('update');
             Route::delete('/{id}', [AccountingController::class, 'dataEntryDestroy'])->name('destroy');
+        });
+        Route::prefix('debtors')->name('debtors.')->group(function () {
+            Route::get('/', [AccountingController::class, 'debtorsIndex'])->name('index');
+            Route::get('/lookup', [AccountingController::class, 'debtorsLookup'])->name('lookup');
         });
     });
 
