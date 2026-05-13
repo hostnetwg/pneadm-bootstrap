@@ -86,12 +86,9 @@
                                 </ul>
                                 <a href="{{ route('online-courses.lessons.create', [$course, $module]) }}"
                                    class="btn btn-sm btn-primary"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   title="Pełny formularz lekcji (TinyMCE, wideo, linki) — otwiera się na nowej karcie">
+                                   title="Formularz lekcji (TinyMCE, wideo, linki)">
                                     Dodaj lekcję
                                 </a>
-                                <span class="small text-muted ms-2">Nowa karta — po zapisie wróć tutaj i odśwież listę.</span>
                             </div>
                         </div>
                     @endforeach
