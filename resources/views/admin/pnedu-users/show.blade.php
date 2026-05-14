@@ -101,6 +101,8 @@
                             </form>
                         </div>
 
+                        @include('admin.pnedu-users.partials.access-credentials-email-modal')
+
                         <div class="mb-4 pb-4 border-bottom">
                             <h6 class="fw-semibold">Ustaw hasło z panelu</h6>
                             <p class="text-muted small mb-2">Nadpisuje hasło w bazie pnedu (użyj tylko gdy jest to uzasadnione procedurą).</p>

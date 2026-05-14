@@ -62,6 +62,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
         Route::get('pnedu-users', [PneduUsersController::class, 'index'])->name('pnedu-users.index');
         Route::post('pnedu-users/{pnedu_user}/send-password-reset', [PneduUsersController::class, 'sendPasswordReset'])->name('pnedu-users.send-password-reset');
+        Route::post('pnedu-users/{pnedu_user}/access-credentials-password', [PneduUsersController::class, 'generateAccessCredentialsPassword'])
+            ->middleware('throttle:30,1')
+            ->name('pnedu-users.access-credentials-password');
         Route::post('pnedu-users/{pnedu_user}/set-password', [PneduUsersController::class, 'setPassword'])->name('pnedu-users.set-password');
         Route::post('pnedu-users/{pnedu_user}/verify-email', [PneduUsersController::class, 'verifyEmail'])->name('pnedu-users.verify-email');
         Route::delete('pnedu-users/{pnedu_user}', [PneduUsersController::class, 'destroy'])->name('pnedu-users.destroy');

@@ -8,10 +8,12 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -128,6 +130,33 @@ class PneduUsersController extends Controller
         );
 
         return back()->with('success', 'Nowe hasło zostało zapisane.');
+    }
+
+    /**
+     * Wygeneruj nowe hasło dla użytkownika pnedu.pl (do wklejenia w szablonie wiadomości z danymi dostępowymi).
+     */
+    public function generateAccessCredentialsPassword(PneduUser $pnedu_user): JsonResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $plain = Str::password(20);
+
+        $pnedu_user->forceFill([
+            'password' => $plain,
+        ])->save();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: wygenerowano hasło (szablon wiadomości dostępowej)',
+            'Wygenerowano i zapisano nowe hasło dla użytkownika ID '.$pnedu_user->id.' ('.$pnedu_user->email.') — treść przekazana w odpowiedzi JSON do panelu (log nie zawiera hasła).',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'email' => $pnedu_user->email,
+                ],
+            ]
+        );
+
+        return response()->json(['password' => $plain]);
     }
 
     public function verifyEmail(Request $request, PneduUser $pnedu_user): RedirectResponse
