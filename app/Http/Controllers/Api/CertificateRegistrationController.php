@@ -119,7 +119,7 @@ class CertificateRegistrationController extends Controller
     }
 
     /**
-     * Rejestracja uczestnika (utworzenie rekordu w participants).
+     * Rejestracja uczestnika (utworzenie lub aktualizacja rekordu w participants przy tym samym e-mailu na kursie).
      * POST /api/certificate-registration/register
      * Body: token, first_name, last_name, email [, birth_date, birth_place gdy kurs zbiera te dane]
      */
@@ -211,11 +211,24 @@ class CertificateRegistrationController extends Controller
             ->first();
 
         if ($existing) {
+            $update = [
+                'first_name' => trim($request->input('first_name')),
+                'last_name' => trim($request->input('last_name')),
+                'email' => trim($request->input('email')),
+            ];
+
+            if ($course->certificate_registration_collect_birth_data) {
+                $update['birth_date'] = $request->filled('birth_date') ? $request->input('birth_date') : null;
+                $update['birth_place'] = $request->filled('birth_place') ? trim((string) $request->input('birth_place')) : null;
+            }
+
+            $existing->update($update);
+
             return response()->json([
-                'success' => false,
-                'already_registered' => true,
-                'message' => 'Jesteś już zarejestrowany dla tego szkolenia.',
-            ], 422);
+                'success' => true,
+                'updated' => true,
+                'message' => 'Twoje dane zostały zaktualizowane.',
+            ]);
         }
 
         $maxOrder = (int) Participant::where('course_id', $course->id)->max('order');
@@ -225,7 +238,7 @@ class CertificateRegistrationController extends Controller
             'order' => $maxOrder + 1,
             'first_name' => trim($request->input('first_name')),
             'last_name' => trim($request->input('last_name')),
-            'email' => $request->input('email'),
+            'email' => trim($request->input('email')),
         ];
 
         if ($course->certificate_registration_collect_birth_data) {
@@ -237,6 +250,7 @@ class CertificateRegistrationController extends Controller
 
         return response()->json([
             'success' => true,
+            'updated' => false,
             'message' => 'Zostałeś zarejestrowany. Zaświadczenie otrzymasz w oddzielnej wiadomości.',
         ]);
     }
