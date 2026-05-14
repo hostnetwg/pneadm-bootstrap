@@ -92,13 +92,39 @@
                                 (<code>{{ rtrim(config('services.pnedu_frontend_url'), '/') }}/reset-password/…</code>).
                             </p>
                             <form method="post"
-                                  action="{{ route('admin.pnedu-users.send-password-reset', ['pnedu_user' => $user->getKey()]) }}"
-                                  onsubmit="return confirm('Wysłać e-mail z linkiem resetu hasła na adres {{ e($user->email) }}?');">
+                                  id="pnedu-send-password-reset-form"
+                                  action="{{ route('admin.pnedu-users.send-password-reset', ['pnedu_user' => $user->getKey()]) }}">
                                 @csrf
-                                <button type="submit" class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-envelope me-1"></i> Wyślij link resetu hasła
-                                </button>
                             </form>
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#pneduSendPasswordResetModal">
+                                <i class="bi bi-envelope me-1"></i> Wyślij link resetu hasła
+                            </button>
+
+                            <div class="modal fade" id="pneduSendPasswordResetModal" tabindex="-1" aria-labelledby="pneduSendPasswordResetModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h2 class="modal-title fs-5" id="pneduSendPasswordResetModalLabel">Potwierdź wysyłkę</h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-2">Wysłać e-mail z linkiem resetu hasła na adres <strong>{{ $user->email }}</strong>?</p>
+                                            <p class="text-muted small mb-0">
+                                                Użytkownik otrzyma wiadomość z linkiem do ustawienia nowego hasła na stronie pnedu.pl.
+                                            </p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                            <button type="submit" form="pnedu-send-password-reset-form" class="btn btn-primary">
+                                                <i class="bi bi-envelope me-1"></i> Wyślij link resetu hasła
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         @include('admin.pnedu-users.partials.access-credentials-email-modal')
