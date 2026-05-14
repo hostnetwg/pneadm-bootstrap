@@ -32,6 +32,8 @@ class Course extends Model
         'certificate_registration_starts_at',
         'certificate_registration_ends_at',
         'certificate_registration_token',
+        'certificate_registration_collect_birth_data',
+        'certificate_registration_birth_data_required',
         'access_duration_days',
         'access_notes',
         'notatki',
@@ -51,6 +53,8 @@ class Course extends Model
         'certificate_registration_open' => 'boolean',
         'certificate_registration_starts_at' => 'datetime',
         'certificate_registration_ends_at' => 'datetime',
+        'certificate_registration_collect_birth_data' => 'boolean',
+        'certificate_registration_birth_data_required' => 'boolean',
     ];
 
     /**

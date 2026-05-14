@@ -317,10 +317,10 @@
                 <!-- Rejestracja zaświadczenia (formularz na pnedu.pl) -->
                 <div class="card mb-4" id="certificate-registration">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-user-plus me-1"></i> Rejestracja uczestnika/zaświadczenia</h5>
+                        <h5 class="mb-0"><i class="fas fa-user-plus me-1"></i> Rejestracja zaświadczenia</h5>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted small">Umożliwia udostępnienie publicznego formularza na pnedu.pl, w którym uczestnicy mogą się zarejestrować do szkolenia (zapis do listy uczestników). Zaświadczenia generujesz jak dotychczas z panelu.</p>
+                        <p class="text-muted small">Publiczny formularz „Rejestracja zaświadczenia” na pnedu.pl zapisuje uczestnika na liście szkolenia (tabela <code>participants</code>). Zaświadczenia nadal tworzysz i udostępniasz jak dotychczas z panelu.</p>
                         <div class="form-check mb-3">
                             <input type="checkbox" name="certificate_registration_open" class="form-check-input" id="certificate_registration_open" {{ old('certificate_registration_open', $course->certificate_registration_open) ? 'checked' : '' }}>
                             <label class="form-check-label" for="certificate_registration_open">Włącz rejestrację zaświadczenia</label>
@@ -335,6 +335,31 @@
                                 <input type="datetime-local" name="certificate_registration_ends_at" id="certificate_registration_ends_at" class="form-control" value="{{ old('certificate_registration_ends_at', $course->certificate_registration_ends_at ? $course->certificate_registration_ends_at->format('Y-m-d\TH:i') : '') }}">
                             </div>
                         </div>
+                        <div class="border rounded p-3 mb-3 bg-light">
+                            <p class="small text-muted mb-2">Formularz na pnedu.pl — dodatkowe pola</p>
+                            <div class="form-check mb-2">
+                                <input type="checkbox" name="certificate_registration_collect_birth_data" class="form-check-input" id="certificate_registration_collect_birth_data" {{ old('certificate_registration_collect_birth_data', $course->certificate_registration_collect_birth_data) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="certificate_registration_collect_birth_data">Pokaż pola: data i miejsce urodzenia</label>
+                            </div>
+                            <div class="form-check ms-4">
+                                <input type="checkbox" name="certificate_registration_birth_data_required" class="form-check-input" id="certificate_registration_birth_data_required" {{ old('certificate_registration_birth_data_required', $course->certificate_registration_birth_data_required) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="certificate_registration_birth_data_required">Te pola są obowiązkowe</label>
+                            </div>
+                            <p class="small text-muted mb-0 mt-2">Druga opcja działa tylko gdy włączone jest pokazywanie pól; po zapisie kursu wyłączenie pierwszej opcji wyzeruje wymaganie obowiązkowości.</p>
+                        </div>
+                        <script>
+                            (function () {
+                                var c = document.getElementById('certificate_registration_collect_birth_data');
+                                var r = document.getElementById('certificate_registration_birth_data_required');
+                                if (!c || !r) return;
+                                function sync() {
+                                    r.disabled = !c.checked;
+                                    if (!c.checked) r.checked = false;
+                                }
+                                c.addEventListener('change', sync);
+                                sync();
+                            })();
+                        </script>
                         @if($course->certificate_registration_token)
                             <div class="mb-3">
                                 <label class="form-label">Token (tylko do odczytu)</label>

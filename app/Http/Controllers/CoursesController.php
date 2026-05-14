@@ -1007,6 +1007,10 @@ class CoursesController extends Controller
             $validated['certificate_registration_token'] = \Illuminate\Support\Str::random(64);
         }
 
+        $validated['certificate_registration_collect_birth_data'] = $request->boolean('certificate_registration_collect_birth_data');
+        $validated['certificate_registration_birth_data_required'] = $request->boolean('certificate_registration_birth_data_required')
+            && $validated['certificate_registration_collect_birth_data'];
+
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (! empty($validated['offer_description_html'])) {
             $validated['offer_description_html'] = strip_tags($validated['offer_description_html'],

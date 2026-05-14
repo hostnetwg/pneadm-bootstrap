@@ -5,11 +5,57 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Participant;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CertificateRegistrationController extends Controller
 {
+    /**
+     * @return array{ok: bool, iso: ?string, message: ?string}
+     */
+    private function parseBirthDateInput(?string $raw): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return ['ok' => true, 'iso' => null, 'message' => null];
+        }
+
+        $raw = trim($raw);
+
+        try {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+                $dt = Carbon::parse($raw)->startOfDay();
+            } elseif (preg_match('/^\d{2}\.\d{2}\.\d{4}$/', $raw)) {
+                $dt = Carbon::createFromFormat('!d.m.Y', $raw)->startOfDay();
+            } else {
+                return ['ok' => false, 'iso' => null, 'message' => 'Podaj datę urodzenia w formacie dd.mm.rrrr, np. 03.05.1984.'];
+            }
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'iso' => null, 'message' => 'Podana data urodzenia jest nieprawidłowa (sprawdź dzień i miesiąc).'];
+        }
+
+        if ($dt->isFuture()) {
+            return ['ok' => false, 'iso' => null, 'message' => 'Data urodzenia nie może być z przyszłości.'];
+        }
+
+        return ['ok' => true, 'iso' => $dt->format('Y-m-d'), 'message' => null];
+    }
+
+    private function formatCourseStartDisplay(Course $course): ?string
+    {
+        if ($course->start_date === null) {
+            return null;
+        }
+
+        $dt = $course->start_date->copy()->timezone(config('app.timezone'));
+
+        if ((int) $dt->format('H') === 0 && (int) $dt->format('i') === 0) {
+            return $dt->format('d.m.Y');
+        }
+
+        return $dt->format('d.m.Y H:i');
+    }
+
     /**
      * Status rejestracji zaświadczenia po tokenie (czy formularz jest aktywny).
      * GET /api/certificate-registration/status/{token}
@@ -18,17 +64,20 @@ class CertificateRegistrationController extends Controller
     {
         $course = Course::with('instructor')->where('certificate_registration_token', $token)->first();
 
-        if (!$course) {
+        if (! $course) {
             return response()->json([
                 'active' => false,
                 'message' => 'Link jest nieprawidłowy lub wygasł.',
             ]);
         }
 
-        if (!$course->certificate_registration_open) {
+        $courseStartDisplay = $this->formatCourseStartDisplay($course);
+
+        if (! $course->certificate_registration_open) {
             return response()->json([
                 'active' => false,
                 'course_title' => $course->title,
+                'course_start_display' => $courseStartDisplay,
                 'message' => 'Rejestracja zaświadczenia jest wyłączona.',
             ]);
         }
@@ -38,6 +87,7 @@ class CertificateRegistrationController extends Controller
             return response()->json([
                 'active' => false,
                 'course_title' => $course->title,
+                'course_start_display' => $courseStartDisplay,
                 'message' => 'Rejestracja nie jest jeszcze dostępna.',
             ]);
         }
@@ -45,6 +95,7 @@ class CertificateRegistrationController extends Controller
             return response()->json([
                 'active' => false,
                 'course_title' => $course->title,
+                'course_start_display' => $courseStartDisplay,
                 'message' => 'Rejestracja zakończyła się.',
             ]);
         }
@@ -59,47 +110,31 @@ class CertificateRegistrationController extends Controller
         return response()->json([
             'active' => true,
             'course_title' => $course->title,
+            'course_start_display' => $courseStartDisplay,
             'instructor_name' => $instructorName,
             'instructor_photo' => $instructorPhoto,
+            'certificate_registration_collect_birth_data' => (bool) $course->certificate_registration_collect_birth_data,
+            'certificate_registration_birth_data_required' => (bool) $course->certificate_registration_birth_data_required,
         ]);
     }
 
     /**
      * Rejestracja uczestnika (utworzenie rekordu w participants).
      * POST /api/certificate-registration/register
-     * Body: token, first_name, last_name, email
+     * Body: token, first_name, last_name, email [, birth_date, birth_place gdy kurs zbiera te dane]
      */
     public function register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'token' => 'required|string|max:64',
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'rodo_consent' => 'required|accepted',
-            'newsletter_consent' => 'sometimes|boolean',
-        ], [
-            'rodo_consent.accepted' => 'Musisz wyrazić zgodę na przetwarzanie danych osobowych.',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Nieprawidłowe dane.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $course = Course::where('certificate_registration_token', $request->input('token'))->first();
 
-        if (!$course) {
+        if (! $course) {
             return response()->json([
                 'success' => false,
                 'message' => 'Link jest nieprawidłowy lub wygasł.',
             ], 404);
         }
 
-        if (!$course->certificate_registration_open) {
+        if (! $course->certificate_registration_open) {
             return response()->json([
                 'success' => false,
                 'message' => 'Rejestracja zaświadczenia jest wyłączona.',
@@ -118,6 +153,56 @@ class CertificateRegistrationController extends Controller
                 'success' => false,
                 'message' => 'Rejestracja zakończyła się.',
             ], 403);
+        }
+
+        $rules = [
+            'token' => 'required|string|max:64',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'rodo_consent' => 'required|accepted',
+            'newsletter_consent' => 'sometimes|boolean',
+        ];
+        $messages = [
+            'rodo_consent.accepted' => 'Musisz wyrazić zgodę na przetwarzanie danych osobowych.',
+            'birth_date.required' => 'Podaj datę urodzenia.',
+            'birth_date.date' => 'Podaj prawidłową datę urodzenia (np. 03.05.1984).',
+            'birth_place.required' => 'Podaj miejsce urodzenia.',
+        ];
+
+        if ($course->certificate_registration_collect_birth_data) {
+            if ($course->certificate_registration_birth_data_required) {
+                $rules['birth_date'] = 'required|date';
+                $rules['birth_place'] = 'required|string|max:255';
+            } else {
+                $rules['birth_date'] = 'nullable|date';
+                $rules['birth_place'] = 'nullable|string|max:255';
+            }
+        }
+
+        if ($course->certificate_registration_collect_birth_data) {
+            $parsed = $this->parseBirthDateInput($request->input('birth_date'));
+            if (! $parsed['ok']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nieprawidłowe dane.',
+                    'errors' => ['birth_date' => [$parsed['message']]],
+                ], 422);
+            }
+            $request->merge(['birth_date' => $parsed['iso']]);
+
+            $place = trim((string) $request->input('birth_place', ''));
+            $request->merge(['birth_place' => $place === '' ? null : $place]);
+        }
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nieprawidłowe dane.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         $emailNormalized = strtolower(trim($request->input('email')));
@@ -134,13 +219,21 @@ class CertificateRegistrationController extends Controller
         }
 
         $maxOrder = (int) Participant::where('course_id', $course->id)->max('order');
-        Participant::create([
+
+        $payload = [
             'course_id' => $course->id,
             'order' => $maxOrder + 1,
             'first_name' => trim($request->input('first_name')),
             'last_name' => trim($request->input('last_name')),
             'email' => $request->input('email'),
-        ]);
+        ];
+
+        if ($course->certificate_registration_collect_birth_data) {
+            $payload['birth_date'] = $request->filled('birth_date') ? $request->input('birth_date') : null;
+            $payload['birth_place'] = $request->filled('birth_place') ? trim((string) $request->input('birth_place')) : null;
+        }
+
+        Participant::create($payload);
 
         return response()->json([
             'success' => true,
