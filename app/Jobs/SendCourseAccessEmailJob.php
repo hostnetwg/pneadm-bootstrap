@@ -9,6 +9,7 @@ use App\Models\CourseFileLink;
 use App\Models\CourseSurveyLink;
 use App\Models\CourseVideo;
 use App\Models\Participant;
+use App\Models\ParticipantDownloadToken;
 use App\Models\PneduUser;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -16,11 +17,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 
 class SendCourseAccessEmailJob implements ShouldQueue
 {
@@ -87,11 +85,11 @@ class SendCourseAccessEmailJob implements ShouldQueue
         }
 
         $pneduFrontendUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/');
-        // pnedu.pl: /dashboard/szkolenia/{participant}/wideo — parametr to ID rekordu participants (w bazie pneadm).
         $courseUrl = $pneduFrontendUrl.'/dashboard/szkolenia/'.rawurlencode((string) $participant->id).'/wideo';
 
         $surveyLinks = CourseSurveyLink::query()
             ->where('course_id', $course->id)
+            ->availableNow()
             ->orderBy('order')
             ->orderBy('id')
             ->get()
@@ -99,42 +97,35 @@ class SendCourseAccessEmailJob implements ShouldQueue
                 'title' => trim((string) ($link->title ?? '')) !== '' ? trim((string) $link->title) : 'Ankieta szkoleniowa',
                 'url' => $link->participantFacingSurveyUrl(),
             ])
+            ->filter(fn (array $item) => trim((string) ($item['url'] ?? '')) !== '')
+            ->values()
             ->all();
 
         $normalizedEmail = strtolower(trim($email));
-        $pneduUser = PneduUser::query()
+        $hasPneduAccount = PneduUser::query()
             ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
-            ->first();
+            ->exists();
 
-        $accountCreatedNow = false;
-        $setPasswordUrl = null;
+        $certificateUrl = null;
+        if ($hasCertificate) {
+            $token = ParticipantDownloadToken::getOrCreateTokenForEmail($email);
+            $certificateUrl = $pneduFrontendUrl.'/certificate/'.$token.'/'.$course->id;
+        }
+
+        $registerUrl = $pneduFrontendUrl.'/register?email='.urlencode($email);
 
         try {
-            if (! $pneduUser) {
-                $accountCreatedNow = true;
-                $pneduUser = PneduUser::query()->create([
-                    'first_name' => trim((string) ($participant->first_name ?? '')),
-                    'last_name' => trim((string) ($participant->last_name ?? '')),
-                    'email' => $normalizedEmail,
-                    'password' => Hash::make(Str::password(48)),
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            if ($accountCreatedNow) {
-                $token = Password::broker('pnedu_users')->createToken($pneduUser);
-                $setPasswordUrl = $pneduFrontendUrl.'/reset-password/'.$token.'?email='.urlencode($pneduUser->getEmailForPasswordReset());
-            }
-
             Mail::to($email)->send(new CourseAccessMail(
                 participant: $participant,
                 course: $course,
-                courseUrl: $courseUrl,
+                hasPneduAccount: $hasPneduAccount,
+                courseUrl: $hasPneduAccount ? $courseUrl : null,
+                certificateUrl: $certificateUrl,
+                registerUrl: $registerUrl,
+                participantEmail: $email,
                 hasVideos: $hasVideos,
                 hasMaterials: $hasMaterials,
                 hasCertificate: $hasCertificate,
-                accountCreatedNow: $accountCreatedNow,
-                setPasswordUrl: $setPasswordUrl,
                 surveyLinks: $surveyLinks
             ));
 
@@ -146,10 +137,11 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'has_videos' => $hasVideos,
                     'has_materials' => $hasMaterials,
                     'has_certificate' => $hasCertificate,
-                    'pnedu_course_url' => $courseUrl,
+                    'pnedu_course_url' => $hasPneduAccount ? $courseUrl : null,
                     'pnedu_participant_id' => (int) $participant->id,
-                    'account_created_now' => $accountCreatedNow,
-                    'set_password_url_generated' => $setPasswordUrl !== null,
+                    'has_pnedu_account' => $hasPneduAccount,
+                    'certificate_url_included' => $certificateUrl !== null,
+                    'register_url_included' => ! $hasPneduAccount,
                     'survey_links_count' => count($surveyLinks),
                 ],
             ]);
@@ -168,9 +160,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'has_videos' => $hasVideos,
                     'has_materials' => $hasMaterials,
                     'has_certificate' => $hasCertificate,
-                    'pnedu_course_url' => $courseUrl,
-                    'pnedu_participant_id' => (int) $participant->id,
-                    'account_created_now' => $accountCreatedNow,
+                    'has_pnedu_account' => $hasPneduAccount,
                     'survey_links_count' => count($surveyLinks),
                 ],
             ]);

@@ -142,8 +142,12 @@ class CourseSurveyLinkController extends Controller
             'title' => $request->input('title'),
             'provider' => CourseSurveyLink::detectProvider($request->input('url')),
             'is_active' => $request->boolean('is_active', true),
-            'opens_at' => $request->filled('opens_at') ? $request->input('opens_at') : null,
-            'closes_at' => $request->filled('closes_at') ? $request->input('closes_at') : null,
+            'opens_at' => $request->filled('opens_at')
+                ? CourseSurveyLink::parseAdminDatetimeLocal($request->input('opens_at'))
+                : null,
+            'closes_at' => $request->filled('closes_at')
+                ? CourseSurveyLink::parseAdminDatetimeLocal($request->input('closes_at'))
+                : null,
             'order' => (int) ($request->input('order') ?? 0),
         ];
     }

@@ -12,6 +12,7 @@ use App\Models\CourseVideo;
 use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
+use App\Models\PneduUser;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -698,6 +699,27 @@ class ParticipantController extends Controller
             }
         }
 
+        $courseAccessHasVideos = CourseVideo::query()->where('course_id', $course->id)->exists();
+        $courseAccessHasMaterials = CourseFileLink::query()->where('course_id', $course->id)->exists();
+        $courseAccessHasCertificate = ($course->certificate_download_status === 'download_enabled');
+        $courseAccessCanSendEmail = $courseAccessHasVideos || $courseAccessHasMaterials || $courseAccessHasCertificate;
+
+        $participantEmailsForLookup = $participants->getCollection()
+            ->pluck('email')
+            ->filter(fn ($e) => $e !== null && trim((string) $e) !== '')
+            ->map(fn ($e) => strtolower(trim((string) $e)))
+            ->unique()
+            ->values();
+
+        $pneduAccountByEmail = [];
+        if ($participantEmailsForLookup->isNotEmpty()) {
+            $matched = PneduUser::query()
+                ->selectRaw('LOWER(TRIM(email)) as email_norm')
+                ->whereIn(DB::raw('LOWER(TRIM(email))'), $participantEmailsForLookup->all())
+                ->pluck('email_norm');
+            $pneduAccountByEmail = array_fill_keys($matched->all(), true);
+        }
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -706,7 +728,12 @@ class ParticipantController extends Controller
             'certificatePdfGenerationCompletedAt',
             'totalCertificates',
             'downloadedCertificates',
-            'trainingPageViewsByParticipantId'
+            'trainingPageViewsByParticipantId',
+            'courseAccessHasVideos',
+            'courseAccessHasMaterials',
+            'courseAccessHasCertificate',
+            'courseAccessCanSendEmail',
+            'pneduAccountByEmail'
         ));
     }
 

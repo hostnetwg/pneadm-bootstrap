@@ -376,10 +376,12 @@
                                     </form>
                                 @endif
                                 @if(!empty($participant->email))
-                                    <form action="{{ route('participants.send-course-access-email', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail o dostępie do nagrania/materiałów na pnedu.pl?');">
-                                        @csrf
-                                        <button type="submit" class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap">E-mail: nagranie</button>
-                                    </form>
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#sendCourseAccessEmailModal{{ $participant->id }}">
+                                        E-mail: nagranie
+                                    </button>
                                 @endif
                             </div>
                         </td>                         
@@ -469,6 +471,66 @@
                 </div>
             </div>
         </div>
+        @endforeach
+
+        {{-- Modale: e-mail o dostępie do nagrania/materiałów (pojedynczy uczestnik) --}}
+        @foreach ($participants as $participant)
+            @if(!empty($participant->email))
+            <div class="modal fade" id="sendCourseAccessEmailModal{{ $participant->id }}" tabindex="-1" aria-labelledby="sendCourseAccessEmailModalLabel{{ $participant->id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header {{ $courseAccessCanSendEmail ? 'bg-primary text-white' : 'bg-warning' }}">
+                            <h5 class="modal-title" id="sendCourseAccessEmailModalLabel{{ $participant->id }}">
+                                <i class="fas fa-video me-2"></i> E-mail: nagranie
+                            </h5>
+                            <button type="button" class="btn-close {{ $courseAccessCanSendEmail ? 'btn-close-white' : '' }}" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-3">
+                                @if($courseAccessCanSendEmail)
+                                    Wysłać e-mail o dostępie do szkolenia na pnedu.pl na adres
+                                    <strong>{{ $participant->email }}</strong>
+                                    ({{ $participant->first_name }} {{ $participant->last_name }})?
+                                @else
+                                    Wysyłka e-maila o dostępie do szkolenia na adres
+                                    <strong>{{ $participant->email }}</strong>
+                                    ({{ $participant->first_name }} {{ $participant->last_name }}).
+                                @endif
+                            </p>
+                            @php
+                                $participantEmailNorm = strtolower(trim((string) $participant->email));
+                                $participantHasPneduAccount = ! empty($pneduAccountByEmail[$participantEmailNorm]);
+                            @endphp
+                            @if($courseAccessCanSendEmail)
+                                <div class="mb-3 small">
+                                    @if($participantHasPneduAccount)
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ma konto na pnedu.pl</span>
+                                        <span class="text-muted ms-1">— w e-mailu: link do szkolenia w panelu.</span>
+                                    @else
+                                        <span class="badge bg-secondary"><i class="bi bi-person-x me-1"></i>Brak konta na pnedu.pl</span>
+                                        <span class="text-muted ms-1">— w e-mailu: zaświadczenie (token) + rejestracja na życzenie; konto nie zostanie utworzone automatycznie.</span>
+                                    @endif
+                                </div>
+                            @endif
+                            @include('participants.partials.course-access-email-availability')
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle"></i> {{ $courseAccessCanSendEmail ? 'Anuluj' : 'Zamknij' }}
+                            </button>
+                            @if($courseAccessCanSendEmail)
+                            <form action="{{ route('participants.send-course-access-email', [$course, $participant]) }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane me-1"></i> Wyślij e-mail
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         @endforeach
 
         {{-- Modale potwierdzenia usunięcia zaświadczeń --}}
@@ -765,14 +827,17 @@
         <div class="modal fade" id="bulkEmailCourseAccessModal" tabindex="-1" aria-labelledby="bulkEmailCourseAccessModalLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
+                    <div class="modal-header {{ $courseAccessCanSendEmail ? 'bg-primary text-white' : 'bg-warning' }}">
                         <h5 class="modal-title" id="bulkEmailCourseAccessModalLabel">
                             <i class="fas fa-video me-2"></i> Wyślij e-mail nagranie
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        <button type="button" class="btn-close {{ $courseAccessCanSendEmail ? 'btn-close-white' : '' }}" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                     </div>
                     <div class="modal-body">
-                        <p>Wyśle e-mail o dostępie do nagrania/materiałów/zaświadczenia na pnedu (treść jak w przycisku „E-mail: nagranie” przy uczestniku).</p>
+                        <p class="mb-3">Masowa wysyłka e-maili o dostępie do szkolenia na pnedu.pl (treść jak przy przycisku „E-mail: nagranie” przy uczestniku).</p>
+                        @include('participants.partials.course-access-email-availability')
+                        @if($courseAccessCanSendEmail)
+                        <hr class="my-3">
                         <div class="mb-0">
                             <label class="form-label fw-bold">Tryb wysyłki</label>
                             <div class="form-check">
@@ -788,19 +853,22 @@
                                 <label class="form-check-label" for="bulk_email_course_access_mode_not_opened">Wyślij tylko do tych, którzy nigdy nie weszli w nagranie</label>
                             </div>
                         </div>
+                        @endif
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="bi bi-x-circle"></i> Anuluj
+                            <i class="bi bi-x-circle"></i> {{ $courseAccessCanSendEmail ? 'Anuluj' : 'Zamknij' }}
                         </button>
+                        @if($courseAccessCanSendEmail)
                         <form action="{{ route('participants.send-certificate-links-bulk', $course) }}" method="POST" class="d-inline">
                             @csrf
                             <input type="hidden" name="type" value="course_access">
                             <input type="hidden" name="mode" id="bulk_email_course_access_mode_input" value="unsent">
-                            <button type="submit" class="btn btn-light">
+                            <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-paper-plane me-1"></i> Wyślij
                             </button>
                         </form>
+                        @endif
                     </div>
                 </div>
             </div>

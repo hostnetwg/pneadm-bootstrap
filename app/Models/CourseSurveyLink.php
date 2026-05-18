@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Traits\LogsActivity;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -103,6 +105,23 @@ class CourseSurveyLink extends Model
     }
 
     /**
+     * Aktywne ankiety w bieżącym oknie czasowym (daty z panelu adm = Europe/Warsaw).
+     */
+    public function scopeAvailableNow(Builder $query): Builder
+    {
+        $now = now();
+
+        return $query
+            ->where('is_active', true)
+            ->where(function (Builder $q) use ($now) {
+                $q->whereNull('opens_at')->orWhere('opens_at', '<=', $now);
+            })
+            ->where(function (Builder $q) use ($now) {
+                $q->whereNull('closes_at')->orWhere('closes_at', '>', $now);
+            });
+    }
+
+    /**
      * Czy ankieta jest aktualnie dostępna (aktywna i w oknie czasowym)?
      */
     public function isAvailableNow(): bool
@@ -117,11 +136,24 @@ class CourseSurveyLink extends Model
             return false;
         }
 
-        if ($this->closes_at && $now->gt($this->closes_at)) {
+        // Zamknięcie o HH:MM = od tej chwili niedostępna (np. zamknięcie 15:35, wysyłka 15:40 → bez ankiety w mailu).
+        if ($this->closes_at && $now->gte($this->closes_at)) {
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * datetime-local z panelu adm (bez strefy) traktujemy jako czas warszawski.
+     */
+    public static function parseAdminDatetimeLocal(?string $value): ?Carbon
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        return Carbon::parse($value, 'Europe/Warsaw');
     }
 
     /**

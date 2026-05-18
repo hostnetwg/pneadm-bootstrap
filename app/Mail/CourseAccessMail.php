@@ -18,12 +18,14 @@ class CourseAccessMail extends Mailable
     public function __construct(
         public Participant $participant,
         public Course $course,
-        public string $courseUrl,
+        public bool $hasPneduAccount,
+        public ?string $courseUrl,
+        public ?string $certificateUrl,
+        public string $registerUrl,
+        public string $participantEmail,
         public bool $hasVideos,
         public bool $hasMaterials,
         public bool $hasCertificate,
-        public bool $accountCreatedNow,
-        public ?string $setPasswordUrl = null,
         public array $surveyLinks = []
     ) {}
 
@@ -51,17 +53,22 @@ class CourseAccessMail extends Mailable
                 ->format('d.m.Y H:i');
         }
 
+        $needsAccountForRecordings = ! $this->hasPneduAccount && ($this->hasVideos || $this->hasMaterials);
+
         return $this->subject('Dostęp do materiałów i nagrania – '.$courseTitle.' – '.config('app.name'))
             ->view('emails.course-access')
             ->with([
                 'participantFirstName' => $participantFirstName,
                 'courseTitle' => $courseTitle,
                 'courseUrl' => $this->courseUrl,
+                'certificateUrl' => $this->certificateUrl,
+                'registerUrl' => $this->registerUrl,
+                'participantEmail' => $this->participantEmail,
+                'hasPneduAccount' => $this->hasPneduAccount,
+                'needsAccountForRecordings' => $needsAccountForRecordings,
                 'hasVideos' => $this->hasVideos,
                 'hasMaterials' => $this->hasMaterials,
                 'hasCertificate' => $this->hasCertificate,
-                'accountCreatedNow' => $this->accountCreatedNow,
-                'setPasswordUrl' => $this->setPasswordUrl,
                 'courseDateLong' => $courseDateLong,
                 'hasLimitedAccess' => $hasLimitedAccess,
                 'accessExpired' => $accessExpired,
