@@ -77,6 +77,9 @@
                     <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
                     </a>
+                    <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#bulkAccessExpiresModal">
+                        <i class="fas fa-clock me-1"></i> Data wygaśnięcia dostępu
+                    </button>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
                         <i class="fas fa-file-csv me-1"></i> Import uczestników z PUBLIGO CSV
                     </button>
@@ -704,6 +707,7 @@
             </div>
         </div>
 
+        @include('participants.partials.bulk-access-expires-modal')
         {{-- Modal: Usuń wszystkie zaświadczenia --}}
         <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
             <div class="modal-dialog">

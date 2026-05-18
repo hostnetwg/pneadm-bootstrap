@@ -720,6 +720,8 @@ class ParticipantController extends Controller
             $pneduAccountByEmail = array_fill_keys($matched->all(), true);
         }
 
+        $courseParticipantsCount = Participant::query()->where('course_id', $course->id)->count();
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -733,8 +735,50 @@ class ParticipantController extends Controller
             'courseAccessHasMaterials',
             'courseAccessHasCertificate',
             'courseAccessCanSendEmail',
-            'pneduAccountByEmail'
+            'pneduAccountByEmail',
+            'courseParticipantsCount'
         ));
+    }
+
+    /**
+     * Ustawia tę samą datę wygaśnięcia dostępu (lub usuwa ją) dla wszystkich uczestników kursu.
+     */
+    public function bulkSetAccessExpires(Request $request, Course $course)
+    {
+        $clear = $request->boolean('clear_access_expires');
+
+        $request->validate([
+            'access_expires_at' => [$clear ? 'nullable' : 'required', 'date'],
+            'clear_access_expires' => 'sometimes|boolean',
+        ], [
+            'access_expires_at.required' => 'Podaj datę i godzinę wygaśnięcia dostępu albo zaznacz „dostęp bezterminowy”.',
+        ]);
+
+        $query = Participant::query()->where('course_id', $course->id);
+
+        if ($clear) {
+            $count = (clone $query)->update(['access_expires_at' => null]);
+
+            return redirect()->route('participants.index', $course)->with(
+                'success',
+                "Usunięto datę wygaśnięcia dostępu dla {$count} uczestników (dostęp bezterminowy)."
+            );
+        }
+
+        $localTime = Carbon::createFromFormat(
+            'Y-m-d\TH:i',
+            (string) $request->input('access_expires_at'),
+            'Europe/Warsaw'
+        );
+
+        $count = (clone $query)->update(['access_expires_at' => $localTime]);
+
+        $formatted = $localTime->copy()->timezone('Europe/Warsaw')->format('d.m.Y H:i');
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            "Ustawiono datę wygaśnięcia dostępu ({$formatted}) dla {$count} uczestników tego szkolenia."
+        );
     }
 
     /**
