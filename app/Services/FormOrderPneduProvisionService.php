@@ -10,6 +10,7 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -79,19 +80,7 @@ class FormOrderPneduProvisionService
                     ];
                 }
 
-                $userExisted = PneduUser::query()
-                    ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-                    ->exists();
-
-                if (! $userExisted) {
-                    PneduUser::query()->create([
-                        'first_name' => $firstName,
-                        'last_name' => $lastName,
-                        'email' => $email,
-                        'password' => Hash::make(Str::password(48)),
-                        'email_verified_at' => now(),
-                    ]);
-                }
+                ['existed' => $userExisted] = $this->findOrCreatePneduUser($email, $firstName, $lastName);
 
                 $birthData = $this->copyBirthDataFromPreviousParticipant($email);
                 $variant = null;
@@ -148,7 +137,7 @@ class FormOrderPneduProvisionService
             }
 
             $pneduUser = PneduUser::query()
-                ->whereRaw('LOWER(TRIM(email)) = ?', [$afterCommit['email']])
+                ->where('email', $afterCommit['email'])
                 ->first();
 
             if (! $pneduUser) {
@@ -236,6 +225,48 @@ class FormOrderPneduProvisionService
                 'http_code' => 500,
             ];
         }
+    }
+
+    /**
+     * @return array{existed: bool}
+     */
+    private function findOrCreatePneduUser(string $email, string $firstName, string $lastName): array
+    {
+        return DB::connection('pnedu')->transaction(function () use ($email, $firstName, $lastName) {
+            $existing = PneduUser::query()
+                ->where('email', $email)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing !== null) {
+                return ['existed' => true];
+            }
+
+            try {
+                PneduUser::query()->create([
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'password' => Hash::make(Str::password(48)),
+                    'email_verified_at' => now(),
+                ]);
+
+                return ['existed' => false];
+            } catch (QueryException $e) {
+                if (! $this->isPneduUserEmailUniqueViolation($e)) {
+                    throw $e;
+                }
+
+                return ['existed' => true];
+            }
+        });
+    }
+
+    private function isPneduUserEmailUniqueViolation(QueryException $e): bool
+    {
+        $sqlState = $e->errorInfo[0] ?? null;
+
+        return in_array($sqlState, ['23000', '23505'], true);
     }
 
     /**

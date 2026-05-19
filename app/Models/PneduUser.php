@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\NormalizesUserEmail;
 use App\Notifications\PneduFrontendResetPassword;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
@@ -16,6 +17,7 @@ use Illuminate\Notifications\Notifiable;
 class PneduUser extends Model implements CanResetPasswordContract, HasLocalePreference
 {
     use CanResetPassword;
+    use NormalizesUserEmail;
     use Notifiable;
     use SoftDeletes;
 
