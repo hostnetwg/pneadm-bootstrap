@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Instructor;
 use App\Models\OnlineCourse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -148,21 +149,42 @@ class OnlineCoursesController extends Controller
         return $validated;
     }
 
-    /** Moduły (AJAX uproszczony): POST z przycisku — wraca na edit. */
-    public function reorderModules(Request $request, OnlineCourse $online_course): RedirectResponse
+    public function reorderModules(Request $request, OnlineCourse $online_course): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'order' => ['required', 'array'],
             'order.*' => ['integer'],
         ]);
 
-        DB::transaction(function () use ($validated, $online_course) {
-            foreach ($validated['order'] as $position => $moduleId) {
+        $expectedIds = $online_course->modules()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $order = array_values(array_unique(array_map('intval', $validated['order'])));
+
+        if ($order === [] && $expectedIds === []) {
+            return $this->reorderModulesResponse($request, $online_course, 'Brak modułów do uporządkowania.');
+        }
+
+        if (count($order) !== count($expectedIds) || array_diff($order, $expectedIds) !== []) {
+            return $this->reorderModulesResponse($request, $online_course, 'Nieprawidłowa lista modułów kursu.', 422);
+        }
+
+        DB::transaction(function () use ($order, $online_course) {
+            foreach ($order as $position => $moduleId) {
                 $online_course->modules()->whereKey($moduleId)->update(['sort_order' => $position]);
             }
         });
 
-        return redirect()->route('online-courses.edit', $online_course)->with('success', 'Kolejność modułów zapisana.');
+        return $this->reorderModulesResponse($request, $online_course, 'Kolejność modułów zapisana.');
+    }
+
+    private function reorderModulesResponse(Request $request, OnlineCourse $online_course, string $message, int $status = 200): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message], $status);
+        }
+
+        $key = $status >= 400 ? 'error' : 'success';
+
+        return redirect()->route('online-courses.edit', $online_course)->with($key, $message);
     }
 
     private function persistUploadedOnlineCourseImage(Request $request, OnlineCourse $course): void

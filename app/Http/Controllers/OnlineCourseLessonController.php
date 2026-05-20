@@ -7,6 +7,7 @@ use App\Models\OnlineCourseLesson;
 use App\Models\OnlineCourseLessonEmbed;
 use App\Models\OnlineCourseLessonResourceLink;
 use App\Models\OnlineCourseModule;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +82,77 @@ class OnlineCourseLessonController extends Controller
         $lesson->delete();
 
         return redirect()->route('online-courses.edit', $online_course)->with('success', 'Lekcja usunięta.');
+    }
+
+    /**
+     * Kolejność lekcji w modułach oraz przenoszenie między modułami (JSON).
+     *
+     * @param  array{modules: array<int, array{id: int, lesson_ids: array<int, int>}>}  $validated
+     */
+    public function reorder(Request $request, OnlineCourse $online_course): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'modules' => ['required', 'array'],
+            'modules.*.id' => ['required', 'integer'],
+            'modules.*.lesson_ids' => ['present', 'array'],
+            'modules.*.lesson_ids.*' => ['integer'],
+        ]);
+
+        $courseModuleIds = $online_course->modules()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $allLessonIds = OnlineCourseLesson::query()
+            ->whereIn('online_course_module_id', $courseModuleIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $seenLessonIds = [];
+
+        foreach ($validated['modules'] as $row) {
+            $moduleId = (int) $row['id'];
+            if (! in_array($moduleId, $courseModuleIds, true)) {
+                return $this->reorderLessonsResponse($request, $online_course, 'Nieprawidłowy moduł w strukturze kursu.', 422);
+            }
+
+            foreach ($row['lesson_ids'] as $lessonId) {
+                $lessonId = (int) $lessonId;
+                if (! in_array($lessonId, $allLessonIds, true)) {
+                    return $this->reorderLessonsResponse($request, $online_course, 'Nieprawidłowa lekcja w strukturze kursu.', 422);
+                }
+                if (in_array($lessonId, $seenLessonIds, true)) {
+                    return $this->reorderLessonsResponse($request, $online_course, 'Ta sama lekcja występuje więcej niż raz.', 422);
+                }
+                $seenLessonIds[] = $lessonId;
+            }
+        }
+
+        if (count($seenLessonIds) !== count($allLessonIds)) {
+            return $this->reorderLessonsResponse($request, $online_course, 'Struktura musi zawierać wszystkie lekcje kursu.', 422);
+        }
+
+        DB::transaction(function () use ($validated) {
+            foreach ($validated['modules'] as $row) {
+                $moduleId = (int) $row['id'];
+                foreach ($row['lesson_ids'] as $position => $lessonId) {
+                    OnlineCourseLesson::query()->whereKey((int) $lessonId)->update([
+                        'online_course_module_id' => $moduleId,
+                        'sort_order' => $position,
+                    ]);
+                }
+            }
+        });
+
+        return $this->reorderLessonsResponse($request, $online_course, 'Kolejność lekcji zapisana.');
+    }
+
+    private function reorderLessonsResponse(Request $request, OnlineCourse $online_course, string $message, int $status = 200): JsonResponse|RedirectResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message], $status);
+        }
+
+        $key = $status >= 400 ? 'error' : 'success';
+
+        return redirect()->route('online-courses.edit', $online_course)->with($key, $message);
     }
 
     /**

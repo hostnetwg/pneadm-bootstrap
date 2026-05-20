@@ -308,6 +308,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::resource('online-courses', OnlineCoursesController::class);
     Route::post('online-courses/{online_course}/modules/reorder', [OnlineCoursesController::class, 'reorderModules'])
         ->name('online-courses.modules.reorder');
+    Route::post('online-courses/{online_course}/lessons/reorder', [OnlineCourseLessonController::class, 'reorder'])
+        ->name('online-courses.lessons.reorder');
     Route::post('online-courses/{online_course}/modules', [OnlineCourseModuleController::class, 'store'])->name('online-courses.modules.store');
     Route::put('online-courses/{online_course}/modules/{module}', [OnlineCourseModuleController::class, 'update'])->name('online-courses.modules.update');
     Route::delete('online-courses/{online_course}/modules/{module}', [OnlineCourseModuleController::class, 'destroy'])->name('online-courses.modules.destroy');

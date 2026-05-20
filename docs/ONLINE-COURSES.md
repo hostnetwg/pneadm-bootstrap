@@ -55,8 +55,9 @@ erDiagram
 ## Panel administracyjny (pneadm)
 
 - **Lista / CRUD kursów:** `OnlineCoursesController`, trasy zasobowe `online-courses` (middleware auth jak reszta panelu).
-- **Moduły:** `OnlineCourseModuleController` — dodawanie / edycja / usuwanie; kolejność modułów: POST `online-courses/{course}/modules/reorder` w `OnlineCoursesController::reorderModules`.
-- **Lekcje:** `OnlineCourseLessonController` — tworzenie z domyślnym `sort_order` = max+1 w module; walidacja tytułu i `body_html`; **embedy i linki** synchronizowane z pól formularza `embeds[]` oraz `resource_links[]` (puste URL są pomijane).
+- **Moduły:** `OnlineCourseModuleController` — dodawanie / edycja / usuwanie; kolejność modułów (drag & drop na stronie edycji kursu): POST `online-courses/{course}/modules/reorder` (`OnlineCoursesController::reorderModules`), body JSON `{ "order": [id_modułu, …] }`.
+- **Lekcje:** `OnlineCourseLessonController` — tworzenie z domyślnym `sort_order` = max+1 w module; walidacja tytułu i `body_html`; **embedy i linki** synchronizowane z pól formularza `embeds[]` oraz `resource_links[]` (puste URL są pomijane). Kolejność i przenoszenie między modułami: POST `online-courses/{course}/lessons/reorder`, body JSON `{ "modules": [ { "id": id_modułu, "lesson_ids": [id_lekcji, …] }, … ] }` — kolejność tablicy modułów = kolejność kart na stronie; każda lekcja musi wystąpić dokładnie raz.
+- **UI struktury:** `resources/views/online-courses/edit.blade.php` + SortableJS (`partials/structure-sortable.blade.php`) — przeciąganie modułów i lekcji, zapis przez AJAX.
 - **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu.
 
 Widoki Blade: `resources/views/online-courses/`.
