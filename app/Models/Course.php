@@ -184,4 +184,48 @@ class Course extends Model
     {
         return $this->hasMany(CourseSurveyLink::class)->orderBy('order');
     }
+
+    /**
+     * Czy publiczny formularz rejestracji zaświadczenia jest włączony i w oknie czasowym od–do.
+     */
+    public function isCertificateRegistrationActiveNow(?\DateTimeInterface $now = null): bool
+    {
+        if (! $this->certificate_registration_open) {
+            return false;
+        }
+
+        if (trim((string) ($this->certificate_registration_token ?? '')) === '') {
+            return false;
+        }
+
+        $now = $now ? \Carbon\Carbon::instance($now) : now();
+
+        if ($this->certificate_registration_starts_at && $now->lt($this->certificate_registration_starts_at)) {
+            return false;
+        }
+
+        if ($this->certificate_registration_ends_at && $now->gt($this->certificate_registration_ends_at)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Publiczny URL formularza rejestracji zaświadczenia na pnedu.pl (lub null).
+     */
+    public function certificateRegistrationPublicUrl(): ?string
+    {
+        $token = trim((string) ($this->certificate_registration_token ?? ''));
+        if ($token === '') {
+            return null;
+        }
+
+        $base = rtrim((string) config('services.pnedu_frontend_url', ''), '/');
+        if ($base === '') {
+            return null;
+        }
+
+        return $base.'/certificate-registration/'.$token;
+    }
 }

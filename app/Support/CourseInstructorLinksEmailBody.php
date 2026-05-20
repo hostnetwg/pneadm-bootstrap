@@ -90,6 +90,17 @@ class CourseInstructorLinksEmailBody
             $n++;
         }
 
+        // Lista obecności (rejestracja zaświadczenia na pnedu.pl)
+        if ($course->isCertificateRegistrationActiveNow()) {
+            $regUrl = $course->certificateRegistrationPublicUrl();
+            if ($regUrl !== null) {
+                $lines[] = "{$n}) LISTA OBECNOŚCI:";
+                $lines[] = '   '.$regUrl;
+                $lines[] = '';
+                $n++;
+            }
+        }
+
         // Ankiety zewnętrzne (Formularze)
         $surveyLines = [];
         foreach ($course->surveyLinks->sortBy('order') as $sl) {
