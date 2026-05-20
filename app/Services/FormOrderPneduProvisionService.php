@@ -247,6 +247,7 @@ class FormOrderPneduProvisionService
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'email' => $email,
+                    'email_unique_slot' => PneduUser::buildEmailUniqueSlot($email, null),
                     'password' => Hash::make(Str::password(48)),
                     'email_verified_at' => now(),
                 ]);

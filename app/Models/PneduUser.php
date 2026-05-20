@@ -29,6 +29,7 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
         'first_name',
         'last_name',
         'email',
+        'email_unique_slot',
         'password',
         'birth_date',
         'birth_place',
