@@ -314,6 +314,10 @@
                     <small class="form-text text-muted d-block">Określa, czy uczestnicy mogą pobierać zaświadczenia przez link z tokenem oraz jak wyświetlać status na pnedu.pl.</small>
                 </div>
 
+                @if($course->category === 'closed')
+                    @include('courses.partials.closed-course-billing', ['course' => $course, 'context' => 'edit'])
+                @endif
+
                 <!-- Rejestracja zaświadczenia (formularz na pnedu.pl) -->
                 <div class="card mb-4" id="certificate-registration">
                     <div class="card-header">

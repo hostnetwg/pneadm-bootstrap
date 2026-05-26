@@ -347,6 +347,19 @@
                         <td class="align-middle">
                             @if($course->category === 'closed')
                                 <div class="text-center small fw-semibold text-uppercase text-primary mb-1">SZKOLENIE ZAMKNIĘTE</div>
+                                @if($course->is_paid && ($course->closed_billing_status ?? '') !== \App\Services\CourseFormOrderBillingService::STATUS_NOT_APPLICABLE)
+                                    @php
+                                        $bs = $course->closed_billing_status;
+                                        $bsClass = \App\Services\CourseFormOrderBillingService::statusBadgeClass($bs);
+                                        $bsLabel = \App\Services\CourseFormOrderBillingService::statusLabel($bs);
+                                    @endphp
+                                    <div class="text-center mb-1">
+                                        <span class="badge {{ $bsClass }} fw-semibold"
+                                              title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">
+                                            <i class="bi bi-receipt"></i> {{ $bsLabel }}
+                                        </span>
+                                    </div>
+                                @endif
                             @endif
                             <strong>{!! $course->title !!}</strong>
                             @include('courses.partials.index-price-variants', ['course' => $course])
@@ -429,9 +442,9 @@
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $completeDataCount }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
                             @if($course->orders_count > 0)
-                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'search' => $course->id]) }}" 
+                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'course_id' => $course->id]) }}" 
                                    class="badge bg-danger text-decoration-none" 
-                                   title="Kliknij, aby zobaczyć nie wprowadzone zamówienia dla tego szkolenia (filtr po ID kursu / product_id)">
+                                   title="Kliknij, aby zobaczyć nieobsłużone zamówienia dla tego szkolenia (pole ID szkol.)">
                                     {{ $course->orders_count }}
                                 </a>
                             @else

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Model FormOrder
@@ -1030,5 +1031,33 @@ class FormOrder extends Model
     public static function isKsefIdTypeSupportedInEtap1(?string $idType): bool
     {
         return self::isKsefIdTypeSupported($idType);
+    }
+
+    /**
+     * Unikalny token zamówienia (edycja formularza na PNEDU bez zgadywania id).
+     */
+    public static function generateIdent(): string
+    {
+        do {
+            $ident = date('ymd').'-'.strtoupper(Str::random(6));
+        } while (self::withTrashed()->where('ident', $ident)->exists());
+
+        return $ident;
+    }
+
+    /**
+     * Uzupełnia ident, jeśli brak — zwraca aktualny ident.
+     */
+    public function ensureIdent(): string
+    {
+        $current = trim((string) $this->ident);
+        if ($current !== '') {
+            return $current;
+        }
+
+        $this->ident = self::generateIdent();
+        $this->save();
+
+        return $this->ident;
     }
 }

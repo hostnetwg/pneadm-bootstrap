@@ -10,6 +10,7 @@ use App\Models\CourseOnlineDetails;
 use App\Models\CourseSeries;
 use App\Models\FormOrder;
 use App\Models\Instructor;
+use App\Services\CourseFormOrderBillingService;
 use App\Support\CourseInstructorLinksEmailBody;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -230,14 +231,31 @@ class CoursesController extends Controller
                 ->pluck('cnt', 'course_id')
                 ->toArray();
 
-            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId) {
+            $closedPaidIds = $courses->getCollection()
+                ->filter(fn (Course $c) => $c->category === 'closed' && $c->is_paid)
+                ->pluck('id')
+                ->all();
+            $billingByCourseId = CourseFormOrderBillingService::billingSummaryByCourseIds($closedPaidIds);
+
+            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId, $billingByCourseId) {
                 $course->orders_count = (int) ($ordersCountsByCourseId[$course->id] ?? 0);
+                $summary = $billingByCourseId[$course->id] ?? null;
+                $course->closed_billing_status = $summary['status'] ?? (
+                    ($course->category === 'closed' && $course->is_paid)
+                        ? CourseFormOrderBillingService::STATUS_NO_ORDERS
+                        : CourseFormOrderBillingService::STATUS_NOT_APPLICABLE
+                );
+                $course->closed_billing_orders_total = (int) ($summary['orders_total'] ?? 0);
+                $course->closed_billing_orders_invoiced = (int) ($summary['orders_invoiced'] ?? 0);
 
                 return $course;
             });
         } else {
             $courses->getCollection()->transform(function ($course) {
                 $course->orders_count = 0;
+                $course->closed_billing_status = CourseFormOrderBillingService::STATUS_NOT_APPLICABLE;
+                $course->closed_billing_orders_total = 0;
+                $course->closed_billing_orders_invoiced = 0;
 
                 return $course;
             });
@@ -716,6 +734,8 @@ class CoursesController extends Controller
 
         $instructorLinksEmailBody = CourseInstructorLinksEmailBody::build($course);
 
+        $closedBilling = $this->closedCourseBillingViewData($course);
+
         return view('courses.show', compact(
             'course',
             'previousCourse',
@@ -723,7 +743,7 @@ class CoursesController extends Controller
             'deletedVariants',
             'priceVariantOrderCounts',
             'instructorLinksEmailBody'
-        ));
+        ) + $closedBilling);
     }
 
     /**
@@ -927,7 +947,7 @@ class CoursesController extends Controller
 
     public function edit($id)
     {
-        $course = Course::with(['location', 'onlineDetails', 'participants'])->findOrFail($id);
+        $course = Course::with(['location', 'onlineDetails', 'participants', 'priceVariants'])->findOrFail($id);
         $instructors = Instructor::all();
 
         // Pobranie listy aktywnych szablonów certyfikatów
@@ -935,7 +955,34 @@ class CoursesController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates'));
+        $closedBilling = $this->closedCourseBillingViewData($course);
+
+        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates') + $closedBilling);
+    }
+
+    /**
+     * @return array{billingStatus: string, courseFormOrders: \Illuminate\Support\Collection}
+     */
+    protected function closedCourseBillingViewData(Course $course): array
+    {
+        if ($course->category !== 'closed') {
+            return [
+                'billingStatus' => CourseFormOrderBillingService::STATUS_NOT_APPLICABLE,
+                'courseFormOrders' => collect(),
+            ];
+        }
+
+        $courseFormOrders = CourseFormOrderBillingService::formOrdersForCourse($course);
+        foreach ($courseFormOrders as $order) {
+            if (trim((string) $order->ident) === '') {
+                $order->ensureIdent();
+            }
+        }
+
+        return [
+            'billingStatus' => CourseFormOrderBillingService::resolveBillingStatus($course, $courseFormOrders),
+            'courseFormOrders' => $courseFormOrders,
+        ];
     }
 
     public function destroy($id)

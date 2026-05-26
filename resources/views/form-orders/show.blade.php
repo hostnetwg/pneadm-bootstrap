@@ -47,6 +47,27 @@
                 </ol>
             </nav>
 
+            @if(!empty($pneduOrderFormEditUrl))
+                <div class="alert alert-light border mb-4">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <strong><i class="bi bi-link-45deg"></i> Formularz zamówienia na PNEDU</strong>
+                            <span class="text-muted small d-block">Wyślij dyrektorowi do uzupełnienia lub edycji (ident: <code>{{ $zamowienie->ident }}</code>)</span>
+                        </div>
+                        <div class="input-group" style="max-width: 36rem;">
+                            <input type="text" class="form-control form-control-sm font-monospace" id="pnedu-order-form-edit-url" value="{{ $pneduOrderFormEditUrl }}" readonly>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('pnedu-order-form-edit-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
+                                Kopiuj link
+                            </button>
+                            <a href="{{ $pneduOrderFormEditUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> Otwórz
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>

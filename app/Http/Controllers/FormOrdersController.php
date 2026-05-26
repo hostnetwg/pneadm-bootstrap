@@ -410,9 +410,22 @@ class FormOrdersController extends Controller
             }
         }
 
+        $courseIdFromQuery = (int) $request->integer('course_id');
+        if ($courseIdFromQuery > 0 && empty($prefill['course_id'])) {
+            $prefill['course_id'] = $courseIdFromQuery;
+        }
+
         $selectedCourse = null;
         if (! empty($prefill['course_id'])) {
-            $selectedCourse = $courses->firstWhere('id', (int) $prefill['course_id']);
+            $selectedCourse = \App\Models\Course::with(['priceVariants' => function ($q) {
+                $q->where('is_active', true)->orderBy('id');
+            }])->find((int) $prefill['course_id']);
+            if ($selectedCourse && empty($prefill['product_price'])) {
+                $variant = $selectedCourse->priceVariants->first();
+                if ($variant && method_exists($variant, 'getCurrentPrice')) {
+                    $prefill['product_price'] = $variant->getCurrentPrice();
+                }
+            }
         }
 
         return view('form-orders.create', compact('courses', 'prefill', 'cloneSourceId', 'cloneWarning', 'selectedCourse'));
@@ -484,6 +497,7 @@ class FormOrdersController extends Controller
 
             // Tworzenie nowego zamówienia
             $formOrder = FormOrder::create([
+                'ident' => FormOrder::generateIdent(),
                 'order_date' => now('UTC'),
                 'product_id' => $course->id, // ID kursu z bazy
                 'product_name' => $course->title,
@@ -600,7 +614,19 @@ class FormOrdersController extends Controller
 
         $duplicateSiblingsCount = FormOrder::findDuplicatesFor($id)->count();
 
-        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'duplicateSiblingsCount'));
+        $zamowienie->ensureIdent();
+        $pneduOrderFormEditUrl = null;
+        if ($zamowienie->product_id) {
+            $courseForLink = $zamowienie->course ?? \App\Models\Course::find($zamowienie->product_id);
+            if ($courseForLink) {
+                $pneduOrderFormEditUrl = \App\Services\CourseFormOrderBillingService::editOrderFormUrl(
+                    $courseForLink,
+                    (string) $zamowienie->ident
+                );
+            }
+        }
+
+        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'duplicateSiblingsCount', 'pneduOrderFormEditUrl'));
     }
 
     /**
