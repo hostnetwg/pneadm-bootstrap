@@ -268,8 +268,10 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             </div>
 
-                            {{-- KSeF – Podmiot3 (metadane) — widok tylko do odczytu --}}
-                            @include('form-orders.partials.ksef-additional-entity-show', ['zamowienie' => $zamowienie])
+                            {{-- KSeF – Podmiot3 (metadane) — podgląd (synchronizowany po zapisie z panelu po prawej) --}}
+                            <div id="ksefSummaryReadonly">
+                                @include('form-orders.partials.ksef-additional-entity-show', ['zamowienie' => $zamowienie])
+                            </div>
                         </div>
                     </div>
 
@@ -735,6 +737,8 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                 </div>
                             @endif
+
+                            @include('form-orders.partials.ksef-additional-entity-inline', ['zamowienie' => $zamowienie])
                             
                             {{-- UWAGI DO FAKTURY (edytowalne dla API iFirma) --}}
                             <div class="card mt-3">
@@ -2551,6 +2555,162 @@ nowoczesna-edukacja.pl `;
                 }
             });
         }
+
+        // KSeF Podmiot3 — automatyczny zapis z panelu po prawej (bez przeładowania strony)
+        (function initKsefInlineSettings() {
+            const formRoot = document.getElementById('ksefSettingsForm');
+            if (!formRoot) {
+                return;
+            }
+
+            const saveUrl = formRoot.dataset.saveUrl;
+            const statusBadge = document.getElementById('ksefSaveStatus');
+            const errorsBox = document.getElementById('ksefValidationErrors');
+            const summaryRoot = document.getElementById('ksefSummaryReadonly');
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            let saveTimer = null;
+            let saveInFlight = false;
+            let pendingSave = false;
+
+            function setStatus(text, variant) {
+                if (!statusBadge) {
+                    return;
+                }
+                statusBadge.textContent = text;
+                statusBadge.className = 'badge bg-' + (variant || 'secondary');
+            }
+
+            function updateRoleHints() {
+                const source = document.getElementById('show_ksef_entity_source')?.value;
+                const role = document.getElementById('show_ksef_additional_entity_role')?.value;
+                const idType = document.getElementById('show_ksef_additional_entity_id_type')?.value;
+                const isRecipient = source === 'recipient';
+
+                document.getElementById('ksefRoleHintJst')?.classList.toggle('d-none', !(isRecipient && role === 'jst_recipient'));
+                document.getElementById('ksefRoleHintVat')?.classList.toggle('d-none', !(isRecipient && role === 'vat_group_member'));
+                document.getElementById('ksefIdTypeWarning')?.classList.toggle(
+                    'd-none',
+                    !(isRecipient && idType && idType !== '' && idType !== 'NIP')
+                );
+            }
+
+            function showValidationErrors(errors) {
+                if (!errorsBox) {
+                    return;
+                }
+                const messages = [];
+                Object.keys(errors).forEach(function (key) {
+                    (errors[key] || []).forEach(function (msg) {
+                        messages.push(msg);
+                    });
+                });
+                if (messages.length === 0) {
+                    errorsBox.classList.add('d-none');
+                    errorsBox.innerHTML = '';
+                    return;
+                }
+                errorsBox.classList.remove('d-none');
+                errorsBox.innerHTML = '<strong>Błąd walidacji:</strong><ul class="mb-0 mt-1"><li>'
+                    + messages.map(function (m) { return escapeHtml(m); }).join('</li><li>')
+                    + '</li></ul>';
+            }
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function collectPayload() {
+                return {
+                    ksef_entity_source: document.getElementById('show_ksef_entity_source')?.value || 'none',
+                    ksef_additional_entity_role: document.getElementById('show_ksef_additional_entity_role')?.value || null,
+                    ksef_additional_entity_id_type: document.getElementById('show_ksef_additional_entity_id_type')?.value || null,
+                    ksef_additional_entity_identifier: document.getElementById('show_ksef_additional_entity_identifier')?.value?.trim() || null,
+                    ksef_admin_note: document.getElementById('show_ksef_admin_note')?.value?.trim() || null,
+                };
+            }
+
+            function saveKsefSettings() {
+                if (saveInFlight) {
+                    pendingSave = true;
+                    return;
+                }
+                saveInFlight = true;
+                pendingSave = false;
+                setStatus('Zapisywanie…', 'info');
+                if (errorsBox) {
+                    errorsBox.classList.add('d-none');
+                }
+
+                fetch(saveUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify(collectPayload()),
+                })
+                    .then(function (response) {
+                        return response.json().then(function (data) {
+                            return { ok: response.ok, status: response.status, data: data };
+                        });
+                    })
+                    .then(function (result) {
+                        if (result.ok && result.data.success) {
+                            setStatus('Zapisano', 'success');
+                            if (summaryRoot && result.data.summary_html) {
+                                summaryRoot.innerHTML = result.data.summary_html;
+                            }
+                            window.setTimeout(function () {
+                                if (statusBadge && statusBadge.textContent === 'Zapisano') {
+                                    setStatus('—', 'secondary');
+                                }
+                            }, 2500);
+                            return;
+                        }
+                        if (result.status === 422 && result.data.errors) {
+                            setStatus('Błąd', 'danger');
+                            showValidationErrors(result.data.errors);
+                            return;
+                        }
+                        setStatus('Błąd', 'danger');
+                        showValidationErrors({ _: [result.data.message || 'Nie udało się zapisać ustawień KSeF.'] });
+                    })
+                    .catch(function () {
+                        setStatus('Błąd', 'danger');
+                        showValidationErrors({ _: ['Błąd połączenia z serwerem.'] });
+                    })
+                    .finally(function () {
+                        saveInFlight = false;
+                        if (pendingSave) {
+                            saveKsefSettings();
+                        }
+                    });
+            }
+
+            function scheduleSave() {
+                updateRoleHints();
+                if (saveTimer) {
+                    window.clearTimeout(saveTimer);
+                }
+                setStatus('Zmieniono…', 'warning');
+                saveTimer = window.setTimeout(saveKsefSettings, 450);
+            }
+
+            formRoot.querySelectorAll('[data-ksef-field]').forEach(function (el) {
+                el.addEventListener('change', scheduleSave);
+                if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+                    el.addEventListener('input', scheduleSave);
+                }
+            });
+
+            updateRoleHints();
+        })();
     </script>
 
     {{-- Modal ostrzeżenia o KSeF przed wystawieniem faktury z automatycznym e-mailem --}}

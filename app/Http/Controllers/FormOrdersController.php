@@ -15,6 +15,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
+use Illuminate\Validation\ValidationException;
 
 class FormOrdersController extends Controller
 {
@@ -2904,6 +2906,63 @@ class FormOrdersController extends Controller
                 'error' => 'Wystąpił błąd podczas zapisywania notatki: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Zapis metadanych KSeF Podmiot3 z widoku szczegółów (AJAX, bez przeładowania).
+     */
+    public function updateKsefSettings(Request $request, $id)
+    {
+        try {
+            $zamowienie = FormOrder::findOrFail($id);
+
+            $validated = $request->validate($this->ksefSettingsValidationRules());
+
+            $zamowienie->fill([
+                'ksef_entity_source' => $validated['ksef_entity_source'],
+                'ksef_additional_entity_role' => ($validated['ksef_additional_entity_role'] ?? null) ?: null,
+                'ksef_additional_entity_id_type' => ($validated['ksef_additional_entity_id_type'] ?? null) ?: null,
+                'ksef_additional_entity_identifier' => ($validated['ksef_additional_entity_identifier'] ?? null) ?: null,
+                'ksef_admin_note' => ($validated['ksef_admin_note'] ?? null) ?: null,
+            ]);
+            $zamowienie->updated_manually_at = now();
+            $zamowienie->save();
+            $zamowienie->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ustawienia KSeF zostały zapisane.',
+                'summary_html' => View::make('form-orders.partials.ksef-additional-entity-show', [
+                    'zamowienie' => $zamowienie,
+                ])->render(),
+                'is_active' => $zamowienie->isKsefAdditionalEntityEnabled(),
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nieprawidłowe ustawienia KSeF.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wystąpił błąd podczas zapisywania ustawień KSeF: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function ksefSettingsValidationRules(): array
+    {
+        return [
+            'ksef_entity_source' => 'required|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
+            'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
+            'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
+            'ksef_additional_entity_identifier' => 'nullable|string|max:50',
+            'ksef_admin_note' => 'nullable|string',
+        ];
     }
 
     /**
