@@ -344,7 +344,12 @@
                                 <span></span>
                             @endif
                         </td>
-                        <td class="align-middle"><strong>{!! $course->title !!}</strong></td>
+                        <td class="align-middle">
+                            @if($course->category === 'closed')
+                                <div class="text-center small fw-semibold text-uppercase text-primary mb-1">SZKOLENIE ZAMKNIĘTE</div>
+                            @endif
+                            <strong>{!! $course->title !!}</strong>
+                        </td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td class="align-middle">
                             <span class="badge {{ $course->is_paid == true ? 'bg-warning' : 'bg-success' }}">
