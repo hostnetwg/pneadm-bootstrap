@@ -160,6 +160,46 @@ class CourseFormOrderBillingService
         return $out;
     }
 
+    /**
+     * Pierwsze (najniższe id) zamówienie bez numeru FV dla danego szkolenia — do linku z listy kursów.
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array<int, int> course_id => form_orders.id
+     */
+    public static function firstUninvoicedOrderIdByCourseIds(array $courseIds): array
+    {
+        if ($courseIds === []) {
+            return [];
+        }
+
+        return DB::connection('mysql')
+            ->table('courses as c')
+            ->join('form_orders as fo', function ($join) {
+                $join->whereNull('fo.deleted_at')
+                    ->where(function ($q) {
+                        $q->whereColumn('fo.product_id', 'c.id')
+                            ->orWhere(function ($q2) {
+                                $q2->whereNotNull('c.id_old')
+                                    ->where('c.id_old', '!=', '')
+                                    ->whereColumn('fo.publigo_product_id', 'c.id_old');
+                            });
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('fo.invoice_number')
+                            ->orWhere('fo.invoice_number', '')
+                            ->orWhere('fo.invoice_number', '0');
+                    });
+            })
+            ->whereIn('c.id', $courseIds)
+            ->where('c.category', 'closed')
+            ->where('c.is_paid', 1)
+            ->groupBy('c.id')
+            ->select('c.id as course_id', DB::raw('MIN(fo.id) as form_order_id'))
+            ->pluck('form_order_id', 'course_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     public static function statusLabel(string $status): string
     {
         return match ($status) {

@@ -360,6 +360,12 @@
                                                title="Dodaj zamówienie dla tego szkolenia">
                                                 <i class="bi bi-receipt"></i> {{ $bsLabel }}
                                             </a>
+                                        @elseif($bs === \App\Services\CourseFormOrderBillingService::STATUS_NO_INVOICE && !empty($course->closed_billing_uninvoiced_order_id))
+                                            <a href="{{ route('form-orders.show', $course->closed_billing_uninvoiced_order_id) }}"
+                                               class="badge {{ $bsClass }} fw-semibold text-decoration-none"
+                                               title="Otwórz zamówienie bez wystawionej faktury (#{{ $course->closed_billing_uninvoiced_order_id }})">
+                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
+                                            </a>
                                         @else
                                             <span class="badge {{ $bsClass }} fw-semibold"
                                                   title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">

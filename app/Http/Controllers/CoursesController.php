@@ -236,8 +236,9 @@ class CoursesController extends Controller
                 ->pluck('id')
                 ->all();
             $billingByCourseId = CourseFormOrderBillingService::billingSummaryByCourseIds($closedPaidIds);
+            $uninvoicedOrderIdByCourseId = CourseFormOrderBillingService::firstUninvoicedOrderIdByCourseIds($closedPaidIds);
 
-            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId, $billingByCourseId) {
+            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId) {
                 $course->orders_count = (int) ($ordersCountsByCourseId[$course->id] ?? 0);
                 $summary = $billingByCourseId[$course->id] ?? null;
                 $course->closed_billing_status = $summary['status'] ?? (
@@ -247,6 +248,7 @@ class CoursesController extends Controller
                 );
                 $course->closed_billing_orders_total = (int) ($summary['orders_total'] ?? 0);
                 $course->closed_billing_orders_invoiced = (int) ($summary['orders_invoiced'] ?? 0);
+                $course->closed_billing_uninvoiced_order_id = $uninvoicedOrderIdByCourseId[$course->id] ?? null;
 
                 return $course;
             });
@@ -256,6 +258,7 @@ class CoursesController extends Controller
                 $course->closed_billing_status = CourseFormOrderBillingService::STATUS_NOT_APPLICABLE;
                 $course->closed_billing_orders_total = 0;
                 $course->closed_billing_orders_invoiced = 0;
+                $course->closed_billing_uninvoiced_order_id = null;
 
                 return $course;
             });
