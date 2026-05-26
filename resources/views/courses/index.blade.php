@@ -354,10 +354,18 @@
                                         $bsLabel = \App\Services\CourseFormOrderBillingService::statusLabel($bs);
                                     @endphp
                                     <div class="text-center mb-1">
-                                        <span class="badge {{ $bsClass }} fw-semibold"
-                                              title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">
-                                            <i class="bi bi-receipt"></i> {{ $bsLabel }}
-                                        </span>
+                                        @if($bs === \App\Services\CourseFormOrderBillingService::STATUS_NO_ORDERS)
+                                            <a href="{{ route('form-orders.create', ['course_id' => $course->id]) }}"
+                                               class="badge {{ $bsClass }} fw-semibold text-decoration-none"
+                                               title="Dodaj zamówienie dla tego szkolenia">
+                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
+                                            </a>
+                                        @else
+                                            <span class="badge {{ $bsClass }} fw-semibold"
+                                                  title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">
+                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
+                                            </span>
+                                        @endif
                                     </div>
                                 @endif
                             @endif
