@@ -32,5 +32,10 @@ class CourseFormOrderBillingServiceTest extends TestCase
             'https://pnedu.pl/courses/510/order-form',
             CourseFormOrderBillingService::newOrderFormUrl($course)
         );
+
+        $this->assertSame(
+            'https://pnedu.pl/courses/510/order-form/edit/260526-CYNMYJ',
+            CourseFormOrderBillingService::editOrderFormUrl($course, '260526-CYNMYJ')
+        );
     }
 }

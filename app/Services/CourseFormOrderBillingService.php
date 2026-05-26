@@ -50,7 +50,7 @@ class CourseFormOrderBillingService
     {
         $ident = trim($ident);
 
-        return self::pneduBaseUrl().'/courses/'.$course->id.'/order-form/'.rawurlencode($ident);
+        return self::pneduBaseUrl().'/courses/'.$course->id.'/order-form/edit/'.rawurlencode($ident);
     }
 
     /**
