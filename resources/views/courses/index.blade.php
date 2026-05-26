@@ -349,6 +349,7 @@
                                 <div class="text-center small fw-semibold text-uppercase text-primary mb-1">SZKOLENIE ZAMKNIĘTE</div>
                             @endif
                             <strong>{!! $course->title !!}</strong>
+                            @include('courses.partials.index-price-variants', ['course' => $course])
                         </td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
                         <td class="align-middle">

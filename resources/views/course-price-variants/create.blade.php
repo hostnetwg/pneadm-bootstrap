@@ -15,6 +15,27 @@
                 </ol>
             </nav>
 
+            <div class="card mb-4 border-secondary bg-light">
+                <div class="card-body py-2">
+                    <div class="fw-semibold">{!! $course->title !!}</div>
+                    <div class="small text-muted mt-1">
+                        <span>
+                            <i class="bi bi-calendar-event"></i>
+                            @if ($course->start_date)
+                                {{ $course->start_date->format('d.m.Y H:i') }}
+                            @else
+                                Brak daty rozpoczęcia
+                            @endif
+                        </span>
+                        <span class="mx-2">·</span>
+                        <span>
+                            <i class="bi bi-person"></i>
+                            {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak prowadzącego' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             @if(session('error'))
                 <div class="alert alert-danger">
                     {{ session('error') }}

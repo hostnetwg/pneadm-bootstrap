@@ -16,7 +16,7 @@ class CoursePriceVariantController extends Controller
      */
     public function create($courseId)
     {
-        $course = Course::findOrFail($courseId);
+        $course = Course::with('instructor:id,first_name,last_name,title')->findOrFail($courseId);
 
         return view('course-price-variants.create', compact('course'));
     }
