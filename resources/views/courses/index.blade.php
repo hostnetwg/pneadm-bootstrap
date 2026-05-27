@@ -407,7 +407,7 @@
                             @endif
                         </td>
                         <td class="align-middle small">
-                            @include('courses.partials.trainer-settlement-instructor-cell', ['course' => $course])
+                            @include('courses.partials.instructor-settlement-instructor-cell', ['course' => $course])
                         </td>
                         <td class="text-center align-middle">
                             <div class="d-flex flex-column align-items-center gap-1">
@@ -1623,7 +1623,7 @@
         });
     </script>
     @if(auth()->user()?->isSuperAdmin())
-        @include('courses.partials.trainer-settlement-modal')
+        @include('courses.partials.instructor-settlement-modal')
     @endif
     @endpush
 </x-app-layout>

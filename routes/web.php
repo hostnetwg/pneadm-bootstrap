@@ -288,14 +288,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     // Rozliczenia trenerów (faktury wypłat) — tylko Super Administrator
     Route::middleware('super_admin')->group(function () {
-        Route::get('/instructors/{instructor}/trainer-invoices', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'instructorInvoices'])
-            ->name('instructors.trainer-invoices.index');
-        Route::post('/trainer-invoices/{trainerInvoice}/mark-paid', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'markPaid'])
-            ->name('trainer-invoices.mark-paid');
-        Route::prefix('courses/{course}/trainer-settlement')->name('courses.trainer-settlement.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'show'])->name('show');
-            Route::post('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'store'])->name('store');
-            Route::delete('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'destroy'])->name('destroy');
+        Route::get('/instructors/{instructor}/instructor-invoices', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'instructorInvoices'])
+            ->name('instructors.instructor-invoices.index');
+        Route::post('/instructor-invoices/{instructorInvoice}/mark-paid', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'markPaid'])
+            ->name('instructor-invoices.mark-paid');
+        Route::prefix('courses/{course}/instructor-settlement')->name('courses.instructor-settlement.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'show'])->name('show');
+            Route::post('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'store'])->name('store');
+            Route::delete('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'destroy'])->name('destroy');
         });
     });
 
@@ -458,14 +458,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/lookup', [AccountingController::class, 'debtorsLookup'])->name('lookup');
         });
 
-        Route::middleware('super_admin')->prefix('trainer-invoices')->name('trainer-invoices.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\TrainerInvoicesController::class, 'index'])->name('index');
-            Route::get('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'show'])->name('show');
-            Route::put('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'update'])->name('update');
-            Route::delete('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'destroy'])->name('destroy');
-            Route::post('/{trainerInvoice}/mark-paid', [\App\Http\Controllers\TrainerInvoicesController::class, 'markPaid'])->name('mark-paid');
-            Route::post('/{trainerInvoice}/mark-unpaid', [\App\Http\Controllers\TrainerInvoicesController::class, 'markUnpaid'])->name('mark-unpaid');
-            Route::delete('/{trainerInvoice}/items/{item}', [\App\Http\Controllers\TrainerInvoicesController::class, 'destroyItem'])->name('items.destroy');
+        Route::middleware('super_admin')->prefix('instructor-invoices')->name('instructor-invoices.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\InstructorInvoicesController::class, 'index'])->name('index');
+            Route::get('/{instructorInvoice}', [\App\Http\Controllers\InstructorInvoicesController::class, 'show'])->name('show');
+            Route::put('/{instructorInvoice}', [\App\Http\Controllers\InstructorInvoicesController::class, 'update'])->name('update');
+            Route::delete('/{instructorInvoice}', [\App\Http\Controllers\InstructorInvoicesController::class, 'destroy'])->name('destroy');
+            Route::post('/{instructorInvoice}/mark-paid', [\App\Http\Controllers\InstructorInvoicesController::class, 'markPaid'])->name('mark-paid');
+            Route::post('/{instructorInvoice}/mark-unpaid', [\App\Http\Controllers\InstructorInvoicesController::class, 'markUnpaid'])->name('mark-unpaid');
+            Route::delete('/{instructorInvoice}/items/{item}', [\App\Http\Controllers\InstructorInvoicesController::class, 'destroyItem'])->name('items.destroy');
         });
     });
 

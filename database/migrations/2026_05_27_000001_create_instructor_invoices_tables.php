@@ -8,11 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('trainer_invoices')) {
+        if (Schema::hasTable('instructor_invoices')) {
             return;
         }
 
-        Schema::create('trainer_invoices', function (Blueprint $table) {
+        Schema::create('instructor_invoices', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('instructor_id');
             $table->string('invoice_number', 64);
@@ -32,18 +32,18 @@ return new class extends Migration
             $table->index(['instructor_id', 'payment_status']);
         });
 
-        Schema::create('trainer_invoice_items', function (Blueprint $table) {
+        Schema::create('instructor_invoice_items', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('trainer_invoice_id');
+            $table->unsignedBigInteger('instructor_invoice_id');
             $table->unsignedBigInteger('course_id');
             $table->decimal('amount_gross', 10, 2);
             $table->decimal('amount_net', 10, 2)->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('trainer_invoice_id')
+            $table->foreign('instructor_invoice_id')
                 ->references('id')
-                ->on('trainer_invoices')
+                ->on('instructor_invoices')
                 ->onDelete('cascade');
 
             $table->foreign('course_id')
@@ -51,14 +51,14 @@ return new class extends Migration
                 ->on('courses')
                 ->onDelete('cascade');
 
-            $table->unique(['trainer_invoice_id', 'course_id']);
+            $table->unique(['instructor_invoice_id', 'course_id']);
             $table->index('course_id');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('trainer_invoice_items');
-        Schema::dropIfExists('trainer_invoices');
+        Schema::dropIfExists('instructor_invoice_items');
+        Schema::dropIfExists('instructor_invoices');
     }
 };

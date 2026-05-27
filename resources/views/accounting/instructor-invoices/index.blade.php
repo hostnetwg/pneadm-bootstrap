@@ -1,11 +1,11 @@
 @php
-    $period = $filters['period'] ?? \App\Support\TrainerInvoicePeriodFilter::PERIOD_CURRENT_MONTH;
-    $isCustomPeriod = $period === \App\Support\TrainerInvoicePeriodFilter::PERIOD_CUSTOM;
-    $defaultParams = \App\Support\TrainerInvoicePeriodFilter::defaultQueryParams();
+    $period = $filters['period'] ?? \App\Support\InstructorInvoicePeriodFilter::PERIOD_CURRENT_MONTH;
+    $isCustomPeriod = $period === \App\Support\InstructorInvoicePeriodFilter::PERIOD_CUSTOM;
+    $defaultParams = \App\Support\InstructorInvoicePeriodFilter::defaultQueryParams();
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">Faktury trenerów</h2>
+        <h2 class="fw-semibold fs-4 text-dark mb-0">Rozliczenia instruktorów</h2>
     </x-slot>
 
     <div class="py-3">
@@ -16,7 +16,7 @@
 
             <div class="card mb-3">
                 <div class="card-body">
-                    <form method="GET" action="{{ route('accounting.trainer-invoices.index') }}" id="trainerInvoicesFilterForm" class="row g-2 align-items-end">
+                    <form method="GET" action="{{ route('accounting.instructor-invoices.index') }}" id="instructorInvoicesFilterForm" class="row g-2 align-items-end">
                         <div class="col-md-3">
                             <label class="form-label small mb-0">Okres</label>
                             <select name="period" id="filterPeriod" class="form-select form-select-sm">
@@ -26,13 +26,22 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small mb-0">Trener</label>
+                            <label class="form-label small mb-0">Instruktor</label>
                             <select name="instructor_id" class="form-select form-select-sm">
                                 <option value="">— wszyscy —</option>
                                 @foreach($instructors as $instructor)
                                     <option value="{{ $instructor->id }}" @selected(($filters['instructor_id'] ?? '') == $instructor->id)>
                                         {{ $instructor->getFullTitleNameAttribute() }}
                                     </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-0">Typ</label>
+                            <select name="settlement_type" class="form-select form-select-sm">
+                                <option value="">— wszystkie —</option>
+                                @foreach($settlementTypeOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['settlement_type'] ?? '') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -60,7 +69,7 @@
                         </div>
                         <div class="col-md-12 d-flex gap-2 mt-1">
                             <button type="submit" class="btn btn-primary btn-sm">Filtruj</button>
-                            <a href="{{ route('accounting.trainer-invoices.index', $defaultParams) }}" class="btn btn-outline-secondary btn-sm">Wyczyść</a>
+                            <a href="{{ route('accounting.instructor-invoices.index', $defaultParams) }}" class="btn btn-outline-secondary btn-sm">Wyczyść</a>
                         </div>
                     </form>
                 </div>
@@ -75,7 +84,7 @@
                     @endif
                 </div>
                 <div class="text-end">
-                    <div><span class="text-muted">Faktur:</span> <strong>{{ $filteredInvoicesCount }}</strong></div>
+                    <div><span class="text-muted">Rozliczeń:</span> <strong>{{ $filteredInvoicesCount }}</strong></div>
                     <div class="fs-5 fw-semibold text-primary">
                         Suma pozycji: {{ number_format($filteredTotalGross, 2, ',', ' ') }} zł
                     </div>
@@ -88,9 +97,10 @@
                         <table class="table table-hover table-sm align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Nr faktury</th>
+                                    <th>Typ</th>
+                                    <th>Nr dokumentu</th>
                                     <th>Trener</th>
-                                    <th>Data FV</th>
+                                    <th>Data</th>
                                     <th>KSeF</th>
                                     <th class="text-center">Szkoleń</th>
                                     <th class="text-end">Suma pozycji</th>
@@ -102,6 +112,13 @@
                             <tbody>
                                 @forelse($invoices as $invoice)
                                     <tr>
+                                        <td>
+                                            @if($invoice->isMandate())
+                                                <span class="badge bg-info text-dark">UZ</span>
+                                            @else
+                                                <span class="badge bg-secondary">FV</span>
+                                            @endif
+                                        </td>
                                         <td class="fw-semibold">{{ $invoice->invoice_number }}</td>
                                         <td>{{ $invoice->instructor?->getFullTitleNameAttribute() ?? '—' }}</td>
                                         <td>{{ $invoice->invoice_date?->format('d.m.Y') ?? '—' }}</td>
@@ -117,12 +134,12 @@
                                         </td>
                                         <td>{{ $invoice->paid_at?->format('d.m.Y') ?? '—' }}</td>
                                         <td class="text-end">
-                                            <a href="{{ route('accounting.trainer-invoices.show', array_merge(['trainerInvoice' => $invoice], $filters)) }}" class="btn btn-sm btn-outline-primary">Szczegóły</a>
+                                            <a href="{{ route('accounting.instructor-invoices.show', array_merge(['instructorInvoice' => $invoice], $filters)) }}" class="btn btn-sm btn-outline-primary">Szczegóły</a>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted py-4">Brak faktur trenerów spełniających kryteria.</td>
+                                        <td colspan="10" class="text-center text-muted py-4">Brak rozliczeń instruktorów spełniających kryteria.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -139,7 +156,7 @@
     @push('scripts')
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('trainerInvoicesFilterForm');
+        const form = document.getElementById('instructorInvoicesFilterForm');
         const periodSelect = document.getElementById('filterPeriod');
         const dateFrom = document.getElementById('filterDateFrom');
         const dateTo = document.getElementById('filterDateTo');

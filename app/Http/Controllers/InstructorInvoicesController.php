@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Instructor;
-use App\Models\TrainerInvoice;
-use App\Models\TrainerInvoiceItem;
-use App\Services\TrainerSettlementService;
-use App\Support\TrainerInvoicePeriodFilter;
+use App\Models\InstructorInvoice;
+use App\Models\InstructorInvoiceItem;
+use App\Services\InstructorSettlementService;
+use App\Support\InstructorInvoicePeriodFilter;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -15,10 +15,10 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
-class TrainerInvoicesController extends Controller
+class InstructorInvoicesController extends Controller
 {
     public function __construct(
-        private readonly TrainerSettlementService $settlementService
+        private readonly InstructorSettlementService $settlementService
     ) {}
 
     /**
@@ -30,6 +30,7 @@ class TrainerInvoicesController extends Controller
             $request->only([
                 'instructor_id',
                 'payment_status',
+                'settlement_type',
                 'search',
             ]),
             [
@@ -51,6 +52,13 @@ class TrainerInvoicesController extends Controller
 
         if ($request->filled('payment_status') && in_array($request->payment_status, ['paid', 'unpaid'], true)) {
             $query->where('payment_status', $request->payment_status);
+        }
+
+        if ($request->filled('settlement_type') && in_array($request->settlement_type, [
+            InstructorInvoice::SETTLEMENT_TYPE_INVOICE,
+            InstructorInvoice::SETTLEMENT_TYPE_MANDATE,
+        ], true)) {
+            $query->where('settlement_type', $request->settlement_type);
         }
 
         if ($request->filled('search')) {
@@ -77,28 +85,28 @@ class TrainerInvoicesController extends Controller
      * @param  array<string, mixed>  $listFilters
      * @return array<string, mixed>
      */
-    private function routeParams(TrainerInvoice $trainerInvoice, array $listFilters = []): array
+    private function routeParams(InstructorInvoice $instructorInvoice, array $listFilters = []): array
     {
-        return array_merge(['trainerInvoice' => $trainerInvoice], $listFilters);
+        return array_merge(['instructorInvoice' => $instructorInvoice], $listFilters);
     }
 
     public function index(Request $request): View|RedirectResponse
     {
-        if (TrainerInvoicePeriodFilter::shouldApplyDefaultPeriod($request)) {
+        if (InstructorInvoicePeriodFilter::shouldApplyDefaultPeriod($request)) {
             return redirect()->route(
-                'accounting.trainer-invoices.index',
-                TrainerInvoicePeriodFilter::defaultQueryParams()
+                'accounting.instructor-invoices.index',
+                InstructorInvoicePeriodFilter::defaultQueryParams()
             );
         }
 
-        $periodRange = TrainerInvoicePeriodFilter::resolve($request);
+        $periodRange = InstructorInvoicePeriodFilter::resolve($request);
         $filters = $this->listFiltersForUrl($request, $periodRange);
 
-        $query = TrainerInvoice::query();
+        $query = InstructorInvoice::query();
         $this->applyListFilters($query, $request, $periodRange);
 
-        $filteredTotalGross = (float) TrainerInvoiceItem::query()
-            ->whereIn('trainer_invoice_id', (clone $query)->select('trainer_invoices.id'))
+        $filteredTotalGross = (float) InstructorInvoiceItem::query()
+            ->whereIn('instructor_invoice_id', (clone $query)->select('instructor_invoices.id'))
             ->sum('amount_gross');
 
         $filteredInvoicesCount = (clone $query)->count();
@@ -117,99 +125,104 @@ class TrainerInvoicesController extends Controller
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'title']);
 
-        return view('accounting.trainer-invoices.index', [
+        return view('accounting.instructor-invoices.index', [
             'invoices' => $invoices,
             'instructors' => $instructors,
             'filters' => $filters,
-            'periodOptions' => TrainerInvoicePeriodFilter::periodOptions(),
+            'periodOptions' => InstructorInvoicePeriodFilter::periodOptions(),
             'filteredTotalGross' => $filteredTotalGross,
             'filteredInvoicesCount' => $filteredInvoicesCount,
-            'periodLabel' => TrainerInvoicePeriodFilter::periodOptions()[$periodRange['period']] ?? '',
+            'periodLabel' => InstructorInvoicePeriodFilter::periodOptions()[$periodRange['period']] ?? '',
+            'settlementTypeOptions' => InstructorInvoice::settlementTypeOptions(),
         ]);
     }
 
-    public function show(Request $request, TrainerInvoice $trainerInvoice): View
+    public function show(Request $request, InstructorInvoice $instructorInvoice): View
     {
-        $periodRange = TrainerInvoicePeriodFilter::resolve($request);
+        $periodRange = InstructorInvoicePeriodFilter::resolve($request);
 
-        $trainerInvoice->load([
+        $instructorInvoice->load([
             'instructor:id,first_name,last_name,title,email',
             'items' => fn ($q) => $q->with(['course:id,title,start_date,end_date,instructor_id']),
         ]);
 
-        return view('accounting.trainer-invoices.show', [
-            'invoice' => $trainerInvoice,
+        return view('accounting.instructor-invoices.show', [
+            'invoice' => $instructorInvoice,
             'listFilters' => $this->listFiltersForUrl($request, $periodRange),
         ]);
     }
 
-    public function update(Request $request, TrainerInvoice $trainerInvoice): RedirectResponse
+    public function update(Request $request, InstructorInvoice $instructorInvoice): RedirectResponse
     {
-        $periodRange = TrainerInvoicePeriodFilter::resolve($request);
+        $periodRange = InstructorInvoicePeriodFilter::resolve($request);
 
         $validated = $request->validate([
-            'invoice_number' => 'required|string|max:64',
+            'settlement_type' => ['required', Rule::in([
+                InstructorInvoice::SETTLEMENT_TYPE_INVOICE,
+                InstructorInvoice::SETTLEMENT_TYPE_MANDATE,
+            ])],
+            'invoice_number' => 'nullable|string|max:64',
             'ksef_number' => 'nullable|string|max:128',
             'invoice_date' => 'nullable|date',
             'notes' => 'nullable|string|max:2000',
-            'payment_status' => ['required', Rule::in([TrainerInvoice::PAYMENT_STATUS_UNPAID, TrainerInvoice::PAYMENT_STATUS_PAID])],
+            'payment_status' => ['required', Rule::in([InstructorInvoice::PAYMENT_STATUS_UNPAID, InstructorInvoice::PAYMENT_STATUS_PAID])],
             'paid_at' => 'nullable|date',
         ]);
 
-        if ($validated['payment_status'] === TrainerInvoice::PAYMENT_STATUS_PAID && empty($validated['paid_at'])) {
+        if ($validated['payment_status'] === InstructorInvoice::PAYMENT_STATUS_PAID && empty($validated['paid_at'])) {
             $validated['paid_at'] = now()->toDateString();
         }
 
         try {
-            $this->settlementService->updateInvoice($trainerInvoice, $validated);
+            $this->settlementService->updateInvoice($instructorInvoice, $validated);
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
         }
 
         return redirect()
-            ->route('accounting.trainer-invoices.show', $this->routeParams($trainerInvoice, $this->listFiltersForUrl($request, $periodRange)))
-            ->with('success', 'Faktura została zaktualizowana.');
+            ->route('accounting.instructor-invoices.show', $this->routeParams($instructorInvoice, $this->listFiltersForUrl($request, $periodRange)))
+            ->with('success', 'Rozliczenie zostało zaktualizowane.');
     }
 
-    public function destroy(Request $request, TrainerInvoice $trainerInvoice): RedirectResponse
+    public function destroy(Request $request, InstructorInvoice $instructorInvoice): RedirectResponse
     {
-        $periodRange = TrainerInvoicePeriodFilter::resolve($request);
-        $number = $trainerInvoice->invoice_number;
-        $this->settlementService->deleteInvoice($trainerInvoice);
+        $periodRange = InstructorInvoicePeriodFilter::resolve($request);
+        $number = $instructorInvoice->invoice_number;
+        $this->settlementService->deleteInvoice($instructorInvoice);
 
         return redirect()
-            ->route('accounting.trainer-invoices.index', $this->listFiltersForUrl($request, $periodRange))
+            ->route('accounting.instructor-invoices.index', $this->listFiltersForUrl($request, $periodRange))
             ->with('success', "Faktura {$number} i wszystkie powiązane pozycje zostały usunięte.");
     }
 
-    public function destroyItem(Request $request, TrainerInvoice $trainerInvoice, TrainerInvoiceItem $item): RedirectResponse
+    public function destroyItem(Request $request, InstructorInvoice $instructorInvoice, InstructorInvoiceItem $item): RedirectResponse
     {
-        $periodRange = TrainerInvoicePeriodFilter::resolve($request);
+        $periodRange = InstructorInvoicePeriodFilter::resolve($request);
 
-        if ((int) $item->trainer_invoice_id !== (int) $trainerInvoice->id) {
+        if ((int) $item->instructor_invoice_id !== (int) $instructorInvoice->id) {
             abort(404);
         }
 
         $this->settlementService->deleteItem($item);
 
         return redirect()
-            ->route('accounting.trainer-invoices.show', $this->routeParams($trainerInvoice, $this->listFiltersForUrl($request, $periodRange)))
+            ->route('accounting.instructor-invoices.show', $this->routeParams($instructorInvoice, $this->listFiltersForUrl($request, $periodRange)))
             ->with('success', 'Pozycja szkolenia została usunięta z faktury.');
     }
 
-    public function markPaid(Request $request, TrainerInvoice $trainerInvoice): RedirectResponse
+    public function markPaid(Request $request, InstructorInvoice $instructorInvoice): RedirectResponse
     {
         $validated = $request->validate(['paid_at' => 'nullable|date']);
         $paidAt = ! empty($validated['paid_at']) ? Carbon::parse($validated['paid_at']) : null;
-        $this->settlementService->markInvoicePaid($trainerInvoice, $paidAt);
+        $this->settlementService->markInvoicePaid($instructorInvoice, $paidAt);
 
-        return back()->with('success', 'Faktura oznaczona jako opłacona.');
+        return back()->with('success', 'Rozliczenie oznaczone jako opłacone.');
     }
 
-    public function markUnpaid(TrainerInvoice $trainerInvoice): RedirectResponse
+    public function markUnpaid(InstructorInvoice $instructorInvoice): RedirectResponse
     {
-        $this->settlementService->markInvoiceUnpaid($trainerInvoice);
+        $this->settlementService->markInvoiceUnpaid($instructorInvoice);
 
-        return back()->with('success', 'Faktura oznaczona jako nieopłacona.');
+        return back()->with('success', 'Rozliczenie oznaczone jako nieopłacone.');
     }
 }

@@ -214,14 +214,14 @@ class Course extends Model
     /**
      * Pozycja faktury trenera przypisana do tego szkolenia (rozliczenie wypłaty).
      */
-    public function trainerInvoiceItems()
+    public function instructorInvoiceItems()
     {
-        return $this->hasMany(TrainerInvoiceItem::class, 'course_id');
+        return $this->hasMany(InstructorInvoiceItem::class, 'course_id');
     }
 
-    public function trainerSettlementItem()
+    public function instructorSettlementItem()
     {
-        return $this->hasOne(TrainerInvoiceItem::class, 'course_id')->latestOfMany();
+        return $this->hasOne(InstructorInvoiceItem::class, 'course_id')->latestOfMany();
     }
 
     /**

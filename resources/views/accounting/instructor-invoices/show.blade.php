@@ -5,8 +5,8 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">Faktura trenera: {{ $invoice->invoice_number }}</h2>
-            <a href="{{ route('accounting.trainer-invoices.index', $listFilters) }}" class="btn btn-sm btn-outline-secondary">← Lista faktur{{ !empty($listFilters) ? ' (z filtrami)' : '' }}</a>
+            <h2 class="fw-semibold fs-4 text-dark mb-0">{{ $invoice->settlementTypeLabel() }}: {{ $invoice->invoice_number }}</h2>
+            <a href="{{ route('accounting.instructor-invoices.index', $listFilters) }}" class="btn btn-sm btn-outline-secondary">← Lista rozliczeń{{ !empty($listFilters) ? ' (z filtrami)' : '' }}</a>
         </div>
     </x-slot>
 
@@ -19,25 +19,34 @@
             <div class="row g-3 mb-3">
                 <div class="col-lg-7">
                     <div class="card">
-                        <div class="card-header fw-semibold">Dane faktury</div>
+                        <div class="card-header fw-semibold">Dane rozliczenia</div>
                         <div class="card-body">
-                            <form method="POST" action="{{ route('accounting.trainer-invoices.update', array_merge(['trainerInvoice' => $invoice], $listFilters)) }}">
+                            <form method="POST" action="{{ route('accounting.instructor-invoices.update', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}">
                                 @csrf
                                 @method('PUT')
+                                <input type="hidden" name="settlement_type" value="{{ $invoice->settlement_type }}">
+                                <div class="mb-2">
+                                    <span class="badge {{ $invoice->isMandate() ? 'bg-info text-dark' : 'bg-secondary' }}">{{ $invoice->settlementTypeLabel() }}</span>
+                                </div>
                                 <div class="row g-2 mb-2">
                                     <div class="col-md-6">
-                                        <label class="form-label">Numer faktury</label>
-                                        <input type="text" name="invoice_number" class="form-control @error('invoice_number') is-invalid @enderror" value="{{ old('invoice_number', $invoice->invoice_number) }}" required maxlength="64">
+                                        <label class="form-label">{{ $invoice->isMandate() ? 'Numer umowy (opcjonalnie)' : 'Numer faktury' }}</label>
+                                        <input type="text" name="invoice_number" class="form-control @error('invoice_number') is-invalid @enderror" value="{{ old('invoice_number', $invoice->invoice_number) }}" maxlength="64" @if(!$invoice->isMandate()) required @endif>
                                         @error('invoice_number')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @if($invoice->isMandate())
+                                            <div class="form-text">Puste pole zachowa lub wygeneruje numer wewnętrzny UZ/…</div>
+                                        @endif
                                     </div>
+                                    @if($invoice->isInvoice())
                                     <div class="col-md-6">
                                         <label class="form-label">Numer KSeF</label>
                                         <input type="text" name="ksef_number" class="form-control" value="{{ old('ksef_number', $invoice->ksef_number) }}" maxlength="128">
                                     </div>
+                                    @endif
                                 </div>
                                 <div class="row g-2 mb-2">
                                     <div class="col-md-4">
-                                        <label class="form-label">Data faktury</label>
+                                        <label class="form-label">{{ $invoice->isMandate() ? "Data umowy / szkolenia" : "Data faktury" }}</label>
                                         <input type="date" name="invoice_date" class="form-control" value="{{ old('invoice_date', $invoice->invoice_date?->format('Y-m-d')) }}">
                                     </div>
                                     <div class="col-md-4">
@@ -63,14 +72,14 @@
                 </div>
                 <div class="col-lg-5">
                     <div class="card h-100">
-                        <div class="card-header fw-semibold">Trener</div>
+                        <div class="card-header fw-semibold">Instruktor</div>
                         <div class="card-body">
                             <p class="mb-1"><strong>{{ $invoice->instructor?->getFullTitleNameAttribute() }}</strong></p>
                             @if($invoice->instructor?->email)
                                 <p class="mb-0 small text-muted">{{ $invoice->instructor->email }}</p>
                             @endif
                             <hr>
-                            <p class="mb-1">Pozycji na fakturze: <strong>{{ $invoice->items->count() }}</strong></p>
+                            <p class="mb-1">Pozycji w rozliczeniu: <strong>{{ $invoice->items->count() }}</strong></p>
                             <p class="mb-0">Suma kwot: <strong>{{ number_format($totalGross, 2, ',', ' ') }} zł</strong></p>
                         </div>
                     </div>
@@ -110,7 +119,7 @@
                                         </td>
                                         <td class="text-end fw-semibold">{{ number_format((float) $item->amount_gross, 2, ',', ' ') }} zł</td>
                                         <td class="text-end">
-                                            <form method="POST" action="{{ route('accounting.trainer-invoices.items.destroy', array_merge(['trainerInvoice' => $invoice, 'item' => $item], $listFilters)) }}" class="d-inline" onsubmit="return confirm('Usunąć tę pozycję ze szkolenia? Faktura pozostanie.');">
+                                            <form method="POST" action="{{ route('accounting.instructor-invoices.items.destroy', array_merge(['instructorInvoice' => $invoice, 'item' => $item], $listFilters)) }}" class="d-inline" onsubmit="return confirm('Usunąć tę pozycję ze szkolenia? Faktura pozostanie.');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Usuń pozycję</button>
@@ -141,21 +150,21 @@
                 <div class="card-header bg-danger text-white fw-semibold">Strefa niebezpieczna</div>
                 <div class="card-body d-flex flex-wrap gap-2 align-items-center">
                     @if(!$invoice->isPaid())
-                        <form method="POST" action="{{ route('accounting.trainer-invoices.mark-paid', array_merge(['trainerInvoice' => $invoice], $listFilters)) }}" class="d-inline">
+                        <form method="POST" action="{{ route('accounting.instructor-invoices.mark-paid', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}" class="d-inline">
                             @csrf
                             <input type="hidden" name="paid_at" value="{{ now()->format('Y-m-d') }}">
                             <button type="submit" class="btn btn-success btn-sm">Oznacz jako opłaconą (dziś)</button>
                         </form>
                     @else
-                        <form method="POST" action="{{ route('accounting.trainer-invoices.mark-unpaid', array_merge(['trainerInvoice' => $invoice], $listFilters)) }}" class="d-inline">
+                        <form method="POST" action="{{ route('accounting.instructor-invoices.mark-unpaid', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}" class="d-inline">
                             @csrf
                             <button type="submit" class="btn btn-warning btn-sm">Oznacz jako nieopłaconą</button>
                         </form>
                     @endif
-                    <form method="POST" action="{{ route('accounting.trainer-invoices.destroy', array_merge(['trainerInvoice' => $invoice], $listFilters)) }}" class="d-inline ms-auto" onsubmit="return confirm('Na pewno usunąć całą fakturę {{ $invoice->invoice_number }} wraz ze wszystkimi pozycjami? Tej operacji nie można cofnąć.');">
+                    <form method="POST" action="{{ route('accounting.instructor-invoices.destroy', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}" class="d-inline ms-auto" onsubmit="return confirm('Na pewno usunąć całe rozliczenie {{ $invoice->invoice_number }} wraz ze wszystkimi pozycjami? Tej operacji nie można cofnąć.');">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger btn-sm">Usuń całą fakturę</button>
+                        <button type="submit" class="btn btn-danger btn-sm">Usuń całe rozliczenie</button>
                     </form>
                 </div>
             </div>

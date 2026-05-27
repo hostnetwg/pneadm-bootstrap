@@ -5,14 +5,14 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Instructor;
 use App\Models\Role;
-use App\Models\TrainerInvoice;
-use App\Models\TrainerInvoiceItem;
+use App\Models\InstructorInvoice;
+use App\Models\InstructorInvoiceItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Support\TrainerInvoicePeriodFilter;
+use App\Support\InstructorInvoicePeriodFilter;
 use Tests\TestCase;
 
-class TrainerInvoicesModuleTest extends TestCase
+class InstructorInvoicesModuleTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -60,15 +60,16 @@ class TrainerInvoicesModuleTest extends TestCase
             'is_active' => true,
             'certificate_format' => '{nr}/PNE',
         ]);
-        $invoice = TrainerInvoice::create([
+        $invoice = InstructorInvoice::create([
             'instructor_id' => $instructor->id,
+            'settlement_type' => InstructorInvoice::SETTLEMENT_TYPE_INVOICE,
             'invoice_number' => 'FV/MOD/1',
             'invoice_date' => '2026-05-10',
             'notes' => 'Notatka modułu',
-            'payment_status' => TrainerInvoice::PAYMENT_STATUS_UNPAID,
+            'payment_status' => InstructorInvoice::PAYMENT_STATUS_UNPAID,
         ]);
-        $item = TrainerInvoiceItem::create([
-            'trainer_invoice_id' => $invoice->id,
+        $item = InstructorInvoiceItem::create([
+            'instructor_invoice_id' => $invoice->id,
             'course_id' => $course->id,
             'amount_gross' => 999.99,
         ]);
@@ -79,13 +80,13 @@ class TrainerInvoicesModuleTest extends TestCase
     /** @return array<string, string> */
     private function defaultListQuery(): array
     {
-        return TrainerInvoicePeriodFilter::defaultQueryParams();
+        return InstructorInvoicePeriodFilter::defaultQueryParams();
     }
 
-    public function test_admin_cannot_access_trainer_invoices_index(): void
+    public function test_admin_cannot_access_instructor_invoices_index(): void
     {
         $this->actingAs($this->admin())
-            ->get(route('accounting.trainer-invoices.index'))
+            ->get(route('accounting.instructor-invoices.index'))
             ->assertForbidden();
     }
 
@@ -95,12 +96,12 @@ class TrainerInvoicesModuleTest extends TestCase
         $user = $this->superAdmin();
 
         $this->actingAs($user)
-            ->get(route('accounting.trainer-invoices.index', $this->defaultListQuery()))
+            ->get(route('accounting.instructor-invoices.index', $this->defaultListQuery()))
             ->assertOk()
             ->assertSee('FV/MOD/1');
 
         $this->actingAs($user)
-            ->get(route('accounting.trainer-invoices.show', $data['invoice']))
+            ->get(route('accounting.instructor-invoices.show', $data['invoice']))
             ->assertOk()
             ->assertSee('Notatka modułu')
             ->assertSee('Szkolenie A');
@@ -112,11 +113,11 @@ class TrainerInvoicesModuleTest extends TestCase
         $user = $this->superAdmin();
 
         $this->actingAs($user)
-            ->delete(route('accounting.trainer-invoices.destroy', array_merge(['trainerInvoice' => $data['invoice']], $this->defaultListQuery())))
-            ->assertRedirect(route('accounting.trainer-invoices.index', $this->defaultListQuery()));
+            ->delete(route('accounting.instructor-invoices.destroy', array_merge(['instructorInvoice' => $data['invoice']], $this->defaultListQuery())))
+            ->assertRedirect(route('accounting.instructor-invoices.index', $this->defaultListQuery()));
 
-        $this->assertDatabaseMissing('trainer_invoices', ['id' => $data['invoice']->id]);
-        $this->assertDatabaseMissing('trainer_invoice_items', ['id' => $data['item']->id]);
+        $this->assertDatabaseMissing('instructor_invoices', ['id' => $data['invoice']->id]);
+        $this->assertDatabaseMissing('instructor_invoice_items', ['id' => $data['item']->id]);
     }
 
     public function test_super_admin_can_delete_single_item(): void
@@ -125,10 +126,10 @@ class TrainerInvoicesModuleTest extends TestCase
         $user = $this->superAdmin();
 
         $this->actingAs($user)
-            ->delete(route('accounting.trainer-invoices.items.destroy', array_merge(['trainerInvoice' => $data['invoice'], 'item' => $data['item']], $this->defaultListQuery())))
-            ->assertRedirect(route('accounting.trainer-invoices.show', array_merge(['trainerInvoice' => $data['invoice']], $this->defaultListQuery())));
+            ->delete(route('accounting.instructor-invoices.items.destroy', array_merge(['instructorInvoice' => $data['invoice'], 'item' => $data['item']], $this->defaultListQuery())))
+            ->assertRedirect(route('accounting.instructor-invoices.show', array_merge(['instructorInvoice' => $data['invoice']], $this->defaultListQuery())));
 
-        $this->assertDatabaseMissing('trainer_invoice_items', ['id' => $data['item']->id]);
-        $this->assertDatabaseHas('trainer_invoices', ['id' => $data['invoice']->id]);
+        $this->assertDatabaseMissing('instructor_invoice_items', ['id' => $data['item']->id]);
+        $this->assertDatabaseHas('instructor_invoices', ['id' => $data['invoice']->id]);
     }
 }

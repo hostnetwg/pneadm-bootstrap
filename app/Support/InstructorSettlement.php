@@ -5,11 +5,11 @@ namespace App\Support;
 use App\Models\Course;
 use Carbon\Carbon;
 
-class TrainerSettlement
+class InstructorSettlement
 {
     public static function cutoffDate(): Carbon
     {
-        return Carbon::parse(config('trainer_settlements.cutoff_date', '2026-05-01'))->startOfDay();
+        return Carbon::parse(config('instructor_settlements.cutoff_date', '2026-05-01'))->startOfDay();
     }
 
     public static function isCourseInScope(Course $course): bool

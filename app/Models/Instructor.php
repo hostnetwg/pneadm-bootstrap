@@ -25,6 +25,7 @@ class Instructor extends Model
         'photo',          // Ścieżka do zdjęcia
         'signature',      // Ścieżka do podpisu instruktora
         'is_active',      // Czy instruktor jest aktywny
+        'default_settlement_type',
         'notes',          // Notatki na temat trenera
         'website_url',    // URL strony WWW
         'linkedin_url',   // URL profilu LinkedIn
@@ -89,9 +90,9 @@ class Instructor extends Model
      * Relacja do ankiet przypisanych do instruktora
      */
 
-    public function trainerInvoices()
+    public function instructorInvoices()
     {
-        return $this->hasMany(TrainerInvoice::class, 'instructor_id');
+        return $this->hasMany(InstructorInvoice::class, 'instructor_id');
     }
 
     public function surveys()

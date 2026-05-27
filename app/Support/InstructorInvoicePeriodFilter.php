@@ -5,7 +5,7 @@ namespace App\Support;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
-class TrainerInvoicePeriodFilter
+class InstructorInvoicePeriodFilter
 {
     public const PERIOD_CURRENT_MONTH = 'current_month';
 

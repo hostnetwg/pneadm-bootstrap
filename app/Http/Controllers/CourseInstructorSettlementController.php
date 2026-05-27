@@ -4,31 +4,34 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\Instructor;
-use App\Models\TrainerInvoice;
-use App\Services\TrainerSettlementService;
-use App\Support\TrainerSettlement;
+use App\Models\InstructorInvoice;
+use App\Services\InstructorSettlementService;
+use App\Support\InstructorSettlement;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
-class CourseTrainerSettlementController extends Controller
+class CourseInstructorSettlementController extends Controller
 {
     public function __construct(
-        private readonly TrainerSettlementService $settlementService
+        private readonly InstructorSettlementService $settlementService
     ) {}
 
     public function show(Course $course): JsonResponse
     {
-        $item = $course->trainerSettlementItem()
-            ->with('trainerInvoice')
+        $item = $course->instructorSettlementItem()
+            ->with(['instructorInvoice' => fn ($q) => $q->withCount('items')])
             ->first();
+
+        $course->loadMissing('instructor');
 
         return response()->json([
             'success' => true,
-            'in_scope' => TrainerSettlement::isCourseInScope($course),
-            'cutoff_date' => TrainerSettlement::cutoffDate()->format('Y-m-d'),
+            'in_scope' => InstructorSettlement::isCourseInScope($course),
+            'cutoff_date' => InstructorSettlement::cutoffDate()->format('Y-m-d'),
+            'default_settlement_type' => $this->settlementService->defaultSettlementTypeForInstructor($course->instructor),
             'settlement' => $item ? $this->formatSettlement($item) : null,
         ]);
     }
@@ -45,14 +48,21 @@ class CourseTrainerSettlementController extends Controller
             ], 422);
         }
 
+        $settlementType = $request->input('settlement_type', InstructorInvoice::SETTLEMENT_TYPE_INVOICE);
+        $isMandate = $settlementType === InstructorInvoice::SETTLEMENT_TYPE_MANDATE;
+
         $validator = Validator::make($request->all(), [
-            'trainer_invoice_id' => 'nullable|integer|exists:trainer_invoices,id',
-            'invoice_number' => 'required_without:trainer_invoice_id|string|max:64',
+            'settlement_type' => ['nullable', Rule::in([
+                InstructorInvoice::SETTLEMENT_TYPE_INVOICE,
+                InstructorInvoice::SETTLEMENT_TYPE_MANDATE,
+            ])],
+            'instructor_invoice_id' => 'nullable|integer|exists:instructor_invoices,id',
+            'invoice_number' => ($isMandate ? 'nullable' : 'required_without:instructor_invoice_id').'|string|max:64',
             'ksef_number' => 'nullable|string|max:128',
             'invoice_date' => 'nullable|date',
             'amount_gross' => 'required|numeric|min:0|max:9999999.99',
             'amount_net' => 'nullable|numeric|min:0|max:9999999.99',
-            'payment_status' => ['nullable', Rule::in([TrainerInvoice::PAYMENT_STATUS_UNPAID, TrainerInvoice::PAYMENT_STATUS_PAID])],
+            'payment_status' => ['nullable', Rule::in([InstructorInvoice::PAYMENT_STATUS_UNPAID, InstructorInvoice::PAYMENT_STATUS_PAID])],
             'paid_at' => 'nullable|date',
             'invoice_notes' => 'nullable|string|max:2000',
         ]);
@@ -65,7 +75,7 @@ class CourseTrainerSettlementController extends Controller
             ], 422);
         }
 
-        if ($request->input('payment_status') === TrainerInvoice::PAYMENT_STATUS_PAID && ! $request->filled('paid_at')) {
+        if ($request->input('payment_status') === InstructorInvoice::PAYMENT_STATUS_PAID && ! $request->filled('paid_at')) {
             $request->merge(['paid_at' => now()->toDateString()]);
         }
 
@@ -74,7 +84,7 @@ class CourseTrainerSettlementController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Rozliczenie trenera zostało zapisane.',
+                'message' => 'Rozliczenie instruktora zostało zapisane.',
                 'settlement' => $this->formatSettlement($item),
             ]);
         } catch (ValidationException $e) {
@@ -109,17 +119,21 @@ class CourseTrainerSettlementController extends Controller
         }
     }
 
-    public function instructorInvoices(Instructor $instructor): JsonResponse
+    public function instructorInvoices(Request $request, Instructor $instructor): JsonResponse
     {
-        $invoices = TrainerInvoice::query()
+        $settlementType = $request->query('settlement_type', InstructorInvoice::SETTLEMENT_TYPE_INVOICE);
+
+        $invoices = InstructorInvoice::query()
             ->where('instructor_id', $instructor->id)
+            ->where('settlement_type', $settlementType)
             ->withCount('items')
             ->orderByDesc('invoice_date')
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->map(fn (TrainerInvoice $invoice) => [
+            ->map(fn (InstructorInvoice $invoice) => [
                 'id' => $invoice->id,
+                'settlement_type' => $invoice->settlement_type,
                 'invoice_number' => $invoice->invoice_number,
                 'ksef_number' => $invoice->ksef_number,
                 'invoice_date' => $invoice->invoice_date?->format('Y-m-d'),
@@ -135,7 +149,7 @@ class CourseTrainerSettlementController extends Controller
         ]);
     }
 
-    public function markPaid(Request $request, TrainerInvoice $trainerInvoice): JsonResponse
+    public function markPaid(Request $request, InstructorInvoice $instructorInvoice): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'paid_at' => 'nullable|date',
@@ -152,7 +166,7 @@ class CourseTrainerSettlementController extends Controller
             ? \Carbon\Carbon::parse($request->input('paid_at'))
             : null;
 
-        $invoice = $this->settlementService->markInvoicePaid($trainerInvoice, $paidAt);
+        $invoice = $this->settlementService->markInvoicePaid($instructorInvoice, $paidAt);
 
         return response()->json([
             'success' => true,
@@ -165,9 +179,9 @@ class CourseTrainerSettlementController extends Controller
         ]);
     }
 
-    private function formatSettlement(\App\Models\TrainerInvoiceItem $item): array
+    private function formatSettlement(\App\Models\InstructorInvoiceItem $item): array
     {
-        $invoice = $item->trainerInvoice;
+        $invoice = $item->instructorInvoice;
 
         return [
             'item_id' => $item->id,
@@ -175,6 +189,7 @@ class CourseTrainerSettlementController extends Controller
             'amount_net' => $item->amount_net !== null ? (string) $item->amount_net : null,
             'invoice' => [
                 'id' => $invoice->id,
+                'settlement_type' => $invoice->settlement_type,
                 'invoice_number' => $invoice->invoice_number,
                 'ksef_number' => $invoice->ksef_number,
                 'invoice_date' => $invoice->invoice_date?->format('Y-m-d'),
@@ -182,6 +197,7 @@ class CourseTrainerSettlementController extends Controller
                 'paid_at' => $invoice->paid_at?->format('Y-m-d H:i'),
                 'is_paid' => $invoice->isPaid(),
                 'notes' => $invoice->notes,
+                'items_count' => (int) ($invoice->items_count ?? 0),
             ],
         ];
     }

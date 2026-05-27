@@ -146,8 +146,17 @@ class CoursesController extends Controller
         ];
 
         if (auth()->user()?->isSuperAdmin()) {
-            $eagerLoads['trainerSettlementItem.trainerInvoice'] = function ($query) {
-                $query->select('id', 'instructor_id', 'invoice_number', 'ksef_number', 'invoice_date', 'payment_status', 'paid_at');
+            $eagerLoads['instructorSettlementItem.instructorInvoice'] = function ($query) {
+                $query->select(
+                    'id',
+                    'instructor_id',
+                    'settlement_type',
+                    'invoice_number',
+                    'ksef_number',
+                    'invoice_date',
+                    'payment_status',
+                    'paid_at'
+                );
             };
         }
 

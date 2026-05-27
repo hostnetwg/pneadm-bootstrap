@@ -310,8 +310,8 @@
                     </li>
                     @if(auth()->user()?->isSuperAdmin())
                     <li>
-                        <a href="{{ route('accounting.trainer-invoices.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.trainer-invoices.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Faktury trenerów
+                        <a href="{{ route('accounting.instructor-invoices.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.instructor-invoices.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Rozliczenia instruktorów
                         </a>
                     </li>
                     @endif
