@@ -22,13 +22,24 @@ class StatisticsController extends Controller
             $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
             $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
 
+            // Form-orders: `order_date` jest zapisywane w UTC, ale karty "Wczoraj/Dzisiaj"
+            // mają liczyć dzień wg strefy aplikacji.
+            $tz = config('app.timezone', 'Europe/Warsaw');
+            $todayLocal = Carbon::today($tz);
+            $yesterdayLocal = Carbon::yesterday($tz);
+
+            $todayStartUtc = $todayLocal->copy()->startOfDay()->utc();
+            $tomorrowStartUtc = $todayLocal->copy()->addDay()->startOfDay()->utc(); // koniec wyłączny
+            $yesterdayStartUtc = $yesterdayLocal->copy()->startOfDay()->utc();
+
             // Statystyki dzisiejsze - zamowienia (Publigo) - używamy data_wplaty
             $todayOrders = Zamowienia::whereDate('data_wplaty', $today)->get();
             $todayOrdersCount = $todayOrders->count();
             $todayOrdersValue = $todayOrders->sum('produkt_cena');
 
             // Statystyki dzisiejsze - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
-            $todayForms = FormOrder::whereDate('order_date', $today)
+            $todayForms = FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
                 ->where(function($q) {
                     $q->whereNull('status_completed')
                       ->orWhere('status_completed', '!=', 1);
@@ -43,7 +54,8 @@ class StatisticsController extends Controller
             $yesterdayOrdersValue = $yesterdayOrders->sum('produkt_cena');
 
             // Statystyki wczoraj - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
-            $yesterdayForms = FormOrder::whereDate('order_date', $yesterday)
+            $yesterdayForms = FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->where(function($q) {
                     $q->whereNull('status_completed')
                       ->orWhere('status_completed', '!=', 1);
@@ -58,7 +70,10 @@ class StatisticsController extends Controller
             $monthlyOrdersValue = $monthlyOrders->sum('produkt_cena');
 
             // Statystyki miesięczne - formularze zamówień - używamy order_date z pneadm:form_orders (tylko niezakończone)
-            $monthlyForms = FormOrder::whereBetween('order_date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
+            $startOfMonthUtc = $startOfMonth->copy()->startOfDay()->utc();
+            $startOfNextMonthUtc = $startOfMonth->copy()->addMonth()->startOfDay()->utc(); // koniec wyłączny
+            $monthlyForms = FormOrder::where('order_date', '>=', $startOfMonthUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $startOfNextMonthUtc->format('Y-m-d H:i:s'))
                 ->where(function($q) {
                     $q->whereNull('status_completed')
                       ->orWhere('status_completed', '!=', 1);
@@ -72,7 +87,10 @@ class StatisticsController extends Controller
             $lastMonthOrdersCount = $lastMonthOrders->count();
             $lastMonthOrdersValue = $lastMonthOrders->sum('produkt_cena');
 
-            $lastMonthForms = FormOrder::whereBetween('order_date', [$startOfLastMonth->format('Y-m-d'), $endOfLastMonth->format('Y-m-d')])
+            $startOfLastMonthUtc = $startOfLastMonth->copy()->startOfDay()->utc();
+            $startOfThisMonthUtc = $startOfMonth->copy()->startOfDay()->utc();
+            $lastMonthForms = FormOrder::where('order_date', '>=', $startOfLastMonthUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $startOfThisMonthUtc->format('Y-m-d H:i:s'))
                 ->where(function($q) {
                     $q->whereNull('status_completed')
                       ->orWhere('status_completed', '!=', 1);

@@ -245,15 +245,27 @@ class FormOrdersController extends Controller
         $newCount = FormOrder::new()->count();
 
         // Statystyki do wyświetlenia
-        // Używamy UTC dla zapytań, ponieważ dane w bazie są w UTC
-        $todayUTC = Carbon::today('UTC');
-        $yesterdayUTC = Carbon::yesterday('UTC');
+        // `order_date` jest zapisywane w bazie jako UTC, ale UI pokazuje dzień wg strefy aplikacji
+        // (np. 00:39/01:00 w lokalnym czasie powinno liczyć się jako "dziś").
+        // Dlatego liczymy granice "wczoraj/dziś" w czasie lokalnym, a dopiero potem porównujemy do UTC.
+        $tz = config('app.timezone', 'Europe/Warsaw');
+
+        $todayLocal = Carbon::today($tz);
+        $yesterdayLocal = Carbon::yesterday($tz);
+
+        $todayStartUtc = $todayLocal->copy()->startOfDay()->utc();
+        $tomorrowStartUtc = $todayLocal->copy()->addDay()->startOfDay()->utc(); // koniec wyłączny
+        $yesterdayStartUtc = $yesterdayLocal->copy()->startOfDay()->utc();
 
         $stats = [
             'total' => FormOrder::count(),
             'new' => $newCount,
-            'yesterday' => FormOrder::whereDate('order_date', $yesterdayUTC->format('Y-m-d'))->count(),
-            'today' => FormOrder::whereDate('order_date', $todayUTC->format('Y-m-d'))->count(),
+            'yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
+                ->count(),
+            'today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
+                ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
+                ->count(),
             'archival' => $archivalCount,
             'sales_value' => FormOrder::withInvoice()->sum('product_price'),
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
