@@ -56,6 +56,18 @@ class CertificateRegistrationController extends Controller
         return $dt->format('d.m.Y H:i');
     }
 
+    private function formatCertificateRegistrationEndsDisplay(Course $course): ?string
+    {
+        if ($course->certificate_registration_ends_at === null) {
+            return null;
+        }
+
+        return $course->certificate_registration_ends_at
+            ->copy()
+            ->timezone(config('app.timezone'))
+            ->format('d.m.Y H:i');
+    }
+
     /**
      * Status rejestracji zaświadczenia po tokenie (czy formularz jest aktywny).
      * GET /api/certificate-registration/status/{token}
@@ -72,12 +84,14 @@ class CertificateRegistrationController extends Controller
         }
 
         $courseStartDisplay = $this->formatCourseStartDisplay($course);
+        $registrationEndsDisplay = $this->formatCertificateRegistrationEndsDisplay($course);
 
         if (! $course->certificate_registration_open) {
             return response()->json([
                 'active' => false,
                 'course_title' => $course->title,
                 'course_start_display' => $courseStartDisplay,
+                'certificate_registration_ends_at_display' => $registrationEndsDisplay,
                 'message' => 'Rejestracja zaświadczenia jest wyłączona.',
             ]);
         }
@@ -88,6 +102,7 @@ class CertificateRegistrationController extends Controller
                 'active' => false,
                 'course_title' => $course->title,
                 'course_start_display' => $courseStartDisplay,
+                'certificate_registration_ends_at_display' => $registrationEndsDisplay,
                 'message' => 'Rejestracja nie jest jeszcze dostępna.',
             ]);
         }
@@ -96,6 +111,7 @@ class CertificateRegistrationController extends Controller
                 'active' => false,
                 'course_title' => $course->title,
                 'course_start_display' => $courseStartDisplay,
+                'certificate_registration_ends_at_display' => $registrationEndsDisplay,
                 'message' => 'Rejestracja zakończyła się.',
             ]);
         }
@@ -111,6 +127,7 @@ class CertificateRegistrationController extends Controller
             'active' => true,
             'course_title' => $course->title,
             'course_start_display' => $courseStartDisplay,
+            'certificate_registration_ends_at_display' => $registrationEndsDisplay,
             'instructor_name' => $instructorName,
             'instructor_photo' => $instructorPhoto,
             'certificate_registration_collect_birth_data' => (bool) $course->certificate_registration_collect_birth_data,
