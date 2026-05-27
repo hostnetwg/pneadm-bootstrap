@@ -722,6 +722,23 @@ class ParticipantController extends Controller
 
         $courseParticipantsCount = Participant::query()->where('course_id', $course->id)->count();
 
+        $participantsWithEmailCount = Participant::query()
+            ->where('course_id', $course->id)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->count();
+
+        $courseEmailDeliveryStats = $this->buildCourseEmailDeliveryStats($course->id);
+        $emailStatusByParticipantId = $this->buildEmailStatusByParticipantIds(
+            $course->id,
+            $participants->getCollection()->pluck('id')->filter()->values()
+        );
+        $courseAccessEmailLabel = $this->buildCourseAccessEmailLabel(
+            $courseAccessHasVideos,
+            $courseAccessHasMaterials,
+            $courseAccessHasCertificate
+        );
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -736,7 +753,11 @@ class ParticipantController extends Controller
             'courseAccessHasCertificate',
             'courseAccessCanSendEmail',
             'pneduAccountByEmail',
-            'courseParticipantsCount'
+            'courseParticipantsCount',
+            'participantsWithEmailCount',
+            'courseEmailDeliveryStats',
+            'emailStatusByParticipantId',
+            'courseAccessEmailLabel'
         ));
     }
 
@@ -807,7 +828,7 @@ class ParticipantController extends Controller
                 'queued_at' => now(),
             ]);
 
-            SendCertificateLinkEmailJob::dispatch(
+            SendCertificateLinkEmailJob::dispatchSync(
                 $course->id,
                 $participant->id,
                 CertificateEmailLog::TYPE_LIST_LINK,
@@ -817,7 +838,7 @@ class ParticipantController extends Controller
             return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail został zlecony do wysyłki na adres '.$email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do zaświadczeń został wysłany na adres '.$email);
     }
 
     /**
@@ -846,7 +867,7 @@ class ParticipantController extends Controller
                 'queued_at' => now(),
             ]);
 
-            SendCertificateLinkEmailJob::dispatch(
+            SendCertificateLinkEmailJob::dispatchSync(
                 $course->id,
                 $participant->id,
                 CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
@@ -856,7 +877,7 @@ class ParticipantController extends Controller
             return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać e-maila: '.$e->getMessage());
         }
 
-        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został zlecony do wysyłki na adres '.$email);
+        return redirect()->route('participants.index', $course)->with('success', 'E-mail z linkiem do tego zaświadczenia został wysłany na adres '.$email);
     }
 
     /**
@@ -1841,5 +1862,175 @@ class ParticipantController extends Controller
             return redirect()->route('participants.emails-list', $queryParams)
                 ->with('error', 'Błąd podczas usuwania e-maila: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Statystyki wysyłki e-maili dla całego szkolenia (niezależnie od paginacji / wyszukiwania).
+     *
+     * @return array<string, array{sent: int, queued: int, failed_without_sent: int}>
+     */
+    private function buildCourseEmailDeliveryStats(int $courseId): array
+    {
+        return [
+            CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK => $this->buildCourseEmailDeliveryStatsForTypes(
+                $courseId,
+                CertificateEmailLog::certificateLinkTypes()
+            ),
+            CertificateEmailLog::TYPE_COURSE_ACCESS => $this->buildCourseEmailDeliveryStatsForTypes(
+                $courseId,
+                [CertificateEmailLog::TYPE_COURSE_ACCESS]
+            ),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $types
+     * @return array{sent: int, queued: int, failed_without_sent: int}
+     */
+    private function buildCourseEmailDeliveryStatsForTypes(int $courseId, array $types): array
+    {
+        $base = CertificateEmailLog::query()
+            ->where('course_id', $courseId)
+            ->whereIn('type', $types);
+
+        return [
+            'sent' => (int) (clone $base)
+                ->where('status', CertificateEmailLog::STATUS_SENT)
+                ->distinct()
+                ->count('participant_id'),
+            'queued' => (int) (clone $base)
+                ->where('status', CertificateEmailLog::STATUS_QUEUED)
+                ->distinct()
+                ->count('participant_id'),
+            'failed_without_sent' => (int) Participant::query()
+                ->where('course_id', $courseId)
+                ->whereExists(function ($q) use ($courseId, $types) {
+                    $q->selectRaw('1')
+                        ->from('certificate_email_logs')
+                        ->whereColumn('certificate_email_logs.participant_id', 'participants.id')
+                        ->where('certificate_email_logs.course_id', $courseId)
+                        ->whereIn('certificate_email_logs.type', $types)
+                        ->where('certificate_email_logs.status', CertificateEmailLog::STATUS_FAILED);
+                })
+                ->whereNotExists(function ($q) use ($courseId, $types) {
+                    $q->selectRaw('1')
+                        ->from('certificate_email_logs')
+                        ->whereColumn('certificate_email_logs.participant_id', 'participants.id')
+                        ->where('certificate_email_logs.course_id', $courseId)
+                        ->whereIn('certificate_email_logs.type', $types)
+                        ->where('certificate_email_logs.status', CertificateEmailLog::STATUS_SENT);
+                })
+                ->count(),
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int|string>  $participantIds
+     * @return array<int, array<string, array{sent_count: int, last_sent_at: ?Carbon, has_queued: bool, has_failed: bool, last_error: ?string}>>
+     */
+    private function buildEmailStatusByParticipantIds(int $courseId, $participantIds): array
+    {
+        $participantIds = $participantIds->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($participantIds->isEmpty()) {
+            return [];
+        }
+
+        $emptyType = [
+            'sent_count' => 0,
+            'last_sent_at' => null,
+            'has_queued' => false,
+            'has_failed' => false,
+            'last_error' => null,
+        ];
+
+        $byParticipant = [];
+        foreach ($participantIds as $pid) {
+            $byParticipant[$pid] = [
+                CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK => $emptyType,
+                CertificateEmailLog::TYPE_COURSE_ACCESS => $emptyType,
+            ];
+        }
+
+        $logs = CertificateEmailLog::query()
+            ->where('course_id', $courseId)
+            ->whereIn('participant_id', $participantIds->all())
+            ->whereIn('type', array_merge(
+                CertificateEmailLog::certificateLinkTypes(),
+                [CertificateEmailLog::TYPE_COURSE_ACCESS]
+            ))
+            ->orderBy('id')
+            ->get(['participant_id', 'type', 'status', 'sent_at', 'failed_at', 'error_message']);
+
+        foreach ($logs as $log) {
+            $pid = (int) $log->participant_id;
+            $bucket = in_array($log->type, CertificateEmailLog::certificateLinkTypes(), true)
+                ? CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK
+                : $log->type;
+
+            if (! isset($byParticipant[$pid][$bucket])) {
+                continue;
+            }
+
+            $ref = &$byParticipant[$pid][$bucket];
+
+            if ($log->status === CertificateEmailLog::STATUS_SENT) {
+                $ref['sent_count']++;
+                if ($log->sent_at !== null) {
+                    $current = $ref['last_sent_at'];
+                    if ($current === null || $log->sent_at->gt($current)) {
+                        $ref['last_sent_at'] = $log->sent_at;
+                    }
+                }
+            } elseif ($log->status === CertificateEmailLog::STATUS_QUEUED) {
+                $ref['has_queued'] = true;
+            } elseif ($log->status === CertificateEmailLog::STATUS_FAILED) {
+                $ref['has_failed'] = true;
+                if ($log->error_message !== null && $log->error_message !== '') {
+                    $ref['last_error'] = $log->error_message;
+                }
+            }
+        }
+
+        foreach ($byParticipant as $pid => $buckets) {
+            $cert = $buckets[CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK];
+            if ($cert['sent_count'] > 0) {
+                $cert['has_queued'] = false;
+                $cert['has_failed'] = false;
+            } elseif ($cert['has_queued']) {
+                $cert['has_failed'] = false;
+            }
+            $byParticipant[$pid][CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK] = $cert;
+
+            $access = $buckets[CertificateEmailLog::TYPE_COURSE_ACCESS];
+            if ($access['sent_count'] > 0) {
+                $access['has_queued'] = false;
+                $access['has_failed'] = false;
+            } elseif ($access['has_queued']) {
+                $access['has_failed'] = false;
+            }
+            $byParticipant[$pid][CertificateEmailLog::TYPE_COURSE_ACCESS] = $access;
+        }
+
+        return $byParticipant;
+    }
+
+    private function buildCourseAccessEmailLabel(bool $hasVideos, bool $hasMaterials, bool $hasCertificate): string
+    {
+        $parts = [];
+        if ($hasVideos) {
+            $parts[] = 'nagranie';
+        }
+        if ($hasMaterials) {
+            $parts[] = 'materiały';
+        }
+        if ($hasCertificate) {
+            $parts[] = 'zaświadczenie';
+        }
+
+        if ($parts === []) {
+            return 'E-mail: dostęp do szkolenia';
+        }
+
+        return ucfirst(implode(', ', $parts));
     }
 }

@@ -39,6 +39,9 @@
                 </span>
             </div>
         @endif
+        @if(isset($courseEmailDeliveryStats) && isset($participantsWithEmailCount))
+            @include('participants.partials.email-delivery-stats')
+        @endif
         <div id="generatingPdfsAlert" class="alert alert-info d-none mb-4" role="alert"
              data-progress-url="{{ route('certificates.pdf-generation-progress', $course) }}"
              data-status-url="{{ route('certificates.pdf-generation-status', $course) }}"
@@ -263,6 +266,10 @@
                                 <i class="fas fa-sort ms-1 text-white-50"></i>
                             @endif
                         </a>
+                        <div class="small fw-normal text-white-50 mt-1" title="Link do zaświadczeń · {{ $courseAccessEmailLabel ?? 'dostęp do szkolenia' }}">
+                            <i class="fas fa-certificate" aria-hidden="true"></i>
+                            <i class="fas fa-video ms-1" aria-hidden="true"></i>
+                        </div>
                     </th>                    
                     <th>Zaświadczenie</th>
                     <th>Akcje</th>
@@ -343,6 +350,24 @@
                                     @endif
                                 </div>
                             @endif
+
+                            @php
+                                $emailRow = $emailStatusByParticipantId[$participant->id] ?? [];
+                            @endphp
+                            <div class="mt-2 d-flex gap-3 small">
+                                @include('participants.partials.email-delivery-icon', [
+                                    'participant' => $participant,
+                                    'emailRow' => $emailRow,
+                                    'emailType' => \App\Models\CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK,
+                                    'iconTitle' => 'Link do zaświadczeń (lista lub to zaświadczenie)',
+                                ])
+                                @include('participants.partials.email-delivery-icon', [
+                                    'participant' => $participant,
+                                    'emailRow' => $emailRow,
+                                    'emailType' => \App\Models\CertificateEmailLog::TYPE_COURSE_ACCESS,
+                                    'iconTitle' => $courseAccessEmailLabel ?? 'Dostęp do szkolenia',
+                                ])
+                            </div>
                         </td>
                         <td>
                             <div class="d-flex flex-column gap-1">
@@ -1285,6 +1310,10 @@
                 if (activeType) startEmailPolling(alertEl, activeType);
             });
         })();
+
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+            new bootstrap.Tooltip(el);
+        });
     </script>
     @endpush
 </x-app-layout>

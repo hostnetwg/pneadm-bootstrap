@@ -13,6 +13,20 @@ class CertificateEmailLog extends Model
     public const TYPE_SINGLE_CERTIFICATE = 'single_certificate';
     public const TYPE_COURSE_ACCESS = 'course_access';
 
+    /** Klucz agregowany (nie zapisywany w DB): lista lub pojedyncze zaświadczenie. */
+    public const AGGREGATE_CERTIFICATE_LINK = 'certificate_link';
+
+    /**
+     * @return list<string>
+     */
+    public static function certificateLinkTypes(): array
+    {
+        return [
+            self::TYPE_LIST_LINK,
+            self::TYPE_SINGLE_CERTIFICATE,
+        ];
+    }
+
     public const STATUS_QUEUED = 'queued';
     public const STATUS_SENT = 'sent';
     public const STATUS_FAILED = 'failed';
