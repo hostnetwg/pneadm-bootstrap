@@ -212,6 +212,19 @@ class Course extends Model
     }
 
     /**
+     * Pozycja faktury trenera przypisana do tego szkolenia (rozliczenie wypłaty).
+     */
+    public function trainerInvoiceItems()
+    {
+        return $this->hasMany(TrainerInvoiceItem::class, 'course_id');
+    }
+
+    public function trainerSettlementItem()
+    {
+        return $this->hasOne(TrainerInvoiceItem::class, 'course_id')->latestOfMany();
+    }
+
+    /**
      * Publiczny URL formularza rejestracji zaświadczenia na pnedu.pl (lub null).
      */
     public function certificateRegistrationPublicUrl(): ?string

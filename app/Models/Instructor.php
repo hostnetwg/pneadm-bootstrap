@@ -88,6 +88,12 @@ class Instructor extends Model
     /**
      * Relacja do ankiet przypisanych do instruktora
      */
+
+    public function trainerInvoices()
+    {
+        return $this->hasMany(TrainerInvoice::class, 'instructor_id');
+    }
+
     public function surveys()
     {
         return $this->hasMany(Survey::class, 'instructor_id');

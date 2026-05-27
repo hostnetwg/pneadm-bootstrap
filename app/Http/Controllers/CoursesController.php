@@ -145,6 +145,12 @@ class CoursesController extends Controller
             'onlineDetails:id,course_id,platform,meeting_link',
         ];
 
+        if (auth()->user()?->isSuperAdmin()) {
+            $eagerLoads['trainerSettlementItem.trainerInvoice'] = function ($query) {
+                $query->select('id', 'instructor_id', 'invoice_number', 'ksef_number', 'invoice_date', 'payment_status', 'paid_at');
+            };
+        }
+
         // Dla większych zbiorów danych, ograniczamy relacje które są używane tylko do liczenia
         if (! $isAll || $filteredCount < 300) {
             $eagerLoads['participants'] = function ($query) {

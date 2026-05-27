@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'noindex' => \App\Http\Middleware\NoIndexMiddleware::class,
             'check.user.status' => \App\Http\Middleware\CheckUserStatus::class,
             'api.token' => \App\Http\Middleware\VerifyApiToken::class,
+            'super_admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
         
         // Dodaj middleware globalnie do wszystkich tras web

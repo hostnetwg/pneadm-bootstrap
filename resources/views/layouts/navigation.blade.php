@@ -308,6 +308,13 @@
                             Wprowadź dane
                         </a>
                     </li>
+                    @if(auth()->user()?->isSuperAdmin())
+                    <li>
+                        <a href="{{ route('accounting.trainer-invoices.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.trainer-invoices.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Faktury trenerów
+                        </a>
+                    </li>
+                    @endif
                     <li>
                         <a href="{{ route('accounting.debtors.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.debtors.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             Dłużnicy

@@ -285,6 +285,20 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::delete('/{fileLink}', [\App\Http\Controllers\CourseFileLinkController::class, 'destroy'])->name('destroy');
     });
 
+
+    // Rozliczenia trenerów (faktury wypłat) — tylko Super Administrator
+    Route::middleware('super_admin')->group(function () {
+        Route::get('/instructors/{instructor}/trainer-invoices', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'instructorInvoices'])
+            ->name('instructors.trainer-invoices.index');
+        Route::post('/trainer-invoices/{trainerInvoice}/mark-paid', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'markPaid'])
+            ->name('trainer-invoices.mark-paid');
+        Route::prefix('courses/{course}/trainer-settlement')->name('courses.trainer-settlement.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'show'])->name('show');
+            Route::post('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'store'])->name('store');
+            Route::delete('/', [\App\Http\Controllers\CourseTrainerSettlementController::class, 'destroy'])->name('destroy');
+        });
+    });
+
     // Linki do zewnętrznych ankiet (np. Google Forms) dla kursów
     Route::prefix('courses/{course}/survey-links')->name('courses.survey-links.')->group(function () {
         Route::get('/', [\App\Http\Controllers\CourseSurveyLinkController::class, 'index'])->name('index');
@@ -442,6 +456,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::prefix('debtors')->name('debtors.')->group(function () {
             Route::get('/', [AccountingController::class, 'debtorsIndex'])->name('index');
             Route::get('/lookup', [AccountingController::class, 'debtorsLookup'])->name('lookup');
+        });
+
+        Route::middleware('super_admin')->prefix('trainer-invoices')->name('trainer-invoices.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\TrainerInvoicesController::class, 'index'])->name('index');
+            Route::get('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'show'])->name('show');
+            Route::put('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'update'])->name('update');
+            Route::delete('/{trainerInvoice}', [\App\Http\Controllers\TrainerInvoicesController::class, 'destroy'])->name('destroy');
+            Route::post('/{trainerInvoice}/mark-paid', [\App\Http\Controllers\TrainerInvoicesController::class, 'markPaid'])->name('mark-paid');
+            Route::post('/{trainerInvoice}/mark-unpaid', [\App\Http\Controllers\TrainerInvoicesController::class, 'markUnpaid'])->name('mark-unpaid');
+            Route::delete('/{trainerInvoice}/items/{item}', [\App\Http\Controllers\TrainerInvoicesController::class, 'destroyItem'])->name('items.destroy');
         });
     });
 

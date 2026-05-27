@@ -242,7 +242,7 @@
                         {{-- <th>Opis</th> --}}
                         <th style="width: 10%;">Rodzaj</th>
                         <th style="width: 18%;">Lokalizacja / Dostęp</th>
-                        <th style="width: 6%;">Instruktor</th>
+                        <th style="width: 10%;">Instruktor</th>
                         <th class="text-center" style="width: 3%;" title="Check lista">C</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
@@ -406,8 +406,8 @@
                                 Brak danych
                             @endif
                         </td>
-                        <td class="align-middle">
-                            {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}
+                        <td class="align-middle small">
+                            @include('courses.partials.trainer-settlement-instructor-cell', ['course' => $course])
                         </td>
                         <td class="text-center align-middle">
                             <div class="d-flex flex-column align-items-center gap-1">
@@ -1622,5 +1622,8 @@
             @endforeach
         });
     </script>
+    @if(auth()->user()?->isSuperAdmin())
+        @include('courses.partials.trainer-settlement-modal')
+    @endif
     @endpush
 </x-app-layout>
