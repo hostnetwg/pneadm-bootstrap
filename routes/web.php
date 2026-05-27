@@ -296,6 +296,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'show'])->name('show');
             Route::post('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'store'])->name('store');
             Route::delete('/', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'destroy'])->name('destroy');
+            Route::delete('/document', [\App\Http\Controllers\CourseInstructorSettlementController::class, 'destroyDocument'])->name('destroy-document');
         });
     });
 

@@ -93,12 +93,34 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer justify-content-between">
-                <button type="button" class="btn btn-outline-danger d-none" id="tsRemoveBtn">Usuń powiązanie ze szkoleniem</button>
-                <div class="ms-auto">
+            <div class="modal-footer justify-content-between flex-wrap gap-2">
+                <div id="tsDangerActions" class="d-flex flex-wrap gap-2 align-items-center d-none">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="tsRemoveBtn">Usuń powiązanie ze szkoleniem</button>
+                    <button type="button" class="btn btn-danger btn-sm d-none" id="tsDeleteDocumentBtn">Usuń całe rozliczenie</button>
+                    <a href="#" class="btn btn-outline-secondary btn-sm d-none" id="tsAccountingLink" target="_blank" rel="noopener">Szczegóły w księgowości</a>
+                </div>
+                <div class="ms-auto d-flex gap-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
                     <button type="button" class="btn btn-primary" id="tsSaveBtn">Zapisz</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="courseSettlementDeleteConfirmModal" tabindex="-1" aria-labelledby="courseSettlementDeleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="courseSettlementDeleteConfirmModalLabel">Potwierdzenie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0" id="courseSettlementDeleteConfirmMessage"></p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                <button type="button" class="btn btn-danger" id="courseSettlementDeleteConfirmBtn">Usuń</button>
             </div>
         </div>
     </div>
@@ -117,7 +139,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const existingBlock = document.getElementById('tsExistingInvoiceBlock');
     const newBlock = document.getElementById('tsNewInvoiceBlock');
     const invoiceSelect = document.getElementById('tsInstructorInvoiceId');
+    const dangerActions = document.getElementById('tsDangerActions');
     const removeBtn = document.getElementById('tsRemoveBtn');
+    const deleteDocumentBtn = document.getElementById('tsDeleteDocumentBtn');
+    const accountingLink = document.getElementById('tsAccountingLink');
     const paymentStatus = document.getElementById('tsPaymentStatus');
     const paidAt = document.getElementById('tsPaidAt');
 
@@ -125,6 +150,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentInstructorId = null;
     let hasSettlement = false;
     let currentInstructorInvoiceId = null;
+    let currentInvoiceNumber = '';
+    let currentItemsCount = 0;
+    let pendingDeleteAction = null;
+
+    const confirmModalEl = document.getElementById('courseSettlementDeleteConfirmModal');
+    const confirmModal = confirmModalEl ? new bootstrap.Modal(confirmModalEl) : null;
+    const confirmTitleEl = document.getElementById('courseSettlementDeleteConfirmModalLabel');
+    const confirmMessageEl = document.getElementById('courseSettlementDeleteConfirmMessage');
+    const confirmBtn = document.getElementById('courseSettlementDeleteConfirmBtn');
 
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const typeInvoice = document.getElementById('tsSettlementTypeInvoice');
@@ -211,8 +245,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function fillFormFromSettlement(settlement) {
         const inv = settlement.invoice;
         currentInstructorInvoiceId = inv.id;
-        const itemsCount = inv.items_count || 1;
-        const isConsolidated = itemsCount > 1;
+        currentInvoiceNumber = inv.invoice_number || '';
+        currentItemsCount = Math.max(1, parseInt(inv.items_count, 10) || 1);
+        const isConsolidated = currentItemsCount > 1;
 
         if (inv.settlement_type === 'mandate') {
             typeMandate.checked = true;
@@ -237,6 +272,40 @@ document.addEventListener('DOMContentLoaded', function() {
             fillHeaderFieldsFromInvoice(inv);
             toggleInvoiceMode();
         }
+        updateDangerActions();
+    }
+
+
+    function updateDangerActions() {
+        if (!dangerActions) {
+            return;
+        }
+        if (!hasSettlement) {
+            dangerActions.classList.add('d-none');
+            deleteDocumentBtn.classList.add('d-none');
+            accountingLink.classList.add('d-none');
+            return;
+        }
+        dangerActions.classList.remove('d-none');
+        const consolidated = currentItemsCount > 1;
+        deleteDocumentBtn.classList.toggle('d-none', consolidated);
+        accountingLink.classList.toggle('d-none', !consolidated);
+        if (consolidated && currentInstructorInvoiceId) {
+            accountingLink.href = `/accounting/instructor-invoices/${currentInstructorInvoiceId}`;
+        }
+        removeBtn.textContent = consolidated
+            ? 'Usuń powiązanie ze szkoleniem'
+            : 'Usuń powiązanie ze szkoleniem';
+        removeBtn.title = consolidated
+            ? 'Dokument rozliczenia pozostanie dla innych szkoleń na tej samej fakturze/umowie.'
+            : 'Odłączy tylko to szkolenie; nagłówek dokumentu pozostanie w księgowości (pusty). Preferuj «Usuń całe rozliczenie».';
+    }
+
+    function openDeleteConfirm(title, message, action) {
+        pendingDeleteAction = action;
+        confirmTitleEl.textContent = title;
+        confirmMessageEl.textContent = message;
+        confirmModal.show();
     }
 
     function resetForm() {
@@ -244,9 +313,11 @@ document.addEventListener('DOMContentLoaded', function() {
         typeInvoice.checked = true;
         useExisting.checked = false;
         syncSettlementTypeUi();
-        removeBtn.classList.add('d-none');
+        dangerActions.classList.add('d-none');
         hasSettlement = false;
         currentInstructorInvoiceId = null;
+        currentInvoiceNumber = '';
+        currentItemsCount = 0;
     }
 
     document.querySelectorAll('.instructor-settlement-open').forEach(btn => {
@@ -271,7 +342,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 syncSettlementTypeUi();
                 if (data.settlement) {
                     hasSettlement = true;
-                    removeBtn.classList.remove('d-none');
                     fillFormFromSettlement(data.settlement);
                 } else {
                     loadInstructorInvoices(currentInstructorId);
@@ -333,24 +403,48 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     removeBtn.addEventListener('click', function() {
-        if (!confirm('Usunąć powiązanie rozliczenia z tym szkoleniem? (Dokument i inne pozycje pozostaną.)')) return;
-        fetch(`/courses/${currentCourseId}/instructor-settlement`, {
-            method: 'DELETE',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrf,
-            },
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                modal.hide();
-                window.location.reload();
-            } else {
-                alert(data.message || 'Błąd usuwania');
-            }
+        const msg = currentItemsCount > 1
+            ? 'Usunąć powiązanie tego szkolenia z dokumentem ' + currentInvoiceNumber + '? Pozostałe szkolenia na tym rozliczeniu pozostaną.'
+            : 'Usunąć powiązanie tego szkolenia z dokumentem ' + currentInvoiceNumber + '? Nagłówek dokumentu pozostanie w księgowości (bez pozycji). Aby skasować dokument, użyj «Usuń całe rozliczenie».';
+        openDeleteConfirm('Usunąć powiązanie ze szkoleniem?', msg, function() {
+            return fetch(`/courses/${currentCourseId}/instructor-settlement`, {
+                method: 'DELETE',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+            }).then(r => r.json());
         });
     });
+
+    deleteDocumentBtn.addEventListener('click', function() {
+        openDeleteConfirm(
+            'Usunąć całe rozliczenie?',
+            'Na pewno usunąć całe rozliczenie ' + currentInvoiceNumber + ' wraz z tym szkoleniem? Tej operacji nie można cofnąć.',
+            function() {
+                return fetch(`/courses/${currentCourseId}/instructor-settlement/document`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                }).then(r => r.json());
+            }
+        );
+    });
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            if (!pendingDeleteAction) return;
+            confirmBtn.disabled = true;
+            pendingDeleteAction()
+                .then(data => {
+                    if (data.success) {
+                        confirmModal.hide();
+                        modal.hide();
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Błąd usuwania');
+                    }
+                })
+                .catch(() => alert('Błąd połączenia.'))
+                .finally(() => { confirmBtn.disabled = false; pendingDeleteAction = null; });
+        });
+    }
 });
 </script>
 @endpush

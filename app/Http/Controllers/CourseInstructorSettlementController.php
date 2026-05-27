@@ -119,6 +119,48 @@ class CourseInstructorSettlementController extends Controller
         }
     }
 
+    public function destroyDocument(Course $course): JsonResponse
+    {
+        try {
+            $this->settlementService->assertCourseInScope($course);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $item = $course->instructorSettlementItem()
+            ->with('instructorInvoice')
+            ->first();
+
+        if (! $item || ! $item->instructorInvoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Brak rozliczenia do usunięcia.',
+            ], 404);
+        }
+
+        $invoice = $item->instructorInvoice;
+        $itemsCount = $invoice->items()->count();
+
+        if ($itemsCount > 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'To rozliczenie obejmuje wiele szkoleń. Usuń całość w module Księgowość lub odłącz tylko to szkolenie.',
+            ], 422);
+        }
+
+        $number = $invoice->invoice_number;
+        $this->settlementService->deleteInvoice($invoice);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Rozliczenie {$number} zostało usunięte.",
+        ]);
+    }
+
     public function instructorInvoices(Request $request, Instructor $instructor): JsonResponse
     {
         $settlementType = $request->query('settlement_type', InstructorInvoice::SETTLEMENT_TYPE_INVOICE);

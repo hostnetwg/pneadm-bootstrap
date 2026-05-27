@@ -300,4 +300,48 @@ class InstructorSettlementTest extends TestCase
         ]);
     }
 
+
+    public function test_destroy_document_from_course_when_single_item(): void
+    {
+        $user = $this->superAdmin();
+        $instructor = $this->createInstructor();
+        $course = $this->createCourse($instructor, '2026-05-15 10:00:00');
+
+        $this->actingAs($user)->postJson(route('courses.instructor-settlement.store', $course), [
+            'invoice_number' => 'FV/DEL/1',
+            'amount_gross' => 100,
+        ])->assertOk();
+
+        $this->actingAs($user)
+            ->deleteJson(route('courses.instructor-settlement.destroy-document', $course))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('instructor_invoices', ['invoice_number' => 'FV/DEL/1']);
+        $this->assertDatabaseMissing('instructor_invoice_items', ['course_id' => $course->id]);
+    }
+
+    public function test_destroy_document_rejected_when_consolidated(): void
+    {
+        $user = $this->superAdmin();
+        $instructor = $this->createInstructor();
+        $courseA = $this->createCourse($instructor, '2026-05-10 10:00:00');
+        $courseB = $this->createCourse($instructor, '2026-05-20 10:00:00');
+
+        $this->actingAs($user)->postJson(route('courses.instructor-settlement.store', $courseA), [
+            'invoice_number' => 'FV/DEL/ZB',
+            'amount_gross' => 100,
+        ]);
+        $invoice = InstructorInvoice::where('invoice_number', 'FV/DEL/ZB')->first();
+        $this->actingAs($user)->postJson(route('courses.instructor-settlement.store', $courseB), [
+            'instructor_invoice_id' => $invoice->id,
+            'amount_gross' => 200,
+        ]);
+
+        $this->actingAs($user)
+            ->deleteJson(route('courses.instructor-settlement.destroy-document', $courseA))
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('instructor_invoices', ['id' => $invoice->id]);
+    }
+
 }
