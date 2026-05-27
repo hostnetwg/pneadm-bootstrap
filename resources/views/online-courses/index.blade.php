@@ -38,8 +38,8 @@
                                             <img src="{{ asset('storage/'.$course->image) }}"
                                                  alt="{{ $course->title }}"
                                                  class="img-thumbnail flex-shrink-0"
-                                                 width="48"
-                                                 height="48"
+                                                 width="96"
+                                                 height="96"
                                                  style="object-fit: cover;">
                                         @endif
                                         <span>{{ $course->title }}</span>
