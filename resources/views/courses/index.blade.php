@@ -366,6 +366,11 @@
                                                title="Otwórz zamówienie bez wystawionej faktury (#{{ $course->closed_billing_uninvoiced_order_id }})">
                                                 <i class="bi bi-receipt"></i> {{ $bsLabel }}
                                             </a>
+                                        @elseif($bs === \App\Services\CourseFormOrderBillingService::STATUS_COMPLETE && !empty($course->closed_billing_first_invoice_number))
+                                            <span class="badge {{ $bsClass }} fw-semibold"
+                                                  title="Faktura: {{ $course->closed_billing_first_invoice_number }}">
+                                                <i class="bi bi-receipt"></i> {{ $bsLabel }} <span class="opacity-75">·</span> {{ $course->closed_billing_first_invoice_number }}
+                                            </span>
                                         @else
                                             <span class="badge {{ $bsClass }} fw-semibold"
                                                   title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">

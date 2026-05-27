@@ -200,6 +200,50 @@ class CourseFormOrderBillingService
             ->all();
     }
 
+    /**
+     * Pierwszy numer FV (najniższe id) dla danego szkolenia — do podglądu na liście kursów.
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array<int, string> course_id => invoice_number
+     */
+    public static function firstInvoiceNumberByCourseIds(array $courseIds): array
+    {
+        if ($courseIds === []) {
+            return [];
+        }
+
+        return DB::connection('mysql')
+            ->table('courses as c')
+            ->join('form_orders as fo', function ($join) {
+                $join->whereNull('fo.deleted_at')
+                    ->where(function ($q) {
+                        $q->whereColumn('fo.product_id', 'c.id')
+                            ->orWhere(function ($q2) {
+                                $q2->whereNotNull('c.id_old')
+                                    ->where('c.id_old', '!=', '')
+                                    ->whereColumn('fo.publigo_product_id', 'c.id_old');
+                            });
+                    })
+                    ->whereNotNull('fo.invoice_number')
+                    ->where('fo.invoice_number', '!=', '')
+                    ->where('fo.invoice_number', '!=', '0');
+            })
+            ->whereIn('c.id', $courseIds)
+            ->where('c.category', 'closed')
+            ->where('c.is_paid', 1)
+            ->orderBy('fo.id')
+            ->select('c.id as course_id', 'fo.invoice_number')
+            ->get()
+            ->groupBy('course_id')
+            ->map(function ($rows) {
+                $row = $rows->first();
+
+                return $row ? (string) $row->invoice_number : '';
+            })
+            ->filter(fn ($n) => trim((string) $n) !== '' && trim((string) $n) !== '0')
+            ->all();
+    }
+
     public static function statusLabel(string $status): string
     {
         return match ($status) {
