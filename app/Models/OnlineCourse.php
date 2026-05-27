@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -65,6 +66,16 @@ class OnlineCourse extends Model
     public function modules(): HasMany
     {
         return $this->hasMany(OnlineCourseModule::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function lessons(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            OnlineCourseLesson::class,
+            OnlineCourseModule::class,
+            'online_course_id',
+            'online_course_module_id'
+        );
     }
 
     public function enrollments(): HasMany

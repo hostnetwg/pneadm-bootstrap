@@ -21,7 +21,7 @@
                             <th>ID</th>
                             <th>Tytuł</th>
                             <th>Slug</th>
-                            <th>Moduły</th>
+                            <th>Moduły/lekcje</th>
                             <th>Dostępy</th>
                             <th>Aktywny</th>
                             <th>W panelu PNEDU</th>
@@ -34,7 +34,7 @@
                                 <td>{{ $course->id }}</td>
                                 <td>{{ $course->title }}</td>
                                 <td><code>{{ $course->slug }}</code></td>
-                                <td>{{ $course->modules_count }}</td>
+                                <td>{{ $course->modules_count }}/{{ $course->lessons_count }}</td>
                                 <td>{{ $course->enrollments_count }}</td>
                                 <td>{{ $course->is_active ? 'Tak' : 'Nie' }}</td>
                                 <td>{{ $course->visible_in_dashboard ? 'Tak' : 'Nie' }}</td>

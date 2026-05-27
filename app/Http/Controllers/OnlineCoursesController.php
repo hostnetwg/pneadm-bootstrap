@@ -18,7 +18,7 @@ class OnlineCoursesController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
-        $query = OnlineCourse::query()->with('instructor')->withCount(['modules', 'enrollments'])->latest('id');
+        $query = OnlineCourse::query()->with('instructor')->withCount(['modules', 'lessons', 'enrollments'])->latest('id');
 
         if ($q !== '') {
             $query->where(function ($sub) use ($q) {
