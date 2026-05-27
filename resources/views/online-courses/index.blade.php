@@ -2,6 +2,29 @@
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">Kursy online (nagrania)</h2>
     </x-slot>
+    <style>
+        .online-course-thumb-preview {
+            cursor: zoom-in;
+        }
+        #online-course-thumb-preview-float {
+            position: fixed;
+            z-index: 1080;
+            pointer-events: none;
+            padding: 6px;
+            background: #fff;
+            border: 1px solid var(--bs-border-color);
+            border-radius: 0.375rem;
+            box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.18);
+        }
+        #online-course-thumb-preview-float img {
+            display: block;
+            max-width: min(320px, 90vw);
+            max-height: min(320px, 70vh);
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+    </style>
     <div class="py-3">
         <div class="container-fluid px-4">
             @if(session('success'))
@@ -35,12 +58,15 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         @if(!empty($course->image))
-                                            <img src="{{ asset('storage/'.$course->image) }}"
+                                            @php $imageUrl = asset('storage/'.$course->image); @endphp
+                                            <img src="{{ $imageUrl }}"
                                                  alt="{{ $course->title }}"
-                                                 class="img-thumbnail flex-shrink-0"
+                                                 class="img-thumbnail flex-shrink-0 online-course-thumb-preview"
                                                  width="96"
                                                  height="96"
-                                                 style="object-fit: cover;">
+                                                 style="object-fit: cover;"
+                                                 data-oc-thumb-preview
+                                                 data-preview-src="{{ $imageUrl }}">
                                         @endif
                                         <span>{{ $course->title }}</span>
                                     </div>
@@ -64,4 +90,73 @@
             {{ $courses->links() }}
         </div>
     </div>
+
+    <div id="online-course-thumb-preview-float" hidden aria-hidden="true">
+        <img src="" alt="">
+    </div>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const floatEl = document.getElementById('online-course-thumb-preview-float');
+            if (!floatEl) {
+                return;
+            }
+            const floatImg = floatEl.querySelector('img');
+            const thumbs = document.querySelectorAll('[data-oc-thumb-preview]');
+            let activeThumb = null;
+
+            function positionPreview(thumb) {
+                const rect = thumb.getBoundingClientRect();
+                const pad = 12;
+                floatEl.hidden = false;
+                const floatRect = floatEl.getBoundingClientRect();
+                let left = rect.right + pad;
+                let top = rect.top + (rect.height / 2) - (floatRect.height / 2);
+
+                if (left + floatRect.width > window.innerWidth - pad) {
+                    left = rect.left - pad - floatRect.width;
+                }
+                if (top < pad) {
+                    top = pad;
+                }
+                if (top + floatRect.height > window.innerHeight - pad) {
+                    top = window.innerHeight - pad - floatRect.height;
+                }
+
+                floatEl.style.left = left + 'px';
+                floatEl.style.top = top + 'px';
+            }
+
+            thumbs.forEach(function (thumb) {
+                thumb.addEventListener('mouseenter', function () {
+                    activeThumb = thumb;
+                    floatImg.src = thumb.dataset.previewSrc || thumb.src;
+                    floatImg.alt = thumb.alt || '';
+                    floatEl.hidden = false;
+                    const place = function () {
+                        if (activeThumb === thumb) {
+                            positionPreview(thumb);
+                        }
+                    };
+                    if (floatImg.complete) {
+                        place();
+                    } else {
+                        floatImg.onload = place;
+                    }
+                });
+                thumb.addEventListener('mouseleave', function () {
+                    activeThumb = null;
+                    floatEl.hidden = true;
+                    floatImg.removeAttribute('src');
+                });
+                thumb.addEventListener('mousemove', function () {
+                    if (activeThumb === thumb) {
+                        positionPreview(thumb);
+                    }
+                });
+            });
+        })();
+    </script>
+    @endpush
 </x-app-layout>
