@@ -32,7 +32,19 @@
                         @forelse($courses as $course)
                             <tr>
                                 <td>{{ $course->id }}</td>
-                                <td>{{ $course->title }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        @if(!empty($course->image))
+                                            <img src="{{ asset('storage/'.$course->image) }}"
+                                                 alt="{{ $course->title }}"
+                                                 class="img-thumbnail flex-shrink-0"
+                                                 width="48"
+                                                 height="48"
+                                                 style="object-fit: cover;">
+                                        @endif
+                                        <span>{{ $course->title }}</span>
+                                    </div>
+                                </td>
                                 <td><code>{{ $course->slug }}</code></td>
                                 <td>{{ $course->modules_count }}/{{ $course->lessons_count }}</td>
                                 <td>{{ $course->enrollments_count }}</td>
