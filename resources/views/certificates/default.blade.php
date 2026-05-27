@@ -204,7 +204,11 @@
                 };
             @endphp
             {{ $title }}<br>
-            <span class="bold">{{ $instructor->first_name }} {{ $instructor->last_name }}</span>
+            @php
+                $instructorTitle = trim((string) ($instructor->title ?? ''));
+                $instructorDisplayName = trim(($instructorTitle !== '' ? $instructorTitle . ' ' : '') . ($instructor->first_name ?? '') . ' ' . ($instructor->last_name ?? ''));
+            @endphp
+            <span class="bold">{{ $instructorDisplayName }}</span>
         </p>
         
         <div class="signature-container" style="margin-right: {{ rand(10, 100) }}px; margin-top: {{ rand(0, 25) }}px;">

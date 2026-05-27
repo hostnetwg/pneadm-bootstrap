@@ -426,10 +426,12 @@ class TemplateRenderer
                 default => 'prowadzący/a:'
             };
             
+            $instructorTitle = trim((string) ($instructor->title ?? ''));
             $firstName = htmlspecialchars($instructor->first_name ?? '');
             $lastName = htmlspecialchars($instructor->last_name ?? '');
+            $displayName = trim(($instructorTitle !== '' ? htmlspecialchars($instructorTitle) . ' ' : '') . "{$firstName} {$lastName}");
             $html .= "            {$title}<br>\n";
-            $html .= "            <span class=\"bold\">{$firstName} {$lastName}</span>\n";
+            $html .= "            <span class=\"bold\">{$displayName}</span>\n";
         }
         
         $html .= "        </p>\n";

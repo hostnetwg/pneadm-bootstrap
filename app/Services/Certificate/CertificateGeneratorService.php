@@ -111,6 +111,7 @@ class CertificateGeneratorService
                 'certificate_templates.slug as template_slug',
                 'certificate_templates.updated_at as template_updated_at',
                 'instructors.id as instructor_id',
+                'instructors.title as instructor_title',
                 'instructors.first_name as instructor_first_name',
                 'instructors.last_name as instructor_last_name',
                 'instructors.gender as instructor_gender',
@@ -245,6 +246,7 @@ class CertificateGeneratorService
             ],
             'instructor' => $certificate->instructor_id ? (object) [
                 'id' => $certificate->instructor_id,
+                'title' => $certificate->instructor_title,
                 'first_name' => $certificate->instructor_first_name,
                 'last_name' => $certificate->instructor_last_name,
                 'gender' => $certificate->instructor_gender,
