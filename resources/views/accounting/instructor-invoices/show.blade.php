@@ -119,11 +119,13 @@
                                         </td>
                                         <td class="text-end fw-semibold">{{ number_format((float) $item->amount_gross, 2, ',', ' ') }} zł</td>
                                         <td class="text-end">
-                                            <form method="POST" action="{{ route('accounting.instructor-invoices.items.destroy', array_merge(['instructorInvoice' => $invoice, 'item' => $item], $listFilters)) }}" class="d-inline" onsubmit="return confirm('Usunąć tę pozycję ze szkolenia? Faktura pozostanie.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Usuń pozycję</button>
-                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger js-settlement-confirm-delete"
+                                                    data-action="{{ route('accounting.instructor-invoices.items.destroy', array_merge(['instructorInvoice' => $invoice, 'item' => $item], $listFilters)) }}"
+                                                    data-title="Usunąć pozycję szkolenia?"
+                                                    data-message="Usunąć tę pozycję ze szkolenia #{{ $item->course_id }}? Nagłówek rozliczenia ({{ $invoice->invoice_number }}) pozostanie — zniknie tylko powiązanie tego szkolenia z kwotą.">
+                                                Usuń pozycję
+                                            </button>
                                         </td>
                                     </tr>
                                 @empty
@@ -161,13 +163,60 @@
                             <button type="submit" class="btn btn-warning btn-sm">Oznacz jako nieopłaconą</button>
                         </form>
                     @endif
-                    <form method="POST" action="{{ route('accounting.instructor-invoices.destroy', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}" class="d-inline ms-auto" onsubmit="return confirm('Na pewno usunąć całe rozliczenie {{ $invoice->invoice_number }} wraz ze wszystkimi pozycjami? Tej operacji nie można cofnąć.');">
+                    <button type="button"
+                            class="btn btn-danger btn-sm ms-auto js-settlement-confirm-delete"
+                            data-action="{{ route('accounting.instructor-invoices.destroy', array_merge(['instructorInvoice' => $invoice], $listFilters)) }}"
+                            data-title="Usunąć całe rozliczenie?"
+                            data-message="Na pewno usunąć całe rozliczenie {{ $invoice->invoice_number }} wraz ze wszystkimi pozycjami ({{ $invoice->items->count() }} {{ $invoice->items->count() === 1 ? 'szkolenie' : 'szkoleń' }})? Tej operacji nie można cofnąć.">
+                        Usuń całe rozliczenie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="settlementDeleteConfirmModal" tabindex="-1" aria-labelledby="settlementDeleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="settlementDeleteConfirmModalLabel">Potwierdzenie usunięcia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="settlementDeleteConfirmMessage"></p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <form method="POST" id="settlementDeleteConfirmForm" class="d-inline">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger btn-sm">Usuń całe rozliczenie</button>
+                        <button type="submit" class="btn btn-danger">Usuń</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalEl = document.getElementById('settlementDeleteConfirmModal');
+        if (!modalEl) return;
+
+        const modal = new bootstrap.Modal(modalEl);
+        const titleEl = document.getElementById('settlementDeleteConfirmModalLabel');
+        const messageEl = document.getElementById('settlementDeleteConfirmMessage');
+        const form = document.getElementById('settlementDeleteConfirmForm');
+
+        document.querySelectorAll('.js-settlement-confirm-delete').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                form.action = btn.dataset.action;
+                titleEl.textContent = btn.dataset.title || 'Potwierdzenie usunięcia';
+                messageEl.textContent = btn.dataset.message || 'Czy na pewno chcesz usunąć?';
+                modal.show();
+            });
+        });
+    });
+    </script>
+    @endpush
 </x-app-layout>
