@@ -107,12 +107,6 @@
                     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkEmailListModal">
                         <i class="fas fa-envelope me-1"></i> Wyślij e-maile: lista zaświadczeń
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bulkEmailSingleModal">
-                        <i class="fas fa-envelope me-1"></i> Wyślij e-maile: to zaświadczenie
-                    </button>
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#bulkEmailCourseAccessModal">
-                        <i class="fas fa-video me-1"></i> Wyślij e-mail nagranie
-                    </button>
                     <a href="{{ route('participants.download-pdf', array_merge(['course' => $course], request()->query())) }}" class="btn btn-info" target="_blank">
                         <i class="fas fa-file-pdf me-1"></i> Pobierz listę uczestników PDF
                     </a>

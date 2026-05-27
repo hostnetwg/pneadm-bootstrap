@@ -21,6 +21,14 @@
                         {{ $listSent }}/{{ $eligible }}
                     </span>
                 </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailListModal">
+                        <i class="fas fa-envelope me-1"></i> Wyślij e-maile: lista zaświadczeń
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailSingleModal">
+                        <i class="fas fa-envelope me-1"></i> Wyślij e-maile: to zaświadczenie
+                    </button>
+                </div>
                 <p class="mb-2 mb-md-1">
                     Wysłano do <strong>{{ $listSent }}</strong> z <strong>{{ $eligible }}</strong> osób z adresem e-mail.
                 </p>
@@ -57,6 +65,11 @@
                     @endif
                 </div>
                 @if($courseAccessCanSendEmail ?? false)
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkEmailCourseAccessModal">
+                            <i class="fas fa-video me-1"></i> Wyślij e-mail nagranie
+                        </button>
+                    </div>
                     <p class="mb-2 mb-md-1">
                         Wysłano do <strong>{{ $accessSent }}</strong> z <strong>{{ $eligible }}</strong> osób z adresem e-mail.
                     </p>
