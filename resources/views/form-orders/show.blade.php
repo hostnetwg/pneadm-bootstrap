@@ -165,7 +165,16 @@
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white py-3">
                     <h5 class="mb-0">
-                        <i class="bi bi-calendar-event"></i> {{ $zamowienie->product_name ?? '—' }}
+                        <i class="bi bi-calendar-event"></i>
+                        @if($zamowienie->course)
+                            <a href="{{ route('courses.show', $zamowienie->course->id) }}"
+                               class="link-light link-underline-opacity-25 link-underline-opacity-100-hover"
+                               title="Przejdź do szczegółów szkolenia">
+                                {{ $zamowienie->product_name ?? '—' }}
+                            </a>
+                        @else
+                            {{ $zamowienie->product_name ?? '—' }}
+                        @endif
                         @if($zamowienie->product_price)
                             <span class="badge bg-success ms-2 fs-6">
                                 {{ number_format($zamowienie->product_price, 2) }} PLN

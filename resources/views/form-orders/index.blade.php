@@ -321,7 +321,17 @@
                                     <h6 class="text-primary fw-bold mb-2">
                                         <i class="bi bi-calendar-event"></i> SZKOLENIE
                                     </h6>
-                                    <div class="fs-5 fw-semibold text-dark">{{ $zamowienie->product_name ?? '—' }}</div>
+                                    <div class="fs-5 fw-semibold text-dark">
+                                        @if($zamowienie->course)
+                                            <a href="{{ route('courses.show', $zamowienie->course->id) }}"
+                                               class="link-primary link-underline-opacity-25 link-underline-opacity-100-hover"
+                                               title="Przejdź do szczegółów szkolenia">
+                                                {{ $zamowienie->product_name ?? '—' }}
+                                            </a>
+                                        @else
+                                            {{ $zamowienie->product_name ?? '—' }}
+                                        @endif
+                                    </div>
                                     @php
                                         $submissionTitle = \App\Models\FormOrder::submissionSourceLabel($zamowienie->submission_source);
                                         if (filled($zamowienie->submission_source)) {

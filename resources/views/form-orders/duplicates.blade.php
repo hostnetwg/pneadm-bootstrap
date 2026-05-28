@@ -239,6 +239,14 @@
                                             $isOldest = $order->id == $duplicate['oldest_order']->id;
                                             $isNewest = $order->id == $duplicate['newest_order']->id;
                                             $priority = $order->priority;
+                                            $accessExtension = $order->access_extension_preview ?? [];
+                                            $canExtendAccess = (bool) ($accessExtension['eligible'] ?? false);
+                                            $currentAccessFormatted = ! empty($accessExtension['current_expires_at'])
+                                                ? $accessExtension['current_expires_at']->copy()->timezone(config('app.timezone'))->format('d.m.Y H:i')
+                                                : null;
+                                            $newAccessFormatted = array_key_exists('new_expires_at', $accessExtension) && $accessExtension['new_expires_at']
+                                                ? $accessExtension['new_expires_at']->copy()->timezone(config('app.timezone'))->format('d.m.Y H:i')
+                                                : ($canExtendAccess ? 'bezterminowo' : null);
                                         @endphp
                                         <div class="col-md-6 mb-3">
                                             <div class="card duplicate-order @if($isRecommended) border-success border-3 @elseif($isOldest) border-info @else border-danger @endif">
@@ -361,6 +369,32 @@
                                                             @endif
                                                         </div>
                                                     </div>
+                                                    @if($canExtendAccess)
+                                                        <div class="alert alert-warning mt-3 mb-0">
+                                                            <div class="d-flex flex-column gap-2">
+                                                                <div>
+                                                                    <strong><i class="bi bi-arrow-repeat"></i> Możliwy ponowny zakup / przedłużenie dostępu</strong>
+                                                                    <div class="small mt-1">
+                                                                        To zamówienie wygląda na świadomy zakup kolejnego okresu dostępu, a nie zwykły duplikat.
+                                                                    </div>
+                                                                </div>
+                                                                <div class="small">
+                                                                    <div>Obecny dostęp: <strong>{{ $currentAccessFormatted ?? '—' }}</strong></div>
+                                                                    <div>Po przedłużeniu: <strong>{{ $newAccessFormatted ?? '—' }}</strong></div>
+                                                                    @if(! empty($accessExtension['variant_label']))
+                                                                        <div>Wariant: <strong>{{ $accessExtension['variant_label'] }}</strong></div>
+                                                                    @endif
+                                                                </div>
+                                                                <div>
+                                                                    <button type="button"
+                                                                            class="btn btn-sm btn-warning fw-bold text-dark"
+                                                                            onclick="extendPneduAccess({{ $order->id }}, '{{ addslashes($currentAccessFormatted ?? '—') }}', '{{ addslashes($newAccessFormatted ?? '—') }}')">
+                                                                        <i class="bi bi-clock-history"></i> Przedłuż dostęp
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    @endif
                                                     <div class="row mt-2">
                                                         <div class="col-12">
                                                             <strong>Powód priorytetu:</strong><br>
@@ -422,6 +456,7 @@
         let currentKeepOrderId = null;
         let currentMarkCompletedOrderId = null;
         let currentEditNotesOrderId = null;
+        let currentExtendAccessOrderId = null;
         let filterTimeout = null;
 
         function deleteDuplicate(orderId) {
@@ -464,6 +499,15 @@
             document.getElementById('editNotesOrderId').textContent = '#' + orderId;
             document.getElementById('orderNotes').value = currentNotes;
             const modal = new bootstrap.Modal(document.getElementById('editNotesModal'));
+            modal.show();
+        }
+
+        function extendPneduAccess(orderId, currentAccess, newAccess) {
+            currentExtendAccessOrderId = orderId;
+            document.getElementById('extendAccessOrderId').textContent = '#' + orderId;
+            document.getElementById('extendAccessCurrent').textContent = currentAccess || '—';
+            document.getElementById('extendAccessNew').textContent = newAccess || '—';
+            const modal = new bootstrap.Modal(document.getElementById('extendAccessModal'));
             modal.show();
         }
 
@@ -742,6 +786,7 @@
             const confirmKeepSelected = document.getElementById('confirmKeepSelected');
             const confirmMarkCompleted = document.getElementById('confirmMarkCompleted');
             const confirmEditNotes = document.getElementById('confirmEditNotes');
+            const confirmExtendAccess = document.getElementById('confirmExtendAccess');
 
             if (confirmDeleteDuplicate) {
                 confirmDeleteDuplicate.addEventListener('click', function() {
@@ -863,6 +908,34 @@
                         .catch(error => {
                             console.error('Error:', error);
                             showErrorMessage('Wystąpił błąd podczas zapisywania notatki');
+                        });
+                    }
+                });
+            }
+
+            if (confirmExtendAccess) {
+                confirmExtendAccess.addEventListener('click', function() {
+                    if (currentExtendAccessOrderId) {
+                        fetch(`/form-orders/${currentExtendAccessOrderId}/pnedu/extend-access`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                            },
+                        })
+                        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                        .then(({ ok, data }) => {
+                            if (ok && data.success) {
+                                showSuccessMessage(data.message + (data.new_expires_at ? ` Nowy termin: ${data.new_expires_at}` : ' Dostęp bezterminowy.'));
+                                location.reload();
+                            } else {
+                                showErrorMessage('Błąd: ' + (data.error || 'Nie udało się przedłużyć dostępu'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showErrorMessage('Wystąpił błąd podczas przedłużania dostępu');
                         });
                     }
                 });
@@ -1016,6 +1089,42 @@
                     </button>
                     <button type="button" class="btn btn-warning" id="confirmMarkCompleted">
                         <i class="bi bi-check-square"></i> Oznacz jako zakończone
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal przedłużenia dostępu PNEDU --}}
+    <div class="modal fade" id="extendAccessModal" tabindex="-1" aria-labelledby="extendAccessModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="extendAccessModalLabel">
+                        <i class="bi bi-clock-history"></i> Przedłuż dostęp PNEDU
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Czy na pewno chcesz potraktować zamówienie <strong id="extendAccessOrderId"></strong>
+                        jako świadomy ponowny zakup i przedłużyć dostęp istniejącego uczestnika?
+                    </p>
+                    <div class="alert alert-light border">
+                        <div>Obecny dostęp: <strong id="extendAccessCurrent">—</strong></div>
+                        <div>Po przedłużeniu: <strong id="extendAccessNew">—</strong></div>
+                    </div>
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> zamówienie zostanie oznaczone jako obsłużone PNEDU, aby nie dało się użyć go drugi raz do kolejnego przedłużenia.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning fw-bold text-dark" id="confirmExtendAccess">
+                        <i class="bi bi-clock-history"></i> Przedłuż dostęp
                     </button>
                 </div>
             </div>

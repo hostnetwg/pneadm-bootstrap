@@ -35,6 +35,32 @@ class ParticipantAccessExpiryService
         return $this->legacyExpiresAtFromCourse($course, $now);
     }
 
+    public function resolveAccessExpiresAtForExtension(
+        Carbon $currentAccessExpiresAt,
+        ?CoursePriceVariant $variant,
+        Course $course,
+        Carbon $now,
+        ?Carbon $purchaseDate = null,
+        bool $usePostEndRuleWhenCourseEnded = false
+    ): ?Carbon
+    {
+        if ($usePostEndRuleWhenCourseEnded && $this->courseHasEnded($course, $now)) {
+            return $this->expiresAtForPostEndAccessExtension(
+                $currentAccessExpiresAt,
+                $variant,
+                $course,
+                $purchaseDate ?? $now,
+                $now
+            );
+        }
+
+        if ($variant !== null) {
+            return $this->expiresAtFromPriceVariantForExtension($currentAccessExpiresAt, $variant, $now);
+        }
+
+        return $this->legacyExpiresAtFromCourseForExtension($currentAccessExpiresAt, $course, $now);
+    }
+
     public function defaultExpiresAtFromCourseEnd(Course $course): ?Carbon
     {
         $baseDate = $course->end_date ?: $course->start_date;
@@ -119,6 +145,65 @@ class ParticipantAccessExpiryService
         }
     }
 
+    public function expiresAtFromPriceVariantForExtension(
+        Carbon $currentAccessExpiresAt,
+        CoursePriceVariant $variant,
+        Carbon $now
+    ): ?Carbon
+    {
+        $accessType = (string) $variant->access_type;
+
+        switch ($accessType) {
+            case '1':
+            case '2':
+                return null;
+
+            case '3':
+                if ($variant->access_duration_value && $variant->access_duration_unit) {
+                    return $this->expiresAtFromDuration(
+                        $this->extensionBaseDate($currentAccessExpiresAt, $now, $now),
+                        (string) $variant->access_duration_unit,
+                        (int) $variant->access_duration_value
+                    );
+                }
+
+                return null;
+
+            case '4':
+                if (! $variant->access_end_datetime) {
+                    return null;
+                }
+
+                $variantEnd = Carbon::parse($variant->access_end_datetime);
+
+                return $currentAccessExpiresAt->gt($variantEnd) ? $currentAccessExpiresAt->copy() : $variantEnd;
+
+            case '5':
+                if ($variant->access_duration_value && $variant->access_duration_unit) {
+                    $fallbackBaseDate = $variant->access_start_datetime
+                        ? Carbon::parse($variant->access_start_datetime)
+                        : $now;
+
+                    return $this->expiresAtFromDuration(
+                        $this->extensionBaseDate($currentAccessExpiresAt, $fallbackBaseDate, $now),
+                        (string) $variant->access_duration_unit,
+                        (int) $variant->access_duration_value
+                    );
+                }
+
+                return null;
+
+            default:
+                Log::warning('ParticipantAccessExpiryService: nieznany typ dostępu przy przedłużaniu', [
+                    'access_type' => $accessType,
+                    'variant_id' => $variant->id,
+                    'course_id' => $variant->course_id,
+                ]);
+
+                return null;
+        }
+    }
+
     /**
      * Poprzednia logika FormOrderPneduProvisionService / Publigo (bez wariantu na zamówieniu).
      */
@@ -135,6 +220,21 @@ class ParticipantAccessExpiryService
 
         if ($course->access_duration_days) {
             return $now->copy()->addDays((int) $course->access_duration_days);
+        }
+
+        return null;
+    }
+
+    public function legacyExpiresAtFromCourseForExtension(Carbon $currentAccessExpiresAt, Course $course, Carbon $now): ?Carbon
+    {
+        if ($course->start_date || $course->access_duration_days) {
+            $baseDate = $this->extensionBaseDate($currentAccessExpiresAt, $now, $now);
+
+            if ($course->access_duration_days) {
+                return $baseDate->copy()->addDays((int) $course->access_duration_days);
+            }
+
+            return $baseDate->copy()->addMonths(2);
         }
 
         return null;
@@ -169,6 +269,65 @@ class ParticipantAccessExpiryService
         }
 
         return $this->expiresAtFromDuration($baseDate, (string) $unit, (int) $value);
+    }
+
+    private function expiresAtForPostEndAccessExtension(
+        Carbon $currentAccessExpiresAt,
+        ?CoursePriceVariant $variant,
+        Course $course,
+        Carbon $purchaseDate,
+        Carbon $now
+    ): ?Carbon
+    {
+        if ($variant !== null) {
+            $variantRule = (string) ($variant->post_end_access_rule ?? CoursePriceVariant::POST_END_RULE_INHERIT);
+            if ($variantRule === CoursePriceVariant::POST_END_RULE_UNLIMITED) {
+                return null;
+            }
+
+            if ($variantRule === CoursePriceVariant::POST_END_RULE_DURATION
+                && $variant->post_end_access_duration_value
+                && $variant->post_end_access_duration_unit
+            ) {
+                return $this->expiresAtFromDuration(
+                    $this->extensionBaseDate($currentAccessExpiresAt, $purchaseDate, $now),
+                    (string) $variant->post_end_access_duration_unit,
+                    (int) $variant->post_end_access_duration_value
+                );
+            }
+        }
+
+        return $this->expiresAtFromCourseOrGlobalPostEndRuleForExtension($currentAccessExpiresAt, $course, $purchaseDate, $now);
+    }
+
+    private function expiresAtFromCourseOrGlobalPostEndRuleForExtension(
+        Carbon $currentAccessExpiresAt,
+        Course $course,
+        Carbon $purchaseDate,
+        Carbon $now
+    ): ?Carbon
+    {
+        $value = $course->post_end_access_duration_value;
+        $unit = $course->post_end_access_duration_unit;
+
+        if (! $value || ! $unit) {
+            $settings = PaymentDisplayOption::getSettings();
+            $value = $settings->default_post_end_access_duration_value ?: 2;
+            $unit = $settings->default_post_end_access_duration_unit ?: 'months';
+        }
+
+        return $this->expiresAtFromDuration(
+            $this->extensionBaseDate($currentAccessExpiresAt, $purchaseDate, $now),
+            (string) $unit,
+            (int) $value
+        );
+    }
+
+    private function extensionBaseDate(Carbon $currentAccessExpiresAt, Carbon $fallbackBaseDate, Carbon $now): Carbon
+    {
+        return $currentAccessExpiresAt->gt($now)
+            ? $currentAccessExpiresAt->copy()
+            : $fallbackBaseDate->copy();
     }
 
     private function expiresAtFromDuration(Carbon $baseDate, string $unit, int $value): Carbon

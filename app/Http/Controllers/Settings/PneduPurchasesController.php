@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\PaymentDisplayOption;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
 class PneduPurchasesController extends Controller
@@ -44,13 +45,15 @@ class PneduPurchasesController extends Controller
         ]);
 
         $options = PaymentDisplayOption::getSettings();
+        $autoFillEnabled = $request->boolean('order_form_auto_fill_test_data');
         $options->update([
             'show_pay_publigo' => $request->boolean('show_pay_publigo'),
             'show_pay_online' => $request->boolean('show_pay_online'),
             'show_deferred_order' => $request->boolean('show_deferred_order'),
             'show_order_form' => $request->boolean('show_order_form'),
             'show_order_form_alt' => $request->boolean('show_order_form_alt'),
-            'order_form_auto_fill_test_data' => $request->boolean('order_form_auto_fill_test_data'),
+            'order_form_auto_fill_test_data' => $autoFillEnabled,
+            'order_form_auto_fill_test_data_enabled_at' => $autoFillEnabled ? Carbon::now() : null,
             'default_post_end_access_duration_value' => $validated['default_post_end_access_duration_value'],
             'default_post_end_access_duration_unit' => $validated['default_post_end_access_duration_unit'],
         ]);

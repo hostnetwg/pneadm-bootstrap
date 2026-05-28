@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
+use App\Services\FormOrderAccessExtensionService;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
 use App\Services\PubligoApiService;
@@ -978,6 +979,16 @@ class FormOrdersController extends Controller
     public function provisionPneduAccess(Request $request, int $id)
     {
         $result = app(FormOrderPneduProvisionService::class)->provision($id);
+
+        $http = (int) ($result['http_code'] ?? 500);
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    public function extendPneduAccess(Request $request, int $id)
+    {
+        $result = app(FormOrderAccessExtensionService::class)->extendByOrder($id);
 
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
@@ -2696,9 +2707,14 @@ class FormOrdersController extends Controller
         foreach ($duplicateGroups as $group) {
             $orderIds = explode(',', $group->order_ids);
             $orders = FormOrder::whereIn('id', $orderIds)
-                ->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders'])
+                ->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'coursePriceVariant'])
                 ->get()
                 ->sortByDesc('priority'); // Sortuj według priorytetu (najważniejsze pierwsze)
+
+            $extensionService = app(FormOrderAccessExtensionService::class);
+            $orders->each(function (FormOrder $order) use ($extensionService): void {
+                $order->access_extension_preview = $extensionService->preview($order);
+            });
 
             $duplicates->push([
                 'email' => $group->participant_email,
