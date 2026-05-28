@@ -43,7 +43,12 @@ class CoursePriceVariantController extends Controller
             'access_end_datetime' => 'nullable|date|after:access_start_datetime|required_if:access_type,2,4',
             'access_duration_value' => 'nullable|integer|min:1|required_if:access_type,3,5',
             'access_duration_unit' => 'nullable|in:hours,days,months,years|required_if:access_type,3,5',
+            'availability_after_course_end' => 'required|in:always,hide_after_end,show_after_end',
+            'post_end_access_rule' => 'required|in:inherit,duration,unlimited',
+            'post_end_access_duration_value' => 'nullable|integer|min:1|max:999|required_if:post_end_access_rule,duration',
+            'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years|required_if:post_end_access_rule,duration',
         ]);
+        $validated = $this->normalizePostEndAccessData($validated);
 
         try {
             DB::beginTransaction();
@@ -100,7 +105,12 @@ class CoursePriceVariantController extends Controller
             'access_end_datetime' => 'nullable|date|after:access_start_datetime|required_if:access_type,2,4',
             'access_duration_value' => 'nullable|integer|min:1|required_if:access_type,3,5',
             'access_duration_unit' => 'nullable|in:hours,days,months,years|required_if:access_type,3,5',
+            'availability_after_course_end' => 'required|in:always,hide_after_end,show_after_end',
+            'post_end_access_rule' => 'required|in:inherit,duration,unlimited',
+            'post_end_access_duration_value' => 'nullable|integer|min:1|max:999|required_if:post_end_access_rule,duration',
+            'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years|required_if:post_end_access_rule,duration',
         ]);
+        $validated = $this->normalizePostEndAccessData($validated);
 
         try {
             DB::beginTransaction();
@@ -257,5 +267,15 @@ class CoursePriceVariantController extends Controller
                 'error' => 'Wystąpił błąd podczas aktywacji wariantu: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    private function normalizePostEndAccessData(array $validated): array
+    {
+        if (($validated['post_end_access_rule'] ?? 'inherit') !== CoursePriceVariant::POST_END_RULE_DURATION) {
+            $validated['post_end_access_duration_value'] = null;
+            $validated['post_end_access_duration_unit'] = null;
+        }
+
+        return $validated;
     }
 }

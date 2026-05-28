@@ -91,7 +91,13 @@ class FormOrderPneduProvisionService
                         ->first();
                 }
                 $accessExpiresAt = app(ParticipantAccessExpiryService::class)
-                    ->resolveAccessExpiresAtForFormOrderProvisioning($variant, $course, now());
+                    ->resolveAccessExpiresAtForFormOrderProvisioning(
+                        $variant,
+                        $course,
+                        now(),
+                        $order->order_date,
+                        $order->submission_source === FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM
+                    );
 
                 Participant::query()->create([
                     'course_id' => $course->id,

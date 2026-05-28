@@ -48,6 +48,45 @@
                         </div>
                     @endforeach
                 </div>
+
+                <hr class="my-4">
+
+                <h5 class="mb-2">Domyślny dostęp po zakończeniu szkolenia</h5>
+                <p class="text-muted small mb-3">
+                    To ustawienie jest używane dla szkoleń online, jeśli konkretne szkolenie lub wariant cenowy nie ma własnej reguły. Dotyczy m.in. zakupu nagrania po zakończeniu, rejestracji zaświadczenia i domyślnej daty w formularzu ręcznego dodawania uczestnika.
+                </p>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="default_post_end_access_duration_value" class="form-label">Okres</label>
+                        <input type="number"
+                               min="1"
+                               max="999"
+                               name="default_post_end_access_duration_value"
+                               id="default_post_end_access_duration_value"
+                               class="form-control @error('default_post_end_access_duration_value') is-invalid @enderror"
+                               value="{{ old('default_post_end_access_duration_value', optional($options)->default_post_end_access_duration_value ?? 2) }}"
+                               required>
+                        @error('default_post_end_access_duration_value')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-3">
+                        <label for="default_post_end_access_duration_unit" class="form-label">Jednostka</label>
+                        <select name="default_post_end_access_duration_unit"
+                                id="default_post_end_access_duration_unit"
+                                class="form-select @error('default_post_end_access_duration_unit') is-invalid @enderror"
+                                required>
+                            @foreach(['days' => 'Dni', 'weeks' => 'Tygodnie', 'months' => 'Miesiące', 'years' => 'Lata'] as $unit => $label)
+                                <option value="{{ $unit }}" {{ old('default_post_end_access_duration_unit', optional($options)->default_post_end_access_duration_unit ?? 'months') === $unit ? 'selected' : '' }}>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('default_post_end_access_duration_unit')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
             </div>
             <div class="card-footer bg-light">
                 <button type="submit" class="btn btn-primary">Zapisz zmiany</button>

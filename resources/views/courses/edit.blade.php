@@ -201,6 +201,47 @@
                     </div>
                 </div>
 
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Dostęp po zakończeniu szkolenia</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Jeżeli pola są puste, system użyje globalnego ustawienia z „Zakupy pnedu.pl”. Ustaw wartość tutaj, aby nadpisać ją tylko dla tego szkolenia.
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="post_end_access_duration_value" class="form-label">Okres</label>
+                                <input type="number"
+                                       min="1"
+                                       max="999"
+                                       name="post_end_access_duration_value"
+                                       id="post_end_access_duration_value"
+                                       class="form-control @error('post_end_access_duration_value') is-invalid @enderror"
+                                       value="{{ old('post_end_access_duration_value', $course->post_end_access_duration_value) }}">
+                                @error('post_end_access_duration_value')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-md-3">
+                                <label for="post_end_access_duration_unit" class="form-label">Jednostka</label>
+                                <select name="post_end_access_duration_unit"
+                                        id="post_end_access_duration_unit"
+                                        class="form-select @error('post_end_access_duration_unit') is-invalid @enderror">
+                                    @foreach(['days' => 'Dni', 'weeks' => 'Tygodnie', 'months' => 'Miesiące', 'years' => 'Lata'] as $unit => $label)
+                                        <option value="{{ $unit }}" {{ old('post_end_access_duration_unit', $course->post_end_access_duration_unit ?? 'months') === $unit ? 'selected' : '' }}>
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('post_end_access_duration_unit')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="offline-fields" style="display: {{ old('type', $course->type) == 'offline' ? 'block' : 'none' }};">
                         <div class="row">
                             <div class="col-md-6">

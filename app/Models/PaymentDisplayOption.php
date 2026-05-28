@@ -19,6 +19,8 @@ class PaymentDisplayOption extends Model
         'show_order_form',
         'show_order_form_alt',
         'order_form_auto_fill_test_data',
+        'default_post_end_access_duration_value',
+        'default_post_end_access_duration_unit',
     ];
 
     protected $casts = [
@@ -28,6 +30,7 @@ class PaymentDisplayOption extends Model
         'show_order_form' => 'boolean',
         'show_order_form_alt' => 'boolean',
         'order_form_auto_fill_test_data' => 'boolean',
+        'default_post_end_access_duration_value' => 'integer',
     ];
 
     /**
@@ -48,6 +51,8 @@ class PaymentDisplayOption extends Model
                 'show_order_form' => true,
                 'show_order_form_alt' => true,
                 'order_form_auto_fill_test_data' => false,
+                'default_post_end_access_duration_value' => 2,
+                'default_post_end_access_duration_unit' => 'months',
             ]);
         } catch (\Throwable $e) {
             report($e);
@@ -58,6 +63,8 @@ class PaymentDisplayOption extends Model
             $fallback->show_order_form = true;
             $fallback->show_order_form_alt = true;
             $fallback->order_form_auto_fill_test_data = false;
+            $fallback->default_post_end_access_duration_value = 2;
+            $fallback->default_post_end_access_duration_unit = 'months';
             return $fallback;
         }
     }

@@ -66,8 +66,12 @@
 
             <div class="mb-3">
                 <label for="access_expires_at" class="form-label">Data wygaśnięcia dostępu</label>
-                <input type="datetime-local" name="access_expires_at" class="form-control" id="access_expires_at">
-                <div class="form-text">Pozostaw puste dla bezterminowego dostępu</div>
+                <input type="datetime-local"
+                       name="access_expires_at"
+                       class="form-control"
+                       id="access_expires_at"
+                       value="{{ old('access_expires_at', $defaultAccessExpiresAt ? $defaultAccessExpiresAt->timezone('Europe/Warsaw')->format('Y-m-d\TH:i') : '') }}">
+                <div class="form-text">Domyślnie: data zakończenia szkolenia + okres ustawiony dla szkolenia lub globalnie. Możesz zmienić datę albo wyczyścić pole dla dostępu bezterminowego.</div>
             </div>
 
             <button type="submit" class="btn btn-success">Dodaj uczestnika</button>

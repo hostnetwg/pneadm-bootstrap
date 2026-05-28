@@ -10,6 +10,7 @@ use App\Models\CourseOnlineDetails;
 use App\Models\CourseSeries;
 use App\Models\FormOrder;
 use App\Models\Instructor;
+use App\Models\PaymentDisplayOption;
 use App\Services\CourseFormOrderBillingService;
 use App\Support\CourseInstructorLinksEmailBody;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -823,13 +824,14 @@ class CoursesController extends Controller
     {
         // Pobranie listy instruktorów do formularza
         $instructors = Instructor::all();
+        $paymentDisplayOptions = PaymentDisplayOption::getSettings();
 
         // Pobranie listy aktywnych szablonów certyfikatów
         $certificateTemplates = CertificateTemplate::where('is_active', true)
             ->orderBy('name')
             ->get();
 
-        return view('courses.create', compact('instructors', 'certificateTemplates'));
+        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions'));
     }
 
     public function store(Request $request)
@@ -857,6 +859,8 @@ class CoursesController extends Controller
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
+            'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
+            'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
             'save_action' => 'required|in:close,stay_editing',
         ]);
         $saveAction = $validated['save_action'];
@@ -865,6 +869,12 @@ class CoursesController extends Controller
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
             ? trim((string) $validated['sendy_suppression_list_id'])
+            : null;
+        $validated['post_end_access_duration_value'] = ! empty($validated['post_end_access_duration_value'])
+            ? (int) $validated['post_end_access_duration_value']
+            : null;
+        $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
+            ? ($validated['post_end_access_duration_unit'] ?? 'months')
             : null;
 
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
@@ -1050,6 +1060,8 @@ class CoursesController extends Controller
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
+            'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
+            'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
             'save_action' => 'required|in:close,stay_editing',
         ]);
 
@@ -1059,6 +1071,12 @@ class CoursesController extends Controller
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
             ? trim((string) $validated['sendy_suppression_list_id'])
+            : null;
+        $validated['post_end_access_duration_value'] = ! empty($validated['post_end_access_duration_value'])
+            ? (int) $validated['post_end_access_duration_value']
+            : null;
+        $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
+            ? ($validated['post_end_access_duration_unit'] ?? 'months')
             : null;
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');

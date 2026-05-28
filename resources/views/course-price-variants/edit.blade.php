@@ -240,6 +240,67 @@
                     </div>
                 </div>
 
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Dostępność i dostęp po zakończeniu szkolenia</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="availability_after_course_end" class="form-label">Dostępność wariantu</label>
+                            <select name="availability_after_course_end" id="availability_after_course_end" class="form-select @error('availability_after_course_end') is-invalid @enderror">
+                                <option value="always" {{ old('availability_after_course_end', $variant->availability_after_course_end ?? 'always') === 'always' ? 'selected' : '' }}>Zawsze dostępny</option>
+                                <option value="hide_after_end" {{ old('availability_after_course_end', $variant->availability_after_course_end ?? 'always') === 'hide_after_end' ? 'selected' : '' }}>Ukryj po zakończeniu szkolenia</option>
+                                <option value="show_after_end" {{ old('availability_after_course_end', $variant->availability_after_course_end ?? 'always') === 'show_after_end' ? 'selected' : '' }}>Pokaż dopiero po zakończeniu szkolenia</option>
+                            </select>
+                            @error('availability_after_course_end')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Użyj „Pokaż dopiero po zakończeniu” dla wariantów typu przedłużenie dostępu do nagrania.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="post_end_access_rule" class="form-label">Reguła dostępu po zakończeniu</label>
+                            <select name="post_end_access_rule" id="post_end_access_rule" class="form-select @error('post_end_access_rule') is-invalid @enderror" onchange="togglePostEndAccessFields()">
+                                <option value="inherit" {{ old('post_end_access_rule', $variant->post_end_access_rule ?? 'inherit') === 'inherit' ? 'selected' : '' }}>Użyj reguły szkolenia / globalnej</option>
+                                <option value="duration" {{ old('post_end_access_rule', $variant->post_end_access_rule ?? 'inherit') === 'duration' ? 'selected' : '' }}>Nadpisz okresem dla tego wariantu</option>
+                                <option value="unlimited" {{ old('post_end_access_rule', $variant->post_end_access_rule ?? 'inherit') === 'unlimited' ? 'selected' : '' }}>Dostęp bezterminowy po zakupie</option>
+                            </select>
+                            @error('post_end_access_rule')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div id="postEndAccessDuration" style="display: {{ old('post_end_access_rule', $variant->post_end_access_rule ?? 'inherit') === 'duration' ? 'block' : 'none' }};">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="post_end_access_duration_value" class="form-label">Okres (ilość)</label>
+                                        <input type="number" name="post_end_access_duration_value" id="post_end_access_duration_value" min="1" max="999"
+                                               class="form-control @error('post_end_access_duration_value') is-invalid @enderror"
+                                               value="{{ old('post_end_access_duration_value', $variant->post_end_access_duration_value) }}">
+                                        @error('post_end_access_duration_value')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="post_end_access_duration_unit" class="form-label">Jednostka</label>
+                                        <select name="post_end_access_duration_unit" id="post_end_access_duration_unit" class="form-select @error('post_end_access_duration_unit') is-invalid @enderror">
+                                            @foreach(['days' => 'Dni', 'weeks' => 'Tygodnie', 'months' => 'Miesiące', 'years' => 'Lata'] as $unit => $label)
+                                                <option value="{{ $unit }}" {{ old('post_end_access_duration_unit', $variant->post_end_access_duration_unit ?? 'months') === $unit ? 'selected' : '' }}>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('post_end_access_duration_unit')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-between">
                     <a href="{{ route('courses.show', $course->id) }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Anuluj
@@ -283,11 +344,17 @@
             accessDuration.style.display = ['3', '5'].includes(accessType) ? 'block' : 'none';
         }
 
+        function togglePostEndAccessFields() {
+            const rule = document.getElementById('post_end_access_rule').value;
+            document.getElementById('postEndAccessDuration').style.display = rule === 'duration' ? 'block' : 'none';
+        }
+
         // Inicjalizacja przy załadowaniu strony
         document.addEventListener('DOMContentLoaded', function() {
             togglePromotionFields();
             togglePromotionDates();
             toggleAccessFields();
+            togglePostEndAccessFields();
         });
     </script>
 </x-app-layout>

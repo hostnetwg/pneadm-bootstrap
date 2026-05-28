@@ -12,6 +12,18 @@ class CoursePriceVariant extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
+    public const AVAILABILITY_ALWAYS = 'always';
+
+    public const AVAILABILITY_HIDE_AFTER_END = 'hide_after_end';
+
+    public const AVAILABILITY_SHOW_AFTER_END = 'show_after_end';
+
+    public const POST_END_RULE_INHERIT = 'inherit';
+
+    public const POST_END_RULE_DURATION = 'duration';
+
+    public const POST_END_RULE_UNLIMITED = 'unlimited';
+
     protected $fillable = [
         'course_id',
         'name',
@@ -28,6 +40,10 @@ class CoursePriceVariant extends Model
         'access_end_datetime',
         'access_duration_value',
         'access_duration_unit',
+        'availability_after_course_end',
+        'post_end_access_rule',
+        'post_end_access_duration_value',
+        'post_end_access_duration_unit',
     ];
 
     protected $casts = [
@@ -40,6 +56,7 @@ class CoursePriceVariant extends Model
         'access_start_datetime' => 'datetime',
         'access_end_datetime' => 'datetime',
         'access_duration_value' => 'integer',
+        'post_end_access_duration_value' => 'integer',
     ];
 
     /**
@@ -69,6 +86,15 @@ class CoursePriceVariant extends Model
         }
 
         return false;
+    }
+
+    public function isAvailableForCourseEndState(bool $courseEnded): bool
+    {
+        return match ($this->availability_after_course_end ?? self::AVAILABILITY_ALWAYS) {
+            self::AVAILABILITY_HIDE_AFTER_END => ! $courseEnded,
+            self::AVAILABILITY_SHOW_AFTER_END => $courseEnded,
+            default => true,
+        };
     }
 
     /**

@@ -30,6 +30,8 @@ class PneduPurchasesController extends Controller
             'show_order_form' => 'boolean',
             'show_order_form_alt' => 'boolean',
             'order_form_auto_fill_test_data' => 'boolean',
+            'default_post_end_access_duration_value' => 'required|integer|min:1|max:999',
+            'default_post_end_access_duration_unit' => 'required|in:days,weeks,months,years',
         ], [], [
             'show_pay_publigo' => 'Zapłać online (Publigo)',
             'show_pay_online' => 'Zapłać online (PayU / PayNow)',
@@ -37,6 +39,8 @@ class PneduPurchasesController extends Controller
             'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz)',
             'show_order_form_alt' => 'Formularz z odroczonym terminem (zdalna-lekcja.pl)',
             'order_form_auto_fill_test_data' => 'Auto-wypełnianie formularza danymi testowymi',
+            'default_post_end_access_duration_value' => 'Domyślny okres dostępu po zakończeniu szkolenia',
+            'default_post_end_access_duration_unit' => 'Jednostka domyślnego okresu dostępu po zakończeniu szkolenia',
         ]);
 
         $options = PaymentDisplayOption::getSettings();
@@ -47,6 +51,8 @@ class PneduPurchasesController extends Controller
             'show_order_form' => $request->boolean('show_order_form'),
             'show_order_form_alt' => $request->boolean('show_order_form_alt'),
             'order_form_auto_fill_test_data' => $request->boolean('order_form_auto_fill_test_data'),
+            'default_post_end_access_duration_value' => $validated['default_post_end_access_duration_value'],
+            'default_post_end_access_duration_unit' => $validated['default_post_end_access_duration_unit'],
         ]);
 
         return redirect()

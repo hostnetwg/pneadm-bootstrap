@@ -13,6 +13,7 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
 use App\Models\PneduUser;
+use App\Services\ParticipantAccessExpiryService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1145,8 +1146,10 @@ class ParticipantController extends Controller
     public function create(Course $course)
     {
         $course->loadMissing('instructor');
+        $defaultAccessExpiresAt = app(ParticipantAccessExpiryService::class)
+            ->defaultExpiresAtFromCourseEnd($course);
 
-        return view('participants.create', compact('course'));
+        return view('participants.create', compact('course', 'defaultAccessExpiresAt'));
     }
 
     /**

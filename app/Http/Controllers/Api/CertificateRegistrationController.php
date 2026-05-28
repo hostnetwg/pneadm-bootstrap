@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Services\ParticipantAccessExpiryService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -234,6 +235,11 @@ class CertificateRegistrationController extends Controller
                 'email' => trim($request->input('email')),
             ];
 
+            if ($existing->access_expires_at === null) {
+                $update['access_expires_at'] = app(ParticipantAccessExpiryService::class)
+                    ->defaultExpiresAtFromCourseEnd($course);
+            }
+
             if ($course->certificate_registration_collect_birth_data) {
                 $update['birth_date'] = $request->filled('birth_date') ? $request->input('birth_date') : null;
                 $update['birth_place'] = $request->filled('birth_place') ? trim((string) $request->input('birth_place')) : null;
@@ -256,6 +262,8 @@ class CertificateRegistrationController extends Controller
             'first_name' => trim($request->input('first_name')),
             'last_name' => trim($request->input('last_name')),
             'email' => trim($request->input('email')),
+            'access_expires_at' => app(ParticipantAccessExpiryService::class)
+                ->defaultExpiresAtFromCourseEnd($course),
         ];
 
         if ($course->certificate_registration_collect_birth_data) {

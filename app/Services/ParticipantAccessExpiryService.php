@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
+use App\Models\PaymentDisplayOption;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -15,13 +16,56 @@ class ParticipantAccessExpiryService
     /**
      * Przy provisioning z zamówienia: jeśli jest wariant — reguły z wariantu; w przeciwnym razie logika „2 miesiące / access_duration_days”.
      */
-    public function resolveAccessExpiresAtForFormOrderProvisioning(?CoursePriceVariant $variant, Course $course, Carbon $now): ?Carbon
+    public function resolveAccessExpiresAtForFormOrderProvisioning(
+        ?CoursePriceVariant $variant,
+        Course $course,
+        Carbon $now,
+        ?Carbon $purchaseDate = null,
+        bool $usePostEndRuleWhenCourseEnded = false
+    ): ?Carbon
     {
+        if ($usePostEndRuleWhenCourseEnded && $this->courseHasEnded($course, $now)) {
+            return $this->expiresAtForPostEndPurchase($variant, $course, $purchaseDate ?? $now);
+        }
+
         if ($variant !== null) {
             return $this->expiresAtFromPriceVariant($variant, $now);
         }
 
         return $this->legacyExpiresAtFromCourse($course, $now);
+    }
+
+    public function defaultExpiresAtFromCourseEnd(Course $course): ?Carbon
+    {
+        $baseDate = $course->end_date ?: $course->start_date;
+        if (! $baseDate) {
+            return null;
+        }
+
+        return $this->expiresAtFromCourseOrGlobalPostEndRule($course, $baseDate->copy());
+    }
+
+    public function expiresAtForPostEndPurchase(?CoursePriceVariant $variant, Course $course, Carbon $baseDate): ?Carbon
+    {
+        if ($variant !== null) {
+            $variantRule = (string) ($variant->post_end_access_rule ?? CoursePriceVariant::POST_END_RULE_INHERIT);
+            if ($variantRule === CoursePriceVariant::POST_END_RULE_UNLIMITED) {
+                return null;
+            }
+
+            if ($variantRule === CoursePriceVariant::POST_END_RULE_DURATION
+                && $variant->post_end_access_duration_value
+                && $variant->post_end_access_duration_unit
+            ) {
+                return $this->expiresAtFromDuration(
+                    $baseDate,
+                    (string) $variant->post_end_access_duration_unit,
+                    (int) $variant->post_end_access_duration_value
+                );
+            }
+        }
+
+        return $this->expiresAtFromCourseOrGlobalPostEndRule($course, $baseDate);
     }
 
     public function expiresAtFromPriceVariant(CoursePriceVariant $variant, Carbon $now): ?Carbon
@@ -101,9 +145,37 @@ class ParticipantAccessExpiryService
         match ($unit) {
             'hours' => $target->addHours($value),
             'days' => $target->addDays($value),
+            'weeks' => $target->addWeeks($value),
             'months' => $target->addMonths($value),
             'years' => $target->addYears($value),
             default => null,
         };
+    }
+
+    private function courseHasEnded(Course $course, Carbon $now): bool
+    {
+        return $course->end_date !== null && $now->gt($course->end_date);
+    }
+
+    private function expiresAtFromCourseOrGlobalPostEndRule(Course $course, Carbon $baseDate): ?Carbon
+    {
+        $value = $course->post_end_access_duration_value;
+        $unit = $course->post_end_access_duration_unit;
+
+        if (! $value || ! $unit) {
+            $settings = PaymentDisplayOption::getSettings();
+            $value = $settings->default_post_end_access_duration_value ?: 2;
+            $unit = $settings->default_post_end_access_duration_unit ?: 'months';
+        }
+
+        return $this->expiresAtFromDuration($baseDate, (string) $unit, (int) $value);
+    }
+
+    private function expiresAtFromDuration(Carbon $baseDate, string $unit, int $value): Carbon
+    {
+        $expiresAt = $baseDate->copy();
+        $this->addDuration($expiresAt, $unit, $value);
+
+        return $expiresAt;
     }
 }

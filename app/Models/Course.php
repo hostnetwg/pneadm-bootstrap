@@ -36,6 +36,8 @@ class Course extends Model
         'certificate_registration_birth_data_required',
         'access_duration_days',
         'access_notes',
+        'post_end_access_duration_value',
+        'post_end_access_duration_unit',
         'notatki',
         'id_old',
         'source_id_old',
@@ -55,6 +57,7 @@ class Course extends Model
         'certificate_registration_ends_at' => 'datetime',
         'certificate_registration_collect_birth_data' => 'boolean',
         'certificate_registration_birth_data_required' => 'boolean',
+        'post_end_access_duration_value' => 'integer',
     ];
 
     /**
@@ -151,6 +154,11 @@ class Course extends Model
     public function priceVariants()
     {
         return $this->hasMany(CoursePriceVariant::class);
+    }
+
+    public function hasEnded(): bool
+    {
+        return $this->end_date !== null && $this->end_date->isPast();
     }
 
     /**
