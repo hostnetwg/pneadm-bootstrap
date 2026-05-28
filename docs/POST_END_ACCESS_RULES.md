@@ -59,12 +59,43 @@ Dla zakupu przed zakończeniem szkolenia nadal działa standardowa reguła waria
 - Rejestracja zaświadczenia: okres liczony od `courses.end_date`.
 - Ręczne dodawanie uczestnika: pole `Data wygaśnięcia dostępu` jest domyślnie wypełniane jako `courses.end_date + okres`, ale operator może je zmienić albo wyczyścić.
 
+## Ponowny zakup i przedłużanie dostępu
+
+Ponowny zakup tego samego szkolenia przez tego samego uczestnika nie jest obsługiwany automatycznie. System traktuje takie przypadki jako potencjalne duplikaty zamówień i pokazuje je na stronie `form-orders/duplicates`.
+
+Jeżeli zamówienie wygląda na świadomy ponowny zakup, administrator widzi przy nim komunikat `Możliwy ponowny zakup / przedłużenie dostępu` oraz przycisk `Przedłuż dostęp`. Dopiero ręczne potwierdzenie tej akcji aktualizuje istniejącego uczestnika.
+
+Warunki pokazania akcji `Przedłuż dostęp`:
+
+- istnieje rekord `participants` dla tego samego `course_id` i e-maila uczestnika,
+- zamówienie nie było wcześniej obsłużone PNEDU (`form_orders.pnedu_provisioned_at` jest puste),
+- zamówienie ma wystawioną fakturę albo jest opłacone online,
+- zamówienie ma przypisany wariant cenowy,
+- wariant ma `availability_after_course_end = always` albo `show_after_end`,
+- wariant jest dostępny dla aktualnego stanu zakończenia szkolenia,
+- obecny dostęp uczestnika nie jest bezterminowy.
+
+Reguła wyliczenia przedłużenia:
+
+- jeśli nowy zakup daje dostęp bezterminowy, `participants.access_expires_at` zostaje ustawione na `null`,
+- jeśli uczestnik ma aktywny dostęp terminowy, nowy okres doliczany jest od obecnej daty wygaśnięcia,
+- jeśli dotychczasowy dostęp wygasł, nowy okres liczony jest od daty zakupu/przyznania dostępu zgodnie z regułą zamówienia,
+- jeśli wariant wskazuje sztywną datę końca dostępu, używana jest późniejsza z dat: obecna data wygaśnięcia albo data z wariantu.
+
+Po skutecznym przedłużeniu:
+
+- aktualizowane jest `participants.access_expires_at`,
+- zamówienie dostaje `pnedu_provisioned_at`, żeby nie dało się użyć go drugi raz do kolejnego przedłużenia,
+- do notatki zamówienia dopisywana jest informacja audytowa z poprzednią i nową datą dostępu.
+
 ## Główne pliki
 
 - `app/Services/ParticipantAccessExpiryService.php` - centralne wyliczanie daty dostępu.
+- `app/Services/FormOrderAccessExtensionService.php` - rozpoznanie i wykonanie świadomego przedłużenia dostępu z duplikatu zamówienia.
 - `app/Services/FormOrderPneduProvisionService.php` - dodawanie uczestnika z zamówienia.
 - `app/Http/Controllers/Api/CertificateRegistrationController.php` - publiczna rejestracja zaświadczenia.
 - `app/Http/Controllers/ParticipantController.php` - ręczne dodawanie uczestnika.
+- `resources/views/form-orders/duplicates.blade.php` - komunikat i akcja `Przedłuż dostęp` dla potencjalnego ponownego zakupu.
 - `resources/views/course-price-variants/*.blade.php` - konfiguracja widoczności wariantów i reguł po zakończeniu.
 - `resources/views/settings/pnedu-purchases.blade.php` - globalna reguła.
 
