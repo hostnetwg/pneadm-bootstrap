@@ -11,6 +11,7 @@ class InstructorTrainingLinksMailTest extends TestCase
     public function test_instructor_training_links_mail_uses_system_sender_and_contains_no_legacy_domains(): void
     {
         config([
+            'mail.system.mailer' => 'ses',
             'mail.system.from_address' => 'info@system.pnedu.pl',
             'mail.system.from_name' => 'Platforma Nowoczesnej Edukacji',
             'mail.system.reply_to_address' => 'kontakt@pnedu.pl',
@@ -23,6 +24,7 @@ class InstructorTrainingLinksMailTest extends TestCase
             subjectLine: 'Linki do szkolenia'
         ))->build();
 
+        $this->assertSame('ses', $mail->mailer);
         $this->assertSame('info@system.pnedu.pl', $mail->from[0]['address']);
         $this->assertSame('Platforma Nowoczesnej Edukacji', $mail->from[0]['name']);
         $this->assertSame('kontakt@pnedu.pl', $mail->replyTo[0]['address']);

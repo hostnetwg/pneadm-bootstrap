@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\FormatsPneduProvisionEmailDetails;
+use App\Notifications\Concerns\UsesSystemMailSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,6 +12,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
 {
     use FormatsPneduProvisionEmailDetails;
     use Queueable;
+    use UsesSystemMailSettings;
 
     public function __construct(
         protected string $token,
@@ -32,7 +34,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         $hasInstructor = $this->instructorLine !== null && $this->instructorLine !== '';
         $hasDate = $this->startDateLine !== null && $this->startDateLine !== '';
 
-        $message = (new MailMessage)
+        $message = $this->configureSystemMail(new MailMessage)
             ->subject('Platforma PNEDU — konto utworzone, ustaw hasło')
             ->greeting('Witaj!')
             ->line('Założyliśmy dla Ciebie konto na platformie pnedu.pl w związku z zapisem na szkolenie.')

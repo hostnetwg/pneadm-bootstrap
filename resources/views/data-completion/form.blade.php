@@ -44,7 +44,7 @@
                     <strong>Niepubliczny Ośrodek Doskonalenia Nauczycieli</strong><br>
                     <em>"Platforma Nowoczesnej Edukacji"</em><br>
                     ul. Andrzeja Zamoyskiego 30/14, 09-320 Bieżuń<br>
-                    kontakt: <a href="mailto:kontakt@nowoczesna-edukacja.pl" style="color: #0d6efd;">kontakt@nowoczesna-edukacja.pl</a>, tel. <a href="tel:501654274" style="color: #0d6efd;">501 654 274</a>
+                    kontakt: <a href="mailto:kontakt@pnedu.pl" style="color: #0d6efd;">kontakt@pnedu.pl</a>, tel. <a href="tel:501654274" style="color: #0d6efd;">501 654 274</a>
                 </div>
             </div>
             
@@ -189,7 +189,7 @@
                         </p>
                         <p class="mb-0">
                             <strong>Kontakt w sprawach RODO:</strong> 
-                            <a href="mailto:kontakt@nowoczesna-edukacja.pl" style="color: #0d6efd;">kontakt@nowoczesna-edukacja.pl</a>
+                            <a href="mailto:kontakt@pnedu.pl" style="color: #0d6efd;">kontakt@pnedu.pl</a>
                         </p>
                     </div>
                 </div>

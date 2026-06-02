@@ -49,19 +49,6 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
-        'data_completion' => [
-            'transport' => 'smtp',
-            'scheme' => env('MAIL_DATA_COMPLETION_SCHEME', env('MAIL_SCHEME')),
-            'url' => env('MAIL_DATA_COMPLETION_URL', env('MAIL_URL')),
-            'host' => env('MAIL_DATA_COMPLETION_HOST', env('MAIL_HOST', '127.0.0.1')),
-            'port' => env('MAIL_DATA_COMPLETION_PORT', env('MAIL_PORT', 2525)),
-            'username' => env('MAIL_DATA_COMPLETION_USERNAME', 'biuro@nowoczesna-edukacja.pl'),
-            'password' => env('MAIL_DATA_COMPLETION_PASSWORD', 'noYkeT#70'),
-            'encryption' => env('MAIL_DATA_COMPLETION_ENCRYPTION', env('MAIL_ENCRYPTION', 'tls')),
-            'timeout' => null,
-            'local_domain' => env('MAIL_DATA_COMPLETION_EHLO_DOMAIN', env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST))),
-        ],
-
         'ses' => [
             'transport' => 'ses',
         ],
@@ -122,8 +109,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', env('MAIL_SYSTEM_FROM_ADDRESS', 'info@system.pnedu.pl')),
+        'name' => env('MAIL_FROM_NAME', env('MAIL_SYSTEM_FROM_NAME', 'Platforma Nowoczesnej Edukacji')),
     ],
 
     'system' => [
@@ -137,24 +124,6 @@ return [
     'brand' => [
         'public_url' => env('MAIL_BRAND_PUBLIC_URL', 'https://pnedu.pl'),
         'public_label' => env('MAIL_BRAND_PUBLIC_LABEL', 'www.pnedu.pl'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Data Completion Module Mail Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for the data completion module email addresses.
-    | FROM address: biuro@nowoczesna-edukacja.pl (nowa skrzynka, mniejsze ryzyko spamu)
-    | Reply-To address: kontakt@nowoczesna-edukacja.pl (główna skrzynka kontaktowa)
-    |
-    */
-
-    'data_completion' => [
-        'from_address' => env('MAIL_DATA_COMPLETION_FROM_ADDRESS', 'biuro@nowoczesna-edukacja.pl'),
-        'from_name' => env('MAIL_DATA_COMPLETION_FROM_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
-        'reply_to_address' => env('MAIL_DATA_COMPLETION_REPLY_TO_ADDRESS', 'kontakt@nowoczesna-edukacja.pl'),
-        'reply_to_name' => env('MAIL_DATA_COMPLETION_REPLY_TO_NAME', env('MAIL_FROM_NAME', 'NODN Platforma Nowoczesnej Edukacji')),
     ],
 
 ];

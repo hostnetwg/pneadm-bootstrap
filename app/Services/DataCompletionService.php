@@ -139,19 +139,19 @@ class DataCompletionService
                         
                         Log::info('Próba wysyłki emaila', [
                             'to' => $recipientEmail,
-                            'from' => config('mail.from.address'),
-                            'reply_to' => config('mail.data_completion.reply_to_address', 'biuro@nowoczesna-edukacja.pl'),
+                            'from' => config('mail.system.from_address'),
+                            'reply_to' => config('mail.system.reply_to_address'),
+                            'mailer' => config('mail.system.mailer'),
                             'original_email' => $email,
                             'test_mode' => $testMode,
-                            'smtp_host' => config('mail.mailers.smtp.host'),
-                            'smtp_port' => config('mail.mailers.smtp.port'),
                         ]);
                         
                         Mail::to($recipientEmail)->send($mail);
                         
-                        Log::info('Email wysłany pomyślnie przez SMTP', [
+                        Log::info('Email wysłany pomyślnie', [
                             'to' => $recipientEmail,
-                            'from' => config('mail.from.address'),
+                            'from' => config('mail.system.from_address'),
+                            'mailer' => config('mail.system.mailer'),
                             'original_email' => $email,
                             'test_mode' => $testMode,
                         ]);

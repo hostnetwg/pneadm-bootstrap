@@ -36,7 +36,7 @@
                         {{ $message }}
                     </p>
                     <p class="text-muted small">
-                        W razie pytań prosimy pisać na <a href="mailto:kontakt@nowoczesna-edukacja.pl">kontakt@nowoczesna-edukacja.pl</a>.
+                        W razie pytań prosimy pisać na <a href="mailto:kontakt@pnedu.pl">kontakt@pnedu.pl</a>.
                     </p>
                 </div>
             </div>

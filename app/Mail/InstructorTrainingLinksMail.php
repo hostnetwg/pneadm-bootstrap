@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\UsesSystemMailSettings;
 use App\Models\Course;
 use App\Support\PlainTextEmailHtml;
 use Illuminate\Bus\Queueable;
@@ -10,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 
 class InstructorTrainingLinksMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, UsesSystemMailSettings;
 
     public function __construct(
         public Course $course,
@@ -22,15 +23,7 @@ class InstructorTrainingLinksMail extends Mailable
     {
         $htmlBody = PlainTextEmailHtml::formatTrainingLinksEmailHtml($this->plainBody);
 
-        return $this
-            ->from(
-                config('mail.system.from_address'),
-                config('mail.system.from_name')
-            )
-            ->replyTo(
-                config('mail.system.reply_to_address'),
-                config('mail.system.reply_to_name')
-            )
+        return $this->withSystemMailSettings()
             ->subject($this->subjectLine)
             ->view('emails.instructor-training-links')
             ->text('emails.instructor-training-links-text')

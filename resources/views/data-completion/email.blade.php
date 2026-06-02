@@ -154,7 +154,7 @@
         </div>
         
         <p>
-            Jeśli masz pytania, prosimy o kontakt: <a href="mailto:kontakt@nowoczesna-edukacja.pl" style="color: #0d6efd;">kontakt@nowoczesna-edukacja.pl</a>
+            Jeśli masz pytania, prosimy o kontakt: <a href="mailto:{{ $contactEmail }}" style="color: #0d6efd;">{{ $contactEmail }}</a>
         </p>
         
     </div>
@@ -166,7 +166,7 @@
             <b>Niepubliczny Ośrodek Doskonalenia Nauczycieli</b><br>
             "<b>Platforma Nowoczesnej Edukacji</b>"<br>
             <img src="https://pnedu.pl/grafika/NODN Platforma Nowoczesnej Edukacji - logo.png" title="PNE- LOGO" style="max-width: 200px; height: auto; margin: 10px 0;"><br>
-            <a href="https://nowoczesna-edukacja.pl" style="color: #0d6efd;">nowoczesna-edukacja.pl</a>
+            <a href="{{ $brandPublicUrl }}" style="color: #0d6efd;">{{ $brandPublicLabel }}</a>
         </p>
         <p style="margin-top: 20px; font-size: 0.85em;">
             Ten email został wysłany automatycznie. Prosimy nie odpowiadać na tę wiadomość.<br>

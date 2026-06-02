@@ -797,9 +797,7 @@ class CoursesController extends Controller
 
         try {
             $subjectLine = CourseInstructorLinksEmailBody::subjectLine($course);
-            Mail::mailer(config('mail.system.mailer'))
-                ->to($toEmail)
-                ->send(new InstructorTrainingLinksMail($course, $validated['body'], $subjectLine));
+            Mail::to($toEmail)->send(new InstructorTrainingLinksMail($course, $validated['body'], $subjectLine));
         } catch (\Throwable $e) {
             Log::error('emailInstructorTrainingLinks failed', [
                 'course_id' => $course->id,

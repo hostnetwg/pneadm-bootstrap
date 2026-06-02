@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\UsesSystemMailSettings;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Lang;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Lang;
  */
 class PneduFrontendResetPassword extends ResetPassword
 {
+    use UsesSystemMailSettings;
     protected function resetUrl($notifiable): string
     {
         $base = rtrim((string) config('services.pnedu_frontend_url'), '/');
@@ -20,7 +22,7 @@ class PneduFrontendResetPassword extends ResetPassword
 
     public function toMail($notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->configureSystemMail(new MailMessage)
             ->subject(Lang::get('Reset Password Notification'))
             ->line(Lang::get('You are receiving this email because we received a password reset request for your account.'))
             ->action(Lang::get('Reset Password'), $this->resetUrl($notifiable))

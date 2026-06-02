@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\UsesSystemMailSettings;
 use App\Models\Course;
 use App\Models\Participant;
 use Illuminate\Bus\Queueable;
@@ -10,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 
 class CourseAccessMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, UsesSystemMailSettings;
 
     /**
      * @param  list<array{title: string, url: string}>  $surveyLinks
@@ -55,7 +56,8 @@ class CourseAccessMail extends Mailable
 
         $needsAccountForRecordings = ! $this->hasPneduAccount && ($this->hasVideos || $this->hasMaterials);
 
-        return $this->subject('Dostęp do materiałów i nagrania – '.$courseTitle.' – '.config('app.name'))
+        return $this->withSystemMailSettings()
+            ->subject('Dostęp do materiałów i nagrania – '.$courseTitle.' – '.config('app.name'))
             ->view('emails.course-access')
             ->with([
                 'participantFirstName' => $participantFirstName,
