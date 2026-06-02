@@ -1,11 +1,11 @@
 # Strategia dostarczalności e-mail — Platforma Nowoczesnej Edukacji
 
-**Status:** dokument wewnętrzny (etap planowania)  
-**Ostatnia aktualizacja:** 2026-05-22  
-**Zakres:** ekosystem `pnedu.pl`, `adm.pnedu.pl`, subdomeny SES, Sendy, integracje Laravel  
+**Status:** dokument wewnętrzny — strategia + stan wdrożenia Laravel + SES
+**Ostatnia aktualizacja:** 2026-06-02
+**Zakres:** ekosystem `pnedu.pl`, `adm.pnedu.pl`, subdomeny SES, Sendy, integracje Laravel
 **Powiązane repozytoria:** `pneadm` (panel administracyjny), `pnedu` (serwis publiczny)
 
-> **Na tym etapie dokument opisuje strategię i stan obecny. Nie wdraża zmian w kodzie, `.env`, DNS, Sendy, przekierowaniach poczty ani migracji SEO.**
+> **Zakres tego dokumentu:** strategia kanałów e-mail, wdrożenie Laravel + Amazon SES dla wiadomości systemowych, backlog poza Laravel (Sendy, iFirma, DNS, SEO). Sendy i kampanie marketingowe są konfigurowane poza repozytoriami aplikacji.
 
 ---
 
@@ -53,7 +53,7 @@ Od ok. dwóch miesięcy nowi uczestnicy otrzymują w wiadomościach linki do nag
 |--------|------|
 | Rola obecna | rozpoznawalna domena historyczna; dotychczasowy serwis Publigo |
 | Rola docelowa | kandydat do przekierowania **301** na `pnedu.pl` po osobnym planie |
-| W kodzie | nadal dominuje `kontakt@nowoczesna-edukacja.pl` w widokach, mailach, PDF, regulaminach |
+| W kodzie — maile Laravel | widoki mailowe w **pnedu** i **adm** używają `kontakt@pnedu.pl` / `www.pnedu.pl`; legacy nadal w regulaminach, RODO, stopce www, PDF certyfikatów (adm) |
 | W e-mail strategy | **nie** używać jako nowego masowego From (ani marketing, ani system) |
 
 ### Future domain migration: nowoczesna-edukacja.pl → pnedu.pl
@@ -142,33 +142,33 @@ Legenda kanału docelowego: **SYS** = `system.pnedu.pl`, **NEWS** = Sendy/`news`
 
 ### 8.1. adm.pnedu.pl (`pneadm`)
 
-| Wiadomość / mechanizm | Pliki (orientacyjnie) | Kanał docelowy | Uwagi |
-|----------------------|------------------------|----------------|-------|
-| Dostęp do nagrań / materiałów / zaświadczeń | `CourseAccessMail`, `SendCourseAccessEmailJob` | **SYS** | linki → `pnedu.pl`; log: `certificate_email_logs` |
-| Link do listy zaświadczeń | `CertificateLinkMail`, job | **SYS** | |
-| Pojedyncze zaświadczenie | `CertificateSingleLinkMail`, job | **SYS** | |
-| Prośba o uzupełnienie danych | `DataCompletionRequestMail`, mailer `data_completion` | **SYS** | obecnie stara domena + osobny SMTP — **task migracyjny** |
-| Provision konta po zamówieniu | `PneduFormOrderProvisioned*` (Notification) | **SYS** | wysyłka z adm, linki → `pnedu.pl` |
-| Reset hasła użytkownika pnedu (z adm) | `PneduFrontendResetPassword` | **SYS** | |
-| Linki szkoleniowe dla prowadzącego | `InstructorTrainingLinksMail` | **SYS** | organizacyjna, bez osobnej subdomeny |
-| Reset hasła admina (Breeze) | Laravel `ResetPassword` | wewnętrzna | poza kanałem klienckim |
-| Subskrypcja Sendy — płatni uczestnicy | `FormOrderSendySyncService` | **NEWS** | tylko zapis na listę, nie Laravel Mail |
-| Panel Sendy (RSPO, ręczne API) | `SendyService`, `SendyController` | **NEWS** / **TIK** | zależnie od listy |
+| Wiadomość / mechanizm | Pliki (orientacyjnie) | Kanał docelowy | Status wdrożenia (Laravel + SES) |
+|----------------------|------------------------|----------------|----------------------------------|
+| Dostęp do nagrań / materiałów / zaświadczeń | `CourseAccessMail`, `SendCourseAccessEmailJob` | **SYS** | **wdrożone** — trait `UsesSystemMailSettings`; linki → `pnedu.pl`; log: `certificate_email_logs` |
+| Link do listy zaświadczeń | `CertificateLinkMail`, job | **SYS** | **wdrożone** |
+| Pojedyncze zaświadczenie | `CertificateSingleLinkMail`, job | **SYS** | **wdrożone** |
+| Prośba o uzupełnienie danych | `DataCompletionRequestMail` | **SYS** | **wdrożone** — usunięty mailer SMTP `data_completion`; szablon maila: `kontakt@pnedu.pl`, `www.pnedu.pl` |
+| Provision konta po zamówieniu | `PneduFormOrderProvisioned*` (Notification) | **SYS** | **wdrożone** — trait `UsesSystemMailSettings` w Notification |
+| Reset hasła użytkownika pnedu (z adm) | `PneduFrontendResetPassword` | **SYS** | **wdrożone** |
+| Linki szkoleniowe dla prowadzącego | `InstructorTrainingLinksMail` | **SYS** | **wdrożone** — potwierdzone na produkcji (SES) |
+| Reset hasła admina (Breeze) | Laravel `ResetPassword` | wewnętrzna | **bez zmian** — tylko konta administracyjne adm; poza kanałem klienckim |
+| Subskrypcja Sendy — płatni uczestnicy | `FormOrderSendySyncService` | **NEWS** | poza Laravel Mail |
+| Panel Sendy (RSPO, ręczne API) | `SendyService`, `SendyController` | **NEWS** / **TIK** | poza Laravel Mail |
 
 **Link publiczny wymagający migracji (bez implementacji teraz):** formularz uzupełniania danych obecnie na `adm.pnedu.pl/uzupelnij-dane/{token}` — docelowo preferencja: `pnedu.pl/uzupelnij-dane/{token}`.
 
 ### 8.2. pnedu.pl
 
-| Wiadomość | Pliki | Kanał docelowy | Uwagi |
-|-----------|-------|----------------|-------|
-| Potwierdzenie zamówienia (PDF) | `OrderNotificationMail`, `CourseController` | **SYS** | From docelowo `info@system.pnedu.pl`; **wysyłka zostaje w pnedu** |
-| Formularz kontaktowy | `ContactFormMail` → odbiorca | **KONTAKT** | wiadomość **do** skrzynki kontaktowej; w kodzie odbiorca nadal `kontakt@nowoczesna-edukacja.pl` (docelowo spójność z publicznym `kontakt@pnedu.pl`) |
-| Powiadomienie o płatności online | `PaymentNotificationMail` | wewnętrzna | tylko admin (hardcoded adres w kodzie) |
-| Weryfikacja e-mail konta | Laravel `MustVerifyEmail` | **SYS** | |
-| Reset hasła (z pnedu) | Laravel `ResetPassword` | **SYS** | |
-| Zapis na listę Sendy — TIK | `SendyService::subscribeCourseRegistration` | **TIK** | brak Laravel Mail; UX obiecuje „potwierdzenie e-mailem” — źródło: Sendy lub future SYS |
-| Zapis na listę — zamówienie per kurs | `sendy_suppression_list_id` | **NEWS** lub **TIK** | zależnie od typu kursu |
-| Zgoda marketingowa — rejestracja zaświadczenia | `LIST_NAUCZYCIELE` | **NEWS** | |
+| Wiadomość | Pliki | Kanał docelowy | Status wdrożenia (Laravel + SES) |
+|-----------|-------|----------------|----------------------------------|
+| Potwierdzenie zamówienia (PDF) | `OrderNotificationMail`, `CourseController` | **SYS** | **wdrożone** — From/Reply-To systemowe; PDF bez legacy domeny; **wysyłka z pnedu**; produkcja: `MAIL_MAILER=ses` |
+| Formularz kontaktowy | `ContactFormMail`, `ContactController` | **KONTAKT** | **wdrożone** — systemowy From; Reply-To nadawcy formularza; odbiorca `config('mail.system.reply_to_address')` → `kontakt@pnedu.pl` |
+| Powiadomienie o płatności online | `PaymentNotificationMail` | wewnętrzna | **wdrożone** — systemowy From/Reply-To; odbiorca admin (wewnętrzny) |
+| Weryfikacja e-mail konta | `SystemVerifyEmail` | **SYS** | **wdrożone** |
+| Reset hasła (z pnedu) | `SystemResetPassword` | **SYS** | **wdrożone** |
+| Zapis na listę Sendy — TIK | `SendyService::subscribeCourseRegistration` | **TIK** | poza Laravel Mail |
+| Zapis na listę — zamówienie per kurs | `sendy_suppression_list_id` | **NEWS** lub **TIK** | poza Laravel Mail |
+| Zgoda marketingowa — rejestracja zaświadczenia | `LIST_NAUCZYCIELE` | **NEWS** | poza Laravel Mail |
 
 ### 8.3. Sendy — mapowanie list (decyzja strategiczna)
 
@@ -189,11 +189,11 @@ Faktury i proformy: `IfirmaApiService::sendInvoiceByEmail`, nadawca `IFIRMA_SEND
 
 | ID | Wiadomość | Klasyfikacja | From docelowo | Reply-To | Aplikacja / uwagi |
 |----|-----------|--------------|---------------|----------|-------------------|
-| **B1** | `OrderNotificationMail` | systemowa / transakcyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | Wysyłka **z pnedu.pl**; **nie** przenosić logiki do adm |
-| **B2** | Weryfikacja konta, reset hasła, provision (`PneduFormOrderProvisioned*`, Breeze) | systemowa / konto | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | adm + pnedu (provision/reset z adm nadal przez mailer adm) |
-| **B3** | `DataCompletionRequestMail` | systemowa | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | Legacy mailer `data_completion` + stara domena = **task migracyjny**; hardcoded fallback SMTP w repo — **ryzyko, bez cytowania sekretów** |
+| **B1** | `OrderNotificationMail` | systemowa / transakcyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (pnedu); wysyłka z pnedu.pl |
+| **B2** | Weryfikacja konta, reset hasła, provision (`PneduFormOrderProvisioned*`) | systemowa / konto | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (pnedu + adm); reset admina adm — bez zmian |
+| **B3** | `DataCompletionRequestMail` | systemowa | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (adm, commit `26237ca`); usunięty legacy mailer SMTP |
 | **B4** | Faktury / proformy iFirma | transakcyjne / finansowe | poza etapem 1 | — | Osobna decyzja: `IFIRMA_SENDER_EMAIL` legacy vs spójność z system / kontakt |
-| **B5** | `InstructorTrainingLinksMail` | systemowa / organizacyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | Bez osobnej subdomeny dla instruktorów |
+| **B5** | `InstructorTrainingLinksMail` | systemowa / organizacyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (adm); potwierdzone na produkcji |
 
 ---
 
@@ -205,7 +205,9 @@ Faktury i proformy: `IfirmaApiService::sendInvoiceByEmail`, nadawca `IFIRMA_SEND
 | Production access | **aktywny** (nie sandbox) |
 | Zweryfikowane tożsamości domen | `news.pnedu.pl`, `system.pnedu.pl`, `tik.pnedu.pl` |
 | Easy DKIM | włączony; konfiguracja **Successful** (po korekcie rekordów CNAME) |
-| Laravel `.env.example` | `AWS_DEFAULT_REGION=us-east-1` — **do zmiany przy wdrożeniu** na `eu-central-1` |
+| Laravel `.env.example` (pnedu + adm) | `AWS_DEFAULT_REGION=eu-central-1` |
+| Laravel produkcja — pnedu.pl | `MAIL_MAILER=ses` — **potwierdzone** |
+| Laravel produkcja — adm.pnedu.pl | `MAIL_SYSTEM_MAILER=ses` — **potwierdzone** (linki instruktora); pełna migracja w kodzie `26237ca` |
 
 **Nie wdrożono jeszcze (plan):**
 
@@ -242,22 +244,31 @@ Faktury i proformy: `IfirmaApiService::sendInvoiceByEmail`, nadawca `IFIRMA_SEND
 
 ---
 
-## 12. Ryzyka wykryte w kodzie (stan na 2026-05-22)
+## 12. Ryzyka i backlog (stan na 2026-06-02)
 
-> **Backlog:** Poniższe pozycje to **przyszłe taski** (etapy 1–11 w sekcji 13), nie zmiany do natychmiastowej implementacji po zatwierdzeniu tej dokumentacji.
+### Rozwiązane w ramach Laravel + SES
+
+| Temat | Status |
+|-------|--------|
+| Brak SES w Laravel (pnedu + adm) | **rozwiązane** — `aws/aws-sdk-php`, `MAIL_MAILER=ses` / `MAIL_SYSTEM_MAILER=ses` |
+| Mailer `data_completion` (osobny SMTP, `biuro@`) | **usunięty** z adm (`26237ca`) |
+| Legacy From/Reply-To w mailach systemowych | **rozwiązane** w widokach mailowych obu aplikacji |
+| Region AWS w `.env.example` | **eu-central-1** w pnedu i adm |
+| Odbiorca formularza kontaktowego | **pnedu** — `ContactController` → `kontakt@pnedu.pl` |
+
+### Otwarty backlog (poza zamkniętym zakresem Laravel + SES)
 
 | Ryzyko | Opis | Priorytet |
 |--------|------|-----------|
-| Stara domena w treściach | `kontakt@nowoczesna-edukacja.pl`, `biuro@nowoczesna-edukacja.pl` w widokach, mailach, PDF, RODO | wysoki (osobny etap migracji treści) |
-| Odbiorca formularza kontaktowego | `ContactController` wysyła na `kontakt@nowoczesna-edukacja.pl` zamiast publicznego `kontakt@pnedu.pl` | średni (alias działa, brak spójności w kodzie) |
-| Mailer `data_completion` | Osobny SMTP, FROM legacy; hardcoded fallback credentials w `config/mail.php` — **nie dokumentować wartości sekretów**; usunąć przy migracji na SES | wysoki |
-| Link na adm | `/uzupelnij-dane/{token}` na `adm.pnedu.pl` | średni |
-| Brak SES w produkcji Laravel | Mailer `ses` zdefiniowany, domyślnie `log` / SMTP; region w przykładach `us-east-1` | średni (wdrożenie) |
-| UX vs kod — rejestracja TIK | Komunikat o „potwierdzeniu e-mailem”, kod tylko zapisuje Sendy | średni |
+| Stara domena w treściach www / PDF | regulaminy, RODO, stopka pnedu, **PDF certyfikatów** (adm) — nadal `nowoczesna-edukacja.pl` | wysoki (etap SEO/treści) |
+| Link formularza uzupełniania danych | `/uzupelnij-dane/{token}` na `adm.pnedu.pl` — docelowo `pnedu.pl` | średni |
 | Brak eventów SES | `certificate_email_logs` — status joba Laravel, nie bounce/complaint z AWS | średni |
+| UX vs kod — rejestracja TIK | komunikat o „potwierdzeniu e-mailem”, kod tylko zapisuje Sendy | średni |
+| Reset hasła admina adm | domyślny Laravel Breeze, bez traitu systemowego | niski (wewnętrzny) |
 | Hardcoded admin e-mail | `waldemar.grabowski@hostnet.pl` w pnedu (zamówienia, płatności) | niski (wewnętrzne) |
-| iFirma sender | `IFIRMA_SENDER_EMAIL` może wskazywać legacy | do decyzji |
-| Dokument `.ai/DOMAIN_MIGRATION_STRATEGY.md` | historyczna rekomendacja canonical `nowoczesna-edukacja.pl` — **sprzeczna z decyzją 2026-05**; wymaga aktualizacji w osobnym tasku SEO | informacyjny |
+| iFirma sender | `faktury@system.pnedu.pl` / `IFIRMA_SENDER_EMAIL` — osobny kanał | do decyzji |
+| Custom MAIL FROM / configuration sets | bounce subdomeny, SNS — patrz sekcja 9 | planowany etap |
+| Dokument `.ai/DOMAIN_MIGRATION_STRATEGY.md` | sprzeczny z kierunkiem `pnedu.pl` | informacyjny |
 
 ---
 
@@ -265,18 +276,21 @@ Faktury i proformy: `IfirmaApiService::sendInvoiceByEmail`, nadawca `IFIRMA_SEND
 
 | Etap | Zakres | Status |
 |------|--------|--------|
-| **0** | Dokumentacja wewnętrzna (ten plik) | **przygotowany do commita** (2026-05-22) |
-| **1** | Inwentaryzacja produkcyjna: obecne SMTP/FROM, Sendy sender identities, iFirma | plan |
-| **2** | SES: custom MAIL FROM + rekordy DNS (bounce.*) | plan — nie teraz |
-| **3** | SES: configuration sets `pne-news`, `pne-system`, `pne-tik` | plan — nie teraz |
-| **4** | Sendy: sender identity i kampanie na `news.pnedu.pl` (`szkolenia@news.pnedu.pl`) | plan — nie teraz |
-| **5** | Sendy: osobna tożsamość TIK na `tik.pnedu.pl`; stopniowy cutover z `zdalna-lekcja.pl` | plan — nie teraz |
-| **6** | Laravel: mailer `system` (SES `eu-central-1`), FROM `info@system.pnedu.pl`, Reply-To `kontakt@pnedu.pl` w **pnedu** i **adm** | plan — nie teraz |
-| **7** | Mapowanie klas Mailable/Notification → mailer `system` (sekcja 8) | plan — nie teraz |
-| **8** | Event publishing SES → SNS/webhooki → log bounce/complaint; rozszerzenie logów | plan — nie teraz |
-| **9** | Testy deliverability: Gmail, Outlook, WP, Onet, Interia, domeny szkolne | plan — nie teraz |
-| **10** | Publiczne endpointy tokenowe na `pnedu.pl` (m.in. uzupełnianie danych) | plan — nie teraz |
-| **11** | **Future domain migration:** SEO, 301, treści, Search Console | osobny program |
+| **0** | Dokumentacja wewnętrzna (ten plik) | **zakończony** |
+| **1** | Inwentaryzacja + pilotaż SES **pnedu** (`OrderNotificationMail`, PDF) | **zakończony** — produkcja potwierdzona |
+| **1B** | PDF zamówienia pnedu — brand `pnedu.pl` | **zakończony** |
+| **1C** | Pozostałe maile **pnedu** (kontakt, płatności, auth) | **zakończony** |
+| **2A** | Inwentaryzacja maili **adm** | **zakończony** |
+| **2B** | Pilotaż SES adm — `InstructorTrainingLinksMail` | **zakończony** — produkcja potwierdzona |
+| **2C** | Pełna migracja maili klienckich **adm** na SES | **zakończony w kodzie** (`26237ca`); weryfikacja produkcyjna pozostałych typów maili — w toku |
+| **3** | SES: custom MAIL FROM + rekordy DNS (bounce.*) | **plan** — nie teraz |
+| **4** | SES: configuration sets `pne-news`, `pne-system`, `pne-tik` | **plan** — nie teraz |
+| **5** | Event publishing SES → SNS/webhooki → log bounce/complaint | **plan** — nie teraz |
+| **6** | Sendy: sender identity i kampanie na `news.pnedu.pl` | **poza repozytorium** — Sendy |
+| **7** | Sendy: cutover TIK na `tik.pnedu.pl` | **poza repozytorium** — Sendy |
+| **8** | Testy deliverability (Gmail, Outlook, WP, domeny szkolne) | **plan** |
+| **9** | Publiczne endpointy tokenowe na `pnedu.pl` (m.in. uzupełnianie danych) | **plan** |
+| **10** | **Future domain migration:** SEO, 301, treści www, PDF certyfikatów | **osobny program** |
 
 ---
 
@@ -313,11 +327,11 @@ Fazy można wykonywać sekwencyjnie z przerwami na monitoring reputacji.
 5. Skonfigurować event publishing do logów (najpierw odczyt, bez automatycznych akcji).
 6. Ustawić `AWS_DEFAULT_REGION=eu-central-1` w środowiskach docelowych (przy wdrożeniu mailera).
 
-### Faza C — kanał systemowy (najwyższy priorytet reputacji klienta)
+### Faza C — kanał systemowy (Laravel + SES)
 
-7. W Laravel (pnedu, potem adm): mailer `system` → SES, From `info@system.pnedu.pl`, Reply-To `kontakt@pnedu.pl`.
-8. Przepiąć pojedynczo: testy wewnętrzne → `OrderNotificationMail` → maile zaświadczeń/dostępu → konta/hasła → `DataCompletionRequestMail` (w tym usunięcie legacy mailera i sekretów z repo).
-9. Monitorować bounce/complaint na `system.pnedu.pl` przez min. 2–4 tygodnie stabilnej wysyłki transakcyjnej.
+7. ~~W Laravel (pnedu, potem adm): mailer systemowy → SES, From `info@system.pnedu.pl`, Reply-To `kontakt@pnedu.pl`.~~ **Zrobione** (2026-06).
+8. ~~Przepiąć maile systemowe (sekcja 8).~~ **Zrobione w kodzie**; na produkcji adm — potwierdzić wszystkie typy (zaświadczenia, dostęp, data completion, provision, reset).
+9. Monitorować bounce/complaint na `system.pnedu.pl` przez min. 2–4 tygodnie stabilnej wysyłki transakcyjnej (wymaga etapu 5 — event publishing).
 
 ### Faza D — Sendy news
 
@@ -336,22 +350,54 @@ Fazy można wykonywać sekwencyjnie z przerwami na monitoring reputacji.
 
 ---
 
-## Załącznik A — konfiguracja Laravel (stan obecny, bez zmian)
+## Załącznik A — konfiguracja Laravel (stan wdrożony)
+
+### Wspólny model systemowy
+
+| Element | Wartość |
+|---------|---------|
+| From | `info@system.pnedu.pl` / „Platforma Nowoczesnej Edukacji” |
+| Reply-To | `kontakt@pnedu.pl` |
+| Region SES | `eu-central-1` |
+| Brand w mailach | `MAIL_BRAND_PUBLIC_URL=https://pnedu.pl`, `MAIL_BRAND_PUBLIC_LABEL=www.pnedu.pl` |
 
 ### adm.pnedu.pl (`pneadm`)
 
-- `config/mail.php`: domyślny mailer `env('MAIL_MAILER', 'log')`; mailer `ses`; mailer `data_completion` (SMTP osobny).
-- Globalny FROM: `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME`.
-- Moduł data completion: `mail.data_completion.*` + env `MAIL_DATA_COMPLETION_*`.
-- Front URL w linkach: `PNEDU_FRONTEND_URL` → `config('services.pnedu_frontend_url')`.
-- Kolejka: `QUEUE_CONNECTION=database`; joby `SendCertificateLinkEmailJob`, `SendCourseAccessEmailJob`.
-- Log wysyłki: model `CertificateEmailLog`.
+- `config/mail.php`: sekcje `system`, `brand`; mailery `ses`, `log`, `smtp` (smtp tylko legacy / nieużywany dla klientów); **brak** mailera `data_completion`.
+- Trait `App\Mail\Concerns\UsesSystemMailSettings` — wszystkie Mailable (`withSystemMailSettings()` → `mail.system.mailer` + From/Reply-To).
+- Trait `App\Notifications\Concerns\UsesSystemMailSettings` — Notification klienckie (`configureSystemMail()`).
+- Zależność: `aws/aws-sdk-php` ^3.383; `composer.json` → `config.platform.php` = `8.3.27`.
+- Lokalnie: `MAIL_MAILER=log`, `MAIL_SYSTEM_MAILER=log`.
+- Produkcja: `MAIL_MAILER=ses`, `MAIL_SYSTEM_MAILER=ses`, `AWS_*`.
+- Kolejka: `QUEUE_CONNECTION=database`; joby `SendCertificateLinkEmailJob`, `SendCourseAccessEmailJob` — po `config:cache` wymagany `queue:restart`.
+- Log wysyłki: `CertificateEmailLog`.
+- Testy: `tests/Feature/Mail/InstructorTrainingLinksMailTest.php`, `SystemMailConfigurationTest.php`.
+- Commits referencyjne: `3fd8c62` (pilotaż SES + infrastruktura), `26237ca` (pełna migracja maili klienckich).
 
 ### pnedu.pl
 
-- `config/mail.php`: domyślny FROM fallback `kontakt@nowoczesna-edukacja.pl`.
-- Sendy: `config/services.php` → `services.sendy.*` (`SENDY_URL`, `SENDY_API_KEY`).
-- Brak dedykowanego mailera systemowego (do utworzenia w fazie C).
+- `config/mail.php`: sekcje `system`, `brand`; mailer `ses`; globalny From spójny z systemowym.
+- Maile: `OrderNotificationMail`, `ContactFormMail`, `PaymentNotificationMail` — From/Reply-To z `mail.system.*`.
+- Auth: `SystemVerifyEmail`, `SystemResetPassword` w modelu `User`.
+- Lokalnie: `MAIL_MAILER=log`; produkcja: `MAIL_MAILER=ses`, `AWS_*`.
+- Zależność: `aws/aws-sdk-php`; platform PHP 8.3.27 w `composer.json`.
+- Testy: `OrderNotificationMailTest`, `SystemMailConfigurationTest`.
+- Sendy: `config/sendy.php` — **bez zmian** w ramach strategii Laravel + SES.
+
+### `.env` produkcyjny — minimalny zestaw (adm)
+
+```env
+MAIL_MAILER=ses
+MAIL_SYSTEM_MAILER=ses
+MAIL_FROM_ADDRESS=info@system.pnedu.pl
+MAIL_SYSTEM_FROM_ADDRESS=info@system.pnedu.pl
+MAIL_SYSTEM_REPLY_TO_ADDRESS=kontakt@pnedu.pl
+AWS_DEFAULT_REGION=eu-central-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+Usunąć z produkcji adm: `MAIL_HOST`/`MAIL_USERNAME` (tekyon), `MAIL_DATA_COMPLETION_*`.
 
 ---
 
