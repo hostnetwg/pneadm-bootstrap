@@ -22,7 +22,16 @@ class InstructorTrainingLinksMail extends Mailable
     {
         $htmlBody = PlainTextEmailHtml::formatTrainingLinksEmailHtml($this->plainBody);
 
-        return $this->subject($this->subjectLine)
+        return $this
+            ->from(
+                config('mail.system.from_address'),
+                config('mail.system.from_name')
+            )
+            ->replyTo(
+                config('mail.system.reply_to_address'),
+                config('mail.system.reply_to_name')
+            )
+            ->subject($this->subjectLine)
             ->view('emails.instructor-training-links')
             ->text('emails.instructor-training-links-text')
             ->with([

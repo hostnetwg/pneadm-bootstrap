@@ -126,6 +126,19 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'system' => [
+        'mailer' => env('MAIL_SYSTEM_MAILER', env('MAIL_MAILER', 'log')),
+        'from_address' => env('MAIL_SYSTEM_FROM_ADDRESS', 'info@system.pnedu.pl'),
+        'from_name' => env('MAIL_SYSTEM_FROM_NAME', 'Platforma Nowoczesnej Edukacji'),
+        'reply_to_address' => env('MAIL_SYSTEM_REPLY_TO_ADDRESS', 'kontakt@pnedu.pl'),
+        'reply_to_name' => env('MAIL_SYSTEM_REPLY_TO_NAME', 'Platforma Nowoczesnej Edukacji'),
+    ],
+
+    'brand' => [
+        'public_url' => env('MAIL_BRAND_PUBLIC_URL', 'https://pnedu.pl'),
+        'public_label' => env('MAIL_BRAND_PUBLIC_LABEL', 'www.pnedu.pl'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Data Completion Module Mail Configuration
