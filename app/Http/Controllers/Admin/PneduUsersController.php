@@ -8,6 +8,7 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,11 @@ class PneduUsersController extends Controller
         session(['pnedu_users_list_query' => $request->query()]);
 
         $query = PneduUser::query();
+        if ($filters['trashed'] === 'with') {
+            $query->withTrashed();
+        } elseif ($filters['trashed'] === 'only') {
+            $query->onlyTrashed();
+        }
         $this->applyFilters($query, $filters);
 
         $sort = $filters['sort'];
@@ -226,7 +232,68 @@ class PneduUsersController extends Controller
 
         return redirect()
             ->route('admin.pnedu-users.index', session('pnedu_users_list_query', []))
-            ->with('success', 'Konto pnedu.pl ('.$userEmail.') zostało usunięte (soft delete). Użytkownik nie zaloguje się ponownie na ten adres do czasu ewentualnej ponownej rejestracji.');
+            ->with('success', 'Konto pnedu.pl ('.$userEmail.') zostało usunięte (soft delete). Adres e-mail może zostać użyty do ponownej rejestracji.');
+    }
+
+    public function restore(Request $request, int $id): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $user = PneduUser::withTrashed()->findOrFail($id);
+        if (! $user->trashed()) {
+            return back()->with('error', 'To konto nie jest usunięte.');
+        }
+
+        $email = $user->email;
+        try {
+            $user->restore();
+        } catch (QueryException $e) {
+            if (($e->errorInfo[1] ?? null) === 1062) {
+                return back()->with('error', 'Nie można przywrócić konta, bo istnieje już aktywne konto z adresem '.$email.'.');
+            }
+
+            throw $e;
+        }
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: przywrócenie konta',
+            'Przywrócono konto użytkownika ID '.$user->id.' ('.$email.').',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $user->id,
+                    'email' => $email,
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Konto pnedu.pl ('.$email.') zostało przywrócone.');
+    }
+
+    public function forceDelete(Request $request, int $id): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $user = PneduUser::withTrashed()->findOrFail($id);
+        if (! $user->trashed()) {
+            return back()->with('error', 'Najpierw usuń konto standardowo, a dopiero potem trwale.');
+        }
+
+        $email = $user->email;
+        $userId = $user->id;
+        $user->forceDelete();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: trwałe usunięcie konta',
+            'Trwale usunięto konto użytkownika ID '.$userId.' ('.$email.') z bazy pnedu.',
+            [
+                'old_values' => [
+                    'pnedu_user_id' => $userId,
+                    'email' => $email,
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Konto pnedu.pl ('.$email.') zostało trwale usunięte.');
     }
 
     private function authorizePneduUserManage(): void
@@ -285,7 +352,7 @@ class PneduUsersController extends Controller
 
     private function normalizeListQuery(Request $request): void
     {
-        foreach (['email', 'name', 'registered_from', 'registered_to'] as $key) {
+        foreach (['email', 'name', 'registered_from', 'registered_to', 'trashed'] as $key) {
             if ($request->query($key) === '') {
                 $request->query->remove($key);
             }
@@ -300,6 +367,7 @@ class PneduUsersController extends Controller
             'registered_from' => ['nullable', 'date'],
             'registered_to' => ['nullable', 'date'],
             'verified' => ['nullable', 'in:all,yes,no'],
+            'trashed' => ['nullable', 'in:active,with,only'],
             'sort' => ['nullable', 'string', 'in:'.implode(',', self::SORT_COLUMNS)],
             'dir' => ['nullable', 'in:asc,desc'],
         ]);
@@ -325,6 +393,7 @@ class PneduUsersController extends Controller
             'registered_from' => $data['registered_from'] ?? null,
             'registered_to' => $data['registered_to'] ?? null,
             'verified' => in_array($data['verified'] ?? '', ['yes', 'no'], true) ? $data['verified'] : 'all',
+            'trashed' => in_array($data['trashed'] ?? '', ['with', 'only'], true) ? $data['trashed'] : 'active',
             'sort' => $sort,
             'dir' => $dir,
         ];

@@ -52,8 +52,26 @@ trait NormalizesUserEmail
         // creating — zapas tuż przed INSERT (np. gdy starszy kod / cache nie odpalił saving poprawnie)
         static::creating($sync);
 
-        static::restored(function (self $model): void {
-            $model->email_unique_slot = static::buildEmailUniqueSlot($model->email, null);
+        static::deleted(function (self $model): void {
+            if (method_exists($model, 'trashed') && $model->trashed()) {
+                static::updateEmailUniqueSlotQuietly($model, $model->deleted_at);
+            }
         });
+
+        static::restored(function (self $model): void {
+            static::updateEmailUniqueSlotQuietly($model, null);
+        });
+    }
+
+    protected static function updateEmailUniqueSlotQuietly(self $model, mixed $deletedAt): void
+    {
+        $slot = static::buildEmailUniqueSlot($model->email, $deletedAt);
+        $model->email_unique_slot = $slot;
+
+        $model->newQueryWithoutScopes()
+            ->whereKey($model->getKey())
+            ->update(['email_unique_slot' => $slot]);
+
+        $model->syncOriginalAttribute('email_unique_slot');
     }
 }

@@ -77,6 +77,14 @@
                             </select>
                         </div>
                         <div class="col-md-4">
+                            <label for="filter-trashed" class="form-label small text-muted mb-1">Status konta</label>
+                            <select name="trashed" id="filter-trashed" class="form-select form-select-sm">
+                                <option value="active" @selected($filters['trashed'] === 'active')>Tylko aktywne</option>
+                                <option value="with" @selected($filters['trashed'] === 'with')>Aktywne i usunięte</option>
+                                <option value="only" @selected($filters['trashed'] === 'only')>Tylko usunięte</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label for="filter-from" class="form-label small text-muted mb-1">Rejestracja od</label>
                             <input type="date" name="registered_from" id="filter-from" class="form-control form-control-sm"
                                    value="{{ old('registered_from', $filters['registered_from']) }}">
@@ -146,7 +154,12 @@
                                 @forelse($users as $user)
                                     <tr>
                                         <td class="text-muted">{{ $user->id }}</td>
-                                        <td>{{ $user->email }}</td>
+                                        <td>
+                                            {{ $user->email }}
+                                            @if($user->trashed())
+                                                <span class="badge text-bg-danger ms-1">Usunięte</span>
+                                            @endif
+                                        </td>
                                         <td>{{ $user->full_name }}</td>
                                         <td class="align-middle py-2">
                                             <div class="text-muted lh-sm" style="font-size: 0.8125rem;">
@@ -166,9 +179,25 @@
                                             {{ $user->created_at?->format('Y-m-d H:i') ?? '—' }}
                                         </td>
                                         <td class="text-end">
-                                            <a href="{{ route('admin.pnedu-users.show', $user) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> Podgląd
-                                            </a>
+                                            @if($user->trashed())
+                                                <form method="POST" action="{{ route('admin.pnedu-users.restore', $user->id) }}" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-success">
+                                                        <i class="bi bi-arrow-counterclockwise"></i> Przywróć
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ route('admin.pnedu-users.force-delete', $user->id) }}" class="d-inline" onsubmit="return confirm('Trwale usunąć konto pnedu.pl {{ $user->email }}? Tej operacji nie można cofnąć.');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i> Usuń trwale
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <a href="{{ route('admin.pnedu-users.show', $user) }}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i> Podgląd
+                                                </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
