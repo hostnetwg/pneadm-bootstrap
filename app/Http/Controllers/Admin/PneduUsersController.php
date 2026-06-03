@@ -82,6 +82,8 @@ class PneduUsersController extends Controller
             'adminService' => $this->pneduUserAdmin,
             'deliverabilityAvailable' => $this->pneduUserAdmin->deliverabilityColumnsAvailable(),
             'loginTrackingAvailable' => $this->pneduUserAdmin->loginTrackingColumnsAvailable(),
+            'loginVisitStats' => $this->pneduUserAdmin->loginVisitStats(),
+            'loginSessionsAvailable' => $this->pneduUserAdmin->loginSessionsTableAvailable(),
         ]);
     }
 

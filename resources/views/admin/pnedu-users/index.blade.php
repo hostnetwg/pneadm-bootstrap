@@ -57,6 +57,42 @@
     </x-slot>
 
     <div class="px-3 py-3">
+        <style>
+        .pnedu-users-stat-card__label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+        .pnedu-users-stat-card__value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1.15;
+            color: #212529;
+            margin-top: 0.1rem;
+        }
+        .pnedu-users-stat-card__hint {
+            font-size: 0.7rem;
+            color: #6c757d;
+            line-height: 1.25;
+            margin-top: 0.15rem;
+        }
+        .pnedu-users-stat-card__subhint {
+            font-size: 0.68rem;
+            color: #868e96;
+            margin-top: 0.1rem;
+        }
+        .pnedu-users-stat-card--visits .pnedu-users-stat-card__value {
+            font-size: 1.2rem;
+        }
+        @media (min-width: 1200px) {
+            .pnedu-users-stat-row > .col {
+                flex: 1 0 0;
+                max-width: 20%;
+            }
+        }
+        </style>
         <div class="container-fluid" style="max-width: 1400px;">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -103,44 +139,85 @@
                 </div>
             @endif
 
-            <div class="row g-3 mb-4">
-                <div class="col-md-3 col-sm-6">
-                    <div class="card border-danger h-100 shadow-sm">
-                        <div class="card-body py-3">
-                            <div class="text-danger small fw-semibold text-uppercase">Niedostarczalne</div>
-                            <div class="fs-3 fw-bold text-dark">{{ $stats['undeliverable'] }}</div>
-                            <div class="small text-muted">bounce / skarga SES</div>
+            <div class="row g-2 mb-3 pnedu-users-stat-row">
+                <div class="col-lg-3 col-sm-6">
+                    <div class="card border-danger h-100 shadow-sm pnedu-users-stat-card">
+                        <div class="card-body py-2 px-3">
+                            <div class="pnedu-users-stat-card__label text-danger">Niedostarczalne</div>
+                            <div class="pnedu-users-stat-card__value">{{ $stats['undeliverable'] }}</div>
+                            <div class="pnedu-users-stat-card__hint">bounce / skarga SES</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="card border-warning h-100 shadow-sm">
-                        <div class="card-body py-3">
-                            <div class="text-warning-emphasis small fw-semibold text-uppercase">Niezweryfikowane</div>
-                            <div class="fs-3 fw-bold text-dark">{{ $stats['unverified'] }}</div>
-                            <div class="small text-muted">bez kliknięcia w link</div>
+                <div class="col-lg-3 col-sm-6">
+                    <div class="card border-warning h-100 shadow-sm pnedu-users-stat-card">
+                        <div class="card-body py-2 px-3">
+                            <div class="pnedu-users-stat-card__label text-warning-emphasis">Niezweryfikowane</div>
+                            <div class="pnedu-users-stat-card__value">{{ $stats['unverified'] }}</div>
+                            <div class="pnedu-users-stat-card__hint">bez kliknięcia w link</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="card border-info h-100 shadow-sm">
-                        <div class="card-body py-3">
-                            <div class="text-info-emphasis small fw-semibold text-uppercase">Czekają na link</div>
-                            <div class="fs-3 fw-bold text-dark">{{ $stats['unverified_deliverable'] }}</div>
-                            <div class="small text-muted">bez bounce — np. spam / oferty</div>
+                <div class="col-lg-3 col-sm-6">
+                    <div class="card border-info h-100 shadow-sm pnedu-users-stat-card">
+                        <div class="card-body py-2 px-3">
+                            <div class="pnedu-users-stat-card__label text-info-emphasis">Czekają na link</div>
+                            <div class="pnedu-users-stat-card__value">{{ $stats['unverified_deliverable'] }}</div>
+                            <div class="pnedu-users-stat-card__hint">bez bounce — np. spam / oferty</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="card border-secondary h-100 shadow-sm">
-                        <div class="card-body py-3">
-                            <div class="text-secondary small fw-semibold text-uppercase">Niedost. (7 dni)</div>
-                            <div class="fs-3 fw-bold text-dark">{{ $stats['undeliverable_recent_7d'] }}</div>
-                            <div class="small text-muted">nowe bounce w tygodniu</div>
+                <div class="col-lg-3 col-sm-6">
+                    <div class="card border-secondary h-100 shadow-sm pnedu-users-stat-card">
+                        <div class="card-body py-2 px-3">
+                            <div class="pnedu-users-stat-card__label text-secondary">Niedost. (7 dni)</div>
+                            <div class="pnedu-users-stat-card__value">{{ $stats['undeliverable_recent_7d'] }}</div>
+                            <div class="pnedu-users-stat-card__hint">nowe bounce w tygodniu</div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            @if(! empty($loginTrackingAvailable))
+                <div class="mb-4">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h3 class="h6 mb-0 fw-semibold">Wejścia na pnedu.pl</h3>
+                        <span class="small text-muted">nowe sesje (logowanie lub „zapamiętaj mnie”)</span>
+                    </div>
+
+                    @if(empty($loginSessionsAvailable) || empty($loginVisitStats))
+                        <div class="alert alert-warning py-2 mb-0 small" role="alert">
+                            Szczegółowe statystyki okresowe wymagają tabeli <code>user_login_sessions</code> w bazie pnedu —
+                            uruchom migracje na pnedu.pl (<code>php artisan migrate</code>). Dane zbierane są od momentu migracji.
+                        </div>
+                    @else
+                        <div class="row g-2 pnedu-users-stat-row">
+                            @php
+                                $visitCards = [
+                                    ['key' => 'today', 'label' => 'Dziś', 'hint' => 'od północy'],
+                                    ['key' => 'yesterday', 'label' => 'Wczoraj', 'hint' => 'cały dzień'],
+                                    ['key' => 'last_7_days', 'label' => '7 dni', 'hint' => 'w tym dziś'],
+                                    ['key' => 'last_30_days', 'label' => '30 dni', 'hint' => 'w tym dziś'],
+                                    ['key' => 'last_365_days', 'label' => 'Rok', 'hint' => 'ostatnie 365 dni'],
+                                ];
+                            @endphp
+                            @foreach($visitCards as $visitCard)
+                                @php $visit = $loginVisitStats[$visitCard['key']]; @endphp
+                                <div class="col">
+                                    <div class="card border-primary-subtle h-100 shadow-sm pnedu-users-stat-card pnedu-users-stat-card--visits">
+                                        <div class="card-body py-2 px-2 px-sm-3">
+                                            <div class="pnedu-users-stat-card__label text-primary">{{ $visitCard['label'] }}</div>
+                                            <div class="pnedu-users-stat-card__value">{{ $visit['sessions'] }}</div>
+                                            <div class="pnedu-users-stat-card__hint">{{ $visitCard['hint'] }}</div>
+                                            <div class="pnedu-users-stat-card__subhint">{{ $visit['users'] }} użytk.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             <div class="d-flex flex-wrap gap-2 mb-3">
                 <span class="small text-muted align-self-center me-1">Szybkie filtry:</span>

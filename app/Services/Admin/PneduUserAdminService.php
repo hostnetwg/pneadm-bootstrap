@@ -5,8 +5,11 @@ namespace App\Services\Admin;
 use App\Models\FormOrder;
 use App\Models\Participant;
 use App\Models\PneduUser;
+use Carbon\Carbon;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PneduUserAdminService
@@ -54,6 +57,75 @@ class PneduUserAdminService
         }
 
         return $available;
+    }
+
+    public function loginSessionsTableAvailable(): bool
+    {
+        static $available = null;
+
+        if ($available !== null) {
+            return $available;
+        }
+
+        try {
+            $available = Schema::connection('pnedu')->hasTable('user_login_sessions');
+        } catch (\Throwable) {
+            $available = false;
+        }
+
+        return $available;
+    }
+
+    /**
+     * Liczba wejść (sesji) i unikalnych użytkowników w oknach czasowych.
+     *
+     * @return array{
+     *     today: array{sessions: int, users: int},
+     *     yesterday: array{sessions: int, users: int},
+     *     last_7_days: array{sessions: int, users: int},
+     *     last_30_days: array{sessions: int, users: int},
+     *     last_365_days: array{sessions: int, users: int}
+     * }|null
+     */
+    public function loginVisitStats(): ?array
+    {
+        if (! $this->loginSessionsTableAvailable()) {
+            return null;
+        }
+
+        $connection = DB::connection('pnedu');
+        $todayStart = now()->startOfDay();
+        $yesterdayStart = now()->copy()->subDay()->startOfDay();
+
+        return [
+            'today' => $this->loginWindowStats($connection, $todayStart, null),
+            'yesterday' => $this->loginWindowStats($connection, $yesterdayStart, $todayStart),
+            'last_7_days' => $this->loginWindowStats($connection, now()->copy()->subDays(6)->startOfDay(), null),
+            'last_30_days' => $this->loginWindowStats($connection, now()->copy()->subDays(29)->startOfDay(), null),
+            'last_365_days' => $this->loginWindowStats($connection, now()->copy()->subDays(364)->startOfDay(), null),
+        ];
+    }
+
+    /**
+     * @return array{sessions: int, users: int}
+     */
+    private function loginWindowStats(Connection $connection, Carbon $from, ?Carbon $until): array
+    {
+        $sessionsQuery = $connection->table('user_login_sessions')
+            ->where('logged_in_at', '>=', $from);
+
+        $usersQuery = $connection->table('user_login_sessions')
+            ->where('logged_in_at', '>=', $from);
+
+        if ($until !== null) {
+            $sessionsQuery->where('logged_in_at', '<', $until);
+            $usersQuery->where('logged_in_at', '<', $until);
+        }
+
+        return [
+            'sessions' => (int) $sessionsQuery->count(),
+            'users' => (int) $usersQuery->distinct()->count('user_id'),
+        ];
     }
 
     /**
