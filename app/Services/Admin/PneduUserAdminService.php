@@ -38,6 +38,24 @@ class PneduUserAdminService
         return $available;
     }
 
+    public function loginTrackingColumnsAvailable(): bool
+    {
+        static $available = null;
+
+        if ($available !== null) {
+            return $available;
+        }
+
+        try {
+            $available = Schema::connection('pnedu')->hasColumn('users', 'last_login_at')
+                && Schema::connection('pnedu')->hasColumn('users', 'login_count');
+        } catch (\Throwable) {
+            $available = false;
+        }
+
+        return $available;
+    }
+
     /**
      * @return array{
      *     undeliverable: int,

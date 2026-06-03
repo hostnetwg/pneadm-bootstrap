@@ -35,6 +35,8 @@ class PneduUsersController extends Controller
         'birth_date',
         'email_verified_at',
         'email_undeliverable_at',
+        'last_login_at',
+        'login_count',
     ];
 
     public function __construct(
@@ -79,6 +81,7 @@ class PneduUsersController extends Controller
             'paidEnrollmentEmails' => array_fill_keys($paidEnrollmentEmails, true),
             'adminService' => $this->pneduUserAdmin,
             'deliverabilityAvailable' => $this->pneduUserAdmin->deliverabilityColumnsAvailable(),
+            'loginTrackingAvailable' => $this->pneduUserAdmin->loginTrackingColumnsAvailable(),
         ]);
     }
 

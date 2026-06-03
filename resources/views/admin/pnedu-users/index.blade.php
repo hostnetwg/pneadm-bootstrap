@@ -20,6 +20,13 @@
 
         return $dir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
     };
+    $sortIconClass = function (string $column) use ($sort, $dir) {
+        if ($sort !== $column) {
+            return 'bi-arrow-down-up text-muted';
+        }
+
+        return ($dir === 'asc' ? 'bi-sort-up' : 'bi-sort-down').' text-primary';
+    };
     $quickFilterUrl = function (array $overrides = []) use ($filters) {
         return route('admin.pnedu-users.index', array_merge(
             [
@@ -66,7 +73,20 @@
 
             <p class="text-muted small mb-3">
                 Konta zarejestrowane na stronie pnedu.pl (baza <code>pnedu</code>, tabela <code>users</code>).
+                @if(! empty($loginTrackingAvailable))
+                    <span class="d-block mt-1">
+                        <strong>Ostatnie logowanie</strong> i <strong>liczba wejść</strong> — nowa sesja na pnedu.pl
+                        (formularz lub „zapamiętaj mnie”), bez liczenia kolejnych podstron w tej samej sesji.
+                    </span>
+                @endif
             </p>
+
+            @if(empty($loginTrackingAvailable))
+                <div class="alert alert-warning py-2 mb-3" role="alert">
+                    Brak kolumn <code>last_login_at</code> / <code>login_count</code> w bazie pnedu —
+                    uruchom migracje na pnedu.pl (<code>php artisan migrate</code>), aby śledzić logowania.
+                </div>
+            @endif
 
             @if(empty($deliverabilityAvailable))
                 <div class="alert alert-warning py-2 mb-3" role="alert">
@@ -269,6 +289,30 @@
                                             Rejestracja @if($sortIcon('created_at'))<i class="bi {{ $sortIcon('created_at') }}"></i>@endif
                                         </a>
                                     </th>
+                                    @if(! empty($loginTrackingAvailable))
+                                        <th scope="col">
+                                            <span class="d-inline-flex align-items-center gap-1 flex-wrap">
+                                                <span title="Ostatnia nowa sesja na pnedu.pl">Ostatnie logowanie</span>
+                                                <a href="{{ $sortLink('last_login_at') }}"
+                                                   class="text-decoration-none lh-1"
+                                                   title="Sortuj według ostatniego logowania"
+                                                   aria-label="Sortuj według ostatniego logowania">
+                                                    <i class="bi {{ $sortIconClass('last_login_at') }}"></i>
+                                                </a>
+                                            </span>
+                                        </th>
+                                        <th scope="col" class="text-center">
+                                            <span class="d-inline-flex align-items-center justify-content-center gap-1 flex-wrap">
+                                                <span title="Liczba nowych sesji (wejść)">Wejścia</span>
+                                                <a href="{{ $sortLink('login_count') }}"
+                                                   class="text-decoration-none lh-1"
+                                                   title="Sortuj według liczby wejść"
+                                                   aria-label="Sortuj według liczby wejść">
+                                                    <i class="bi {{ $sortIconClass('login_count') }}"></i>
+                                                </a>
+                                            </span>
+                                        </th>
+                                    @endif
                                     <th scope="col" class="text-end">Akcje</th>
                                 </tr>
                             </thead>
@@ -319,6 +363,14 @@
                                         <td class="text-muted small">
                                             {{ $user->created_at?->format('Y-m-d H:i') ?? '—' }}
                                         </td>
+                                        @if(! empty($loginTrackingAvailable))
+                                            <td class="text-muted small">
+                                                {{ $user->last_login_at?->format('Y-m-d H:i') ?? '—' }}
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge text-bg-light text-dark border">{{ (int) ($user->login_count ?? 0) }}</span>
+                                            </td>
+                                        @endif
                                         <td class="text-end">
                                             @if($user->trashed())
                                                 <form method="POST" action="{{ route('admin.pnedu-users.restore', $user->id) }}" class="d-inline">
@@ -343,7 +395,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted py-4">
+                                        <td colspan="{{ ! empty($loginTrackingAvailable) ? 10 : 8 }}" class="text-center text-muted py-4">
                                             Brak użytkowników spełniających kryteria.
                                         </td>
                                     </tr>

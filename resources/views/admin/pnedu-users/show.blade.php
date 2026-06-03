@@ -91,6 +91,20 @@
                         <dt class="col-sm-4 text-muted">Data rejestracji</dt>
                         <dd class="col-sm-8 text-muted">{{ $user->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
 
+                        @if($adminService->loginTrackingColumnsAvailable())
+                            <dt class="col-sm-4 text-muted">Ostatnie logowanie</dt>
+                            <dd class="col-sm-8 text-muted">
+                                {{ $user->last_login_at?->format('Y-m-d H:i:s') ?? '—' }}
+                                <span class="d-block small">Nowa sesja na pnedu.pl (logowanie lub „zapamiętaj mnie”).</span>
+                            </dd>
+
+                            <dt class="col-sm-4 text-muted">Liczba wejść</dt>
+                            <dd class="col-sm-8">
+                                <span class="fw-semibold">{{ (int) ($user->login_count ?? 0) }}</span>
+                                <span class="text-muted small d-block">Bez liczenia podstron w tej samej sesji.</span>
+                            </dd>
+                        @endif
+
                         <dt class="col-sm-4 text-muted">Ostatnia aktualizacja</dt>
                         <dd class="col-sm-8 text-muted">{{ $user->updated_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
 

@@ -48,8 +48,10 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
         return [
             'email_verified_at' => 'datetime',
             'email_undeliverable_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'birth_date' => 'date',
             'password' => 'hashed',
+            'login_count' => 'integer',
         ];
     }
 
