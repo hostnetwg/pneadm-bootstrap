@@ -88,6 +88,11 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
         return $this->email_verified_at !== null;
     }
 
+    public function getEmailForVerification(): string
+    {
+        return (string) $this->email;
+    }
+
     public function unverifiedAccountDeletionDeadline(): ?\Illuminate\Support\Carbon
     {
         if ($this->hasVerifiedEmail()) {
