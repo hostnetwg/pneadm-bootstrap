@@ -164,14 +164,7 @@
                                     Wyślij ponownie link weryfikacyjny (np. gdy wiadomość wpadła do spamu).
                                     Przy aktywnym bounce wysyłka jest zablokowana — najpierw poprawa adresu lub wyczyszczenie flagi.
                                 </p>
-                                <form method="post" action="{{ route('admin.pnedu-users.send-verification-email', ['pnedu_user' => $user->getKey()]) }}" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline-primary btn-sm"
-                                            @disabled($user->hasUndeliverableEmail())
-                                            onclick="return confirm('Wysłać link weryfikacyjny na {{ $user->email }}?');">
-                                        <i class="bi bi-envelope-check me-1"></i> Wyślij link weryfikacyjny
-                                    </button>
-                                </form>
+                                @include('admin.pnedu-users.partials.send-verification-email-modal')
                                 @if($user->hasUndeliverableEmail())
                                     <p class="text-danger small mt-2 mb-0">Wysyłka zablokowana — aktywna flaga niedostarczalności.</p>
                                 @endif

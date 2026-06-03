@@ -104,8 +104,8 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
         return $this->created_at?->copy()->addDays($graceDays);
     }
 
-    public function sendEmailVerificationNotification(): void
+    public function sendEmailVerificationNotification(?string $verificationUrl = null): void
     {
-        $this->notify(new \App\Notifications\PneduFrontendVerifyEmail);
+        $this->notify(new \App\Notifications\PneduFrontendVerifyEmail($verificationUrl));
     }
 }

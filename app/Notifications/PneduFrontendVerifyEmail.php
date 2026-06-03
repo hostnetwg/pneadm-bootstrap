@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\UsesSystemMailSettings;
+use App\Support\PneduVerificationMailContent;
 use App\Support\PneduVerificationUrl;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,6 +12,10 @@ class PneduFrontendVerifyEmail extends Notification
 {
     use UsesSystemMailSettings;
 
+    public function __construct(
+        private readonly ?string $verificationUrl = null,
+    ) {}
+
     public function via(object $notifiable): array
     {
         return ['mail'];
@@ -18,12 +23,13 @@ class PneduFrontendVerifyEmail extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $verificationUrl = PneduVerificationUrl::forUser($notifiable);
+        $verificationUrl = $this->verificationUrl ?? PneduVerificationUrl::forUser($notifiable);
+        $content = PneduVerificationMailContent::build($notifiable, $verificationUrl);
 
         return $this->configureSystemMail(new MailMessage)
-            ->subject('Zweryfikuj adres e-mail — Platforma Nowoczesnej Edukacji')
-            ->line('Kliknij poniższy przycisk, aby potwierdzić swój adres e-mail i aktywować konto na pnedu.pl.')
-            ->action('Zweryfikuj adres e-mail', $verificationUrl)
-            ->line('Jeśli nie zakładałeś/aś konta, zignoruj tę wiadomość.');
+            ->subject($content['subject'])
+            ->line($content['intro'])
+            ->action($content['action_label'], $content['action_url'])
+            ->line($content['outro']);
     }
 }

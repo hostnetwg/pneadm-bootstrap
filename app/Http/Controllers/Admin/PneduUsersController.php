@@ -7,6 +7,8 @@ use App\Models\ActivityLog;
 use App\Models\Participant;
 use App\Models\PneduUser;
 use App\Services\Admin\PneduUserAdminService;
+use App\Support\PneduVerificationMailContent;
+use App\Support\PneduVerificationUrl;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -91,6 +93,17 @@ class PneduUsersController extends Controller
         $hasPaidEnrollment = $this->pneduUserAdmin->userHasPaidCourseEnrollment($pnedu_user);
         $relatedFormOrders = $this->pneduUserAdmin->relatedFormOrdersForEmail($pnedu_user->email);
 
+        $verificationEmailPreview = null;
+        if (
+            auth()->user()->hasPermission('users.edit')
+            && ! $pnedu_user->hasVerifiedEmail()
+            && ! $pnedu_user->hasUndeliverableEmail()
+        ) {
+            $verificationUrl = PneduVerificationUrl::forUser($pnedu_user);
+            session()->put($this->pendingVerificationSessionKey($pnedu_user), $verificationUrl);
+            $verificationEmailPreview = PneduVerificationMailContent::build($pnedu_user, $verificationUrl);
+        }
+
         return view('admin.pnedu-users.show', [
             'user' => $pnedu_user,
             'participations' => $participations,
@@ -99,6 +112,7 @@ class PneduUsersController extends Controller
             'hasPaidEnrollment' => $hasPaidEnrollment,
             'relatedFormOrders' => $relatedFormOrders,
             'adminService' => $this->pneduUserAdmin,
+            'verificationEmailPreview' => $verificationEmailPreview,
         ]);
     }
 
@@ -114,7 +128,13 @@ class PneduUsersController extends Controller
             return back()->with('error', 'Adres ma aktywną flagę niedostarczalności (bounce). Najpierw poproś użytkownika o poprawę e-mail w profilu lub wyczyść flagę po ustaleniach.');
         }
 
-        $pnedu_user->sendEmailVerificationNotification();
+        $sessionKey = $this->pendingVerificationSessionKey($pnedu_user);
+        $verificationUrl = session()->pull($sessionKey);
+        if (! is_string($verificationUrl) || $verificationUrl === '') {
+            $verificationUrl = PneduVerificationUrl::forUser($pnedu_user);
+        }
+
+        $pnedu_user->sendEmailVerificationNotification($verificationUrl);
 
         ActivityLog::logCustom(
             'Użytkownik pnedu.pl: wysłano link weryfikacji e-mail (admin)',
@@ -377,6 +397,11 @@ class PneduUsersController extends Controller
         );
 
         return back()->with('success', 'Konto pnedu.pl ('.$email.') zostało trwale usunięte.');
+    }
+
+    private function pendingVerificationSessionKey(PneduUser $user): string
+    {
+        return 'pnedu_verification_pending_url.'.$user->getKey();
     }
 
     private function authorizePneduUserManage(): void
