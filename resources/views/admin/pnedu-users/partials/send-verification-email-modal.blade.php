@@ -23,8 +23,8 @@
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small mb-3">
-                        Poniżej treść e-maila, który zostanie wysłany na
-                        <strong>{{ $verificationEmailPreview['to'] }}</strong>.
+                        To wiadomość <strong>ponownego przypomnienia</strong> (inna treść niż automatyczny mail po rejestracji).
+                        Zostanie wysłana na <strong>{{ $verificationEmailPreview['to'] }}</strong>.
                         Po potwierdzeniu użytkownik otrzyma dokładnie ten link weryfikacyjny.
                     </p>
 
@@ -51,6 +51,8 @@
 
                         <div class="bg-white border rounded p-3">
                             <p class="mb-3">{{ $verificationEmailPreview['intro'] }}</p>
+                            <p class="mb-3">{{ $verificationEmailPreview['context'] }}</p>
+                            <p class="mb-3">{{ $verificationEmailPreview['action_prompt'] }}</p>
                             <p class="mb-3">
                                 <a href="{{ $verificationEmailPreview['action_url'] }}"
                                    class="btn btn-primary btn-sm"

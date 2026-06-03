@@ -24,11 +24,13 @@ class PneduFrontendVerifyEmail extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $verificationUrl = $this->verificationUrl ?? PneduVerificationUrl::forUser($notifiable);
-        $content = PneduVerificationMailContent::build($notifiable, $verificationUrl);
+        $content = PneduVerificationMailContent::buildForAdminResend($notifiable, $verificationUrl);
 
         return $this->configureSystemMail(new MailMessage)
             ->subject($content['subject'])
             ->line($content['intro'])
+            ->line($content['context'])
+            ->line($content['action_prompt'])
             ->action($content['action_label'], $content['action_url'])
             ->line($content['outro']);
     }

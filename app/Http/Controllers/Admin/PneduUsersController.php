@@ -101,7 +101,7 @@ class PneduUsersController extends Controller
         ) {
             $verificationUrl = PneduVerificationUrl::forUser($pnedu_user);
             session()->put($this->pendingVerificationSessionKey($pnedu_user), $verificationUrl);
-            $verificationEmailPreview = PneduVerificationMailContent::build($pnedu_user, $verificationUrl);
+            $verificationEmailPreview = PneduVerificationMailContent::buildForAdminResend($pnedu_user, $verificationUrl);
         }
 
         return view('admin.pnedu-users.show', [
