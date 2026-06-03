@@ -7,7 +7,7 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PneduUserAdminService
 {
@@ -16,6 +16,27 @@ class PneduUserAdminService
     public const DELIVERABILITY_UNDELIVERABLE = 'undeliverable';
 
     public const DELIVERABILITY_DELIVERABLE = 'deliverable';
+
+    /** @var list<string>|null */
+    private ?array $paidEnrollmentEmailsCache = null;
+
+    public function deliverabilityColumnsAvailable(): bool
+    {
+        static $available = null;
+
+        if ($available !== null) {
+            return $available;
+        }
+
+        try {
+            $available = Schema::connection('pnedu')->hasColumn('users', 'email_undeliverable_at')
+                && Schema::connection('pnedu')->hasColumn('users', 'email_undeliverable_reason');
+        } catch (\Throwable) {
+            $available = false;
+        }
+
+        return $available;
+    }
 
     /**
      * @return array{
@@ -35,19 +56,32 @@ class PneduUserAdminService
             $base->whereNull('deleted_at');
         }
 
-        $undeliverable = (clone $base)->whereNotNull('email_undeliverable_at');
         $unverified = (clone $base)->whereNull('email_verified_at');
+
+        if (! $this->deliverabilityColumnsAvailable()) {
+            return [
+                'undeliverable' => 0,
+                'undeliverable_unverified' => 0,
+                'undeliverable_paid' => 0,
+                'undeliverable_recent_7d' => 0,
+                'unverified' => (clone $unverified)->count(),
+                'unverified_deliverable' => (clone $unverified)->count(),
+                'unverified_paid' => $this->countWithPaidEnrollment(clone $unverified),
+            ];
+        }
+
+        $undeliverable = (clone $base)->whereNotNull('email_undeliverable_at');
 
         return [
             'undeliverable' => (clone $undeliverable)->count(),
             'undeliverable_unverified' => (clone $undeliverable)->whereNull('email_verified_at')->count(),
-            'undeliverable_paid' => $this->applyHasPaidCourseFilter(clone $undeliverable)->count(),
+            'undeliverable_paid' => $this->countWithPaidEnrollment(clone $undeliverable),
             'undeliverable_recent_7d' => (clone $undeliverable)
                 ->where('email_undeliverable_at', '>=', now()->subDays(7))
                 ->count(),
             'unverified' => (clone $unverified)->count(),
             'unverified_deliverable' => (clone $unverified)->whereNull('email_undeliverable_at')->count(),
-            'unverified_paid' => $this->applyHasPaidCourseFilter(clone $unverified)->count(),
+            'unverified_paid' => $this->countWithPaidEnrollment(clone $unverified),
         ];
     }
 
@@ -87,14 +121,16 @@ class PneduUserAdminService
             $query->whereNull('email_verified_at');
         }
 
-        if ($filters['deliverability'] === self::DELIVERABILITY_UNDELIVERABLE) {
-            $query->whereNotNull('email_undeliverable_at');
-        } elseif ($filters['deliverability'] === self::DELIVERABILITY_DELIVERABLE) {
-            $query->whereNull('email_undeliverable_at');
-        }
+        if ($this->deliverabilityColumnsAvailable()) {
+            if ($filters['deliverability'] === self::DELIVERABILITY_UNDELIVERABLE) {
+                $query->whereNotNull('email_undeliverable_at');
+            } elseif ($filters['deliverability'] === self::DELIVERABILITY_DELIVERABLE) {
+                $query->whereNull('email_undeliverable_at');
+            }
 
-        if ($filters['undeliverable_reason'] !== null && $filters['undeliverable_reason'] !== '') {
-            $query->where('email_undeliverable_reason', $filters['undeliverable_reason']);
+            if ($filters['undeliverable_reason'] !== null && $filters['undeliverable_reason'] !== '') {
+                $query->where('email_undeliverable_reason', $filters['undeliverable_reason']);
+            }
         }
 
         if ($filters['has_paid'] === 'yes') {
@@ -110,16 +146,13 @@ class PneduUserAdminService
      */
     public function applyHasPaidCourseFilter(Builder $query): Builder
     {
-        $pneadmDb = DB::connection('mysql')->getDatabaseName();
+        $paidEmails = $this->paidEnrollmentNormalizedEmails();
 
-        return $query->whereExists(function ($sub) use ($pneadmDb) {
-            $sub->selectRaw('1')
-                ->from("{$pneadmDb}.participants as p")
-                ->join("{$pneadmDb}.courses as c", 'c.id', '=', 'p.course_id')
-                ->whereRaw('LOWER(TRIM(p.email)) = LOWER(TRIM(users.email))')
-                ->where('c.is_paid', 1)
-                ->whereNull('p.deleted_at');
-        });
+        if ($paidEmails === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $this->whereEmailInNormalizedList($query, $paidEmails);
     }
 
     /**
@@ -127,16 +160,86 @@ class PneduUserAdminService
      */
     private function applyWithoutPaidCourseFilter(Builder $query): void
     {
-        $pneadmDb = DB::connection('mysql')->getDatabaseName();
+        $paidEmails = $this->paidEnrollmentNormalizedEmails();
 
-        $query->whereNotExists(function ($sub) use ($pneadmDb) {
-            $sub->selectRaw('1')
-                ->from("{$pneadmDb}.participants as p")
-                ->join("{$pneadmDb}.courses as c", 'c.id', '=', 'p.course_id')
-                ->whereRaw('LOWER(TRIM(p.email)) = LOWER(TRIM(users.email))')
-                ->where('c.is_paid', 1)
-                ->whereNull('p.deleted_at');
+        if ($paidEmails === []) {
+            return;
+        }
+
+        $this->whereEmailNotInNormalizedList($query, $paidEmails);
+    }
+
+    /**
+     * @param  Builder<PneduUser>  $query
+     */
+    private function countWithPaidEnrollment(Builder $query): int
+    {
+        $paidEmails = $this->paidEnrollmentNormalizedEmails();
+
+        if ($paidEmails === []) {
+            return 0;
+        }
+
+        return $this->whereEmailInNormalizedList(clone $query, $paidEmails)->count();
+    }
+
+    /**
+     * @param  Builder<PneduUser>  $query
+     * @param  list<string>  $normalizedEmails
+     * @return Builder<PneduUser>
+     */
+    private function whereEmailInNormalizedList(Builder $query, array $normalizedEmails): Builder
+    {
+        return $query->where(function (Builder $outer) use ($normalizedEmails) {
+            foreach (array_chunk($normalizedEmails, 400) as $chunk) {
+                $outer->orWhere(function (Builder $inner) use ($chunk) {
+                    foreach ($chunk as $email) {
+                        $inner->orWhereRaw('LOWER(TRIM(email)) = ?', [$email]);
+                    }
+                });
+            }
         });
+    }
+
+    /**
+     * @param  Builder<PneduUser>  $query
+     * @param  list<string>  $normalizedEmails
+     */
+    private function whereEmailNotInNormalizedList(Builder $query, array $normalizedEmails): void
+    {
+        $query->where(function (Builder $outer) use ($normalizedEmails) {
+            foreach (array_chunk($normalizedEmails, 400) as $chunk) {
+                $outer->where(function (Builder $inner) use ($chunk) {
+                    foreach ($chunk as $email) {
+                        $inner->whereRaw('LOWER(TRIM(email)) != ?', [$email]);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * E-maile z zapisem na płatne szkolenie (osobne zapytanie do bazy pneadm — bez cross-DB JOIN).
+     *
+     * @return list<string>
+     */
+    public function paidEnrollmentNormalizedEmails(): array
+    {
+        if ($this->paidEnrollmentEmailsCache !== null) {
+            return $this->paidEnrollmentEmailsCache;
+        }
+
+        $this->paidEnrollmentEmailsCache = Participant::query()
+            ->whereHas('course', fn ($q) => $q->where('is_paid', 1))
+            ->whereNull('deleted_at')
+            ->pluck('email')
+            ->map(fn ($email) => Participant::normalizeEmail($email))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->paidEnrollmentEmailsCache;
     }
 
     public function userHasPaidCourseEnrollment(PneduUser $user): bool
@@ -146,10 +249,7 @@ class PneduUserAdminService
             return false;
         }
 
-        return Participant::query()
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$norm])
-            ->whereHas('course', fn ($q) => $q->where('is_paid', 1))
-            ->exists();
+        return in_array($norm, $this->paidEnrollmentNormalizedEmails(), true);
     }
 
     /**
@@ -185,23 +285,24 @@ class PneduUserAdminService
             ->map(fn ($email) => Participant::normalizeEmail($email))
             ->filter()
             ->unique()
-            ->values();
+            ->values()
+            ->all();
 
-        if ($normalized->isEmpty()) {
+        if ($normalized === []) {
             return [];
         }
 
-        $placeholders = implode(',', array_fill(0, $normalized->count(), '?'));
+        $paidSet = array_flip($this->paidEnrollmentNormalizedEmails());
 
-        $matches = Participant::query()
-            ->whereRaw('LOWER(TRIM(email)) IN ('.$placeholders.')', $normalized->all())
-            ->whereHas('course', fn ($q) => $q->where('is_paid', 1))
-            ->pluck('email')
-            ->map(fn ($email) => Participant::normalizeEmail($email))
-            ->filter()
-            ->unique()
-            ->all();
+        return array_values(array_filter($normalized, fn (string $email) => isset($paidSet[$email])));
+    }
 
-        return array_values($matches);
+    public function undeliverableReasonLabel(?string $reason): string
+    {
+        return match ($reason) {
+            'permanent_bounce' => 'Trwały bounce (hard)',
+            'complaint' => 'Skarga (complaint)',
+            default => $reason ?: '—',
+        };
     }
 }

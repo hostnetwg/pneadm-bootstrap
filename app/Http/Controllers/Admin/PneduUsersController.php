@@ -76,6 +76,7 @@ class PneduUsersController extends Controller
             'stats' => $this->pneduUserAdmin->listStats(),
             'paidEnrollmentEmails' => array_fill_keys($paidEnrollmentEmails, true),
             'adminService' => $this->pneduUserAdmin,
+            'deliverabilityAvailable' => $this->pneduUserAdmin->deliverabilityColumnsAvailable(),
         ]);
     }
 

@@ -68,7 +68,12 @@
                 Konta zarejestrowane na stronie pnedu.pl (baza <code>pnedu</code>, tabela <code>users</code>).
             </p>
 
-            @if($stats['undeliverable'] > 0)
+            @if(empty($deliverabilityAvailable))
+                <div class="alert alert-warning py-2 mb-3" role="alert">
+                    Kolumny <code>email_undeliverable_*</code> nie są jeszcze w bazie pnedu — uruchom migracje na pnedu.pl
+                    (<code>php artisan migrate</code>). Statystyki bounce będą niedostępne do czasu migracji.
+                </div>
+            @elseif($stats['undeliverable'] > 0)
                 <div class="alert alert-danger py-2 mb-3" role="alert">
                     <i class="bi bi-envelope-x me-1" aria-hidden="true"></i>
                     <strong>{{ $stats['undeliverable'] }}</strong> kont ma niedostarczalny e-mail (bounce/skarga).
@@ -285,7 +290,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if($user->hasUndeliverableEmail())
+                                            @if(! empty($deliverabilityAvailable) && $user->hasUndeliverableEmail())
                                                 <span class="badge text-bg-danger" title="{{ $adminService->undeliverableReasonLabel($user->email_undeliverable_reason) }}">
                                                     Bounce
                                                 </span>
