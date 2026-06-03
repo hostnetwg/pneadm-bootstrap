@@ -63,6 +63,31 @@
                             @endif
                         </dd>
 
+                        <dt class="col-sm-4 text-muted">Dostarczalność e-mail</dt>
+                        <dd class="col-sm-8">
+                            @if($user->hasUndeliverableEmail())
+                                <span class="badge text-bg-danger">{{ $adminService->undeliverableReasonLabel($user->email_undeliverable_reason) }}</span>
+                                <span class="text-muted ms-1">{{ $user->email_undeliverable_at?->format('Y-m-d H:i:s') }}</span>
+                            @else
+                                <span class="badge text-bg-success">Brak flagi bounce</span>
+                                @if(! $user->email_verified_at)
+                                    <span class="text-muted small d-block mt-1">Mail mógł trafić do spamu / ofert — użytkownik nie kliknął linku.</span>
+                                @endif
+                            @endif
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted">Ochrona przed auto-usunięciem</dt>
+                        <dd class="col-sm-8">
+                            @if($hasPaidEnrollment)
+                                <span class="badge text-bg-dark">Tak — płatne szkolenie</span>
+                            @else
+                                <span class="badge text-bg-secondary">Nie</span>
+                                @if(! $user->email_verified_at && ($deadline = $user->unverifiedAccountDeletionDeadline()))
+                                    <span class="text-danger small d-block mt-1">Usunięcie niezweryfikowanego konta najpóźniej: {{ $deadline->format('d.m.Y') }}</span>
+                                @endif
+                            @endif
+                        </dd>
+
                         <dt class="col-sm-4 text-muted">Data rejestracji</dt>
                         <dd class="col-sm-8 text-muted">{{ $user->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
 
@@ -78,6 +103,51 @@
                 </div>
             </div>
 
+            @if($relatedFormOrders->isNotEmpty())
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light py-3">
+                        <h5 class="mb-1"><i class="bi bi-telephone me-2"></i>Zamówienia i kontakt (form_orders)</h5>
+                        <small class="text-muted d-block">Dopasowanie po e-mailu zamawiającego lub uczestnika — telefon z zamówienia.</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Ident</th>
+                                        <th>Telefon</th>
+                                        <th>E-mail zamawiającego</th>
+                                        <th>Szkolenie</th>
+                                        <th class="text-end">Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($relatedFormOrders as $order)
+                                        <tr>
+                                            <td class="text-nowrap small">{{ $order->order_date?->format('d.m.Y') ?? '—' }}</td>
+                                            <td class="small"><code>{{ $order->ident ?: $order->id }}</code></td>
+                                            <td class="text-nowrap">
+                                                @if($order->orderer_phone)
+                                                    <a href="tel:{{ preg_replace('/\s+/', '', $order->orderer_phone) }}" class="text-decoration-none fw-semibold">{{ $order->orderer_phone }}</a>
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="small">{{ $order->orderer_email ?: '—' }}</td>
+                                            <td class="small">{{ \Illuminate\Support\Str::limit($order->product_name ?? '—', 50) }}</td>
+                                            <td class="text-end">
+                                                <a href="{{ route('form-orders.show', $order->id) }}" class="btn btn-outline-primary btn-sm">Zamówienie</a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if(auth()->user()->hasPermission('users.edit'))
                 <div class="card shadow-sm border-warning">
                     <div class="card-header bg-warning bg-opacity-25 py-3">
@@ -86,10 +156,62 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-4 pb-4 border-bottom">
+                            <h6 class="fw-semibold">Weryfikacja e-mail</h6>
+                            @if($user->email_verified_at)
+                                <p class="text-muted small mb-0">Adres jest już zweryfikowany.</p>
+                            @else
+                                <p class="text-muted small mb-3">
+                                    Wyślij ponownie link weryfikacyjny (np. gdy wiadomość wpadła do spamu).
+                                    Przy aktywnym bounce wysyłka jest zablokowana — najpierw poprawa adresu lub wyczyszczenie flagi.
+                                </p>
+                                <form method="post" action="{{ route('admin.pnedu-users.send-verification-email', ['pnedu_user' => $user->getKey()]) }}" class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-primary btn-sm"
+                                            @disabled($user->hasUndeliverableEmail())
+                                            onclick="return confirm('Wysłać link weryfikacyjny na {{ $user->email }}?');">
+                                        <i class="bi bi-envelope-check me-1"></i> Wyślij link weryfikacyjny
+                                    </button>
+                                </form>
+                                @if($user->hasUndeliverableEmail())
+                                    <p class="text-danger small mt-2 mb-0">Wysyłka zablokowana — aktywna flaga niedostarczalności.</p>
+                                @endif
+                            @endif
+                        </div>
+
+                        @if($user->hasUndeliverableEmail())
+                            <div class="mb-4 pb-4 border-bottom">
+                                <h6 class="fw-semibold text-danger">Wyczyść flagę niedostarczalności</h6>
+                                <p class="text-muted small mb-2">
+                                    Użyj po kontakcie z użytkownikiem (np. telefon) i ustaleniu poprawnego adresu.
+                                    Użytkownik powinien też poprawić e-mail w profilu na pnedu.pl — wtedy flaga znika automatycznie.
+                                </p>
+                                <form method="post" action="{{ route('admin.pnedu-users.clear-undeliverable', ['pnedu_user' => $user->getKey()]) }}">
+                                    @csrf
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" name="confirm_clear_undeliverable" id="confirm_clear_undeliverable" value="1" required>
+                                        <label class="form-check-label small" for="confirm_clear_undeliverable">
+                                            Potwierdzam wyczyszczenie flagi bounce dla <strong>{{ $user->email }}</strong>.
+                                        </label>
+                                    </div>
+                                    @error('confirm_clear_undeliverable')
+                                        <div class="text-danger small mb-2">{{ $message }}</div>
+                                    @enderror
+                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                            onclick="return confirm('Wyczyścić flagę niedostarczalności e-mail?');">
+                                        <i class="bi bi-envelope-check me-1"></i> Wyczyść flagę bounce
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+
+                        <div class="mb-4 pb-4 border-bottom">
                             <h6 class="fw-semibold">Reset hasła (e-mail)</h6>
                             <p class="text-muted small mb-2">
                                 Wysyła standardową wiadomość Laravel z linkiem do formularza resetu na stronie pnedu.pl
                                 (<code>{{ rtrim(config('services.pnedu_frontend_url'), '/') }}/reset-password/…</code>).
+                                @if($user->hasUndeliverableEmail())
+                                    <span class="text-danger d-block mt-1">Uwaga: adres ma flagę bounce — mail resetu może nie dotrzeć.</span>
+                                @endif
                             </p>
                             <form method="post"
                                   id="pnedu-send-password-reset-form"
@@ -166,6 +288,9 @@
                                 <p class="text-muted small mb-0">Adres jest już zweryfikowany — akcja niedostępna.</p>
                             @else
                                 <p class="text-muted small mb-2">Oznacza adres jako zweryfikowany (np. po weryfikacji poza systemem).</p>
+                                @if($user->hasUndeliverableEmail())
+                                    <div class="alert alert-warning small py-2">Adres ma flagę bounce — ręczna weryfikacja nie usuwa problemu dostarczalności.</div>
+                                @endif
                                 <form method="post" action="{{ route('admin.pnedu-users.verify-email', ['pnedu_user' => $user->getKey()]) }}">
                                     @csrf
                                     <div class="form-check mb-3">
@@ -192,7 +317,9 @@
                             <p class="text-muted small mb-3">
                                 Deaktywuje konto tak jak przy usunięciu przez użytkownika: <strong>soft delete</strong> (<code>deleted_at</code> w bazie pnedu),
                                 brak możliwości logowania. Adres e-mail może zostać ponownie użyty przy nowej rejestracji.
-                                Uprawnienie: edycja użytkowników — akcja trafia do logu aktywności.
+                                @if($hasPaidEnrollment)
+                                    <span class="text-danger d-block mt-2 fw-semibold">To konto ma powiązane płatne szkolenie — rozważ kontakt telefoniczny przed usunięciem.</span>
+                                @endif
                             </p>
                             <form method="post"
                                   action="{{ route('admin.pnedu-users.destroy', ['pnedu_user' => $user->getKey()]) }}"

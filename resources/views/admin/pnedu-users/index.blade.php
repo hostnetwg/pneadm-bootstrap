@@ -20,6 +20,25 @@
 
         return $dir === 'asc' ? 'bi-sort-up' : 'bi-sort-down';
     };
+    $quickFilterUrl = function (array $overrides = []) use ($filters) {
+        return route('admin.pnedu-users.index', array_merge(
+            [
+                'sort' => $filters['sort'],
+                'dir' => $filters['dir'],
+                'trashed' => 'active',
+            ],
+            $overrides
+        ));
+    };
+    $isQuickActive = function (array $expected) use ($filters) {
+        foreach ($expected as $key => $value) {
+            if (($filters[$key] ?? null) !== $value) {
+                return false;
+            }
+        }
+
+        return true;
+    };
 @endphp
 
 <x-app-layout>
@@ -49,6 +68,79 @@
                 Konta zarejestrowane na stronie pnedu.pl (baza <code>pnedu</code>, tabela <code>users</code>).
             </p>
 
+            @if($stats['undeliverable'] > 0)
+                <div class="alert alert-danger py-2 mb-3" role="alert">
+                    <i class="bi bi-envelope-x me-1" aria-hidden="true"></i>
+                    <strong>{{ $stats['undeliverable'] }}</strong> kont ma niedostarczalny e-mail (bounce/skarga).
+                    @if($stats['undeliverable_paid'] > 0)
+                        W tym <strong>{{ $stats['undeliverable_paid'] }}</strong> z płatnym szkoleniem — priorytet kontaktu.
+                    @endif
+                </div>
+            @endif
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="card border-danger h-100 shadow-sm">
+                        <div class="card-body py-3">
+                            <div class="text-danger small fw-semibold text-uppercase">Niedostarczalne</div>
+                            <div class="fs-3 fw-bold text-dark">{{ $stats['undeliverable'] }}</div>
+                            <div class="small text-muted">bounce / skarga SES</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card border-warning h-100 shadow-sm">
+                        <div class="card-body py-3">
+                            <div class="text-warning-emphasis small fw-semibold text-uppercase">Niezweryfikowane</div>
+                            <div class="fs-3 fw-bold text-dark">{{ $stats['unverified'] }}</div>
+                            <div class="small text-muted">bez kliknięcia w link</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card border-info h-100 shadow-sm">
+                        <div class="card-body py-3">
+                            <div class="text-info-emphasis small fw-semibold text-uppercase">Czekają na link</div>
+                            <div class="fs-3 fw-bold text-dark">{{ $stats['unverified_deliverable'] }}</div>
+                            <div class="small text-muted">bez bounce — np. spam / oferty</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card border-secondary h-100 shadow-sm">
+                        <div class="card-body py-3">
+                            <div class="text-secondary small fw-semibold text-uppercase">Niedost. (7 dni)</div>
+                            <div class="fs-3 fw-bold text-dark">{{ $stats['undeliverable_recent_7d'] }}</div>
+                            <div class="small text-muted">nowe bounce w tygodniu</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <span class="small text-muted align-self-center me-1">Szybkie filtry:</span>
+                <a href="{{ $quickFilterUrl(['verified' => 'no', 'deliverability' => 'all', 'has_paid' => 'all']) }}"
+                   class="btn btn-sm {{ $isQuickActive(['verified' => 'no', 'deliverability' => 'all', 'has_paid' => 'all', 'trashed' => 'active']) && $filters['undeliverable_reason'] === null ? 'btn-warning' : 'btn-outline-warning' }}">
+                    Niezweryfikowane ({{ $stats['unverified'] }})
+                </a>
+                <a href="{{ $quickFilterUrl(['verified' => 'no', 'deliverability' => 'deliverable', 'has_paid' => 'all']) }}"
+                   class="btn btn-sm {{ $isQuickActive(['verified' => 'no', 'deliverability' => 'deliverable', 'has_paid' => 'all', 'trashed' => 'active']) ? 'btn-info' : 'btn-outline-info' }}">
+                    Czekają na link ({{ $stats['unverified_deliverable'] }})
+                </a>
+                <a href="{{ $quickFilterUrl(['verified' => 'all', 'deliverability' => 'undeliverable', 'has_paid' => 'all']) }}"
+                   class="btn btn-sm {{ $isQuickActive(['verified' => 'all', 'deliverability' => 'undeliverable', 'has_paid' => 'all', 'trashed' => 'active']) && $filters['undeliverable_reason'] === null ? 'btn-danger' : 'btn-outline-danger' }}">
+                    Niedostarczalne ({{ $stats['undeliverable'] }})
+                </a>
+                <a href="{{ $quickFilterUrl(['verified' => 'all', 'deliverability' => 'undeliverable', 'has_paid' => 'yes']) }}"
+                   class="btn btn-sm {{ $isQuickActive(['deliverability' => 'undeliverable', 'has_paid' => 'yes', 'trashed' => 'active']) ? 'btn-danger' : 'btn-outline-danger' }}">
+                    Niedost. + płatne ({{ $stats['undeliverable_paid'] }})
+                </a>
+                <a href="{{ $quickFilterUrl(['verified' => 'no', 'deliverability' => 'all', 'has_paid' => 'yes']) }}"
+                   class="btn btn-sm {{ $isQuickActive(['verified' => 'no', 'has_paid' => 'yes', 'trashed' => 'active']) ? 'btn-outline-dark' : 'btn-outline-secondary' }}">
+                    Niezweryf. + płatne ({{ $stats['unverified_paid'] }})
+                </a>
+            </div>
+
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light py-3">
                     <h6 class="mb-0 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtry i wyszukiwanie</h6>
@@ -74,6 +166,30 @@
                                 <option value="all" @selected($filters['verified'] === 'all')>Wszystkie</option>
                                 <option value="yes" @selected($filters['verified'] === 'yes')>Tak</option>
                                 <option value="no" @selected($filters['verified'] === 'no')>Nie</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter-deliverability" class="form-label small text-muted mb-1">Dostarczalność e-mail</label>
+                            <select name="deliverability" id="filter-deliverability" class="form-select form-select-sm">
+                                <option value="all" @selected($filters['deliverability'] === 'all')>Wszystkie</option>
+                                <option value="deliverable" @selected($filters['deliverability'] === 'deliverable')>Bez bounce (czeka / OK)</option>
+                                <option value="undeliverable" @selected($filters['deliverability'] === 'undeliverable')>Niedostarczalne</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter-undeliverable-reason" class="form-label small text-muted mb-1">Powód niedostarczalności</label>
+                            <select name="undeliverable_reason" id="filter-undeliverable-reason" class="form-select form-select-sm">
+                                <option value="" @selected($filters['undeliverable_reason'] === null)>Wszystkie</option>
+                                <option value="permanent_bounce" @selected($filters['undeliverable_reason'] === 'permanent_bounce')>Trwały bounce</option>
+                                <option value="complaint" @selected($filters['undeliverable_reason'] === 'complaint')>Skarga (complaint)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filter-has-paid" class="form-label small text-muted mb-1">Płatne szkolenie</label>
+                            <select name="has_paid" id="filter-has-paid" class="form-select form-select-sm">
+                                <option value="all" @selected($filters['has_paid'] === 'all')>Wszystkie</option>
+                                <option value="yes" @selected($filters['has_paid'] === 'yes')>Tak</option>
+                                <option value="no" @selected($filters['has_paid'] === 'no')>Nie</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -123,6 +239,7 @@
                                             E-mail @if($sortIcon('email'))<i class="bi {{ $sortIcon('email') }}"></i>@endif
                                         </a>
                                     </th>
+                                    <th scope="col">Status e-mail</th>
                                     <th scope="col">
                                         <a href="{{ $sortLink('first_name') }}" class="text-decoration-none text-dark" title="Sort po imieniu">
                                             Imię @if($sortIcon('first_name'))<i class="bi {{ $sortIcon('first_name') }}"></i>@endif
@@ -152,12 +269,31 @@
                             </thead>
                             <tbody>
                                 @forelse($users as $user)
+                                    @php
+                                        $normEmail = strtolower(trim($user->email));
+                                        $hasPaid = isset($paidEnrollmentEmails[$normEmail]);
+                                    @endphp
                                     <tr>
                                         <td class="text-muted">{{ $user->id }}</td>
                                         <td>
                                             {{ $user->email }}
                                             @if($user->trashed())
                                                 <span class="badge text-bg-danger ms-1">Usunięte</span>
+                                            @endif
+                                            @if($hasPaid)
+                                                <span class="badge text-bg-dark ms-1" title="Ma zapis na płatne szkolenie">Płatne</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($user->hasUndeliverableEmail())
+                                                <span class="badge text-bg-danger" title="{{ $adminService->undeliverableReasonLabel($user->email_undeliverable_reason) }}">
+                                                    Bounce
+                                                </span>
+                                                <span class="d-block text-muted small">{{ $user->email_undeliverable_at?->format('Y-m-d H:i') }}</span>
+                                            @elseif(! $user->email_verified_at)
+                                                <span class="badge text-bg-warning text-dark">Czeka na link</span>
+                                            @else
+                                                <span class="badge text-bg-success">OK</span>
                                             @endif
                                         </td>
                                         <td>{{ $user->full_name }}</td>
@@ -202,7 +338,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">
+                                        <td colspan="8" class="text-center text-muted py-4">
                                             Brak użytkowników spełniających kryteria.
                                         </td>
                                     </tr>

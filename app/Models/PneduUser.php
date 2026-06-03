@@ -34,6 +34,8 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
         'birth_date',
         'birth_place',
         'email_verified_at',
+        'email_undeliverable_at',
+        'email_undeliverable_reason',
     ];
 
     protected $hidden = [
@@ -45,6 +47,7 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_undeliverable_at' => 'datetime',
             'birth_date' => 'date',
             'password' => 'hashed',
         ];
@@ -67,5 +70,37 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
     public function preferredLocale(): string
     {
         return 'pl';
+    }
+
+    public function hasUndeliverableEmail(): bool
+    {
+        return $this->email_undeliverable_at !== null;
+    }
+
+    public function clearEmailDeliverabilityFlags(): void
+    {
+        $this->email_undeliverable_at = null;
+        $this->email_undeliverable_reason = null;
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    public function unverifiedAccountDeletionDeadline(): ?\Illuminate\Support\Carbon
+    {
+        if ($this->hasVerifiedEmail()) {
+            return null;
+        }
+
+        $graceDays = (int) config('auth.pnedu_unverified_grace_days', 90);
+
+        return $this->created_at?->copy()->addDays($graceDays);
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new \App\Notifications\PneduFrontendVerifyEmail);
     }
 }

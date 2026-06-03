@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Participant;
 use App\Models\PneduUser;
+use App\Services\Admin\PneduUserAdminService;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +24,20 @@ class PneduUsersController extends Controller
     private const PER_PAGE = 25;
 
     /** @var list<string> */
-    private const SORT_COLUMNS = ['id', 'email', 'created_at', 'first_name', 'last_name', 'birth_date', 'email_verified_at'];
+    private const SORT_COLUMNS = [
+        'id',
+        'email',
+        'created_at',
+        'first_name',
+        'last_name',
+        'birth_date',
+        'email_verified_at',
+        'email_undeliverable_at',
+    ];
+
+    public function __construct(
+        private readonly PneduUserAdminService $pneduUserAdmin,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -44,7 +57,7 @@ class PneduUsersController extends Controller
         } elseif ($filters['trashed'] === 'only') {
             $query->onlyTrashed();
         }
-        $this->applyFilters($query, $filters);
+        $this->pneduUserAdmin->applyListFilters($query, $filters);
 
         $sort = $filters['sort'];
         $dir = $filters['dir'];
@@ -55,10 +68,14 @@ class PneduUsersController extends Controller
         }
 
         $users = $query->paginate(self::PER_PAGE)->withQueryString();
+        $paidEnrollmentEmails = $this->pneduUserAdmin->paidEnrollmentEmailSetForEmails($users->getCollection()->pluck('email'));
 
         return view('admin.pnedu-users.index', [
             'users' => $users,
             'filters' => $filters,
+            'stats' => $this->pneduUserAdmin->listStats(),
+            'paidEnrollmentEmails' => array_fill_keys($paidEnrollmentEmails, true),
+            'adminService' => $this->pneduUserAdmin,
         ]);
     }
 
@@ -70,13 +87,78 @@ class PneduUsersController extends Controller
 
         $participations = $this->participationsForPneduEmail($pnedu_user->email);
         [$participationsPaidCount, $participationsFreeCount] = $this->participationPaidFreeCounts($participations);
+        $hasPaidEnrollment = $this->pneduUserAdmin->userHasPaidCourseEnrollment($pnedu_user);
+        $relatedFormOrders = $this->pneduUserAdmin->relatedFormOrdersForEmail($pnedu_user->email);
 
         return view('admin.pnedu-users.show', [
             'user' => $pnedu_user,
             'participations' => $participations,
             'participationsPaidCount' => $participationsPaidCount,
             'participationsFreeCount' => $participationsFreeCount,
+            'hasPaidEnrollment' => $hasPaidEnrollment,
+            'relatedFormOrders' => $relatedFormOrders,
+            'adminService' => $this->pneduUserAdmin,
         ]);
+    }
+
+    public function sendVerificationEmail(PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        if ($pnedu_user->hasVerifiedEmail()) {
+            return back()->with('error', 'Ten adres e-mail jest już zweryfikowany.');
+        }
+
+        if ($pnedu_user->hasUndeliverableEmail()) {
+            return back()->with('error', 'Adres ma aktywną flagę niedostarczalności (bounce). Najpierw poproś użytkownika o poprawę e-mail w profilu lub wyczyść flagę po ustaleniach.');
+        }
+
+        $pnedu_user->sendEmailVerificationNotification();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: wysłano link weryfikacji e-mail (admin)',
+            'Administracyjnie wysłano wiadomość weryfikacyjną na adres '.$pnedu_user->email.' (ID użytkownika: '.$pnedu_user->id.').',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'email' => $pnedu_user->email,
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Wysłano wiadomość weryfikacyjną na adres '.$pnedu_user->email.'.');
+    }
+
+    public function clearUndeliverableFlag(Request $request, PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $request->validate([
+            'confirm_clear_undeliverable' => ['accepted'],
+        ], [
+            'confirm_clear_undeliverable.accepted' => 'Zaznacz potwierdzenie wyczyszczenia flagi niedostarczalności.',
+        ]);
+
+        if (! $pnedu_user->hasUndeliverableEmail()) {
+            return back()->with('error', 'To konto nie ma aktywnej flagi niedostarczalności e-mail.');
+        }
+
+        $previousReason = $pnedu_user->email_undeliverable_reason;
+        $pnedu_user->clearEmailDeliverabilityFlags();
+        $pnedu_user->save();
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: wyczyszczono flagę niedostarczalności e-mail',
+            'Administracyjnie wyczyszczono flagę niedostarczalności dla użytkownika ID '.$pnedu_user->id.' ('.$pnedu_user->email.'), poprzedni powód: '.($previousReason ?: 'brak').'.',
+            [
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'email' => $pnedu_user->email,
+                ],
+            ]
+        );
+
+        return back()->with('success', 'Flaga niedostarczalności e-mail została wyczyszczona.');
     }
 
     public function sendPasswordReset(PneduUser $pnedu_user): RedirectResponse
@@ -352,7 +434,7 @@ class PneduUsersController extends Controller
 
     private function normalizeListQuery(Request $request): void
     {
-        foreach (['email', 'name', 'registered_from', 'registered_to', 'trashed'] as $key) {
+        foreach (['email', 'name', 'registered_from', 'registered_to', 'trashed', 'undeliverable_reason'] as $key) {
             if ($request->query($key) === '') {
                 $request->query->remove($key);
             }
@@ -367,6 +449,9 @@ class PneduUsersController extends Controller
             'registered_from' => ['nullable', 'date'],
             'registered_to' => ['nullable', 'date'],
             'verified' => ['nullable', 'in:all,yes,no'],
+            'deliverability' => ['nullable', 'in:all,undeliverable,deliverable'],
+            'undeliverable_reason' => ['nullable', 'in:permanent_bounce,complaint'],
+            'has_paid' => ['nullable', 'in:all,yes,no'],
             'trashed' => ['nullable', 'in:active,with,only'],
             'sort' => ['nullable', 'string', 'in:'.implode(',', self::SORT_COLUMNS)],
             'dir' => ['nullable', 'in:asc,desc'],
@@ -393,45 +478,14 @@ class PneduUsersController extends Controller
             'registered_from' => $data['registered_from'] ?? null,
             'registered_to' => $data['registered_to'] ?? null,
             'verified' => in_array($data['verified'] ?? '', ['yes', 'no'], true) ? $data['verified'] : 'all',
+            'deliverability' => in_array($data['deliverability'] ?? '', ['undeliverable', 'deliverable'], true)
+                ? $data['deliverability']
+                : 'all',
+            'undeliverable_reason' => $data['undeliverable_reason'] ?? null,
+            'has_paid' => in_array($data['has_paid'] ?? '', ['yes', 'no'], true) ? $data['has_paid'] : 'all',
             'trashed' => in_array($data['trashed'] ?? '', ['with', 'only'], true) ? $data['trashed'] : 'active',
             'sort' => $sort,
             'dir' => $dir,
         ];
-    }
-
-    /**
-     * @param  array{email: ?string, name: ?string, registered_from: ?string, registered_to: ?string, verified: string, sort: string, dir: string}  $filters
-     */
-    private function applyFilters(Builder $query, array $filters): void
-    {
-        if ($filters['email'] !== null && $filters['email'] !== '') {
-            $term = '%'.addcslashes($filters['email'], '%_\\').'%';
-            $query->where('email', 'like', $term);
-        }
-
-        if ($filters['name'] !== null && $filters['name'] !== '') {
-            $term = '%'.addcslashes($filters['name'], '%_\\').'%';
-            $query->where(function (Builder $q) use ($term) {
-                $q->where('first_name', 'like', $term)
-                    ->orWhere('last_name', 'like', $term)
-                    ->orWhereRaw(
-                        "CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?",
-                        [$term]
-                    );
-            });
-        }
-
-        if (! empty($filters['registered_from'])) {
-            $query->where('created_at', '>=', Carbon::parse($filters['registered_from'])->startOfDay());
-        }
-        if (! empty($filters['registered_to'])) {
-            $query->where('created_at', '<=', Carbon::parse($filters['registered_to'])->endOfDay());
-        }
-
-        if ($filters['verified'] === 'yes') {
-            $query->whereNotNull('email_verified_at');
-        } elseif ($filters['verified'] === 'no') {
-            $query->whereNull('email_verified_at');
-        }
     }
 }

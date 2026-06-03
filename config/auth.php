@@ -126,4 +126,8 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    // Konta pnedu.pl — zgodnie z config/auth.php na froncie (dni / minuty)
+    'pnedu_unverified_grace_days' => (int) env('PNEDU_UNVERIFIED_GRACE_DAYS', 90),
+    'pnedu_verification_expire' => (int) env('PNEDU_VERIFICATION_EXPIRE', 60),
+
 ];

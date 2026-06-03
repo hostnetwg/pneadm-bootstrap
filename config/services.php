@@ -84,6 +84,9 @@ return [
     // Adres frontu pnedu.pl (lista zaświadczeń po tokenie) – do linków testowych w panelu admina
     'pnedu_frontend_url' => env('PNEDU_FRONTEND_URL', 'http://localhost:8081'),
 
+    // APP_KEY z aplikacji pnedu.pl — podpis linków weryfikacji e-mail wysyłanych z adm
+    'pnedu_app_key' => env('PNEDU_APP_KEY'),
+
     'teryt' => [
         'username' => env('TERYT_USERNAME', 'WaldemarGrabowski'),
         'password' => env('TERYT_PASSWORD', 'k1Yc4S0ius'),

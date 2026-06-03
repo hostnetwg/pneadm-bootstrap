@@ -62,6 +62,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
         Route::get('pnedu-users', [PneduUsersController::class, 'index'])->name('pnedu-users.index');
         Route::post('pnedu-users/{pnedu_user}/send-password-reset', [PneduUsersController::class, 'sendPasswordReset'])->name('pnedu-users.send-password-reset');
+        Route::post('pnedu-users/{pnedu_user}/send-verification-email', [PneduUsersController::class, 'sendVerificationEmail'])->name('pnedu-users.send-verification-email');
+        Route::post('pnedu-users/{pnedu_user}/clear-undeliverable', [PneduUsersController::class, 'clearUndeliverableFlag'])->name('pnedu-users.clear-undeliverable');
         Route::post('pnedu-users/{pnedu_user}/access-credentials-password', [PneduUsersController::class, 'generateAccessCredentialsPassword'])
             ->middleware('throttle:30,1')
             ->name('pnedu-users.access-credentials-password');
@@ -287,7 +289,6 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::put('/{fileLink}', [\App\Http\Controllers\CourseFileLinkController::class, 'update'])->name('update');
         Route::delete('/{fileLink}', [\App\Http\Controllers\CourseFileLinkController::class, 'destroy'])->name('destroy');
     });
-
 
     // Rozliczenia trenerów (faktury wypłat) — tylko Super Administrator
     Route::middleware('super_admin')->group(function () {
