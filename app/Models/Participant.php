@@ -18,6 +18,7 @@ class Participant extends Model
         'first_name',
         'last_name',
         'email',
+        'email_normalized',
         'birth_date',
         'birth_place',
         'phone',
@@ -38,6 +39,29 @@ class Participant extends Model
     public function certificate()
     {
         return $this->hasOne(Certificate::class, 'participant_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Participant $participant) {
+            if ($participant->isDirty('deleted_at') && $participant->deleted_at !== null) {
+                $participant->email_normalized = null;
+
+                return;
+            }
+
+            $participant->email_normalized = self::normalizeEmail($participant->email);
+        });
+
+        static::deleted(function (Participant $participant) {
+            if ($participant->isForceDeleting() || $participant->email_normalized === null) {
+                return;
+            }
+
+            Participant::withTrashed()
+                ->whereKey($participant->getKey())
+                ->update(['email_normalized' => null]);
+        });
     }
 
     /**

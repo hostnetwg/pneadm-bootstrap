@@ -32,7 +32,9 @@ class ParticipantAccessExpiryService
             return $this->expiresAtFromPriceVariant($variant, $now);
         }
 
-        return $this->legacyExpiresAtFromCourse($course, $now);
+        $baseDate = ($course->end_date ?? $purchaseDate ?? $now)->copy();
+
+        return $this->expiresAtForPostEndPurchase(null, $course, $baseDate);
     }
 
     public function resolveAccessExpiresAtForExtension(
@@ -259,6 +261,10 @@ class ParticipantAccessExpiryService
 
     private function expiresAtFromCourseOrGlobalPostEndRule(Course $course, Carbon $baseDate): ?Carbon
     {
+        if ($this->courseHasUnlimitedPostEndAccess($course)) {
+            return null;
+        }
+
         $value = $course->post_end_access_duration_value;
         $unit = $course->post_end_access_duration_unit;
 
@@ -307,6 +313,10 @@ class ParticipantAccessExpiryService
         Carbon $now
     ): ?Carbon
     {
+        if ($this->courseHasUnlimitedPostEndAccess($course)) {
+            return null;
+        }
+
         $value = $course->post_end_access_duration_value;
         $unit = $course->post_end_access_duration_unit;
 
@@ -336,5 +346,10 @@ class ParticipantAccessExpiryService
         $this->addDuration($expiresAt, $unit, $value);
 
         return $expiresAt;
+    }
+
+    private function courseHasUnlimitedPostEndAccess(Course $course): bool
+    {
+        return (string) ($course->post_end_access_rule ?? Course::POST_END_RULE_DURATION) === Course::POST_END_RULE_UNLIMITED;
     }
 }

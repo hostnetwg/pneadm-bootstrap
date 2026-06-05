@@ -159,9 +159,18 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small mb-3">
-                            Domyślnie pobieramy globalne ustawienie z „Zakupy pnedu.pl”. Możesz je zmienić dla tego szkolenia; zostaw puste, aby nadal używać ustawienia globalnego.
+                            Domyślnie pobieramy globalne ustawienie z „Zakupy pnedu.pl”. Przydatne głównie dla szkoleń bezpłatnych bez wariantów cenowych. Wariant cenowy ma zawsze pierwszeństwo.
                         </p>
-                        <div class="row g-3">
+                        <div class="form-check mb-3">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   name="post_end_access_unlimited"
+                                   id="post_end_access_unlimited"
+                                   value="1"
+                                   {{ old('post_end_access_unlimited') ? 'checked' : '' }}>
+                            <label class="form-check-label" for="post_end_access_unlimited">Dostęp bezterminowy</label>
+                        </div>
+                        <div class="row g-3" id="postEndAccessDurationFields">
                             <div class="col-md-3">
                                 <label for="post_end_access_duration_value" class="form-label">Okres</label>
                                 <input type="number"
@@ -475,5 +484,28 @@
         // Użyj blur zamiast change - walidacja uruchomi się gdy użytkownik opuści pole
         endDateInput.addEventListener("blur", validateDates);
         startDateInput.addEventListener("blur", validateDates);
+    });
+</script>
+<script>
+    function toggleCoursePostEndAccessFields() {
+        const unlimited = document.getElementById('post_end_access_unlimited');
+        const fields = document.getElementById('postEndAccessDurationFields');
+        if (! unlimited || ! fields) {
+            return;
+        }
+
+        const disabled = unlimited.checked;
+        fields.querySelectorAll('input, select').forEach((el) => {
+            el.disabled = disabled;
+        });
+        fields.style.opacity = disabled ? '0.5' : '1';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const unlimited = document.getElementById('post_end_access_unlimited');
+        if (unlimited) {
+            unlimited.addEventListener('change', toggleCoursePostEndAccessFields);
+            toggleCoursePostEndAccessFields();
+        }
     });
 </script>

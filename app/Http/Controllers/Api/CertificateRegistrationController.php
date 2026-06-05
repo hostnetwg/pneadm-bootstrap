@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
-use App\Models\Participant;
-use App\Services\ParticipantAccessExpiryService;
+use App\Services\CertificateRegistrationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CertificateRegistrationController extends Controller
 {
+    public function __construct(
+        private readonly CertificateRegistrationService $registrationService,
+    ) {}
+
     /**
      * @return array{ok: bool, iso: ?string, message: ?string}
      */
@@ -223,60 +226,19 @@ class CertificateRegistrationController extends Controller
             ], 422);
         }
 
-        $emailNormalized = strtolower(trim($request->input('email')));
-        $existing = Participant::where('course_id', $course->id)
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$emailNormalized])
-            ->first();
-
-        if ($existing) {
-            $update = [
-                'first_name' => trim($request->input('first_name')),
-                'last_name' => trim($request->input('last_name')),
-                'email' => trim($request->input('email')),
-            ];
-
-            if ($existing->access_expires_at === null) {
-                $update['access_expires_at'] = app(ParticipantAccessExpiryService::class)
-                    ->defaultExpiresAtFromCourseEnd($course);
-            }
-
-            if ($course->certificate_registration_collect_birth_data) {
-                $update['birth_date'] = $request->filled('birth_date') ? $request->input('birth_date') : null;
-                $update['birth_place'] = $request->filled('birth_place') ? trim((string) $request->input('birth_place')) : null;
-            }
-
-            $existing->update($update);
-
-            return response()->json([
-                'success' => true,
-                'updated' => true,
-                'message' => 'Twoje dane zostały zaktualizowane.',
-            ]);
-        }
-
-        $maxOrder = (int) Participant::where('course_id', $course->id)->max('order');
-
-        $payload = [
-            'course_id' => $course->id,
-            'order' => $maxOrder + 1,
-            'first_name' => trim($request->input('first_name')),
-            'last_name' => trim($request->input('last_name')),
-            'email' => trim($request->input('email')),
-            'access_expires_at' => app(ParticipantAccessExpiryService::class)
-                ->defaultExpiresAtFromCourseEnd($course),
-        ];
-
-        if ($course->certificate_registration_collect_birth_data) {
-            $payload['birth_date'] = $request->filled('birth_date') ? $request->input('birth_date') : null;
-            $payload['birth_place'] = $request->filled('birth_place') ? trim((string) $request->input('birth_place')) : null;
-        }
-
-        Participant::create($payload);
+        $result = $this->registrationService->registerOrUpdate($course, [
+            'first_name' => $request->input('first_name'),
+            'last_name' => $request->input('last_name'),
+            'email' => $request->input('email'),
+            'birth_date' => $request->input('birth_date'),
+            'birth_place' => $request->input('birth_place'),
+            'collect_birth_data' => (bool) $course->certificate_registration_collect_birth_data,
+        ]);
 
         return response()->json([
             'success' => true,
-            'updated' => false,
-            'message' => 'Zostałeś zarejestrowany. Zaświadczenie otrzymasz w oddzielnej wiadomości.',
+            'updated' => $result['updated'],
+            'message' => $result['message'],
         ]);
     }
 }

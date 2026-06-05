@@ -11,6 +11,10 @@ class Course extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
+    public const POST_END_RULE_DURATION = 'duration';
+
+    public const POST_END_RULE_UNLIMITED = 'unlimited';
+
     protected $fillable = [
         'title',
         'description',
@@ -34,10 +38,12 @@ class Course extends Model
         'certificate_registration_token',
         'certificate_registration_collect_birth_data',
         'certificate_registration_birth_data_required',
+        'next_participant_order',
         'access_duration_days',
         'access_notes',
         'post_end_access_duration_value',
         'post_end_access_duration_unit',
+        'post_end_access_rule',
         'notatki',
         'id_old',
         'source_id_old',
@@ -57,6 +63,7 @@ class Course extends Model
         'certificate_registration_ends_at' => 'datetime',
         'certificate_registration_collect_birth_data' => 'boolean',
         'certificate_registration_birth_data_required' => 'boolean',
+        'next_participant_order' => 'integer',
         'post_end_access_duration_value' => 'integer',
     ];
 

@@ -201,15 +201,24 @@
                     </div>
                 </div>
 
-                <div class="card mb-4">
+                <div class="card mb-4" id="post-end-access-card">
                     <div class="card-header bg-light">
                         <h5 class="mb-0">Dostęp po zakończeniu szkolenia</h5>
                     </div>
                     <div class="card-body">
                         <p class="text-muted small mb-3">
-                            Jeżeli pola są puste, system użyje globalnego ustawienia z „Zakupy pnedu.pl”. Ustaw wartość tutaj, aby nadpisać ją tylko dla tego szkolenia.
+                            Jeżeli pola okresu są puste, system użyje globalnego ustawienia z „Zakupy pnedu.pl”. Przydatne głównie dla szkoleń bezpłatnych bez wariantów cenowych — rejestracja zaświadczenia, ręczne dodanie uczestnika i „Dodaj tylko do PNEDU”. Wariant cenowy ma zawsze pierwszeństwo.
                         </p>
-                        <div class="row g-3">
+                        <div class="form-check mb-3">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   name="post_end_access_unlimited"
+                                   id="post_end_access_unlimited"
+                                   value="1"
+                                   {{ old('post_end_access_unlimited', ($course->post_end_access_rule ?? 'duration') === 'unlimited') ? 'checked' : '' }}>
+                            <label class="form-check-label" for="post_end_access_unlimited">Dostęp bezterminowy</label>
+                        </div>
+                        <div class="row g-3" id="postEndAccessDurationFields">
                             <div class="col-md-3">
                                 <label for="post_end_access_duration_value" class="form-label">Okres</label>
                                 <input type="number"
@@ -628,5 +637,28 @@ window.onload = toggleCourseFields;
         // Użyj blur zamiast change - walidacja uruchomi się gdy użytkownik opuści pole
         endDateInput.addEventListener("blur", validateDates);
         startDateInput.addEventListener("blur", validateDates);
+    });
+</script>
+<script>
+    function toggleCoursePostEndAccessFields() {
+        const unlimited = document.getElementById('post_end_access_unlimited');
+        const fields = document.getElementById('postEndAccessDurationFields');
+        if (! unlimited || ! fields) {
+            return;
+        }
+
+        const disabled = unlimited.checked;
+        fields.querySelectorAll('input, select').forEach((el) => {
+            el.disabled = disabled;
+        });
+        fields.style.opacity = disabled ? '0.5' : '1';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const unlimited = document.getElementById('post_end_access_unlimited');
+        if (unlimited) {
+            unlimited.addEventListener('change', toggleCoursePostEndAccessFields);
+            toggleCoursePostEndAccessFields();
+        }
     });
 </script>

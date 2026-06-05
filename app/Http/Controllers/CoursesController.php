@@ -870,12 +870,7 @@ class CoursesController extends Controller
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
             ? trim((string) $validated['sendy_suppression_list_id'])
             : null;
-        $validated['post_end_access_duration_value'] = ! empty($validated['post_end_access_duration_value'])
-            ? (int) $validated['post_end_access_duration_value']
-            : null;
-        $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
-            ? ($validated['post_end_access_duration_unit'] ?? 'months')
-            : null;
+        $this->normalizePostEndAccessInput($request, $validated);
 
         // ✅ Sanityzacja HTML - dozwolone tagi Bootstrap 5 i standardowe HTML
         if (! empty($validated['offer_description_html'])) {
@@ -1072,12 +1067,7 @@ class CoursesController extends Controller
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
             ? trim((string) $validated['sendy_suppression_list_id'])
             : null;
-        $validated['post_end_access_duration_value'] = ! empty($validated['post_end_access_duration_value'])
-            ? (int) $validated['post_end_access_duration_value']
-            : null;
-        $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
-            ? ($validated['post_end_access_duration_unit'] ?? 'months')
-            : null;
+        $this->normalizePostEndAccessInput($request, $validated);
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
         $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
@@ -1306,5 +1296,29 @@ class CoursesController extends Controller
         }
 
         return redirect($url);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function normalizePostEndAccessInput(Request $request, array &$validated): void
+    {
+        $validated['post_end_access_rule'] = $request->boolean('post_end_access_unlimited')
+            ? Course::POST_END_RULE_UNLIMITED
+            : Course::POST_END_RULE_DURATION;
+
+        if ($validated['post_end_access_rule'] === Course::POST_END_RULE_UNLIMITED) {
+            $validated['post_end_access_duration_value'] = null;
+            $validated['post_end_access_duration_unit'] = null;
+
+            return;
+        }
+
+        $validated['post_end_access_duration_value'] = ! empty($validated['post_end_access_duration_value'])
+            ? (int) $validated['post_end_access_duration_value']
+            : null;
+        $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
+            ? ($validated['post_end_access_duration_unit'] ?? 'months')
+            : null;
     }
 }

@@ -58,6 +58,8 @@ class PneduPurchasesController extends Controller
             'default_post_end_access_duration_unit' => $validated['default_post_end_access_duration_unit'],
         ]);
 
+        PaymentDisplayOption::forgetSettingsCache();
+
         return redirect()
             ->route('settings.pnedu-purchases.index')
             ->with('success', 'Ustawienia widoczności opcji płatności zostały zapisane.');
