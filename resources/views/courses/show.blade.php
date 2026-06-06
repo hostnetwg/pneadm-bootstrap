@@ -679,6 +679,14 @@
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
+                                @if($googleCalendarUrl = $course->googleCalendarUrl())
+                                    <a href="{{ $googleCalendarUrl }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="btn btn-outline-secondary">
+                                        <i class="fas fa-calendar-plus"></i> Dodaj do Google Calendar
+                                    </a>
+                                @endif
                                 <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-warning">
                                     <i class="fas fa-edit"></i> Edytuj szkolenie
                                 </a>

@@ -256,4 +256,82 @@ class Course extends Model
 
         return $base.'/certificate-registration/'.$token;
     }
+
+    /**
+     * URL do dodania szkolenia w Google Calendar (link TEMPLATE — bez OAuth).
+     */
+    public function googleCalendarUrl(): ?string
+    {
+        if (! $this->start_date) {
+            return null;
+        }
+
+        $start = $this->start_date->copy()->timezone('Europe/Warsaw');
+        $end = $this->calendarEventEnd()->timezone('Europe/Warsaw');
+
+        if ($end->lessThanOrEqualTo($start)) {
+            $end = $start->copy()->addHours(2);
+        }
+
+        $detailLines = [];
+        if ($this->instructor) {
+            $detailLines[] = 'Instruktor: '.$this->instructor->getFullTitleNameAttribute();
+        }
+        $detailLines[] = route('courses.show', $this->id);
+
+        $params = [
+            'action' => 'TEMPLATE',
+            'text' => $this->plainTitle() ?: 'Szkolenie',
+            'dates' => $start->format('Ymd\THis').'/'.$end->format('Ymd\THis'),
+            'details' => implode("\n", $detailLines),
+            'location' => $this->calendarEventLocation(),
+            'ctz' => 'Europe/Warsaw',
+        ];
+
+        return 'https://calendar.google.com/calendar/render?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    protected function calendarEventEnd(): \Carbon\Carbon
+    {
+        if ($this->end_date) {
+            return $this->end_date->copy();
+        }
+
+        return $this->start_date->copy()->addHours(2);
+    }
+
+    protected function calendarEventLocation(): string
+    {
+        if ($this->type === 'offline' && $this->location) {
+            return trim(implode(', ', array_filter([
+                $this->location->location_name,
+                $this->location->address,
+                trim(($this->location->postal_code ?? '').' '.($this->location->post_office ?? '')),
+                $this->location->country,
+            ])));
+        }
+
+        if ($this->type === 'online') {
+            $parts = ['Online'];
+            if ($this->onlineDetails) {
+                if ($this->onlineDetails->platform) {
+                    $parts[] = $this->onlineDetails->platform;
+                }
+                if ($this->onlineDetails->meeting_link) {
+                    $parts[] = $this->onlineDetails->meeting_link;
+                }
+            }
+
+            return implode(' — ', $parts);
+        }
+
+        return '';
+    }
+
+    protected function plainTitle(): string
+    {
+        $title = strip_tags(html_entity_decode((string) ($this->title ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        return trim(preg_replace('/\s+/u', ' ', $title));
+    }
 }

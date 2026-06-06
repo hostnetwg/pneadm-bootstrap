@@ -221,7 +221,7 @@
                     <tr>
                         <th class="text-center" style="width: 5%;">#id</th>
                         <th class="text-center" style="width: 6%;">id_old</th>
-                        <th style="width: 8%;">
+                        <th class="text-center" style="width: 8%;">
                             <a href="{{ route('courses.index', array_merge(request()->query(), ['sort' => 'start_date', 'direction' => request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-light text-decoration-none">
                                 Data
                                 @php
@@ -324,17 +324,31 @@
                             <br>
                             <small class="text-muted">{{ $course->source_id_old ?? '-' }}</small>
                         </td>
-                        <td class="align-middle">
-                            @if ($course->start_date && $course->end_date)
-                                {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>
-                                @php
-                                    $startDateTime = \Carbon\Carbon::parse($course->start_date);
-                                    $endDateTime = \Carbon\Carbon::parse($course->end_date);
-                                    $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
-                                @endphp
-                                <small class="text-muted">{{ $durationMinutes }} min</small>
+                        <td class="text-center align-middle">
+                            @if ($course->start_date)
+                                @if($googleCalendarUrl = $course->googleCalendarUrl())
+                                    <a href="{{ $googleCalendarUrl }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-primary d-inline-block mb-1"
+                                       title="Dodaj do Google Calendar">
+                                        <i class="fas fa-calendar-plus"></i>
+                                    </a>
+                                    <br>
+                                @endif
+                                @if ($course->end_date)
+                                    {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>
+                                    @php
+                                        $startDateTime = \Carbon\Carbon::parse($course->start_date);
+                                        $endDateTime = \Carbon\Carbon::parse($course->end_date);
+                                        $durationMinutes = $startDateTime->diffInMinutes($endDateTime);
+                                    @endphp
+                                    <small class="text-muted">{{ $durationMinutes }} min</small>
+                                @else
+                                    {{ date('d.m.Y H:i', strtotime($course->start_date)) }}
+                                @endif
                             @else
-                                {{ $course->start_date ? date('d.m.Y H:i', strtotime($course->start_date)) : 'Brak daty' }}
+                                Brak daty
                             @endif
                         </td>                        
                         <td class="text-center align-middle">
