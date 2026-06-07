@@ -12,6 +12,8 @@ use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\PaymentDisplayOption;
 use App\Services\CourseFormOrderBillingService;
+use App\Services\CourseGoogleCalendarSyncService;
+use App\Services\GoogleCalendarClientFactory;
 use App\Support\CourseInstructorLinksEmailBody;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -283,7 +285,20 @@ class CoursesController extends Controller
             });
         }
 
-        return view('courses.index', compact('courses', 'instructors', 'series', 'sourceIdOldOptions', 'filters', 'filteredCount', 'totalCount'));
+        $googleCalendarEnabled = (bool) config('services.google_calendar.enabled', false);
+        $googleCalendarConfigured = app(GoogleCalendarClientFactory::class)->isConfigured();
+        $googleCalendarSyncActive = $googleCalendarEnabled && $googleCalendarConfigured;
+
+        return view('courses.index', compact(
+            'courses',
+            'instructors',
+            'series',
+            'sourceIdOldOptions',
+            'filters',
+            'filteredCount',
+            'totalCount',
+            'googleCalendarSyncActive',
+        ));
     }
 
     /**
@@ -758,13 +773,20 @@ class CoursesController extends Controller
 
         $closedBilling = $this->closedCourseBillingViewData($course);
 
+        $googleCalendarEnabled = (bool) config('services.google_calendar.enabled', false);
+        $googleCalendarConfigured = app(GoogleCalendarClientFactory::class)->isConfigured();
+        $googleCalendarSyncActive = $googleCalendarEnabled && $googleCalendarConfigured;
+
         return view('courses.show', compact(
             'course',
             'previousCourse',
             'nextCourse',
             'deletedVariants',
             'priceVariantOrderCounts',
-            'instructorLinksEmailBody'
+            'instructorLinksEmailBody',
+            'googleCalendarEnabled',
+            'googleCalendarConfigured',
+            'googleCalendarSyncActive',
         ) + $closedBilling);
     }
 
@@ -815,6 +837,43 @@ class CoursesController extends Controller
 
         return redirect()->route('courses.show', $course->id)
             ->with('success', $successMsg);
+    }
+
+    /**
+     * Ręczna synchronizacja szkolenia z wspólnym kalendarzem Google (API).
+     */
+    public function syncGoogleCalendar(int $id, CourseGoogleCalendarSyncService $syncService): RedirectResponse
+    {
+        if (! $syncService->isEnabled()) {
+            return $this->redirectAfterGoogleCalendarSync($id, 'error', 'Synchronizacja Google Calendar jest wyłączona lub nie skonfigurowana.');
+        }
+
+        $course = Course::with(['instructor', 'location', 'onlineDetails'])->findOrFail($id);
+        $syncService->sync($course);
+        $course->refresh();
+
+        if ($course->google_calendar_sync_status === Course::GOOGLE_CALENDAR_SYNC_SYNCED) {
+            return $this->redirectAfterGoogleCalendarSync($id, 'success', 'Szkolenie zsynchronizowano z kalendarzem zespołu Google.');
+        }
+
+        if ($course->google_calendar_sync_status === Course::GOOGLE_CALENDAR_SYNC_SKIPPED) {
+            return $this->redirectAfterGoogleCalendarSync($id, 'success', 'Synchronizacja zakończona (szkolenie pominięte — nieaktywne lub brak dat).');
+        }
+
+        return $this->redirectAfterGoogleCalendarSync(
+            $id,
+            'error',
+            'Synchronizacja nie powiodła się: '.($course->google_calendar_sync_error ?? 'nieznany błąd')
+        );
+    }
+
+    protected function redirectAfterGoogleCalendarSync(int $id, string $flashKey, string $message): RedirectResponse
+    {
+        if (url()->previous()) {
+            return back()->with($flashKey, $message);
+        }
+
+        return redirect()->route('courses.show', $id)->with($flashKey, $message);
     }
 
     /**

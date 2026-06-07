@@ -331,11 +331,28 @@
                                        target="_blank"
                                        rel="noopener noreferrer"
                                        class="text-primary d-inline-block mb-1"
-                                       title="Dodaj do Google Calendar">
+                                       title="Dodaj do swojego Google Calendar">
                                         <i class="fas fa-calendar-plus"></i>
                                     </a>
-                                    <br>
                                 @endif
+                                @if($googleCalendarSyncActive)
+                                    <form method="post"
+                                          action="{{ route('courses.sync-google-calendar', $course->id) }}"
+                                          class="d-inline-block mb-1">
+                                        @csrf
+                                        <button type="submit"
+                                                class="btn btn-link p-0 border-0"
+                                                title="{{ $course->googleCalendarSyncListTooltip($googleCalendarSyncActive) }}">
+                                            <i class="{{ $course->googleCalendarSyncListIconClass() }}"></i>
+                                        </button>
+                                    </form>
+                                @else
+                                    <span class="d-inline-block mb-1"
+                                          title="{{ $course->googleCalendarSyncListTooltip($googleCalendarSyncActive) }}">
+                                        <i class="{{ $course->googleCalendarSyncListIconClass() }}"></i>
+                                    </span>
+                                @endif
+                                <br>
                                 @if ($course->end_date)
                                     {{ date('d.m.Y H:i', strtotime($course->start_date)) }}<br>
                                     @php

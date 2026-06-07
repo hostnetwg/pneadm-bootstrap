@@ -15,3 +15,7 @@ Artisan::command('inspire', function () {
 Schedule::command('queue:work --stop-when-empty --max-time=300')
     ->everyMinute()
     ->withoutOverlapping(5);
+
+Schedule::command('courses:sync-google-calendar --only-errors')
+    ->hourly()
+    ->when(fn () => (bool) config('services.google_calendar.enabled', false));

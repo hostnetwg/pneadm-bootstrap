@@ -94,4 +94,14 @@ return [
         'endpoint' => env('TERYT_ENDPOINT', 'https://uslugaterytws1.stat.gov.pl/terytws1.svc'),
     ],
 
+    'google_calendar' => [
+        'enabled' => env('GOOGLE_CALENDAR_ENABLED', false),
+        'calendar_id' => env('GOOGLE_CALENDAR_ID'),
+        'credentials' => env('GOOGLE_CALENDAR_CREDENTIALS'),
+        'timezone' => env('GOOGLE_CALENDAR_TIMEZONE', 'Europe/Warsaw'),
+        'color_id_online' => env('GOOGLE_CALENDAR_COLOR_ID_ONLINE', '9'),
+        'color_id_offline' => env('GOOGLE_CALENDAR_COLOR_ID_OFFLINE', '5'),
+        'reminder_minutes' => (int) env('GOOGLE_CALENDAR_REMINDER_MINUTES', 60),
+    ],
+
 ];

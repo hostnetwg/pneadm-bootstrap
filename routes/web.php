@@ -270,6 +270,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::post('/courses/{id}/email-instructor-training-links', [CoursesController::class, 'emailInstructorTrainingLinks'])
         ->whereNumber('id')
         ->name('courses.email-instructor-training-links');
+    Route::post('/courses/{id}/sync-google-calendar', [CoursesController::class, 'syncGoogleCalendar'])
+        ->whereNumber('id')
+        ->name('courses.sync-google-calendar');
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');

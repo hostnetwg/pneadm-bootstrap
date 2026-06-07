@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use App\Models\Course;
 use App\Models\FormOrder;
-use App\Observers\FormOrderObserver;
 use App\Models\Participant;
+use App\Observers\CourseObserver;
+use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 
 class AppServiceProvider extends ServiceProvider
@@ -31,6 +33,8 @@ class AppServiceProvider extends ServiceProvider
         
         // Rejestracja Observer dla automatycznej aktualizacji participant_emails
         Participant::observe(ParticipantObserver::class);
-        
+
+        Course::observe(CourseObserver::class);
+
     }
 }

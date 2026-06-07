@@ -12,6 +12,7 @@
         "php": "^8.2",
         "aws/aws-sdk-php": "^3.383",
         "barryvdh/laravel-dompdf": "^3.1",
+        "google/apiclient": "^2.15",
         "guzzlehttp/guzzle": "^7.9",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9"

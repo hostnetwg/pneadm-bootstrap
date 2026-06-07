@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CourseCalendarEventBuilder;
 use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,14 @@ class Course extends Model
     public const POST_END_RULE_DURATION = 'duration';
 
     public const POST_END_RULE_UNLIMITED = 'unlimited';
+
+    public const GOOGLE_CALENDAR_SYNC_PENDING = 'pending';
+
+    public const GOOGLE_CALENDAR_SYNC_SYNCED = 'synced';
+
+    public const GOOGLE_CALENDAR_SYNC_ERROR = 'error';
+
+    public const GOOGLE_CALENDAR_SYNC_SKIPPED = 'skipped';
 
     protected $fillable = [
         'title',
@@ -49,6 +58,11 @@ class Course extends Model
         'source_id_old',
         'show_on_pnedu',
         'sendy_suppression_list_id',
+        'google_calendar_event_id',
+        'google_calendar_html_link',
+        'google_calendar_sync_status',
+        'google_calendar_synced_at',
+        'google_calendar_sync_error',
     ];
 
     protected $casts = [
@@ -65,7 +79,53 @@ class Course extends Model
         'certificate_registration_birth_data_required' => 'boolean',
         'next_participant_order' => 'integer',
         'post_end_access_duration_value' => 'integer',
+        'google_calendar_synced_at' => 'datetime',
     ];
+
+    public function googleCalendarSyncStatusLabel(): string
+    {
+        return match ($this->google_calendar_sync_status) {
+            self::GOOGLE_CALENDAR_SYNC_SYNCED => 'W kalendarzu zespołu',
+            self::GOOGLE_CALENDAR_SYNC_ERROR => 'Błąd synchronizacji',
+            self::GOOGLE_CALENDAR_SYNC_SKIPPED => 'Pominięto',
+            default => 'Oczekuje na synchronizację',
+        };
+    }
+
+    public function googleCalendarSyncBadgeClass(): string
+    {
+        return match ($this->google_calendar_sync_status) {
+            self::GOOGLE_CALENDAR_SYNC_SYNCED => 'bg-success',
+            self::GOOGLE_CALENDAR_SYNC_ERROR => 'bg-danger',
+            self::GOOGLE_CALENDAR_SYNC_SKIPPED => 'bg-secondary',
+            default => 'bg-warning text-dark',
+        };
+    }
+
+    public function googleCalendarSyncListIconClass(): string
+    {
+        return match ($this->google_calendar_sync_status) {
+            self::GOOGLE_CALENDAR_SYNC_SYNCED => 'fas fa-check-circle text-success',
+            self::GOOGLE_CALENDAR_SYNC_ERROR => 'fas fa-exclamation-circle text-danger',
+            self::GOOGLE_CALENDAR_SYNC_SKIPPED => 'fas fa-minus-circle text-secondary',
+            default => 'fas fa-clock text-warning',
+        };
+    }
+
+    public function googleCalendarSyncListTooltip(bool $syncActive = true): string
+    {
+        $label = $this->googleCalendarSyncStatusLabel();
+
+        if ($this->google_calendar_sync_status === self::GOOGLE_CALENDAR_SYNC_ERROR && $this->google_calendar_sync_error) {
+            $label .= ': '.$this->google_calendar_sync_error;
+        }
+
+        if (! $syncActive) {
+            return 'Sync kalendarza zespołu wyłączony. Status: '.$label;
+        }
+
+        return 'Kalendarz zespołu (API): '.$label.'. Kliknij, aby synchronizować.';
+    }
 
     /**
      * Relacja 1:1 – kurs ma jedną lokalizację (jeśli stacjonarny)
@@ -266,121 +326,21 @@ class Course extends Model
             return null;
         }
 
-        $start = $this->start_date->copy()->timezone('Europe/Warsaw');
-        $end = $this->calendarEventEnd()->timezone('Europe/Warsaw');
-
-        if ($end->lessThanOrEqualTo($start)) {
-            $end = $start->copy()->addHours(2);
-        }
+        $builder = CourseCalendarEventBuilder::for($this);
 
         $params = [
             'action' => 'TEMPLATE',
-            'text' => $this->calendarEventTitle(),
-            'dates' => $start->format('Ymd\THis').'/'.$end->format('Ymd\THis'),
-            'details' => implode("\n", $this->calendarEventDetailLines()),
-            'ctz' => 'Europe/Warsaw',
+            'text' => $builder->title(),
+            'dates' => $builder->templateDatesString(),
+            'details' => $builder->description(),
+            'ctz' => (string) config('services.google_calendar.timezone', 'Europe/Warsaw'),
         ];
 
-        $location = $this->calendarEventLocation();
+        $location = $builder->location();
         if ($location !== null) {
             $params['location'] = $location;
         }
 
         return 'https://calendar.google.com/calendar/render?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-    }
-
-    protected function calendarEventTitle(): string
-    {
-        $title = $this->plainTitle() ?: 'Szkolenie';
-
-        if ($this->instructor) {
-            $instructorName = trim($this->instructor->getFullTitleNameAttribute());
-            if ($instructorName !== '') {
-                $title .= ' ['.$instructorName.']';
-            }
-        }
-
-        return $title;
-    }
-
-    /**
-     * @return list<string>
-     */
-    protected function calendarEventDetailLines(): array
-    {
-        $lines = [];
-
-        if ($this->instructor) {
-            $lines[] = 'Instruktor: '.$this->instructor->getFullTitleNameAttribute();
-        }
-
-        $lines[] = route('courses.show', $this->id);
-
-        if ($this->type === 'online' && $this->onlineDetails) {
-            $meetingLink = trim((string) ($this->onlineDetails->meeting_link ?? ''));
-            $platform = mb_strtolower(trim((string) ($this->onlineDetails->platform ?? '')));
-
-            if ($meetingLink !== '') {
-                if ($this->isClickMeetingLink($meetingLink, $platform)) {
-                    $lines[] = 'ClickMeeting: '.$meetingLink;
-                }
-
-                if ($this->isYouTubeLink($meetingLink, $platform)) {
-                    $lines[] = 'YouTube: '.$meetingLink;
-                }
-            }
-        }
-
-        return $lines;
-    }
-
-    protected function isClickMeetingLink(string $url, string $platform): bool
-    {
-        if (str_contains($platform, 'clickmeeting')) {
-            return true;
-        }
-
-        return str_contains(mb_strtolower($url), 'clickmeeting');
-    }
-
-    protected function isYouTubeLink(string $url, string $platform): bool
-    {
-        if (str_contains($platform, 'youtube')) {
-            return true;
-        }
-
-        return (bool) preg_match('/(?:youtube\.com|youtu\.be|youtube-nocookie\.com)/i', $url);
-    }
-
-    protected function calendarEventEnd(): \Carbon\Carbon
-    {
-        if ($this->end_date) {
-            return $this->end_date->copy();
-        }
-
-        return $this->start_date->copy()->addHours(2);
-    }
-
-    protected function calendarEventLocation(): ?string
-    {
-        if ($this->type !== 'offline' || ! $this->location) {
-            return null;
-        }
-
-        $location = trim(implode(', ', array_filter([
-            $this->location->location_name,
-            $this->location->address,
-            trim(($this->location->postal_code ?? '').' '.($this->location->post_office ?? '')),
-            $this->location->country,
-        ])));
-
-        return $location !== '' ? $location : null;
-    }
-
-    protected function plainTitle(): string
-    {
-        $title = strip_tags(html_entity_decode((string) ($this->title ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-
-        return trim(preg_replace('/\s+/u', ' ', $title));
     }
 }

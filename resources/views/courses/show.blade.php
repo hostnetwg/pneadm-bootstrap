@@ -679,6 +679,53 @@
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
+                                <div class="border rounded p-2 mb-1 text-start">
+                                    <div class="small fw-semibold mb-1">Kalendarz zespołu (Google API)</div>
+
+                                    @if(! $googleCalendarEnabled)
+                                        <span class="badge bg-secondary mb-2">Wyłączone</span>
+                                        <p class="small text-muted mb-0">
+                                            Automatyczna synchronizacja jest wyłączona. Ustaw
+                                            <code>GOOGLE_CALENDAR_ENABLED=true</code> w pliku <code>.env</code>
+                                            oraz skonfiguruj kalendarz Google (Calendar ID i plik credentials).
+                                        </p>
+                                    @elseif(! $googleCalendarConfigured)
+                                        <span class="badge bg-warning text-dark mb-2">Brak konfiguracji</span>
+                                        <p class="small text-muted mb-0">
+                                            Sync jest włączony w <code>.env</code>, ale brakuje
+                                            <code>GOOGLE_CALENDAR_ID</code> lub
+                                            <code>GOOGLE_CALENDAR_CREDENTIALS</code> (plik JSON musi być dostępny dla aplikacji).
+                                        </p>
+                                    @else
+                                        <span class="badge {{ $course->googleCalendarSyncBadgeClass() }} mb-2">
+                                            {{ $course->googleCalendarSyncStatusLabel() }}
+                                        </span>
+                                        @if($course->google_calendar_sync_status === \App\Models\Course::GOOGLE_CALENDAR_SYNC_ERROR && $course->google_calendar_sync_error)
+                                            <div class="small text-danger mb-2">{{ $course->google_calendar_sync_error }}</div>
+                                        @endif
+                                        @if($course->google_calendar_html_link)
+                                            <div class="mb-2">
+                                                <a href="{{ $course->google_calendar_html_link }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   class="small">
+                                                    Otwórz wydarzenie w Google Calendar
+                                                </a>
+                                            </div>
+                                        @endif
+                                        @if($course->google_calendar_synced_at)
+                                            <div class="small text-muted mb-2">
+                                                Ostatnia sync: {{ $course->google_calendar_synced_at->format('d.m.Y H:i') }}
+                                            </div>
+                                        @endif
+                                        <form method="post" action="{{ route('courses.sync-google-calendar', $course->id) }}">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                                                <i class="fas fa-sync-alt"></i> Synchronizuj ponownie
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                                 @if($googleCalendarUrl = $course->googleCalendarUrl())
                                     <a href="{{ $googleCalendarUrl }}"
                                        target="_blank"
