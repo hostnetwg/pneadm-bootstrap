@@ -273,22 +273,83 @@ class Course extends Model
             $end = $start->copy()->addHours(2);
         }
 
-        $detailLines = [];
-        if ($this->instructor) {
-            $detailLines[] = 'Instruktor: '.$this->instructor->getFullTitleNameAttribute();
-        }
-        $detailLines[] = route('courses.show', $this->id);
-
         $params = [
             'action' => 'TEMPLATE',
-            'text' => $this->plainTitle() ?: 'Szkolenie',
+            'text' => $this->calendarEventTitle(),
             'dates' => $start->format('Ymd\THis').'/'.$end->format('Ymd\THis'),
-            'details' => implode("\n", $detailLines),
-            'location' => $this->calendarEventLocation(),
+            'details' => implode("\n", $this->calendarEventDetailLines()),
             'ctz' => 'Europe/Warsaw',
         ];
 
+        $location = $this->calendarEventLocation();
+        if ($location !== null) {
+            $params['location'] = $location;
+        }
+
         return 'https://calendar.google.com/calendar/render?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    protected function calendarEventTitle(): string
+    {
+        $title = $this->plainTitle() ?: 'Szkolenie';
+
+        if ($this->instructor) {
+            $instructorName = trim($this->instructor->getFullTitleNameAttribute());
+            if ($instructorName !== '') {
+                $title .= ' ['.$instructorName.']';
+            }
+        }
+
+        return $title;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function calendarEventDetailLines(): array
+    {
+        $lines = [];
+
+        if ($this->instructor) {
+            $lines[] = 'Instruktor: '.$this->instructor->getFullTitleNameAttribute();
+        }
+
+        $lines[] = route('courses.show', $this->id);
+
+        if ($this->type === 'online' && $this->onlineDetails) {
+            $meetingLink = trim((string) ($this->onlineDetails->meeting_link ?? ''));
+            $platform = mb_strtolower(trim((string) ($this->onlineDetails->platform ?? '')));
+
+            if ($meetingLink !== '') {
+                if ($this->isClickMeetingLink($meetingLink, $platform)) {
+                    $lines[] = 'ClickMeeting: '.$meetingLink;
+                }
+
+                if ($this->isYouTubeLink($meetingLink, $platform)) {
+                    $lines[] = 'YouTube: '.$meetingLink;
+                }
+            }
+        }
+
+        return $lines;
+    }
+
+    protected function isClickMeetingLink(string $url, string $platform): bool
+    {
+        if (str_contains($platform, 'clickmeeting')) {
+            return true;
+        }
+
+        return str_contains(mb_strtolower($url), 'clickmeeting');
+    }
+
+    protected function isYouTubeLink(string $url, string $platform): bool
+    {
+        if (str_contains($platform, 'youtube')) {
+            return true;
+        }
+
+        return (bool) preg_match('/(?:youtube\.com|youtu\.be|youtube-nocookie\.com)/i', $url);
     }
 
     protected function calendarEventEnd(): \Carbon\Carbon
@@ -300,32 +361,20 @@ class Course extends Model
         return $this->start_date->copy()->addHours(2);
     }
 
-    protected function calendarEventLocation(): string
+    protected function calendarEventLocation(): ?string
     {
-        if ($this->type === 'offline' && $this->location) {
-            return trim(implode(', ', array_filter([
-                $this->location->location_name,
-                $this->location->address,
-                trim(($this->location->postal_code ?? '').' '.($this->location->post_office ?? '')),
-                $this->location->country,
-            ])));
+        if ($this->type !== 'offline' || ! $this->location) {
+            return null;
         }
 
-        if ($this->type === 'online') {
-            $parts = ['Online'];
-            if ($this->onlineDetails) {
-                if ($this->onlineDetails->platform) {
-                    $parts[] = $this->onlineDetails->platform;
-                }
-                if ($this->onlineDetails->meeting_link) {
-                    $parts[] = $this->onlineDetails->meeting_link;
-                }
-            }
+        $location = trim(implode(', ', array_filter([
+            $this->location->location_name,
+            $this->location->address,
+            trim(($this->location->postal_code ?? '').' '.($this->location->post_office ?? '')),
+            $this->location->country,
+        ])));
 
-            return implode(' — ', $parts);
-        }
-
-        return '';
+        return $location !== '' ? $location : null;
     }
 
     protected function plainTitle(): string
