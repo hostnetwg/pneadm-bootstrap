@@ -442,6 +442,11 @@
                         </td>
                         <td class="text-center align-middle">
                             <div class="d-flex flex-column align-items-center gap-1">
+                                @if($course->show_on_pnedu)
+                                    <i class="bi bi-house-fill text-success" title="Pokaż na stronie głównej pnedu.pl" style="font-size: 1.2em;"></i>
+                                @else
+                                    <i class="bi bi-house text-danger" title="Nie pokazuj na stronie głównej pnedu.pl" style="font-size: 1.2em;"></i>
+                                @endif
                                 @php
                                     $certStatus = $course->certificate_download_status ?? 'in_preparation';
                                 @endphp
@@ -457,18 +462,35 @@
                                 @else
                                     <i class="bi bi-x-circle-fill text-danger" title="brak zakresu szkolenia" style="font-size: 1.2em;"></i>
                                 @endif
-                                @if(!empty(trim($course->notatki ?? '')))
-                                    <i class="bi bi-journal-text text-primary" 
-                                       title="{{ e($course->notatki) }}" 
-                                       style="font-size: 1.2em; cursor: help;"></i>
+                                @php
+                                    $clickmeetingEventId = trim((string) ($course->onlineDetails->clickmeeting_event_id ?? ''));
+                                @endphp
+                                @if($clickmeetingEventId !== '')
+                                    <img src="{{ asset('clickmeeting.svg') }}"
+                                         width="22"
+                                         height="22"
+                                         alt=""
+                                         title="ID wydarzenia ClickMeeting: {{ e($clickmeetingEventId) }}">
+                                @elseif($course->type === 'online')
+                                    <i class="bi bi-broadcast text-danger" title="Brak ID wydarzenia ClickMeeting" style="font-size: 1.2em;"></i>
                                 @endif
-                                @if(!empty(trim($course->sendy_suppression_list_id ?? '')))
+                                @php
+                                    $sendyListId = trim((string) ($course->sendy_suppression_list_id ?? ''));
+                                @endphp
+                                @if($sendyListId !== '')
                                     <img src="{{ asset('sendy-avatar.webp') }}"
                                          width="22"
                                          height="22"
-                                         class="rounded mt-1"
+                                         class="rounded"
                                          alt=""
-                                         title="Lista Sendy (wykluczenia) — ID przypisany do szkolenia">
+                                         title="ID listy na SENDY: {{ e($sendyListId) }}">
+                                @else
+                                    <i class="bi bi-envelope-x text-danger" title="Brak ID listy na SENDY" style="font-size: 1.2em;"></i>
+                                @endif
+                                @if(!empty(trim($course->notatki ?? '')))
+                                    <i class="bi bi-journal-text text-primary"
+                                       title="{{ e($course->notatki) }}"
+                                       style="font-size: 1.2em; cursor: help;"></i>
                                 @endif
                             </div>
                         </td>

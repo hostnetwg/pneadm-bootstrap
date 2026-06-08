@@ -145,7 +145,7 @@ class CoursesController extends Controller
         $eagerLoads = [
             'instructor:id,first_name,last_name,title',
             'location:id,course_id,location_name,address,postal_code,post_office',
-            'onlineDetails:id,course_id,platform,meeting_link',
+            'onlineDetails:id,course_id,platform,meeting_link,clickmeeting_event_id',
         ];
 
         if (auth()->user()?->isSuperAdmin()) {
