@@ -16,7 +16,7 @@ class FormOrderSendySyncService
      *   errors:array<int,string>
      * }
      */
-    public function syncByFormOrderId(int $formOrderId): array
+    public function syncByFormOrderId(int $formOrderId, bool $includeParticipant = true): array
     {
         $order = FormOrder::query()->with('primaryParticipant', 'course')->find($formOrderId);
 
@@ -29,7 +29,7 @@ class FormOrderSendySyncService
             ];
         }
 
-        return $this->syncOrder($order);
+        return $this->syncOrder($order, $includeParticipant);
     }
 
     /**
@@ -40,7 +40,7 @@ class FormOrderSendySyncService
      *   errors:array<int,string>
      * }
      */
-    public function syncOrder(FormOrder $order): array
+    public function syncOrder(FormOrder $order, bool $includeParticipant = true): array
     {
         $listId = trim((string) config('sendy.lists.paid_participants'));
         if ($listId === '') {
@@ -52,7 +52,7 @@ class FormOrderSendySyncService
             ];
         }
 
-        $contacts = $this->contactsForOrder($order);
+        $contacts = $this->contactsForOrder($order, $includeParticipant);
         $results = [
             'attempted' => $contacts->count(),
             'success' => 0,
@@ -103,14 +103,14 @@ class FormOrderSendySyncService
      *   id_szkolenia:int|string
      * }>
      */
-    public function contactsForOrder(FormOrder $order): Collection
+    public function contactsForOrder(FormOrder $order, bool $includeParticipant = true): Collection
     {
         $courseId = $this->resolveCourseId($order);
         $courseDate = $order->course?->start_date?->format('Y-m-d') ?? '';
         $contacts = collect();
 
         $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? '')));
-        if ($participantEmail !== '' && str_contains($participantEmail, '@')) {
+        if ($includeParticipant && $participantEmail !== '' && str_contains($participantEmail, '@')) {
             $contacts->push([
                 'name' => trim((string) ($order->primaryParticipant?->participant_firstname ?? '')),
                 'email' => $participantEmail,

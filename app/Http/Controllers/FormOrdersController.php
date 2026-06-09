@@ -978,7 +978,10 @@ class FormOrdersController extends Controller
      */
     public function provisionPneduAccess(Request $request, int $id)
     {
-        $result = app(FormOrderPneduProvisionService::class)->provision($id);
+        $result = app(FormOrderPneduProvisionService::class)->provision(
+            $id,
+            $request->boolean('add_participant_to_sendy')
+        );
 
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);

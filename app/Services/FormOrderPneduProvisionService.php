@@ -23,7 +23,7 @@ class FormOrderPneduProvisionService
     /**
      * @return array{success: bool, error?: string, message?: string, http_code: int, email_warning?: string, clickmeeting_warning?: string}
      */
-    public function provision(int $formOrderId): array
+    public function provision(int $formOrderId, bool $addParticipantToSendy = false): array
     {
         $emailWarning = null;
         $clickMeetingWarning = null;
@@ -162,7 +162,14 @@ class FormOrderPneduProvisionService
                 $clickMeetingWarning = $clickMeetingResult['warning'];
             }
 
-            $sendyResult = app(FormOrderSendySyncService::class)->syncByFormOrderId($formOrderId);
+            $orderForSendy = FormOrder::query()->with('primaryParticipant', 'course')->find($formOrderId);
+            $includeParticipantInSendy = $orderForSendy
+                ? $this->shouldIncludeParticipantInSendy($orderForSendy, $addParticipantToSendy)
+                : true;
+            $sendyResult = app(FormOrderSendySyncService::class)->syncByFormOrderId(
+                $formOrderId,
+                $includeParticipantInSendy
+            );
             if (($sendyResult['failed'] ?? 0) > 0) {
                 $sendyWarning = 'Uwaga: nie wszystkie kontakty zostały dodane do listy Sendy.';
                 Log::warning('FormOrderPneduProvisionService: problem sync Sendy', [
@@ -231,6 +238,22 @@ class FormOrderPneduProvisionService
                 'http_code' => 500,
             ];
         }
+    }
+
+    private function shouldIncludeParticipantInSendy(FormOrder $order, bool $addParticipantToSendy): bool
+    {
+        $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? '')));
+        $ordererEmail = strtolower(trim((string) ($order->orderer_email ?? '')));
+
+        if ($participantEmail === '' || $ordererEmail === '') {
+            return true;
+        }
+
+        if ($participantEmail === $ordererEmail) {
+            return true;
+        }
+
+        return $addParticipantToSendy;
     }
 
     /**

@@ -320,12 +320,16 @@ nowoczesna-edukacja.pl </div>
                                 </button>
                             </div>
                             @if($zamowienie->display_participant_email)
+                                @php
+                                    $participantEmailDiffersFromOrderer = ! empty($zamowienie->orderer_email)
+                                        && strtolower(trim((string) $zamowienie->display_participant_email)) !== strtolower(trim((string) $zamowienie->orderer_email));
+                                @endphp
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>
                                         <i class="bi bi-envelope"></i> 
                                         <a href="mailto:{{ $zamowienie->display_participant_email }}" 
-                                           class="text-decoration-none @if($zamowienie->display_participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->display_participant_email == $zamowienie->orderer_email) title="Ten sam email co do faktury" @endif>
+                                           class="text-decoration-none @if(!$participantEmailDiffersFromOrderer) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                           @if(!$participantEmailDiffersFromOrderer) title="Ten sam email co do faktury" @endif>
                                             {{ $zamowienie->display_participant_email }}
                                         </a>
                                     </small>
@@ -333,6 +337,14 @@ nowoczesna-edukacja.pl </div>
                                         <i class="bi bi-clipboard"></i> Email uczestnika
                                     </button>
                                 </div>
+                                @if($participantEmailDiffersFromOrderer && ! $zamowienie->pnedu_provisioned_at)
+                                    <div class="form-check mt-2 small">
+                                        <input class="form-check-input" type="checkbox" value="1" id="addParticipantToSendyCheckbox">
+                                        <label class="form-check-label" for="addParticipantToSendyCheckbox">
+                                            Dodaj uczestnika do listy e-mailowej
+                                        </label>
+                                    </div>
+                                @endif
                             @endif
 
                     {{-- Button Dodaj zamówienie przez PUBLIGO (wymaga: product_id + price_id + publigo_sent != 1) + Dodaj tylko do PNEDU --}}
@@ -1083,13 +1095,18 @@ nowoczesna-edukacja.pl `;
             if (resultDiv) {
                 resultDiv.innerHTML = '';
             }
+            const addParticipantCheckbox = document.getElementById('addParticipantToSendyCheckbox');
+            const payload = {
+                add_participant_to_sendy: !!(addParticipantCheckbox && addParticipantCheckbox.checked),
+            };
             fetch(`/form-orders/${orderId}/pnedu/provision`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
+                },
+                body: JSON.stringify(payload),
             })
                 .then((response) => response.json().then((data) => ({ ok: response.ok, status: response.status, data })))
                 .then(({ ok, data }) => {
