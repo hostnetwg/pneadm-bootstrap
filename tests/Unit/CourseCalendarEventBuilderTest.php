@@ -20,10 +20,12 @@ class CourseCalendarEventBuilderTest extends TestCase
             'services.google_calendar.timezone' => 'Europe/Warsaw',
             'services.google_calendar.color_id_online' => '9',
             'services.google_calendar.color_id_offline' => '5',
+            'services.google_calendar.color_id_free' => '10',
             'services.google_calendar.reminder_minutes' => 60,
         ]);
 
         $course = $this->makeCourse('offline');
+        $course->is_paid = true;
         $course->setRelation('location', new CourseLocation([
             'location_name' => 'Sala A',
             'address' => 'ul. Test 1',
@@ -55,6 +57,28 @@ class CourseCalendarEventBuilderTest extends TestCase
         $this->assertStringContainsString('Instruktor: dr Jan Kowalski', $description);
         $this->assertStringContainsString(route('courses.show', 516), $description);
         $this->assertStringContainsString('YouTube: https://www.youtube.com/watch?v=dQw4w9WgXcQ', $description);
+    }
+
+    public function test_free_course_uses_free_color_regardless_of_type(): void
+    {
+        config([
+            'services.google_calendar.color_id_free' => '10',
+            'services.google_calendar.color_id_online' => '9',
+            'services.google_calendar.color_id_offline' => '5',
+        ]);
+
+        $this->assertSame('10', CourseCalendarEventBuilder::for($this->makeCourse('online'))->colorId());
+        $this->assertSame('10', CourseCalendarEventBuilder::for($this->makeCourse('offline'))->colorId());
+    }
+
+    public function test_paid_online_course_uses_online_color(): void
+    {
+        config(['services.google_calendar.color_id_online' => '9']);
+
+        $course = $this->makeCourse('online');
+        $course->is_paid = true;
+
+        $this->assertSame('9', CourseCalendarEventBuilder::for($course)->colorId());
     }
 
     public function test_should_sync_requires_active_course_with_dates(): void

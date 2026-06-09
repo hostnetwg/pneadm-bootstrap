@@ -113,6 +113,10 @@ class CourseCalendarEventBuilder
 
     public function colorId(): string
     {
+        if (! $this->course->is_paid) {
+            return (string) config('services.google_calendar.color_id_free', '10');
+        }
+
         if ($this->course->type === 'online') {
             return (string) config('services.google_calendar.color_id_online', '9');
         }

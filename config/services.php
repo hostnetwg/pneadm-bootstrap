@@ -101,6 +101,7 @@ return [
         'timezone' => env('GOOGLE_CALENDAR_TIMEZONE', 'Europe/Warsaw'),
         'color_id_online' => env('GOOGLE_CALENDAR_COLOR_ID_ONLINE', '9'),
         'color_id_offline' => env('GOOGLE_CALENDAR_COLOR_ID_OFFLINE', '5'),
+        'color_id_free' => env('GOOGLE_CALENDAR_COLOR_ID_FREE', '10'),
         'reminder_minutes' => (int) env('GOOGLE_CALENDAR_REMINDER_MINUTES', 60),
     ],
 
