@@ -13,6 +13,7 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
 use App\Models\PneduUser;
+use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -740,6 +741,8 @@ class ParticipantController extends Controller
             $courseAccessHasCertificate
         );
 
+        $mailSystemConfig = SystemMailDiagnostics::currentConfig();
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -758,7 +761,8 @@ class ParticipantController extends Controller
             'participantsWithEmailCount',
             'courseEmailDeliveryStats',
             'emailStatusByParticipantId',
-            'courseAccessEmailLabel'
+            'courseAccessEmailLabel',
+            'mailSystemConfig'
         ));
     }
 
@@ -1944,6 +1948,8 @@ class ParticipantController extends Controller
             'has_queued' => false,
             'has_failed' => false,
             'last_error' => null,
+            'last_delivery' => null,
+            'sent_without_real_delivery' => false,
         ];
 
         $byParticipant = [];
@@ -1962,7 +1968,7 @@ class ParticipantController extends Controller
                 [CertificateEmailLog::TYPE_COURSE_ACCESS]
             ))
             ->orderBy('id')
-            ->get(['participant_id', 'type', 'status', 'sent_at', 'failed_at', 'error_message']);
+            ->get(['participant_id', 'type', 'status', 'sent_at', 'failed_at', 'error_message', 'meta']);
 
         foreach ($logs as $log) {
             $pid = (int) $log->participant_id;
@@ -1982,6 +1988,10 @@ class ParticipantController extends Controller
                     $current = $ref['last_sent_at'];
                     if ($current === null || $log->sent_at->gt($current)) {
                         $ref['last_sent_at'] = $log->sent_at;
+                        $delivery = SystemMailDiagnostics::deliveryMetaFromLog(is_array($log->meta) ? $log->meta : null);
+                        $ref['last_delivery'] = $delivery;
+                        $ref['sent_without_real_delivery'] = $delivery !== null
+                            && ($delivery['real_delivery'] ?? true) === false;
                     }
                 }
             } elseif ($log->status === CertificateEmailLog::STATUS_QUEUED) {

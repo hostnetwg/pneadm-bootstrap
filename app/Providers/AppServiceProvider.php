@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Support\OutboundMailCapture;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 use App\Models\Course;
@@ -36,5 +38,6 @@ class AppServiceProvider extends ServiceProvider
 
         Course::observe(CourseObserver::class);
 
+        Event::listen(MessageSent::class, [OutboundMailCapture::class, 'record']);
     }
 }

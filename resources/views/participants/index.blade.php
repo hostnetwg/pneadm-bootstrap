@@ -40,6 +40,7 @@
             </div>
         @endif
         @if(isset($courseEmailDeliveryStats) && isset($participantsWithEmailCount))
+            @include('participants.partials.mail-system-config-alert')
             @include('participants.partials.email-delivery-stats')
         @endif
         <div id="generatingPdfsAlert" class="alert alert-info d-none mb-4" role="alert"

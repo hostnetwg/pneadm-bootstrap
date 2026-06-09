@@ -8,6 +8,7 @@ use App\Models\CertificateEmailLog;
 use App\Models\Course;
 use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
+use App\Services\Mail\SystemMailDiagnostics;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class SendCertificateLinkEmailJob implements ShouldQueue
 {
@@ -68,6 +68,8 @@ class SendCertificateLinkEmailJob implements ShouldQueue
         $pneduFrontendUrl = rtrim(config('services.pnedu_frontend_url', 'http://localhost:8081'), '/');
 
         try {
+            $diagnostics = app(SystemMailDiagnostics::class);
+
             if ($this->type === CertificateEmailLog::TYPE_SINGLE_CERTIFICATE) {
                 $trainerName = null;
                 if (!empty($course->trainer) && $course->trainer !== 'Brak trenera') {
@@ -77,16 +79,23 @@ class SendCertificateLinkEmailJob implements ShouldQueue
                 }
 
                 $certificateUrl = $pneduFrontendUrl . '/certificate/' . $token . '/' . $course->id;
-                Mail::to($email)->send(new CertificateSingleLinkMail($participant, $course, $certificateUrl, $trainerName));
+                $deliveryMeta = $diagnostics->send(
+                    $email,
+                    new CertificateSingleLinkMail($participant, $course, $certificateUrl, $trainerName)
+                );
             } else {
                 $certificatesUrl = $pneduFrontendUrl . '/certificates/' . $token;
-                Mail::to($email)->send(new CertificateLinkMail($participant, $course, $certificatesUrl));
+                $deliveryMeta = $diagnostics->send(
+                    $email,
+                    new CertificateLinkMail($participant, $course, $certificatesUrl)
+                );
             }
 
             $log->update([
                 'status' => CertificateEmailLog::STATUS_SENT,
                 'sent_at' => now(),
                 'error_message' => null,
+                'meta' => array_merge($log->meta ?? [], ['delivery' => $deliveryMeta]),
             ]);
         } catch (\Throwable $e) {
             Log::warning('SendCertificateLinkEmailJob failed', [

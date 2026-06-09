@@ -11,6 +11,7 @@ use App\Models\CourseVideo;
 use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\PneduUser;
+use App\Services\Mail\SystemMailDiagnostics;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,7 +19,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class SendCourseAccessEmailJob implements ShouldQueue
 {
@@ -115,25 +115,28 @@ class SendCourseAccessEmailJob implements ShouldQueue
         $registerUrl = $pneduFrontendUrl.'/register?email='.urlencode($email);
 
         try {
-            Mail::to($email)->send(new CourseAccessMail(
-                participant: $participant,
-                course: $course,
-                hasPneduAccount: $hasPneduAccount,
-                courseUrl: $hasPneduAccount ? $courseUrl : null,
-                certificateUrl: $certificateUrl,
-                registerUrl: $registerUrl,
-                participantEmail: $email,
-                hasVideos: $hasVideos,
-                hasMaterials: $hasMaterials,
-                hasCertificate: $hasCertificate,
-                surveyLinks: $surveyLinks
-            ));
+            $deliveryMeta = app(SystemMailDiagnostics::class)->send(
+                $email,
+                new CourseAccessMail(
+                    participant: $participant,
+                    course: $course,
+                    hasPneduAccount: $hasPneduAccount,
+                    courseUrl: $hasPneduAccount ? $courseUrl : null,
+                    certificateUrl: $certificateUrl,
+                    registerUrl: $registerUrl,
+                    participantEmail: $email,
+                    hasVideos: $hasVideos,
+                    hasMaterials: $hasMaterials,
+                    hasCertificate: $hasCertificate,
+                    surveyLinks: $surveyLinks
+                )
+            );
 
             $log->update([
                 'status' => CertificateEmailLog::STATUS_SENT,
                 'sent_at' => now(),
                 'error_message' => null,
-                'meta' => [
+                'meta' => array_merge([
                     'has_videos' => $hasVideos,
                     'has_materials' => $hasMaterials,
                     'has_certificate' => $hasCertificate,
@@ -143,7 +146,7 @@ class SendCourseAccessEmailJob implements ShouldQueue
                     'certificate_url_included' => $certificateUrl !== null,
                     'register_url_included' => ! $hasPneduAccount,
                     'survey_links_count' => count($surveyLinks),
-                ],
+                ], ['delivery' => $deliveryMeta]),
             ]);
         } catch (\Throwable $e) {
             Log::warning('SendCourseAccessEmailJob failed', [
