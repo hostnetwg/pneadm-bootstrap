@@ -45,7 +45,10 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label for="email" class="form-label">Email</label>
-                        <input type="email" name="email" id="email" class="form-control" value="{{ old('email', $participant->email) }}">
+                        <input type="email" name="email" id="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $participant->email) }}">
+                        @error('email')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
                     <div class="col-md-6">
                         <label for="phone" class="form-label">Telefon</label>

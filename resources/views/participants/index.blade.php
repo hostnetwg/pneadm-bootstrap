@@ -41,6 +41,7 @@
         @endif
         @if(isset($courseEmailDeliveryStats) && isset($participantsWithEmailCount))
             @include('participants.partials.mail-system-config-alert')
+            @include('participants.partials.access-expiry-reminder-info')
             @include('participants.partials.email-delivery-stats')
         @endif
         <div id="generatingPdfsAlert" class="alert alert-info d-none mb-4" role="alert"
@@ -261,9 +262,10 @@
                                 <i class="fas fa-sort ms-1 text-white-50"></i>
                             @endif
                         </a>
-                        <div class="small fw-normal text-white-50 mt-1" title="Link do zaświadczeń · {{ $courseAccessEmailLabel ?? 'dostęp do szkolenia' }}">
+                        <div class="small fw-normal text-white-50 mt-1" title="Link do zaświadczeń · {{ $courseAccessEmailLabel ?? 'dostęp do szkolenia' }} · przypomnienie o wygaśnięciu">
                             <i class="fas fa-certificate" aria-hidden="true"></i>
                             <i class="fas fa-video ms-1" aria-hidden="true"></i>
+                            <i class="fas fa-bell ms-1" aria-hidden="true"></i>
                         </div>
                     </th>                    
                     <th>Zaświadczenie</th>
@@ -362,6 +364,12 @@
                                     'emailType' => \App\Models\CertificateEmailLog::TYPE_COURSE_ACCESS,
                                     'iconTitle' => $courseAccessEmailLabel ?? 'Dostęp do szkolenia',
                                 ])
+                                @include('participants.partials.email-delivery-icon', [
+                                    'participant' => $participant,
+                                    'emailRow' => $emailRow,
+                                    'emailType' => \App\Models\CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
+                                    'iconTitle' => 'Przypomnienie o wygaśnięciu dostępu',
+                                ])
                             </div>
                         </td>
                         <td>
@@ -405,6 +413,27 @@
                                             data-bs-target="#sendCourseAccessEmailModal{{ $participant->id }}">
                                         E-mail: nagranie
                                     </button>
+                                @endif
+                                @php
+                                    $reminderEligibility = $accessExpiryReminderEligibilityByParticipantId[$participant->id] ?? ['eligible' => false, 'reason' => null];
+                                    $reminderDaysLeft = $reminderEligibility['days_until'] ?? null;
+                                    $reminderConfirmMessage = "Wysłać przypomnienie o wygaśnięciu dostępu do nagrania/materiałów?\n\nZaświadczenie pozostaje dostępne bezterminowo.";
+                                    if ($reminderDaysLeft !== null) {
+                                        $reminderConfirmMessage .= "\nPozostało dni do wygaśnięcia: {$reminderDaysLeft}";
+                                    }
+                                @endphp
+                                @if($reminderEligibility['eligible'] ?? false)
+                                    <form action="{{ route('participants.send-access-expiry-reminder', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm(@js($reminderConfirmMessage));">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-warning btn-sm px-2 py-0 small text-nowrap" title="Ręczne przypomnienie (test lub poza harmonogramem automatycznym)">
+                                            <i class="fas fa-bell"></i> Wyślij przypomnienie
+                                        </button>
+                                    </form>
+                                @elseif(!empty($participant->email) && ($course->is_paid ?? false))
+                                    <span class="small text-muted" title="{{ e($reminderEligibility['reason'] ?? 'Niedostępne') }}">
+                                        <i class="fas fa-bell text-muted opacity-50"></i>
+                                        Przypomnienie n/d
+                                    </span>
                                 @endif
                             </div>
                         </td>                         

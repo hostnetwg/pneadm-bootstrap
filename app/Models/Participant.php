@@ -78,6 +78,27 @@ class Participant extends Model
     }
 
     /**
+     * Aktywny uczestnik tego kursu z tym samym znormalizowanym e-mailem (unikalność per kurs).
+     */
+    public static function findDuplicateInCourse(int $courseId, ?string $email, ?int $exceptParticipantId = null): ?self
+    {
+        $normalized = self::normalizeEmail($email);
+        if ($normalized === null) {
+            return null;
+        }
+
+        $query = self::query()
+            ->where('course_id', $courseId)
+            ->where('email_normalized', $normalized);
+
+        if ($exceptParticipantId !== null) {
+            $query->whereKeyNot($exceptParticipantId);
+        }
+
+        return $query->first();
+    }
+
+    /**
      * Normalizacja imienia lub nazwiska przy porównaniu rekordów.
      */
     public static function normalizeNamePart(?string $name): string

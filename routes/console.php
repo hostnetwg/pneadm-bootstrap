@@ -19,3 +19,11 @@ Schedule::command('queue:work --stop-when-empty --max-time=300')
 Schedule::command('courses:sync-google-calendar --only-errors')
     ->hourly()
     ->when(fn () => (bool) config('services.google_calendar.enabled', false));
+
+$reminderTime = (string) config('participant_access.expiry_reminder.schedule_time', '08:00');
+$reminderTimezone = (string) config('participant_access.expiry_reminder.timezone', 'Europe/Warsaw');
+
+Schedule::command('participants:send-access-expiry-reminders')
+    ->dailyAt($reminderTime)
+    ->timezone($reminderTimezone)
+    ->when(fn () => (bool) config('participant_access.expiry_reminder.enabled', true));

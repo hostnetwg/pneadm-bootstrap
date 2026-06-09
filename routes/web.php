@@ -375,6 +375,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{participant}/send-certificate-link', [ParticipantController::class, 'sendCertificateLink'])->name('participants.send-certificate-link'); // Wyślij e-mail z linkiem do zaświadczeń
         Route::post('/{participant}/send-single-certificate-link', [ParticipantController::class, 'sendSingleCertificateLink'])->name('participants.send-single-certificate-link'); // Wyślij e-mail z linkiem do konkretnego zaświadczenia
         Route::post('/{participant}/send-course-access-email', [ParticipantController::class, 'sendCourseAccessEmail'])->name('participants.send-course-access-email'); // Wyślij e-mail o dostępie do nagrań/materiałów
+        Route::post('/{participant}/send-access-expiry-reminder', [ParticipantController::class, 'sendAccessExpiryReminder'])->name('participants.send-access-expiry-reminder'); // Przypomnienie o wygaśnięciu dostępu
         Route::post('/send-certificate-links-bulk', [ParticipantController::class, 'sendCertificateLinksBulk'])->name('participants.send-certificate-links-bulk'); // Masowa wysyłka linków do zaświadczeń
         Route::post('/bulk-access-expires', [ParticipantController::class, 'bulkSetAccessExpires'])->name('participants.bulk-set-access-expires'); // Masowe ustawienie daty wygaśnięcia dostępu
         Route::get('/certificate-emails/status', [ParticipantController::class, 'certificateEmailBatchStatus'])->name('participants.certificate-emails.status'); // Status wysyłki e-maili (batch)

@@ -66,7 +66,12 @@
     $tooltip = implode(' — ', $tooltipParts);
 
     $isCertificate = $emailType === CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK;
-    $glyph = $isCertificate ? 'fa-certificate' : 'fa-video';
+    $isExpiryReminder = $emailType === CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER;
+    $glyph = match (true) {
+        $isExpiryReminder => 'fa-bell',
+        $isCertificate => 'fa-certificate',
+        default => 'fa-video',
+    };
 
     $iconClass = match ($state) {
         'sent' => $glyph.' text-success',

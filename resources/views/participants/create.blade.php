@@ -29,18 +29,27 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="first_name" class="form-label">Imię</label>
-                    <input type="text" name="first_name" class="form-control" id="first_name" required>
+                    <input type="text" name="first_name" class="form-control @error('first_name') is-invalid @enderror" id="first_name" value="{{ old('first_name') }}" required>
+                    @error('first_name')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
                 <div class="col-md-6">
                     <label for="last_name" class="form-label">Nazwisko</label>
-                    <input type="text" name="last_name" class="form-control" id="last_name" required>
+                    <input type="text" name="last_name" class="form-control @error('last_name') is-invalid @enderror" id="last_name" value="{{ old('last_name') }}" required>
+                    @error('last_name')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
             </div>
 
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="email" class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" id="email">
+                    <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" id="email" value="{{ old('email') }}">
+                    @error('email')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
                 <div class="col-md-6">
                     <label for="phone" class="form-label">Telefon</label>

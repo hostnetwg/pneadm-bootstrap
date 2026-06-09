@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendAccessExpiryReminderEmailJob;
 use App\Jobs\SendCertificateLinkEmailJob;
 use App\Jobs\SendCourseAccessEmailJob;
 use App\Models\Certificate;
@@ -14,6 +15,7 @@ use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
 use App\Models\PneduUser;
 use App\Services\Mail\SystemMailDiagnostics;
+use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -743,6 +745,22 @@ class ParticipantController extends Controller
 
         $mailSystemConfig = SystemMailDiagnostics::currentConfig();
 
+        $expiryReminderService = app(ParticipantAccessExpiryReminderService::class);
+        $expiryReminderSchedule = $expiryReminderService->scheduleSummary();
+        $accessExpiryReminderEligibilityByParticipantId = [];
+        foreach ($participants->getCollection() as $p) {
+            $eligibility = $expiryReminderService->eligibilityForParticipant(
+                $p,
+                $course,
+                $courseAccessHasVideos,
+                $courseAccessHasMaterials
+            );
+            if ($eligibility['eligible']) {
+                $eligibility['days_until'] = $expiryReminderService->daysUntilExpiry($p);
+            }
+            $accessExpiryReminderEligibilityByParticipantId[(int) $p->id] = $eligibility;
+        }
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -762,7 +780,9 @@ class ParticipantController extends Controller
             'courseEmailDeliveryStats',
             'emailStatusByParticipantId',
             'courseAccessEmailLabel',
-            'mailSystemConfig'
+            'mailSystemConfig',
+            'expiryReminderSchedule',
+            'accessExpiryReminderEligibilityByParticipantId'
         ));
     }
 
@@ -938,6 +958,66 @@ class ParticipantController extends Controller
         }
 
         return redirect()->route('participants.index', $course)->with('success', 'E-mail o dostępie do szkolenia został wysłany na adres '.$email);
+    }
+
+    /**
+     * Ręczne wysłanie przypomnienia o zbliżającym się wygaśnięciu dostępu (nagrania / materiały).
+     */
+    public function sendAccessExpiryReminder(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $hasVideos = CourseVideo::query()->where('course_id', $course->id)->exists();
+        $hasMaterials = CourseFileLink::query()->where('course_id', $course->id)->exists();
+        $reminderService = app(ParticipantAccessExpiryReminderService::class);
+        $eligibility = $reminderService->eligibilityForParticipant($participant, $course, $hasVideos, $hasMaterials);
+
+        if (! $eligibility['eligible']) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie wysłano przypomnienia: '.($eligibility['reason'] ?? 'Uczestnik nie spełnia warunków.')
+            );
+        }
+
+        $email = trim((string) $participant->email);
+        $daysBefore = $reminderService->daysUntilExpiry($participant);
+        if ($daysBefore === null) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nie wysłano przypomnienia: brak aktywnej daty wygaśnięcia dostępu.');
+        }
+
+        $createdBy = Auth::id();
+
+        try {
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+                'meta' => [
+                    'days_before' => $daysBefore,
+                    'manual' => true,
+                    'triggered_at' => now()->toIso8601String(),
+                ],
+            ]);
+
+            SendAccessExpiryReminderEmailJob::dispatchSync(
+                (int) $course->id,
+                (int) $participant->id,
+                $daysBefore,
+                (int) $log->id
+            );
+        } catch (\Throwable $e) {
+            return redirect()->route('participants.index', $course)->with('error', 'Nie udało się wysłać przypomnienia: '.$e->getMessage());
+        }
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            'Wysłano przypomnienie o wygaśnięciu dostępu na adres '.$email.'.'
+        );
     }
 
     /**
@@ -1183,6 +1263,8 @@ class ParticipantController extends Controller
             $data['access_expires_at'] = $localTime;
         }
 
+        $this->assertNoDuplicateEmailInCourse($course, $request->input('email'));
+
         // Pobranie ostatniego numeru porządkowego w danym kursie
         $lastOrder = $course->participants()->max('order') ?? 0;
 
@@ -1297,6 +1379,8 @@ class ParticipantController extends Controller
             // NIE konwertujemy na UTC - Laravel zrobi to automatycznie
             $data['access_expires_at'] = $localTime;
         }
+
+        $this->assertNoDuplicateEmailInCourse($course, $request->input('email'), $participant);
 
         $profilePayload = [
             'first_name' => $data['first_name'],
@@ -1957,6 +2041,7 @@ class ParticipantController extends Controller
             $byParticipant[$pid] = [
                 CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK => $emptyType,
                 CertificateEmailLog::TYPE_COURSE_ACCESS => $emptyType,
+                CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER => $emptyType,
             ];
         }
 
@@ -1965,7 +2050,10 @@ class ParticipantController extends Controller
             ->whereIn('participant_id', $participantIds->all())
             ->whereIn('type', array_merge(
                 CertificateEmailLog::certificateLinkTypes(),
-                [CertificateEmailLog::TYPE_COURSE_ACCESS]
+                [
+                    CertificateEmailLog::TYPE_COURSE_ACCESS,
+                    CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
+                ]
             ))
             ->orderBy('id')
             ->get(['participant_id', 'type', 'status', 'sent_at', 'failed_at', 'error_message', 'meta']);
@@ -2022,6 +2110,15 @@ class ParticipantController extends Controller
                 $access['has_failed'] = false;
             }
             $byParticipant[$pid][CertificateEmailLog::TYPE_COURSE_ACCESS] = $access;
+
+            $reminder = $buckets[CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER];
+            if ($reminder['sent_count'] > 0) {
+                $reminder['has_queued'] = false;
+                $reminder['has_failed'] = false;
+            } elseif ($reminder['has_queued']) {
+                $reminder['has_failed'] = false;
+            }
+            $byParticipant[$pid][CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER] = $reminder;
         }
 
         return $byParticipant;
@@ -2045,5 +2142,30 @@ class ParticipantController extends Controller
         }
 
         return ucfirst(implode(', ', $parts));
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function assertNoDuplicateEmailInCourse(Course $course, ?string $email, ?Participant $except = null): void
+    {
+        $duplicate = Participant::findDuplicateInCourse(
+            (int) $course->id,
+            $email,
+            $except?->id
+        );
+
+        if ($duplicate === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'email' => sprintf(
+                'Uczestnik z adresem %s jest już zapisany na tym szkoleniu (%s %s).',
+                trim((string) $email),
+                $duplicate->first_name,
+                $duplicate->last_name
+            ),
+        ]);
     }
 }

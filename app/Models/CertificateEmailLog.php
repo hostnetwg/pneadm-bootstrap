@@ -12,6 +12,7 @@ class CertificateEmailLog extends Model
     public const TYPE_LIST_LINK = 'list_link';
     public const TYPE_SINGLE_CERTIFICATE = 'single_certificate';
     public const TYPE_COURSE_ACCESS = 'course_access';
+    public const TYPE_ACCESS_EXPIRY_REMINDER = 'access_expiry_reminder';
 
     /** Klucz agregowany (nie zapisywany w DB): lista lub pojedyncze zaświadczenie. */
     public const AGGREGATE_CERTIFICATE_LINK = 'certificate_link';
