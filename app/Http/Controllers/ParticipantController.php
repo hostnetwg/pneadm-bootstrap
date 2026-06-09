@@ -747,6 +747,26 @@ class ParticipantController extends Controller
 
         $expiryReminderService = app(ParticipantAccessExpiryReminderService::class);
         $expiryReminderSchedule = $expiryReminderService->scheduleSummary();
+        $accessExpiryReminderCanBulkSend = ($course->is_paid ?? false)
+            && ($courseAccessHasVideos || $courseAccessHasMaterials);
+        $accessExpiryReminderEligibleCount = 0;
+        $accessExpiryReminderUnsentCount = 0;
+        if ($accessExpiryReminderCanBulkSend) {
+            $eligibleForReminder = $expiryReminderService->eligibleParticipantsForCourse(
+                $course,
+                $courseAccessHasVideos,
+                $courseAccessHasMaterials
+            );
+            $accessExpiryReminderEligibleCount = $eligibleForReminder->count();
+            $accessExpiryReminderUnsentCount = $eligibleForReminder->filter(function (Participant $p) use ($course) {
+                return ! CertificateEmailLog::query()
+                    ->where('participant_id', $p->id)
+                    ->where('course_id', $course->id)
+                    ->where('type', CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER)
+                    ->where('status', CertificateEmailLog::STATUS_SENT)
+                    ->exists();
+            })->count();
+        }
         $accessExpiryReminderEligibilityByParticipantId = [];
         foreach ($participants->getCollection() as $p) {
             $eligibility = $expiryReminderService->eligibilityForParticipant(
@@ -782,6 +802,9 @@ class ParticipantController extends Controller
             'courseAccessEmailLabel',
             'mailSystemConfig',
             'expiryReminderSchedule',
+            'accessExpiryReminderCanBulkSend',
+            'accessExpiryReminderEligibleCount',
+            'accessExpiryReminderUnsentCount',
             'accessExpiryReminderEligibilityByParticipantId'
         ));
     }
@@ -1021,6 +1044,109 @@ class ParticipantController extends Controller
     }
 
     /**
+     * Masowa wysyłka przypomnień o zbliżającym się wygaśnięciu dostępu (nagrania / materiały).
+     */
+    public function sendAccessExpiryRemindersBulk(Request $request, Course $course)
+    {
+        $request->validate([
+            'mode' => 'required|string|in:eligible,unsent',
+        ]);
+
+        $mode = $request->string('mode')->toString();
+        $hasVideos = CourseVideo::query()->where('course_id', $course->id)->exists();
+        $hasMaterials = CourseFileLink::query()->where('course_id', $course->id)->exists();
+        $reminderService = app(ParticipantAccessExpiryReminderService::class);
+
+        if (! $course->is_paid) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie wysłano przypomnień: automatyczne i ręczne przypomnienia dotyczą tylko płatnych szkoleń.'
+            );
+        }
+
+        if (! $hasVideos && ! $hasMaterials) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Nie wysłano przypomnień: brak nagrań i materiałów do przypomnienia.'
+            );
+        }
+
+        $participants = $reminderService->eligibleParticipantsForCourse($course, $hasVideos, $hasMaterials);
+
+        if ($mode === 'unsent') {
+            $participants = $participants->filter(function (Participant $participant) use ($course) {
+                return ! CertificateEmailLog::query()
+                    ->where('participant_id', $participant->id)
+                    ->where('course_id', $course->id)
+                    ->where('type', CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER)
+                    ->where('status', CertificateEmailLog::STATUS_SENT)
+                    ->exists();
+            })->values();
+        }
+
+        if ($participants->isEmpty()) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                $mode === 'unsent'
+                    ? 'Brak uczestników kwalifikujących się do przypomnienia, do których jeszcze nie wysłano.'
+                    : 'Brak uczestników spełniających warunki wysyłki przypomnienia (e-mail, aktywna data wygaśnięcia dostępu).'
+            );
+        }
+
+        $createdBy = Auth::id();
+        $jobs = [];
+        $logIds = [];
+
+        foreach ($participants as $participant) {
+            $daysBefore = $reminderService->daysUntilExpiry($participant);
+            if ($daysBefore === null) {
+                continue;
+            }
+
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+                'meta' => [
+                    'days_before' => $daysBefore,
+                    'manual' => true,
+                    'bulk' => true,
+                    'triggered_at' => now()->toIso8601String(),
+                ],
+            ]);
+            $logIds[] = $log->id;
+
+            $jobs[] = new SendAccessExpiryReminderEmailJob(
+                (int) $course->id,
+                (int) $participant->id,
+                $daysBefore,
+                (int) $log->id
+            );
+        }
+
+        if ($jobs === []) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Brak uczestników spełniających warunki wysyłki przypomnienia.'
+            );
+        }
+
+        $batch = Bus::batch($jobs)
+            ->name($this->emailBatchName($course, CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER))
+            ->dispatch();
+
+        CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            'Zlecono wysyłkę '.$participants->count().' przypomnień o wygaśnięciu dostępu. Wysyłka odbywa się w tle (wymaga działającego workera kolejki).'
+        );
+    }
+
+    /**
      * Masowa wysyłka e-maili (kolejka).
      * Typy: list_link | single_certificate | course_access
      * Tryby:
@@ -1123,7 +1249,7 @@ class ParticipantController extends Controller
         }
 
         $batch = Bus::batch($jobs)
-            ->name("certificate-emails-{$type}-course-{$course->id}")
+            ->name($this->emailBatchName($course, $type))
             ->dispatch();
 
         CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
@@ -1140,13 +1266,13 @@ class ParticipantController extends Controller
     public function certificateEmailBatchStatus(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE.','.CertificateEmailLog::TYPE_COURSE_ACCESS,
+            'type' => 'required|string|in:'.implode(',', $this->certificateEmailBatchTypes()),
         ]);
 
         $type = $request->string('type')->toString();
         $connection = config('queue.batching.database');
         $batchTable = config('queue.batching.table', 'job_batches');
-        $name = "certificate-emails-{$type}-course-{$course->id}";
+        $name = $this->emailBatchName($course, $type);
 
         $row = DB::connection($connection)->table($batchTable)
             ->where('name', $name)
@@ -1198,13 +1324,13 @@ class ParticipantController extends Controller
     public function cancelCertificateEmailBatch(Request $request, Course $course)
     {
         $request->validate([
-            'type' => 'required|string|in:'.CertificateEmailLog::TYPE_LIST_LINK.','.CertificateEmailLog::TYPE_SINGLE_CERTIFICATE.','.CertificateEmailLog::TYPE_COURSE_ACCESS,
+            'type' => 'required|string|in:'.implode(',', $this->certificateEmailBatchTypes()),
         ]);
 
         $type = $request->string('type')->toString();
         $connection = config('queue.batching.database');
         $batchTable = config('queue.batching.table', 'job_batches');
-        $name = "certificate-emails-{$type}-course-{$course->id}";
+        $name = $this->emailBatchName($course, $type);
 
         $row = DB::connection($connection)->table($batchTable)
             ->where('name', $name)
@@ -1971,7 +2097,29 @@ class ParticipantController extends Controller
                 $courseId,
                 [CertificateEmailLog::TYPE_COURSE_ACCESS]
             ),
+            CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER => $this->buildCourseEmailDeliveryStatsForTypes(
+                $courseId,
+                [CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER]
+            ),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function certificateEmailBatchTypes(): array
+    {
+        return [
+            CertificateEmailLog::TYPE_LIST_LINK,
+            CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
+            CertificateEmailLog::TYPE_COURSE_ACCESS,
+            CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
+        ];
+    }
+
+    private function emailBatchName(Course $course, string $type): string
+    {
+        return "certificate-emails-{$type}-course-{$course->id}";
     }
 
     /**

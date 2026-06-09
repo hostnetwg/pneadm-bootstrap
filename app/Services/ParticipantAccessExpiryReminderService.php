@@ -137,6 +137,32 @@ class ParticipantAccessExpiryReminderService
     }
 
     /**
+     * Uczestnicy kursu kwalifikujący się do ręcznego przypomnienia (cały kurs, nie tylko bieżąca strona).
+     *
+     * @return Collection<int, Participant>
+     */
+    public function eligibleParticipantsForCourse(Course $course, bool $hasVideos, bool $hasMaterials): Collection
+    {
+        if (! $course->is_paid || (! $hasVideos && ! $hasMaterials)) {
+            return collect();
+        }
+
+        return Participant::query()
+            ->where('course_id', $course->id)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereNotNull('access_expires_at')
+            ->where('access_expires_at', '>', now('UTC'))
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get()
+            ->filter(function (Participant $participant) use ($course, $hasVideos, $hasMaterials) {
+                return $this->eligibilityForParticipant($participant, $course, $hasVideos, $hasMaterials)['eligible'];
+            })
+            ->values();
+    }
+
+    /**
      * @return array{enabled: bool, days_before: list<int>, timezone: string, schedule_time: string, days_label: string}
      */
     public function scheduleSummary(): array

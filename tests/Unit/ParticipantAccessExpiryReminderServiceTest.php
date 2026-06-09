@@ -131,4 +131,42 @@ class ParticipantAccessExpiryReminderServiceTest extends TestCase
         $this->assertTrue($this->service->reminderWasSent($participant->id, $course->id, 7));
         $this->assertCount(0, $this->service->participantsDueForReminder(7, $referenceDay));
     }
+
+    public function test_eligible_participants_for_course_filters_by_email_and_expiry(): void
+    {
+        $course = $this->createPaidCourseWithVideo();
+        $expiresAt = Carbon::parse('2026-07-28 14:00', 'Europe/Warsaw')->utc();
+
+        Participant::create([
+            'course_id' => $course->id,
+            'order' => 1,
+            'first_name' => 'Anna',
+            'last_name' => 'Eligible',
+            'email' => 'anna@example.test',
+            'access_expires_at' => $expiresAt,
+        ]);
+
+        Participant::create([
+            'course_id' => $course->id,
+            'order' => 2,
+            'first_name' => 'Brak',
+            'last_name' => 'Email',
+            'email' => null,
+            'access_expires_at' => $expiresAt,
+        ]);
+
+        Participant::create([
+            'course_id' => $course->id,
+            'order' => 3,
+            'first_name' => 'Wygasly',
+            'last_name' => 'Dostep',
+            'email' => 'expired@example.test',
+            'access_expires_at' => now('UTC')->subDay(),
+        ]);
+
+        $eligible = $this->service->eligibleParticipantsForCourse($course, true, false);
+
+        $this->assertCount(1, $eligible);
+        $this->assertSame('anna@example.test', $eligible->first()->email);
+    }
 }

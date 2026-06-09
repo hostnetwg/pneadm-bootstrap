@@ -381,9 +381,19 @@
                                         <i class="bi bi-trash"></i> Usuń
                                     </button>
                                     @if(!empty($participant->certificate->file_path))
-                                        <form action="{{ route('certificates.delete-pdf', $participant->certificate) }}" method="POST" class="d-inline" onsubmit="return confirm('Usunąć tylko plik PDF tego zaświadczenia? Numer zaświadczenia zostanie zachowany – potem możesz wygenerować plik ponownie (np. po poprawce danych).');">
+                                        <form id="deleteCertificatePdfForm{{ $participant->certificate->id }}" action="{{ route('certificates.delete-pdf', $participant->certificate) }}" method="POST" class="d-inline">
                                             @csrf
-                                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Usuwa plik PDF, zachowuje zaświadczenie – potem wygeneruj ponownie">
+                                            <button type="button"
+                                                    class="btn btn-outline-warning btn-sm"
+                                                    title="Usuwa plik PDF, zachowuje zaświadczenie – potem wygeneruj ponownie"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#formConfirmModal"
+                                                    data-confirm-title="Usuń plik PDF"
+                                                    data-confirm-message="Usunąć tylko plik PDF tego zaświadczenia? Numer zaświadczenia zostanie zachowany – potem możesz wygenerować plik ponownie (np. po poprawce danych)."
+                                                    data-confirm-form="#deleteCertificatePdfForm{{ $participant->certificate->id }}"
+                                                    data-confirm-btn-class="btn-warning"
+                                                    data-confirm-btn-text="Usuń PDF"
+                                                    data-confirm-header-class="bg-warning text-dark">
                                                 <i class="bi bi-file-earmark-pdf"></i> Usuń PDF
                                             </button>
                                         </form>
@@ -397,13 +407,35 @@
                                 @if($certToken)
                                     <a href="{{ $pneduFrontendUrl }}/certificates/{{ $certToken }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="Lista zaświadczeń (pnedu.pl)">Zaświadczenia (pnedu)</a>
                                     <a href="{{ $pneduFrontendUrl }}/certificate/{{ $certToken }}/{{ $course->id }}" class="btn btn-link btn-sm p-0 text-start" target="_blank" rel="noopener" title="To konkretne zaświadczenie (pnedu.pl)">Zaświadczenie (pnedu)</a>
-                                    <form action="{{ route('participants.send-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do zaświadczeń?');">
+                                    <form id="sendCertificateLinkForm{{ $participant->id }}" action="{{ route('participants.send-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap">Wyślij e-mail</button>
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#formConfirmModal"
+                                                data-confirm-title="Wyślij e-mail"
+                                                data-confirm-message="Wysłać e-mail z linkiem do zaświadczeń?"
+                                                data-confirm-form="#sendCertificateLinkForm{{ $participant->id }}"
+                                                data-confirm-btn-class="btn-secondary"
+                                                data-confirm-btn-text="Wyślij e-mail"
+                                                data-confirm-header-class="bg-secondary text-white">
+                                            Wyślij e-mail
+                                        </button>
                                     </form>
-                                    <form action="{{ route('participants.send-single-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm('Wysłać e-mail z linkiem do tego konkretnego zaświadczenia?');">
+                                    <form id="sendSingleCertificateLinkForm{{ $participant->id }}" action="{{ route('participants.send-single-certificate-link', [$course, $participant]) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap">Wyślij e-mail to</button>
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm px-2 py-0 small text-nowrap"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#formConfirmModal"
+                                                data-confirm-title="Wyślij e-mail"
+                                                data-confirm-message="Wysłać e-mail z linkiem do tego konkretnego zaświadczenia?"
+                                                data-confirm-form="#sendSingleCertificateLinkForm{{ $participant->id }}"
+                                                data-confirm-btn-class="btn-secondary"
+                                                data-confirm-btn-text="Wyślij e-mail"
+                                                data-confirm-header-class="bg-secondary text-white">
+                                            Wyślij e-mail to
+                                        </button>
                                     </form>
                                 @endif
                                 @if(!empty($participant->email))
@@ -423,10 +455,20 @@
                                     }
                                 @endphp
                                 @if($reminderEligibility['eligible'] ?? false)
-                                    <form action="{{ route('participants.send-access-expiry-reminder', [$course, $participant]) }}" method="POST" class="d-inline" onsubmit="return confirm(@js($reminderConfirmMessage));">
+                                    <form id="sendAccessExpiryReminderForm{{ $participant->id }}" action="{{ route('participants.send-access-expiry-reminder', [$course, $participant]) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-outline-warning btn-sm px-2 py-0 small text-nowrap" title="Ręczne przypomnienie (test lub poza harmonogramem automatycznym)">
-                                            <i class="fas fa-bell"></i> Wyślij przypomnienie
+                                        <button type="button"
+                                                class="btn btn-outline-warning btn-sm px-2 py-0 small text-nowrap"
+                                                title="Ręczne przypomnienie (test lub poza harmonogramem automatycznym)"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#formConfirmModal"
+                                                data-confirm-title="Wyślij przypomnienie teraz"
+                                                data-confirm-message='@json($reminderConfirmMessage)'
+                                                data-confirm-form="#sendAccessExpiryReminderForm{{ $participant->id }}"
+                                                data-confirm-btn-class="btn-warning"
+                                                data-confirm-btn-text="Wyślij przypomnienie"
+                                                data-confirm-header-class="bg-warning text-dark">
+                                            <i class="fas fa-bell"></i> Wyślij przypomnienie teraz
                                         </button>
                                     </form>
                                 @elseif(!empty($participant->email) && ($course->is_paid ?? false))
@@ -926,6 +968,9 @@
                 </div>
             </div>
         </div>
+
+        @include('participants.partials.form-confirm-modal')
+
     </div>
 
     <!-- Modal Import CSV -->
@@ -1048,6 +1093,7 @@
             bind('bulk_email_list_mode', 'bulk_email_list_mode_input');
             bind('bulk_email_single_mode', 'bulk_email_single_mode_input');
             bind('bulk_email_course_access_mode', 'bulk_email_course_access_mode_input');
+            bind('bulk_expiry_reminder_mode', 'bulk_expiry_reminder_mode_input');
         })();
 
         function clearModalBackdrop() {
@@ -1061,6 +1107,7 @@
             if (type === 'single_certificate') return 'to zaświadczenie';
             if (type === 'list_link') return 'lista zaświadczeń';
             if (type === 'course_access') return 'nagranie/materiały';
+            if (type === 'access_expiry_reminder') return 'przypomnienie o wygaśnięciu dostępu';
             return type || 'e-maile';
         }
 
@@ -1088,8 +1135,8 @@
                             textEl.innerHTML =
                                 '<strong>Wysyłka zakończona (' + emailTypeLabel(data.type) + ').</strong> ' +
                                 'Wysłano/obsłużono <strong>' + data.processed + ' z ' + data.total + '</strong>, ' +
-                                'błędów: <strong>' + data.failed + '</strong>.';
-                            setTimeout(function() { alertEl.classList.add('d-none'); }, 6000);
+                                'błędów: <strong>' + data.failed + '</strong>. Odświeżanie listy…';
+                            setTimeout(function() { window.location.reload(); }, 2500);
                         } else if (data.state === 'cancelled') {
                             alertEl.classList.remove('alert-info', 'alert-success', 'alert-danger');
                             alertEl.classList.add('alert-warning');
@@ -1329,8 +1376,13 @@
                     .catch(function() { return null; });
             }
 
-            Promise.all([check('single_certificate'), check('list_link'), check('course_access')]).then(function(results) {
-                var activeType = results[0] || results[1] || results[2];
+            Promise.all([
+                check('single_certificate'),
+                check('list_link'),
+                check('course_access'),
+                check('access_expiry_reminder'),
+            ]).then(function(results) {
+                var activeType = results[0] || results[1] || results[2] || results[3];
                 if (activeType) startEmailPolling(alertEl, activeType);
             });
         })();
