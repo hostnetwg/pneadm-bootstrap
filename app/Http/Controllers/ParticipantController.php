@@ -1134,11 +1134,24 @@ class ParticipantController extends Controller
             );
         }
 
-        $batch = Bus::batch($jobs)
-            ->name($this->emailBatchName($course, CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER))
-            ->dispatch();
+        try {
+            $batch = Bus::batch($jobs)
+                ->name($this->emailBatchName($course, CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER))
+                ->dispatch();
 
-        CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+            CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+        } catch (\Throwable $e) {
+            CertificateEmailLog::whereIn('id', $logIds)->update([
+                'status' => CertificateEmailLog::STATUS_FAILED,
+                'failed_at' => now(),
+                'error_message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie udało się zlecić zbiorczej wysyłki przypomnień: '.$e->getMessage()
+            );
+        }
 
         return redirect()->route('participants.index', $course)->with(
             'success',

@@ -13,6 +13,7 @@ use App\Models\ParticipantDownloadToken;
 use App\Models\PneduUser;
 use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Log;
 
 class SendAccessExpiryReminderEmailJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
 
@@ -38,6 +39,10 @@ class SendAccessExpiryReminderEmailJob implements ShouldQueue
     public function handle(
         ParticipantAccessExpiryReminderService $reminderService
     ): void {
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $log = CertificateEmailLog::find($this->emailLogId);
         if (! $log) {
             return;
