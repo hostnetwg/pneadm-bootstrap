@@ -20,11 +20,21 @@
     <p class="small text-muted mb-2">
         Tryb HTML: pełna kontrola (np. atrybuty <code class="small">data-time</code> w spisie treści wideo). Tryb wizualny: wygodniejszy — do surowego kodu przełącz na „HTML”; w edytorze jest też przycisk „źródło” (<strong>&lt;/&gt;</strong>).
     </p>
+    <div class="alert alert-info small py-2 mb-2">
+        <strong>Spis treści wideo (znaczniki czasu):</strong> URL nagrania wpisz w sekcji <strong>„Wideo osadzone”</strong> poniżej — nie wklejaj tutaj <code>&lt;iframe&gt;</code> ani <code>&lt;script&gt;</code> ze starej strony NE.pl.
+        W treści zostaw opis i listę linków, np.:
+        <code class="d-block mt-1 user-select-all">&lt;ul class="no-bullets"&gt;&lt;li&gt;&lt;a href="#" data-time="00:03:59"&gt;00:03:59 - Tytuł fragmentu&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;</code>
+        Przy kilku nagraniach w lekcji dodaj <code>data-embed-index="1"</code> (0 = pierwsze wideo, 1 = drugie itd.).
+    </div>
     <textarea id="lesson-body-html" name="body_html" class="form-control font-monospace" rows="14" spellcheck="true">{{ old('body_html', $lesson?->body_html) }}</textarea>
 </div>
 
 <h5>Wideo osadzone (YouTube / Vimeo / „inny” jako link)</h5>
-<p class="small text-muted">Puste wiersze są pomijane.</p>
+<p class="small text-muted mb-2">
+    <strong>Wymagane dla spisu treści ze znacznikami czasu.</strong> Wklej URL YouTube/Vimeo (np. <code>https://www.youtube.com/watch?v=…</code>) i wybierz platformę.
+    Odtwarzacz na pnedu.pl obsługuje przewijanie po kliknięciu linków <code>data-time</code> z treści lekcji — bez dodatkowego kodu JavaScript w HTML.
+    Puste wiersze są pomijane.
+</p>
 <div id="embed-rows">
     @foreach($embeds as $i => $row)
         <div class="row g-2 mb-2 embed-row">
