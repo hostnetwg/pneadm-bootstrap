@@ -62,6 +62,7 @@ class OnlineCourseLessonController extends Controller
             'module' => $module,
             'lesson' => $lesson,
             'linkedCourse' => $this->linkedCourseForLessonForm($lesson),
+            'lessonNav' => $this->lessonEditNavigation($online_course, $lesson),
         ]);
     }
 
@@ -219,6 +220,57 @@ class OnlineCourseLessonController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    /**
+     * Poprzednia i następna lekcja w kolejności struktury kursu (moduły + sort_order).
+     *
+     * @return array{
+     *     prev: ?array{url: string, title: string},
+     *     next: ?array{url: string, title: string}
+     * }
+     */
+    private function lessonEditNavigation(OnlineCourse $online_course, OnlineCourseLesson $lesson): array
+    {
+        $ordered = OnlineCourseLesson::query()
+            ->select([
+                'online_course_lessons.id',
+                'online_course_lessons.online_course_module_id',
+                'online_course_lessons.title',
+            ])
+            ->join('online_course_modules as m', 'm.id', '=', 'online_course_lessons.online_course_module_id')
+            ->where('m.online_course_id', $online_course->id)
+            ->orderBy('m.sort_order')
+            ->orderBy('m.id')
+            ->orderBy('online_course_lessons.sort_order')
+            ->orderBy('online_course_lessons.id')
+            ->get();
+
+        $index = $ordered->search(fn ($row) => (int) $row->id === (int) $lesson->id);
+        if ($index === false) {
+            return ['prev' => null, 'next' => null];
+        }
+
+        $build = function (?OnlineCourseLesson $neighbor) use ($online_course): ?array {
+            if ($neighbor === null) {
+                return null;
+            }
+
+            $neighborModule = OnlineCourseModule::query()->findOrFail($neighbor->online_course_module_id);
+
+            return [
+                'url' => route('online-courses.lessons.edit', [$online_course, $neighborModule, $neighbor]),
+                'title' => (string) $neighbor->title,
+            ];
+        };
+
+        $prevRow = $index > 0 ? $ordered[$index - 1] : null;
+        $nextRow = $index < $ordered->count() - 1 ? $ordered[$index + 1] : null;
+
+        return [
+            'prev' => $build($prevRow),
+            'next' => $build($nextRow),
+        ];
     }
 
     private function linkedCourseForLessonForm(?OnlineCourseLesson $lesson): ?Course

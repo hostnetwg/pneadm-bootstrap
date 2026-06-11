@@ -45,6 +45,7 @@
         'embeds' => $embeds,
         'resource_links' => $resource_links,
         'linkedCourse' => $linkedCourse ?? null,
+        'lessonNav' => $lessonNav ?? null,
     ])
 </form>
 
@@ -168,6 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setup: function (editor) {
                     editor.on('change input undo redo ExecCommand NodeChange KeyUp Paste Cut SetContent', function () {
                         editor.save();
+                        ta.dispatchEvent(new Event('input', { bubbles: true }));
                     });
                 },
             });
@@ -260,6 +262,76 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     document.querySelectorAll('.btn-remove-embed').forEach(btn => bindRemove(btn, btn.closest('.embed-row')));
     document.querySelectorAll('.btn-remove-link').forEach(btn => bindRemove(btn, btn.closest('.link-row')));
+
+    const lessonNavLinks = document.querySelectorAll('.lesson-nav-link');
+    const lessonNavDirtyHint = document.getElementById('lesson-nav-dirty-hint');
+    let lessonFormSnapshot = null;
+
+    function serializeLessonFormState() {
+        if (!form) return '';
+        if (window.tinymce) {
+            window.tinymce.triggerSave();
+        }
+        const data = new FormData(form);
+        const pairs = [];
+        for (const [key, value] of data.entries()) {
+            if (key === '_token' || key === '_method') continue;
+            pairs.push(key + '=' + String(value));
+        }
+        pairs.sort();
+        return pairs.join('&');
+    }
+
+    function isLessonFormDirty() {
+        if (lessonFormSnapshot === null) return false;
+        return serializeLessonFormState() !== lessonFormSnapshot;
+    }
+
+    function setLessonNavEnabled(enabled) {
+        lessonNavLinks.forEach(function (link) {
+            if (enabled) {
+                link.classList.remove('disabled', 'pe-none');
+                link.removeAttribute('aria-disabled');
+                link.removeAttribute('tabindex');
+            } else {
+                link.classList.add('disabled', 'pe-none');
+                link.setAttribute('aria-disabled', 'true');
+                link.setAttribute('tabindex', '-1');
+            }
+        });
+        if (lessonNavDirtyHint) {
+            lessonNavDirtyHint.style.display = enabled ? 'none' : 'block';
+        }
+    }
+
+    function refreshLessonNavState() {
+        if (!lessonNavLinks.length) return;
+        setLessonNavEnabled(!isLessonFormDirty());
+    }
+
+    if (lessonNavLinks.length && form) {
+        lessonNavLinks.forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                if (isLessonFormDirty()) {
+                    event.preventDefault();
+                }
+            });
+        });
+
+        form.addEventListener('input', refreshLessonNavState);
+        form.addEventListener('change', refreshLessonNavState);
+
+        window.addEventListener('beforeunload', function (event) {
+            if (!isLessonFormDirty()) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
+
+        window.setTimeout(function () {
+            lessonFormSnapshot = serializeLessonFormState();
+            refreshLessonNavState();
+        }, 350);
+    }
 });
 </script>
 @endpush

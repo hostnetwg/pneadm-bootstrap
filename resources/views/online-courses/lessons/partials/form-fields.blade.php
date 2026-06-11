@@ -83,3 +83,31 @@
     <button type="submit" class="btn btn-primary">{{ $lesson ? 'Zapisz lekcję' : 'Dodaj lekcję' }}</button>
     <a href="{{ route('online-courses.edit', $course) }}" class="btn btn-outline-secondary">Wróć do struktury</a>
 </div>
+
+@if($lesson && !empty($lessonNav) && ($lessonNav['prev'] || $lessonNav['next']))
+    <div class="d-flex gap-2 flex-wrap mt-2" id="lesson-nav-buttons">
+        @if($lessonNav['prev'])
+            <a href="{{ $lessonNav['prev']['url'] }}"
+               class="btn btn-outline-primary lesson-nav-link"
+               data-lesson-nav="prev"
+               title="{{ $lessonNav['prev']['title'] }}">
+                ← Poprzednia lekcja
+            </a>
+        @else
+            <span class="btn btn-outline-secondary disabled" aria-disabled="true">← Poprzednia lekcja</span>
+        @endif
+        @if($lessonNav['next'])
+            <a href="{{ $lessonNav['next']['url'] }}"
+               class="btn btn-outline-primary lesson-nav-link"
+               data-lesson-nav="next"
+               title="{{ $lessonNav['next']['title'] }}">
+                Następna lekcja →
+            </a>
+        @else
+            <span class="btn btn-outline-secondary disabled" aria-disabled="true">Następna lekcja →</span>
+        @endif
+    </div>
+    <p class="small text-muted mb-0 mt-1" id="lesson-nav-dirty-hint" style="display: none;">
+        Zapisz lekcję, aby przejść do poprzedniej lub następnej.
+    </p>
+@endif
