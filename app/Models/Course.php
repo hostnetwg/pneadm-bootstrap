@@ -261,6 +261,19 @@ class Course extends Model
     }
 
     /**
+     * Czy rejestracja zaświadczenia jest włączona (bez sprawdzania okna czasowego).
+     * Dla abonentów kursów online z aktywnym dostępem.
+     */
+    public function isCertificateRegistrationOpenForExtendedAccess(): bool
+    {
+        if (! $this->certificate_registration_open) {
+            return false;
+        }
+
+        return trim((string) ($this->certificate_registration_token ?? '')) !== '';
+    }
+
+    /**
      * Czy publiczny formularz rejestracji zaświadczenia jest włączony i w oknie czasowym od–do.
      */
     public function isCertificateRegistrationActiveNow(?\DateTimeInterface $now = null): bool

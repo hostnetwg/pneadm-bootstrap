@@ -94,11 +94,15 @@ export function initCourseSelect(selectId, options) {
                     : '';
                 const titleClass = statusToTitleClass(item.status);
                 const statusBadge = statusBadgeHtml(item.status);
+                const certBadge = item.certificate_registration_open
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Rej. wł.</span>'
+                    : '';
                 return (
                     '<div class="py-1">' +
-                    '<div class="d-flex align-items-start gap-2">' +
+                    '<div class="d-flex align-items-start gap-2 flex-wrap">' +
                         '<div class="fw-semibold ' + titleClass + '">' + escape(title) + '</div>' +
                         statusBadge +
+                        certBadge +
                     '</div>' +
                     '<div class="small text-muted">#' + escape(item.id) + idOld + startDate + '</div>' +
                     instructor +

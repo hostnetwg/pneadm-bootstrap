@@ -4,7 +4,12 @@
     </x-slot>
     <div class="py-3">
         <div class="container-fluid px-4" style="max-width: 960px;">
-            @include('online-courses.lessons.partials.form', ['course' => $online_course, 'module' => $module, 'lesson' => null])
+            @include('online-courses.lessons.partials.form', [
+                'course' => $online_course,
+                'module' => $module,
+                'lesson' => null,
+                'linkedCourse' => $linkedCourse ?? null,
+            ])
         </div>
     </div>
 </x-app-layout>

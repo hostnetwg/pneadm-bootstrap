@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\OnlineCourse;
 use App\Models\OnlineCourseLesson;
 use App\Models\OnlineCourseLessonEmbed;
@@ -19,7 +20,11 @@ class OnlineCourseLessonController extends Controller
     {
         abort_unless($module->online_course_id === $online_course->id, 404);
 
-        return view('online-courses.lessons.create', compact('online_course', 'module'));
+        return view('online-courses.lessons.create', [
+            'online_course' => $online_course,
+            'module' => $module,
+            'linkedCourse' => $this->linkedCourseForLessonForm(null),
+        ]);
     }
 
     public function store(Request $request, OnlineCourse $online_course, OnlineCourseModule $module): RedirectResponse
@@ -37,6 +42,7 @@ class OnlineCourseLessonController extends Controller
                 'body_html' => $validated['body_html'],
                 'is_published' => $request->boolean('is_published'),
                 'sort_order' => $max + 1,
+                'linked_course_id' => $validated['linked_course_id'] ?? null,
             ]);
             $this->syncEmbedsAndLinks($created, $request);
         });
@@ -49,9 +55,14 @@ class OnlineCourseLessonController extends Controller
         abort_unless($module->online_course_id === $online_course->id, 404);
         abort_unless($lesson->online_course_module_id === $module->id, 404);
 
-        $lesson->load(['embeds', 'resourceLinks']);
+        $lesson->load(['embeds', 'resourceLinks', 'linkedCourse.instructor']);
 
-        return view('online-courses.lessons.edit', compact('online_course', 'module', 'lesson'));
+        return view('online-courses.lessons.edit', [
+            'online_course' => $online_course,
+            'module' => $module,
+            'lesson' => $lesson,
+            'linkedCourse' => $this->linkedCourseForLessonForm($lesson),
+        ]);
     }
 
     public function update(Request $request, OnlineCourse $online_course, OnlineCourseModule $module, OnlineCourseLesson $lesson): RedirectResponse
@@ -66,6 +77,7 @@ class OnlineCourseLessonController extends Controller
                 'title' => $validated['title'],
                 'body_html' => $validated['body_html'],
                 'is_published' => $request->boolean('is_published'),
+                'linked_course_id' => $validated['linked_course_id'] ?? null,
             ]);
             $lesson->embeds()->delete();
             $lesson->resourceLinks()->delete();
@@ -156,13 +168,84 @@ class OnlineCourseLessonController extends Controller
     }
 
     /**
-     * @return array{title:string,body_html:?string}
+     * Wyszukiwanie szkoleń/webinarów do powiązania z lekcją (TomSelect, jak w form-orders).
+     */
+    public function searchLinkableCourses(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('limit', 30);
+        $limit = max(1, min($limit, 100));
+
+        $query = Course::query()
+            ->with('instructor:id,title,first_name,last_name')
+            ->select('id', 'id_old', 'title', 'start_date', 'end_date', 'instructor_id', 'certificate_registration_open');
+
+        if ($q !== '') {
+            $like = '%'.$q.'%';
+            $query->where(function ($w) use ($q, $like) {
+                $w->where('title', 'LIKE', $like)
+                    ->orWhere('id_old', 'LIKE', $like);
+
+                if (ctype_digit($q)) {
+                    $w->orWhere('id', (int) $q);
+                }
+            });
+        }
+
+        $courses = $query
+            ->orderByRaw('start_date IS NULL')
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $tz = config('app.timezone');
+
+        return response()->json([
+            'items' => $courses->map(function (Course $course) use ($tz) {
+                return [
+                    'value' => (string) $course->id,
+                    'id' => (int) $course->id,
+                    'id_old' => (string) ($course->id_old ?? ''),
+                    'title_text' => trim(strip_tags((string) $course->title)),
+                    'title_html' => (string) $course->title,
+                    'start_date' => $course->start_date ? $course->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+                    'end_date' => $course->end_date ? $course->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+                    'status' => $course->getLifecycleStatus(),
+                    'instructor' => $course->instructor
+                        ? trim(($course->instructor->title ? $course->instructor->title.' ' : '').$course->instructor->first_name.' '.$course->instructor->last_name)
+                        : '',
+                    'certificate_registration_open' => (bool) $course->certificate_registration_open,
+                ];
+            })->values(),
+        ]);
+    }
+
+    private function linkedCourseForLessonForm(?OnlineCourseLesson $lesson): ?Course
+    {
+        $linkedId = old('linked_course_id', $lesson?->linked_course_id);
+        if ($linkedId === null || $linkedId === '') {
+            return null;
+        }
+
+        if ($lesson && (int) $lesson->linked_course_id === (int) $linkedId && $lesson->relationLoaded('linkedCourse')) {
+            return $lesson->linkedCourse;
+        }
+
+        return Course::query()
+            ->with('instructor:id,title,first_name,last_name')
+            ->find((int) $linkedId);
+    }
+
+    /**
+     * @return array{title:string,body_html:?string,linked_course_id:?int}
      */
     private function validatedLesson(Request $request): array
     {
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'body_html' => ['nullable', 'string'],
+            'linked_course_id' => ['nullable', 'integer', 'exists:courses,id'],
         ]);
     }
 

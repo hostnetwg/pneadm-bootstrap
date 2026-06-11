@@ -328,6 +328,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     });
 
     // Kursy online nagraniowe (LMS) — oddzielnie od szkoleń (courses).
+    Route::get('online-courses/search/linkable-courses', [OnlineCourseLessonController::class, 'searchLinkableCourses'])
+        ->name('online-courses.linkable-courses.search');
     Route::resource('online-courses', OnlineCoursesController::class);
     Route::post('online-courses/{online_course}/modules/reorder', [OnlineCoursesController::class, 'reorderModules'])
         ->name('online-courses.modules.reorder');

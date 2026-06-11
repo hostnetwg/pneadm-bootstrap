@@ -44,14 +44,78 @@
         'lesson' => $lesson,
         'embeds' => $embeds,
         'resource_links' => $resource_links,
+        'linkedCourse' => $linkedCourse ?? null,
     ])
 </form>
 
 @push('scripts')
+@php
+    $linkedCourseSearchUrl = route('online-courses.linkable-courses.search');
+    $linkedCoursePreselected = null;
+    if (! empty($linkedCourse)) {
+        $tz = config('app.timezone');
+        $linkedCoursePreselected = [
+            'id' => $linkedCourse->id,
+            'id_old' => $linkedCourse->id_old,
+            'title_text' => trim(strip_tags((string) $linkedCourse->title)),
+            'start_date' => $linkedCourse->start_date ? $linkedCourse->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+            'end_date' => $linkedCourse->end_date ? $linkedCourse->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
+            'status' => $linkedCourse->getLifecycleStatus(),
+            'instructor' => optional($linkedCourse->instructor)->full_title_name ?? '',
+            'certificate_registration_open' => (bool) $linkedCourse->certificate_registration_open,
+        ];
+    }
+@endphp
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.6/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var STORAGE_KEY = 'pneadm_oc_lesson_body_editor_mode';
+    const linkedCourseSearchUrl = @json($linkedCourseSearchUrl);
+    const linkedCoursePreselected = @json($linkedCoursePreselected);
+    const linkedCourseInfo = document.getElementById('linked-course-info');
+    const linkedCourseDetails = document.getElementById('linked-course-details');
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderLinkedCourseInfo(item) {
+        if (!linkedCourseInfo || !linkedCourseDetails) {
+            return;
+        }
+        if (!item) {
+            linkedCourseInfo.style.display = 'none';
+            return;
+        }
+        const certNote = item.certificate_registration_open
+            ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Rejestracja zaświadczenia wł.</span>'
+            : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Rejestracja zaświadczenia wył.</span>';
+        const instructor = item.instructor ? escapeHtml(item.instructor) : '<span class="text-muted">—</span>';
+        linkedCourseDetails.innerHTML =
+            '<div class="d-flex flex-wrap align-items-center gap-2 mb-1">' + certNote + '</div>' +
+            '<div><strong>Tytuł:</strong> ' + escapeHtml(item.title_text || '') + '</div>' +
+            '<div><strong>Data:</strong> ' + (item.start_date ? escapeHtml(item.start_date) : '—') + '</div>' +
+            '<div><strong>Prowadzący:</strong> ' + instructor + '</div>';
+        linkedCourseInfo.style.display = 'block';
+    }
+
+    const linkedCourseTs = window.initCourseSelect && window.initCourseSelect('linked_course_id', {
+        searchUrl: linkedCourseSearchUrl,
+        preselected: linkedCoursePreselected,
+        includeArchived: true,
+        placeholder: 'Wybierz lub wpisz tytuł / ID szkolenia...',
+        onCourseChanged: renderLinkedCourseInfo,
+    });
+
+    if (linkedCourseTs && linkedCoursePreselected) {
+        renderLinkedCourseInfo(linkedCoursePreselected);
+    }
+
+    var STORAGE_KEY_EDITOR = 'pneadm_oc_lesson_body_editor_mode';
     var ta = document.getElementById('lesson-body-html');
     var btnW = document.getElementById('lesson-body-btn-wysiwyg');
     var btnH = document.getElementById('lesson-body-btn-html');
@@ -68,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btnH.setAttribute('aria-pressed', (!wysiwygActive) ? 'true' : 'false');
         ta.classList.toggle('font-monospace', !wysiwygActive);
         try {
-            sessionStorage.setItem(STORAGE_KEY, mode);
+            sessionStorage.setItem(STORAGE_KEY_EDITOR, mode);
         } catch (e) { /* ignore */ }
     }
 
@@ -149,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var initialMode = 'html';
     try {
-        var saved = sessionStorage.getItem(STORAGE_KEY);
+        var saved = sessionStorage.getItem(STORAGE_KEY_EDITOR);
         if (saved === 'wysiwyg' || saved === 'html') initialMode = saved;
     } catch (e) { /* ignore */ }
 

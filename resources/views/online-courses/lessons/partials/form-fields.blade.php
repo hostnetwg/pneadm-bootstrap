@@ -57,9 +57,11 @@
         </div>
     @endforeach
 </div>
-<button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btn-add-embed">+ kolejne wideo</button>
+<button type="button" class="btn btn-sm btn-outline-primary mb-2" id="btn-add-embed">+ kolejne wideo</button>
 
-<h5>Linki do materiałów</h5>
+@include('online-courses.lessons.partials.certificate-link-fields', ['linkedCourse' => $linkedCourse ?? null])
+
+<h5 class="mt-2">Linki do materiałów</h5>
 <div id="link-rows">
     @foreach($resource_links as $i => $row)
         <div class="row g-2 mb-2 link-row">

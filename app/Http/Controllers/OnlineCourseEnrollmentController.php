@@ -85,8 +85,8 @@ class OnlineCourseEnrollmentController extends Controller
     {
         $validated = $request->validate([
             'email' => ['required', 'email:rfc,dns'],
-            'first_name' => ['nullable', 'string', 'max:190'],
-            'last_name' => ['nullable', 'string', 'max:190'],
+            'first_name' => ['required', 'string', 'max:190'],
+            'last_name' => ['required', 'string', 'max:190'],
             'access_expires_at' => ['nullable', 'date'],
             'access_source' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],

@@ -241,4 +241,119 @@ class CertificateRegistrationController extends Controller
             'message' => $result['message'],
         ]);
     }
+
+    /**
+     * Status rejestracji dla abonentów kursu online (bez okna czasowego).
+     * GET /api/certificate-registration/status-by-course/{course}
+     */
+    public function statusByCourse(Course $course)
+    {
+        $course->loadMissing('instructor');
+        $courseStartDisplay = $this->formatCourseStartDisplay($course);
+        $registrationEndsDisplay = $this->formatCertificateRegistrationEndsDisplay($course);
+
+        if (! $course->isCertificateRegistrationOpenForExtendedAccess()) {
+            return response()->json([
+                'active' => false,
+                'course_title' => $course->title,
+                'course_start_display' => $courseStartDisplay,
+                'certificate_registration_ends_at_display' => $registrationEndsDisplay,
+                'message' => $course->certificate_registration_open
+                    ? 'Rejestracja zaświadczenia nie jest skonfigurowana dla tego szkolenia.'
+                    : 'Rejestracja zaświadczenia jest wyłączona.',
+            ]);
+        }
+
+        $instructorName = null;
+        $instructorPhoto = null;
+        if ($course->instructor) {
+            $instructorName = $course->instructor->full_title_name ?? $course->instructor->full_name;
+            $instructorPhoto = $course->instructor->photo ? ltrim($course->instructor->photo, '/') : null;
+        }
+
+        return response()->json([
+            'active' => true,
+            'course_title' => $course->title,
+            'course_start_display' => $courseStartDisplay,
+            'certificate_registration_ends_at_display' => $registrationEndsDisplay,
+            'instructor_name' => $instructorName,
+            'instructor_photo' => $instructorPhoto,
+            'certificate_registration_collect_birth_data' => (bool) $course->certificate_registration_collect_birth_data,
+            'certificate_registration_birth_data_required' => (bool) $course->certificate_registration_birth_data_required,
+        ]);
+    }
+
+    /**
+     * Rejestracja uczestnika dla abonenta kursu online (pomija okno czasowe).
+     * POST /api/certificate-registration/register-extended
+     */
+    public function registerExtended(Request $request)
+    {
+        $validated = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email'],
+            'rodo_consent' => ['required', 'accepted'],
+            'newsletter_consent' => ['sometimes', 'boolean'],
+            'birth_date' => ['nullable', 'date'],
+            'birth_place' => ['nullable', 'string', 'max:255'],
+        ], [
+            'rodo_consent.accepted' => 'Musisz wyrazić zgodę na przetwarzanie danych osobowych.',
+        ]);
+
+        $course = Course::query()->find((int) $validated['course_id']);
+        if ($course === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Szkolenie nie zostało znalezione.',
+            ], 404);
+        }
+
+        if (! $course->isCertificateRegistrationOpenForExtendedAccess()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Rejestracja zaświadczenia jest wyłączona dla tego szkolenia.',
+            ], 403);
+        }
+
+        $birthDate = $validated['birth_date'] ?? null;
+        $birthPlace = isset($validated['birth_place']) ? trim((string) $validated['birth_place']) : null;
+        if ($birthPlace === '') {
+            $birthPlace = null;
+        }
+
+        if ($course->certificate_registration_collect_birth_data) {
+            if ($course->certificate_registration_birth_data_required) {
+                if ($birthDate === null || $birthPlace === null) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Nieprawidłowe dane.',
+                        'errors' => array_filter([
+                            'birth_date' => $birthDate === null ? ['Podaj datę urodzenia.'] : null,
+                            'birth_place' => $birthPlace === null ? ['Podaj miejsce urodzenia.'] : null,
+                        ]),
+                    ], 422);
+                }
+            }
+        } else {
+            $birthDate = null;
+            $birthPlace = null;
+        }
+
+        $result = $this->registrationService->registerOrUpdate($course, [
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'email' => $validated['email'],
+            'birth_date' => $birthDate,
+            'birth_place' => $birthPlace,
+            'collect_birth_data' => (bool) $course->certificate_registration_collect_birth_data,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'updated' => $result['updated'],
+            'message' => $result['message'],
+        ]);
+    }
 }

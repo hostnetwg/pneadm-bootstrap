@@ -245,4 +245,65 @@ class CertificateRegistrationApiTest extends TestCase
             'deleted_at' => null,
         ]);
     }
+
+    /** @param array<string, mixed> $payload */
+    private function postRegisterExtended(array $payload)
+    {
+        return $this->withToken(self::API_TOKEN)
+            ->postJson('/api/certificate-registration/register-extended', $payload);
+    }
+
+    public function test_status_by_course_active_when_open_without_date_window(): void
+    {
+        $course = $this->createOpenRegistrationCourse([
+            'certificate_registration_starts_at' => now()->addDay(),
+            'certificate_registration_ends_at' => now()->subDay(),
+        ]);
+
+        $response = $this->withToken(self::API_TOKEN)
+            ->getJson('/api/certificate-registration/status-by-course/'.$course->id);
+
+        $response->assertOk()->assertJson([
+            'active' => true,
+            'course_title' => 'Webinar testowy',
+        ]);
+    }
+
+    public function test_register_extended_ignores_registration_date_window(): void
+    {
+        $course = $this->createOpenRegistrationCourse([
+            'certificate_registration_starts_at' => now()->addDay(),
+            'certificate_registration_ends_at' => now()->subDay(),
+        ]);
+
+        $response = $this->postRegisterExtended([
+            'course_id' => $course->id,
+            'first_name' => 'Karol',
+            'last_name' => 'Abonent',
+            'email' => 'karol.abonent@example.com',
+            'rodo_consent' => 1,
+        ]);
+
+        $response->assertOk()->assertJson(['success' => true, 'updated' => false]);
+
+        $this->assertDatabaseHas('participants', [
+            'course_id' => $course->id,
+            'email_normalized' => 'karol.abonent@example.com',
+        ]);
+    }
+
+    public function test_register_extended_rejected_when_registration_closed(): void
+    {
+        $course = $this->createOpenRegistrationCourse([
+            'certificate_registration_open' => false,
+        ]);
+
+        $this->postRegisterExtended([
+            'course_id' => $course->id,
+            'first_name' => 'Anna',
+            'last_name' => 'Test',
+            'email' => 'anna@example.com',
+            'rodo_consent' => 1,
+        ])->assertStatus(403);
+    }
 }

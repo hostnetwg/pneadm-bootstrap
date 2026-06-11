@@ -101,5 +101,7 @@ Route::post('/participants/update-birth-data', [CertificateApiController::class,
 // Rejestracja zaświadczenia (formularz na pnedu) – chronione tokenem API
 Route::prefix('certificate-registration')->name('api.certificate-registration.')->middleware('api.token')->group(function () {
     Route::get('/status/{token}', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'status'])->name('status');
+    Route::get('/status-by-course/{course}', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'statusByCourse'])->name('status-by-course');
     Route::post('/register', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'register'])->name('register');
+    Route::post('/register-extended', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'registerExtended'])->name('register-extended');
 });
