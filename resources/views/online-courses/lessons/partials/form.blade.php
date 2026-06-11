@@ -205,11 +205,14 @@ document.addEventListener('DOMContentLoaded', function () {
         showWysiwyg();
     });
 
+    let lessonFormAllowUnload = false;
+
     if (form) {
         form.addEventListener('submit', function () {
             if (window.tinymce) {
                 window.tinymce.triggerSave();
             }
+            lessonFormAllowUnload = true;
         });
     }
 
@@ -322,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.addEventListener('change', refreshLessonNavState);
 
         window.addEventListener('beforeunload', function (event) {
-            if (!isLessonFormDirty()) return;
+            if (lessonFormAllowUnload || !isLessonFormDirty()) return;
             event.preventDefault();
             event.returnValue = '';
         });
