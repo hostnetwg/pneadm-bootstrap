@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\CourseCalendarEventBuilder;
 use App\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -213,6 +214,39 @@ class Course extends Model
         }
 
         return 'archived';
+    }
+
+    /**
+     * Filtrowanie kursów w selectach TomSelect (adm).
+     *
+     * - #50 → wyłącznie courses.id = 50
+     * - 50 (same cyfry) → id = 50 lub id_old = '50' (bez LIKE w tytule)
+     * - tekst → tytuł lub id_old (LIKE)
+     */
+    public function scopeWhereMatchesAdminSelectSearch(Builder $query, string $term): Builder
+    {
+        $term = trim($term);
+        if ($term === '') {
+            return $query;
+        }
+
+        if (preg_match('/^#(\d+)$/', $term, $hashMatch)) {
+            return $query->where('id', (int) $hashMatch[1]);
+        }
+
+        if (ctype_digit($term)) {
+            return $query->where(function ($w) use ($term) {
+                $w->where('id', (int) $term)
+                    ->orWhere('id_old', $term);
+            });
+        }
+
+        $like = '%'.$term.'%';
+
+        return $query->where(function ($w) use ($like) {
+            $w->where('title', 'LIKE', $like)
+                ->orWhere('id_old', 'LIKE', $like);
+        });
     }
 
     /**

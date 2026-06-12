@@ -79,6 +79,11 @@
 </div>
 <button type="button" class="btn btn-sm btn-outline-primary mb-4" id="btn-add-link">+ kolejny link</button>
 
+<div class="form-check mb-3">
+    <input type="checkbox" name="redirect_to_create" value="1" class="form-check-input" id="redirect_to_create">
+    <label class="form-check-label" for="redirect_to_create">Po utworzeniu lekcji otwórz formularz tworzenia nowej lekcji</label>
+</div>
+
 <div class="d-flex gap-2 flex-wrap">
     <button type="submit" class="btn btn-primary">{{ $lesson ? 'Zapisz lekcję' : 'Dodaj lekcję' }}</button>
     <a href="{{ route('online-courses.edit', $course) }}" class="btn btn-outline-secondary">Wróć do struktury</a>

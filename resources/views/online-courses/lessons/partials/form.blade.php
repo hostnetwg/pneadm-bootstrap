@@ -70,6 +70,26 @@
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.6/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const STORAGE_KEY_REDIRECT_CREATE = 'pneadm_oc_lesson_redirect_to_create';
+    const redirectOld = @json(old('redirect_to_create'));
+    const redirectCheckbox = document.getElementById('redirect_to_create');
+    if (redirectCheckbox) {
+        if (redirectOld !== null) {
+            redirectCheckbox.checked = !!redirectOld;
+        } else {
+            try {
+                const savedRedirect = localStorage.getItem(STORAGE_KEY_REDIRECT_CREATE);
+                if (savedRedirect === '1') redirectCheckbox.checked = true;
+                if (savedRedirect === '0') redirectCheckbox.checked = false;
+            } catch (e) { /* ignore */ }
+        }
+        redirectCheckbox.addEventListener('change', function () {
+            try {
+                localStorage.setItem(STORAGE_KEY_REDIRECT_CREATE, this.checked ? '1' : '0');
+            } catch (e) { /* ignore */ }
+        });
+    }
+
     const linkedCourseSearchUrl = @json($linkedCourseSearchUrl);
     const linkedCoursePreselected = @json($linkedCoursePreselected);
     const linkedCourseInfo = document.getElementById('linked-course-info');
@@ -108,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
         searchUrl: linkedCourseSearchUrl,
         preselected: linkedCoursePreselected,
         includeArchived: true,
-        placeholder: 'Wybierz lub wpisz tytuł / ID szkolenia...',
+        placeholder: 'Tytuł, Publigo ID lub #ID kursu (np. #50)...',
         onCourseChanged: renderLinkedCourseInfo,
     });
 

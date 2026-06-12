@@ -63,7 +63,7 @@ export function initCourseSelect(selectId, options) {
     const settings = {
         valueField: 'value',
         labelField: 'title_text',
-        searchField: ['title_text', 'id_old', 'value', 'instructor'],
+        searchField: ['title_text', 'id_old', 'value', 'id_hash', 'instructor'],
         maxOptions: 50,
         placeholder: options.placeholder || 'Wybierz lub wpisz tytuł / ID szkolenia...',
         plugins: {
@@ -76,6 +76,10 @@ export function initCourseSelect(selectId, options) {
         // — dla większości operatorów to wystarcza bez wpisywania czegokolwiek.
         preload: 'focus',
         load: function (query, callback) {
+            const self = this;
+            // Każde wyszukiwanie zastępuje poprzednią listę (preload na fokusie
+            // zostawiał #515, #514 przy wpisywaniu #50).
+            self.clearOptions();
             const url = options.searchUrl
                 + '?q=' + encodeURIComponent(query || '')
                 + '&include_archived=' + (includeArchived ? '1' : '0');
@@ -137,6 +141,7 @@ export function initCourseSelect(selectId, options) {
         settings.options = [{
             value: String(pre.id),
             id: pre.id,
+            id_hash: '#' + pre.id,
             id_old: pre.id_old || '',
             title_text: pre.title_text || ('Kurs #' + pre.id),
             start_date: pre.start_date || '',
@@ -149,6 +154,13 @@ export function initCourseSelect(selectId, options) {
     }
 
     const ts = new TomSelect('#' + selectId, settings);
+
+    // TomSelect cache'uje zapytania w loadedSearches — przy każdym load odświeżamy wynik.
+    const originalLoad = ts.load.bind(ts);
+    ts.load = function (value) {
+        delete this.loadedSearches[value];
+        return originalLoad(value);
+    };
 
     // Pozwala przełączać widoczność archiwalnych z poziomu UI (checkbox).
     // Domyślnie clearOptions() w TomSelect zachowuje aktualnie wybrany item,

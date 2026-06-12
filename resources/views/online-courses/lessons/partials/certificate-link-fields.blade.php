@@ -14,7 +14,9 @@
         </select>
         @error('linked_course_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
         <small class="form-text text-muted d-block mt-1">
-            Wpisz tytuł, ID lub Publigo ID. Lista obejmuje także szkolenia archiwalne. Pole opcjonalne — wyczyść wybór, jeśli lekcja nie ma powiązanego zaświadczenia.
+            Wpisz tytuł lub Publigo ID. Aby wyszukać po wewnętrznym ID kursu, użyj <code>#50</code> (np. <code>#49</code>).
+            Same cyfry (<code>50</code>) też szukają po ID lub dokładnym Publigo ID — bez dopasowań w tytule.
+            Lista obejmuje także szkolenia archiwalne. Pole opcjonalne — wyczyść wybór, jeśli lekcja nie ma powiązanego zaświadczenia.
         </small>
         <div id="linked-course-info" class="alert alert-light mt-2 mb-0 py-2 small border" style="display: none;">
             <div id="linked-course-details"></div>

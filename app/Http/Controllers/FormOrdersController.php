@@ -305,15 +305,7 @@ class FormOrdersController extends Controller
             ->select('id', 'id_old', 'title', 'start_date', 'end_date', 'instructor_id');
 
         if ($q !== '') {
-            $like = '%'.$q.'%';
-            $query->where(function ($w) use ($q, $like) {
-                $w->where('title', 'LIKE', $like)
-                    ->orWhere('id_old', 'LIKE', $like);
-
-                if (ctype_digit($q)) {
-                    $w->orWhere('id', (int) $q);
-                }
-            });
+            $query->whereMatchesAdminSelectSearch($q);
         }
 
         $now = now();
@@ -356,6 +348,7 @@ class FormOrdersController extends Controller
                 return [
                     'value' => (string) $c->id,
                     'id' => (int) $c->id,
+                    'id_hash' => '#'.$c->id,
                     'id_old' => (string) ($c->id_old ?? ''),
                     'title_text' => trim(strip_tags((string) $c->title)),
                     'title_html' => (string) $c->title,

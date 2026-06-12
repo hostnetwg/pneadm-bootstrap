@@ -47,6 +47,12 @@ class OnlineCourseLessonController extends Controller
             $this->syncEmbedsAndLinks($created, $request);
         });
 
+        if ($request->boolean('redirect_to_create')) {
+            return redirect()
+                ->route('online-courses.lessons.create', [$online_course, $module])
+                ->with('success', 'Lekcja dodana. Dodaj kolejną lekcję w tym module.');
+        }
+
         return redirect()->route('online-courses.edit', $online_course)->with('success', 'Lekcja dodana.');
     }
 
@@ -84,6 +90,12 @@ class OnlineCourseLessonController extends Controller
             $lesson->resourceLinks()->delete();
             $this->syncEmbedsAndLinks($lesson, $request);
         });
+
+        if ($request->boolean('redirect_to_create')) {
+            return redirect()
+                ->route('online-courses.lessons.create', [$online_course, $module])
+                ->with('success', 'Lekcja zapisana. Dodaj kolejną lekcję w tym module.');
+        }
 
         return redirect()->route('online-courses.lessons.edit', [$online_course, $module, $lesson])->with('success', 'Lekcja zapisana.');
     }
@@ -182,15 +194,7 @@ class OnlineCourseLessonController extends Controller
             ->select('id', 'id_old', 'title', 'start_date', 'end_date', 'instructor_id', 'certificate_registration_open');
 
         if ($q !== '') {
-            $like = '%'.$q.'%';
-            $query->where(function ($w) use ($q, $like) {
-                $w->where('title', 'LIKE', $like)
-                    ->orWhere('id_old', 'LIKE', $like);
-
-                if (ctype_digit($q)) {
-                    $w->orWhere('id', (int) $q);
-                }
-            });
+            $query->whereMatchesAdminSelectSearch($q);
         }
 
         $courses = $query
@@ -207,6 +211,7 @@ class OnlineCourseLessonController extends Controller
                 return [
                     'value' => (string) $course->id,
                     'id' => (int) $course->id,
+                    'id_hash' => '#'.$course->id,
                     'id_old' => (string) ($course->id_old ?? ''),
                     'title_text' => trim(strip_tags((string) $course->title)),
                     'title_html' => (string) $course->title,
