@@ -81,7 +81,13 @@
 
 <div class="form-check mb-3">
     <input type="checkbox" name="redirect_to_create" value="1" class="form-check-input" id="redirect_to_create">
-    <label class="form-check-label" for="redirect_to_create">Po utworzeniu lekcji otwórz formularz tworzenia nowej lekcji</label>
+    <label class="form-check-label" for="redirect_to_create">
+        @if($lesson)
+            Po zapisaniu lekcji otwórz formularz tworzenia nowej lekcji
+        @else
+            Po utworzeniu lekcji otwórz formularz tworzenia nowej lekcji
+        @endif
+    </label>
 </div>
 
 <div class="d-flex gap-2 flex-wrap">
