@@ -69,13 +69,15 @@ class CourseFunnelStatsService
     }
 
     /**
-     * Zamówienie „z fakturą” — jak scopeWithInvoice() / has_invoice w panelu zamówień.
+     * Zamówienia w liczniku 🛒 — bez soft delete; bez zamkniętych ręcznie bez faktury
+     * (status_completed = 1 i brak invoice_number), spójnie z badge „niewprowadzone” w panelu.
      *
      * @return array<int, array{submitted: int, invoiced: int}>
      */
     public function orderCountsForCourses(array $courseIds, Carbon $from, Carbon $to): array
     {
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
+        $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
         $rows = DB::table('form_orders as fo')
             ->join('courses as c', function ($join) {
@@ -91,7 +93,7 @@ class CourseFunnelStatsService
             ->whereBetween('fo.order_date', [$from, $to])
             ->groupBy('c.id')
             ->selectRaw('c.id as course_id')
-            ->selectRaw('COUNT(DISTINCT fo.id) as submitted')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$operationalSubmitted} THEN fo.id END) as submitted")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$invoicePresent} THEN fo.id END) as invoiced")
             ->get();
 
@@ -112,6 +114,7 @@ class CourseFunnelStatsService
     public function funnelByCampaign(Carbon $from, Carbon $to, ?int $sourceTypeId = null): Collection
     {
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
+        $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
         $query = DB::table('marketing_campaigns as mc')
             ->leftJoin('marketing_source_types as mst', 'mst.id', '=', 'mc.source_type_id')
@@ -123,7 +126,7 @@ class CourseFunnelStatsService
             ->whereNull('mc.deleted_at')
             ->groupBy('mc.id', 'mc.campaign_code', 'mc.name', 'mst.name', 'mst.color', 'mc.is_active')
             ->selectRaw('mc.id, mc.campaign_code, mc.name, mst.name as source_type_name, mst.color as source_type_color, mc.is_active')
-            ->selectRaw('COUNT(fo.id) as orders_submitted')
+            ->selectRaw("SUM(CASE WHEN fo.id IS NOT NULL AND {$operationalSubmitted} THEN 1 ELSE 0 END) as orders_submitted")
             ->selectRaw("SUM(CASE WHEN {$invoicePresent} THEN 1 ELSE 0 END) as orders_invoiced")
             ->selectRaw("SUM(CASE WHEN {$invoicePresent} THEN 1 ELSE 0 END) as orders_paid")
             ->orderByDesc('orders_submitted');
@@ -155,5 +158,15 @@ class CourseFunnelStatsService
     public function invoicePresentSql(string $column = 'invoice_number'): string
     {
         return "({$column} IS NOT NULL AND {$column} != '' AND {$column} != '0')";
+    }
+
+    /**
+     * Zamówienie operacyjnie „złożone” w lejku (🛒): wyklucza ręcznie zakończone bez faktury.
+     */
+    public function operationalSubmittedOrderSql(string $invoiceColumn = 'invoice_number', string $statusColumn = 'status_completed'): string
+    {
+        $invoicePresent = $this->invoicePresentSql($invoiceColumn);
+
+        return "NOT ({$statusColumn} = 1 AND NOT {$invoicePresent})";
     }
 }

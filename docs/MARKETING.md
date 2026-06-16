@@ -117,10 +117,10 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 |------|---------|-----------|
 | Wejście na opis | `views_course_show` | GET `/courses/{id}`, max 1×/gość/kurs/dzień, bez botów |
 | Wejście na formularz | `views_order_form` | GET `order-form` + `deferred-order`, ten sam licznik |
-| Złożone | `orders_submitted` | Rekord w `form_orders` w okresie |
+| Złożone | `orders_submitted` | Rekord w `form_orders` w okresie; **bez** `status_completed = 1` przy braku faktury |
 | Z fakturą | `orders_invoiced` | `invoice_number` wypełnione (jak `FormOrder::scopeWithInvoice()`) |
 
-**Nie liczymy jako sukces:** `status_completed = 1` (ręczne zamknięcie), `payment_status = paid` bez faktury.
+**Wykluczone z 🛒:** zamówienie oznaczone jako zakończone (`status_completed = 1`) i jednocześnie bez numeru faktury — np. rezygnacja zamknięta w panelu (spójnie z badge „niewprowadzone” = 0).
 
 Serwis: `App\Services\CourseFunnelStatsService`.  
 UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
@@ -250,7 +250,7 @@ Stan po migracji `2026_06_16_100001_normalize_marketing_source_type_utm_values.p
 
 ### Zmiana definicji „sukcesu” w lejku
 
-Edytuj `CourseFunnelStatsService::orderCountsForCourses()` — warunek faktury: `invoicePresentSql()`.  
+Edytuj `CourseFunnelStatsService::orderCountsForCourses()` — faktura: `invoicePresentSql()`, 🛒: `operationalSubmittedOrderSql()`.  
 **Nie** mieszaj z `status_completed` bez wyraźnej decyzji biznesowej (patrz sekcja 4).
 
 ### Testy lokalne

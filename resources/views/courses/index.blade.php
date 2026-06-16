@@ -540,7 +540,7 @@
                                 <div title="Wejścia na formularz (order-form + deferred-order, unikalne/dzień)">
                                     <i class="bi bi-ui-checks text-muted"></i> {{ number_format($fs['views_order_form'], 0, ',', ' ') }}
                                 </div>
-                                <div title="Złożone zamówienia">
+                                <div title="Złożone zamówienia (bez ręcznie zakończonych bez faktury)">
                                     <i class="bi bi-cart text-muted"></i> {{ number_format($fs['orders_submitted'], 0, ',', ' ') }}
                                 </div>
                                 <div title="Wystawiona faktura (invoice_number)">
