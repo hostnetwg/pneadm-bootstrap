@@ -12,6 +12,9 @@ class MarketingSourceType extends Model
     protected $fillable = [
         'name',
         'slug',
+        'utm_source',
+        'default_utm_medium',
+        'default_utm_content',
         'description',
         'color',
         'is_active',

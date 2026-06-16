@@ -30,10 +30,42 @@
                                     <label for="slug" class="form-label">Slug *</label>
                                     <input type="text" class="form-control @error('slug') is-invalid @enderror" 
                                            id="slug" name="slug" value="{{ old('slug') }}" required>
-                                    <div class="form-text">Unikalny identyfikator (np. facebook, email)</div>
+                                    <div class="form-text">Wewnętrzny identyfikator (np. facebook, email)</div>
                                     @error('slug')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="utm_source" class="form-label">UTM Source <span class="text-muted fw-normal">(<code>utm_source</code>)</span></label>
+                                    <input type="text" class="form-control @error('utm_source') is-invalid @enderror"
+                                           id="utm_source" name="utm_source" value="{{ old('utm_source') }}" placeholder="np. newsletter, facebook, pnedu">
+                                    <div class="form-text">Platforma w linku — nie adres e-mail. Puste = mapowanie ze slug (niezalecane).</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="default_utm_medium" class="form-label">Domyślne UTM Medium <span class="text-muted fw-normal">(<code>utm_medium</code>)</span> *</label>
+                                    <select class="form-select @error('default_utm_medium') is-invalid @enderror" id="default_utm_medium" name="default_utm_medium" required>
+                                        @foreach(config('marketing.utm_medium_options', []) as $value => $label)
+                                            <option value="{{ $value }}" {{ old('default_utm_medium', 'paid') === $value ? 'selected' : '' }}>{{ $label }} ({{ $value }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="default_utm_content" class="form-label">Domyślne UTM Content <span class="text-muted fw-normal">(<code>utm_content</code>)</span></label>
+                                    <input type="text" class="form-control @error('default_utm_content') is-invalid @enderror"
+                                           id="default_utm_content" name="default_utm_content"
+                                           value="{{ old('default_utm_content') }}"
+                                           maxlength="100" list="utm-content-presets"
+                                           placeholder="np. prospecting, remarketing, organic">
+                                    <datalist id="utm-content-presets">
+                                        @foreach(array_keys(config('marketing.utm_content_presets', [])) as $preset)
+                                            <option value="{{ $preset }}"></option>
+                                        @endforeach
+                                    </datalist>
+                                    <div class="form-text">Taktyka w GA4 — np. <code>prospecting</code> vs <code>remarketing</code> przy tym samym <code>facebook/paid</code>.</div>
+                                    @error('default_utm_content')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
 
                                 <div class="mb-3">
@@ -65,6 +97,7 @@
                                     @error('sort_order')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
+                                    <div class="form-text">Zostaw <code>0</code>, aby dodać na końcu listy. Kolejność możesz też ustawić na <a href="{{ route('marketing-source-types.index') }}">liście typów</a> — przeciągając wiersze.</div>
                                 </div>
 
                                 <div class="mb-3 form-check">

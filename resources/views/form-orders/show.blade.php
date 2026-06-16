@@ -71,7 +71,11 @@
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="d-inline-block @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                    <h2 class="d-inline-block mb-0 @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                    @include('form-orders.partials.marketing-attribution', [
+                        'zamowienie' => $zamowienie,
+                        'variant' => 'subtle',
+                    ])
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
@@ -842,7 +846,7 @@ nowoczesna-edukacja.pl </div>
                             </div>
 
                             {{-- DODATKOWE INFORMACJE - kompaktowe --}}
-                            @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->fb_source)
+                            @if($zamowienie->order_date || $zamowienie->ip_address)
                                 <div class="card mt-3">
                                     <div class="card-header bg-info text-white py-2">
                                         <h6 class="mb-0">
@@ -869,20 +873,6 @@ nowoczesna-edukacja.pl </div>
                                             <div class="mb-1">
                                                 <small>
                                                     <strong>IP:</strong> {{ $zamowienie->ip_address }}
-                                                </small>
-                                            </div>
-                                        @endif
-                                        @if($zamowienie->fb_source)
-                                            <div class="mb-1">
-                                                <small>
-                                                    <strong>Źródło pozyskania:</strong> 
-                                                    <span class="badge ms-1" 
-                                                          style="background-color: {{ $zamowienie->marketingCampaign && $zamowienie->marketingCampaign->sourceType ? $zamowienie->marketingCampaign->sourceType->color : '#28a745' }}; color: white;"
-                                                          title="{{ $zamowienie->marketingCampaign ? $zamowienie->marketingCampaign->name . ' (' . ($zamowienie->marketingCampaign->sourceType->name ?? 'Nieznany typ') . ')' : 'Źródło: ' . $zamowienie->fb_source }}"
-                                                          data-bs-toggle="tooltip" 
-                                                          data-bs-placement="top">
-                                                        {{ $zamowienie->fb_source }}
-                                                    </span>
                                                 </small>
                                             </div>
                                         @endif

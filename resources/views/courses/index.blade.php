@@ -28,6 +28,13 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
+                <div class="small text-muted">
+                    Kolumna „Lejek”: ostatnie {{ $funnelStatsDays }} dni —
+                    wejścia: max 1×/gość/dzień (bez botów);
+                    opis = strona kursu;
+                    formularz = order-form + deferred-order;
+                    zamówienia z bazy form_orders
+                </div>
                 <div class="d-flex align-items-center gap-3">
                     <!-- Button do generowania PDF -->
                     <a href="{{ route('courses.pdf', request()->query()) }}" class="btn btn-success" target="_blank">
@@ -245,6 +252,7 @@
                         <th style="width: 10%;">Instruktor</th>
                         <th class="text-center" style="width: 3%;" title="Check lista">C</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
+                        <th class="text-center" style="width: 5%;" title="Lejek marketingowy ({{ $funnelStatsDays }} dni): unikalne wejścia/dzień na pnedu.pl (opis, formularz order-form + deferred-order) oraz zamówienia">Lejek</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
                 </thead>
@@ -521,6 +529,34 @@
                                 </a>
                             @else
                                 <span class="badge bg-secondary" title="Liczba nie wprowadzonych zamówień">0</span>
+                            @endif
+                        </td>
+                        <td class="text-center align-middle small" style="line-height: 1.35;">
+                            @php $fs = $course->funnel_stats ?? null; @endphp
+                            @if($fs)
+                                <div title="Wejścia na opis szkolenia (pnedu.pl, unikalne/dzień)">
+                                    <i class="bi bi-eye text-muted"></i> {{ number_format($fs['views_course_show'], 0, ',', ' ') }}
+                                </div>
+                                <div title="Wejścia na formularz (order-form + deferred-order, unikalne/dzień)">
+                                    <i class="bi bi-ui-checks text-muted"></i> {{ number_format($fs['views_order_form'], 0, ',', ' ') }}
+                                </div>
+                                <div title="Złożone zamówienia">
+                                    <i class="bi bi-cart text-muted"></i> {{ number_format($fs['orders_submitted'], 0, ',', ' ') }}
+                                </div>
+                                <div title="Wystawiona faktura (invoice_number)">
+                                    <i class="bi bi-receipt text-muted"></i> {{ number_format($fs['orders_invoiced'] ?? $fs['orders_paid'] ?? 0, 0, ',', ' ') }}
+                                </div>
+                                @if(($fs['cr_show_to_invoiced'] ?? null) !== null)
+                                    <div class="text-success fw-semibold" title="Konwersja: opis → faktura">
+                                        {{ number_format($fs['cr_show_to_invoiced'], 1, ',', ' ') }}%
+                                    </div>
+                                @elseif($fs['cr_show_to_order'] !== null)
+                                    <div class="text-primary fw-semibold" title="Konwersja: opis → zamówienie">
+                                        {{ number_format($fs['cr_show_to_order'], 1, ',', ' ') }}%
+                                    </div>
+                                @endif
+                            @else
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td class="align-middle">

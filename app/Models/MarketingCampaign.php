@@ -15,12 +15,22 @@ class MarketingCampaign extends Model
         'name',
         'description',
         'source_type_id',
+        'utm_medium',
+        'utm_content',
+        'course_id',
+        'landing_target',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'course_id' => 'integer',
     ];
+
+    public function course()
+    {
+        return $this->belongsTo(Course::class);
+    }
 
     /**
      * Scope - tylko aktywne kampanie

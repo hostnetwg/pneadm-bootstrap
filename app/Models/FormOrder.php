@@ -237,6 +237,7 @@ class FormOrder extends Model
         // Dane techniczne
         'ip_address',
         'fb_source',
+        'conversion_placement',
     ];
 
     /**
@@ -785,11 +786,47 @@ class FormOrder extends Model
     }
 
     /**
-     * Relacja do kampanii marketingowej
+     * Relacja do kampanii marketingowej (także po soft delete — historia zamówień).
      */
     public function marketingCampaign()
     {
-        return $this->belongsTo(MarketingCampaign::class, 'fb_source', 'campaign_code');
+        return $this->belongsTo(MarketingCampaign::class, 'fb_source', 'campaign_code')->withTrashed();
+    }
+
+    /**
+     * Efektywne utm_content kampanii (pole kampanii lub domyślne z typu źródła).
+     */
+    public function effectiveMarketingUtmContent(): ?string
+    {
+        $campaign = $this->marketingCampaign;
+        if (! $campaign) {
+            return null;
+        }
+
+        $content = trim((string) ($campaign->utm_content ?? ''));
+        if ($content !== '') {
+            return $content;
+        }
+
+        $default = trim((string) ($campaign->sourceType?->default_utm_content ?? ''));
+
+        return $default !== '' ? $default : null;
+    }
+
+    public const CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR = 'dashboard_sidebar';
+
+    /**
+     * Etykieta miejsca konwersji (np. panel klienta → Aktualna oferta).
+     */
+    public static function conversionPlacementLabel(?string $placement): string
+    {
+        if ($placement === null || trim($placement) === '') {
+            return '—';
+        }
+
+        $key = trim($placement);
+
+        return (string) (config('marketing.conversion_placements')[$key] ?? $key);
     }
 
     /**

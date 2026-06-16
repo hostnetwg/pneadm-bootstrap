@@ -1,85 +1,102 @@
 @php
-    // Zmienne pomocnicze dla sortowania
     $currentSortBy = request('sort_by', 'created_at');
     $currentSortOrder = request('sort_order', 'desc');
+
+    $sortLink = function (string $column) use ($currentSortBy, $currentSortOrder) {
+        return request()->fullUrlWithQuery([
+            'sort_by' => $column,
+            'sort_order' => $currentSortBy === $column && $currentSortOrder === 'asc' ? 'desc' : 'asc',
+        ]);
+    };
+
+    $sortIcon = function (string $column) use ($currentSortBy, $currentSortOrder) {
+        if ($currentSortBy !== $column) {
+            return '';
+        }
+
+        return '<i class="bi bi-arrow-'.($currentSortOrder === 'asc' ? 'up' : 'down').'-short ms-1"></i>';
+    };
 @endphp
 
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            {{ __('Źródła pozyskania') }}
+            {{ __('Kampanie marketingowe') }}
         </h2>
     </x-slot>
 
     <div class="px-3 py-3">
-        <div class="container">
+        <div class="container-fluid col-xl-11 px-0 px-xl-2">
+            @include('marketing-campaigns.partials.campaign-index-styles')
+
             @if(session('success'))
-                <div class="alert alert-success">
+                <div class="alert alert-success alert-dismissible fade show">
                     {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
                 </div>
             @endif
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3>Kampanie marketingowe</h3>
+            <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
+                <div>
+                    <h3 class="h4 mb-1 fw-semibold">Kampanie marketingowe</h3>
+                    <p class="small text-muted mb-0">
+                        Kolumna <strong>Zam.</strong> — cała historia zamówień z tym kodem.
+                        <a href="{{ route('marketing-funnel.index') }}">Lejek konwersji</a> ·
+                        <a href="{{ route('marketing-source-types.index') }}">Typy źródeł</a> ·
+                        <a href="{{ route('marketing.help.links') }}">Pomoc: linki UTM</a>
+                    </p>
+                </div>
                 <a href="{{ route('marketing-campaigns.create') }}" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Dodaj kampanię
                 </a>
             </div>
 
-            <!-- Formularz wyszukiwania i filtrów -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <form method="GET" action="{{ route('marketing-campaigns.index') }}" class="row g-3">
-                        <!-- Wyszukiwanie -->
-                        <div class="col-md-4">
-                            <label for="search" class="form-label">Wyszukaj</label>
-                            <input type="text" class="form-control" id="search" name="search" 
-                                   value="{{ request('search') }}" 
-                                   placeholder="Kod, nazwa lub opis kampanii...">
+            <div class="card shadow-sm mb-4 campaigns-index-filters">
+                <div class="card-header bg-white py-2 px-3 border-bottom-0">
+                    <span class="small fw-semibold text-muted"><i class="bi bi-funnel"></i> Filtry</span>
+                </div>
+                <div class="card-body pt-2 pb-3">
+                    <form method="GET" action="{{ route('marketing-campaigns.index') }}" class="row g-2 g-lg-3 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <label for="search" class="form-label">Szukaj</label>
+                            <input type="text" class="form-control form-control-sm" id="search" name="search"
+                                   value="{{ request('search') }}"
+                                   placeholder="Kod, nazwa lub opis…">
                         </div>
-                        
-                        <!-- Filtr typu źródła -->
-                        <div class="col-md-3">
+                        <div class="col-lg-3 col-md-6">
                             <label for="source_type_id" class="form-label">Typ źródła</label>
-                            <select class="form-select" id="source_type_id" name="source_type_id">
+                            <select class="form-select form-select-sm" id="source_type_id" name="source_type_id">
                                 <option value="">Wszystkie typy</option>
                                 @foreach($sourceTypes as $sourceType)
-                                    <option value="{{ $sourceType->id }}" 
-                                            {{ request('source_type_id') == $sourceType->id ? 'selected' : '' }}>
-                                        {{ $sourceType->name }}
+                                    <option value="{{ $sourceType->id }}"
+                                            {{ (string) request('source_type_id') === (string) $sourceType->id ? 'selected' : '' }}>
+                                        {{ $sourceType->name }}@if(!$sourceType->is_active) (wył.)@endif
                                     </option>
                                 @endforeach
                             </select>
                         </div>
-                        
-                        <!-- Filtr statusu -->
-                        <div class="col-md-2">
+                        <div class="col-lg-2 col-md-4">
                             <label for="is_active" class="form-label">Status</label>
-                            <select class="form-select" id="is_active" name="is_active">
+                            <select class="form-select form-select-sm" id="is_active" name="is_active">
                                 <option value="">Wszystkie</option>
                                 <option value="1" {{ request('is_active') === '1' ? 'selected' : '' }}>Aktywne</option>
                                 <option value="0" {{ request('is_active') === '0' ? 'selected' : '' }}>Nieaktywne</option>
                             </select>
                         </div>
-                        
-                        <!-- Liczba na stronę -->
-                        <div class="col-md-2">
-                            <label for="per_page" class="form-label">Na stronę</label>
-                            <select class="form-select" id="per_page" name="per_page">
-                                <option value="10" {{ request('per_page') == '10' ? 'selected' : '' }}>10</option>
-                                <option value="20" {{ request('per_page') == '20' ? 'selected' : '' }}>20</option>
-                                <option value="50" {{ request('per_page') == '50' ? 'selected' : '' }}>50</option>
-                                <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100</option>
+                        <div class="col-lg-1 col-md-3">
+                            <label for="per_page" class="form-label">Na str.</label>
+                            <select class="form-select form-select-sm" id="per_page" name="per_page">
+                                @foreach([10, 20, 50, 100] as $size)
+                                    <option value="{{ $size }}" {{ (int) request('per_page', 20) === $size ? 'selected' : '' }}>{{ $size }}</option>
+                                @endforeach
                             </select>
                         </div>
-                        
-                        <!-- Przyciski -->
-                        <div class="col-md-1 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary me-2">
-                                <i class="bi bi-search"></i>
+                        <div class="col-lg-2 col-md-5 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                                <i class="bi bi-search"></i> Szukaj
                             </button>
-                            <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-circle"></i>
+                            <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-outline-secondary btn-sm" title="Wyczyść filtry">
+                                <i class="bi bi-x-lg"></i>
                             </a>
                         </div>
                     </form>
@@ -87,210 +104,209 @@
             </div>
 
             @if($campaigns->count() > 0)
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'created_at', 'sort_order' => $currentSortBy == 'created_at' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Data utworzenia
-                                        @if($currentSortBy == 'created_at')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'campaign_code', 'sort_order' => $currentSortBy == 'campaign_code' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Kod kampanii
-                                        @if($currentSortBy == 'campaign_code')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => $currentSortBy == 'name' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Nazwa
-                                        @if($currentSortBy == 'name')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'source_type', 'sort_order' => $currentSortBy == 'source_type' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Typ źródła
-                                        @if($currentSortBy == 'source_type')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'is_active', 'sort_order' => $currentSortBy == 'is_active' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Status
-                                        @if($currentSortBy == 'is_active')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'orders_count', 'sort_order' => $currentSortBy == 'orders_count' && $currentSortOrder == 'asc' ? 'desc' : 'asc']) }}" 
-                                       class="text-white text-decoration-none">
-                                        Liczba zamówień
-                                        @if($currentSortBy == 'orders_count')
-                                            <i class="bi bi-arrow-{{ $currentSortOrder == 'asc' ? 'up' : 'down' }}"></i>
-                                        @endif
-                                    </a>
-                                </th>
-                                <th>Akcje</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($campaigns as $campaign)
+                <div class="card shadow-sm">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0 campaigns-index-table">
+                            <thead class="table-light border-bottom">
                                 <tr>
-                                    <td>
-                                        @if($campaign->created_at)
-                                            {{ $campaign->created_at->format('d.m.Y H:i') }}
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </td>
-                                    <td><code>{{ $campaign->campaign_code }}</code></td>
-                                    <td>{{ $campaign->name }}</td>
-                                    <td>
-                                        @if($campaign->sourceType)
-                                            <span class="badge" 
-                                                  style="background-color: {{ $campaign->sourceType->color }}; color: white;"
-                                                  title="{{ $campaign->sourceType->description ?? 'Brak opisu' }}"
-                                                  data-bs-toggle="tooltip" 
-                                                  data-bs-placement="top">
-                                                {{ $campaign->sourceType->name }}
-                                            </span>
-                                        @else
-                                            <span class="badge bg-secondary" 
-                                                  title="Typ źródła nie został określony"
-                                                  data-bs-toggle="tooltip" 
-                                                  data-bs-placement="top">
-                                                Nieznany
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($campaign->is_active)
-                                            <span class="badge bg-success">Aktywna</span>
-                                        @else
-                                            <span class="badge bg-secondary">Nieaktywna</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-primary">{{ $campaign->form_orders_count ?? $campaign->formOrders->count() }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ route('marketing-campaigns.show', $campaign) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> Podgląd
-                                            </a>
-                                            <a href="{{ route('marketing-campaigns.edit', $campaign) }}" class="btn btn-sm btn-outline-warning">
-                                                <i class="bi bi-pencil"></i> Edytuj
-                                            </a>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#deleteModal{{ $campaign->id }}">
-                                                <i class="bi bi-trash"></i> Usuń
-                                            </button>
-                                        </div>
-                                    </td>
+                                    <th class="ps-3">
+                                        <a href="{{ $sortLink('campaign_code') }}" class="text-dark text-decoration-none">
+                                            Kod {!! $sortIcon('campaign_code') !!}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="{{ $sortLink('name') }}" class="text-dark text-decoration-none">
+                                            Nazwa {!! $sortIcon('name') !!}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="{{ $sortLink('source_type') }}" class="text-dark text-decoration-none">
+                                            Źródło {!! $sortIcon('source_type') !!}
+                                        </a>
+                                    </th>
+                                    <th class="text-center">
+                                        <a href="{{ $sortLink('is_active') }}" class="text-dark text-decoration-none">
+                                            Status {!! $sortIcon('is_active') !!}
+                                        </a>
+                                    </th>
+                                    <th class="text-center" title="Zamówienia — cała historia">
+                                        <a href="{{ $sortLink('orders_count') }}" class="text-dark text-decoration-none">
+                                            Zam. {!! $sortIcon('orders_count') !!}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="{{ $sortLink('created_at') }}" class="text-dark text-decoration-none">
+                                            Utworzono {!! $sortIcon('created_at') !!}
+                                        </a>
+                                    </th>
+                                    <th class="text-end pe-3" style="min-width: 9rem;">Akcje</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @foreach($campaigns as $campaign)
+                                    @php
+                                        $urls = $campaignUrlsById[$campaign->id] ?? ['utm' => '', 'legacy' => '', 'short' => ''];
+                                        $landingLabel = ($campaign->landing_target ?? 'order_form') === 'order_form'
+                                            ? 'formularz'
+                                            : 'opis';
+                                    @endphp
+                                    <tr class="{{ !$campaign->is_active ? 'table-secondary' : '' }}">
+                                        <td class="ps-3">
+                                            <a href="{{ route('marketing-campaigns.show', $campaign) }}"
+                                               class="campaign-code-link font-monospace fw-semibold">
+                                                {{ $campaign->campaign_code }}
+                                            </a>
+                                        </td>
+                                        <td class="campaign-name-cell">
+                                            <div class="text-truncate fw-medium" title="{{ $campaign->name }}">
+                                                {{ $campaign->name }}
+                                            </div>
+                                            @if($campaign->course_id)
+                                                <div class="campaign-meta-line text-muted">
+                                                    <i class="bi bi-mortarboard"></i>
+                                                    #{{ $campaign->course_id }}
+                                                    @if($campaign->course)
+                                                        · {{ Str::limit(strip_tags($campaign->course->title), 40) }}
+                                                    @endif
+                                                    · {{ $landingLabel }}
+                                                </div>
+                                            @else
+                                                <div class="campaign-meta-line text-warning-emphasis">
+                                                    <i class="bi bi-exclamation-circle"></i> Brak szkolenia — brak linków
+                                                </div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($campaign->sourceType)
+                                                <span class="badge rounded-pill text-truncate d-inline-block"
+                                                      style="background-color: {{ $campaign->sourceType->color }}; color: #fff; max-width: 160px;"
+                                                      title="{{ $campaign->sourceType->name }}"
+                                                      data-bs-toggle="tooltip">
+                                                    {{ $campaign->sourceType->name }}
+                                                </span>
+                                                @if(filled($urls['utm_content'] ?? null))
+                                                    <span class="badge bg-light text-dark border font-monospace ms-1"
+                                                          title="utm_content w linku (GA4)"
+                                                          data-bs-toggle="tooltip">
+                                                        {{ $urls['utm_content'] }}
+                                                    </span>
+                                                @endif
+                                            @else
+                                                <span class="badge bg-secondary rounded-pill">—</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @if($campaign->is_active)
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle">Aktywna</span>
+                                            @else
+                                                <span class="badge bg-secondary-subtle text-secondary border">Wył.</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @if(($campaign->form_orders_count ?? 0) > 0)
+                                                <a href="{{ route('marketing-campaigns.show', $campaign) }}"
+                                                   class="badge bg-primary text-decoration-none"
+                                                   title="Podgląd kampanii i zamówień">
+                                                    {{ $campaign->form_orders_count }}
+                                                </a>
+                                            @else
+                                                <span class="text-muted small">0</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-muted small text-nowrap">
+                                            {{ $campaign->created_at?->format('d.m.Y') }}
+                                            <span class="d-none d-md-inline">{{ $campaign->created_at?->format('H:i') }}</span>
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            @include('marketing-campaigns.partials.index-row-actions', [
+                                                'campaign' => $campaign,
+                                                'urls' => $urls,
+                                            ])
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <!-- Informacja o wynikach -->
-                <div class="d-flex justify-content-between align-items-center mt-3">
-                    <div class="text-muted">
-                        Wyświetlane {{ $campaigns->firstItem() ?? 0 }} - {{ $campaigns->lastItem() ?? 0 }} 
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                    <div class="small text-muted">
+                        {{ $campaigns->firstItem() ?? 0 }}–{{ $campaigns->lastItem() ?? 0 }}
                         z {{ $campaigns->total() }} kampanii
                         @if(request()->hasAny(['search', 'source_type_id', 'is_active']))
-                            <span class="badge bg-info ms-2">Filtrowane</span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle ms-1">filtrowane</span>
                         @endif
                     </div>
-                    <div>
-                        {{ $campaigns->links() }}
-                    </div>
+                    <div>{{ $campaigns->links() }}</div>
                 </div>
             @else
-                <div class="text-center py-5">
-                    <i class="bi bi-graph-up fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">Brak kampanii marketingowych</h4>
-                    <p class="text-muted">Dodaj pierwszą kampanię, aby rozpocząć śledzenie źródeł pozyskania.</p>
-                    <a href="{{ route('marketing-campaigns.create') }}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Dodaj pierwszą kampanię
-                    </a>
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-megaphone display-4 text-muted mb-3 d-block"></i>
+                        <h4 class="text-muted h5">Brak kampanii</h4>
+                        <p class="text-muted small mb-3">
+                            @if(request()->hasAny(['search', 'source_type_id', 'is_active']))
+                                Brak wyników dla wybranych filtrów.
+                                <a href="{{ route('marketing-campaigns.index') }}">Wyczyść filtry</a>
+                            @else
+                                Dodaj pierwszą kampanię, aby generować linki UTM i śledzić zamówienia.
+                            @endif
+                        </p>
+                        <a href="{{ route('marketing-campaigns.create') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Dodaj kampanię
+                        </a>
+                    </div>
                 </div>
             @endif
 
-            {{-- Modale potwierdzenia usunięcia kampanii --}}
             @foreach ($campaigns as $campaign)
-<div class="modal fade" id="deleteModal{{ $campaign->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $campaign->id }}" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteModalLabel{{ $campaign->id }}">
-                    <i class="bi bi-exclamation-triangle"></i> Potwierdzenie usunięcia
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Czy na pewno chcesz usunąć kampanię <strong>#{{ $campaign->id }}</strong>?</p>
-                <div class="bg-light p-3 rounded">
-                    <h6 class="mb-2">Szczegóły kampanii:</h6>
-                    <ul class="mb-0">
-                        <li><strong>Nazwa:</strong> {{ $campaign->name }}</li>
-                        <li><strong>Typ źródła:</strong> {{ $campaign->sourceType->name ?? 'Brak' }}</li>
-                        <li><strong>Opis:</strong> {{ $campaign->description ? Str::limit($campaign->description, 100) : 'Brak' }}</li>
-                        <li><strong>Status:</strong> {{ $campaign->is_active ? 'Aktywna' : 'Nieaktywna' }}</li>
-                        <li><strong>Data utworzenia:</strong> {{ $campaign->created_at ? $campaign->created_at->format('d.m.Y H:i') : 'Nieznana' }}</li>
-                    </ul>
+                <div class="modal fade" id="deleteModal{{ $campaign->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $campaign->id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="deleteModalLabel{{ $campaign->id }}">
+                                    <i class="bi bi-exclamation-triangle"></i> Usunąć kampanię?
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-2">Kampania <code>{{ $campaign->campaign_code }}</code></p>
+                                <div class="bg-light p-3 rounded small">
+                                    <div><strong>Nazwa:</strong> {{ $campaign->name }}</div>
+                                    <div><strong>Źródło:</strong> {{ $campaign->sourceType->name ?? '—' }}</div>
+                                    <div><strong>Zamówienia:</strong> {{ $campaign->form_orders_count ?? 0 }} (zostaną w bazie)</div>
+                                </div>
+                                <p class="text-muted small mt-3 mb-0">
+                                    Miękkie usunięcie — historia zamówień zachowuje kod <code>{{ $campaign->campaign_code }}</code>.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                <form action="{{ route('marketing-campaigns.destroy', $campaign) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-trash"></i> Usuń
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <p class="text-muted mt-3">
-                    <i class="bi bi-info-circle"></i>
-                    Kampania zostanie przeniesiona do kosza (soft delete) i będzie można ją przywrócić.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Anuluj
-                </button>
-                <form action="{{ route('marketing-campaigns.destroy', $campaign) }}" 
-                      method="POST" 
-                      class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Usuń kampanię
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    </div>
-    @endforeach
-        </div>
-    </div>
-</x-app-layout>
+            @endforeach
 
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicjalizacja tooltipów Bootstrap
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+            @include('marketing-campaigns.partials.campaign-links-modal')
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
     });
-});
-</script>
-@endpush
+    </script>
+    @endpush
+</x-app-layout>

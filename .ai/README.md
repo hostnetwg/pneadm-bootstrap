@@ -39,6 +39,20 @@ This directory contains documentation specifically designed to provide context f
 
 **Best for**: Understanding and configuring environment variables, troubleshooting configuration issues.
 
+### [MULTI_PROJECT_CONTEXT.md](./MULTI_PROJECT_CONTEXT.md)
+**Cross-project architecture (pneadm + pnedu + shared DB)**
+
+**Best for**: Understanding how adm and public site interact.
+
+### [../docs/MARKETING.md](../docs/MARKETING.md)
+**Marketing campaigns, UTM conventions, funnel analytics, GA4 roadmap**
+
+- Typy źródeł (`utm_source` / `utm_medium`), kampanie, generator linków
+- Wewnętrzny lejek (adm) vs Google Analytics (pnedu)
+- Audyt typów źródeł, pliki w kodzie, plan rozwoju dla developerów
+
+**Best for**: Rozwój modułu marketingowego, spójne linki UTM, lejek konwersji.
+
 ### [FILES_INDEX.txt](./FILES_INDEX.txt)
 **Visual documentation index and file tree**
 

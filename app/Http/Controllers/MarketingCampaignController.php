@@ -4,16 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\MarketingCampaign;
 use App\Models\MarketingSourceType;
+use App\Models\Course;
+use App\Services\MarketingCampaignUrlBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class MarketingCampaignController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request, MarketingCampaignUrlBuilder $urlBuilder)
     {
-        $query = MarketingCampaign::with('sourceType')->withCount('formOrders');
+        $query = MarketingCampaign::with(['sourceType', 'course'])->withCount('formOrders');
 
         // Wyszukiwanie
         if ($request->filled('search')) {
@@ -54,10 +57,15 @@ class MarketingCampaignController extends Controller
         $perPage = $request->get('per_page', 20);
         $campaigns = $query->paginate($perPage)->withQueryString();
 
-        // Pobierz typy źródeł dla filtra
-        $sourceTypes = MarketingSourceType::active()->ordered()->get();
+        // Pobierz typy źródeł dla filtra (wszystkie — także wyłączone, żeby link z typów źródeł działał)
+        $sourceTypes = MarketingSourceType::ordered()->get();
 
-        return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes'));
+        $campaignUrlsById = [];
+        foreach ($campaigns as $campaign) {
+            $campaignUrlsById[$campaign->id] = $urlBuilder->buildForCampaign($campaign);
+        }
+
+        return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes', 'campaignUrlsById'));
     }
 
     /**
@@ -65,10 +73,12 @@ class MarketingCampaignController extends Controller
      */
     public function create()
     {
-        $sourceTypes = MarketingSourceType::active()->ordered()->get();
+        $sourceTypes = $this->sourceTypesForCampaignForm(old('source_type_id'));
         $nextCampaignCode = $this->getNextCampaignCode();
+        $selectedCourse = $this->selectedCourseForForm(old('course_id'));
+        $utmMediumOptions = config('marketing.utm_medium_options', []);
 
-        return view('marketing-campaigns.create', compact('sourceTypes', 'nextCampaignCode'));
+        return view('marketing-campaigns.create', compact('sourceTypes', 'nextCampaignCode', 'selectedCourse', 'utmMediumOptions'));
     }
 
     /**
@@ -81,8 +91,15 @@ class MarketingCampaignController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'source_type_id' => 'required|exists:marketing_source_types,id',
+            'utm_medium_custom' => 'sometimes|boolean',
+            'utm_medium' => 'nullable|string|max:50',
+            'utm_content' => 'nullable|string|max:100',
+            'course_id' => 'nullable|integer|exists:courses,id',
+            'landing_target' => 'nullable|in:course_show,order_form',
             'is_active' => 'boolean',
         ]);
+
+        $this->validateCampaignUtmMedium($request);
 
         // Sprawdź czy kod kampanii już istnieje (także wśród soft-deleted — unikalny indeks w BD obejmuje wszystkie wiersze)
         $campaignCode = $request->get('campaign_code');
@@ -99,13 +116,56 @@ class MarketingCampaignController extends Controller
             }
         }
 
-        $data = $request->all();
+        $data = $request->only([
+            'name', 'description', 'source_type_id',
+            'course_id', 'landing_target', 'is_active',
+        ]);
         $data['campaign_code'] = $campaignCode;
+        $data['utm_medium'] = $this->resolveCampaignUtmMedium($request);
+        $data['utm_content'] = $this->normalizeCampaignUtmContent($request);
+        if (blank($data['landing_target'] ?? null)) {
+            $data['landing_target'] = 'order_form';
+        }
 
-        MarketingCampaign::create($data);
+        $campaign = MarketingCampaign::create($data);
 
-        return redirect()->route('marketing-campaigns.index')
-            ->with('success', 'Kampania marketingowa została utworzona.');
+        return redirect()->route('marketing-campaigns.show', $campaign)
+            ->with('success', 'Kampania marketingowa została utworzona. Skopiuj linki poniżej.');
+    }
+
+    /**
+     * Wstępia formularz create danymi z kampanii źródłowej — bez zapisu do bazy.
+     */
+    public function duplicate(MarketingCampaign $marketingCampaign)
+    {
+        $marketingCampaign->load('sourceType');
+
+        $defaultMedium = $marketingCampaign->sourceType?->default_utm_medium ?? 'paid';
+        $hasCustomMedium = filled($marketingCampaign->utm_medium)
+            && $marketingCampaign->utm_medium !== $defaultMedium;
+
+        $input = array_filter([
+            'campaign_code' => $this->suggestDuplicateCampaignCode($marketingCampaign->campaign_code),
+            'name' => $this->suggestDuplicateName($marketingCampaign->name),
+            'description' => $marketingCampaign->description,
+            'source_type_id' => $marketingCampaign->source_type_id,
+            'course_id' => $marketingCampaign->course_id,
+            'landing_target' => $marketingCampaign->landing_target ?: 'order_form',
+            'utm_content' => $marketingCampaign->utm_content
+                ?: $marketingCampaign->sourceType?->default_utm_content,
+            'utm_medium_custom' => $hasCustomMedium ? '1' : null,
+            'utm_medium' => $hasCustomMedium ? $marketingCampaign->utm_medium : null,
+            'is_active' => '1',
+        ], fn ($value) => $value !== null && $value !== '');
+
+        return redirect()
+            ->route('marketing-campaigns.create')
+            ->withInput($input)
+            ->with('duplicate_from', [
+                'id' => $marketingCampaign->id,
+                'campaign_code' => $marketingCampaign->campaign_code,
+                'name' => $marketingCampaign->name,
+            ]);
     }
 
     /**
@@ -155,22 +215,33 @@ class MarketingCampaignController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(MarketingCampaign $marketingCampaign)
+    public function show(MarketingCampaign $marketingCampaign, MarketingCampaignUrlBuilder $urlBuilder)
     {
-        $marketingCampaign->load('sourceType');
+        $marketingCampaign->load(['sourceType', 'course']);
         $formOrders = $marketingCampaign->formOrders()->with('primaryParticipant')->paginate(20);
+        $campaignUrls = $urlBuilder->buildForCampaign($marketingCampaign);
 
-        return view('marketing-campaigns.show', compact('marketingCampaign', 'formOrders'));
+        return view('marketing-campaigns.show', compact('marketingCampaign', 'formOrders', 'campaignUrls'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(MarketingCampaign $marketingCampaign)
+    public function edit(MarketingCampaign $marketingCampaign, MarketingCampaignUrlBuilder $urlBuilder)
     {
-        $sourceTypes = MarketingSourceType::active()->ordered()->get();
+        $marketingCampaign->load(['course.instructor:id,title,first_name,last_name', 'sourceType']);
+        $sourceTypes = $this->sourceTypesForCampaignForm(old('source_type_id', $marketingCampaign->source_type_id));
+        $selectedCourse = $this->selectedCourseForForm(
+            old('course_id', $marketingCampaign->course_id),
+            $marketingCampaign->course,
+        );
+        $utmMediumOptions = config('marketing.utm_medium_options', []);
+        $campaignUrls = $urlBuilder->buildForCampaign($marketingCampaign);
 
-        return view('marketing-campaigns.edit', compact('marketingCampaign', 'sourceTypes'));
+        return view('marketing-campaigns.edit', compact(
+            'marketingCampaign',
+            'sourceTypes',
+            'selectedCourse',
+            'utmMediumOptions',
+            'campaignUrls',
+        ));
     }
 
     /**
@@ -196,13 +267,27 @@ class MarketingCampaignController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'source_type_id' => 'required|exists:marketing_source_types,id',
+            'utm_medium_custom' => 'sometimes|boolean',
+            'utm_medium' => 'nullable|string|max:50',
+            'utm_content' => 'nullable|string|max:100',
+            'course_id' => 'nullable|integer|exists:courses,id',
+            'landing_target' => 'nullable|in:course_show,order_form',
             'is_active' => 'boolean',
         ]);
 
-        $marketingCampaign->update($request->all());
+        $this->validateCampaignUtmMedium($request);
 
-        return redirect()->route('marketing-campaigns.index')
-            ->with('success', 'Kampania marketingowa została zaktualizowana.');
+        $marketingCampaign->update([
+            ...$request->only([
+                'campaign_code', 'name', 'description', 'source_type_id',
+                'course_id', 'landing_target', 'is_active',
+            ]),
+            'utm_medium' => $this->resolveCampaignUtmMedium($request),
+            'utm_content' => $this->normalizeCampaignUtmContent($request),
+        ]);
+
+        return redirect()->route('marketing-campaigns.show', $marketingCampaign)
+            ->with('success', 'Kampania marketingowa została zaktualizowana. Skopiuj linki poniżej.');
     }
 
     /**
@@ -214,5 +299,264 @@ class MarketingCampaignController extends Controller
 
         return redirect()->route('marketing-campaigns.index')
             ->with('success', 'Kampania marketingowa została usunięta.');
+    }
+
+    public function verifyShortLink(MarketingCampaign $marketingCampaign, MarketingCampaignUrlBuilder $urlBuilder)
+    {
+        $urls = $urlBuilder->buildForCampaign($marketingCampaign);
+
+        if (empty($urls['short']) || empty($urls['utm'])) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Brak powiązanego szkolenia — ustaw je w kampanii, aby wygenerować link krótki.',
+            ], 422);
+        }
+
+        try {
+            $shortUrlForVerify = $this->shortUrlForInternalVerify($urls['short'], $urlBuilder);
+
+            $response = Http::timeout(15)
+                ->withOptions(['allow_redirects' => false])
+                ->get($shortUrlForVerify);
+
+            $status = $response->status();
+            $location = $response->header('Location');
+
+            if (is_string($location) && $location !== '' && ! str_starts_with($location, 'http')) {
+                $location = rtrim($urlBuilder->pneduBaseUrl(), '/').'/'.ltrim($location, '/');
+            }
+
+            if ($status === 404) {
+                return response()->json([
+                    'ok' => false,
+                    'short_url' => $urls['short'],
+                    'expected_url' => $urls['utm'],
+                    'redirect_status' => $status,
+                    'message' => 'pnedu zwróciło 404 — na dev upewnij się, że PNEDU_PUBLIC_URL=http://localhost:8081 i kontener pnedu działa. Na produkcji wdróż kod /l/ (git pull + route:clear).',
+                ], 502);
+            }
+
+            $ok = in_array($status, [301, 302, 303, 307, 308], true)
+                && $this->redirectMatchesUtmUrl($location, $urls['utm']);
+
+            return response()->json([
+                'ok' => $ok,
+                'short_url' => $urls['short'],
+                'expected_url' => $urls['utm'],
+                'redirect_status' => $status,
+                'redirect_to' => $location,
+                'message' => $ok
+                    ? 'Przekierowanie działa — link krótki prowadzi do właściwego adresu z parametrami UTM.'
+                    : 'Przekierowanie nie zgadza się z linkiem UTM (status '.$status.'). Sprawdź ustawienia kampanii lub logi pnedu.',
+            ], $ok ? 200 : 502);
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'short_url' => $urls['short'],
+                'expected_url' => $urls['utm'],
+                'message' => 'Nie udało się połączyć z pnedu.pl: '.$exception->getMessage(),
+            ], 502);
+        }
+    }
+
+    private function redirectMatchesUtmUrl(?string $redirectUrl, string $expectedUrl): bool
+    {
+        if (! is_string($redirectUrl) || $redirectUrl === '') {
+            return false;
+        }
+
+        $redirectParts = parse_url($redirectUrl);
+        $expectedParts = parse_url($expectedUrl);
+
+        if (($redirectParts['path'] ?? '') !== ($expectedParts['path'] ?? '')) {
+            return false;
+        }
+
+        parse_str($redirectParts['query'] ?? '', $redirectQuery);
+        parse_str($expectedParts['query'] ?? '', $expectedQuery);
+
+        foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'] as $key) {
+            $expected = $expectedQuery[$key] ?? null;
+            $actual = $redirectQuery[$key] ?? null;
+
+            if ($expected === null || $expected === '') {
+                continue;
+            }
+
+            if ($actual !== $expected) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function shortUrlForInternalVerify(string $publicShortUrl, MarketingCampaignUrlBuilder $urlBuilder): string
+    {
+        $publicBase = rtrim($urlBuilder->pneduBaseUrl(), '/');
+        $internalBase = rtrim((string) config('marketing.pnedu_internal_url', $publicBase), '/');
+
+        if ($publicBase === $internalBase) {
+            return $publicShortUrl;
+        }
+
+        return $internalBase.substr($publicShortUrl, strlen($publicBase));
+    }
+
+    private function selectedCourseForForm(mixed $courseId, ?Course $loaded = null): ?Course
+    {
+        if ($courseId === null || $courseId === '') {
+            return null;
+        }
+
+        $id = (int) $courseId;
+        if ($id <= 0) {
+            return null;
+        }
+
+        if ($loaded && (int) $loaded->id === $id) {
+            return $loaded;
+        }
+
+        return Course::query()
+            ->with('instructor:id,title,first_name,last_name')
+            ->find($id);
+    }
+
+    /**
+     * Aktywne typy źródeł + opcjonalnie aktualnie wybrany (np. wyłączony) przy edycji.
+     *
+     * @return \Illuminate\Support\Collection<int, MarketingSourceType>
+     */
+    private function sourceTypesForCampaignForm(mixed $selectedId = null)
+    {
+        $types = MarketingSourceType::active()->ordered()->get();
+
+        if ($selectedId === null || $selectedId === '') {
+            return $types;
+        }
+
+        $selectedId = (int) $selectedId;
+        if ($selectedId > 0 && ! $types->contains('id', $selectedId)) {
+            $extra = MarketingSourceType::query()->find($selectedId);
+            if ($extra) {
+                $types = $types->push($extra)->sortBy([
+                    ['sort_order', 'asc'],
+                    ['name', 'asc'],
+                ])->values();
+            }
+        }
+
+        return $types;
+    }
+
+    private function validateCampaignUtmMedium(Request $request): void
+    {
+        if (! $request->boolean('utm_medium_custom')) {
+            return;
+        }
+
+        $allowed = array_keys(config('marketing.utm_medium_options', []));
+        $medium = (string) $request->input('utm_medium', '');
+
+        if ($medium === '' || ! in_array($medium, $allowed, true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'utm_medium' => 'Wybierz dozwoloną wartość medium lub odznacz „Niestandardowe utm_medium”.',
+            ]);
+        }
+    }
+
+    private function resolveCampaignUtmMedium(Request $request): ?string
+    {
+        if (! $request->boolean('utm_medium_custom')) {
+            return null;
+        }
+
+        $medium = (string) $request->input('utm_medium', '');
+        $sourceType = MarketingSourceType::query()->find($request->input('source_type_id'));
+
+        if ($medium === '' || ($sourceType && $medium === $sourceType->default_utm_medium)) {
+            return null;
+        }
+
+        return $medium;
+    }
+
+    private function normalizeCampaignUtmContent(Request $request): ?string
+    {
+        $content = trim((string) $request->input('utm_content', ''));
+
+        if ($content !== '') {
+            return $content;
+        }
+
+        $sourceType = MarketingSourceType::query()->find($request->input('source_type_id'));
+        $default = trim((string) ($sourceType?->default_utm_content ?? ''));
+
+        return $default !== '' ? $default : null;
+    }
+
+    private function suggestDuplicateCampaignCode(string $baseCode): string
+    {
+        $baseCode = trim($baseCode);
+        if ($baseCode === '') {
+            return '';
+        }
+
+        $suffixes = ['-2', '-3', '-4', '-5', '-kopia'];
+        for ($i = 6; $i <= 20; $i++) {
+            $suffixes[] = '-'.$i;
+        }
+
+        foreach ($suffixes as $suffix) {
+            $candidate = $this->appendSuffixToCampaignCode($baseCode, $suffix);
+            if ($candidate !== '' && ! $this->campaignCodeExists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+
+    private function suggestDuplicateName(string $name): string
+    {
+        $name = trim($name);
+        $suffix = ' (kopia)';
+
+        if ($name === '') {
+            return 'Kampania (kopia)';
+        }
+
+        if (str_ends_with($name, '(kopia)')) {
+            return strlen($name) + 2 <= 255 ? $name.' 2' : substr($name, 0, 252).' 2';
+        }
+
+        if (strlen($name) + strlen($suffix) <= 255) {
+            return $name.$suffix;
+        }
+
+        return substr($name, 0, 255 - strlen($suffix)).$suffix;
+    }
+
+    private function appendSuffixToCampaignCode(string $baseCode, string $suffix): string
+    {
+        $max = 50;
+        if (strlen($suffix) >= $max) {
+            return substr($suffix, 0, $max);
+        }
+
+        $maxBaseLen = $max - strlen($suffix);
+        $base = strlen($baseCode) > $maxBaseLen
+            ? rtrim(substr($baseCode, 0, $maxBaseLen), '-_')
+            : $baseCode;
+
+        return $base.$suffix;
+    }
+
+    private function campaignCodeExists(string $code): bool
+    {
+        return MarketingCampaign::withTrashed()
+            ->where('campaign_code', $code)
+            ->exists();
     }
 }

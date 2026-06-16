@@ -113,7 +113,12 @@ class FormOrdersController extends Controller
                     ->orWhere('recipient_address', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_postal_code', 'LIKE', "%{$search}%")
                     ->orWhere('recipient_city', 'LIKE', "%{$search}%")
-                    ->orWhere('recipient_nip', 'LIKE', "%{$search}%");
+                    ->orWhere('recipient_nip', 'LIKE', "%{$search}%")
+                    ->orWhere('fb_source', 'LIKE', "%{$search}%")
+                    ->orWhereHas('marketingCampaign', function ($mq) use ($search) {
+                        $mq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('campaign_code', 'LIKE', "%{$search}%");
+                    });
             });
         }
 
@@ -175,6 +180,21 @@ class FormOrdersController extends Controller
                     OnlinePaymentOrder::STATUS_FAILED,
                 ]);
             });
+        }
+
+        $placementFilterRaw = (string) $request->get('placement', '');
+        $allowedPlacementFilters = ['dashboard_sidebar', 'other'];
+        $placementFilter = in_array($placementFilterRaw, $allowedPlacementFilters, true) ? $placementFilterRaw : '';
+        if ($placementFilter !== '' && Schema::hasColumn($formOrdersTable, 'conversion_placement')) {
+            if ($placementFilter === 'dashboard_sidebar') {
+                $query->where($formOrdersTable.'.conversion_placement', FormOrder::CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR);
+            } elseif ($placementFilter === 'other') {
+                $query->where(function ($q) use ($formOrdersTable) {
+                    $q->whereNull($formOrdersTable.'.conversion_placement')
+                        ->orWhere($formOrdersTable.'.conversion_placement', '')
+                        ->orWhere($formOrdersTable.'.conversion_placement', '!=', FormOrder::CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR);
+                });
+            }
         }
 
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
@@ -272,7 +292,30 @@ class FormOrdersController extends Controller
             'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
         ];
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
+        if (Schema::hasColumn((new FormOrder)->getTable(), 'conversion_placement')) {
+            $sidebarPlacement = FormOrder::CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR;
+            $stats['dashboard_sidebar_total'] = FormOrder::where('conversion_placement', $sidebarPlacement)->count();
+            $stats['dashboard_sidebar_invoiced'] = FormOrder::withInvoice()
+                ->where('conversion_placement', $sidebarPlacement)
+                ->count();
+            $stats['dashboard_sidebar_sales'] = FormOrder::withInvoice()
+                ->where('conversion_placement', $sidebarPlacement)
+                ->sum('product_price');
+            $stats['other_placement_total'] = FormOrder::where(function ($q) use ($sidebarPlacement) {
+                $q->whereNull('conversion_placement')
+                    ->orWhere('conversion_placement', '')
+                    ->orWhere('conversion_placement', '!=', $sidebarPlacement);
+            })->count();
+            $stats['other_placement_invoiced'] = FormOrder::withInvoice()
+                ->where(function ($q) use ($sidebarPlacement) {
+                    $q->whereNull('conversion_placement')
+                        ->orWhere('conversion_placement', '')
+                        ->orWhere('conversion_placement', '!=', $sidebarPlacement);
+                })
+                ->count();
+        }
+
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
     }
 
     /**

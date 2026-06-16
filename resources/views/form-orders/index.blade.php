@@ -24,6 +24,18 @@
         .form-order-card--online-gateway.border-danger {
             background: linear-gradient(145deg, #ffebee 0%, #e3f2fd 40%, #fce4ec 100%);
         }
+        a.form-order-marketing-pill:hover {
+            filter: brightness(0.96);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        }
+        .form-order-marketing-pill {
+            font-size: 0.8rem;
+            font-weight: 400;
+            white-space: nowrap;
+            max-width: min(100%, 28rem);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 
     <div class="py-3">
@@ -162,6 +174,14 @@
                                 </select>
                             </div>
                             <div class="col-6 col-md-2">
+                                <label for="placement" class="form-label small mb-1">Konwersja z</label>
+                                <select id="placement" name="placement" class="form-select form-select-sm" title="Miejsce konwersji (osobno od kampanii reklamowej)">
+                                    <option value="" {{ ($placementFilter ?? '') === '' ? 'selected' : '' }}>Wszystkie</option>
+                                    <option value="dashboard_sidebar" {{ ($placementFilter ?? '') === 'dashboard_sidebar' ? 'selected' : '' }}>Panel → Aktualna oferta</option>
+                                    <option value="other" {{ ($placementFilter ?? '') === 'other' ? 'selected' : '' }}>Inne / bez panelu</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
                                 <label for="per_page" class="form-label small mb-1">Rekordów na stronę:</label>
                                 <select id="per_page" name="per_page" class="form-select form-select-sm w-100">
                                     <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
@@ -181,13 +201,13 @@
                                        id="search"
                                        name="search"
                                        value="{{ $search }}"
-                                       placeholder="Imię, email uczestnika, email zamawiającego, produkt, numer faktury, notatki, ID, Publigo ID...">
+                                       placeholder="Imię, email, produkt, faktura, kod kampanii, nazwa kampanii, ID…">
                             </div>
                             <div class="col-12 col-md-4 d-flex align-items-end gap-2 flex-wrap">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '')
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index', ['filter' => $filter]) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -209,6 +229,16 @@
                         <strong>Archiwalne:</strong> {{ $stats['archival'] }} | 
                         <strong>Wartość sprzedaży:</strong> {{ number_format($stats['sales_value'], 0, ',', ' ') }} zł | 
                         <strong>Średnia cena:</strong> {{ number_format($stats['avg_price'], 2, ',', ' ') }} zł
+                        @if(isset($stats['dashboard_sidebar_total']))
+                            <br class="d-md-none">
+                            <span class="text-muted">
+                                <strong>Panel (sidebar):</strong> {{ number_format($stats['dashboard_sidebar_total'], 0, ',', ' ') }} zam.
+                                ({{ number_format($stats['dashboard_sidebar_invoiced'], 0, ',', ' ') }} z fakturą,
+                                {{ number_format($stats['dashboard_sidebar_sales'], 0, ',', ' ') }} zł) |
+                                <strong>Inne:</strong> {{ number_format($stats['other_placement_total'], 0, ',', ' ') }} zam.
+                                ({{ number_format($stats['other_placement_invoiced'], 0, ',', ' ') }} z fakturą)
+                            </span>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -247,15 +277,6 @@
                                                     {{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}
                                                 </span>
                                             @endif
-                                            @if($zamowienie->fb_source)
-                                                <span class="badge fs-6 ms-2" 
-                                                      style="background-color: {{ $zamowienie->marketingCampaign && $zamowienie->marketingCampaign->sourceType ? $zamowienie->marketingCampaign->sourceType->color : '#28a745' }}; color: white;"
-                                                      title="{{ $zamowienie->marketingCampaign ? $zamowienie->marketingCampaign->name . ' (' . ($zamowienie->marketingCampaign->sourceType->name ?? 'Nieznany typ') . ')' : 'Źródło: ' . $zamowienie->fb_source }}"
-                                                      data-bs-toggle="tooltip" 
-                                                      data-bs-placement="top">
-                                                    Źródło: {{ $zamowienie->fb_source }}
-                                                </span>
-                                            @endif
                                             @if($isDuplicate)
                                                 <span class="badge bg-danger ms-2" 
                                                       title="Duplikat: {{ $duplicateCount }} zamówień dla tego samego emaila i szkolenia"
@@ -292,11 +313,17 @@
                                                 $orderDateFormatted = null;
                                             }
                                         @endphp
-                                        @if($orderDateFormatted)
-                                            <small class="text-muted">
-                                                <i class="bi bi-calendar-event"></i> {{ $orderDateFormatted }}
-                                            </small>
-                                        @endif
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                                            @if($orderDateFormatted)
+                                                <small class="text-muted">
+                                                    <i class="bi bi-calendar-event"></i> {{ $orderDateFormatted }}
+                                                </small>
+                                            @endif
+                                            @include('form-orders.partials.marketing-attribution', [
+                                                'zamowienie' => $zamowienie,
+                                                'variant' => 'compact',
+                                            ])
+                                        </div>
                                     </div>
                                     <div class="text-end">
                                         <a href="{{ route('form-orders.show', $zamowienie->id) }}" 
@@ -708,6 +735,9 @@
                                         }
                                         if (($opoStatusFilter ?? '') !== '') {
                                             $paginationQuery['opo_status'] = $opoStatusFilter;
+                                        }
+                                        if (($placementFilter ?? '') !== '') {
+                                            $paginationQuery['placement'] = $placementFilter;
                                         }
                                     @endphp
                                     {{ $zamowienia->appends($paginationQuery)->links() }}

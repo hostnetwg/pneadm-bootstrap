@@ -12,6 +12,7 @@ use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\PaymentDisplayOption;
 use App\Services\CourseFormOrderBillingService;
+use App\Services\CourseFunnelStatsService;
 use App\Services\CourseGoogleCalendarSyncService;
 use App\Services\GoogleCalendarClientFactory;
 use App\Support\CourseInstructorLinksEmailBody;
@@ -285,6 +286,27 @@ class CoursesController extends Controller
             });
         }
 
+        $funnelStatsService = app(CourseFunnelStatsService::class);
+        $funnelStatsDays = $funnelStatsService->defaultStatsDays();
+        $funnelStats = [];
+        if (! empty($courseIdsOnPage)) {
+            $funnelStats = $funnelStatsService->statsForCourses($courseIdsOnPage);
+            $courses->getCollection()->transform(function ($course) use ($funnelStats) {
+                $course->funnel_stats = $funnelStats[$course->id] ?? [
+                    'views_course_show' => 0,
+                    'views_order_form' => 0,
+                    'orders_submitted' => 0,
+                    'orders_invoiced' => 0,
+                    'orders_paid' => 0,
+                    'cr_show_to_order' => null,
+                    'cr_form_to_order' => null,
+                    'cr_show_to_invoiced' => null,
+                ];
+
+                return $course;
+            });
+        }
+
         $googleCalendarEnabled = (bool) config('services.google_calendar.enabled', false);
         $googleCalendarConfigured = app(GoogleCalendarClientFactory::class)->isConfigured();
         $googleCalendarSyncActive = $googleCalendarEnabled && $googleCalendarConfigured;
@@ -298,6 +320,7 @@ class CoursesController extends Controller
             'filteredCount',
             'totalCount',
             'googleCalendarSyncActive',
+            'funnelStatsDays',
         ));
     }
 

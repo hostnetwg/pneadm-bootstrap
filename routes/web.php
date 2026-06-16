@@ -15,6 +15,8 @@ use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\MarketingCampaignController;
+use App\Http\Controllers\MarketingFunnelController;
+use App\Http\Controllers\MarketingHelpController;
 use App\Http\Controllers\MarketingSourceTypeController;
 use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\OnlineCourseEnrollmentController;
@@ -219,7 +221,23 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/{id}', [OnlinePaymentOrderController::class, 'show'])->name('show');
         });
 
-    // Marketing Campaigns - źródła pozyskania
+    // Marketing Funnel - lejek konwersji
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+        ->prefix('marketing-funnel')
+        ->name('marketing-funnel.')
+        ->group(function () {
+            Route::get('/', [MarketingFunnelController::class, 'index'])->name('index');
+        });
+
+    // Marketing — dokumentacja / pomoc
+    Route::middleware(['auth', 'verified', 'check.user.status'])
+        ->prefix('marketing')
+        ->name('marketing.')
+        ->group(function () {
+            Route::get('/help/links', [MarketingHelpController::class, 'links'])->name('help.links');
+        });
+
+    // Marketing Campaigns - kampanie marketingowe
     Route::middleware(['auth', 'verified', 'check.user.status'])
         ->prefix('marketing-campaigns')
         ->name('marketing-campaigns.')
@@ -227,6 +245,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/', [MarketingCampaignController::class, 'index'])->name('index');
             Route::get('/create', [MarketingCampaignController::class, 'create'])->name('create');
             Route::post('/', [MarketingCampaignController::class, 'store'])->name('store');
+            Route::get('/{marketingCampaign}/duplicate', [MarketingCampaignController::class, 'duplicate'])
+                ->name('duplicate');
+            Route::get('/{marketingCampaign}/verify-short-link', [MarketingCampaignController::class, 'verifyShortLink'])
+                ->name('verify-short-link');
             Route::get('/{marketingCampaign}', [MarketingCampaignController::class, 'show'])->name('show');
             Route::get('/{marketingCampaign}/edit', [MarketingCampaignController::class, 'edit'])->name('edit');
             Route::put('/{marketingCampaign}', [MarketingCampaignController::class, 'update'])->name('update');
@@ -239,6 +261,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('marketing-source-types.')
         ->group(function () {
             Route::get('/', [MarketingSourceTypeController::class, 'index'])->name('index');
+            Route::post('/reorder', [MarketingSourceTypeController::class, 'reorder'])->name('reorder');
             Route::get('/create', [MarketingSourceTypeController::class, 'create'])->name('create');
             Route::post('/', [MarketingSourceTypeController::class, 'store'])->name('store');
             Route::get('/{marketingSourceType}', [MarketingSourceTypeController::class, 'show'])->name('show');

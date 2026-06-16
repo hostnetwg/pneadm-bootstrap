@@ -6,85 +6,72 @@
     </x-slot>
 
     <div class="px-3 py-3">
-        <div class="container">
-            <div class="row justify-content-center">
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4 class="mb-0">Nowa kampania marketingowa</h4>
+        <div class="container col-lg-9">
+            <div class="mb-3">
+                <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Kampanie marketingowe
+                </a>
+            </div>
+
+            @if(session('duplicate_from'))
+                @php($duplicateFrom = session('duplicate_from'))
+                <div class="alert alert-info border-0 shadow-sm mb-3">
+                    <i class="bi bi-copy"></i>
+                    Tworzysz <strong>kopię</strong> kampanii
+                    <code>{{ $duplicateFrom['campaign_code'] }}</code>
+                    <span class="text-muted">— {{ Str::limit($duplicateFrom['name'], 80) }}</span>.
+                    Sprawdź <strong>kod kampanii</strong> przed zapisem — dopóki nie klikniesz „Zapisz kampanię”, w bazie nie powstanie nowy rekord.
+                </div>
+            @endif
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h4 class="h5 mb-1 fw-semibold">
+                        @if(session('duplicate_from'))
+                            Nowa kampania (kopia)
+                        @else
+                            Nowa kampania marketingowa
+                        @endif
+                    </h4>
+                    <p class="small text-muted mb-0">
+                        @if(session('duplicate_from'))
+                            Pola wypełnione z wybranej kampanii — dostosuj kod i nazwę, potem zapisz.
+                        @else
+                            Uzupełnij sekcje po kolei — od szkolenia i linku, potem kanał UTM. Po zapisie skopiujesz gotowe adresy.
+                        @endif
+                    </p>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <form action="{{ route('marketing-campaigns.store') }}" method="POST" id="marketing-campaign-form">
+                        @csrf
+
+                        @include('marketing-campaigns.partials.campaign-form-body', [
+                            'isCreate' => true,
+                            'nextCampaignCode' => $nextCampaignCode ?? null,
+                            'selectedCourse' => $selectedCourse ?? null,
+                            'sourceTypes' => $sourceTypes,
+                            'utmMediumOptions' => $utmMediumOptions,
+                        ])
+
+                        <div class="campaign-form-actions rounded px-3 py-3 mt-2 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox"
+                                       id="is_active" name="is_active" value="1"
+                                       {{ old('is_active', true) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="is_active">
+                                    Kampania aktywna
+                                </label>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-outline-secondary">
+                                    Anuluj
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Zapisz kampanię
+                                </button>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <form action="{{ route('marketing-campaigns.store') }}" method="POST">
-                                @csrf
-                                
-                                <div class="mb-3">
-                                    <label for="campaign_code" class="form-label">Kod kampanii <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('campaign_code') is-invalid @enderror" 
-                                           id="campaign_code" name="campaign_code" 
-                                           value="{{ old('campaign_code', $nextCampaignCode ?? '') }}" required>
-                                    @error('campaign_code')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                    <div class="form-text">Unikalny kod kampanii (np. 537, fb_001). Automatycznie wypełniony następnym wolnym numerem.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="name" class="form-label">Nazwa kampanii <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('name') is-invalid @enderror" 
-                                           id="name" name="name" 
-                                           value="{{ old('name') }}" required>
-                                    @error('name')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="description" class="form-label">Opis</label>
-                                    <textarea class="form-control @error('description') is-invalid @enderror" 
-                                              id="description" name="description" rows="3">{{ old('description') }}</textarea>
-                                    @error('description')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="source_type_id" class="form-label">Typ źródła <span class="text-danger">*</span></label>
-                                    <select class="form-select @error('source_type_id') is-invalid @enderror" 
-                                            id="source_type_id" name="source_type_id" required>
-                                        <option value="">Wybierz typ źródła</option>
-                                        @foreach($sourceTypes as $sourceType)
-                                            <option value="{{ $sourceType->id }}" {{ old('source_type_id') == $sourceType->id ? 'selected' : '' }}>
-                                                {{ $sourceType->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    @error('source_type_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" 
-                                               id="is_active" name="is_active" value="1" 
-                                               {{ old('is_active', true) ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="is_active">
-                                            Kampania aktywna
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex justify-content-between">
-                                    <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-secondary">
-                                        <i class="bi bi-arrow-left"></i> Powrót
-                                    </a>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="bi bi-save"></i> Zapisz kampanię
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
