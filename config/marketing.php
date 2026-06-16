@@ -85,4 +85,20 @@ return [
         'dashboard_sidebar' => 'Panel klienta → Aktualna oferta',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Opt-out lejka na pnedu.pl (linki pomocnicze w panelu adm)
+    |--------------------------------------------------------------------------
+    */
+    'funnel_skip_cookie' => env('MARKETING_FUNNEL_SKIP_COOKIE', 'pne_skip_funnel'),
+    'funnel_skip_until_cookie' => env('MARKETING_FUNNEL_SKIP_UNTIL_COOKIE', 'pne_skip_funnel_until'),
+    'funnel_skip_query_param' => env('MARKETING_FUNNEL_SKIP_QUERY_PARAM', 'pne_skip_funnel'),
+    'funnel_skip_token_param' => env('MARKETING_FUNNEL_SKIP_TOKEN_PARAM', 'token'),
+    'funnel_skip_token' => env('MARKETING_FUNNEL_SKIP_TOKEN'),
+    'funnel_skip_cookie_days' => (int) env('MARKETING_FUNNEL_SKIP_COOKIE_DAYS', 365),
+    'funnel_skip_cookie_domain' => env(
+        'MARKETING_FUNNEL_SKIP_COOKIE_DOMAIN',
+        env('APP_ENV') === 'production' ? '.pnedu.pl' : null
+    ),
+
 ];

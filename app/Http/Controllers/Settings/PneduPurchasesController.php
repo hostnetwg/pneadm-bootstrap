@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\PaymentDisplayOption;
+use App\Services\FunnelSkipService;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
@@ -12,11 +13,76 @@ class PneduPurchasesController extends Controller
     /**
      * Ustawienia zakupów na pnedu.pl (formularze zamówień, płatności itp.)
      */
-    public function index()
+    public function index(Request $request)
     {
         $options = PaymentDisplayOption::getSettings();
+        $funnelSkip = app(FunnelSkipService::class);
+        $funnelSkipCookie = $funnelSkip->cookieName();
+        $funnelSkipUntilCookie = $funnelSkip->untilCookieName();
 
-        return view('settings.pnedu-purchases', compact('options'));
+        $funnelSkipEnableUrl = $funnelSkip->pneduToggleUrl(true);
+        $funnelSkipDisableUrl = $funnelSkip->pneduToggleUrl(false);
+
+        $funnelSkipEnabledForBrowser = $request->cookie($funnelSkipCookie) === '1';
+        $funnelSkipUntilRaw = $request->cookie($funnelSkipUntilCookie);
+        $funnelSkipUntil = null;
+        if (is_string($funnelSkipUntilRaw) && trim($funnelSkipUntilRaw) !== '') {
+            try {
+                $funnelSkipUntil = Carbon::parse($funnelSkipUntilRaw);
+            } catch (\Throwable) {
+                $funnelSkipUntil = null;
+            }
+        }
+
+        return view('settings.pnedu-purchases', compact(
+            'options',
+            'funnelSkipEnableUrl',
+            'funnelSkipDisableUrl',
+            'funnelSkipEnabledForBrowser',
+            'funnelSkipUntil',
+            'funnelSkipCookie',
+            'funnelSkipUntilCookie'
+        ));
+    }
+
+    /**
+     * Ustawia cookie opt-out w przeglądarce adm, potem przekierowuje na pnedu (tam też ustawia cookie) i wraca tutaj.
+     */
+    public function funnelSkipToggle(string $action, FunnelSkipService $funnelSkip)
+    {
+        if (! in_array($action, ['enable', 'disable'], true)) {
+            abort(404);
+        }
+
+        if (! $funnelSkip->isConfigured()) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->with('error', 'Brak konfiguracji MARKETING_FUNNEL_SKIP_TOKEN w .env.');
+        }
+
+        $enable = $action === 'enable';
+        $returnUrl = route('settings.pnedu-purchases.index', [
+            'funnel_skip' => $enable ? 'enabled' : 'disabled',
+        ], absolute: true);
+
+        $pneduUrl = $funnelSkip->pneduToggleUrl($enable, $returnUrl);
+        if ($pneduUrl === null) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->with('error', 'Nie udało się zbudować linku opt-out dla pnedu.');
+        }
+
+        $redirect = redirect()->away($pneduUrl);
+
+        if ($enable) {
+            $redirect->withCookie($funnelSkip->makeOptOutCookie())
+                ->withCookie($funnelSkip->makeOptOutUntilCookie());
+        } else {
+            $redirect->withCookie($funnelSkip->forgetOptOutCookie())
+                ->withCookie($funnelSkip->forgetOptOutUntilCookie());
+        }
+
+        return $redirect;
     }
 
     /**

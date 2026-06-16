@@ -27,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // $middleware->web(append: [
         //     \App\Http\Middleware\NoIndexMiddleware::class,
         // ]);
+
+        $middleware->encryptCookies(except: [
+            'pne_skip_funnel',
+            'pne_skip_funnel_until',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // 419 Page Expired (wygasła sesja / CSRF) – dla formularza pnedu-zakupy przekieruj z powrotem z komunikatem

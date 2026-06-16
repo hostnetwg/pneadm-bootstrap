@@ -508,6 +508,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('pnedu-zakupy', [PneduPurchasesController::class, 'index'])->name('pnedu-purchases.index');
         Route::post('pnedu-zakupy', [PneduPurchasesController::class, 'store'])->name('pnedu-purchases.store');
+        Route::get('pnedu-zakupy/lejek-opt-out/{action}', [PneduPurchasesController::class, 'funnelSkipToggle'])
+            ->whereIn('action', ['enable', 'disable'])
+            ->name('pnedu-purchases.funnel-skip');
     });
 });
 
