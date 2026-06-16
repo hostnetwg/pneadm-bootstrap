@@ -125,6 +125,8 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 Serwis: `App\Services\CourseFunnelStatsService`.  
 UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
+**Opt-out zespołu (pnedu):** cookie `pne_skip_funnel` po `?pne_skip_funnel=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` pnedu). Wyłącza liczenie wejść w `course_page_stats_daily` i eventów GA `course_view` / `order_form_view`. Przywrócenie: `pne_skip_funnel=0` z tym samym tokenem.
+
 ---
 
 ## 5. Typy źródeł — audyt i rekomendacje
