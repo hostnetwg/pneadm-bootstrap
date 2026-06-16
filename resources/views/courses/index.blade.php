@@ -252,7 +252,7 @@
                         <th style="width: 10%;">Instruktor</th>
                         <th class="text-center" style="width: 3%;" title="Check lista">C</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
-                        <th class="text-center" style="width: 5%;" title="Lejek marketingowy ({{ $funnelStatsDays }} dni): unikalne wejścia/dzień na pnedu.pl (opis, formularz order-form + deferred-order) oraz zamówienia">Lejek</th>
+                        <th class="text-center" style="width: 5%;" title="Lejek marketingowy: kampanie (cała historia); poniżej statystyki z ostatnich {{ $funnelStatsDays }} dni (wejścia, formularz, zamówienia)">Lejek</th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
                 </thead>
@@ -532,7 +532,16 @@
                             @endif
                         </td>
                         <td class="text-center align-middle small" style="line-height: 1.35;">
-                            @php $fs = $course->funnel_stats ?? null; @endphp
+                            @php
+                                $fs = $course->funnel_stats ?? null;
+                                $campaignCount = (int) ($fs['campaigns_count'] ?? 0);
+                            @endphp
+                            <div class="mb-1" title="Kampanie marketingowe przypisane do tego szkolenia (cała historia)">
+                                <a href="{{ route('marketing-campaigns.index', ['course_id' => $course->id]) }}"
+                                   class="badge text-bg-success text-decoration-none fw-bold px-2 py-1 {{ $campaignCount === 0 ? 'opacity-75' : '' }}">
+                                    <i class="bi bi-megaphone-fill"></i> {{ $campaignCount }}
+                                </a>
+                            </div>
                             @if($fs)
                                 <div title="Wejścia na opis szkolenia (pnedu.pl, unikalne/dzień)">
                                     <i class="bi bi-eye text-muted"></i> {{ number_format($fs['views_course_show'], 0, ',', ' ') }}

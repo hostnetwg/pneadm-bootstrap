@@ -33,6 +33,14 @@ class MarketingCampaignController extends Controller
             $query->where('source_type_id', $request->get('source_type_id'));
         }
 
+        // Filtr według szkolenia
+        $filteredCourse = null;
+        if ($request->filled('course_id')) {
+            $courseId = $request->integer('course_id');
+            $query->where('course_id', $courseId);
+            $filteredCourse = Course::query()->find($courseId);
+        }
+
         // Filtr według statusu
         if ($request->filled('is_active')) {
             $query->where('is_active', $request->get('is_active'));
@@ -65,7 +73,7 @@ class MarketingCampaignController extends Controller
             $campaignUrlsById[$campaign->id] = $urlBuilder->buildForCampaign($campaign);
         }
 
-        return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes', 'campaignUrlsById'));
+        return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes', 'campaignUrlsById', 'filteredCourse'));
     }
 
     /**

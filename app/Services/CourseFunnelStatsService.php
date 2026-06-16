@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CoursePageStatsDaily;
+use App\Models\MarketingCampaign;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,32 @@ class CourseFunnelStatsService
                 'cr_form_to_order' => $this->conversionRate($submitted, $viewsForm),
                 'cr_show_to_invoiced' => $this->conversionRate($invoiced, $viewsShow),
             ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Liczba kampanii marketingowych przypisanych do szkolenia (cała historia, bez soft delete).
+     *
+     * @param  array<int>  $courseIds
+     * @return array<int, int>
+     */
+    public function campaignCountsForCourses(array $courseIds): array
+    {
+        if ($courseIds === []) {
+            return [];
+        }
+
+        $counts = MarketingCampaign::query()
+            ->whereIn('course_id', $courseIds)
+            ->selectRaw('course_id, COUNT(*) as campaigns_count')
+            ->groupBy('course_id')
+            ->pluck('campaigns_count', 'course_id');
+
+        $result = [];
+        foreach ($courseIds as $courseId) {
+            $result[$courseId] = (int) ($counts[$courseId] ?? 0);
         }
 
         return $result;

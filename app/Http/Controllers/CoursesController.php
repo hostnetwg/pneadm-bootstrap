@@ -291,8 +291,9 @@ class CoursesController extends Controller
         $funnelStats = [];
         if (! empty($courseIdsOnPage)) {
             $funnelStats = $funnelStatsService->statsForCourses($courseIdsOnPage);
-            $courses->getCollection()->transform(function ($course) use ($funnelStats) {
-                $course->funnel_stats = $funnelStats[$course->id] ?? [
+            $campaignCounts = $funnelStatsService->campaignCountsForCourses($courseIdsOnPage);
+            $courses->getCollection()->transform(function ($course) use ($funnelStats, $campaignCounts) {
+                $course->funnel_stats = array_merge($funnelStats[$course->id] ?? [
                     'views_course_show' => 0,
                     'views_order_form' => 0,
                     'orders_submitted' => 0,
@@ -301,7 +302,9 @@ class CoursesController extends Controller
                     'cr_show_to_order' => null,
                     'cr_form_to_order' => null,
                     'cr_show_to_invoiced' => null,
-                ];
+                ], [
+                    'campaigns_count' => $campaignCounts[$course->id] ?? 0,
+                ]);
 
                 return $course;
             });

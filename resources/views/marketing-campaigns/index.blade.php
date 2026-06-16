@@ -36,6 +36,16 @@
                 </div>
             @endif
 
+            @if($filteredCourse ?? null)
+                <div class="alert alert-info py-2 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <span>
+                        Kampanie dla szkolenia <strong>#{{ $filteredCourse->id }}</strong>:
+                        {!! \Illuminate\Support\Str::limit(strip_tags($filteredCourse->title), 80) !!}
+                    </span>
+                    <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-sm btn-outline-secondary">Pokaż wszystkie kampanie</a>
+                </div>
+            @endif
+
             <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-3">
                 <div>
                     <h3 class="h4 mb-1 fw-semibold">Kampanie marketingowe</h3>
@@ -57,6 +67,9 @@
                 </div>
                 <div class="card-body pt-2 pb-3">
                     <form method="GET" action="{{ route('marketing-campaigns.index') }}" class="row g-2 g-lg-3 align-items-end">
+                        @if(request()->filled('course_id'))
+                            <input type="hidden" name="course_id" value="{{ request('course_id') }}">
+                        @endif
                         <div class="col-lg-4 col-md-6">
                             <label for="search" class="form-label">Szukaj</label>
                             <input type="text" class="form-control form-control-sm" id="search" name="search"
