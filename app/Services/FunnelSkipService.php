@@ -36,19 +36,50 @@ class FunnelSkipService
         return (string) config('marketing.funnel_skip_query_param', 'pne_skip_funnel');
     }
 
+    public function analyticsQueryParam(): string
+    {
+        return (string) config('marketing.funnel_skip_analytics_query_param', 'pne_skip_analytics');
+    }
+
     public function tokenParam(): string
     {
         return (string) config('marketing.funnel_skip_token_param', 'token');
     }
 
-    public function pneduToggleUrl(bool $enable, ?string $admReturnUrl = null): ?string
+    public function analyticsCookieName(): string
+    {
+        return (string) config('marketing.funnel_skip_analytics_cookie', 'pne_skip_analytics');
+    }
+
+    public function pneduFunnelToggleUrl(bool $enableOptOut, ?string $admReturnUrl = null): ?string
     {
         if (! $this->isConfigured()) {
             return null;
         }
 
         $query = [
-            $this->queryParam() => $enable ? '1' : '0',
+            $this->queryParam() => $enableOptOut ? '1' : '0',
+            $this->tokenParam() => (string) config('marketing.funnel_skip_token'),
+            $this->analyticsQueryParam() => '0',
+        ];
+
+        if (filled($admReturnUrl)) {
+            $query['adm_return'] = $admReturnUrl;
+        }
+
+        $base = rtrim((string) config('marketing.pnedu_public_url', 'https://pnedu.pl'), '/');
+
+        return $base.'/?'.http_build_query($query);
+    }
+
+    public function pneduAnalyticsToggleUrl(bool $enableOptOut, ?string $admReturnUrl = null): ?string
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        $query = [
+            $this->analyticsQueryParam() => $enableOptOut ? '1' : '0',
             $this->tokenParam() => (string) config('marketing.funnel_skip_token'),
         ];
 
@@ -59,6 +90,16 @@ class FunnelSkipService
         $base = rtrim((string) config('marketing.pnedu_public_url', 'https://pnedu.pl'), '/');
 
         return $base.'/?'.http_build_query($query);
+    }
+
+    /** @deprecated Użyj pneduFunnelToggleUrl() lub pneduAnalyticsToggleUrl() */
+    public function pneduToggleUrl(bool $enable, ?string $admReturnUrl = null, bool $disableAnalytics = true): ?string
+    {
+        if ($disableAnalytics && $enable) {
+            return $this->pneduFunnelToggleUrl(true, $admReturnUrl);
+        }
+
+        return $this->pneduFunnelToggleUrl($enable, $admReturnUrl);
     }
 
     public function makeOptOutCookie(): Cookie
@@ -98,6 +139,24 @@ class FunnelSkipService
         );
     }
 
+    public function makeAnalyticsOptOutCookie(): Cookie
+    {
+        $days = max(1, (int) config('marketing.funnel_skip_cookie_days', 365));
+        $minutes = $days * 24 * 60;
+
+        return cookie(
+            $this->analyticsCookieName(),
+            '1',
+            $minutes,
+            '/',
+            $this->cookieDomain(),
+            app()->environment('production'),
+            true,
+            false,
+            'Lax'
+        );
+    }
+
     public function forgetOptOutCookie(): Cookie
     {
         return cookie(
@@ -123,6 +182,21 @@ class FunnelSkipService
             $this->cookieDomain(),
             app()->environment('production'),
             false,
+            false,
+            'Lax'
+        );
+    }
+
+    public function forgetAnalyticsOptOutCookie(): Cookie
+    {
+        return cookie(
+            $this->analyticsCookieName(),
+            '',
+            -1,
+            '/',
+            $this->cookieDomain(),
+            app()->environment('production'),
+            true,
             false,
             'Lax'
         );

@@ -507,8 +507,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     // Ustawienia
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('pnedu-zakupy', [PneduPurchasesController::class, 'index'])->name('pnedu-purchases.index');
+        Route::get('analityka', [PneduPurchasesController::class, 'analytics'])->name('analytics.index');
         Route::post('pnedu-zakupy', [PneduPurchasesController::class, 'store'])->name('pnedu-purchases.store');
-        Route::get('pnedu-zakupy/lejek-opt-out/{action}', [PneduPurchasesController::class, 'funnelSkipToggle'])
+        Route::get('analityka/lejek-opt-out/{scope}/{action}', [PneduPurchasesController::class, 'funnelSkipToggle'])
+            ->whereIn('scope', ['funnel', 'analytics'])
             ->whereIn('action', ['enable', 'disable'])
             ->name('pnedu-purchases.funnel-skip');
     });

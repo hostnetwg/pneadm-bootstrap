@@ -13,10 +13,15 @@ return new class extends Migration
     {
         Schema::table('payment_display_options', function (Blueprint $table) {
             if (! Schema::hasColumn('payment_display_options', 'order_form_auto_fill_test_data_developers_only')) {
-                $table->boolean('order_form_auto_fill_test_data_developers_only')
+                $column = $table->boolean('order_form_auto_fill_test_data_developers_only')
                     ->default(false)
-                    ->after('order_form_auto_fill_test_data_enabled_at')
                     ->comment('Auto-wypełnianie formularza danymi testowymi tylko dla kont deweloperskich (zalogowani na pnedu.pl)');
+
+                if (Schema::hasColumn('payment_display_options', 'order_form_auto_fill_test_data_enabled_at')) {
+                    $column->after('order_form_auto_fill_test_data_enabled_at');
+                } elseif (Schema::hasColumn('payment_display_options', 'order_form_auto_fill_test_data')) {
+                    $column->after('order_form_auto_fill_test_data');
+                }
             }
         });
     }

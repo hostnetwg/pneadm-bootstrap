@@ -92,7 +92,9 @@ return [
     */
     'funnel_skip_cookie' => env('MARKETING_FUNNEL_SKIP_COOKIE', 'pne_skip_funnel'),
     'funnel_skip_until_cookie' => env('MARKETING_FUNNEL_SKIP_UNTIL_COOKIE', 'pne_skip_funnel_until'),
+    'funnel_skip_analytics_cookie' => env('MARKETING_FUNNEL_SKIP_ANALYTICS_COOKIE', 'pne_skip_analytics'),
     'funnel_skip_query_param' => env('MARKETING_FUNNEL_SKIP_QUERY_PARAM', 'pne_skip_funnel'),
+    'funnel_skip_analytics_query_param' => env('MARKETING_FUNNEL_SKIP_ANALYTICS_QUERY_PARAM', 'pne_skip_analytics'),
     'funnel_skip_token_param' => env('MARKETING_FUNNEL_SKIP_TOKEN_PARAM', 'token'),
     'funnel_skip_token' => env('MARKETING_FUNNEL_SKIP_TOKEN'),
     'funnel_skip_cookie_days' => (int) env('MARKETING_FUNNEL_SKIP_COOKIE_DAYS', 365),

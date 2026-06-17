@@ -346,6 +346,11 @@
                             Zakupy pnedu.pl
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('settings.analytics.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.analytics.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Analityka
+                        </a>
+                    </li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>
                 </ul>
             </div>

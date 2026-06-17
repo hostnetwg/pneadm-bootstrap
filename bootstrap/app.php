@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: [
             'pne_skip_funnel',
             'pne_skip_funnel_until',
+            'pne_skip_analytics',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

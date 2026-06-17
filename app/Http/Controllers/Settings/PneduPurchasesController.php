@@ -7,6 +7,7 @@ use App\Models\PaymentDisplayOption;
 use App\Services\FunnelSkipService;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class PneduPurchasesController extends Controller
 {
@@ -16,14 +17,28 @@ class PneduPurchasesController extends Controller
     public function index(Request $request)
     {
         $options = PaymentDisplayOption::getSettings();
+        $developersOnlyColumnReady = $this->developersOnlyColumnReady();
+
+        return view('settings.pnedu-purchases', compact(
+            'options',
+            'developersOnlyColumnReady',
+        ));
+    }
+
+    public function analytics(Request $request)
+    {
         $funnelSkip = app(FunnelSkipService::class);
         $funnelSkipCookie = $funnelSkip->cookieName();
         $funnelSkipUntilCookie = $funnelSkip->untilCookieName();
+        $funnelSkipAnalyticsCookie = $funnelSkip->analyticsCookieName();
 
-        $funnelSkipEnableUrl = $funnelSkip->pneduToggleUrl(true);
-        $funnelSkipDisableUrl = $funnelSkip->pneduToggleUrl(false);
+        $funnelSkipEnableUrl = $funnelSkip->pneduFunnelToggleUrl(true);
+        $funnelSkipDisableUrl = $funnelSkip->pneduFunnelToggleUrl(false);
+        $analyticsSkipEnableUrl = $funnelSkip->pneduAnalyticsToggleUrl(true);
+        $analyticsSkipDisableUrl = $funnelSkip->pneduAnalyticsToggleUrl(false);
 
         $funnelSkipEnabledForBrowser = $request->cookie($funnelSkipCookie) === '1';
+        $funnelSkipAnalyticsEnabledForBrowser = $request->cookie($funnelSkipAnalyticsCookie) === '1';
         $funnelSkipUntilRaw = $request->cookie($funnelSkipUntilCookie);
         $funnelSkipUntil = null;
         if (is_string($funnelSkipUntilRaw) && trim($funnelSkipUntilRaw) !== '') {
@@ -34,52 +49,82 @@ class PneduPurchasesController extends Controller
             }
         }
 
-        return view('settings.pnedu-purchases', compact(
-            'options',
+        return view('settings.analytics', compact(
             'funnelSkipEnableUrl',
             'funnelSkipDisableUrl',
+            'analyticsSkipEnableUrl',
+            'analyticsSkipDisableUrl',
             'funnelSkipEnabledForBrowser',
+            'funnelSkipAnalyticsEnabledForBrowser',
             'funnelSkipUntil',
             'funnelSkipCookie',
-            'funnelSkipUntilCookie'
+            'funnelSkipUntilCookie',
+            'funnelSkipAnalyticsCookie',
         ));
     }
 
-    /**
-     * Ustawia cookie opt-out w przeglądarce adm, potem przekierowuje na pnedu (tam też ustawia cookie) i wraca tutaj.
-     */
-    public function funnelSkipToggle(string $action, FunnelSkipService $funnelSkip)
+    private function developersOnlyColumnReady(): bool
     {
+        try {
+            return Schema::hasColumn('payment_display_options', 'order_form_auto_fill_test_data_developers_only');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Przełącza opt-out lejka lub analityki w przeglądarce adm, potem przekierowuje na pnedu i wraca tutaj.
+     *
+     * @param  'funnel'|'analytics'  $scope
+     * @param  'enable'|'disable'  $action  enable = opt-out włączony (zliczanie OFF), disable = opt-out wyłączony (zliczanie ON)
+     */
+    public function funnelSkipToggle(string $scope, string $action, FunnelSkipService $funnelSkip)
+    {
+        if (! in_array($scope, ['funnel', 'analytics'], true)) {
+            abort(404);
+        }
+
         if (! in_array($action, ['enable', 'disable'], true)) {
             abort(404);
         }
 
         if (! $funnelSkip->isConfigured()) {
             return redirect()
-                ->route('settings.pnedu-purchases.index')
+                ->route('settings.analytics.index')
                 ->with('error', 'Brak konfiguracji MARKETING_FUNNEL_SKIP_TOKEN w .env.');
         }
 
-        $enable = $action === 'enable';
-        $returnUrl = route('settings.pnedu-purchases.index', [
-            'funnel_skip' => $enable ? 'enabled' : 'disabled',
-        ], absolute: true);
+        $enableOptOut = $action === 'enable';
+        $returnQuery = $scope === 'funnel'
+            ? ['funnel' => $enableOptOut ? 'off' : 'on']
+            : ['analytics' => $enableOptOut ? 'off' : 'on'];
 
-        $pneduUrl = $funnelSkip->pneduToggleUrl($enable, $returnUrl);
+        $returnUrl = route('settings.analytics.index', $returnQuery, absolute: true);
+
+        $pneduUrl = $scope === 'funnel'
+            ? $funnelSkip->pneduFunnelToggleUrl($enableOptOut, $returnUrl)
+            : $funnelSkip->pneduAnalyticsToggleUrl($enableOptOut, $returnUrl);
+
         if ($pneduUrl === null) {
             return redirect()
-                ->route('settings.pnedu-purchases.index')
+                ->route('settings.analytics.index')
                 ->with('error', 'Nie udało się zbudować linku opt-out dla pnedu.');
         }
 
         $redirect = redirect()->away($pneduUrl);
 
-        if ($enable) {
-            $redirect->withCookie($funnelSkip->makeOptOutCookie())
-                ->withCookie($funnelSkip->makeOptOutUntilCookie());
+        if ($scope === 'funnel') {
+            if ($enableOptOut) {
+                $redirect->withCookie($funnelSkip->makeOptOutCookie())
+                    ->withCookie($funnelSkip->makeOptOutUntilCookie());
+            } else {
+                $redirect->withCookie($funnelSkip->forgetOptOutCookie())
+                    ->withCookie($funnelSkip->forgetOptOutUntilCookie());
+            }
+        } elseif ($enableOptOut) {
+            $redirect->withCookie($funnelSkip->makeAnalyticsOptOutCookie());
         } else {
-            $redirect->withCookie($funnelSkip->forgetOptOutCookie())
-                ->withCookie($funnelSkip->forgetOptOutUntilCookie());
+            $redirect->withCookie($funnelSkip->forgetAnalyticsOptOutCookie());
         }
 
         return $redirect;
@@ -114,18 +159,31 @@ class PneduPurchasesController extends Controller
 
         $options = PaymentDisplayOption::getSettings();
         $autoFillEnabled = $request->boolean('order_form_auto_fill_test_data');
-        $options->update([
+        $developersOnlyEnabled = $request->boolean('order_form_auto_fill_test_data_developers_only');
+
+        if ($developersOnlyEnabled && ! $this->developersOnlyColumnReady()) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->with('error', 'Nie można zapisać opcji dla kont deweloperskich — brak kolumny w bazie. Na serwerze produkcyjnym uruchom: php artisan migrate --force');
+        }
+
+        $updateData = [
             'show_pay_publigo' => $request->boolean('show_pay_publigo'),
             'show_pay_online' => $request->boolean('show_pay_online'),
             'show_deferred_order' => $request->boolean('show_deferred_order'),
             'show_order_form' => $request->boolean('show_order_form'),
             'show_order_form_alt' => $request->boolean('show_order_form_alt'),
-            'order_form_auto_fill_test_data_developers_only' => $request->boolean('order_form_auto_fill_test_data_developers_only'),
             'order_form_auto_fill_test_data' => $autoFillEnabled,
             'order_form_auto_fill_test_data_enabled_at' => $autoFillEnabled ? Carbon::now() : null,
             'default_post_end_access_duration_value' => $validated['default_post_end_access_duration_value'],
             'default_post_end_access_duration_unit' => $validated['default_post_end_access_duration_unit'],
-        ]);
+        ];
+
+        if ($this->developersOnlyColumnReady()) {
+            $updateData['order_form_auto_fill_test_data_developers_only'] = $developersOnlyEnabled;
+        }
+
+        $options->update($updateData);
 
         PaymentDisplayOption::forgetSettingsCache();
 
