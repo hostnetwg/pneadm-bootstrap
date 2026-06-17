@@ -97,7 +97,7 @@ return [
     'funnel_skip_analytics_query_param' => env('MARKETING_FUNNEL_SKIP_ANALYTICS_QUERY_PARAM', 'pne_skip_analytics'),
     'funnel_skip_token_param' => env('MARKETING_FUNNEL_SKIP_TOKEN_PARAM', 'token'),
     'funnel_skip_token' => env('MARKETING_FUNNEL_SKIP_TOKEN'),
-    'funnel_skip_cookie_days' => (int) env('MARKETING_FUNNEL_SKIP_COOKIE_DAYS', 365),
+    'funnel_skip_cookie_days' => (int) env('MARKETING_FUNNEL_SKIP_COOKIE_DAYS', 365), // rolling TTL — odnawiane przy wizycie; OFF trwa do ręcznego ON
     'funnel_skip_cookie_domain' => env(
         'MARKETING_FUNNEL_SKIP_COOKIE_DOMAIN',
         env('APP_ENV') === 'production' ? '.pnedu.pl' : null

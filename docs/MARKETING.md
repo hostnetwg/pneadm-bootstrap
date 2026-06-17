@@ -125,7 +125,7 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 Serwis: `App\Services\CourseFunnelStatsService`.  
 UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
-**Opt-out zespołu (pnedu):** cookie `pne_skip_funnel` po `?pne_skip_funnel=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` pnedu). Wyłącza liczenie wejść w `course_page_stats_daily`, eventy GA `course_view` / `order_form_view` oraz **całkowicie pomija ładowanie GA4 i GTM** na pnedu.pl w tej przeglądarce. Przywrócenie: `pne_skip_funnel=0` z tym samym tokenem.
+**Opt-out zespołu (pnedu + adm):** przełączniki na **Ustawienia → Analityka** (`/settings/analityka`) lub linki `?pne_skip_funnel=1&token=…` / `?pne_skip_analytics=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` obu projektów). Lejek OFF wyłącza zliczanie wejść w `course_page_stats_daily` i eventy GA `course_view` / `order_form_view`. GA/GTM OFF pomija ładowanie GA4 i GTM na pnedu.pl. **Wyłączenie trwa do ręcznego ON** — cookie ma techniczny TTL (`MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, domyślnie 365 dni), ale jest **odnawiane przy każdej wizycie** na pnedu.pl i w panelu adm, więc nie wygasa samo po roku.
 
 ---
 

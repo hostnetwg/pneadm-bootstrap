@@ -95,7 +95,8 @@
 
                     <p class="small text-muted mb-3">
                         <strong>ON</strong> (zielony) = dane są zliczane &nbsp;·&nbsp;
-                        <strong>OFF</strong> (czerwony) = wyłączone dla tej przeglądarki
+                        <strong>OFF</strong> (czerwony) = wyłączone dla tej przeglądarki do momentu ponownego kliknięcia <strong>ON</strong>
+                        (nie wygasa samo po czasie).
                     </p>
 
                     <details class="mb-3">
@@ -136,13 +137,20 @@
                     </div>
                 @endif
 
-                @if($funnelSkipEnabledForBrowser && $funnelSkipUntil)
-                    <div class="border rounded p-3">
-                        <div class="small text-muted">
-                            Cookie lejka ważne do:
-                            <strong>{{ $funnelSkipUntil->timezone(config('app.timezone', 'Europe/Warsaw'))->format('d.m.Y H:i') }}</strong>
-                            (strefa {{ config('app.timezone', 'Europe/Warsaw') }}).
-                        </div>
+                @if($funnelSkipEnabledForBrowser || $funnelSkipAnalyticsEnabledForBrowser)
+                    <div class="border rounded p-3 bg-light">
+                        @if($funnelSkipEnabledForBrowser)
+                            <div class="small {{ $funnelSkipAnalyticsEnabledForBrowser ? 'mb-2' : 'mb-0' }}">
+                                <strong>Lejek jest wyłączony</strong> w tej przeglądarce — zliczanie wróci dopiero po kliknięciu
+                                <strong>Lejek → ON</strong>. Ustawienie pozostaje aktywne do ręcznego włączenia.
+                            </div>
+                        @endif
+                        @if($funnelSkipAnalyticsEnabledForBrowser)
+                            <div class="small mb-0">
+                                <strong>Google Analytics / GTM są wyłączone</strong> w tej przeglądarce — wrócą dopiero po kliknięciu
+                                <strong>GA/GTM → ON</strong>.
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>

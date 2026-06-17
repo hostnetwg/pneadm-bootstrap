@@ -28,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
         //     \App\Http\Middleware\NoIndexMiddleware::class,
         // ]);
 
+        $middleware->web(append: [
+            \App\Http\Middleware\RefreshFunnelSkipOptOutCookies::class,
+        ]);
+
         $middleware->encryptCookies(except: [
             'pne_skip_funnel',
             'pne_skip_funnel_until',
