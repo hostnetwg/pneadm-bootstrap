@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Cache;
  */
 class PaymentDisplayOption extends Model
 {
+    /** Po tym czasie na produkcji sama wyłącza się opcja bez ograniczeń e-mail (bezpiecznik). */
+    public const UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES = 1;
+
     public const SETTINGS_CACHE_KEY = 'payment_display_options';
 
     public const SETTINGS_CACHE_TTL_SECONDS = 900;
@@ -25,6 +28,7 @@ class PaymentDisplayOption extends Model
         'show_order_form_alt',
         'order_form_auto_fill_test_data',
         'order_form_auto_fill_test_data_enabled_at',
+        'order_form_auto_fill_test_data_developers_only',
         'default_post_end_access_duration_value',
         'default_post_end_access_duration_unit',
     ];
@@ -37,6 +41,7 @@ class PaymentDisplayOption extends Model
         'show_order_form_alt' => 'boolean',
         'order_form_auto_fill_test_data' => 'boolean',
         'order_form_auto_fill_test_data_enabled_at' => 'datetime',
+        'order_form_auto_fill_test_data_developers_only' => 'boolean',
         'default_post_end_access_duration_value' => 'integer',
     ];
 
@@ -51,11 +56,55 @@ class PaymentDisplayOption extends Model
      */
     public static function getSettings(): self
     {
-        return Cache::remember(
+        $settings = Cache::remember(
             self::SETTINGS_CACHE_KEY,
             self::SETTINGS_CACHE_TTL_SECONDS,
             fn () => self::loadSettingsFromDatabase(),
         );
+
+        return self::expireUnrestrictedAutoFillIfNeeded($settings);
+    }
+
+    public static function unrestrictedAutoFillShouldExpire(): bool
+    {
+        return app()->environment('production');
+    }
+
+    public static function isUnrestrictedAutoFillExpired(?\Illuminate\Support\Carbon $enabledAt): bool
+    {
+        if ($enabledAt instanceof \Illuminate\Support\Carbon) {
+            return $enabledAt->lt(now()->subMinutes(self::UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES));
+        }
+
+        return true;
+    }
+
+    /**
+     * Na produkcji wyłącza opcję bez ograniczeń e-mail po UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES.
+     * Opcja developers_only nie ma auto-wygaśnięcia.
+     */
+    public static function expireUnrestrictedAutoFillIfNeeded(self $row): self
+    {
+        if (! (bool) ($row->order_form_auto_fill_test_data ?? false)) {
+            return $row;
+        }
+
+        if (! self::unrestrictedAutoFillShouldExpire()) {
+            return $row;
+        }
+
+        if (! self::isUnrestrictedAutoFillExpired($row->order_form_auto_fill_test_data_enabled_at)) {
+            return $row;
+        }
+
+        $row->forceFill([
+            'order_form_auto_fill_test_data' => false,
+            'order_form_auto_fill_test_data_enabled_at' => null,
+        ])->save();
+
+        self::forgetSettingsCache();
+
+        return $row->fresh() ?? $row;
     }
 
     private static function loadSettingsFromDatabase(): self
@@ -74,6 +123,7 @@ class PaymentDisplayOption extends Model
                 'show_order_form_alt' => true,
                 'order_form_auto_fill_test_data' => false,
                 'order_form_auto_fill_test_data_enabled_at' => null,
+                'order_form_auto_fill_test_data_developers_only' => false,
                 'default_post_end_access_duration_value' => 2,
                 'default_post_end_access_duration_unit' => 'months',
             ]);
@@ -87,6 +137,7 @@ class PaymentDisplayOption extends Model
             $fallback->show_order_form_alt = true;
             $fallback->order_form_auto_fill_test_data = false;
             $fallback->order_form_auto_fill_test_data_enabled_at = null;
+            $fallback->order_form_auto_fill_test_data_developers_only = false;
             $fallback->default_post_end_access_duration_value = 2;
             $fallback->default_post_end_access_duration_unit = 'months';
 

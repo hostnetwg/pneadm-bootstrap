@@ -60,11 +60,10 @@
                         'show_deferred_order' => 'Formularz zamówienia z odroczonym terminem płatności (w PNEDU)',
                         'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz zamówienia i płatności online)',
                         'show_order_form_alt' => 'Formularz zamówienia z odroczonym terminem płatności (link zdalna-lekcja.pl)',
-                        'order_form_auto_fill_test_data' => 'Automatyczne wypełnianie formularza zamówienia danymi testowymi (ułatwia testy; niewidoczne na stronie kursu)',
                     ] as $key => $label)
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="{{ $key }}" id="{{ $key }}" value="1"
-                                {{ (optional($options)->{$key} ?? ($key === 'order_form_auto_fill_test_data' ? false : true)) ? 'checked' : '' }}>
+                                {{ (optional($options)->{$key} ?? true) ? 'checked' : '' }}>
                             <label class="form-check-label" for="{{ $key }}">
                                 @if($key === 'show_order_form')
                                     <span class="fw-bold">Zamawiam szkolenie</span> (uniwersalny formularz zamówienia i płatności online)
@@ -74,6 +73,33 @@
                             </label>
                         </div>
                     @endforeach
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               name="order_form_auto_fill_test_data_developers_only"
+                               id="order_form_auto_fill_test_data_developers_only"
+                               value="1"
+                            {{ optional($options)->order_form_auto_fill_test_data_developers_only ? 'checked' : '' }}>
+                        <label class="form-check-label" for="order_form_auto_fill_test_data_developers_only">
+                            Automatyczne wypełnianie formularza zamówienia danymi testowymi (wyłącznie dla kont waldemar.grabowski@hostnet.pl oraz luman0599@gmail.com)
+                        </label>
+                        <div class="form-text text-muted small">
+                            Działa tylko dla zalogowanych użytkowników z podanymi adresami e-mail. Nie wyłącza się automatycznie.
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               name="order_form_auto_fill_test_data"
+                               id="order_form_auto_fill_test_data"
+                               value="1"
+                            {{ optional($options)->order_form_auto_fill_test_data ? 'checked' : '' }}>
+                        <label class="form-check-label text-danger fw-semibold" for="order_form_auto_fill_test_data">
+                            Automatyczne wypełnianie formularza zamówienia danymi testowymi (ułatwia testy; niewidoczne na stronie kursu)
+                        </label>
+                        <div class="form-text text-danger small">
+                            Bez ograniczeń e-mail (także dla niezalogowanych). Na produkcji wyłącza się automatycznie po {{ \App\Models\PaymentDisplayOption::UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES }} min od włączenia — także w tym panelu, bez ręcznego odznaczania.
+                        </div>
+                    </div>
                 </div>
 
                 <hr class="my-4">
