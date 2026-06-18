@@ -4,6 +4,8 @@ Dokumentacja dla developerów **pneadm** (adm) i **pnedu** (front). Opisuje stan
 
 Powiązane projekty: zobacz też [.ai/MULTI_PROJECT_CONTEXT.md](../.ai/MULTI_PROJECT_CONTEXT.md).
 
+**Kontynuacja pracy bez historii chatów AI:** [MARKETING-HANDOFF.md](./MARKETING-HANDOFF.md) — stan wdrożenia, pliki, testy, deploy, pułapki dev.
+
 ---
 
 ## 1. Do czego dążymy
@@ -61,14 +63,20 @@ Implementacja przekierowania: `pnedu` → `GET /l/{campaign_code}` (`MarketingCa
 │  marketing_source_types → marketing_campaigns → generator URL   │
 │  CourseFunnelStatsService, MarketingFunnelController            │
 │  form_orders.fb_source ↔ marketing_campaigns.campaign_code      │
-│  course_page_stats_daily (agregaty wejść)                       │
+│  course_page_stats_daily (lejek: opis / formularz per kurs)     │
+│  marketing_campaign_stats_daily (kliknięcia w link kampanii)    │
+│  MarketingCampaignStatsService — okresy na liście kampanii    │
+│  Ustawienia → Analityka — opt-out lejka / GA (FunnelSkipService)│
 └────────────────────────────┬────────────────────────────────────┘
                              │ baza pneadm
 ┌────────────────────────────▼────────────────────────────────────┐
 │  pnedu.pl (pnedu)                                               │
-│  CaptureMarketingSource (middleware global) — cookie 7 dni        │
-│  TrackCoursePageView — wejścia opis / formularz                 │
+│  CaptureMarketingSource — cookie UTM 7 dni + link tracker       │
+│  MarketingCampaignLinkTracker — wejścia z linku kampanii        │
+│  TrackCoursePageView — wejścia opis / formularz (lejek)         │
 │  MarketingAttributionService — UTM + fb → sesja/cookie          │
+│  GET /l/{code} — skrócony link → 302 z UTM                      │
+│  CaptureFunnelSkipOptOut + RefreshFunnelSkipOptOutCookies       │
 │  formularz: hidden fb_source → zapis do form_orders             │
 │  GA4: course_view, order_form_view (+ campaign_id jeśli gtag)  │
 └─────────────────────────────────────────────────────────────────┘
@@ -81,15 +89,16 @@ Implementacja przekierowania: `pnedu` → `GET /l/{campaign_code}` (`MarketingCa
 | `marketing_source_types` | Kanał → domyślne `utm_source`, `default_utm_medium` |
 | `marketing_campaigns` | Kampania: `campaign_code`, `course_id`, `landing_target`, opcjonalne `utm_medium` |
 | `form_orders` | `fb_source` = kod kampanii (legacy nazwa pola); `conversion_placement` = miejsce konwersji (np. panel klienta) |
-| `course_page_stats_daily` | `views_course_show`, `views_order_form` per dzień/kurs |
+| `course_page_stats_daily` | `views_course_show`, `views_order_form` per dzień/kurs (lejek) |
+| `marketing_campaign_stats_daily` | `link_entries` per dzień/kampania (`campaign_code`) — kliknięcia w link |
 
 ### Konfiguracja
 
 | Plik | Zmienne |
 |------|---------|
-| `pneadm/config/marketing.php` | `PNEDU_PUBLIC_URL`, `MARKETING_ATTRIBUTION_DAYS`, `MARKETING_FUNNEL_STATS_DAYS`, `utm_medium_options` |
-| `pnedu/config/marketing.php` | `attribution_days`, `cookie_name`, `funnel_session_cookie` |
-| `pnedu/.env` | `GOOGLE_TAG_MANAGER_ID`, `GOOGLE_ANALYTICS_ID`, `MARKETING_ATTRIBUTION_DAYS` |
+| `pneadm/config/marketing.php` | `PNEDU_PUBLIC_URL`, `MARKETING_ATTRIBUTION_DAYS`, `MARKETING_FUNNEL_STATS_DAYS`, `MARKETING_FUNNEL_SKIP_TOKEN`, `MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, `utm_medium_options` |
+| `pnedu/config/marketing.php` | `attribution_days`, `cookie_name`, `funnel_session_cookie`, `funnel_skip_*` |
+| `pnedu/.env` | `GOOGLE_TAG_MANAGER_ID`, `GOOGLE_ANALYTICS_ID`, `MARKETING_ATTRIBUTION_DAYS`, `MARKETING_FUNNEL_SKIP_TOKEN` (ten sam co adm) |
 
 ---
 
@@ -127,7 +136,22 @@ UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
 **Opt-out zespołu (pnedu + adm):** przełączniki na **Ustawienia → Analityka** (`/settings/analityka`) lub linki `?pne_skip_funnel=1&token=…` / `?pne_skip_analytics=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` obu projektów). Lejek OFF wyłącza zliczanie wejść w `course_page_stats_daily` i eventy GA `course_view` / `order_form_view`. GA/GTM OFF pomija ładowanie GA4 i GTM na pnedu.pl. **Wyłączenie trwa do ręcznego ON** — cookie ma techniczny TTL (`MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, domyślnie 365 dni), ale jest **odnawiane przy każdej wizycie** na pnedu.pl i w panelu adm, więc nie wygasa samo po roku.
 
-**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Na liście kampanii można filtrować **okres** (presety: dziś, wczoraj, 7/30 dni, własny zakres) — wtedy kolumny Wejś./Zam. pokazują sumy w przedziale; bez filtra dat — cała historia. Zamówienia w okresie — ta sama logika operacyjna co w lejku (`CourseFunnelStatsService`).
+**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` / `fb_source` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Ten sam gość może tego samego dnia zliczyć **kilka różnych** kampanii. Respektuje opt-out lejka (`pne_skip_funnel=1` blokuje też wejścia z linków). Dane tylko od wdrożenia licznika (brak backfillu).
+
+**Lista kampanii — filtr okresu** (`MarketingCampaignStatsService`):
+
+| Parametr URL | Wartości | Efekt |
+|--------------|----------|-------|
+| `period` | `today`, `yesterday`, `7d`, `30d`, `custom` lub brak | Brak = cała historia |
+| `date_from`, `date_to` | `Y-m-d` | Wymagane przy `period=custom` |
+| `activity_metric` | `entries` (domyślnie), `orders` | Metryka dla sortowania i filtra aktywności |
+| `only_with_activity` | `1` | Ukryj kampanie bez Wejś./Zam. w okresie |
+
+W trybie okresu: kolumny **Wejś. (okres)** / **Zam. (okres)**, pasek sum u góry, domyślne sortowanie wg wybranej metryki. Zamówienia w okresie — ta sama logika operacyjna co w lejku (`CourseFunnelStatsService`).
+
+**Sortowanie Wejś.:** subquery `SUM(link_entries)` (Laravel 11 nie ma `orderBySum()` na relacji).
+
+**Atrybucja zamówień — „nieznana kampania”:** badge na `/form-orders` gdy `fb_source` nie pasuje do `marketing_campaigns.campaign_code` (np. stare linki, ID Meta zamiast kodu). Nie jest to błąd systemu — świadomie bez auto-mapowania.
 
 ---
 
@@ -216,25 +240,31 @@ Stan po migracji `2026_06_16_100001_normalize_marketing_source_type_utm_values.p
 
 | Obszar | Pliki |
 |--------|-------|
-| Modele | `app/Models/MarketingCampaign.php`, `MarketingSourceType.php`, `CoursePageStatsDaily.php`, `FormOrder.php` |
-| URL | `app/Services/MarketingCampaignUrlBuilder.php` |
-| Lejek | `app/Services/CourseFunnelStatsService.php`, `Http/Controllers/MarketingFunnelController.php` |
-| Kampanie | `Http/Controllers/MarketingCampaignController.php` |
-| Typy źródeł | `Http/Controllers/MarketingSourceTypeController.php` |
-| Widoki | `resources/views/marketing-campaigns/`, `marketing-source-types/`, `marketing-funnel/` |
+| Modele | `MarketingCampaign.php`, `MarketingSourceType.php`, `CoursePageStatsDaily.php`, `MarketingCampaignStatsDaily.php`, `FormOrder.php` |
+| URL | `MarketingCampaignUrlBuilder.php` |
+| Lejek | `CourseFunnelStatsService.php`, `MarketingFunnelController.php` |
+| Kampanie + okres | `MarketingCampaignController.php`, `MarketingCampaignStatsService.php` |
+| Opt-out analityki | `FunnelSkipService.php`, `RefreshFunnelSkipOptOutCookies.php`, `Settings/PneduPurchasesController.php` (`analytics`, `funnelSkipToggle`) |
+| Typy źródeł | `MarketingSourceTypeController.php` |
+| Widoki | `marketing-campaigns/`, `marketing-source-types/`, `marketing-funnel/`, `settings/analytics.blade.php` |
 | Config | `config/marketing.php` |
-| Migracje | `database/migrations/2026_06_02_*`, `2026_06_16_100001_*` |
+| Testy | `tests/Unit/MarketingCampaignStatsServiceTest.php`, `RefreshFunnelSkipOptOutCookiesTest.php` |
+| Migracje | `2026_06_02_*`, `2026_06_16_100001_*`, `2026_06_17_120001_create_marketing_campaign_stats_daily_table.php` |
 
 ### pnedu
 
 | Obszar | Pliki |
 |--------|-------|
-| Atrybucja | `app/Services/MarketingAttributionService.php` |
-| Wejścia | `app/Services/CoursePageViewTracker.php`, `Http/Middleware/TrackCoursePageView.php` |
-| Cookie UTM | `Http/Middleware/CaptureMarketingSource.php` |
-| Zamówienie | `Http/Controllers/CourseController.php` (`resolveFbSourceForFormOrder`) |
-| GA eventy | `resources/views/courses/partials/marketing-ga-event.blade.php` |
-| Analytics | `resources/views/layouts/analytics-head.blade.php` |
+| Atrybucja | `MarketingAttributionService.php` |
+| Lejek (opis/formularz) | `CoursePageViewTracker.php`, `TrackCoursePageView.php` |
+| Wejścia z linku kampanii | `MarketingCampaignLinkTracker.php`, `MarketingCampaignStatsDaily.php` |
+| Cookie UTM + tracker | `CaptureMarketingSource.php` |
+| Skrócony link | `MarketingCampaignShortLinkController.php`, trasa `GET /l/{campaign_code}` |
+| Opt-out | `FunnelSkipService.php`, `CaptureFunnelSkipOptOut.php`, `RefreshFunnelSkipOptOutCookies.php` |
+| Zamówienie | `CourseController.php` (`resolveFbSourceForFormOrder`) |
+| GA eventy | `courses/partials/marketing-ga-event.blade.php` |
+| Analytics | `layouts/analytics-head.blade.php` |
+| Testy | `tests/Feature/MarketingCampaignLinkTrackerTest.php`, `FunnelSkipOptOutTest.php`, `MarketingAnalyticsOptOutTest.php` |
 
 ---
 
@@ -259,9 +289,20 @@ Edytuj `CourseFunnelStatsService::orderCountsForCourses()` — faktura: `invoice
 
 ### Testy lokalne
 
-- adm: `http://adm.localhost:8083/marketing-campaigns`, `/marketing-source-types`, `/marketing-funnel`
-- pnedu: wejście z `?utm_source=newsletter&utm_medium=email&utm_campaign=TEST`
+- adm: `http://adm.localhost:8083/marketing-campaigns`, `/marketing-source-types`, `/marketing-funnel`, `/settings/analityka`
+- pnedu: wejście z `?utm_source=newsletter&utm_medium=email&utm_campaign=TEST` lub `/l/{kod}`
 - Sprawdź `form_orders.fb_source` po złożeniu zamówienia testowego.
+- **Wejś. z linku:** Lejek musi być ON (opt-out blokuje tracker); `PNEDU_PUBLIC_URL=http://localhost:8081` w adm.
+- Automatyczne: patrz [MARKETING-HANDOFF.md](./MARKETING-HANDOFF.md) sekcja 6.
+
+### Dev — pułapki
+
+| Temat | Zasada |
+|-------|--------|
+| Host adm | `adm.localhost:8083` — spójny z `adm_return` po toggle analityki |
+| Token opt-out | Identyczny `MARKETING_FUNNEL_SKIP_TOKEN` w obu `.env` |
+| Cookie opt-out | Na prod domena `.pnedu.pl`; na dev host-only (per port) |
+| Middleware renewal | Nie odnawia cookie na trasie `settings/analityka/lejek-opt-out/*` ani gdy odpowiedź już ustawia/usuwa cookie |
 
 ---
 
@@ -273,3 +314,8 @@ Edytuj `CourseFunnelStatsService::orderCountsForCourses()` — faktura: `invoice
 | 2026-06-18 | Domyślne `utm_content` per typ źródła (prospecting/remarketing/organic); auto-uzupełnianie w kampanii |
 | 2026-06-18 | Typ źródła YouTube (`youtube` / `social` / `video-description`) |
 | 2026-06-16 | Link krótki `pnedu.pl/l/{campaign_code}` — przekierowanie 302 na pełny URL z UTM; wariant w generatorze + test w adm |
+| 2026-06-17 | Opt-out lejka/GA: wyłączenie do ręcznego ON, odnawianie cookie, UI `/settings/analityka`, fix dev (renewal vs toggle) |
+| 2026-06-17 | `marketing_campaign_stats_daily` + kolumna **Wejś.** (kliknięcia w link kampanii, osobno od lejka kursu) |
+| 2026-06-17 | Fix sortowania Wejś. (subquery zamiast `orderBySum`) |
+| 2026-06-17 | Filtr okresu na liście kampanii (`MarketingCampaignStatsService`, presety dat, aktywność w okresie) |
+| 2026-06-19 | [MARKETING-HANDOFF.md](./MARKETING-HANDOFF.md) — dokument kontynuacji pracy bez historii chatów AI |

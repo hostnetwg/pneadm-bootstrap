@@ -53,6 +53,14 @@ This directory contains documentation specifically designed to provide context f
 
 **Best for**: Rozwój modułu marketingowego, spójne linki UTM, lejek konwersji.
 
+### [../docs/MARKETING-HANDOFF.md](../docs/MARKETING-HANDOFF.md)
+**Handoff — kontynuacja pracy bez historii chatów AI (czerwiec 2026)**
+
+- Stan wdrożenia: opt-out analityki, wejścia z linków, filtr okresu kampanii
+- Lista plików, testy, deploy checklist, pułapki dev
+
+**Best for**: Nowy laptop, nowa sesja AI, szybkie wznowienie pracy nad marketingiem.
+
 ### [FILES_INDEX.txt](./FILES_INDEX.txt)
 **Visual documentation index and file tree**
 
