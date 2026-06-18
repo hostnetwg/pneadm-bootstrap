@@ -48,9 +48,9 @@
                 <i class="bi bi-info-circle text-muted"></i>
                 <strong>Okres:</strong> {{ $from->format('d.m.Y') }} – {{ $to->format('d.m.Y') }}.
                 <strong>Lejek per szkolenie</strong> — wejścia i wszystkie zamówienia kursu w okresie (także bez kampanii).
-                <strong>Kampanie</strong> (prawa tabela) — tylko zamówienia z <code>fb_source</code> w okresie; filtr typu źródła dotyczy wyłącznie tej tabeli.
+                <strong>Kampanie</strong> (prawa tabela) — wejścia z linku kampanii (<code>marketing_campaign_stats_daily</code>) oraz zamówienia z <code>fb_source</code> w okresie; filtr typu źródła dotyczy wyłącznie tej tabeli.
                 Listy <a href="{{ route('marketing-campaigns.index') }}">kampanii</a> i <a href="{{ route('marketing-source-types.index') }}">typów źródeł</a> — liczniki za <strong>całą historię</strong>.
-                <span class="d-block mt-1">Wejścia: max 1×/gość/kurs/dzień (<code>course_page_stats_daily</code>). Formularz = <code>order-form</code> + <code>deferred-order</code>.</span>
+                <span class="d-block mt-1">Wejścia kursu: max 1×/gość/kurs/dzień (<code>course_page_stats_daily</code>). Wejścia kampanii: max 1×/gość/kampania/dzień (klik w link UTM / <code>/l/{kod}</code>). Formularz = <code>order/[id]/order-form</code> + <code>deferred-order</code>.</span>
             </div>
 
             <div class="row g-3 mb-4">
@@ -150,6 +150,7 @@
                                     <tr>
                                         <th>Kod</th>
                                         <th>Kampania</th>
+                                        <th class="text-end" title="Kliknięcia w link kampanii (UTM / /l/{kod}), max 1× gość/kampania/dzień">Wejś.</th>
                                         <th class="text-end">Złoż.</th>
                                         <th class="text-end">Fakt.</th>
                                     </tr>
@@ -164,11 +165,12 @@
                                                 @endif
                                                 <div class="small">{{ Str::limit($campaign->name, 50) }}</div>
                                             </td>
+                                            <td class="text-end">{{ number_format((int) ($campaign->link_entries ?? 0), 0, ',', ' ') }}</td>
                                             <td class="text-end">{{ (int) $campaign->orders_submitted }}</td>
                                             <td class="text-end">{{ (int) $campaign->orders_paid }}</td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="4" class="text-center text-muted py-3">Brak danych</td></tr>
+                                        <tr><td colspan="5" class="text-center text-muted py-3">Brak danych</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>

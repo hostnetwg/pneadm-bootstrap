@@ -143,8 +143,16 @@ class CourseFunnelStatsService
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
         $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
+        $entriesSubquery = DB::table('marketing_campaign_stats_daily')
+            ->selectRaw('campaign_code, SUM(link_entries) as link_entries')
+            ->whereBetween('stat_date', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('campaign_code');
+
         $query = DB::table('marketing_campaigns as mc')
             ->leftJoin('marketing_source_types as mst', 'mst.id', '=', 'mc.source_type_id')
+            ->leftJoinSub($entriesSubquery, 'mcs_agg', function ($join) {
+                $join->on('mcs_agg.campaign_code', '=', 'mc.campaign_code');
+            })
             ->leftJoin('form_orders as fo', function ($join) use ($from, $to) {
                 $join->on('fo.fb_source', '=', 'mc.campaign_code')
                     ->whereNull('fo.deleted_at')
@@ -153,6 +161,7 @@ class CourseFunnelStatsService
             ->whereNull('mc.deleted_at')
             ->groupBy('mc.id', 'mc.campaign_code', 'mc.name', 'mst.name', 'mst.color', 'mc.is_active')
             ->selectRaw('mc.id, mc.campaign_code, mc.name, mst.name as source_type_name, mst.color as source_type_color, mc.is_active')
+            ->selectRaw('COALESCE(MAX(mcs_agg.link_entries), 0) as link_entries')
             ->selectRaw("SUM(CASE WHEN fo.id IS NOT NULL AND {$operationalSubmitted} THEN 1 ELSE 0 END) as orders_submitted")
             ->selectRaw("SUM(CASE WHEN {$invoicePresent} THEN 1 ELSE 0 END) as orders_invoiced")
             ->selectRaw("SUM(CASE WHEN {$invoicePresent} THEN 1 ELSE 0 END) as orders_paid")
