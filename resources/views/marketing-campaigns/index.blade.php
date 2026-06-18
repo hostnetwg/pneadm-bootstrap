@@ -50,7 +50,8 @@
                 <div>
                     <h3 class="h4 mb-1 fw-semibold">Kampanie marketingowe</h3>
                     <p class="small text-muted mb-0">
-                        Kolumna <strong>Zam.</strong> — cała historia zamówień z tym kodem.
+                        <strong>Wejście</strong> — kliknięcia w link kampanii (UTM / skrócony <code>/l/</code>, max 1× gość/kampania/dzień).
+                        <strong>Zam.</strong> — cała historia zamówień z tym kodem.
                         <a href="{{ route('marketing-funnel.index') }}">Lejek konwersji</a> ·
                         <a href="{{ route('marketing-source-types.index') }}">Typy źródeł</a> ·
                         <a href="{{ route('marketing.help.links') }}">Pomoc: linki UTM</a>
@@ -142,6 +143,11 @@
                                             Status {!! $sortIcon('is_active') !!}
                                         </a>
                                     </th>
+                                    <th class="text-center" title="Wejścia przez link kampanii — cała historia">
+                                        <a href="{{ $sortLink('link_entries_count') }}" class="text-dark text-decoration-none">
+                                            Wejś. {!! $sortIcon('link_entries_count') !!}
+                                        </a>
+                                    </th>
                                     <th class="text-center" title="Zamówienia — cała historia">
                                         <a href="{{ $sortLink('orders_count') }}" class="text-dark text-decoration-none">
                                             Zam. {!! $sortIcon('orders_count') !!}
@@ -213,6 +219,17 @@
                                                 <span class="badge bg-success-subtle text-success border border-success-subtle">Aktywna</span>
                                             @else
                                                 <span class="badge bg-secondary-subtle text-secondary border">Wył.</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @php $linkEntries = (int) ($campaign->link_entries_total ?? 0); @endphp
+                                            @if($linkEntries > 0)
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle"
+                                                      title="Wejścia przez link kampanii">
+                                                    {{ $linkEntries }}
+                                                </span>
+                                            @else
+                                                <span class="text-muted small">0</span>
                                             @endif
                                         </td>
                                         <td class="text-center">

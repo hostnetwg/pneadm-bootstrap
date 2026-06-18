@@ -56,6 +56,11 @@ class MarketingCampaign extends Model
         return $this->hasMany(FormOrder::class, 'fb_source', 'campaign_code');
     }
 
+    public function statsDaily()
+    {
+        return $this->hasMany(MarketingCampaignStatsDaily::class, 'campaign_code', 'campaign_code');
+    }
+
     /**
      * Accessor - nazwa typu źródła
      */

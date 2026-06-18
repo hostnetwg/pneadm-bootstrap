@@ -16,7 +16,9 @@ class MarketingCampaignController extends Controller
      */
     public function index(Request $request, MarketingCampaignUrlBuilder $urlBuilder)
     {
-        $query = MarketingCampaign::with(['sourceType', 'course'])->withCount('formOrders');
+        $query = MarketingCampaign::with(['sourceType', 'course'])
+            ->withCount('formOrders')
+            ->withSum('statsDaily as link_entries_total', 'link_entries');
 
         // Wyszukiwanie
         if ($request->filled('search')) {
@@ -57,6 +59,8 @@ class MarketingCampaignController extends Controller
                 ->select('marketing_campaigns.*');
         } elseif ($sortBy === 'orders_count') {
             $query->orderBy('form_orders_count', $sortOrder);
+        } elseif ($sortBy === 'link_entries_count') {
+            $query->orderBySum('statsDaily', 'link_entries', $sortOrder);
         } else {
             $query->orderBy($sortBy, $sortOrder);
         }
