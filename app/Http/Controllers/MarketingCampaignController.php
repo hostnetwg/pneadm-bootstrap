@@ -6,6 +6,7 @@ use App\Models\MarketingCampaign;
 use App\Models\MarketingSourceType;
 use App\Models\Course;
 use App\Services\MarketingCampaignUrlBuilder;
+use App\Services\MarketingCampaignStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -14,13 +15,67 @@ class MarketingCampaignController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request, MarketingCampaignUrlBuilder $urlBuilder)
-    {
-        $query = MarketingCampaign::with(['sourceType', 'course'])
-            ->withCount('formOrders')
-            ->withSum('statsDaily as link_entries_total', 'link_entries');
+    public function index(
+        Request $request,
+        MarketingCampaignUrlBuilder $urlBuilder,
+        MarketingCampaignStatsService $campaignStats,
+    ) {
+        $period = $campaignStats->resolvePeriod($request);
+        $activityMetric = in_array($request->query('activity_metric'), ['entries', 'orders'], true)
+            ? (string) $request->query('activity_metric')
+            : 'entries';
+        $onlyWithActivity = $request->boolean('only_with_activity');
 
-        // Wyszukiwanie
+        $query = MarketingCampaign::with(['sourceType', 'course']);
+        $filteredCourse = $this->applyMarketingCampaignIndexFilters($query, $request);
+
+        $query = $campaignStats->applyStatsToQuery($query, $period);
+        $query = $campaignStats->applyActivityFilter($query, $period, $activityMetric, $onlyWithActivity);
+
+        $sortOrder = strtolower((string) $request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $sortBy = $request->get('sort_by');
+        if (! is_string($sortBy) || $sortBy === '') {
+            $sortBy = $campaignStats->isLifetimeMode($period)
+                ? 'created_at'
+                : $campaignStats->defaultSortForMetric($activityMetric);
+        }
+
+        $query = $campaignStats->applySort($query, $sortBy, $sortOrder, $period);
+
+        $periodTotals = null;
+        if (! $campaignStats->isLifetimeMode($period)) {
+            $totalsQuery = MarketingCampaign::query();
+            $this->applyMarketingCampaignIndexFilters($totalsQuery, $request);
+            $periodTotals = $campaignStats->periodTotalsForQuery($totalsQuery, $period);
+        }
+
+        $perPage = $request->get('per_page', 20);
+        $campaigns = $query->paginate($perPage)->withQueryString();
+
+        $sourceTypes = MarketingSourceType::ordered()->get();
+
+        $campaignUrlsById = [];
+        foreach ($campaigns as $campaign) {
+            $campaignUrlsById[$campaign->id] = $urlBuilder->buildForCampaign($campaign);
+        }
+
+        return view('marketing-campaigns.index', compact(
+            'campaigns',
+            'sourceTypes',
+            'campaignUrlsById',
+            'filteredCourse',
+            'period',
+            'periodTotals',
+            'activityMetric',
+            'onlyWithActivity',
+        ));
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\MarketingCampaign>  $query
+     */
+    private function applyMarketingCampaignIndexFilters($query, Request $request): ?Course
+    {
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
@@ -30,12 +85,10 @@ class MarketingCampaignController extends Controller
             });
         }
 
-        // Filtr według typu źródła
         if ($request->filled('source_type_id')) {
             $query->where('source_type_id', $request->get('source_type_id'));
         }
 
-        // Filtr według szkolenia
         $filteredCourse = null;
         if ($request->filled('course_id')) {
             $courseId = $request->integer('course_id');
@@ -43,43 +96,11 @@ class MarketingCampaignController extends Controller
             $filteredCourse = Course::query()->find($courseId);
         }
 
-        // Filtr według statusu
         if ($request->filled('is_active')) {
             $query->where('is_active', $request->get('is_active'));
         }
 
-        // Sortowanie
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = strtolower((string) $request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
-
-        // Obsługa sortowania według relacji
-        if ($sortBy === 'source_type') {
-            $query->join('marketing_source_types', 'marketing_campaigns.source_type_id', '=', 'marketing_source_types.id')
-                ->orderBy('marketing_source_types.name', $sortOrder)
-                ->select('marketing_campaigns.*');
-        } elseif ($sortBy === 'orders_count') {
-            $query->orderBy('form_orders_count', $sortOrder);
-        } elseif ($sortBy === 'link_entries_count') {
-            $query->orderByRaw(
-                '(SELECT COALESCE(SUM(link_entries), 0) FROM marketing_campaign_stats_daily WHERE campaign_code = marketing_campaigns.campaign_code) '.$sortOrder
-            )->orderBy('marketing_campaigns.created_at', 'desc');
-        } else {
-            $query->orderBy($sortBy, $sortOrder);
-        }
-
-        // Paginacja
-        $perPage = $request->get('per_page', 20);
-        $campaigns = $query->paginate($perPage)->withQueryString();
-
-        // Pobierz typy źródeł dla filtra (wszystkie — także wyłączone, żeby link z typów źródeł działał)
-        $sourceTypes = MarketingSourceType::ordered()->get();
-
-        $campaignUrlsById = [];
-        foreach ($campaigns as $campaign) {
-            $campaignUrlsById[$campaign->id] = $urlBuilder->buildForCampaign($campaign);
-        }
-
-        return view('marketing-campaigns.index', compact('campaigns', 'sourceTypes', 'campaignUrlsById', 'filteredCourse'));
+        return $filteredCourse;
     }
 
     /**

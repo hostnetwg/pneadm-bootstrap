@@ -1,6 +1,17 @@
 @php
-    $currentSortBy = request('sort_by', 'created_at');
+    $periodActive = $period !== null;
+    $periodPreset = $period['preset'] ?? (string) request('period', '');
+    $filterBase = request()->except(['page']);
+    $currentSortBy = request('sort_by', $periodActive ? ($activityMetric === 'orders' ? 'orders_count' : 'link_entries_count') : 'created_at');
     $currentSortOrder = request('sort_order', 'desc');
+
+    $presetLink = function (string $preset, array $extra = []) use ($filterBase) {
+        return route('marketing-campaigns.index', array_merge(
+            $filterBase,
+            ['period' => $preset],
+            $extra,
+        ));
+    };
 
     $sortLink = function (string $column) use ($currentSortBy, $currentSortOrder) {
         return request()->fullUrlWithQuery([
@@ -51,7 +62,12 @@
                     <h3 class="h4 mb-1 fw-semibold">Kampanie marketingowe</h3>
                     <p class="small text-muted mb-0">
                         <strong>Wejście</strong> — kliknięcia w link kampanii (UTM / skrócony <code>/l/</code>, max 1× gość/kampania/dzień).
-                        <strong>Zam.</strong> — cała historia zamówień z tym kodem.
+                        <strong>Zam.</strong> — zamówienia z kodem kampanii (logika jak w lejku konwersji).
+                        @if($periodActive)
+                            <span class="d-block mt-1">Tryb <strong>okresu</strong> — kolumny Wejś./Zam. dotyczą wybranego przedziału dat.</span>
+                        @else
+                            <span class="d-block mt-1">Bez filtra dat — kolumny Wejś./Zam. pokazują <strong>całą historię</strong>.</span>
+                        @endif
                         <a href="{{ route('marketing-funnel.index') }}">Lejek konwersji</a> ·
                         <a href="{{ route('marketing-source-types.index') }}">Typy źródeł</a> ·
                         <a href="{{ route('marketing.help.links') }}">Pomoc: linki UTM</a>
@@ -62,6 +78,21 @@
                 </a>
             </div>
 
+            @if($periodActive && $periodTotals)
+                <div class="alert alert-light border small py-2 mb-3 d-flex flex-wrap align-items-center gap-2">
+                    <i class="bi bi-calendar-range text-muted"></i>
+                    <span>
+                        <strong>Okres:</strong>
+                        {{ $period['from']->format('d.m.Y') }} – {{ $period['to']->format('d.m.Y') }}
+                        · <strong>Wejścia:</strong> {{ number_format($periodTotals['link_entries'], 0, ',', ' ') }}
+                        · <strong>Zamówienia:</strong> {{ number_format($periodTotals['orders'], 0, ',', ' ') }}
+                        <span class="text-muted">(wg bieżących filtrów listy)</span>
+                    </span>
+                    <a href="{{ route('marketing-campaigns.index', request()->except(['period', 'date_from', 'date_to', 'only_with_activity', 'page'])) }}"
+                       class="btn btn-sm btn-outline-secondary ms-auto">Cała historia</a>
+                </div>
+            @endif
+
             <div class="card shadow-sm mb-4 campaigns-index-filters">
                 <div class="card-header bg-white py-2 px-3 border-bottom-0">
                     <span class="small fw-semibold text-muted"><i class="bi bi-funnel"></i> Filtry</span>
@@ -71,6 +102,53 @@
                         @if(request()->filled('course_id'))
                             <input type="hidden" name="course_id" value="{{ request('course_id') }}">
                         @endif
+                        <div class="col-12">
+                            <label class="form-label small text-muted mb-1">Okres aktywności</label>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <a href="{{ route('marketing-campaigns.index', request()->except(['period', 'date_from', 'date_to', 'page'])) }}"
+                                   class="btn btn-sm {{ $periodActive ? 'btn-outline-secondary' : 'btn-secondary' }}">Cała historia</a>
+                                <a href="{{ $presetLink('today') }}"
+                                   class="btn btn-sm {{ $periodPreset === 'today' ? 'btn-primary' : 'btn-outline-primary' }}">Dziś</a>
+                                <a href="{{ $presetLink('yesterday') }}"
+                                   class="btn btn-sm {{ $periodPreset === 'yesterday' ? 'btn-primary' : 'btn-outline-primary' }}">Wczoraj</a>
+                                <a href="{{ $presetLink('7d') }}"
+                                   class="btn btn-sm {{ $periodPreset === '7d' ? 'btn-primary' : 'btn-outline-primary' }}">7 dni</a>
+                                <a href="{{ $presetLink('30d') }}"
+                                   class="btn btn-sm {{ $periodPreset === '30d' ? 'btn-primary' : 'btn-outline-primary' }}">30 dni</a>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-lg-2">
+                            <label for="date_from" class="form-label">Data od</label>
+                            <input type="date" class="form-control form-control-sm" id="date_from" name="date_from"
+                                   value="{{ request('date_from', $periodActive ? $period['from']->format('Y-m-d') : '') }}">
+                        </div>
+                        <div class="col-md-2 col-lg-2">
+                            <label for="date_to" class="form-label">Data do</label>
+                            <input type="date" class="form-control form-control-sm" id="date_to" name="date_to"
+                                   value="{{ request('date_to', $periodActive ? $period['to']->format('Y-m-d') : '') }}">
+                        </div>
+                        <input type="hidden" name="period" value="custom">
+                        <div class="col-md-3 col-lg-2">
+                            <label class="form-label d-block">Sortuj / filtruj wg</label>
+                            <div class="btn-group btn-group-sm w-100" role="group">
+                                <input type="radio" class="btn-check" name="activity_metric" id="activity_metric_entries" value="entries"
+                                       {{ $activityMetric === 'entries' ? 'checked' : '' }}>
+                                <label class="btn btn-outline-primary" for="activity_metric_entries">Wejścia</label>
+                                <input type="radio" class="btn-check" name="activity_metric" id="activity_metric_orders" value="orders"
+                                       {{ $activityMetric === 'orders' ? 'checked' : '' }}>
+                                <label class="btn btn-outline-primary" for="activity_metric_orders">Zamówienia</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-lg-3 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="only_with_activity" value="1" id="only_with_activity"
+                                       {{ $onlyWithActivity ? 'checked' : '' }}
+                                       @disabled(! $periodActive)>
+                                <label class="form-check-label small {{ $periodActive ? '' : 'text-muted' }}" for="only_with_activity">
+                                    Tylko kampanie z aktywnością w okresie
+                                </label>
+                            </div>
+                        </div>
                         <div class="col-lg-4 col-md-6">
                             <label for="search" class="form-label">Szukaj</label>
                             <input type="text" class="form-control form-control-sm" id="search" name="search"
@@ -143,14 +221,14 @@
                                             Status {!! $sortIcon('is_active') !!}
                                         </a>
                                     </th>
-                                    <th class="text-center" title="Wejścia przez link kampanii — cała historia">
+                                    <th class="text-center" title="{{ $periodActive ? 'Wejścia w wybranym okresie' : 'Wejścia przez link kampanii — cała historia' }}">
                                         <a href="{{ $sortLink('link_entries_count') }}" class="text-dark text-decoration-none">
-                                            Wejś. {!! $sortIcon('link_entries_count') !!}
+                                            Wejś.@if($periodActive)<span class="text-muted fw-normal"> (okres)</span>@endif {!! $sortIcon('link_entries_count') !!}
                                         </a>
                                     </th>
-                                    <th class="text-center" title="Zamówienia — cała historia">
+                                    <th class="text-center" title="{{ $periodActive ? 'Zamówienia w wybranym okresie' : 'Zamówienia — cała historia' }}">
                                         <a href="{{ $sortLink('orders_count') }}" class="text-dark text-decoration-none">
-                                            Zam. {!! $sortIcon('orders_count') !!}
+                                            Zam.@if($periodActive)<span class="text-muted fw-normal"> (okres)</span>@endif {!! $sortIcon('orders_count') !!}
                                         </a>
                                     </th>
                                     <th>
