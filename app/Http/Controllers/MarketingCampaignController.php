@@ -7,6 +7,7 @@ use App\Models\MarketingSourceType;
 use App\Models\Course;
 use App\Services\MarketingCampaignUrlBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 class MarketingCampaignController extends Controller
@@ -50,7 +51,7 @@ class MarketingCampaignController extends Controller
 
         // Sortowanie
         $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $sortOrder = strtolower((string) $request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         // Obsługa sortowania według relacji
         if ($sortBy === 'source_type') {
@@ -60,7 +61,15 @@ class MarketingCampaignController extends Controller
         } elseif ($sortBy === 'orders_count') {
             $query->orderBy('form_orders_count', $sortOrder);
         } elseif ($sortBy === 'link_entries_count') {
-            $query->orderBySum('statsDaily', 'link_entries', $sortOrder);
+            $statsSub = DB::table('marketing_campaign_stats_daily')
+                ->select('campaign_code', DB::raw('SUM(link_entries) as link_entries_sort'))
+                ->groupBy('campaign_code');
+
+            $query->leftJoinSub($statsSub, 'mcs_sort', function ($join) {
+                $join->on('mcs_sort.campaign_code', '=', 'marketing_campaigns.campaign_code');
+            })
+                ->orderByRaw('COALESCE(mcs_sort.link_entries_sort, 0) '.$sortOrder)
+                ->select('marketing_campaigns.*');
         } else {
             $query->orderBy($sortBy, $sortOrder);
         }
