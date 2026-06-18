@@ -78,7 +78,7 @@ class PneduPurchasesController extends Controller
      * @param  'funnel'|'analytics'  $scope
      * @param  'enable'|'disable'  $action  enable = opt-out włączony (zliczanie OFF), disable = opt-out wyłączony (zliczanie ON)
      */
-    public function funnelSkipToggle(string $scope, string $action, FunnelSkipService $funnelSkip)
+    public function funnelSkipToggle(Request $request, string $scope, string $action, FunnelSkipService $funnelSkip)
     {
         if (! in_array($scope, ['funnel', 'analytics'], true)) {
             abort(404);
