@@ -99,7 +99,8 @@ class PneduPurchasesController extends Controller
             ? ['funnel' => $enableOptOut ? 'off' : 'on']
             : ['analytics' => $enableOptOut ? 'off' : 'on'];
 
-        $returnUrl = route('settings.analytics.index', $returnQuery, absolute: true);
+        $returnUrl = $request->getSchemeAndHttpHost()
+            .route('settings.analytics.index', $returnQuery, false);
 
         $pneduUrl = $scope === 'funnel'
             ? $funnelSkip->pneduFunnelToggleUrl($enableOptOut, $returnUrl)

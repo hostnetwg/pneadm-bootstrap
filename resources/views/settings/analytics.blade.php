@@ -44,11 +44,16 @@
                 <h5 class="mb-0">Lejek i analityka {{ $pneduPublicHost }} — włącz/wyłącz dla tej przeglądarki na tym komputerze</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-3">
-                    Dwa niezależne przełączniki dla tej przeglądarki — ustawiamy cookie na <strong>{{ $pneduPublicHost }}</strong>
-                    i w panelu adm (<code>{{ $admHost }}</code>), potem wracasz tutaj.
-                    Kolor i napis <strong>ON/OFF</strong> pokazują aktualny stan; kliknięcie przełącza na przeciwny.
-                </p>
+                    <p class="text-muted mb-3">
+                        Dwa niezależne przełączniki dla tej przeglądarki — ustawiamy cookie na <strong>{{ $pneduPublicHost }}</strong>
+                        i w panelu adm (<code>{{ $admHost }}</code>), potem wracasz tutaj.
+                        Kolor i napis <strong>ON/OFF</strong> pokazują aktualny stan; kliknięcie przełącza na przeciwny.
+                        @if(app()->environment('local'))
+                            <span class="d-block mt-2 small text-warning-emphasis">
+                                Dev: używaj spójnego hosta adm (<code>{{ $admHost }}</code>) — np. cały czas <code>adm.localhost</code>, nie mieszaj z <code>localhost</code>.
+                            </span>
+                        @endif
+                    </p>
 
                 @if(filled($funnelSkipEnableUrl) && filled($funnelSkipDisableUrl))
                     @php
