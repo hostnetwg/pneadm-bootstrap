@@ -23,6 +23,12 @@
                 </div>
             @endif
 
+            @if(session('warning'))
+                <div class="alert alert-warning">
+                    {{ session('warning') }}
+                </div>
+            @endif
+
             <!-- Błędy walidacji -->
             @if($errors->any())
                 <div class="alert alert-danger">

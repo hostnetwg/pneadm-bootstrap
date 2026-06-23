@@ -983,21 +983,14 @@ class CoursesController extends Controller
             // Kurs bez pliku w $validated — obraz zapisujemy osobno (walidacja zwraca UploadedFile, nie ścieżkę).
             $course = Course::create($validated);
 
+            $imageUploadWarning = null;
             if ($request->hasFile('image')) {
-                $file = $request->file('image');
-                $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg';
-                $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
-                $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
-                $imagePath = $file->storeAs('courses/images', $imageFileName, 'public');
-
+                $imagePath = $this->saveCourseImageUpload($request, $course);
                 if ($imagePath) {
                     $course->update(['image' => $imagePath]);
                     Log::info("Plik zapisany jako: {$imagePath}");
                 } else {
-                    Log::error('Błąd zapisu pliku grafiki kursu (store)', [
-                        'course_id' => $course->id,
-                        'filename' => $imageFileName,
-                    ]);
+                    $imageUploadWarning = 'Szkolenie utworzono, ale nie udało się zapisać grafiki na serwerze. Sprawdź uprawnienia katalogu storage/app/public/courses/images i spróbuj ponownie.';
                 }
             }
 
@@ -1038,12 +1031,18 @@ class CoursesController extends Controller
             \Log::info('Transakcja zatwierdzona');
 
             if ($saveAction === 'stay_editing') {
-                return $this->redirectToCourseEdit($course->id)
+                $redirect = $this->redirectToCourseEdit($course->id)
                     ->with('success', 'Szkolenie zostało dodane. Możesz kontynuować edycję.');
+            } else {
+                $redirect = redirect()->route('courses.index')
+                    ->with('success', 'Szkolenie zostało dodane!');
             }
 
-            return redirect()->route('courses.index')
-                ->with('success', 'Szkolenie zostało dodane!');
+            if (! empty($imageUploadWarning)) {
+                $redirect = $redirect->with('warning', $imageUploadWarning);
+            }
+
+            return $redirect;
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1194,23 +1193,13 @@ class CoursesController extends Controller
             $validated['image'] = null;
         }
 
+        $imageUploadWarning = null;
         if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg';
-            $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
-            $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
-            $imagePath = $file->storeAs('courses/images', $imageFileName, 'public');
-
+            $imagePath = $this->saveCourseImageUpload($request, $course);
             if ($imagePath) {
-                if ($course->image && Storage::disk('public')->exists($course->image)) {
-                    Storage::disk('public')->delete($course->image);
-                }
                 $validated['image'] = $imagePath;
             } else {
-                Log::error('Błąd zapisu pliku grafiki kursu (update)', [
-                    'course_id' => $course->id,
-                    'filename' => $imageFileName,
-                ]);
+                $imageUploadWarning = 'Szkolenie zaktualizowano, ale nie udało się zapisać nowej grafiki na serwerze. Sprawdź uprawnienia katalogu storage/app/public/courses/images i wgraj obrazek ponownie.';
             }
         }
 
@@ -1256,11 +1245,17 @@ class CoursesController extends Controller
         $queryParams = $this->extractFilterQueryParamsFromRequest($request);
 
         if ($saveAction === 'stay_editing') {
-            return $this->redirectToCourseEdit((int) $course->id, $queryParams)
+            $redirect = $this->redirectToCourseEdit((int) $course->id, $queryParams)
                 ->with('success', 'Szkolenie zaktualizowane.');
+        } else {
+            $redirect = redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
         }
 
-        return redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
+        if (! empty($imageUploadWarning)) {
+            $redirect = $redirect->with('warning', $imageUploadWarning);
+        }
+
+        return $redirect;
     }
 
     /* --------importFromPubligo------------ */
@@ -1405,5 +1400,47 @@ class CoursesController extends Controller
         $validated['post_end_access_duration_unit'] = $validated['post_end_access_duration_value']
             ? ($validated['post_end_access_duration_unit'] ?? 'months')
             : null;
+    }
+
+    /**
+     * Zapisuje plik grafiki kursu na dysku public i zwraca ścieżkę względną; usuwa poprzedni plik po udanym zapisie.
+     */
+    private function saveCourseImageUpload(Request $request, Course $course): ?string
+    {
+        $file = $request->file('image');
+        if (! $file) {
+            return null;
+        }
+
+        $directory = storage_path('app/public/courses/images');
+        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+            Log::error('Nie można utworzyć katalogu grafik kursów', [
+                'course_id' => $course->id,
+                'directory' => $directory,
+            ]);
+
+            return null;
+        }
+
+        $extension = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'jpg';
+        $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
+        $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
+        $imagePath = $file->storeAs('courses/images', $imageFileName, 'public');
+
+        if (! $imagePath || ! Storage::disk('public')->exists($imagePath)) {
+            Log::error('Błąd zapisu pliku grafiki kursu — plik nie istnieje po storeAs', [
+                'course_id' => $course->id,
+                'filename' => $imageFileName,
+                'returned_path' => $imagePath,
+            ]);
+
+            return null;
+        }
+
+        if ($course->image && Storage::disk('public')->exists($course->image)) {
+            Storage::disk('public')->delete($course->image);
+        }
+
+        return $imagePath;
     }
 }

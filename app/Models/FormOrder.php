@@ -287,6 +287,22 @@ class FormOrder extends Model
     }
 
     /**
+     * Data zamówienia w strefie czasowej aplikacji (domyślnie Europe/Warsaw) — do wyświetlania.
+     * Wartość w bazie jest zawsze w UTC.
+     */
+    public function formatOrderDateLocal(?string $format = 'd.m.Y H:i'): ?string
+    {
+        $raw = $this->attributes['order_date'] ?? null;
+        if (! $raw) {
+            return null;
+        }
+
+        return Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'UTC')
+            ->setTimezone(config('app.timezone', 'Europe/Warsaw'))
+            ->format($format);
+    }
+
+    /**
      * Mutator - zapisuje datę w UTC w formacie zgodnym z bazą
      * Zawsze zapisujemy daty w UTC, niezależnie od timezone aplikacji
      */

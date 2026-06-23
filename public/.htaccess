@@ -21,14 +21,15 @@ ServerTokens Prod
 Header unset Server
 Header unset X-Powered-By
 
-# Zabezpieczenie przed hotlinking - POPRAWIONE
+# Zabezpieczenie przed hotlinking — wyłączone dla /storage/ (publiczne miniatury kursów na pnedu.pl)
 RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/storage/
 RewriteCond %{HTTP_REFERER} !^$
 RewriteCond %{HTTP_REFERER} !^https?://(www\.)?adm\.pnedu\.pl [NC]
 RewriteCond %{HTTP_REFERER} !^https?://(www\.)?pnedu\.pl [NC]
 RewriteCond %{HTTP_REFERER} !^https?://localhost [NC]
 RewriteCond %{HTTP_REFERER} !^https?://127\.0\.0\.1 [NC]
-RewriteRule \.(jpg|jpeg|png|gif|css|js)$ - [F]
+RewriteRule \.(jpg|jpeg|png|gif|webp|css|js)$ - [F]
 
 # Blokuj dostęp do plików konfiguracyjnych
 <FilesMatch "\.(env|log|ini|conf|sql|bak|backup|old|tmp)$">

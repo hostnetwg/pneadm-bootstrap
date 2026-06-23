@@ -174,7 +174,7 @@
                                     @foreach($formOrders as $order)
                                         <tr>
                                             <td>{{ $order->id }}</td>
-                                            <td>{{ $order->order_date ? $order->order_date->format('d.m.Y H:i') : '—' }}</td>
+                                            <td>{{ $order->formatOrderDateLocal() ?? '—' }}</td>
                                             <td>
                                                 @if($order->primaryParticipant)
                                                     {{ $order->primaryParticipant->first_name }} {{ $order->primaryParticipant->last_name }}
