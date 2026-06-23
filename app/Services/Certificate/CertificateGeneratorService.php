@@ -4,6 +4,7 @@ namespace App\Services\Certificate;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
@@ -309,15 +310,23 @@ class CertificateGeneratorService
         $courseFolder = "certificates/{$courseId}";
         $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
         $filePath = "{$courseFolder}/{$fileName}";
-        
-        // Utwórz katalog jeśli nie istnieje
-        if (!Storage::disk('public')->exists($courseFolder)) {
-            Storage::disk('public')->makeDirectory($courseFolder, 0777, true);
+        $absoluteDir = storage_path('app/public/' . $courseFolder);
+        $absolutePath = $absoluteDir . '/' . $fileName;
+
+        if (! File::isDirectory($absoluteDir) && ! File::makeDirectory($absoluteDir, 0775, true)) {
+            throw new \RuntimeException(
+                "Nie można utworzyć katalogu na zaświadczenia: {$absoluteDir}. "
+                . 'Sprawdź uprawnienia katalogu storage pakietu pne-certificate-generator (775, właściciel www-data/sail).'
+            );
         }
-        
-        // Zapisz plik
-        Storage::disk('public')->put($filePath, $pdf->output());
-        
+
+        if (file_put_contents($absolutePath, $pdf->output()) === false) {
+            throw new \RuntimeException(
+                "Nie można zapisać pliku PDF: {$absolutePath}. "
+                . 'Sprawdź uprawnienia katalogu storage pakietu pne-certificate-generator (775, właściciel www-data/sail).'
+            );
+        }
+
         // Zaktualizuj ścieżkę w bazie (użyj tego samego połączenia co w getCertificateData)
         $query = $connection ? DB::connection($connection)->table('certificates') : DB::table('certificates');
         $query->where('certificate_number', $certificateNumber)
@@ -325,7 +334,7 @@ class CertificateGeneratorService
                 'file_path' => 'storage/' . $filePath,
                 'generated_at' => now(),
             ]);
-        
+
         return $filePath;
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Http\Middleware\RefreshFunnelSkipOptOutCookies;
 use App\Services\FunnelSkipService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 class RefreshFunnelSkipOptOutCookiesTest extends TestCase
@@ -24,5 +25,20 @@ class RefreshFunnelSkipOptOutCookiesTest extends TestCase
 
         $this->assertContains('pne_skip_analytics', $names);
         $this->assertNotContains('pne_skip_funnel', $names);
+    }
+
+    public function test_renewal_works_on_binary_file_response(): void
+    {
+        $request = Request::create('/certificates/generate/1', 'GET');
+        $request->cookies->set('pne_skip_funnel', '1');
+
+        $middleware = app(RefreshFunnelSkipOptOutCookies::class);
+        $response = $middleware->handle($request, function () {
+            return new BinaryFileResponse(__FILE__);
+        });
+
+        $names = collect($response->headers->getCookies())->map->getName()->all();
+
+        $this->assertContains('pne_skip_funnel', $names);
     }
 }

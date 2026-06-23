@@ -64,44 +64,20 @@ class CertificateController extends Controller
         // Używamy istniejącego numeru certyfikatu
         $certificateNumber = $certificate->certificate_number;
     
-        // Tworzenie nazwy pliku na podstawie numeru certyfikatu
-        $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
-        $filePath = 'certificates/' . $fileName; // Ścieżka w public/storage
-    
         // Tworzenie ścieżki do folderu kursu
         $courseFolder = 'certificates/' . $course->id;
         $fileName = str_replace('/', '-', $certificateNumber) . '.pdf';
-        $filePath = $courseFolder . '/' . $fileName; // Ścieżka w public/storage
-
-        // Sprawdzenie i utworzenie katalogu jeśli nie istnieje
-        if (!Storage::disk('public')->exists($courseFolder)) {
-            Storage::disk('public')->makeDirectory($courseFolder, 0777, true);
-        }
-    
-        // Usuwamy ewentualne spacje i konwertujemy format
-        $startDateTime = Carbon::parse(trim($course->start_date));
-        $endDateTime = Carbon::parse(trim($course->end_date));
+        $filePath = $courseFolder . '/' . $fileName;
 
         // Użyj nowego CertificateGeneratorService zamiast plików Blade
         $certificateGenerator = app(CertificateGeneratorService::class);
-        
-        // Generuj PDF używając nowego systemu (renderowanie z JSON)
-        $pdf = $certificateGenerator->generatePdf($participant->id, [
+
+        // Generuj PDF używając nowego systemu (renderowanie z JSON) i zapisz w storage
+        $certificateGenerator->generatePdf($participant->id, [
             'save_to_storage' => true,
-            'cache' => false
+            'cache' => false,
         ]);
-    
-        // Zapisywanie pliku PDF w storage/public/certificates
-        Storage::disk('public')->put($filePath, $pdf->output());
-    
-        // Aktualizacja ścieżki pliku w bazie (jeśli brak)
-        if (empty($certificate->file_path)) {
-            $certificate->update([
-                'file_path' => 'storage/' . $filePath,
-                'generated_at' => now(),
-            ]);
-        }
-    
+
         // Pobieranie pliku PDF (z folderu public/storage) – nazwa przy zapisie na dysk użytkownika z przedrostkiem
         $downloadFileName = 'zaswiadczenie_' . str_replace('/', '-', $certificateNumber) . '.pdf';
         return response()->download(storage_path('app/public/' . $filePath), $downloadFileName);

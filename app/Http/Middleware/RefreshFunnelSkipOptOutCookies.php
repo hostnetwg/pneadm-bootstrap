@@ -22,7 +22,7 @@ class RefreshFunnelSkipOptOutCookies
         }
 
         foreach ($this->funnelSkip->renewalCookiesForRequest($request) as $cookie) {
-            $response = $response->withCookie($cookie);
+            $response->headers->setCookie($cookie);
         }
 
         return $response;
