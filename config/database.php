@@ -85,6 +85,28 @@ return [
             ]) : [],
         ],
 
+        // Osobna baza analityczna wspólna dla adm.pnedu.pl i pnedu.pl.
+        'analytics' => [
+            'driver' => 'mysql',
+            'url' => env('DB_ANALYTICS_URL'),
+            'host' => env('DB_ANALYTICS_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DB_ANALYTICS_PORT', env('DB_PORT', '3306')),
+            'database' => env('DB_ANALYTICS_DATABASE', 'pne_analytics'),
+            'username' => env('DB_ANALYTICS_USERNAME', env('DB_USERNAME', 'sail')),
+            'password' => env('DB_ANALYTICS_PASSWORD', env('DB_PASSWORD', 'password')),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'timezone' => env('DB_ANALYTICS_TIMEZONE', env('DB_TIMEZONE', '+00:00')),
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         // 4. MariaDB (jeśli będziesz potrzebować)
         'mariadb' => [
             'driver' => 'mariadb',

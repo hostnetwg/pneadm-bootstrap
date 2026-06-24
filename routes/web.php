@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Analytics\AnalyticsDebugEventController;
+use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Admin\PneduUsersController;
 use App\Http\Controllers\Admin\StatisticsController;
 use App\Http\Controllers\Admin\UsersController;
@@ -235,6 +237,14 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('marketing.')
         ->group(function () {
             Route::get('/help/links', [MarketingHelpController::class, 'links'])->name('help.links');
+        });
+
+    Route::middleware(['auth', 'verified', 'check.user.status', 'analytics.debug.access'])
+        ->prefix('analytics')
+        ->name('analytics.')
+        ->group(function () {
+            Route::get('/debug-events', [AnalyticsDebugEventController::class, 'index'])->name('debug-events.index');
+            Route::get('/sales-funnel', [AnalyticsSalesFunnelController::class, 'index'])->name('sales-funnel.index');
         });
 
     // Marketing Campaigns - kampanie marketingowe

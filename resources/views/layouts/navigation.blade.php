@@ -140,6 +140,32 @@
                 </ul>
             </div>
         </li>
+        <!-- Analityka -->
+        @if(auth()->user()?->isAdmin() && (config('analytics.sales_funnel_dashboard.enabled', true) || config('analytics.debug_panel.enabled', false)))
+            <li class="mb-1">
+                <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('analytics.*') ? '' : 'collapsed' }}"
+                        data-bs-toggle="collapse" data-bs-target="#analytics-collapse"
+                        aria-expanded="{{ request()->routeIs('analytics.*') ? 'true' : 'false' }}">
+                    <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                        <use xlink:href="#graph-up"></use>
+                    </svg>
+                    Analityka
+                    <svg class="bi pe-none ms-auto" width="16" height="16">
+                        <use xlink:href="#chevron-right"></use>
+                    </svg>
+                </button>
+                <div class="collapse {{ request()->routeIs('analytics.*') ? 'show' : '' }}" id="analytics-collapse" data-bs-parent="#menuAccordion">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                        @if(config('analytics.sales_funnel_dashboard.enabled', true))
+                            <li><a href="{{ route('analytics.sales-funnel.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.sales-funnel.*') ? 'active' : '' }}">Lejek sprzedaży</a></li>
+                        @endif
+                        @if(config('analytics.debug_panel.enabled', false))
+                            <li><a href="{{ route('analytics.debug-events.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.debug-events.*') ? 'active' : '' }}">Debug eventów</a></li>
+                        @endif
+                    </ul>
+                </div>
+            </li>
+        @endif
 
         <!-- Baza Certgen -->
         <li class="mb-1">

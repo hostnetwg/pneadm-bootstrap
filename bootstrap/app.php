@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.user.status' => \App\Http\Middleware\CheckUserStatus::class,
             'api.token' => \App\Http\Middleware\VerifyApiToken::class,
             'super_admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'analytics.debug.access' => \App\Http\Middleware\EnsureAnalyticsDebugAccess::class,
         ]);
         
         // Dodaj middleware globalnie do wszystkich tras web
