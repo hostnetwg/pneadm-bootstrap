@@ -83,8 +83,8 @@ Dozwolone przykłady:
 | `order_form_submit_attempted` | submit formularza przed zapisem | `course_id`, `campaign_code`, `payment_type`, `buyer_type`, `participant_count` | `full`, `standard`, `light` |
 | `order_form_validation_failed` | nieudana walidacja backendowa | `course_id`, `field_keys`, `error_rules`, `buyer_type`, `payment_type` | `full`, `standard` |
 | `form_order_created` | po skutecznym zapisie `FormOrder` i uczestników, w online przed przejściem do bramki | `form_order_id`, `course_id`, `campaign_code`, `order_flow`, `payment_type`, `buyer_type`, `participant_count`, `has_price_variant`, `has_recipient`, `amount_gross`, `form_order_status` | `full`, `standard`, `light` |
-| `online_payment_selected` | wybór płatności online | `course_id`, `payment_gateway` | `full`, `standard`, `light` |
-| `deferred_invoice_selected` | wybór faktury z odroczonym terminem | `course_id`, `invoice_payment_delay_bucket` | `full`, `standard`, `light` |
+| `online_payment_selected` | wybór płatności online po udanej walidacji (wdrożone w Etapie 2A-1) | `course_id`, `payment_type=online`, `payment_gateway` (`payu`/`paynow`/`unknown`), `buyer_type`, `has_price_variant`, `order_flow=online` | `full`, `standard`, `light` |
+| `deferred_invoice_selected` | wybór faktury / płatności odroczonej po udanej walidacji (wdrożone w Etapie 2A-1) | `course_id`, `payment_type=deferred_invoice`, `buyer_type`, `has_price_variant`, `order_flow=deferred` | `full`, `standard`, `light` |
 | `payment_order_created` | utworzenie `OnlinePaymentOrder` | `payment_order_id`, `form_order_id`, `payment_gateway`, `amount_snapshot` | `full`, `standard`, `light` |
 | `payment_status_changed` | webhook/return z bramki | `payment_order_id`, `form_order_id`, `payment_gateway`, `payment_status` | `full`, `standard`, `light` |
 | `invoice_created` | po utworzeniu faktury w backoffice | `form_order_id`, `course_id`, `invoice_path_type`, `has_recipient`, `ksef_option_selected` | `full`, `standard`, `light` |

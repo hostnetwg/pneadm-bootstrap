@@ -177,7 +177,7 @@ Rekomendowane rozbicie Etapu 1:
 ### Plan Etapu 1 — Do Implementacji
 
 Data dopisania: 2026-06-24.  
-Status: Etap 1A wdrożony lokalnie; Etap 1A-Debug wdrożony lokalnie; Etap 1B-1 i 1B-2 wdrożone lokalnie; Etap 1C wdrożony lokalnie w `adm.pnedu.pl`; Etap 2 do implementacji.
+Status: Etap 1A wdrożony lokalnie; Etap 1A-Debug wdrożony lokalnie; Etap 1B-1 i 1B-2 wdrożone lokalnie; Etap 1C wdrożony lokalnie w `adm.pnedu.pl`; Etap 2A-1 (`online_payment_selected`, `deferred_invoice_selected`) wdrożony lokalnie w `pnedu.pl`; reszta Etapu 2 (m.in. `payment_order_created`, `payment_status_changed`, agregaty/dashboard płatności, eventy faktur, JS tracking) do implementacji.
 
 Etap 1 zostaje zawężony do minimalnego backend trackingu bez JS.
 
@@ -373,6 +373,36 @@ Spełnione lokalnie:
 - Dostęp do przyszłych eksportów AI-safe i AI-doradcy: tylko właściciel/admin.
 - Polityka prywatności/cookies: prawdopodobnie wymaga aktualizacji przed pełnym trackingiem.
 - Profile fakturowe powiązane z e-mailem: osobna analiza RODO/prawna.
+
+## Etap 2A-1 — Wybór metody płatności (wdrożony lokalnie)
+
+Data dopisania: 2026-06-24.
+
+Zakres wdrożony:
+
+- `online_payment_selected` — odnotowuje wybór płatności online po udanej walidacji formularza, zanim flow przejdzie do procesu płatności online,
+- `deferred_invoice_selected` — odnotowuje wybór faktury / płatności odroczonej po udanej walidacji formularza, zanim flow utworzy zamówienie odroczone.
+
+Miejsce podłączenia: `CourseController@storeOrderForm` (gałąź online i gałąź deferred), przez metody `BackendAnalyticsTracker::trackOnlinePaymentSelected()` oraz `trackDeferredInvoiceSelected()`.
+
+Eventy oznaczają wyłącznie wybór metody płatności po walidacji. Nie oznaczają utworzenia zamówienia płatności online, sukcesu płatności ani wystawienia faktury.
+
+Status: wdrożone lokalnie w `pnedu.pl`. Sanitizer i enumy nie wymagały zmian — wszystkie potrzebne klucze metadata (`payment_type`, `payment_gateway`, `buyer_type`, `has_price_variant`, `order_flow`) oraz nazwy/kategorie eventów już istniały.
+
+Nadal NIE wdrożono w ramach Etapu 2:
+
+- `payment_order_created`,
+- `payment_status_changed`,
+- webhooków płatności i syncu statusów po return/callback,
+- agregatów płatności,
+- dashboardu płatności,
+- eventów faktur (`invoice_created`),
+- iFirma, KSeF,
+- JS trackingu,
+- porzuceń formularza,
+- A/B testów,
+- AI,
+- eksportów AI-safe.
 
 ## Etap 2 — JS Tracking Formularza
 

@@ -7,6 +7,20 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 Dokument określa najbliższe kroki po utworzeniu dokumentacji. Ma chronić projekt przed chaotycznym wdrożeniem analityki i przypominać, że obecny etap dotyczy dokumentacji, nie kodu.
 
+## Lokalny dev na nowym komputerze (checklist)
+
+Po sklonowaniu ostatniego commita:
+
+- [x] Sieć `pne-network` i kontener `pneadm-mysql` (wspólny MySQL dla obu projektów),
+- [x] Baza `pne_analytics` w `pneadm-mysql`,
+- [x] Zmienne `DB_ANALYTICS_*` / `ANALYTICS_*` w `.env` obu projektów,
+- [x] Migracje analityczne uruchomione tylko z `pneadm` (`sail artisan migrate`),
+- [x] Testy `sail artisan test --filter=Analytics` w obu projektach,
+- [ ] Ręczna weryfikacja panelu `/analytics/debug-events` po zalogowaniu jako admin,
+- [ ] Worker kolejki `analytics` (opcjonalnie lokalnie): `sail artisan queue:work redis --queue=analytics`.
+
+Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Lokalna konfiguracja `pne_analytics` na nowym komputerze developerskim”.
+
 ## Najbliższe 10 Kroków
 
 1. Otworzyć `adm.pnedu.pl -> Analityka -> Lejek sprzedaży` i zweryfikować dane po `analytics:aggregate-daily`.
@@ -16,7 +30,7 @@ Dokument określa najbliższe kroki po utworzeniu dokumentacji. Ma chronić proj
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.
 7. Przetestować filtry dashboardu (daty, kampania, kurs, landing target) na realnych danych.
-8. Przygotować plan eventów płatności (Etap 2) lub rozbudowy landing_target w agregacji kampanii.
+8. Etap 2A-1 wdrożony (`online_payment_selected`, `deferred_invoice_selected`). Następny krok płatności: `payment_order_created`, potem `payment_status_changed`.
 9. Rozważyć progi alertów dashboardu po pierwszych tygodniach obserwacji.
 10. Skonsultować z ChatGPT kolejny etap (płatności, JS, porzucenia) po akceptacji właściciela.
 
@@ -52,8 +66,9 @@ Etap 1:
 - tworzenie zamówienia: wdrożone w 1B-2 (`form_order_created`, deferred i online),
 - agregaty dzienne: wdrożone w 1C (`analytics:aggregate-daily` w `adm.pnedu.pl`),
 - dashboard lejka sprzedaży: wdrożony w 1D (`/analytics/sales-funnel`),
-- wybór płatności: nie wdrożono jako event,
-- status płatności: nie wdrożono,
+- wybór płatności: wdrożono w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
+- status płatności: nie wdrożono (`payment_order_created`, `payment_status_changed`),
+- agregaty/dashboard płatności: nie wdrożono,
 - faktura: nie wdrożono.
 
 ## Decyzje Właściciela Do Podjęcia

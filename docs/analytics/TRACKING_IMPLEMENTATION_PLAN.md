@@ -297,12 +297,12 @@ Rekomendowana kolejność:
 5. `order_form_submit_attempted`.
 6. `order_form_validation_failed`.
 7. `form_order_created` — wdrożone w 1B-2.
-8. `online_payment_selected` i `deferred_invoice_selected`.
+8. `online_payment_selected` i `deferred_invoice_selected` — wdrożone w 2A-1.
 9. `payment_order_created`.
 10. `payment_status_changed`.
 11. `invoice_created`.
 
-Dotychczas wdrożono wyłącznie backendowe eventy Etapu 1A oraz 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`). Nie wdrożono eventów płatności, faktur, iFirma, KSeF, JS trackingu, porzuceń, A/B testów, dashboardu biznesowego, AI ani eksportów AI-safe.
+Dotychczas wdrożono backendowe eventy Etapu 1A, 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`) oraz 2A-1 (`online_payment_selected`, `deferred_invoice_selected`). Nie wdrożono pozostałych eventów płatności (`payment_order_created`, `payment_status_changed`), faktur, iFirma, KSeF, JS trackingu, porzuceń, A/B testów, dashboardu/agregatów płatności, AI ani eksportów AI-safe.
 
 ### Konfiguracja Produkcyjna
 
@@ -352,7 +352,39 @@ ANALYTICS_QUEUE=analytics
 ANALYTICS_SAMPLE_RATE=100
 ```
 
-W `pnedu` host może wymagać wartości `pneadm-mysql` zamiast `mysql`, jeżeli request idzie z kontenera `pnedu-app` przez wspólną sieć `pne-network`. Do potwierdzenia podczas Etapu 0 testem połączenia.
+W `pnedu` host może wymagać wartości `pneadm-mysql` zamiast `mysql`, jeżeli request idzie z kontenera `pnedu-app` przez wspólną sieć `pne-network`. Na WSL2/Docker oba hosty (`mysql` i `pneadm-mysql`) zwykle wskazują na ten sam kontener `pneadm-mysql` w sieci `pne-network`.
+
+### Lokalna konfiguracja `pne_analytics` na nowym komputerze developerskim
+
+Checklist po sklonowaniu repozytoriów (bez wdrażania nowych funkcji biznesowych):
+
+1. Uruchomić Sail w `pneadm` (tworzy `pneadm-mysql`, sieć `pne-network`, port aplikacji `8083`).
+2. Uruchomić Sail w `pnedu` (bez własnego MySQL; korzysta ze wspólnego `pneadm-mysql`).
+3. Skopiować `.env` z `.env.example` lub uzupełnić brakujące zmienne `DB_ANALYTICS_*` i `ANALYTICS_*` w obu projektach (patrz sekcja powyżej).
+4. Utworzyć bazę, jeśli nie istnieje:
+
+```bash
+docker exec pneadm-mysql mysql -usail -ppassword \
+  -e "CREATE DATABASE IF NOT EXISTS pne_analytics CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+5. Uruchomić migracje analityczne **tylko z `pneadm`**:
+
+```bash
+cd pneadm
+./vendor/bin/sail artisan migrate --force
+```
+
+Migracje `2026_06_24_*` używają wewnętrznie `Schema::connection('analytics')`, więc tabele powstają w `pne_analytics`, a wpisy trafiają do `pneadm.migrations`. **Nie** uruchamiać `migrate --database=analytics` bez `--path` — uruchomiłoby wszystkie migracje adm na bazie analitycznej.
+
+6. Zweryfikować połączenie w obu projektach:
+
+```bash
+./vendor/bin/sail artisan tinker --execute="DB::connection('analytics')->getPdo(); echo 'OK';"
+./vendor/bin/sail artisan test --filter=Analytics
+```
+
+7. Panel debug: `http://localhost:8083/analytics/debug-events` (wymaga logowania jako admin; `ANALYTICS_DEBUG_PANEL_ENABLED=true`).
 
 ### Redis Queue `analytics`
 
@@ -789,13 +821,15 @@ Nie wdrażać teraz:
 
 Te eventy dotyczą płatności i faktur. Wymagają osobnego etapu i testów regresji procesów finansowych.
 
-Status po wdrożeniu 1B-2:
+Status po wdrożeniu 2A-1:
 
 - submit formularza jest śledzony w 1B-1,
 - walidacja jest śledzona w 1B-1,
 - tworzenie zamówienia jest śledzone w 1B-2,
-- płatności nie są śledzone,
+- wybór metody płatności jest śledzony w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
+- pozostałe eventy płatności (`payment_order_created`, `payment_status_changed`) nie są śledzone,
 - faktury nie są śledzone,
+- agregaty/dashboard płatności nie są wdrożone,
 - JS tracking nie jest wdrożony,
 - porzucenia formularza nie są wdrożone,
 - testy A/B nie są wdrożone,
@@ -815,6 +849,8 @@ Status po wdrożeniu 1B-2:
 | `order_form_submit_attempted` | początek `CourseController::storeOrderForm()` | przed walidacją, po ustaleniu `buyer_type` | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, UTM, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.has_price_variant`, `metadata.price_variant_id` | nie czytać raw input; bez wartości pól | wdrożone w 1B-1; POST formularza dispatchuje event mimo błędu walidacji |
 | `order_form_validation_failed` | `CourseController::storeOrderForm()` przy `ValidationException` i ręcznych `withErrors()` | gdy walidacja nie przejdzie | `course_id`, `order_form_session_id`, `campaign_code`, `metadata.validation_context`, `metadata.error_count`, `metadata.field_keys`, `metadata.section_keys`, `metadata.error_codes` | bez wartości pól, bez komunikatów błędów, bez raw input | wdrożone w 1B-1; błędny POST wysyła event bez wartości pól |
 | `form_order_created` | `CourseController::storeOrderForm()` i `CourseController::processOrderFormOnlinePayment()` | po zapisie `FormOrder`, po `FormOrderParticipant::syncFromFormOrder()`, w online przed utworzeniem `OnlinePaymentOrder` i przed bramką | `form_order_id`, `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `metadata.order_flow`, `metadata.buyer_type`, `metadata.payment_type`, `metadata.participant_count`, `metadata.amount_gross` | nie trackować danych uczestnika, fakturowych ani płatniczych; `form_order_id` nie trafia do AI-safe exportów | wdrożone w 1B-2; poprawny deferred i online POST tworzą zamówienie i dispatchują jeden event |
+| `online_payment_selected` | `CourseController::storeOrderForm()`, gałąź online | po udanej walidacji, po ustaleniu `payment_type=online` i bramki, tuż przed `processOrderFormOnlinePayment()` | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_type=online`, `metadata.payment_gateway` (`payu`/`paynow`/`unknown`), `metadata.buyer_type`, `metadata.has_price_variant`, `metadata.order_flow=online` | bez danych płatnika/karty/bramki; oznacza tylko wybór metody, nie utworzenie `OnlinePaymentOrder` | wdrożone w 2A-1; online POST dispatchuje event przed redirectem do bramki |
+| `deferred_invoice_selected` | `CourseController::storeOrderForm()`, gałąź deferred | po udanej walidacji, po ustaleniu `payment_type=deferred`, przed utworzeniem zamówienia odroczonego | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_type=deferred_invoice`, `metadata.buyer_type`, `metadata.has_price_variant`, `metadata.order_flow=deferred` | bez danych fakturowych/uczestnika; oznacza tylko wybór metody, nie wystawienie faktury | wdrożone w 2A-1; deferred POST dispatchuje event |
 
 ### `analytics_session_id`
 
