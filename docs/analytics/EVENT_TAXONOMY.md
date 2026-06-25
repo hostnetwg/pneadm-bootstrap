@@ -87,7 +87,7 @@ Dozwolone przykłady:
 | `deferred_invoice_selected` | wybór faktury / płatności odroczonej po udanej walidacji (wdrożone w Etapie 2A-1) | `course_id`, `payment_type=deferred_invoice`, `buyer_type`, `has_price_variant`, `order_flow=deferred` | `full`, `standard`, `light` |
 | `payment_order_created` | utworzenie `OnlinePaymentOrder` (wdrożone w Etapie 2A-2) | `payment_order_id`, `form_order_id`, `payment_gateway`, `amount_snapshot`, `buyer_type`, `has_price_variant`, `order_flow=online` | `full`, `standard`, `light` |
 | `payment_status_changed` | zmiana statusu płatności online (webhook/return sync PayU/PayNow; wdrożone w Etapie 2B-1) | `payment_order_id`, `form_order_id`, `course_id`, `amount_snapshot`, `payment_gateway`, `payment_status` (`created`/`pending`/`paid`/`failed`/`canceled`/`expired`/`unknown`), `payment_previous_status`, `status_source` (`webhook`/`return_sync`), `payment_type=online`, `order_flow=online`; deterministyczny event_uuid; bez sesji i kontekstu requestu | `full`, `standard`, `light` |
-| `invoice_created` | po utworzeniu faktury w backoffice | `form_order_id`, `course_id`, `invoice_path_type`, `has_recipient`, `ksef_option_selected` | `full`, `standard`, `light` |
+| `invoice_created` | wdrożone w Etapie 2C-1 (`pneadm`, observer `FormOrderObserver`) — pierwsze ustawienie poprawnego `form_orders.invoice_number` (przejście empty→present; iFirma lub ręcznie); oznacza „zafakturowane / rozliczone operacyjnie", NIE wpływ przelewu (patrz ADR-005) | `form_order_id`, `course_id`, `amount_snapshot`; `metadata`: `order_flow` (`deferred`/`online`/`unknown`), `invoice_path_type` (`ifirma`/`manual`/`unknown`), `payment_type`, `amount_gross`; idempotencja `event_uuid = invoice_created\|{form_order_id}`; event backoffice (bez sesji/route/path/referrer/device); ZAKAZANE: numer faktury, NIP, nazwy/adresy, dane uczestników, dane/raw iFirma, KSeF, raw request | `full`, `standard`, `light` |
 
 ## Eventy JavaScript Formularza
 
@@ -123,6 +123,38 @@ Dozwolone przykłady:
 | `saved_billing_profile_used` | użycie zapisanego profilu fakturowego | `profile_source` (`account`/`email`) | `full`, `standard` |
 | `saved_billing_profile_created` | zapis profilu fakturowego | `profile_scope` | `full`, `standard` |
 | `saved_billing_profile_updated` | aktualizacja profilu fakturowego | `profile_scope` | `full`, `standard` |
+
+## Terminologia Rozliczeń (zafakturowane vs opłacone) — ADR-005
+
+Rozróżniamy dwa źródła prawdy o rozliczeniu zamówienia:
+
+| Pojęcie | Definicja | Źródło prawdy |
+|---|---|---|
+| `online_paid` | zamówienie online opłacone | event `payment_status_changed` z `payment_status = paid` (bramka PayU/PayNow) |
+| `deferred_invoiced` | zamówienie odroczone zafakturowane / rozliczone operacyjnie | pierwsze pojawienie się `form_orders.invoice_number` (przyszły event `invoice_created`) |
+| `settled_orders_total` | rozliczone łącznie | `online_paid + deferred_invoiced` |
+
+Metryki przychodu:
+
+- `ordered_revenue_gross` — przychód zamówiony (data `form_order_created`),
+- `online_paid_revenue_gross` — przychód opłacony online (data `payment_status_changed: paid`),
+- `deferred_invoiced_revenue_gross` — przychód zafakturowany odroczony (data `invoice_created`),
+- `settled_revenue_gross` — `online_paid_revenue_gross + deferred_invoiced_revenue_gross`.
+
+Zasady:
+
+- `paid` / „opłacone" rezerwujemy wyłącznie dla ścieżki online. Dla odroczonych używamy `invoiced` / „zafakturowane".
+- `invoice_number` (niepuste, ≠ `''`, ≠ `'0'`) = zafakturowane, NIE wpływ przelewu.
+- Pro-forma NIE ustawia `invoice_number` (trafia do `notes`) — nie jest rozliczeniem.
+- Edge case: online z późniejszą fakturą liczymy raz (jako `online_paid`), faktura to tylko znacznik księgowy.
+- Historyczny alias `orders_paid` (w `CourseFunnelStatsService`) faktycznie liczy zafakturowane = `orders_invoiced`. Alias zostaje dla kompatybilności, ale w NOWYCH agregatach/dashboardach nie używamy nazwy `paid` dla odroczonych (preferowane: `orders_invoiced` / `deferred_invoiced`).
+- Ścieżkę odroczoną rozpoznajemy po jednoznacznym polu `FormOrder` (`payment_mode` / `order_flow`), a NIE po braku `OnlinePaymentOrder`.
+
+Cel metryk przychodu: `ordered_revenue_gross` mierzy sprzedaż z kampanii; `settled_revenue_gross` mierzy przychód rozliczony operacyjnie.
+
+Poza zakresem obecnego modelu (NIE teraz; osobne przyszłe eventy/decyzje): rekonsyliacja przelewów bankowych, częściowe płatności, zaliczki, faktury zaliczkowe, wiele faktur do jednego zamówienia, korekty/anulowanie faktur, zwroty online, chargebacki, ręczne korekty statusów, rozliczenia mieszane, KSeF, szczegółowe dane księgowe. Poglądowe przyszłe eventy: `bank_payment_confirmed`, `invoice_corrected`, `invoice_cancelled`, `refund_created`, `chargeback_received`.
+
+Szczegóły: `docs/decisions/ADR-005-invoice-number-means-invoiced-not-paid.md`.
 
 ## Kategorie Eventów
 
@@ -274,9 +306,9 @@ Nie wdrażać w Etapie 1:
 - `payment_status_changed`,
 - `invoice_created`.
 
-Powód: dotyczą płatności, faktur lub ścieżek finansowych. Wymagają osobnego planu i testów regresji.
+Powód: dotyczą płatności, faktur lub ścieżek finansowych. Wymagały osobnego planu i testów regresji.
 
-Status: nie wdrożono.
+Status: wdrożone w Etapie 2 — `online_payment_selected`, `deferred_invoice_selected`, `payment_order_created`, `payment_status_changed` (w `pnedu`) oraz `invoice_created` (w `pneadm`, Etap 2C-1).
 
 ### Dodatkowe Zasady RODO Dla Etapu 1
 

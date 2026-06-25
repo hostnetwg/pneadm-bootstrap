@@ -297,6 +297,13 @@ Dane osobowe: nie.
 
 Retencja: 24 miesiące lub dłużej.
 
+> Uwaga (ADR-005) — semantyka `paid_orders` vs `invoiced_orders`:
+> Kolumny `paid_orders` i `invoiced_orders` w poniższych tabelach są obecnie placeholderami (zawsze `0`, nie inkrementowane przez `analytics:aggregate-daily`). Przy wdrażaniu agregatów płatności/faktur należy je mapować rozłącznie:
+> - `paid_orders` — TYLKO ścieżka online (`payment_status_changed: paid`), czyli „opłacone online",
+> - `invoiced_orders` — zafakturowane (pierwsze `invoice_number` / przyszły event `invoice_created`), czyli „zafakturowane".
+> „Rozliczone łącznie" = `paid_orders` (online) + `invoiced_orders` (odroczone), z pominięciem podwójnego liczenia online, które później dostaje fakturę. Nie używać nazwy `paid` dla odroczonych.
+> Ścieżkę odroczoną (do `invoiced_orders` / `deferred_invoiced`) rozpoznawać po jednoznacznym, bezpiecznym polu `FormOrder` (`payment_mode` / `order_flow`), a NIE po braku powiązanego `OnlinePaymentOrder` (warunek pośredni, ryzyko błędów). `invoice_created` z `order_flow=online` to tylko znacznik księgowy — nie zwiększa „rozliczone łącznie". Szczegóły: `docs/decisions/ADR-005-invoice-number-means-invoiced-not-paid.md`.
+
 ### `analytics_daily_course_stats`
 
 Cel: dzienne agregaty per szkolenie.

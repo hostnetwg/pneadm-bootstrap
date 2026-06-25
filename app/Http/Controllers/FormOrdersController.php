@@ -690,6 +690,11 @@ class FormOrdersController extends Controller
                 return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
             }
 
+            // Analityka (ADR-005): ręczna edycja numeru faktury → invoice_path_type=manual.
+            \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
+                \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_MANUAL
+            );
+
             // Sprawdzamy, skąd użytkownik przyszedł
             $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             $isFromEditPage = $request->has('from_edit_page') && $request->input('from_edit_page') == '1';
@@ -1762,6 +1767,10 @@ class FormOrdersController extends Controller
 
                     // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
                     if (empty($oldInvoiceNumber) || $force) {
+                        // Analityka (ADR-005): numer ustawiony przez iFirma → invoice_path_type=ifirma.
+                        \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
+                            \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
+                        );
                         $zamowienie->invoice_number = $invoiceNumber;
                         $zamowienie->save();
 
@@ -2106,6 +2115,10 @@ class FormOrdersController extends Controller
 
                     // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
                     if (empty($oldInvoiceNumber) || $force) {
+                        // Analityka (ADR-005): numer ustawiony przez iFirma → invoice_path_type=ifirma.
+                        \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
+                            \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
+                        );
                         $zamowienie->invoice_number = $invoiceNumber;
                         $zamowienie->save();
 
@@ -2457,6 +2470,10 @@ class FormOrdersController extends Controller
             }
 
             // Aktualizacja numeru faktury w bazie
+            // Analityka (ADR-005): numer ustawiony przez iFirma (KSeF) → invoice_path_type=ifirma.
+            \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
+                \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
+            );
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
             $zamowienie->save();
 

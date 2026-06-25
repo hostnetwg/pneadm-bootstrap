@@ -58,6 +58,7 @@ class AnalyticsPayloadSanitizer
     ];
 
     private const ALLOWED_METADATA_KEYS = [
+        'amount_gross',
         'buyer_type',
         'campaign_channel',
         'campaign_code',
@@ -78,6 +79,7 @@ class AnalyticsPayloadSanitizer
         'ksef_option_selected',
         'landing_target',
         'lookup_target',
+        'order_flow',
         'participant_count',
         'participant_count_bucket',
         'payment_gateway',
