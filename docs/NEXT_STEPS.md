@@ -247,8 +247,8 @@ Po każdej implementacji należy:
 - Testy: `--filter=Analytics` → **110 passed** (pnedu), **98 passed** (pneadm); sanity formularza → **15 passed**; `npm run build` → OK.
 - **B3 — agregacja porzuceń (wdrożone produkcyjnie 2026-06-25, `pneadm` `b0b4535`):** zakres **kurs + kampania**. Komenda `analytics:aggregate-abandonments`, domyślnie 2 dni wstecz. Klasyfikacja po `order_form_session_id`; kampania **first-touch**; bez PII. Catch-up prod 2026-06-25: 9 wierszy kursów, 6 kampanii. Cron 03:15 Europe/Warsaw.
 - **B4 — dashboard porzuceń:** ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. Produkcyjny `git pull` po stronie Waldemara.
-- **B5 — CSV AI-safe export:** ✅ zaimplementowane w `pneadm` (eksport CSV z dashboardu porzuceń per kurs i per kampania, na agregatach B3/B4, bez raw eventów/sesji/PII; rates jako ułamki dziesiętne; przyciski w UI zachowują filtry). Endpointy `analytics.form-abandonments.export.courses|campaigns`. **Czeka na deploy** (bez migracji). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
-- **Następny etap (po decyzji Waldemara):** prosty wykres trendu dziennego `sessions_total` vs `converted`.
+- **B5 — CSV AI-safe export:** ✅ wypchnięte (`pneadm` `cb8046a`). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII; przyciski w UI zachowują filtry.
+- **B6 — wykres trendu dziennego + dzienny CSV:** ✅ zaimplementowane w `pneadm`. Wykres Chart.js `sessions_total` vs `converted` na dashboardzie porzuceń (bez nowej biblioteki — Chart.js już z CDN) + dzienny wariant CSV (`analytics.form-abandonments.export.daily`, jeden wiersz na `stat_date`, totale dzienne). Bez PII, bez migracji. **Czeka na deploy.** Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

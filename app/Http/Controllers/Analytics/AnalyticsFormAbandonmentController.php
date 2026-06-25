@@ -47,6 +47,16 @@ class AnalyticsFormAbandonmentController extends Controller
         return $export->streamCampaigns($request->only(self::FILTER_KEYS));
     }
 
+    /**
+     * Eksport CSV "AI-safe" dziennego trendu (Etap B6) — jeden wiersz na stat_date.
+     */
+    public function exportDaily(Request $request, AnalyticsFormAbandonmentCsvExportService $export): StreamedResponse
+    {
+        $this->ensureEnabled();
+
+        return $export->streamDaily($request->only(self::FILTER_KEYS));
+    }
+
     private function ensureEnabled(): void
     {
         if (! config('analytics.form_abandonment_dashboard.enabled', true)) {

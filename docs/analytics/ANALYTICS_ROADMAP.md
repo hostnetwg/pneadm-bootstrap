@@ -529,8 +529,8 @@ Poza zakresem obecnego modelu (osobne przyszłe eventy/decyzje, NIE teraz): reko
 > - **PR B2 — wdrożony produkcyjnie (pnedu `bdc74ca`):** inline, fail-silent JS collector na formularzu zamówienia.
 > - **PR B3 — wdrożony produkcyjnie (pneadm `b0b4535`, 2026-06-25):** porzucenia jako **agregacja** (NIE event JS). Komenda `analytics:aggregate-abandonments` (idempotentna, domyślnie 2 dni wstecz), dwie tabele `analytics_daily_*_abandonment_stats` (connection `analytics`). Sesje liczone wg **dnia pierwszego eventu** (Europe/Warsaw); kampania przypisywana **first-touch** w obrębie `order_form_session_id`; bez PII. Cron 03:15 Europe/Warsaw. Catch-up prod 2026-06-25: 9 kursów / 6 kampanii.
 > - **B4 (dashboard porzuceń)** — ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, agregaty B3, dane per kurs i per kampania, `lag=2`, first-event/first-touch attribution, brak PII; nie skanuje raw eventów.
-> - **B5 (CSV AI-safe export)** — ✅ zaimplementowane w `pneadm` (eksport CSV per kurs i per kampania z dashboardu porzuceń, na agregatach B3/B4, bez raw eventów/sesji/PII). Czeka na deploy.
-> - **Następny etap (po decyzji):** prosty wykres trendu dziennego `sessions_total` vs `converted`.
+> - **B5 (CSV AI-safe export)** — ✅ wypchnięte (`pneadm` `cb8046a`). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII.
+> - **B6 (wykres trendu dziennego + dzienny CSV)** — ✅ zaimplementowane w `pneadm`. Wykres Chart.js `sessions_total` vs `converted` + dzienny CSV (jeden wiersz na `stat_date`). Bez PII, bez migracji. Czeka na deploy.
 >
 > Uwaga: poniższa lista eventów to wcześniejszy szerszy szkic; B1 świadomie startuje z węższym, bezpieczniejszym MVP (4 eventy), żeby ograniczyć szum i ryzyko PII.
 

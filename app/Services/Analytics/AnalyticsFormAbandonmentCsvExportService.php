@@ -76,6 +76,32 @@ class AnalyticsFormAbandonmentCsvExportService
         'submit_attempted_not_created_rate',
     ];
 
+    /**
+     * Kolumny CSV dziennego trendu (jeden wiersz na stat_date).
+     *
+     * @var list<string>
+     */
+    private const DAILY_COLUMNS = [
+        'stat_date',
+        'sessions_total',
+        'reached_viewed',
+        'reached_started',
+        'reached_submit_clicked',
+        'reached_submit_attempted',
+        'reached_created',
+        'viewed_not_started',
+        'started_not_submit_clicked',
+        'submit_clicked_not_attempted',
+        'submit_attempted_not_created',
+        'converted',
+        'abandoned_total',
+        'conversion_rate',
+        'viewed_not_started_rate',
+        'started_not_submit_clicked_rate',
+        'submit_clicked_not_attempted_rate',
+        'submit_attempted_not_created_rate',
+    ];
+
     public function __construct(
         private readonly AnalyticsFormAbandonmentDashboardService $dashboard,
     ) {}
@@ -104,6 +130,51 @@ class AnalyticsFormAbandonmentCsvExportService
         $filename = $this->filename('campaigns', $filters);
 
         return $this->stream(self::CAMPAIGN_COLUMNS, $rows, $filename);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    public function streamDaily(array $input): StreamedResponse
+    {
+        $data = $this->dashboard->build($input);
+        $filters = $data['filters'];
+        $rows = $this->dailyExportRows($data['trend']);
+        $filename = $this->filename('daily', $filters);
+
+        return $this->stream(self::DAILY_COLUMNS, $rows, $filename);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $trend
+     * @return list<array<string, mixed>>
+     */
+    private function dailyExportRows(array $trend): array
+    {
+        return array_map(function (array $row): array {
+            $sessions = (int) $row['sessions_total'];
+
+            return [
+                'stat_date' => $row['stat_date'],
+                'sessions_total' => $sessions,
+                'reached_viewed' => (int) $row['reached_viewed'],
+                'reached_started' => (int) $row['reached_started'],
+                'reached_submit_clicked' => (int) $row['reached_submit_clicked'],
+                'reached_submit_attempted' => (int) $row['reached_submit_attempted'],
+                'reached_created' => (int) $row['reached_created'],
+                'viewed_not_started' => (int) $row['viewed_not_started'],
+                'started_not_submit_clicked' => (int) $row['started_not_submit_clicked'],
+                'submit_clicked_not_attempted' => (int) $row['submit_clicked_not_attempted'],
+                'submit_attempted_not_created' => (int) $row['submit_attempted_not_created'],
+                'converted' => (int) $row['converted'],
+                'abandoned_total' => (int) $row['abandoned_total'],
+                'conversion_rate' => $this->rate((int) $row['converted'], $sessions),
+                'viewed_not_started_rate' => $this->rate((int) $row['viewed_not_started'], $sessions),
+                'started_not_submit_clicked_rate' => $this->rate((int) $row['started_not_submit_clicked'], $sessions),
+                'submit_clicked_not_attempted_rate' => $this->rate((int) $row['submit_clicked_not_attempted'], $sessions),
+                'submit_attempted_not_created_rate' => $this->rate((int) $row['submit_attempted_not_created'], $sessions),
+            ];
+        }, $trend);
     }
 
     /**

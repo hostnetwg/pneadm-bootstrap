@@ -74,6 +74,7 @@ class AnalyticsFormAbandonmentDashboardService
             'buckets' => $buckets,
             'courses' => $this->buildCourseTable($courseRows),
             'campaigns' => $this->buildCampaignTable($campaignRows),
+            'trend' => $this->buildDailyTrend($filters, $courseRows, $campaignRows),
             'meta' => [
                 'lag_days' => $this->aggregationLagDays(),
                 'default_days' => $this->defaultDays(),
@@ -272,6 +273,61 @@ class AnalyticsFormAbandonmentDashboardService
             ->all();
 
         return $this->enrichWithCampaignMetadata($rows);
+    }
+
+    /**
+     * Dzienny trend (jeden wiersz na każdy stat_date w zakresie, z wypełnieniem brakujących dni zerami).
+     *
+     * Źródło zależy od aktywnego filtra:
+     * - gdy ustawiono `campaign_code` → grupujemy tabelę kampanii po stat_date (subset z kampanią),
+     * - w przeciwnym razie → grupujemy tabelę kursów po stat_date (kanoniczne sesje, z filtrem course_id).
+     *
+     * Wykorzystuje już pobrane kolekcje (bez dodatkowego zapytania).
+     *
+     * @param  array<string, mixed>  $filters
+     * @param  Collection<int, AnalyticsDailyFormAbandonmentStat>  $courseRows
+     * @param  Collection<int, AnalyticsDailyCampaignAbandonmentStat>  $campaignRows
+     * @return list<array<string, mixed>>
+     */
+    private function buildDailyTrend(array $filters, Collection $courseRows, Collection $campaignRows): array
+    {
+        $source = $filters['campaign_code'] !== null ? $campaignRows : $courseRows;
+
+        $byDate = $source->groupBy(fn ($row): string => Carbon::parse($row->stat_date)->toDateString());
+
+        $rows = [];
+        $cursor = Carbon::parse($filters['date_from']);
+        $end = Carbon::parse($filters['date_to']);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $key = $cursor->toDateString();
+            /** @var Collection<int, mixed> $dayRows */
+            $dayRows = $byDate->get($key, collect());
+
+            $sessionsTotal = (int) $dayRows->sum('sessions_total');
+            $converted = (int) $dayRows->sum('converted');
+
+            $rows[] = [
+                'stat_date' => $key,
+                'sessions_total' => $sessionsTotal,
+                'reached_viewed' => (int) $dayRows->sum('reached_viewed'),
+                'reached_started' => (int) $dayRows->sum('reached_started'),
+                'reached_submit_clicked' => (int) $dayRows->sum('reached_submit_clicked'),
+                'reached_submit_attempted' => (int) $dayRows->sum('reached_submit_attempted'),
+                'reached_created' => (int) $dayRows->sum('reached_created'),
+                'viewed_not_started' => (int) $dayRows->sum('viewed_not_started'),
+                'started_not_submit_clicked' => (int) $dayRows->sum('started_not_submit_clicked'),
+                'submit_clicked_not_attempted' => (int) $dayRows->sum('submit_clicked_not_attempted'),
+                'submit_attempted_not_created' => (int) $dayRows->sum('submit_attempted_not_created'),
+                'converted' => $converted,
+                'abandoned_total' => max(0, $sessionsTotal - $converted),
+                'conversion_rate' => $this->rate($converted, $sessionsTotal),
+            ];
+
+            $cursor->addDay();
+        }
+
+        return $rows;
     }
 
     /**

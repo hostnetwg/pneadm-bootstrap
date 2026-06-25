@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (dashboard porzuceń) — wdrożone do repo (`a6ee852`, pushed).** **B5 (CSV AI-safe) — zaimplementowane w `pneadm`, czeka na deploy.**
+Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (`a6ee852`) + B5 (`cb8046a`) wypchnięte.** **B6 (wykres trendu dziennego + dzienny CSV) — zaimplementowane w `pneadm`, czeka na deploy.**
 
 ## Cel etapu
 
@@ -22,7 +22,8 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 | **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ✅ ZROBIONE (`b0b4535`, deployed 2026-06-25) |
 | B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm` `a6ee852`, pushed) |
-| B5 | CSV AI-safe export z dashboardu porzuceń | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
+| B5 | CSV AI-safe export z dashboardu porzuceń | ✅ ZROBIONE (`pneadm` `cb8046a`, pushed) |
+| B6 | Wykres trendu dziennego + dzienny CSV | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
 
 ---
 
@@ -394,13 +395,62 @@ php artisan view:cache
 
 ---
 
+## PR B6 — wykres trendu dziennego + dzienny CSV (2026-06-26)
+
+Dodaje do dashboardu B4 **dzienny trend** (`sessions_total` vs `converted`) oraz **dzienny wariant CSV**
+(jeden wiersz na `stat_date`). Tylko `pneadm`, read-only, na agregatach B3, **bez skanowania `analytics_events`**,
+bez migracji, bez zmian w `pnedu`/B3/cronie/płatnościach.
+
+### Wykres
+- Chart.js (już ładowany globalnie z CDN w `layouts/app.blade.php`, cel `<x-app-layout>`) — **bez nowej biblioteki**.
+- Sekcja „Trend dzienny — sesje vs zamówienia”, `<canvas id="abandonmentTrendChart">`, init w `@push('scripts')`.
+- Dane do wykresu liczone w PHP (`$trendChart`), przekazane przez `@json` (Blade nie radzi sobie z arrow-fn w `@json`).
+- Pusty stan, gdy brak sesji w zakresie.
+
+### Dzienny trend (serwis)
+- `AnalyticsFormAbandonmentDashboardService::buildDailyTrend()` — jeden wiersz na każdy dzień zakresu (**wypełnienie brakujących dni zerami**), sort rosnąco.
+- Źródło zależne od filtra: `campaign_code` ustawione → tabela kampanii po `stat_date`; w przeciwnym razie tabela kursów po `stat_date` (z filtrem `course_id`). Reużywa już pobranych kolekcji (bez dodatkowego zapytania).
+- Zwracane w `build()` jako `trend`.
+
+### Dzienny CSV
+- Endpoint: `GET /analytics/form-abandonments/export/daily` → `analytics.form-abandonments.export.daily` (admin-only).
+- `AnalyticsFormAbandonmentCsvExportService::streamDaily()` — reużywa `build()['trend']`.
+- Kolumny: `stat_date, sessions_total, reached_viewed, reached_started, reached_submit_clicked, reached_submit_attempted, reached_created, viewed_not_started, started_not_submit_clicked, submit_clicked_not_attempted, submit_attempted_not_created, converted, abandoned_total, conversion_rate, viewed_not_started_rate, started_not_submit_clicked_rate, submit_clicked_not_attempted_rate, submit_attempted_not_created_rate`.
+- Nazwa pliku: `pne-form-abandonments-daily-YYYY-MM-DD_YYYY-MM-DD.csv`. BOM UTF-8, separator `,`, rates jako ułamki dziesiętne.
+- Przycisk „Eksport CSV — dziennie” w UI (zachowuje filtry).
+
+### Pliki
+- `app/Services/Analytics/AnalyticsFormAbandonmentDashboardService.php` (+`buildDailyTrend`, `trend` w `build()`).
+- `app/Services/Analytics/AnalyticsFormAbandonmentCsvExportService.php` (+`streamDaily`, `DAILY_COLUMNS`).
+- `app/Http/Controllers/Analytics/AnalyticsFormAbandonmentController.php` (+`exportDaily`).
+- `resources/views/analytics/form-abandonments/index.blade.php` (wykres + przycisk + `@push('scripts')`).
+- `routes/web.php`.
+
+### RODO / AI-safe
+Dzienny CSV i wykres zawierają wyłącznie daty agregacji, liczniki i rates. Brak PII, identyfikatorów sesji/zamówień/faktur, metadata, raw eventów. Dzienny CSV nie zawiera nawet `course_id`/`campaign_code` (czyste totale dzienne).
+
+### Testy B6
+`--filter=Analytics` → **151 passed**, w tym 10 nowych dla B6 (trend wypełnia zakres zerami, trend z tabeli kampanii przy filtrze kampanii, render `<canvas>`, pobranie dziennego CSV + nagłówek, dostęp nie-admin, jeden wiersz na dzień, poprawność rates, brak PII, link eksportu z filtrami).
+
+### Deploy B6 (bez migracji)
+```bash
+cd /path/to/adm.pnedu.pl
+git pull
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+# restart PHP-FPM / workerów tylko jeśli proces tego wymaga
+```
+
+---
+
 ## Status etapów — skrót
 
 - **B2**: ✅ wdrożone produkcyjnie (`pnedu` `bdc74ca`).
 - **B3**: ✅ wdrożone produkcyjnie (`pneadm` `b0b4535`, 2026-06-25). Migracja, catch-up 2026-06-25 (9 kursów / 6 kampanii), cron 03:15.
-- **B4**: ✅ wypchnięte (`pneadm` `a6ee852`). Dashboard porzuceń, read-only, agregaty B3. Produkcyjny `git pull` po stronie Waldemara.
-- **B5**: ✅ zaimplementowane w `pneadm` (CSV AI-safe export). **Czeka na deploy** (bez migracji).
-- **Następny etap (po decyzji):** prosty wykres trendu dziennego `sessions_total` vs `converted`.
+- **B4**: ✅ wypchnięte (`pneadm` `a6ee852`). Dashboard porzuceń, read-only, agregaty B3.
+- **B5**: ✅ wypchnięte (`pneadm` `cb8046a`). CSV AI-safe export (per kurs / per kampania).
+- **B6**: ✅ zaimplementowane w `pneadm` (wykres trendu dziennego + dzienny CSV). **Czeka na deploy** (bez migracji).
 
 ## Smoke test produkcyjny (po B2)
 

@@ -527,6 +527,163 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
             ])), false);
     }
 
+    // ---------------------------------------------------------------------
+    // B6 — wykres trendu dziennego + dzienny CSV
+    // ---------------------------------------------------------------------
+
+    public function test_build_returns_daily_trend_filling_range_with_zeros(): void
+    {
+        $this->seedCourse('2026-06-10', 100, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'converted' => 2, 'viewed_not_started' => 3]);
+
+        $service = app(\App\Services\Analytics\AnalyticsFormAbandonmentDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-09', 'date_to' => '2026-06-11']);
+
+        $this->assertCount(3, $data['trend']);
+        $this->assertSame('2026-06-09', $data['trend'][0]['stat_date']);
+        $this->assertSame(0, $data['trend'][0]['sessions_total']);
+        $this->assertSame('2026-06-10', $data['trend'][1]['stat_date']);
+        $this->assertSame(5, $data['trend'][1]['sessions_total']);
+        $this->assertSame(2, $data['trend'][1]['converted']);
+        $this->assertSame('2026-06-11', $data['trend'][2]['stat_date']);
+        $this->assertSame(0, $data['trend'][2]['sessions_total']);
+    }
+
+    public function test_daily_trend_uses_campaign_table_when_campaign_filter_set(): void
+    {
+        $this->seedCourse('2026-06-10', 100, 'Kurs', ['sessions_total' => 50, 'reached_viewed' => 50, 'viewed_not_started' => 50]);
+        $this->seedCampaign('2026-06-10', 'PROMO', ['sessions_total' => 7, 'reached_viewed' => 7, 'converted' => 1, 'viewed_not_started' => 6]);
+
+        $service = app(\App\Services\Analytics\AnalyticsFormAbandonmentDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-10', 'date_to' => '2026-06-10', 'campaign_code' => 'PROMO']);
+
+        $this->assertCount(1, $data['trend']);
+        $this->assertSame(7, $data['trend'][0]['sessions_total']);
+        $this->assertSame(1, $data['trend'][0]['converted']);
+    }
+
+    public function test_dashboard_renders_trend_chart_canvas_when_data_exists(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'converted' => 1, 'viewed_not_started' => 4]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.form-abandonments.index', ['date_from' => '2026-06-01', 'date_to' => '2026-06-30']))
+            ->assertOk()
+            ->assertSee('abandonmentTrendChart')
+            ->assertSee('Trend dzienny');
+    }
+
+    public function test_admin_can_download_daily_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 8, 'reached_viewed' => 8, 'converted' => 2, 'viewed_not_started' => 4]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.form-abandonments.export.daily', [
+            'date_from' => '2026-06-15', 'date_to' => '2026-06-15',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-form-abandonments-daily-2026-06-15_2026-06-15.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+    }
+
+    public function test_non_admin_cannot_download_daily_csv(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->get(route('analytics.form-abandonments.export.daily'))
+            ->assertForbidden();
+    }
+
+    public function test_daily_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 1, 'reached_viewed' => 1, 'viewed_not_started' => 1]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.daily', [
+            'date_from' => '2026-06-15', 'date_to' => '2026-06-15',
+        ])));
+
+        $this->assertSame([
+            'stat_date', 'sessions_total', 'reached_viewed', 'reached_started', 'reached_submit_clicked',
+            'reached_submit_attempted', 'reached_created', 'viewed_not_started', 'started_not_submit_clicked',
+            'submit_clicked_not_attempted', 'submit_attempted_not_created', 'converted', 'abandoned_total',
+            'conversion_rate', 'viewed_not_started_rate', 'started_not_submit_clicked_rate',
+            'submit_clicked_not_attempted_rate', 'submit_attempted_not_created_rate',
+        ], $this->csvLine($body, 0));
+    }
+
+    public function test_daily_csv_has_one_row_per_day_in_range(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-10', 100, 'Kurs', ['sessions_total' => 3, 'reached_viewed' => 3, 'viewed_not_started' => 3]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.daily', [
+            'date_from' => '2026-06-10', 'date_to' => '2026-06-12',
+        ])));
+
+        $lines = array_values(array_filter(explode("\n", trim($body)), fn ($l) => $l !== ''));
+        // 1 nagłówek + 3 dni
+        $this->assertCount(4, $lines);
+        $this->assertSame('2026-06-10', $this->csvLine($body, 1)[0]);
+        $this->assertSame('2026-06-11', $this->csvLine($body, 2)[0]);
+        $this->assertSame('2026-06-12', $this->csvLine($body, 3)[0]);
+    }
+
+    public function test_daily_csv_rates_are_correct(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'sessions_total' => 8, 'reached_viewed' => 8, 'converted' => 2, 'viewed_not_started' => 4,
+        ]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.daily', [
+            'date_from' => '2026-06-15', 'date_to' => '2026-06-15',
+        ])));
+
+        $map = array_combine($this->csvLine($body, 0), $this->csvLine($body, 1));
+        $this->assertSame('8', $map['sessions_total']);
+        $this->assertSame('6', $map['abandoned_total']);
+        $this->assertSame('0.25', $map['conversion_rate']);
+        $this->assertSame('0.5', $map['viewed_not_started_rate']);
+    }
+
+    public function test_daily_csv_does_not_contain_pii(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.daily', [
+            'date_from' => '2026-06-15', 'date_to' => '2026-06-15',
+        ])));
+
+        foreach ([
+            'analytics_session_id', 'order_form_session_id', 'form_order_id', 'payment_order_id',
+            'invoice_number', 'metadata', 'email', '@', 'course_id', 'campaign_code',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $body, "Dzienny CSV zawiera zakazane: {$forbidden}");
+        }
+    }
+
+    public function test_daily_export_link_on_dashboard_carries_filters(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 200, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.form-abandonments.index', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200,
+            ]))
+            ->assertOk()
+            ->assertSee(e(route('analytics.form-abandonments.export.daily', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200,
+            ])), false);
+    }
+
     private function csvBody(\Illuminate\Testing\TestResponse $response): string
     {
         $response->assertOk();

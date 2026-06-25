@@ -31,6 +31,9 @@
                 <a href="{{ route('analytics.form-abandonments.export.campaigns', $exportQuery) }}" class="btn btn-outline-success btn-sm">
                     <i class="bi bi-filetype-csv"></i> Eksport CSV — kampanie
                 </a>
+                <a href="{{ route('analytics.form-abandonments.export.daily', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — dziennie
+                </a>
                 @if(\Illuminate\Support\Facades\Route::has('analytics.sales-funnel.index'))
                     <a href="{{ route('analytics.sales-funnel.index') }}" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-funnel"></i> Lejek sprzedaży
@@ -138,6 +141,41 @@
                         <div class="small text-muted">Konwersja do zamówienia</div>
                         <div class="fs-4 fw-semibold">{{ $formatRate($summary['conversion_rate']) }}</div>
                     </div></div>
+                </div>
+            </div>
+
+            {{-- Wykres trendu dziennego --}}
+            @php
+                $trendData = $trend ?? [];
+                $trendHasData = collect($trendData)->sum('sessions_total') > 0;
+                $trendChart = array_map(static fn (array $r): array => [
+                    'date' => $r['stat_date'],
+                    'sessions' => (int) $r['sessions_total'],
+                    'converted' => (int) $r['converted'],
+                ], $trendData);
+            @endphp
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny — sesje vs zamówienia</span>
+                    @if(($filters['campaign_code'] ?? null))
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis small">źródło: kampania {{ $filters['campaign_code'] }}</span>
+                    @endif
+                </div>
+                <div class="card-body">
+                    @unless($trendHasData)
+                        <p class="text-muted small mb-0">Brak danych do wykresu w wybranym zakresie.</p>
+                    @else
+                        <div style="position: relative; height: 280px;">
+                            <canvas id="abandonmentTrendChart"></canvas>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">
+                            Każdy punkt to dzień (atrybucja do dnia pierwszego eventu sesji). Linia „Sesje” = wszystkie sesje formularza,
+                            „Zamówienia” = sesje zakończone zamówieniem. Dane z lagiem {{ (int) ($meta['lag_days'] ?? 2) }} dni.
+                            @if(($filters['campaign_code'] ?? null))
+                                Wykres pokazuje tylko wybraną kampanię.
+                            @endif
+                        </p>
+                    @endunless
                 </div>
             </div>
 
@@ -320,4 +358,55 @@
             </div>
         </div>
     </div>
+
+    @if($trendHasData ?? false)
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const canvas = document.getElementById('abandonmentTrendChart');
+                    if (!canvas || typeof Chart === 'undefined') {
+                        return;
+                    }
+
+                    const trend = @json($trendChart ?? []);
+
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: trend.map(r => r.date),
+                            datasets: [
+                                {
+                                    label: 'Sesje',
+                                    data: trend.map(r => r.sessions),
+                                    borderColor: '#ffc107',
+                                    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                                    tension: 0.25,
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Zamówienia',
+                                    data: trend.map(r => r.converted),
+                                    borderColor: '#198754',
+                                    backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                                    tension: 0.25,
+                                    fill: true,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 } },
+                            },
+                            plugins: {
+                                legend: { position: 'bottom' },
+                            },
+                        },
+                    });
+                });
+            </script>
+        @endpush
+    @endif
 </x-app-layout>
