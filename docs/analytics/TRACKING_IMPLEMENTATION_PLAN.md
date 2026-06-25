@@ -9,7 +9,7 @@ Dokument opisuje, gdzie i jak w przyszłości wdrożyć backend tracking, JS tra
 
 Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`; Etap 2C-1 — event `invoice_created` (observer w `pneadm`). Nadal nie wdrożono iFirma/KSeF trackingu, agregatów/dashboardu faktur, AI ani eksportów AI-safe.
 
-**Etap B (JS tracking):** wdrożono produkcyjnie **B1** + **B1a** (`pnedu` `6b32a4d`), **B2** (`pnedu` `bdc74ca`), **B3** (`pneadm` `b0b4535`, agregacja porzuceń, 2026-06-25) oraz **linki w sales-funnel** (`pneadm` `60acc21`). Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`. **Następny etap rozwojowy: B4** (dashboard porzuceń).
+**Etap B (JS tracking):** wdrożono produkcyjnie **B1** + **B1a** (`pnedu` `6b32a4d`), **B2** (`pnedu` `bdc74ca`), **B3** (`pneadm` `b0b4535`, agregacja porzuceń, 2026-06-25) oraz **linki w sales-funnel** (`pneadm` `60acc21`). **B4** (dashboard porzuceń, read-only, agregaty B3) — zaimplementowane w `pneadm`, czeka na deploy. Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
 ## Zasada Nadrzędna
 

@@ -36,6 +36,15 @@ return [
         'recompute_max_days' => (int) env('ANALYTICS_SALES_FUNNEL_RECOMPUTE_MAX_DAYS', 366),
     ],
 
+    // Etap B4 — dashboard porzuceń formularza (read-only, czyta wyłącznie agregaty B3).
+    'form_abandonment_dashboard' => [
+        'enabled' => (bool) env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_ENABLED', true),
+        'timezone' => env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_TIMEZONE', 'Europe/Warsaw'),
+        'default_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_DEFAULT_DAYS', 14),
+        // Maksymalny zakres dni filtra (ochrona przed zbyt dużym zapytaniem). Domyślnie ~rok.
+        'max_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_MAX_DAYS', 366),
+    ],
+
     'queue' => [
         'connection' => env('ANALYTICS_QUEUE_CONNECTION', 'redis'),
         'name' => env('ANALYTICS_QUEUE', 'analytics'),

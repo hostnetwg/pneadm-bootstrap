@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). Commit B3: `b0b4535` (`pneadm`). **Następny etap rozwojowy: B4** (dashboard porzuceń).
+Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (dashboard porzuceń) — zaimplementowane w `pneadm`, czeka na deploy.**
 
 ## Cel etapu
 
@@ -21,7 +21,7 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
 | **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ✅ ZROBIONE (`b0b4535`, deployed 2026-06-25) |
-| B4 | Dashboard porzuceń | ⏳ TODO (następny etap) |
+| B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
 
 ---
 
@@ -299,11 +299,59 @@ idempotencja, domyślny dzień z lagiem, komenda, brak PII).
 
 ---
 
-## Co dalej (B4) — skrót
+## PR B4 — dashboard porzuceń formularza (2026-06-25)
+
+Pierwszy, prosty dashboard **read-only** czytający WYŁĄCZNIE agregaty B3
+(`analytics_daily_form_abandonment_stats`, `analytics_daily_campaign_abandonment_stats`).
+**Nie skanuje `analytics_events`.** Tylko `pneadm`. Bez migracji, bez zmian w `pnedu`, bez zmian w B3/cronie.
+
+### Trasa i menu
+- `GET /analytics/form-abandonments` → `analytics.form-abandonments.index`.
+- Dostęp: ta sama grupa middleware co reszta `Analityka` (`auth`, `verified`, `check.user.status`, `analytics.debug.access` → admin-only).
+- Menu: `Analityka → Porzucenia formularza` (pod „Lejek sprzedaży”), za flagą `analytics.form_abandonment_dashboard.enabled`.
+
+### Pliki
+- `app/Http/Controllers/Analytics/AnalyticsFormAbandonmentController.php` (read-only `index`, 404 gdy flaga off).
+- `app/Services/Analytics/AnalyticsFormAbandonmentDashboardService.php` (filtry, summary, kubełki, tabele kurs/kampania, enrich nazwą kampanii fail-safe).
+- `resources/views/analytics/form-abandonments/index.blade.php` (kafelki, paski %, 2 tabele, „Jak czytać dane”).
+- `config/analytics.php` → sekcja `form_abandonment_dashboard` (enabled, timezone, default_days=14, max_days=366).
+- `routes/web.php`, `resources/views/layouts/navigation.blade.php`.
+
+### Filtry i domyślny zakres
+- `date_from`, `date_to`, `course_id` (opc.), `campaign_code` (opc.).
+- Domyślnie: ostatnie **14 dni zakończone na dniu dojrzałym** → `date_to = dziś(Europe/Warsaw) − lag(2)`, `date_from = date_to − 13`.
+- Limit zakresu: **366 dni** (przycięcie `date_from`).
+- Brak danych → pusty stan z komunikatem, nie błąd. Procenty przy `sessions_total=0` → `—` (bez dzielenia przez zero).
+
+### Metryki
+- Kafelki: sesje, rozpoczęto, klik submit, próba submitu, zamówienie, porzucono łącznie (`sessions_total − converted`), konwersja (`converted/sessions_total`).
+- Kubełki rozłączne (sumują się do `sessions_total`): `viewed_not_started`, `started_not_submit_clicked`, `submit_clicked_not_attempted`, `submit_attempted_not_created`, `converted` — z paskami %.
+- Tabela per kurs (grupowanie `course_id`, tytuł = najnowszy niepusty snapshot, sort `sessions_total DESC`, link do kursu jeśli istnieje `courses.show`).
+- Tabela per kampania (grupowanie `campaign_code`, link do karty kampanii jeśli jest dopasowanie w `marketing_campaigns`, sort `sessions_total DESC`).
+
+### RODO
+Czyta wyłącznie agregaty B3 (liczniki + `course_title_snapshot`/`campaign_code`). Brak emaili, telefonów, NIP, nazw nabywców/szkół, adresów, danych uczestników, wartości pól, raw metadata, raw eventów.
+
+### Testy B4
+`--filter=Analytics` → **128 passed**, w tym 15 nowych dla B4 (dostęp admin/nie-admin/gość, pusty stan, summary, sumowanie per kurs/kampania, filtry data/course_id/campaign_code, brak dzielenia przez zero, suma kubełków = `sessions_total`, brak PII/metadata, menu, brak skanowania `analytics_events`, 404 przy fladze off).
+
+### Deploy B4 (bez migracji)
+```bash
+cd /path/to/adm.pnedu.pl
+git pull
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+# restart PHP-FPM / workerów tylko jeśli obecny proces tego wymaga
+```
+
+---
+
+## Status etapów — skrót
 
 - **B2**: ✅ wdrożone produkcyjnie (`pnedu` `bdc74ca`).
 - **B3**: ✅ wdrożone produkcyjnie (`pneadm` `b0b4535`, 2026-06-25). Migracja, catch-up 2026-06-25 (9 kursów / 6 kampanii), cron 03:15.
-- **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data) czytający tabele `analytics_daily_*_abandonment_stats`. **Następny etap** — po zebraniu kilku dni danych produkcyjnych.
+- **B4**: ✅ zaimplementowane w `pneadm` (dashboard porzuceń, read-only, agregaty B3). **Czeka na deploy** (bez migracji).
 
 ## Smoke test produkcyjny (po B2)
 

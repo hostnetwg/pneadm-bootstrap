@@ -159,6 +159,9 @@
                         @if(config('analytics.sales_funnel_dashboard.enabled', true))
                             <li><a href="{{ route('analytics.sales-funnel.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.sales-funnel.*') ? 'active' : '' }}">Lejek sprzedaży</a></li>
                         @endif
+                        @if(config('analytics.form_abandonment_dashboard.enabled', true))
+                            <li><a href="{{ route('analytics.form-abandonments.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.form-abandonments.*') ? 'active' : '' }}">Porzucenia formularza</a></li>
+                        @endif
                         @if(config('analytics.debug_panel.enabled', false))
                             <li><a href="{{ route('analytics.debug-events.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.debug-events.*') ? 'active' : '' }}">Debug eventów</a></li>
                         @endif

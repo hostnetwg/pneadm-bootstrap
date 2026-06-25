@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Analytics\AnalyticsDebugEventController;
+use App\Http\Controllers\Analytics\AnalyticsFormAbandonmentController;
 use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsSettingsController;
 use App\Http\Controllers\Admin\PneduUsersController;
@@ -247,6 +248,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/debug-events', [AnalyticsDebugEventController::class, 'index'])->name('debug-events.index');
             Route::get('/sales-funnel', [AnalyticsSalesFunnelController::class, 'index'])->name('sales-funnel.index');
             Route::post('/sales-funnel/recompute', [AnalyticsSalesFunnelController::class, 'recompute'])->name('sales-funnel.recompute');
+            Route::get('/form-abandonments', [AnalyticsFormAbandonmentController::class, 'index'])->name('form-abandonments.index');
             Route::get('/settings', [AnalyticsSettingsController::class, 'index'])->name('settings.index');
             Route::post('/settings', [AnalyticsSettingsController::class, 'update'])->name('settings.update');
         });
