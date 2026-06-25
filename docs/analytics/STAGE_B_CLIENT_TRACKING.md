@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a wdrożone lokalnie** (backend endpoint + kontrakt + hardening + testy). B2/B3/B4 — do zrobienia.
+Status: **PR B1 + B1a + B2 wdrożone lokalnie** (backend endpoint + hardening + JS collector na formularzu + testy). B3/B4 — do zrobienia.
 
 ## Cel etapu
 
@@ -19,7 +19,7 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 |----|--------|--------|
 | **B1** | Endpoint batch + enumy + sanitizer + tryby + testy RODO | ✅ ZROBIONE |
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
-| B2 | Lekki JS collector na formularzu zamówienia | ⏳ TODO |
+| **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (czeka na zgodę na commit) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ⏳ TODO |
 | B4 | Dashboard porzuceń | ⏳ TODO |
 
@@ -181,9 +181,63 @@ Audyt realnego `resources/views/courses/order-form.blade.php` (pnedu):
 
 ---
 
+## PR B2 — JS collector na formularzu (2026-06-25, czeka na zgodę na commit)
+
+Lekki, fail-silent collector **tylko** na stronie formularza zamówienia (`pnedu`). Podłącza front do istniejącego endpointu B1/B1a. **Bez** porzuceń, bez nowych eventów, bez field-level, bez zmian logiki formularza/płatności/faktur.
+
+### Gdzie i jak się ładuje
+
+- Projekt nie używa `@vite` w layoucie formularza (biblioteki z CDN, własny JS formularza jest **inline**, layout ma `@stack('scripts')`). Dlatego collector to **inline `<script>`** w partialu, dołączany **wyłącznie** na tej stronie — zgodnie ze stylem projektu i zasadą „nie globalnie".
+- Pliki:
+  - `resources/views/courses/partials/order-form-client-tracking.blade.php` — collector (self-contained IIFE, cały w `try/catch`).
+  - `resources/views/courses/order-form.blade.php` — element configu `#order-form-analytics-config` + `@include` partiala, oba w `@if(config('analytics.enabled'))`; dodane `data-analytics-section` / `data-analytics-cta`.
+- Config przekazywany do JS tylko jako bezpieczne `data-*`: `data-endpoint`, `data-course-id`, `data-price-variant-id`, `data-max-batch`. **Brak** danych osobowych, pełnego URL, referrera.
+
+### Eventy i triggery
+
+| Event | Trigger (JS) | Klucz |
+|-------|--------------|-------|
+| `order_form_started` | pierwsza interakcja (input/change/click/submit) | `trigger=first_interaction`, raz na wejście |
+| `order_form_section_interacted` | pierwsza interakcja z sekcją | `section_key` z `data-analytics-section`, raz na sekcję |
+| `order_form_cta_clicked` | klik/zmiana CTA | `cta_key` z `data-analytics-cta` |
+| `order_form_submit_clicked` | zdarzenie `submit` formularza | (bez preventDefault) |
+
+Mapowanie w formularzu (whitelisty B1/B1a):
+- sekcje: `buyer_data` (Dane kontaktowe zamawiającego **oraz** „Dane do faktury": nazwa nabywcy/NIP/adres), `invoice` (tylko „Uwagi do faktury"), `recipient_data` (blok odbiorcy), `participants` (Dane uczestników), `payment_method` (sposób rozliczenia/płatność);
+- CTA: `select_deferred_invoice`, `select_online_payment` (radia płatności), `submit_order` (przycisk), `back_to_course` (link „Powrót do szczegółów szkolenia").
+- `add_participant`/`remove_participant`/`consents`/`summary` nie występują w obecnym jednokrokowym formularzu (rezerwa); przyciski GUS świadomie pominięte (B-future).
+
+### Batch / debounce / flush
+
+- kolejka w pamięci, batch ≤ `data-max-batch` (domyślnie 20);
+- debounce wysyłki ~3 s (`setTimeout`), wysyłka `fetch(..., {keepalive:true, credentials:'same-origin'})`;
+- flush beaconem (`navigator.sendBeacon`, fallback `fetch keepalive`) przy: `submit`, `visibilitychange` (hidden), `pagehide`;
+- każdy event ma klientowski `event_uuid` (crypto.randomUUID + fallback v4; brak crypto → pomijamy, serwer wygeneruje) — backend B1a traktuje go jako **seed** deduplikacji (UUIDv5);
+- brak localStorage/sessionStorage, brak agresywnych retry.
+
+### RODO
+
+JS **nigdy** nie czyta wartości pól (`input.value`/`textarea`/`select`, `FormData`, `innerText`, HTML, pełny URL, raw referrer). Payload zawiera wyłącznie: `event_name`, `event_uuid`, `course_id`, `price_variant_id`, `section_key`, `cta_key`, `trigger` — wszystkie z whitelisty. Wartości `section_key/cta_key` pochodzą z autorskich `data-*`, nie z treści DOM.
+
+### Fail-silent
+
+Cały collector w `try/catch`; brak collectora / endpointu / `sendBeacon` / `crypto`, adblock, timeout, błąd `fetch`, tryb `off` → **formularz działa normalnie**. **Brak** `preventDefault()` na submit.
+
+### Tryby analityki
+
+Logiki trybów **nie duplikujemy** w JS (backend B1/B1a egzekwuje): `standard` zbiera 4 MVP; `light` zapisze tylko `order_form_started` + `order_form_submit_clicked`; `aggregate_only`/`off` nic nie zapiszą (endpoint zwraca `204`). Dodatkowo: gdy hard kill switch (`config('analytics.enabled')=false`), collector **nie jest renderowany**.
+
+### Testy B2
+
+`tests/Feature/AnalyticsOrderFormClientTrackingStageB2Test.php` (8 testów): collector obecny na formularzu i nieobecny poza nim; config zawiera endpoint + `course_id` + `max_batch`; `data-analytics-section`/`data-analytics-cta` tylko z whitelisty; config bez PII; formularz nadal się renderuje; collector nieobecny przy hard kill switch.
+
+Wyniki: `--filter=Analytics` → **110 passed** (745 assertions). Sanity formularza (`OrderEntryPlacementTest|FormOrderCheckoutResumeServiceTest|PaymentDisplayOptionOrderFormTestModeTest`) → **15 passed**. `npm run build` → OK.
+
+---
+
 ## Co dalej (B2–B4) — skrót
 
-- **B2**: mały moduł JS ładowany tylko na stronie formularza zamówienia; debounce 2–5 s, batch ≤20, flush na `visibilitychange`, `sendBeacon` best-effort; działa tylko gdy analityka włączona i tryb pozwala; brak wartości pól; awaria JS/endpointu nie blokuje submitu.
+- **B2**: ✅ wdrożone (czeka na zgodę na commit) — inline collector na formularzu, debounce ~3 s, batch ≤20, flush na `submit`/`visibilitychange`/`pagehide`, `sendBeacon` + `fetch keepalive`; brak wartości pól; awaria JS/endpointu nie blokuje submitu. Szczegóły wyżej.
 - **B3**: porzucenia jako **agregacja po czasie** (nie event `order_form_abandoned`). Okno startowe: **24 h**. Definicje: `viewed_not_started`, `started_not_submitted`, `submit_clicked_not_submitted`, `submitted_not_created`. Komenda np. `analytics:aggregate-abandonments` (idempotentna).
 - **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data). Najpierw dane oglądamy w `/analytics/debug-events`.
 

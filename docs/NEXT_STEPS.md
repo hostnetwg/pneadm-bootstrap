@@ -237,8 +237,14 @@ Po każdej implementacji należy:
   - batch większy niż limit jest **ucinany do limitu** (best-effort, nie odrzucamy całości);
   - **whitelisty bez zmian** po audycie realnego formularza (`invoice` zostaje, NIE dodano `invoice_data`);
   - **porzucenia nadal poza zakresem** B1/B1a (planowane jako agregacja po 24 h w B3).
-- Testy: `sail artisan test --filter=Analytics` → **102 passed** (706 assertions).
-- **Do zrobienia:** B2 (JS collector w widoku formularza), B3 (agregacja porzuceń), B4 (dashboard porzuceń). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **B2 — JS collector na formularzu** (pnedu, **czeka na zgodę Waldemara na commit**):
+  - inline, fail-silent collector ładowany **tylko** na stronie formularza zamówienia (layout nie używa `@vite`; styl projektu = inline + CDN + `@stack('scripts')`);
+  - wysyła 4 eventy MVP do `POST /analytics/client-events`; sekcje/CTA przez `data-analytics-section`/`data-analytics-cta` (whitelista); zero wartości pól, zero PII w configu;
+  - batch ≤20, debounce ~3 s, flush `submit`/`visibilitychange`/`pagehide` (`sendBeacon` + `fetch keepalive`); klientowski `event_uuid` = seed (UUIDv5 po stronie serwera);
+  - **nie blokuje formularza** w żadnym scenariuszu (brak `preventDefault`); gdy hard kill switch — collector nie jest renderowany;
+  - pliki: `resources/views/courses/partials/order-form-client-tracking.blade.php`, zmiany w `resources/views/courses/order-form.blade.php`, test `tests/Feature/AnalyticsOrderFormClientTrackingStageB2Test.php`.
+- Testy: `--filter=Analytics` → **110 passed** (745 assertions); sanity formularza → **15 passed**; `npm run build` → OK.
+- **Do zrobienia:** B3 (agregacja porzuceń po 24 h), B4 (dashboard porzuceń). Porzucenia nadal poza zakresem B2. Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

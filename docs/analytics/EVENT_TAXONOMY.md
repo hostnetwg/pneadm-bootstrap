@@ -103,6 +103,8 @@ Dozwolone przykłady:
 >
 > Pozostałe pozycje w tabeli poniżej to **backlog** (B-future), niewdrożony w B1.
 >
+> **B2 (2026-06-25) — JS collector na formularzu (pnedu, czeka na zgodę na commit):** inline, fail-silent collector ładowany TYLKO na stronie formularza zamówienia, wysyła te 4 eventy do `POST /analytics/client-events`. Triggery: `order_form_started` (pierwsza interakcja, raz), `order_form_section_interacted` (pierwsza interakcja z sekcją wg `data-analytics-section`, raz/sekcja), `order_form_cta_clicked` (klik/zmiana wg `data-analytics-cta`), `order_form_submit_clicked` (zdarzenie `submit`, bez `preventDefault`). Batch ≤20, debounce ~3 s, flush `submit`/`visibilitychange`/`pagehide` (`sendBeacon` + `fetch keepalive`). RODO: zero wartości pól; `section_key`/`cta_key`/`trigger` z whitelisty (z `data-*`, nie z DOM). Tryby egzekwuje backend.
+>
 > **Hardening B1a (2026-06-25):**
 > - **Same-origin guard** — żądania z obcego hosta (`Origin`/`Referer` po HOŚCIE) są ciche (`204`), bez zapisu; przy obu pustych nagłówkach: best-effort (nie blokujemy). CSRF-exempt zostaje (wsparcie `sendBeacon`). Nie logujemy URL-i/referrerów; do analityki trafia tylko `referrer_domain`.
 > - **`event_uuid` namespacowany serwerowo** — klientowski UUID jest **tylko seedem deduplikacji**; finalny `event_uuid` to deterministyczny UUIDv5 z `client_js|{order_form_session_id}|{event_name}|{client_event_uuid}` (mieści się w `char(36)`). Brak/niepoprawny UUID klienta → serwer generuje własny. `client_event_uuid` nie jest zapisywany do metadata.
