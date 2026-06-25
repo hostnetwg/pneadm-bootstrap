@@ -228,6 +228,18 @@ Po każdej implementacji należy:
 - Uwaga dev: testy używają osobnej bazy `testing`. Nową migrację trzeba zastosować także tam, np.:
   `DB_DATABASE=testing php artisan migrate --path=database/migrations/2026_06_25_120000_create_analytics_settings_table.php` (wewnątrz kontenera Sail).
 
+## Etap B — JS Tracking Formularza (wdrożone lokalnie: B1 + B1a, 2026-06-25)
+
+- **B1** — backendowy endpoint `POST /analytics/client-events` w `pnedu`: batch ≤20 eventów, payload ≤10 KB, rate limit 60/min/IP, **fail-silent `204`**, 4 eventy MVP (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`), whitelisty wartości (`section_key`/`cta_key`/`trigger`), tryby (standard = pełne MVP). CSRF-exempt dla wsparcia `navigator.sendBeacon`. Zero PII.
+- **B1a — hardening** (bez zmiany zakresu eventów, bez JS, bez porzuceń):
+  - dodano **same-origin guard** (porównanie po HOŚCIE z `Origin`/`Referer`; obcy host → `204` bez zapisu; oba puste → best-effort; nigdy `403`; bez logowania URL-i); CSRF-exempt **zostaje**;
+  - klientowski `event_uuid` jest **tylko seedem deduplikacji**; finalny `event_uuid` generowany/namespacowany po stronie serwera (deterministyczny UUIDv5: `client_js|order_form_session_id|event_name|client_event_uuid`, mieści się w `char(36)`);
+  - batch większy niż limit jest **ucinany do limitu** (best-effort, nie odrzucamy całości);
+  - **whitelisty bez zmian** po audycie realnego formularza (`invoice` zostaje, NIE dodano `invoice_data`);
+  - **porzucenia nadal poza zakresem** B1/B1a (planowane jako agregacja po 24 h w B3).
+- Testy: `sail artisan test --filter=Analytics` → **102 passed** (706 assertions).
+- **Do zrobienia:** B2 (JS collector w widoku formularza), B3 (agregacja porzuceń), B4 (dashboard porzuceń). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+
 ## Do Aktualizacji Po Wdrożeniu
 
 - Odhaczyć wykonane kroki.

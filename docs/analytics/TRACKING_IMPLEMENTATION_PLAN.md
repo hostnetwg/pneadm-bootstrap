@@ -7,7 +7,9 @@ Status: Etap 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C i 1D wdrożone lokalnie
 
 Dokument opisuje, gdzie i jak w przyszłości wdrożyć backend tracking, JS tracking, kolejkę Redis `analytics` oraz fail-silent zapis do `pne_analytics`.
 
-Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`; Etap 2C-1 — event `invoice_created` (observer w `pneadm`). Nadal nie wdrożono JS trackingu, iFirma/KSeF trackingu, agregatów/dashboardu faktur, AI ani eksportów AI-safe.
+Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`; Etap 2C-1 — event `invoice_created` (observer w `pneadm`). Nadal nie wdrożono iFirma/KSeF trackingu, agregatów/dashboardu faktur, AI ani eksportów AI-safe.
+
+**Etap B (JS tracking) — start:** wdrożono lokalnie **B1** (endpoint `POST /analytics/client-events` w `pnedu`: batch ≤20, payload ≤10 KB, rate limit 60/min/IP, fail-silent `204`, 4 eventy MVP, whitelisty wartości, tryby) oraz **B1a hardening** (same-origin guard po HOŚCIE z `Origin`/`Referer`; klientowski `event_uuid` jako wyłącznie seed deduplikacji, finalny `event_uuid` = deterministyczny UUIDv5 namespacowany sesją formularza i nazwą eventu; CSRF-exempt zostaje dla `sendBeacon`; batch > limitu ucinany do limitu; porzucenia nadal poza zakresem B1/B1a). Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`. Do zrobienia: **B2** (JS collector w widoku formularza), **B3** (agregacja porzuceń po 24 h), **B4** (dashboard porzuceń).
 
 ## Zasada Nadrzędna
 

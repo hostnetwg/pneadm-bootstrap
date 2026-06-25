@@ -91,6 +91,22 @@ Dozwolone przykłady:
 
 ## Eventy JavaScript Formularza
 
+> **Wdrożone w PR B1 (MVP — stan faktyczny).** Endpoint `POST /analytics/client-events` (projekt pnedu)
+> przyjmuje wyłącznie poniższe 4 eventy. Pełny kontrakt: [`STAGE_B_CLIENT_TRACKING.md`](./STAGE_B_CLIENT_TRACKING.md).
+>
+> | Event | Kiedy powstaje | Metadane dozwolone | Tryby |
+> |---|---|---|---|
+> | `order_form_started` | pierwsza sensowna interakcja z formularzem | `trigger` (whitelist), `price_variant_id` | `full`, `standard`, `light` |
+> | `order_form_section_interacted` | pierwsza interakcja z sekcją | `section_key` (whitelist) | `full`, `standard` |
+> | `order_form_cta_clicked` | kliknięcie ważnej akcji/CTA | `cta_key` (whitelist) | `full`, `standard` |
+> | `order_form_submit_clicked` | kliknięcie submitu po stronie JS (przed backendowym `order_form_submit_attempted`) | — | `full`, `standard`, `light` |
+>
+> Pozostałe pozycje w tabeli poniżej to **backlog** (B-future), niewdrożony w B1.
+>
+> **Hardening B1a (2026-06-25):**
+> - **Same-origin guard** — żądania z obcego hosta (`Origin`/`Referer` po HOŚCIE) są ciche (`204`), bez zapisu; przy obu pustych nagłówkach: best-effort (nie blokujemy). CSRF-exempt zostaje (wsparcie `sendBeacon`). Nie logujemy URL-i/referrerów; do analityki trafia tylko `referrer_domain`.
+> - **`event_uuid` namespacowany serwerowo** — klientowski UUID jest **tylko seedem deduplikacji**; finalny `event_uuid` to deterministyczny UUIDv5 z `client_js|{order_form_session_id}|{event_name}|{client_event_uuid}` (mieści się w `char(36)`). Brak/niepoprawny UUID klienta → serwer generuje własny. `client_event_uuid` nie jest zapisywany do metadata.
+
 | Event | Kiedy powstaje | Metadane dozwolone | Tryby |
 |---|---|---|---|
 | `order_form_js_loaded` | po załadowaniu JS formularza | `course_id`, `order_form_session_id` | `full`, `standard` |

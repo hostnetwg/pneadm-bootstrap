@@ -523,6 +523,13 @@ Poza zakresem obecnego modelu (osobne przyszłe eventy/decyzje, NIE teraz): reko
 
 ## Etap 2 — JS Tracking Formularza
 
+> **Aktualizacja 2026-06-25 — Etap B (JS tracking) wystartował.**
+> Realizujemy w PR-ach B1→B4. Pełny, aktualny kontrakt i status: [`STAGE_B_CLIENT_TRACKING.md`](./STAGE_B_CLIENT_TRACKING.md).
+> - **PR B1 — wdrożony lokalnie (pnedu):** endpoint `POST /analytics/client-events` (batch, fail-silent 204, rate limit, limity rozmiaru), 4 eventy MVP (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`), whitelisty wartości, tryby (standard = MVP), 19 testów RODO/limity/tryby.
+> - B2 (JS collector), B3 (agregacja porzuceń po 24 h), B4 (dashboard porzuceń) — do zrobienia.
+>
+> Uwaga: poniższa lista eventów to wcześniejszy szerszy szkic; B1 świadomie startuje z węższym, bezpieczniejszym MVP (4 eventy), żeby ograniczyć szum i ryzyko PII.
+
 Zakres:
 
 - JS tracker w formularzu zamówienia,
