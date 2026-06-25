@@ -25,7 +25,12 @@ ee22c83 — feat(analytics): add analytics settings panel with runtime override 
 
 ```text
 ccb3e3e — feat(analytics): apply runtime analytics mode override from pneadm
+6b32a4d — feat(analytics): harden client analytics endpoint (Etap B1 + B1a — POST /analytics/client-events)
+bdc74ca — feat(analytics): add order form client-side tracking (Etap B2 — JS collector formularza)
 ```
+
+> Etap B (B1/B1a/B2) w `pneadm` to **wyłącznie dokumentacja** (commity `2c12826`, `272dc6e`) —
+> brak kodu produkcyjnego pneadm do wdrożenia w tym etapie. Wdrażany kod B jest w `pnedu`.
 
 ### Wynik testów lokalnych
 
@@ -33,6 +38,17 @@ ccb3e3e — feat(analytics): apply runtime analytics mode override from pneadm
 pneadm --filter=Analytics: 89 passed (244 assertions)
 pnedu  --filter=Analytics: 75 passed (598 assertions)
 pnedu  sanity formularza:   15 passed (OrderEntryPlacement 4 + FormOrderCheckoutResumeService 5 + PaymentDisplayOptionOrderFormTestMode 6)
+```
+
+### Wynik testów lokalnych — Etap B (client tracking), stan na 2026-06-25
+
+```text
+pnedu --filter=Analytics:                          110 passed (746 assertions)
+pnedu --filter=OrderEntryPlacementTest:              4 passed (5 assertions)
+pnedu --filter=FormOrderCheckoutResumeServiceTest:   5 passed (9 assertions)
+pnedu --filter=PaymentDisplayOptionOrderFormTestModeTest: 6 passed (11 assertions)
+pnedu npm run build:                               OK (vite build, ✓ built ~8.8 s)
+pnedu npm test:                                    BRAK SKRYPTU (projekt nie ma testów JS; frontend B2 testowany testami PHP Feature)
 ```
 
 ---
@@ -331,30 +347,106 @@ php artisan up
 php artisan migrate:status | grep analytics_settings
 ```
 
-### 7.2 Deploy `pnedu`
+### 7.2 Deploy `pnedu` (z budowaniem assetów — od Etapu B2)
+
+> Od Etapu B2 proces deployu `pnedu` zawiera krok `npm run build` (decyzja Waldemara, 2026-06-25).
+> WAŻNE: sam collector B2 jest renderowany **inline w Blade** i NIE wymaga bundla — portal zadziała
+> nawet bez przebudowy assetów. `npm run build` wchodzi do procesu jako standaryzacja (przyszłe zmiany
+> w `resources/js/*`/`resources/sass/*`), a nie jako twardy warunek działania B2.
+> Konsekwencje `public/build` (dirty working tree, ryzyko blokady `git pull`) → patrz **7.3**.
 
 ```bash
-cd /path/to/pnedu.pl
+cd /path/to/pnedu.pl          # produkcja PNEdu: /home/srv66127/domains/pnedu.pl/app
 
-git status
+git status                     # MUSI być czysto (jeśli dirty przez public/build → patrz 7.3)
 git pull
 
 # Maintenance mode na portalu sprzedażowym BYWA RYZYKOWNE — zwykle pomijamy 'down'.
 # Wariant z maintenance (opcjonalny):
 # php artisan down --render="errors::503" || true
 
+# Composer — TYLKO jeśli zmieniły się zależności PHP. B2 ich NIE zmienia, więc zwykle pomijamy:
+# composer install --no-dev --optimize-autoloader
+
+# Frontend (Node/npm) — od B2. PRZED pierwszym buildem zweryfikuj dostępność Node na serwerze (7.3):
+npm ci                         # preferowane: w repo jest package-lock.json (deterministyczny install)
+npm run build                  # vite build → public/build/* (UWAGA: pliki śledzone, patrz 7.3)
+
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 # (lub: php artisan optimize)
+
+php artisan queue:restart      # przeładowanie workerów po deployu (lub naturalnie przez --max-time crona)
 
 # Jeśli użyto 'down':
 # php artisan up
 ```
 
 ```text
-W pnedu NIE uruchamiamy migracji dla tego etapu.
-Rekomendacja: deploy pnedu bez maintenance mode (portal sprzedażowy), bo zmiana jest addytywna i fail-safe.
+- npm ci jest PREFEROWANE, bo w repo jest package-lock.json (czysty, deterministyczny install).
+  Jeśli na serwerze brak package-lock lub `npm ci` zawiedzie → fallback `npm install`.
+- W pnedu NIE uruchamiamy migracji dla tego etapu.
+- Rekomendacja: deploy pnedu bez maintenance mode (portal sprzedażowy) — zmiana addytywna i fail-safe.
+- Realny prod PNEdu używa alt-php: zamiast `php` bywa /opt/alt/php82/usr/bin/php.
+  Node/npm na DirectAdmin/SeoHost mogą być pod osobną ścieżką lub wymagać włączenia —
+  zweryfikuj `node -v` / `npm -v` PRZED deployem (7.3).
+- Jeśli Node na produkcji NIE jest dostępny: B2 i tak działa (collector inline) — pomiń krok npm,
+  a włączenie buildu na prod potraktuj jako osobny etap porządkowy (7.3).
+```
+
+### 7.3 `public/build` na produkcji — pre-check Node i ryzyko „dirty working tree"
+
+`public/build/*` jest **śledzone w Git** (`public/build/manifest.json`, `public/build/assets/app-*.css`,
+`public/build/assets/app-*.js`). Dotychczas produkcja **nie** wykonywała `npm run build` i serwowała
+commitowane assety. Od B2 deploy ma robić build — to rodzi konsekwencje opisane niżej.
+
+**Pre-check środowiska (na serwerze, PRZED pierwszym buildem):**
+
+```bash
+node -v          # czy Node jest dostępny i w jakiej wersji (lokalnie: v22)
+npm -v           # lokalnie: 11.x
+which node npm   # ścieżki (na alt-php/DirectAdmin/SeoHost mogą być nietypowe lub Node wyłączony)
+```
+
+```text
+Jeśli Node/npm NIE są dostępne na produkcji:
+- B2 i tak DZIAŁA (collector inline w Blade) → deploy B2 nie jest zablokowany,
+- pomiń krok npm i wdróż resztę; assety zostają jak w repo (poprzedni bundel),
+- włączenie Node/buildu na produkcji potraktuj jako osobny, przyszły etap porządkowy (niżej).
+```
+
+**Konsekwencje uruchomienia `npm run build` na produkcji (zweryfikowane lokalnie 2026-06-25):**
+
+1. Build **zmienia pliki śledzone**: nadpisuje `public/build/manifest.json` i generuje
+   `public/build/assets/app-*.js` z **nowym hashem treści** (lokalnie: `app-yYbHl3fg.js` → `app-CsKfMtAR.js`),
+   stary plik znika. CSS bez zmian (`app-DAs5Lhk2.css`).
+2. Po buildzie `git status` na produkcji **będzie „dirty"**: zmodyfikowany `manifest.json`,
+   usunięty stary `app-*.js`, nieśledzony nowy `app-*.js`.
+3. **Przyszły `git pull` może zostać zablokowany** komunikatem typu
+   *„Your local changes to the following files would be overwritten by merge: public/build/…"*.
+
+> OSTRZEŻENIE (do procesu deployu): Ponieważ public/build jest śledzone w Git, uruchomienie
+> npm run build na produkcji może zostawić lokalne zmiany w public/build. Przed kolejnymi deployami
+> trzeba sprawdzić git status i nie dopuścić, aby zmodyfikowany build blokował git pull.
+
+**Obejście na teraz (NIE zmieniamy architektury assetów w tym kroku):**
+
+```bash
+# Jeśli przed git pull working tree jest „dirty" tylko przez public/build:
+git checkout -- public/build      # odrzuć lokalny build (wróci wersja z repo)
+git pull
+npm ci && npm run build           # odtwórz build po pullu
+# Alternatywnie: git stash push -- public/build   (i ewentualnie git stash drop)
+```
+
+**Przyszły etap porządkowy (NIE wdrażać teraz)** — rekomendowany, gdy build na prod się ustabilizuje:
+
+```text
+chore(assets): standardize production asset build process
+- albo: usunąć public/build z Gita + dodać do .gitignore + budować deterministycznie na deployu/CI,
+- albo: budować assety w CI i wgrywać artefakt (produkcja bez Node).
+Cel: koniec z „dirty working tree" i ryzykiem blokady git pull.
 ```
 
 ---
@@ -588,6 +680,38 @@ tail -n 20 storage/logs/analytics-aggregate.log
 10. Sprawdź logi Laravel `pnedu` (`storage/logs/laravel.log`).
 11. Sprawdź `failed_jobs` (brak nowych błędów analityki).
 12. Sprawdź worker queue `analytics` (działa, przerabia joby).
+
+### 9.1 Smoke test B2 — JS collector formularza (po deployu z `npm run build`)
+
+```text
+1.  Deploy pnedu wykonany (z krokiem npm run build — sekcja 7.2; lub pominiętym, jeśli brak Node — 7.3).
+2.  Otwórz formularz zamówienia (URL jak w sekcji 9).
+3.  Wejdź w pierwsze pole formularza (focus/wpisanie czegokolwiek).
+4.  Wybierz metodę płatności (online / faktura odroczona).
+5.  Kliknij „Powrót do szczegółów szkolenia" LUB submit — tylko w kontrolowanym scenariuszu
+    (NIE wysyłaj realnego zamówienia bez decyzji Waldemara).
+6.  Wejdź na /analytics/debug-events (jako admin).
+7.  Oczekiwane eventy:
+    - order_form_viewed
+    - order_form_started
+    - order_form_section_interacted
+    - order_form_cta_clicked
+    - order_form_submit_clicked   (tylko jeśli kliknięto submit)
+8.  Sprawdź metadata eventów: BRAK PII i BRAK wartości pól
+    (dozwolone tylko: section_key / cta_key / trigger / course_id / price_variant_id).
+9.  Sprawdź logi Laravel pnedu (storage/logs/laravel.log) — brak błędów.
+10. Sprawdź failed_jobs — brak nowych błędów analityki.
+11. Sprawdź `git status` na produkcji PO buildzie i opisz, czy public/build/* zostało zmienione
+    (oczekiwane: TAK — patrz 7.3; zadbać, by nie zablokowało kolejnego git pull).
+```
+
+```text
+Tryb analityki a widoczność eventów JS:
+- efektywny tryb >= standard → widoczne wszystkie 4 eventy JS,
+- tryb 'light' (z JS) → CELOWO tylko order_form_started i order_form_submit_clicked
+  (section_interacted/cta_clicked pomijane jako zbyt szczegółowe — patrz AnalyticsModeResolver),
+- tryb off/aggregate_only → eventy JS nie są zapisywane (fail-silent, endpoint zawsze 204).
+```
 
 ---
 

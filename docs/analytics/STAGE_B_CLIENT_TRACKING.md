@@ -207,6 +207,10 @@ Mapowanie w formularzu (whitelisty B1/B1a):
 - CTA: `select_deferred_invoice`, `select_online_payment` (radia płatności), `submit_order` (przycisk), `back_to_course` (link „Powrót do szczegółów szkolenia").
 - `add_participant`/`remove_participant`/`consents`/`summary` nie występują w obecnym jednokrokowym formularzu (rezerwa); przyciski GUS świadomie pominięte (B-future).
 
+> Decyzja 2026-06-25 (deploy B2): `add_participant`/`remove_participant` są **tylko rezerwą w whiteliście backendu**.
+> W obecnym B2 NIE dodajemy ich do widoku, ponieważ bieżący formularz nie ma istotnych przycisków
+> dodawania/usuwania uczestników w zakresie tego etapu. Pozostają nieszkodliwe (whitelista wartości, nie pól).
+
 ### Batch / debounce / flush
 
 - kolejka w pamięci, batch ≤ `data-max-batch` (domyślnie 20);
