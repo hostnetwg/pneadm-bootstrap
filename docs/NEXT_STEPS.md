@@ -30,7 +30,7 @@ Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Loka
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.
 7. Przetestować filtry dashboardu (daty, kampania, kurs, landing target) na realnych danych.
-8. Etap 2A-1 wdrożony (`online_payment_selected`, `deferred_invoice_selected`). Następny krok płatności: `payment_order_created`, potem `payment_status_changed`.
+8. Etap 2B-1 wdrożony (`payment_status_changed`; webhook + return sync PayU/PayNow). Następny krok: agregaty/dashboard płatności albo eventy faktur (`invoice_created`).
 9. Rozważyć progi alertów dashboardu po pierwszych tygodniach obserwacji.
 10. Skonsultować z ChatGPT kolejny etap (płatności, JS, porzucenia) po akceptacji właściciela.
 
@@ -67,7 +67,8 @@ Etap 1:
 - agregaty dzienne: wdrożone w 1C (`analytics:aggregate-daily` w `adm.pnedu.pl`),
 - dashboard lejka sprzedaży: wdrożony w 1D (`/analytics/sales-funnel`),
 - wybór płatności: wdrożono w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
-- status płatności: nie wdrożono (`payment_order_created`, `payment_status_changed`),
+- utworzenie zamówienia płatności online: wdrożono w 2A-2 (`payment_order_created`),
+- status płatności: wdrożono w 2B-1 (`payment_status_changed`; webhook + return sync PayU/PayNow),
 - agregaty/dashboard płatności: nie wdrożono,
 - faktura: nie wdrożono.
 

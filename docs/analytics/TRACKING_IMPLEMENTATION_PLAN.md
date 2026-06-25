@@ -298,11 +298,11 @@ Rekomendowana kolejność:
 6. `order_form_validation_failed`.
 7. `form_order_created` — wdrożone w 1B-2.
 8. `online_payment_selected` i `deferred_invoice_selected` — wdrożone w 2A-1.
-9. `payment_order_created`.
-10. `payment_status_changed`.
+9. `payment_order_created` — wdrożone w 2A-2.
+10. `payment_status_changed` — wdrożone w 2B-1.
 11. `invoice_created`.
 
-Dotychczas wdrożono backendowe eventy Etapu 1A, 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`) oraz 2A-1 (`online_payment_selected`, `deferred_invoice_selected`). Nie wdrożono pozostałych eventów płatności (`payment_order_created`, `payment_status_changed`), faktur, iFirma, KSeF, JS trackingu, porzuceń, A/B testów, dashboardu/agregatów płatności, AI ani eksportów AI-safe.
+Dotychczas wdrożono backendowe eventy Etapu 1A, 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`), 2A-1 (`online_payment_selected`, `deferred_invoice_selected`), 2A-2 (`payment_order_created`) oraz 2B-1 (`payment_status_changed`). Nie wdrożono eventów faktur (`invoice_created`), iFirma, KSeF, JS trackingu, porzuceń, A/B testów, dashboardu/agregatów płatności, AI ani eksportów AI-safe.
 
 ### Konfiguracja Produkcyjna
 
@@ -827,7 +827,8 @@ Status po wdrożeniu 2A-1:
 - walidacja jest śledzona w 1B-1,
 - tworzenie zamówienia jest śledzone w 1B-2,
 - wybór metody płatności jest śledzony w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
-- pozostałe eventy płatności (`payment_order_created`, `payment_status_changed`) nie są śledzone,
+- utworzenie zamówienia płatności online jest śledzone w 2A-2 (`payment_order_created`),
+- zmiana statusu płatności jest śledzona w 2B-1 (`payment_status_changed`; webhook + return sync PayU/PayNow, deterministyczny event_uuid),
 - faktury nie są śledzone,
 - agregaty/dashboard płatności nie są wdrożone,
 - JS tracking nie jest wdrożony,
@@ -851,6 +852,8 @@ Status po wdrożeniu 2A-1:
 | `form_order_created` | `CourseController::storeOrderForm()` i `CourseController::processOrderFormOnlinePayment()` | po zapisie `FormOrder`, po `FormOrderParticipant::syncFromFormOrder()`, w online przed utworzeniem `OnlinePaymentOrder` i przed bramką | `form_order_id`, `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `metadata.order_flow`, `metadata.buyer_type`, `metadata.payment_type`, `metadata.participant_count`, `metadata.amount_gross` | nie trackować danych uczestnika, fakturowych ani płatniczych; `form_order_id` nie trafia do AI-safe exportów | wdrożone w 1B-2; poprawny deferred i online POST tworzą zamówienie i dispatchują jeden event |
 | `online_payment_selected` | `CourseController::storeOrderForm()`, gałąź online | po udanej walidacji, po ustaleniu `payment_type=online` i bramki, tuż przed `processOrderFormOnlinePayment()` | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_type=online`, `metadata.payment_gateway` (`payu`/`paynow`/`unknown`), `metadata.buyer_type`, `metadata.has_price_variant`, `metadata.order_flow=online` | bez danych płatnika/karty/bramki; oznacza tylko wybór metody, nie utworzenie `OnlinePaymentOrder` | wdrożone w 2A-1; online POST dispatchuje event przed redirectem do bramki |
 | `deferred_invoice_selected` | `CourseController::storeOrderForm()`, gałąź deferred | po udanej walidacji, po ustaleniu `payment_type=deferred`, przed utworzeniem zamówienia odroczonego | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_type=deferred_invoice`, `metadata.buyer_type`, `metadata.has_price_variant`, `metadata.order_flow=deferred` | bez danych fakturowych/uczestnika; oznacza tylko wybór metody, nie wystawienie faktury | wdrożone w 2A-1; deferred POST dispatchuje event |
+| `payment_order_created` | `CourseController::processOrderFormOnlinePayment()` | po utworzeniu `OnlinePaymentOrder`, przed `storeAfterSubmit` i przed redirectem do PayU/PayNow | `payment_order_id`, `form_order_id`, `amount_snapshot`, `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_gateway`, `metadata.payment_type=online`, `metadata.order_flow=online`, `metadata.buyer_type`, `metadata.has_price_variant` | bez danych płatnika/karty/bramki; oznacza utworzenie rekordu płatności, nie sukces płatności | wdrożone w 2A-2; online POST dispatchuje event przed redirectem do bramki |
+| `payment_status_changed` | `PaymentController::payuNotify()`, `paynowNotify()`, `syncPayuOrderFromApi()`, `syncPaynowOrderFromApi()` | po skutecznym `update(['status'])` i `syncLinkedFormOrderPaymentStatus()` | `payment_order_id`, `form_order_id`, `course_id`, `amount_snapshot`, `metadata.payment_gateway`, `metadata.payment_status`, `metadata.payment_previous_status`, `metadata.status_source` (`webhook`/`return_sync`), `metadata.payment_type=online`, `metadata.amount_gross`, `metadata.order_flow=online` | event server-to-server: BEZ `analytics_session_id`, `order_form_session_id`, route, path, referrer, device; bez raw statusu/payloadu bramki; deterministyczny `event_uuid` (UUID v5, bez `status_source`); tylko płatności z `form_order_id` | wdrożone w 2B-1; webhook i return sync tego samego statusu = jeden rekord (insertOrIgnore) |
 
 ### `analytics_session_id`
 
