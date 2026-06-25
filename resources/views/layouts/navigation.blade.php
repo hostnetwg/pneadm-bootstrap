@@ -141,7 +141,7 @@
             </div>
         </li>
         <!-- Analityka -->
-        @if(auth()->user()?->isAdmin() && (config('analytics.sales_funnel_dashboard.enabled', true) || config('analytics.debug_panel.enabled', false)))
+        @if(auth()->user()?->isAdmin())
             <li class="mb-1">
                 <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('analytics.*') ? '' : 'collapsed' }}"
                         data-bs-toggle="collapse" data-bs-target="#analytics-collapse"
@@ -162,6 +162,7 @@
                         @if(config('analytics.debug_panel.enabled', false))
                             <li><a href="{{ route('analytics.debug-events.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.debug-events.*') ? 'active' : '' }}">Debug eventów</a></li>
                         @endif
+                        <li><a href="{{ route('analytics.settings.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('analytics.settings.*') ? 'active' : '' }}">Ustawienia</a></li>
                     </ul>
                 </div>
             </li>
@@ -374,7 +375,7 @@
                     </li>
                     <li>
                         <a href="{{ route('settings.analytics.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.analytics.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Analityka
+                            GA i lejek (cookie)
                         </a>
                     </li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>

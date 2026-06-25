@@ -177,7 +177,7 @@ Rekomendowane rozbicie Etapu 1:
 ### Plan Etapu 1 — Do Implementacji
 
 Data dopisania: 2026-06-24.  
-Status: Etap 1A wdrożony lokalnie; Etap 1A-Debug wdrożony lokalnie; Etap 1B-1 i 1B-2 wdrożone lokalnie; Etap 1C wdrożony lokalnie w `adm.pnedu.pl`; Etap 2A-1 (`online_payment_selected`, `deferred_invoice_selected`) wdrożony lokalnie w `pnedu.pl`; Etap 2A-2 (`payment_order_created`) wdrożony lokalnie w `pnedu.pl`; Etap 2B-1 (`payment_status_changed`) wdrożony lokalnie w `pnedu.pl`; reszta Etapu 2 (m.in. agregaty/dashboard płatności, eventy faktur, JS tracking) do implementacji.
+Status: Etap 1A wdrożony lokalnie; Etap 1A-Debug wdrożony lokalnie; Etap 1B-1 i 1B-2 wdrożone lokalnie; Etap 1C wdrożony lokalnie w `adm.pnedu.pl`; Etap 2A-1 (`online_payment_selected`, `deferred_invoice_selected`) wdrożony lokalnie w `pnedu.pl`; Etap 2A-2 (`payment_order_created`) wdrożony lokalnie w `pnedu.pl`; Etap 2B-1 (`payment_status_changed`) wdrożony lokalnie w `pnedu.pl`; Etap 2C-1 (`invoice_created`) wdrożony lokalnie w `pneadm`; reszta Etapu 2 (m.in. agregaty/dashboard płatności i faktur, JS tracking) do implementacji.
 
 Etap 1 zostaje zawężony do minimalnego backend trackingu bez JS.
 
@@ -468,6 +468,49 @@ Nadal NIE wdrożono:
 - AI,
 - eksportów AI-safe.
 
+## Decyzja terminologiczna — `invoice_number` = zafakturowane, nie opłacone (ADR-005)
+
+Data dopisania: 2026-06-25.  
+Status: **zaakceptowane** (właściciel + ChatGPT, 2026-06-25), dokumentacja bez zmian kodu. Pełny zapis: `docs/decisions/ADR-005-invoice-number-means-invoiced-not-paid.md`.
+
+Ustalono, że `form_orders.invoice_number` (niepuste, ≠ `''`, ≠ `'0'`) oznacza **zafakturowane / rozliczone operacyjnie**, a nie fizyczny wpływ przelewu. Stąd rozdział źródeł prawdy:
+
+- online: `online_paid` = `payment_status_changed: paid` (bramka),
+- odroczone: `deferred_invoiced` = pierwsze `invoice_number` (przyszły event `invoice_created`),
+- łącznie: `settled_orders_total = online_paid + deferred_invoiced`.
+
+Przychód: `ordered_revenue_gross`, `online_paid_revenue_gross`, `deferred_invoiced_revenue_gross`, `settled_revenue_gross`.
+
+Konsekwencje dla roadmapy:
+
+- przyszły event `invoice_created` (nie wdrożony) odzwierciedla zafakturowanie, nie opłacenie,
+- edge case online + faktura nie może być liczony podwójnie w „rozliczone łącznie",
+- alias `orders_paid` w `CourseFunnelStatsService` faktycznie liczy zafakturowane — docelowa zmiana nazwy na `orders_invoiced` (osobny krok, bez refaktoryzacji teraz),
+- kolumny agregatów `paid_orders` (online) i `invoiced_orders` (odroczone) mapować rozłącznie przy wdrażaniu agregatów płatności.
+
+## Etap 2C-1 — `invoice_created` (wdrożony lokalnie)
+
+Data dopisania: 2026-06-25. Wdrożono **tylko** event `invoice_created`. NIE wdrożono: agregatów invoice, dashboardu invoice, `bank_payment_confirmed`, korekt/anulowania faktur, KSeF tracking, iFirma tracking, AI, eksportów AI-safe.
+
+- **Miejsce**: `pneadm` (bo `invoice_number` jest ustawiany w `pneadm`).
+- **Detekcja**: observer `App\Observers\FormOrderObserver` (model-level), emisja przez `App\Services\Analytics\InvoiceAnalyticsTracker` → `AnalyticsService` → `StoreAnalyticsEventJob` (Redis queue `analytics`, `insertOrIgnore`).
+- **Trigger**: przejście `invoice_number` **empty → present** (`created` i `updated`). `empty` = `null` / `''` / `'0'`; `present` = po `trim` niepuste i ≠ `'0'`. NIE emituje przy empty→empty, present→present, present→changed, present→empty.
+- **Źródła**: faktura iFirma i ręczne wpisanie numeru przez admina. Pro-forma NIE liczy się (trafia do `notes`).
+- **Payload (bezpieczny)**: top-level `form_order_id`, `course_id` (= `product_id`), `amount_snapshot`; `metadata`: `order_flow` (z `FormOrder.payment_mode`), `invoice_path_type` (`ifirma`/`manual`/`unknown`), `payment_type`, `amount_gross` (z `product_price` zamówienia, nie z faktury).
+- **`invoice_path_type`**: ustalany przez lekką wskazówkę `InvoiceAnalyticsTracker::hintSource()` w miejscach zapisu (`update()` → `manual`; metody iFirma → `ifirma`); gdy brak wskazówki → `unknown`.
+- **Zakazane**: numer faktury, NIP, nazwa nabywcy/odbiorcy, adres, e-mail, telefon, dane uczestników, dane fakturowe, dane/raw response iFirma, payload KSeF, raw request, `toArray()`.
+- **Idempotencja**: deterministyczny `event_uuid = invoice_created|{form_order_id}` + `insertOrIgnore` → jeden event na zamówienie (korekta/zmiana numeru nie tworzy drugiego eventu).
+- **Fail-silent**: błąd analityki nie psuje zapisu `invoice_number` ani fakturowania.
+- **Ograniczenie**: observer łapie tylko zapisy przez Eloquent. Bezpośrednie `UPDATE` SQL / importy poza Eloquent nie wyemitują eventu (ewentualna komenda rekonsyliacyjna = przyszły etap).
+- **Testy**: `tests/Feature/AnalyticsInvoiceCreatedStage2C1Test.php` (17 testów). `sail artisan test --filter=Analytics` → 54 passed, 2 skipped (pominięcia wcześniejsze).
+- **Źródła**: oba — faktura iFirma i ręczne wpisanie numeru przez admina. Pro-forma się nie liczy (trafia do `notes`).
+
+Wykrywanie `deferred_invoiced` (przyszłe agregaty): po jednoznacznym, bezpiecznym polu `FormOrder` (`payment_mode` / `order_flow`). NIE po braku `OnlinePaymentOrder` (warunek pośredni, ryzyko błędów). `invoice_created` z `order_flow=online` to tylko znacznik księgowy i NIE zwiększa `settled_orders_total`.
+
+Przychód — cel rozróżnienia: `ordered_revenue_gross` mierzy sprzedaż wygenerowaną przez kampanie; `settled_revenue_gross` mierzy przychód rozliczony operacyjnie (online opłacone + odroczone zafakturowane).
+
+Poza zakresem obecnego modelu (osobne przyszłe eventy/decyzje, NIE teraz): rekonsyliacja przelewów bankowych, częściowe płatności, zaliczki, faktury zaliczkowe, wiele faktur do jednego zamówienia, korekty/anulowanie faktur, zwroty online, chargebacki, ręczne korekty statusów, rozliczenia mieszane, KSeF, szczegółowe dane księgowe. Poglądowe przyszłe eventy: `bank_payment_confirmed`, `invoice_corrected`, `invoice_cancelled`, `refund_created`, `chargeback_received`. Szczegóły: ADR-005.
+
 ## Etap 2 — JS Tracking Formularza
 
 Zakres:
@@ -637,6 +680,22 @@ Kryteria ukończenia:
 - AI otrzymuje tylko dane AI-safe,
 - dane są zagregowane,
 - źródła raportu są zapisane.
+
+## Panel Ustawień Analityki — Runtime Override (wdrożone 2026-06-25, wariant B+C)
+
+Status: wdrożony.
+
+- Dodano panel admina `Analityka -> Ustawienia` (`/analytics/settings`) — podgląd i zmiana trybu.
+- Dodano runtime override z bazy `pneadm` (tabela `analytics_settings`, jeden rekord `id=1`),
+  wspólny dla `pneadm` i `pnedu` (odczyt w `pnedu` przez connection `pneadm`, wzorzec `PaymentDisplayOption`).
+- `AnalyticsModeResolver` w obu projektach uwzględnia override w kolejności:
+  hard kill switch `.env` → `enabled_override` → `default_mode_override` → `.env/config` → fallback `standard`.
+- `.env ANALYTICS_ENABLED=false` pozostaje **hard kill switch** (priorytet absolutny).
+- `sample_rate` jest **tylko podglądowy** (bez edycji w tym etapie).
+- Cache ustawień (`analytics_settings_singleton`, TTL 60 s) czyszczony po zapisie.
+- Stare menu `Ustawienia -> Analityka` przemianowane na `Ustawienia -> GA i lejek (cookie)`
+  (dotyczy GA/GTM + cookie opt-out lejka, nie analityki `pne_analytics`).
+- Szczegóły decyzji: `docs/decisions/ADR-004-analytics-modes.md`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

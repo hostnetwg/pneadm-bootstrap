@@ -4,16 +4,27 @@ namespace App\Services\Analytics;
 
 use App\Enums\Analytics\AnalyticsEventName;
 use App\Enums\Analytics\AnalyticsMode;
+use App\Models\AnalyticsSetting;
 
 class AnalyticsModeResolver
 {
     public function resolve(?string $mode = null): AnalyticsMode
     {
+        // Hard kill switch: .env/config ANALYTICS_ENABLED=false ma absolutny priorytet nad runtime override.
         if (! config('analytics.enabled', true)) {
             return AnalyticsMode::Off;
         }
 
-        return AnalyticsMode::fromConfig($mode ?: config('analytics.default_mode', 'standard'));
+        // Runtime override z bazy pneadm (fail-safe: brak/awaria => null => użyj .env/config).
+        if (AnalyticsSetting::enabledOverride() === false) {
+            return AnalyticsMode::Off;
+        }
+
+        $effectiveMode = $mode
+            ?: AnalyticsSetting::defaultModeOverride()
+            ?: config('analytics.default_mode', 'standard');
+
+        return AnalyticsMode::fromConfig($effectiveMode);
     }
 
     public function shouldTrack(AnalyticsEventName|string $eventName, ?string $mode = null, ?string $analyticsSessionId = null): bool

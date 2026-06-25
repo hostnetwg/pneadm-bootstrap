@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        Analityka
+        GA i lejek (cookie)
     </x-slot>
 
     @php
