@@ -228,23 +228,24 @@ Po każdej implementacji należy:
 - Uwaga dev: testy używają osobnej bazy `testing`. Nową migrację trzeba zastosować także tam, np.:
   `DB_DATABASE=testing php artisan migrate --path=database/migrations/2026_06_25_120000_create_analytics_settings_table.php` (wewnątrz kontenera Sail).
 
-## Etap B — JS Tracking Formularza (wdrożone lokalnie: B1 + B1a, 2026-06-25)
+## Etap B — JS Tracking Formularza (B1 + B1a + B2 zacommitowane i pushed, 2026-06-25)
 
-- **B1** — backendowy endpoint `POST /analytics/client-events` w `pnedu`: batch ≤20 eventów, payload ≤10 KB, rate limit 60/min/IP, **fail-silent `204`**, 4 eventy MVP (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`), whitelisty wartości (`section_key`/`cta_key`/`trigger`), tryby (standard = pełne MVP). CSRF-exempt dla wsparcia `navigator.sendBeacon`. Zero PII.
-- **B1a — hardening** (bez zmiany zakresu eventów, bez JS, bez porzuceń):
+- **B1** — backendowy endpoint `POST /analytics/client-events` w `pnedu` (`6b32a4d`): batch ≤20 eventów, payload ≤10 KB, rate limit 60/min/IP, **fail-silent `204`**, 4 eventy MVP (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`), whitelisty wartości (`section_key`/`cta_key`/`trigger`), tryby (standard = pełne MVP). CSRF-exempt dla wsparcia `navigator.sendBeacon`. Zero PII.
+- **B1a — hardening** (w tym samym commicie `6b32a4d`):
   - dodano **same-origin guard** (porównanie po HOŚCIE z `Origin`/`Referer`; obcy host → `204` bez zapisu; oba puste → best-effort; nigdy `403`; bez logowania URL-i); CSRF-exempt **zostaje**;
   - klientowski `event_uuid` jest **tylko seedem deduplikacji**; finalny `event_uuid` generowany/namespacowany po stronie serwera (deterministyczny UUIDv5: `client_js|order_form_session_id|event_name|client_event_uuid`, mieści się w `char(36)`);
   - batch większy niż limit jest **ucinany do limitu** (best-effort, nie odrzucamy całości);
   - **whitelisty bez zmian** po audycie realnego formularza (`invoice` zostaje, NIE dodano `invoice_data`);
   - **porzucenia nadal poza zakresem** B1/B1a (planowane jako agregacja po 24 h w B3).
-- **B2 — JS collector na formularzu** (pnedu, **czeka na zgodę Waldemara na commit**):
+- **B2 — JS collector na formularzu** (`pnedu` `bdc74ca`, **zacommitowane i wypchnięte**):
   - inline, fail-silent collector ładowany **tylko** na stronie formularza zamówienia (layout nie używa `@vite`; styl projektu = inline + CDN + `@stack('scripts')`);
   - wysyła 4 eventy MVP do `POST /analytics/client-events`; sekcje/CTA przez `data-analytics-section`/`data-analytics-cta` (whitelista); zero wartości pól, zero PII w configu;
   - batch ≤20, debounce ~3 s, flush `submit`/`visibilitychange`/`pagehide` (`sendBeacon` + `fetch keepalive`); klientowski `event_uuid` = seed (UUIDv5 po stronie serwera);
   - **nie blokuje formularza** w żadnym scenariuszu (brak `preventDefault`); gdy hard kill switch — collector nie jest renderowany;
   - pliki: `resources/views/courses/partials/order-form-client-tracking.blade.php`, zmiany w `resources/views/courses/order-form.blade.php`, test `tests/Feature/AnalyticsOrderFormClientTrackingStageB2Test.php`.
-- Testy: `--filter=Analytics` → **110 passed** (745 assertions); sanity formularza → **15 passed**; `npm run build` → OK.
-- **Do zrobienia:** B3 (agregacja porzuceń po 24 h), B4 (dashboard porzuceń). Porzucenia nadal poza zakresem B2. Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **Deploy produkcyjny B2:** **GO** (decyzja Waldemara 2026-06-25). Instrukcja: `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 7.2, 7.3, 9.1. `pnedu`: `git pull` + `npm ci` + `npm run build` + cache + `queue:restart`. `pneadm`: `git pull` + cache (dokumentacja + linki w sales-funnel `60acc21`).
+- Testy: `--filter=Analytics` → **110 passed** (pnedu), **98 passed** (pneadm); sanity formularza → **15 passed**; `npm run build` → OK.
+- **Następny etap rozwojowy:** **B3** (agregacja porzuceń po 24 h, idempotentna komenda). Potem B4 (dashboard porzuceń). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

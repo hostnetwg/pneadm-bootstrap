@@ -1,11 +1,11 @@
 # Wdrożenie produkcyjne — Analityka PNEdu (czerwiec 2026)
 
-Status: **GO na przygotowanie deploya** (Waldemar). Produkcyjnego deploya **nie wykonujemy bez ostatniego potwierdzenia na serwerze**.
+Status: **GO — deploy Etapu B2** (decyzja Waldemara 2026-06-25). Commity wypchnięte na GitHub; wykonaj `git pull` na produkcji wg sekcji 7.
 
 Ten plik opisuje wdrożenie zakresu:
 
-- `pneadm`: event `invoice_created` (2C-1), panel ustawień analityki (B+C), baner stanu analityki.
-- `pnedu`: runtime override trybu analityki czytany z bazy `pneadm`.
+- `pneadm`: event `invoice_created` (2C-1), panel ustawień analityki (B+C), baner stanu analityki, **linki kampanii/szkoleń w sales-funnel** (`60acc21`).
+- `pnedu`: runtime override trybu analityki, **Etap B1/B1a/B2** (endpoint JS + collector formularza).
 
 > Bez sekretów. Wszystkie loginy/hosty/hasła to placeholdery (`USER_PNEDU`, `HOST`, `...`).
 
@@ -13,24 +13,27 @@ Ten plik opisuje wdrożenie zakresu:
 
 ## 1. Commity do wdrożenia
 
-### pneadm (gałąź `main`, nad `3b43005`)
+### pneadm (gałąź `main` — commity analityki + Etap B docs + sales-funnel)
 
 ```text
 764e31f — feat(analytics): add invoice_created event (stage 2C-1)
 ee22c83 — feat(analytics): add analytics settings panel with runtime override (B+C)
 037d05e — feat(analytics): add analytics status warning banner
+2c12826 — docs(analytics): document client analytics endpoint (B1 + B1a hardening)
+272dc6e — docs(analytics): document order form client-side tracking (B2)
+fb209dc — docs(analytics): document B2 deploy asset build step
+60acc21 — feat(analytics): link campaigns and courses in sales funnel dashboard
 ```
 
-### pnedu (gałąź `main`, nad `db5a520`)
+### pnedu (gałąź `main` — Etap B)
 
 ```text
 ccb3e3e — feat(analytics): apply runtime analytics mode override from pneadm
-6b32a4d — feat(analytics): harden client analytics endpoint (Etap B1 + B1a — POST /analytics/client-events)
-bdc74ca — feat(analytics): add order form client-side tracking (Etap B2 — JS collector formularza)
+6b32a4d — feat(analytics): harden client analytics endpoint (Etap B1 + B1a)
+bdc74ca — feat(analytics): add order form client-side tracking (Etap B2)
 ```
 
-> Etap B (B1/B1a/B2) w `pneadm` to **wyłącznie dokumentacja** (commity `2c12826`, `272dc6e`) —
-> brak kodu produkcyjnego pneadm do wdrożenia w tym etapie. Wdrażany kod B jest w `pnedu`.
+> **Deploy Etapu B2 (2026-06-25):** kod w `pnedu` (`6b32a4d`, `bdc74ca`). W `pneadm` oprócz dokumentacji jest też kod UI (`60acc21` — linki w lejku). Oba projekty: `git pull` + cache. `pnedu` dodatkowo: `npm ci` + `npm run build` (sekcja 7.2–7.3). Po deployu: smoke test 9.1. **Następny etap rozwojowy: B3** (agregacja porzuceń).
 
 ### Wynik testów lokalnych
 

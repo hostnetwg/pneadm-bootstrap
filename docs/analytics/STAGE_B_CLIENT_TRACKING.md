@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 wdrożone lokalnie** (backend endpoint + hardening + JS collector na formularzu + testy). B3/B4 — do zrobienia.
+Status: **PR B1 + B1a + B2 zacommitowane i wypchnięte na GitHub** (2026-06-25). **Czeka na deploy produkcyjny.** Następny etap rozwojowy: **B3** (agregacja porzuceń). B4 — do zrobienia.
 
 ## Cel etapu
 
@@ -19,7 +19,7 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 |----|--------|--------|
 | **B1** | Endpoint batch + enumy + sanitizer + tryby + testy RODO | ✅ ZROBIONE |
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
-| **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (czeka na zgodę na commit) |
+| **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ⏳ TODO |
 | B4 | Dashboard porzuceń | ⏳ TODO |
 
@@ -181,9 +181,11 @@ Audyt realnego `resources/views/courses/order-form.blade.php` (pnedu):
 
 ---
 
-## PR B2 — JS collector na formularzu (2026-06-25, czeka na zgodę na commit)
+## PR B2 — JS collector na formularzu (2026-06-25, commit `bdc74ca`)
 
 Lekki, fail-silent collector **tylko** na stronie formularza zamówienia (`pnedu`). Podłącza front do istniejącego endpointu B1/B1a. **Bez** porzuceń, bez nowych eventów, bez field-level, bez zmian logiki formularza/płatności/faktur.
+
+**Status:** zacommitowane i wypchnięte (`pnedu` `bdc74ca`). Deploy produkcyjny wg `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 7.2 i 9.1.
 
 ### Gdzie i jak się ładuje
 
@@ -239,10 +241,10 @@ Wyniki: `--filter=Analytics` → **110 passed** (745 assertions). Sanity formula
 
 ---
 
-## Co dalej (B2–B4) — skrót
+## Co dalej (B3–B4) — skrót
 
-- **B2**: ✅ wdrożone (czeka na zgodę na commit) — inline collector na formularzu, debounce ~3 s, batch ≤20, flush na `submit`/`visibilitychange`/`pagehide`, `sendBeacon` + `fetch keepalive`; brak wartości pól; awaria JS/endpointu nie blokuje submitu. Szczegóły wyżej.
-- **B3**: porzucenia jako **agregacja po czasie** (nie event `order_form_abandoned`). Okno startowe: **24 h**. Definicje: `viewed_not_started`, `started_not_submitted`, `submit_clicked_not_submitted`, `submitted_not_created`. Komenda np. `analytics:aggregate-abandonments` (idempotentna).
+- **B2**: ✅ zacommitowane i wypchnięte (`pnedu` `bdc74ca`) — inline collector na formularzu, debounce ~3 s, batch ≤20, flush na `submit`/`visibilitychange`/`pagehide`, `sendBeacon` + `fetch keepalive`; brak wartości pól; awaria JS/endpointu nie blokuje submitu. **Deploy produkcyjny — w toku (decyzja Waldemara 2026-06-25).** Szczegóły wyżej.
+- **B3**: **następny etap rozwojowy** (decyzja Waldemara 2026-06-25). Porzucenia jako **agregacja po czasie** (nie event `order_form_abandoned`). Okno startowe: **24 h**. Definicje: `viewed_not_started`, `started_not_submitted`, `submit_clicked_not_submitted`, `submitted_not_created`. Komenda np. `analytics:aggregate-abandonments` (idempotentna).
 - **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data). Najpierw dane oglądamy w `/analytics/debug-events`.
 
 ## Smoke test produkcyjny (po B2)
