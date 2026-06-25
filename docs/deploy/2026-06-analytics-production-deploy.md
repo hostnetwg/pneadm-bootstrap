@@ -421,6 +421,53 @@ queue:restart nie zabija jobów natychmiast — każe workerom zakończyć bież
 (przez Supervisor). Wykonać po deployach, które zmieniają kod obsługiwany przez worker.
 ```
 
+### 8.5 Stały worker bez Supervisora (cron + flock) — PRODUKCJA PNEdu
+
+Na produkcyjnym hostingu PNEdu **nie ma Supervisora** (`supervisorctl: command not found`).
+Stały worker utrzymujemy cronem co minutę z blokadą `flock` (auto-restart, przeżywa reboot,
+brak duplikatów). `--max-time=3600` powoduje, że worker sam kończy po godzinie, a cron go wznawia
+(dzięki temu po deployu łapie nowy kod — nie trzeba osobnego `queue:restart`).
+
+Ścieżki produkcyjne (dostosuj do realnych):
+
+```text
+pnedu:  /home/srv66127/domains/pnedu.pl/app
+pneadm: /home/srv66127/domains/adm.pnedu.pl/pneadm
+```
+
+Katalogi na pliki blokad:
+
+```bash
+mkdir -p /home/srv66127/domains/pnedu.pl/app/storage/locks
+mkdir -p /home/srv66127/domains/adm.pnedu.pl/pneadm/storage/locks
+```
+
+Wpisy crontab (`crontab -e`):
+
+```bash
+# Worker kolejki analityki — pnedu.pl
+* * * * * cd /home/srv66127/domains/pnedu.pl/app && flock -n storage/locks/queue-analytics.lock -c "php artisan queue:work database --queue=default,analytics --sleep=3 --tries=3 --max-time=3600" >> storage/logs/queue-worker.log 2>&1
+
+# Worker kolejki analityki — adm.pnedu.pl / pneadm
+* * * * * cd /home/srv66127/domains/adm.pnedu.pl/pneadm && flock -n storage/locks/queue-analytics.lock -c "php artisan queue:work database --queue=default,analytics --sleep=3 --tries=3 --max-time=3600" >> storage/logs/queue-worker.log 2>&1
+```
+
+```text
+UWAGA: przed włączeniem crona zatrzymaj ręcznie uruchomione workery (nohup/screen),
+żeby nie dublować procesów:
+  ps aux | grep "queue:work" | grep -v grep
+  kill <PID>
+flock i tak blokuje duplikat z crona, ale stary ręczny proces należy zamknąć.
+```
+
+Weryfikacja:
+
+```bash
+ps aux | grep "queue:work" | grep -v grep         # powinny być 2 procesy (pnedu + pneadm)
+tail -n 20 storage/logs/queue-worker.log
+php artisan tinker --execute="echo DB::connection('analytics')->table('analytics_events')->count();"
+```
+
 ---
 
 ## 9. Smoke test po deployu
