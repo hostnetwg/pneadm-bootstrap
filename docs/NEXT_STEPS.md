@@ -245,7 +245,8 @@ Po każdej implementacji należy:
   - pliki: `resources/views/courses/partials/order-form-client-tracking.blade.php`, zmiany w `resources/views/courses/order-form.blade.php`, test `tests/Feature/AnalyticsOrderFormClientTrackingStageB2Test.php`.
 - **Deploy produkcyjny B2:** **GO** (decyzja Waldemara 2026-06-25). Instrukcja: `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 7.2, 7.3, 9.1. `pnedu`: `git pull` + `npm ci` + `npm run build` + cache + `queue:restart`. `pneadm`: `git pull` + cache (dokumentacja + linki w sales-funnel `60acc21`).
 - Testy: `--filter=Analytics` → **110 passed** (pnedu), **98 passed** (pneadm); sanity formularza → **15 passed**; `npm run build` → OK.
-- **Następny etap rozwojowy:** **B3** (agregacja porzuceń po 24 h, idempotentna komenda). Potem B4 (dashboard porzuceń). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **B3 — agregacja porzuceń (zaimplementowane lokalnie, czeka na commit + deploy):** zakres **kurs + kampania** (decyzja Waldemara 2026-06-25). Idempotentna komenda `analytics:aggregate-abandonments`, domyślnie 2 dni wstecz (okno 24 h). Dwie tabele `analytics_daily_*_abandonment_stats` (migracja w `pneadm`, baza `pne_analytics`). Klasyfikacja sesji po `order_form_session_id`: `viewed_not_started`/`started_not_submit_clicked`/`submit_clicked_not_attempted`/`submit_attempted_not_created`/`converted`. Testy: `--filter=Analytics` → **111 passed** (pneadm). Deploy: `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 6 i 8.7 (migracja + cron 03:15).
+- **Następny etap rozwojowy:** **B4** (dashboard porzuceń, filtry kurs/kampania/data). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

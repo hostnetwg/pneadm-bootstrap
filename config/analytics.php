@@ -18,6 +18,14 @@ return [
         'timezone' => env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw'),
     ],
 
+    'abandonment' => [
+        'timezone' => env('ANALYTICS_ABANDONMENT_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw')),
+        // Domyślny cel komendy (gdy bez dat, np. z crona): ile dni wstecz przeliczać.
+        // 2 dni dają sesjom okno ~24-48 h dojrzałości — użytkownik raczej nie wróci do
+        // porzuconego formularza, więc klasyfikacja jest stabilna. Backfill: --date/--from/--to.
+        'aggregation_lag_days' => (int) env('ANALYTICS_ABANDONMENT_LAG_DAYS', 2),
+    ],
+
     'sales_funnel_dashboard' => [
         'enabled' => (bool) env('ANALYTICS_SALES_FUNNEL_DASHBOARD_ENABLED', true),
         'timezone' => env('ANALYTICS_SALES_FUNNEL_DASHBOARD_TIMEZONE', 'Europe/Warsaw'),

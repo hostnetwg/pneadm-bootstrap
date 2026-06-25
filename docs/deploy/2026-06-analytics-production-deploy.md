@@ -1,6 +1,6 @@
 # Wdrożenie produkcyjne — Analityka PNEdu (czerwiec 2026)
 
-Status: **GO — deploy Etapu B2** (decyzja Waldemara 2026-06-25). Commity wypchnięte na GitHub; wykonaj `git pull` na produkcji wg sekcji 7.
+Status: **GO — deploy Etapu B2** (wdrożone). **B3 (agregacja porzuceń) — zaimplementowane lokalnie, czeka na commit + deploy**: migracja (sekcja 6) + cron `analytics:aggregate-abandonments` (sekcja 8.7). Commity B2 wypchnięte na GitHub; wykonaj `git pull` na produkcji wg sekcji 7.
 
 Ten plik opisuje wdrożenie zakresu:
 
@@ -293,11 +293,17 @@ Nie wpisywać realnego użytkownika, hosta ani hasła.
 - **NIE** uruchamiać w `pnedu`.
 - **NIE** uruchamiać w `pne_analytics`.
 
-Plik migracji:
+Pliki migracji:
 
 ```text
 database/migrations/2026_06_25_120000_create_analytics_settings_table.php
+database/migrations/2026_06_25_120000_create_analytics_daily_abandonment_stats_tables.php   # Etap B3
 ```
+
+> Migracja B3 (`analytics_daily_*_abandonment_stats`) celuje w bazę **`pne_analytics`**
+> (connection `analytics`), a nie w domyślną `pneadm` — robi to wewnątrz pliku przez
+> `Schema::connection('analytics')`. Uruchamiana standardowo przez `php artisan migrate --force`
+> w `pneadm` (artisan widzi oba pliki; każdy tworzy tabele we właściwej bazie).
 
 ### Wariant standardowy (uruchamia wszystkie pending migracje)
 
@@ -659,6 +665,98 @@ tail -n 20 storage/logs/analytics-aggregate.log
 #    -> liczby wierszy w punkcie 2 pozostają takie same
 ```
 
+### 8.7 Agregacja porzuceń formularza (Etap B3) — cron `analytics:aggregate-abandonments`
+
+Etap B3 dodaje **drugą, niezależną** agregację: lejek porzuceń formularza zamówienia.
+Czyta te same surowe eventy (`analytics_events`), grupuje je po `order_form_session_id`
+i zapisuje do tabel `analytics_daily_form_abandonment_stats` (per kurs) oraz
+`analytics_daily_campaign_abandonment_stats` (per kampania).
+
+Wymaga **migracji** (sekcja 7): `2026_06_25_120000_create_analytics_daily_abandonment_stats_tables`
+(baza `pne_analytics`, połączenie `analytics`).
+
+Klasyfikacja sesji (kubełki rozłączne, sumują się do `sessions_total`):
+
+- `viewed_not_started` — weszli na formularz, brak eventu JS `order_form_started`,
+- `started_not_submit_clicked` — zaczęli, nie kliknęli „wyślij" (JS `order_form_submit_clicked`),
+- `submit_clicked_not_attempted` — kliknęli „wyślij", request nie doszedł do backendu (`order_form_submit_attempted`),
+- `submit_attempted_not_created` — submit doszedł, ale `form_order_created` nie powstał,
+- `converted` — sesja zakończona zamówieniem (baza do wskaźników).
+
+> WAŻNE (interpretacja): `order_form_started` i `order_form_submit_clicked` to eventy **JS (B2)**.
+> Sesje bez JS / z adblockiem oraz tryby `aggregate_only`/`off` **nie mają** tych eventów, więc
+> wpadają do `viewed_not_started` lub do najgłębszego etapu backendowego (`submit_attempted`/`created`).
+> Lejek porzuceń jest miarodajny przede wszystkim dla trybów `standard`/`full` z działającym JS.
+
+Zachowanie komendy (analogiczne do `aggregate-daily`):
+
+- domyślnie (bez dat, np. z crona) liczy dzień z opóźnieniem `ANALYTICS_ABANDONMENT_LAG_DAYS`
+  (domyślnie **2 dni wstecz**) — daje sesjom okno ~24-48 h dojrzałości,
+- `--date=Y-m-d` / `--from=Y-m-d --to=Y-m-d` do backfillu,
+- **idempotentna**: kasuje wiersze danego `stat_date` i przelicza od zera,
+- sesja liczona **raz**, w dniu jej **pierwszego eventu** formularza (Europe/Warsaw),
+- **kampania = first-touch**: pierwsza niepusta kampania w sesji wg `occurred_at` (nie dominanta),
+- nie zapisuje metadanych ani PII (tylko liczniki + snapshoty `course_id`/`campaign_code`/`campaign_id`).
+
+```bash
+# Agregacja porzuceń — adm.pnedu.pl / pneadm (03:15 czasu serwera = Europe/Warsaw)
+15 3 * * * /usr/bin/flock -n /tmp/pneadm-analytics-abandonments.lock /opt/alt/php82/usr/bin/php /home/srv66127/domains/adm.pnedu.pl/pneadm/artisan analytics:aggregate-abandonments >> /home/srv66127/domains/adm.pnedu.pl/pneadm/storage/logs/analytics-abandonments.log 2>&1
+```
+
+> Osobny `flock` (`pneadm-analytics-abandonments.lock`) i osobny log, żeby nie kolidować z 8.6.
+> 03:15 (po 02:15 dla `aggregate-daily`) — kolejność nie jest krytyczna (obie agregacje są niezależne i idempotentne).
+> Jeśli crontab serwera działa w UTC (a nie Europe/Warsaw), dodaj na początku crontaba `CRON_TZ=Europe/Warsaw`
+> albo przesuń godzinę ręcznie. Komenda i tak liczy dobę w Europe/Warsaw — zmieni się tylko godzina odpalenia.
+
+#### Catch-up B3 po wdrożeniu (jednorazowo)
+
+Najpierw sprawdź zakres realnych eventów funnelowych (te, z których liczone są porzucenia):
+
+```sql
+SELECT MIN(occurred_at), MAX(occurred_at), COUNT(*)
+FROM pne_analytics.analytics_events
+WHERE event_name IN (
+  'order_form_viewed',
+  'order_form_started',
+  'order_form_submit_clicked',
+  'order_form_submit_attempted',
+  'form_order_created'
+);
+```
+
+Rekomendowany zakres: od **dnia wdrożenia B2** (gdy pojawiły się eventy JS `order_form_started`/
+`order_form_submit_clicked`) lub maksymalnie **ostatnie 7–14 dni**. Można przeliczyć więcej wstecz,
+ale sesje **sprzed B2** w dużej części wpadną do `viewed_not_started` (brak eventów JS).
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+# podstaw realne daty z zapytania wyżej (przykład — ostatnie ~7 dni):
+/opt/alt/php82/usr/bin/php artisan analytics:aggregate-abandonments --from=2026-06-19 --to=2026-06-25 --force
+```
+
+#### Kontrola po deployu B3 (checklista)
+
+```bash
+# 1) migracja widoczna jako wykonana:
+/opt/alt/php82/usr/bin/php artisan migrate:status | grep abandonment
+# 2) tabele istnieją w pne_analytics i mają wiersze:
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo 'form=' . DB::connection('analytics')->table('analytics_daily_form_abandonment_stats')->count() . ' campaign=' . DB::connection('analytics')->table('analytics_daily_campaign_abandonment_stats')->count();"
+# 3) jednorazowy catch-up kończy się bez błędu (patrz wyżej).
+# 4) idempotencja — ponowne uruchomienie tego samego zakresu NIE duplikuje danych:
+/opt/alt/php82/usr/bin/php artisan analytics:aggregate-abandonments --date=2026-06-24 --force
+#    -> liczby wierszy z punktu 2 pozostają takie same.
+# 5) suma kubełków terminalnych = sessions_total (spójność klasyfikacji):
+/opt/alt/php82/usr/bin/php artisan tinker --execute="\$r=DB::connection('analytics')->table('analytics_daily_form_abandonment_stats')->selectRaw('SUM(sessions_total) st, SUM(viewed_not_started+started_not_submit_clicked+submit_clicked_not_attempted+submit_attempted_not_created+converted) buckets')->first(); echo 'sessions_total='.\$r->st.' buckets='.\$r->buckets;"
+#    -> obie liczby muszą być równe.
+# 6) brak PII / metadata w agregatach (tabele mają wyłącznie liczniki + snapshoty kodów/id).
+# 7) log Laravel bez nowych błędów:
+tail -n 30 storage/logs/laravel.log
+# 8) failed_jobs bez nowych błędów:
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo DB::table('failed_jobs')->count();"
+# 9) cron B3 (analytics:aggregate-abandonments, 03:15) dodany i działa (sprawdź log po pierwszym przebiegu).
+# 10) B4 / dashboard porzuceń NIE jest jeszcze wdrożony (świadomie — dane zbieramy najpierw).
+```
+
 ---
 
 ## 9. Smoke test po deployu
@@ -784,6 +882,9 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
 [ ] failed_jobs bez nowych błędów
 [ ] cron agregacji (analytics:aggregate-daily, 02:15) dodany w pneadm
 [ ] catch-up agregacji uruchomiony (lejek sprzedaży pokazuje dane)
+[ ] migracja B3 (analytics_daily_*_abandonment_stats) wykonana
+[ ] cron porzuceń (analytics:aggregate-abandonments, 03:15) dodany w pneadm
+[ ] catch-up porzuceń uruchomiony (tabele abandonment mają wiersze)
 ```
 
 ---

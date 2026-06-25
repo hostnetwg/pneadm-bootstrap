@@ -9,7 +9,7 @@ Dokument opisuje, gdzie i jak w przyszłości wdrożyć backend tracking, JS tra
 
 Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`; Etap 2C-1 — event `invoice_created` (observer w `pneadm`). Nadal nie wdrożono iFirma/KSeF trackingu, agregatów/dashboardu faktur, AI ani eksportów AI-safe.
 
-**Etap B (JS tracking):** wdrożono i wypchnięto **B1** + **B1a** (`pnedu` `6b32a4d`), **B2** (`pnedu` `bdc74ca`) oraz **B2 deploy docs** + **linki w sales-funnel** (`pneadm` `60acc21`). B2 **czeka na deploy produkcyjny** (GO 2026-06-25). Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`. **Następny etap rozwojowy: B3** (agregacja porzuceń po 24 h, idempotentna komenda), potem B4 (dashboard porzuceń).
+**Etap B (JS tracking):** wdrożono i wypchnięto **B1** + **B1a** (`pnedu` `6b32a4d`), **B2** (`pnedu` `bdc74ca`, wdrożone produkcyjnie) oraz **B2 deploy docs** + **linki w sales-funnel** (`pneadm` `60acc21`). **B3** (agregacja porzuceń, zakres kurs + kampania) **zaimplementowane i przetestowane lokalnie** (`pneadm`, 111 passed) — komenda `analytics:aggregate-abandonments`, 2 tabele `analytics_daily_*_abandonment_stats`, **czeka na commit + deploy** (migracja + cron 03:15). Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`. **Następny etap rozwojowy: B4** (dashboard porzuceń).
 
 ## Zasada Nadrzędna
 

@@ -241,11 +241,69 @@ Wyniki: `--filter=Analytics` → **110 passed** (745 assertions). Sanity formula
 
 ---
 
-## Co dalej (B3–B4) — skrót
+## PR B3 — agregacja porzuceń formularza (2026-06-25)
 
-- **B2**: ✅ zacommitowane i wypchnięte (`pnedu` `bdc74ca`) — inline collector na formularzu, debounce ~3 s, batch ≤20, flush na `submit`/`visibilitychange`/`pagehide`, `sendBeacon` + `fetch keepalive`; brak wartości pól; awaria JS/endpointu nie blokuje submitu. **Deploy produkcyjny — w toku (decyzja Waldemara 2026-06-25).** Szczegóły wyżej.
-- **B3**: **następny etap rozwojowy** (decyzja Waldemara 2026-06-25). Porzucenia jako **agregacja po czasie** (nie event `order_form_abandoned`). Okno startowe: **24 h**. Definicje: `viewed_not_started`, `started_not_submitted`, `submit_clicked_not_submitted`, `submitted_not_created`. Komenda np. `analytics:aggregate-abandonments` (idempotentna).
-- **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data). Najpierw dane oglądamy w `/analytics/debug-events`.
+Porzucenia jako **agregacja po czasie** (NIE nowy event `order_form_abandoned`). Idempotentna
+komenda przelicza dzienne statystyki z `analytics_events` grupując po `order_form_session_id` —
+analogicznie do `analytics:aggregate-daily` (1C). Zakres B3 wybrany 2026-06-25 (Waldemar): **kurs + kampania**.
+
+**Status:** zaimplementowane i przetestowane lokalnie; **czeka na commit + deploy produkcyjny**
+(migracja + cron, wg `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 6 i 8.7).
+
+### Lejek sesji
+| Etap | Event | Źródło |
+|------|-------|--------|
+| viewed | `order_form_viewed` | backend |
+| started | `order_form_started` | JS (B2) |
+| submit_clicked | `order_form_submit_clicked` | JS (B2) |
+| submit_attempted | `order_form_submit_attempted` | backend |
+| created (konwersja) | `form_order_created` | backend |
+
+### Kubełki terminalne (rozłączne, sumują się do `sessions_total`)
+- `viewed_not_started`, `started_not_submit_clicked`, `submit_clicked_not_attempted`,
+  `submit_attempted_not_created`, `converted`.
+- Dodatkowo liczniki zasięgu `reached_*` (obecność danego etapu w sesji).
+
+### Decyzje techniczne
+- **Atrybucja dnia**: sesja liczona raz, w dniu jej **pierwszego** eventu formularza (Europe/Warsaw) —
+  odpowiada pytaniu „co stało się z sesjami rozpoczętymi danego dnia?".
+- **Atrybucja kampanii = first-touch**: pierwsza (wg `occurred_at`) **niepusta** kampania w obrębie
+  `order_form_session_id`; `campaign_id` z tego samego eventu. Brak kampanii → sesja poza tabelą kampanii.
+  (Nie dominanta — kampania ma odpowiadać źródłu wejścia do formularza, nie późniejszej aktywności.)
+- **Okno 24 h**: domyślny cel komendy = **2 dni wstecz** (`ANALYTICS_ABANDONMENT_LAG_DAYS=2`) →
+  sesje dojrzałe, wynik deterministyczny (zależy tylko od niezmiennych eventów).
+- **Idempotencja**: `delete` wierszy `stat_date` + przeliczenie; `--date`/`--from`/`--to` do backfillu.
+- **occurred_at czytany jako UTC** (inwariant produkcyjny) — niezależnie od strefy castowania modelu.
+- **Bez PII / metadata** — tylko liczniki + snapshoty `course_id`/`campaign_code`/`campaign_id`.
+- **Indeksy pod B4**: oprócz `unique(stat_date, course_id)` / `unique(stat_date, campaign_code)` —
+  `index(course_id, stat_date)`, `index(campaign_code, stat_date)` oraz `index(campaign_id, stat_date)`
+  (B4 będzie linkować/filtrować po `campaign_id` jak dashboard sales-funnel; akceptujemy częste null).
+
+> WAŻNE (interpretacja): `started`/`submit_clicked` to eventy JS (B2). Sesje bez JS/adblock oraz tryby
+> `aggregate_only`/`off` nie mają ich → trafiają do `viewed_not_started` lub najgłębszego etapu
+> backendowego. Lejek porzuceń miarodajny głównie dla `standard`/`full` z działającym JS.
+
+### Pliki (pneadm, baza `pne_analytics`)
+- `database/migrations/2026_06_25_120000_create_analytics_daily_abandonment_stats_tables.php` — dwie tabele.
+- `app/Models/Analytics/AnalyticsDailyFormAbandonmentStat.php`, `AnalyticsDailyCampaignAbandonmentStat.php`.
+- `app/Services/Analytics/AnalyticsAbandonmentAggregationService.php` — klasyfikacja sesji.
+- `app/Console/Commands/AggregateAnalyticsAbandonmentsCommand.php` — `analytics:aggregate-abandonments`.
+- `config/analytics.php` — sekcja `abandonment` (timezone, `aggregation_lag_days`).
+- `tests/Feature/AnalyticsAbandonmentAggregationTest.php` — 15 testów.
+
+### Testy B3
+`--filter=Analytics` → **113 passed** (306 assertions), w tym 15 nowych dla B3
+(kubełki, suma = sessions_total, atrybucja do dnia pierwszego eventu, sesja przez północ,
+poziom kampanii, **first-touch kampanii (vs dominanta) + pominięcie wiodących eventów bez kampanii**,
+idempotencja, domyślny dzień z lagiem, komenda, brak PII).
+
+---
+
+## Co dalej (B4) — skrót
+
+- **B2**: ✅ zacommitowane, wypchnięte i wdrożone produkcyjnie (`pnedu` `bdc74ca`).
+- **B3**: ✅ zaimplementowane i przetestowane lokalnie (111 passed). Czeka na commit + deploy (migracja + cron 03:15).
+- **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data) czytający tabele `analytics_daily_*_abandonment_stats`. Najpierw dane oglądamy w `/analytics/debug-events` i przez komendę.
 
 ## Smoke test produkcyjny (po B2)
 
