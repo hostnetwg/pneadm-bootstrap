@@ -22,6 +22,8 @@
 
     <div class="px-3 py-3">
         <div class="container-fluid px-0">
+            @include('analytics.partials.status-banner', ['showSettingsLink' => true])
+
             <div class="alert alert-warning small" role="alert">
                 <strong>Panel techniczny.</strong>
                 Ten widok służy wyłącznie do diagnostyki zapisu eventów w bazie <code>pne_analytics</code>.

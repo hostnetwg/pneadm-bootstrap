@@ -30,7 +30,7 @@ Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Loka
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.
 7. Przetestować filtry dashboardu (daty, kampania, kurs, landing target) na realnych danych.
-8. Etap 2B-1 wdrożony (`payment_status_changed`; webhook + return sync PayU/PayNow). Następny krok: agregaty/dashboard płatności albo eventy faktur (`invoice_created`).
+8. Etap 2C-1 wdrożony (`invoice_created`; observer w `pneadm`, zgodnie z ADR-005: zafakturowane ≠ opłacone). Następny krok: agregaty rozliczeń (`paid_orders` online + `invoiced_orders` z `invoice_created`) lub komenda rekonsyliacyjna dla zaległych `invoice_number` ustawionych poza Eloquent.
 9. Rozważyć progi alertów dashboardu po pierwszych tygodniach obserwacji.
 10. Skonsultować z ChatGPT kolejny etap (płatności, JS, porzucenia) po akceptacji właściciela.
 
@@ -69,8 +69,23 @@ Etap 1:
 - wybór płatności: wdrożono w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
 - utworzenie zamówienia płatności online: wdrożono w 2A-2 (`payment_order_created`),
 - status płatności: wdrożono w 2B-1 (`payment_status_changed`; webhook + return sync PayU/PayNow),
-- agregaty/dashboard płatności: nie wdrożono,
-- faktura: nie wdrożono.
+- zafakturowanie: wdrożono w 2C-1 (`invoice_created`; observer `FormOrderObserver` w `pneadm`, przejście invoice_number empty→present),
+- agregaty/dashboard płatności i faktur: nie wdrożono.
+
+### Decyzja terminologiczna: `invoice_number` = zafakturowane, nie opłacone (ADR-005) — ZAAKCEPTOWANA
+
+Status: zaakceptowana (właściciel + ChatGPT, 2026-06-25). Dokumentacja, bez zmian kodu.
+
+- `form_orders.invoice_number` (niepuste, ≠ `''`, ≠ `'0'`) oznacza **zafakturowane / rozliczone operacyjnie**, NIE fizyczny wpływ przelewu.
+- Online: źródło prawdy o opłaceniu = bramka (`payment_status_changed: paid` → `online_paid`).
+- Odroczone: rozliczenie operacyjne = pierwsze pojawienie się `invoice_number` (przyszły `deferred_invoiced` / event `invoice_created`).
+- Metryka łączna: `settled_orders_total = online_paid + deferred_invoiced`.
+- Docelowe 3 metryki zamówień: `online_paid`, `deferred_invoiced`, `settled_orders_total` („Opłacone online", „Zafakturowane odroczone", „Rozliczone łącznie").
+- Docelowe 4 metryki przychodu: `ordered_revenue_gross`, `online_paid_revenue_gross`, `deferred_invoiced_revenue_gross`, `settled_revenue_gross`.
+- Wykrywanie odroczonych po `payment_mode` / `order_flow` (NIE po braku `OnlinePaymentOrder`).
+- Edge case: online z późniejszą fakturą NIE liczone podwójnie (faktura = znacznik księgowy).
+- Alias `orders_paid` w `CourseFunnelStatsService` zostaje dla kompatybilności (bez refaktoryzacji teraz); w nowych metrykach używamy `orders_invoiced` / `deferred_invoiced`.
+- Poza zakresem (osobne przyszłe eventy): rekonsyliacja przelewów (`bank_payment_confirmed`), korekty/anulowanie faktur, zwroty, chargebacki, częściowe płatności, zaliczki, wiele faktur, KSeF. Szczegóły: `docs/decisions/ADR-005-invoice-number-means-invoiced-not-paid.md`.
 
 ## Decyzje Właściciela Do Podjęcia
 
@@ -199,6 +214,19 @@ Po każdej implementacji należy:
 - dopisać realne komendy,
 - dopisać testy,
 - oznaczyć rozbieżności między planem i kodem.
+
+## Panel Ustawień Analityki — Runtime Override (wdrożone 2026-06-25)
+
+- Wdrożono panel `Analityka -> Ustawienia` (`/analytics/settings`) — podgląd i zmiana trybu analityki.
+- Wdrożono runtime override z bazy `pneadm` (tabela `analytics_settings`), wspólny dla `pneadm` i `pnedu`.
+- `.env ANALYTICS_ENABLED=false` pozostaje **hard kill switch** (priorytet absolutny nad override).
+- `sample_rate` na tym etapie jest **tylko podglądowe** (bez edycji).
+- Stare `Ustawienia -> Analityka` przemianowane na `Ustawienia -> GA i lejek (cookie)`.
+- Dodano baner ostrzegawczy stanu analityki w panelach `Analityka` (sales-funnel, debug-events, ustawienia):
+  pokazuje `off` i hard kill switch (czerwony) oraz `aggregate_only`/`light` (żółty); brak dla `standard`/`full`.
+  Panel nadal nie odpytuje `pnedu` (brak health endpointu) — `pnedu` może mieć własny `.env` hard kill switch.
+- Uwaga dev: testy używają osobnej bazy `testing`. Nową migrację trzeba zastosować także tam, np.:
+  `DB_DATABASE=testing php artisan migrate --path=database/migrations/2026_06_25_120000_create_analytics_settings_table.php` (wewnątrz kontenera Sail).
 
 ## Do Aktualizacji Po Wdrożeniu
 

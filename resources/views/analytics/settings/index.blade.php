@@ -48,6 +48,15 @@
                 </div>
             @endif
 
+            @include('analytics.partials.status-banner', ['showSettingsLink' => false])
+
+            <div class="alert alert-info small" role="alert">
+                <strong>Uwaga:</strong> <code>pnedu</code> ma własną konfigurację <code>.env</code>.
+                Runtime override jest wspólny, ale lokalny hard kill switch <code>.env</code> w <code>pnedu</code>
+                może nadal wyłączyć zbieranie eventów po stronie portalu. Panel <code>pneadm</code> tego nie wykrywa
+                (brak health endpointu <code>pnedu</code>).
+            </div>
+
             {{-- 1. Efektywny stan --}}
             <div class="card mb-3">
                 <div class="card-header bg-light">

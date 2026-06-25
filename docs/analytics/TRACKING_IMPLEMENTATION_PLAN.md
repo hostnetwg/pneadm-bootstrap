@@ -7,7 +7,7 @@ Status: Etap 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C i 1D wdrożone lokalnie
 
 Dokument opisuje, gdzie i jak w przyszłości wdrożyć backend tracking, JS tracking, kolejkę Redis `analytics` oraz fail-silent zapis do `pne_analytics`.
 
-Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C i 1D został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`. Nadal nie wdrożono JS trackingu, eventów płatności, faktur, iFirma, KSeF, AI ani eksportów AI-safe.
+Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został wdrożony lokalnie. Etap 1C obejmuje ręczną komendę agregacji dziennej; Etap 1D — pierwszy dashboard lejka sprzedaży w `adm.pnedu.pl`; Etap 2C-1 — event `invoice_created` (observer w `pneadm`). Nadal nie wdrożono JS trackingu, iFirma/KSeF trackingu, agregatów/dashboardu faktur, AI ani eksportów AI-safe.
 
 ## Zasada Nadrzędna
 
@@ -302,7 +302,7 @@ Rekomendowana kolejność:
 10. `payment_status_changed` — wdrożone w 2B-1.
 11. `invoice_created`.
 
-Dotychczas wdrożono backendowe eventy Etapu 1A, 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`), 2A-1 (`online_payment_selected`, `deferred_invoice_selected`), 2A-2 (`payment_order_created`) oraz 2B-1 (`payment_status_changed`). Nie wdrożono eventów faktur (`invoice_created`), iFirma, KSeF, JS trackingu, porzuceń, A/B testów, dashboardu/agregatów płatności, AI ani eksportów AI-safe.
+Dotychczas wdrożono backendowe eventy Etapu 1A, 1B (`order_form_submit_attempted`, `order_form_validation_failed`, `form_order_created`), 2A-1 (`online_payment_selected`, `deferred_invoice_selected`), 2A-2 (`payment_order_created`), 2B-1 (`payment_status_changed`) oraz 2C-1 (`invoice_created`, observer w `pneadm`). Nie wdrożono iFirma/KSeF trackingu, agregatów/dashboardu faktur, JS trackingu, porzuceń, A/B testów, dashboardu/agregatów płatności, AI ani eksportów AI-safe.
 
 ### Konfiguracja Produkcyjna
 
@@ -470,9 +470,11 @@ Ponieważ klasy będą potrzebne w obu projektach, na Etapie 0/1 rekomendacja je
 | `MarketingCampaignController::store()` | `campaign_created` poza MVP sprzedażowym |
 | `MarketingCampaignController::update()` | `campaign_updated` poza MVP sprzedażowym |
 | `FormOrdersController::store()` | `form_order_created` dla zamówienia ręcznego |
-| `FormOrdersController::createIfirmaInvoice()` | `invoice_created` |
-| `FormOrdersController::createIfirmaInvoiceWithReceiver()` | `invoice_created` z `invoice_path_type=with_receiver` |
-| `FormOrdersController::createIfirmaInvoiceWithKsef()` | `invoice_created` z `ksef_option_selected=true` |
+| `App\Observers\FormOrderObserver` (`created`/`updated`) — detekcja przejścia `invoice_number` empty→present | `invoice_created` (WDROŻONE w 2C-1) |
+| `FormOrdersController` — metody iFirma (faktura krajowa, WithReceiver, WithKsef) ustawiają `invoice_number = PelnyNumer` | wskazówka `InvoiceAnalyticsTracker::hintSource('ifirma')` przed zapisem → `invoice_path_type=ifirma` |
+| `FormOrdersController::update()` — ręczne wpisanie/edycja `invoice_number` | wskazówka `InvoiceAnalyticsTracker::hintSource('manual')` → `invoice_path_type=manual` |
+
+> Status (Etap 2C-1, wdrożone w `pneadm`): event `invoice_created` powstaje przy **pierwszym** ustawieniu poprawnego `invoice_number` (≠ `''`, ≠ `'0'`) przez observer `FormOrderObserver` (model-level), niezależnie od ścieżki (iFirma lub ręcznie). Pro-forma NIE liczy się (trafia do `notes`). Idempotencja: `event_uuid = invoice_created|{form_order_id}` + `insertOrIgnore`. Payload bezpieczny: top-level `form_order_id`, `course_id`, `amount_snapshot`; metadata `order_flow` (z `FormOrder.payment_mode`), `invoice_path_type`, `payment_type`, `amount_gross` (z `product_price`). ZAKAZANE: numer faktury, NIP, nazwy/adresy, dane uczestników, dane/raw iFirma, KSeF, raw request, `toArray()`. Fail-silent. Ograniczenie: observer łapie tylko zapisy przez Eloquent (bezpośrednie `UPDATE` SQL / importy poza zakresem; ewentualna rekonsyliacja = przyszły etap). Wykrywanie `deferred_invoiced` w przyszłych agregatach: po jednoznacznym polu `FormOrder` (`payment_mode` / `order_flow`), NIE po braku `OnlinePaymentOrder`; `invoice_created` z `order_flow=online` to tylko znacznik księgowy (nie zwiększa `settled_orders_total`). Poza zakresem (NIE teraz): rekonsyliacja przelewów, częściowe płatności, zaliczki, korekty/anulowanie faktur, zwroty, chargebacki, wiele faktur, KSeF — patrz ADR-005. Testy: `tests/Feature/AnalyticsInvoiceCreatedStage2C1Test.php`. Szczegóły: `docs/decisions/ADR-005-invoice-number-means-invoiced-not-paid.md`.
 
 Nie używać `activity_logs` jako źródła analityki, ponieważ mogą zawierać dane osobowe.
 
@@ -829,7 +831,7 @@ Status po wdrożeniu 2A-1:
 - wybór metody płatności jest śledzony w 2A-1 (`online_payment_selected`, `deferred_invoice_selected`),
 - utworzenie zamówienia płatności online jest śledzone w 2A-2 (`payment_order_created`),
 - zmiana statusu płatności jest śledzona w 2B-1 (`payment_status_changed`; webhook + return sync PayU/PayNow, deterministyczny event_uuid),
-- faktury nie są śledzone,
+- wystawienie/zafakturowanie jest śledzone w 2C-1 (`invoice_created`; observer `FormOrderObserver` w `pneadm`, przejście invoice_number empty→present),
 - agregaty/dashboard płatności nie są wdrożone,
 - JS tracking nie jest wdrożony,
 - porzucenia formularza nie są wdrożone,
@@ -854,6 +856,7 @@ Status po wdrożeniu 2A-1:
 | `deferred_invoice_selected` | `CourseController::storeOrderForm()`, gałąź deferred | po udanej walidacji, po ustaleniu `payment_type=deferred`, przed utworzeniem zamówienia odroczonego | `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_type=deferred_invoice`, `metadata.buyer_type`, `metadata.has_price_variant`, `metadata.order_flow=deferred` | bez danych fakturowych/uczestnika; oznacza tylko wybór metody, nie wystawienie faktury | wdrożone w 2A-1; deferred POST dispatchuje event |
 | `payment_order_created` | `CourseController::processOrderFormOnlinePayment()` | po utworzeniu `OnlinePaymentOrder`, przed `storeAfterSubmit` i przed redirectem do PayU/PayNow | `payment_order_id`, `form_order_id`, `amount_snapshot`, `course_id`, `course_title_snapshot`, `order_form_session_id`, `campaign_code`, `route_name`, `path`, `referrer_domain`, `device_type`, `metadata.payment_gateway`, `metadata.payment_type=online`, `metadata.order_flow=online`, `metadata.buyer_type`, `metadata.has_price_variant` | bez danych płatnika/karty/bramki; oznacza utworzenie rekordu płatności, nie sukces płatności | wdrożone w 2A-2; online POST dispatchuje event przed redirectem do bramki |
 | `payment_status_changed` | `PaymentController::payuNotify()`, `paynowNotify()`, `syncPayuOrderFromApi()`, `syncPaynowOrderFromApi()` | po skutecznym `update(['status'])` i `syncLinkedFormOrderPaymentStatus()` | `payment_order_id`, `form_order_id`, `course_id`, `amount_snapshot`, `metadata.payment_gateway`, `metadata.payment_status`, `metadata.payment_previous_status`, `metadata.status_source` (`webhook`/`return_sync`), `metadata.payment_type=online`, `metadata.amount_gross`, `metadata.order_flow=online` | event server-to-server: BEZ `analytics_session_id`, `order_form_session_id`, route, path, referrer, device; bez raw statusu/payloadu bramki; deterministyczny `event_uuid` (UUID v5, bez `status_source`); tylko płatności z `form_order_id` | wdrożone w 2B-1; webhook i return sync tego samego statusu = jeden rekord (insertOrIgnore) |
+| `invoice_created` | `App\Observers\FormOrderObserver` (`created`/`updated`) w `pneadm`; emisja przez `InvoiceAnalyticsTracker` | przy przejściu `invoice_number` empty→present (pierwsze poprawne; ≠ `''`, ≠ `'0'`); pro-forma nie liczy się | top-level `form_order_id`, `course_id`, `amount_snapshot`; `metadata.order_flow` (z `payment_mode`), `metadata.invoice_path_type` (`ifirma`/`manual`/`unknown`), `metadata.payment_type`, `metadata.amount_gross` (z `product_price`) | event backoffice: BEZ sesji/route/path/referrer/device; oznacza ZAFAKTUROWANE, nie opłacone (ADR-005); bez numeru faktury, NIP, nazw/adresów, danych uczestników, danych/raw iFirma, KSeF, raw request, toArray; idempotencja `event_uuid = invoice_created\|{form_order_id}` + insertOrIgnore; online z fakturą NIE liczyć podwójnie w „rozliczone łącznie" | wdrożone w 2C-1; testy `AnalyticsInvoiceCreatedStage2C1Test` (17) |
 
 ### `analytics_session_id`
 
@@ -936,6 +939,38 @@ Wykonane testy po Etapie 1A:
 
 - `sail artisan test --filter=Analytics` w `pnedu` — 24 testy, 107 asercji, wynik pozytywny,
 - `sail artisan test --filter='MarketingCampaign(LinkTracker|ShortLink)'` w `pnedu` — 9 testów, 21 asercji, wynik pozytywny.
+
+## Panel Ustawień Analityki — Runtime Override (wdrożone 2026-06-25)
+
+- Tabela `analytics_settings` w bazie `pneadm` (connection domyślny `mysql`, NIE `analytics`):
+  `enabled_override` (nullable bool), `default_mode_override` (nullable string),
+  `updated_by` (nullable), `timestamps`. Jeden rekord `id=1`.
+- Modele odczytu/zapisu:
+  - `pneadm`: `App\Models\AnalyticsSetting` (connection domyślny) — odczyt + zapis + cache,
+  - `pnedu`: `App\Models\AnalyticsSetting` (connection `pneadm`) — tylko odczyt + cache.
+- Resolver (`AnalyticsModeResolver` w obu projektach): hard kill switch `config('analytics.enabled')`
+  → `enabled_override` → `default_mode_override` → `config('analytics.default_mode')` → fallback `standard`.
+- Panel adm: `GET /analytics/settings` (`analytics.settings.index`), `POST /analytics/settings`
+  (`analytics.settings.update`), kontroler `App\Http\Controllers\Analytics\AnalyticsSettingsController`,
+  widok `resources/views/analytics/settings/index.blade.php`, dostęp `isAdmin` (middleware grupy analytics).
+- Cache `analytics_settings_singleton` (TTL 60 s), czyszczony po zapisie.
+- Audit log: `ActivityLog::logCustom('analytics_settings_updated', ...)` (stare/nowe wartości).
+- Menu: dodano `Analityka -> Ustawienia`; przemianowano `Ustawienia -> Analityka` → `GA i lejek (cookie)`.
+- Testy: `pneadm` — `AnalyticsSettingsPanelTest` (15) + `AnalyticsRuntimeOverrideResolverTest` (6);
+  `pnedu` — `AnalyticsRuntimeOverrideResolverTest` (5). Wynik: `--filter=Analytics` zielone w obu projektach.
+
+### Baner ostrzegawczy stanu analityki (wdrożone 2026-06-25)
+
+- Serwis: `App\Services\Analytics\AnalyticsRuntimeStatusService` (read-only; zwraca `config_enabled`,
+  `runtime_enabled_override`, `runtime_default_mode_override`, `effective_enabled`, `effective_mode`,
+  `source`, `warning_level`, `show_banner`, `message`).
+- Partial: `resources/views/analytics/partials/status-banner.blade.php` (param `showSettingsLink`).
+- Wpięcie: `analytics/sales-funnel/index.blade.php`, `analytics/debug-events/index.blade.php`
+  (z linkiem do ustawień), `analytics/settings/index.blade.php` (bez linku).
+- Poziomy: danger (hard kill switch lub `off`), warning (`aggregate_only`, `light`); brak dla `standard`/`full`.
+- Strona ustawień zawiera informację o osobnym `.env` w `pnedu` (lokalny hard kill switch).
+- Panel nie odpytuje `pnedu` przez health endpoint.
+- Testy: `AnalyticsStatusBannerTest` (12). `--filter=Analytics` w `pneadm`: 89 passed.
 
 ## Do Aktualizacji Po Wdrożeniu
 

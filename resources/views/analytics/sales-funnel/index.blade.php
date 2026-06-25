@@ -34,6 +34,8 @@
 
     <div class="px-3 py-3">
         <div class="container-fluid px-0">
+            @include('analytics.partials.status-banner', ['showSettingsLink' => true])
+
             <div class="alert alert-info small" role="alert">
                 <strong>Dashboard MVP.</strong>
                 Dane pochodzą wyłącznie z dziennych agregatów <code>pne_analytics</code>
