@@ -4,9 +4,11 @@ namespace App\Services\Analytics;
 
 use App\Models\Analytics\AnalyticsDailyCampaignStat;
 use App\Models\Analytics\AnalyticsDailyCourseStat;
+use App\Models\MarketingCampaign;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class AnalyticsSalesFunnelDashboardService
 {
@@ -165,6 +167,10 @@ class AnalyticsSalesFunnelDashboardService
                     'campaign_code' => $campaignCode,
                     'campaign_channel' => $first?->campaign_channel,
                     'landing_target' => $first?->landing_target,
+                    'campaign_id' => null,
+                    'campaign_name' => null,
+                    'campaign_course_id' => null,
+                    'campaign_course_title' => null,
                     'link_entries' => $linkEntries,
                     'description_views' => $descriptionViews,
                     'form_views' => $formViews,
@@ -179,7 +185,65 @@ class AnalyticsSalesFunnelDashboardService
             ->values()
             ->all();
 
+        $grouped = $this->enrichWithCampaignMetadata($grouped);
+
         return $this->sortCampaignRows($grouped, $this->resolveSort($sort));
+    }
+
+    /**
+     * Dokleja do wierszy kampanii dane z tabeli marketing_campaigns (połączenie domyślne):
+     * ID kampanii (link do karty), nazwę kampanii oraz tytuł powiązanego szkolenia.
+     *
+     * Łączymy po unikalnym `campaign_code`. Tylko nieusunięte kampanie dostają link/nazwę
+     * (route model binding i tak ukrywa soft-deleted). Fail-safe: każdy błąd odczytu zostawia
+     * wiersze bez wzbogacenia — dashboard analityki nie może się wywalić przez tabelę kampanii.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function enrichWithCampaignMetadata(array $rows): array
+    {
+        if ($rows === []) {
+            return $rows;
+        }
+
+        try {
+            $codes = collect($rows)
+                ->pluck('campaign_code')
+                ->filter(fn ($code): bool => is_string($code) && $code !== '')
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($codes === []) {
+                return $rows;
+            }
+
+            $campaigns = MarketingCampaign::query()
+                ->with('course:id,title')
+                ->whereIn('campaign_code', $codes)
+                ->get(['id', 'campaign_code', 'name', 'course_id'])
+                ->keyBy('campaign_code');
+
+            return array_map(function (array $row) use ($campaigns): array {
+                $code = $row['campaign_code'] ?? null;
+                $campaign = is_string($code) ? $campaigns->get($code) : null;
+
+                if ($campaign === null) {
+                    return $row;
+                }
+
+                $row['campaign_id'] = (int) $campaign->id;
+                $row['campaign_name'] = $campaign->name;
+                $row['campaign_course_id'] = $campaign->course_id !== null ? (int) $campaign->course_id : null;
+                $row['campaign_course_title'] = $campaign->course?->title;
+
+                return $row;
+            }, $rows);
+        } catch (Throwable) {
+            // Wzbogacenie jest opcjonalne — bez metadanych pokazujemy sam kod kampanii.
+            return $rows;
+        }
     }
 
     /**

@@ -294,7 +294,28 @@
                             <tbody>
                                 @forelse($campaigns as $row)
                                     <tr>
-                                        <td><code>{{ $row['campaign_code'] }}</code></td>
+                                        <td>
+                                            @if(!empty($row['campaign_id']))
+                                                <a href="{{ route('marketing-campaigns.show', $row['campaign_id']) }}" target="_blank" rel="noopener" title="Otwórz kartę kampanii">
+                                                    <code>{{ $row['campaign_code'] }}</code>
+                                                </a>
+                                            @else
+                                                <code>{{ $row['campaign_code'] }}</code>
+                                            @endif
+                                            @if(!empty($row['campaign_name']))
+                                                <div class="small text-muted">{{ $row['campaign_name'] }}</div>
+                                            @endif
+                                            @if(!empty($row['campaign_course_title']))
+                                                <div class="small text-muted">
+                                                    <i class="bi bi-mortarboard"></i>
+                                                    @if(!empty($row['campaign_course_id']))
+                                                        <a href="{{ route('courses.show', $row['campaign_course_id']) }}" target="_blank" rel="noopener" class="text-muted">{{ $row['campaign_course_title'] }}</a>
+                                                    @else
+                                                        {{ $row['campaign_course_title'] }}
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </td>
                                         <td>{{ $row['campaign_channel'] ?? '—' }}</td>
                                         <td>{{ $row['landing_target'] ?? '—' }}</td>
                                         <td class="text-end">{{ $formatNumber($row['link_entries']) }}</td>
@@ -341,8 +362,20 @@
                             <tbody>
                                 @forelse($courses as $row)
                                     <tr>
-                                        <td>{{ $row['course_id'] }}</td>
-                                        <td>{{ $row['course_title_snapshot'] ?? '—' }}</td>
+                                        <td>
+                                            <a href="{{ route('courses.show', $row['course_id']) }}" target="_blank" rel="noopener" title="Otwórz kartę szkolenia">
+                                                {{ $row['course_id'] }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            @if(!empty($row['course_title_snapshot']))
+                                                <a href="{{ route('courses.show', $row['course_id']) }}" target="_blank" rel="noopener" title="Otwórz kartę szkolenia">
+                                                    {{ $row['course_title_snapshot'] }}
+                                                </a>
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
                                         <td class="text-end">{{ $formatNumber($row['description_views']) }}</td>
                                         <td class="text-end">{{ $formatNumber($row['form_views']) }}</td>
                                         <td class="text-end">{{ $formatNumber($row['form_submits']) }}</td>

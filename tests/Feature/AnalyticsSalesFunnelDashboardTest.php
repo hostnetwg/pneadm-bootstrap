@@ -21,6 +21,10 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
 
     private array $createdRoleIds = [];
 
+    private array $createdCampaignCodes = [];
+
+    private array $createdCourseIds = [];
+
     private int $outputBufferLevel = 0;
 
     protected function setUp(): void
@@ -67,6 +71,16 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
                 ->delete();
         }
 
+        if ($this->createdCampaignCodes !== [] && Schema::hasTable('marketing_campaigns')) {
+            \App\Models\MarketingCampaign::withTrashed()
+                ->whereIn('campaign_code', $this->createdCampaignCodes)
+                ->forceDelete();
+        }
+
+        if ($this->createdCourseIds !== [] && Schema::hasTable('courses')) {
+            DB::table('courses')->whereIn('id', $this->createdCourseIds)->delete();
+        }
+
         parent::tearDown();
     }
 
@@ -96,6 +110,7 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
             ->assertSee('Lejek sprzedaży')
             ->assertSee('KEEP-CAMP')
             ->assertSee('Szkolenie testowe')
+            ->assertSee(route('courses.show', 100), false)
             ->assertSee('50')
             ->assertSee('10');
     }
@@ -180,6 +195,84 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
             ->assertDontSee('SKIP-CAMP')
             ->assertSee('Kurs 200')
             ->assertDontSee('Kurs 300');
+    }
+
+    public function test_campaign_code_links_to_campaign_card_with_name_and_course(): void
+    {
+        if (! Schema::hasTable('marketing_campaigns') || ! Schema::hasTable('courses')) {
+            $this->markTestSkipped('Brak tabel marketing_campaigns/courses w testowej bazie adm.');
+        }
+
+        $admin = $this->userWithRole('admin');
+
+        $courseId = (int) DB::table('courses')->insertGetId([
+            'title' => 'Szkolenie z RKO dla nauczycieli',
+            'description' => 'Opis',
+            'start_date' => now()->subDays(3),
+            'end_date' => now()->addDays(7),
+            'is_paid' => 1,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => 1,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->createdCourseIds[] = $courseId;
+
+        $campaignCode = 'LINK-CAMP-'.Str::upper(Str::random(6));
+        $this->createdCampaignCodes[] = $campaignCode;
+
+        $campaign = \App\Models\MarketingCampaign::create([
+            'campaign_code' => $campaignCode,
+            'name' => 'Newsletter czerwiec — RKO',
+            'course_id' => $courseId,
+            'is_active' => true,
+        ]);
+
+        AnalyticsDailyCampaignStat::query()->create([
+            'stat_date' => '2026-06-12',
+            'campaign_code' => $campaignCode,
+            'campaign_channel' => 'newsletter',
+            'link_entries' => 40,
+            'order_form_views' => 10,
+            'orders_created' => 2,
+            'revenue_snapshot' => 400,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.sales-funnel.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+            ]))
+            ->assertOk()
+            ->assertSee($campaignCode)
+            ->assertSee(route('marketing-campaigns.show', $campaign->id), false)
+            ->assertSee('Newsletter czerwiec — RKO', false)
+            ->assertSee('Szkolenie z RKO dla nauczycieli');
+    }
+
+    public function test_campaign_without_matching_marketing_campaign_shows_plain_code_without_link(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $orphanCode = 'ORPHAN-CODE-XYZ';
+
+        AnalyticsDailyCampaignStat::query()->create([
+            'stat_date' => '2026-06-12',
+            'campaign_code' => $orphanCode,
+            'link_entries' => 5,
+            'orders_created' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.sales-funnel.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+            ]))
+            ->assertOk()
+            ->assertSee($orphanCode)
+            ->assertDontSee('marketing-campaigns/'.$orphanCode);
     }
 
     public function test_conversion_rates_are_calculated_and_zero_division_is_safe(): void
