@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 zacommitowane i wypchnięte na GitHub** (2026-06-25). **Czeka na deploy produkcyjny.** Następny etap rozwojowy: **B3** (agregacja porzuceń). B4 — do zrobienia.
+Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). Commit B3: `b0b4535` (`pneadm`). **Następny etap rozwojowy: B4** (dashboard porzuceń).
 
 ## Cel etapu
 
@@ -20,8 +20,8 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 | **B1** | Endpoint batch + enumy + sanitizer + tryby + testy RODO | ✅ ZROBIONE |
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
 | **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
-| B3 | Agregacja porzuceń (komenda, idempotentna) | ⏳ TODO |
-| B4 | Dashboard porzuceń | ⏳ TODO |
+| B3 | Agregacja porzuceń (komenda, idempotentna) | ✅ ZROBIONE (`b0b4535`, deployed 2026-06-25) |
+| B4 | Dashboard porzuceń | ⏳ TODO (następny etap) |
 
 ---
 
@@ -247,8 +247,8 @@ Porzucenia jako **agregacja po czasie** (NIE nowy event `order_form_abandoned`).
 komenda przelicza dzienne statystyki z `analytics_events` grupując po `order_form_session_id` —
 analogicznie do `analytics:aggregate-daily` (1C). Zakres B3 wybrany 2026-06-25 (Waldemar): **kurs + kampania**.
 
-**Status:** zaimplementowane i przetestowane lokalnie; **czeka na commit + deploy produkcyjny**
-(migracja + cron, wg `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 6 i 8.7).
+**Status:** wdrożone produkcyjnie (2026-06-25). Commit `b0b4535` (`pneadm`). Migracja + catch-up + cron 03:15 Europe/Warsaw.
+Wynik catch-up prod (2026-06-25): **9 wierszy kursów**, **6 wierszy kampanii** (jedyny dzień z eventami funnelowymi na starcie).
 
 ### Lejek sesji
 | Etap | Event | Źródło |
@@ -301,9 +301,9 @@ idempotencja, domyślny dzień z lagiem, komenda, brak PII).
 
 ## Co dalej (B4) — skrót
 
-- **B2**: ✅ zacommitowane, wypchnięte i wdrożone produkcyjnie (`pnedu` `bdc74ca`).
-- **B3**: ✅ zaimplementowane i przetestowane lokalnie (111 passed). Czeka na commit + deploy (migracja + cron 03:15).
-- **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data) czytający tabele `analytics_daily_*_abandonment_stats`. Najpierw dane oglądamy w `/analytics/debug-events` i przez komendę.
+- **B2**: ✅ wdrożone produkcyjnie (`pnedu` `bdc74ca`).
+- **B3**: ✅ wdrożone produkcyjnie (`pneadm` `b0b4535`, 2026-06-25). Migracja, catch-up 2026-06-25 (9 kursów / 6 kampanii), cron 03:15.
+- **B4**: prosty dashboard porzuceń (filtry kurs/kampania/data) czytający tabele `analytics_daily_*_abandonment_stats`. **Następny etap** — po zebraniu kilku dni danych produkcyjnych.
 
 ## Smoke test produkcyjny (po B2)
 

@@ -1,6 +1,6 @@
 # Wdrożenie produkcyjne — Analityka PNEdu (czerwiec 2026)
 
-Status: **GO — deploy Etapu B2** (wdrożone). **B3 (agregacja porzuceń) — zaimplementowane lokalnie, czeka na commit + deploy**: migracja (sekcja 6) + cron `analytics:aggregate-abandonments` (sekcja 8.7). Commity B2 wypchnięte na GitHub; wykonaj `git pull` na produkcji wg sekcji 7.
+Status: **B2 + B3 wdrożone produkcyjnie** (2026-06-25). B3: commit `b0b4535`, migracja, catch-up, cron 03:15 — szczegóły w sekcji 8.7.1. **Następny etap: B4** (dashboard porzuceń).
 
 Ten plik opisuje wdrożenie zakresu:
 
@@ -23,6 +23,8 @@ ee22c83 — feat(analytics): add analytics settings panel with runtime override 
 272dc6e — docs(analytics): document order form client-side tracking (B2)
 fb209dc — docs(analytics): document B2 deploy asset build step
 60acc21 — feat(analytics): link campaigns and courses in sales funnel dashboard
+05d2a4c — docs(analytics): mark B2 committed/pushed, GO deploy, next B3
+b0b4535 — feat(analytics): aggregate order form abandonments (Etap B3)
 ```
 
 ### pnedu (gałąź `main` — Etap B)
@@ -33,7 +35,8 @@ ccb3e3e — feat(analytics): apply runtime analytics mode override from pneadm
 bdc74ca — feat(analytics): add order form client-side tracking (Etap B2)
 ```
 
-> **Deploy Etapu B2 (2026-06-25):** kod w `pnedu` (`6b32a4d`, `bdc74ca`). W `pneadm` oprócz dokumentacji jest też kod UI (`60acc21` — linki w lejku). Oba projekty: `git pull` + cache. `pnedu` dodatkowo: `npm ci` + `npm run build` (sekcja 7.2–7.3). Po deployu: smoke test 9.1. **Następny etap rozwojowy: B3** (agregacja porzuceń).
+> **Deploy Etapu B2 (2026-06-25):** kod w `pnedu` (`6b32a4d`, `bdc74ca`). W `pneadm` oprócz dokumentacji jest też kod UI (`60acc21` — linki w lejku). Oba projekty: `git pull` + cache. `pnedu` dodatkowo: `npm ci` + `npm run build` (sekcja 7.2–7.3). Po deployu: smoke test 9.1.
+> **Deploy Etapu B3 (2026-06-25):** tylko `pneadm` (`b0b4535`): `git pull` + `migrate --force` + cache + catch-up + cron 03:15 (sekcja 8.7). **Następny etap: B4** (dashboard porzuceń).
 
 ### Wynik testów lokalnych
 
@@ -757,6 +760,45 @@ tail -n 30 storage/logs/laravel.log
 # 10) B4 / dashboard porzuceń NIE jest jeszcze wdrożony (świadomie — dane zbieramy najpierw).
 ```
 
+#### 8.7.1 Wynik wdrożenia produkcyjnego B3 (2026-06-25)
+
+Potwierdzone na produkcji (`adm.pnedu.pl` / `srv66127@h30`):
+
+| Krok | Wynik |
+|------|--------|
+| `git pull` + migracja `2026_06_25_120000_create_analytics_daily_abandonment_stats_tables` | ✅ DONE (~34 ms) |
+| MIN/MAX eventów funnelowych | `2026-06-25 12:20:30` … `21:32:02`, **56** eventów (jedyny dzień z danymi na starcie) |
+| Catch-up `--from=2026-06-25 --to=2026-06-25 --force` | ✅ **9** wierszy kursów, **6** wierszy kampanii |
+| Ręczny test crona (bez dat, `lag=2`) | ✅ policzył `2026-06-23` → 0/0 (poprawnie — brak eventów sprzed 25.06) |
+| Cron `analytics:aggregate-abandonments` | ✅ dodany: **15 3 * * *** (03:15 Europe/Warsaw), osobny flock + log |
+| Idempotencja catch-up 25.06 | ✅ ponowne `--force` nie zmienia liczb |
+| Sanity: `sessions_total` vs suma kubełków | ✅ **`sessions_total=38 buckets=38`** (2026-06-25, prod) |
+
+**Uwagi interpretacyjne (pierwszy dzień):**
+
+- `order_form_started` (JS): tylko **1** event — większość sesji 25.06 wpadnie do `viewed_not_started` (normalne tuż po wdrożeniu B2).
+- Od kolejnych dni (pełniejszy JS) lejek porzuceń będzie miarodajniejszy.
+- Cron bez dat od **27.06** zacznie regularnie uzupełniać dzień **25.06** (lag=2).
+
+**Cron — weryfikacja wpisu w panelu (potwierdzone 2026-06-25):**
+
+Godzina **15 / 3**, pełna ścieżka **`/usr/bin/flock`** i komenda `analytics:aggregate-abandonments` — poprawne (screen panelu crona).
+
+```bash
+15 3 * * * /usr/bin/flock -n /tmp/pneadm-analytics-abandonments.lock /opt/alt/php82/usr/bin/php /home/srv66127/domains/adm.pnedu.pl/pneadm/artisan analytics:aggregate-abandonments >> /home/srv66127/domains/adm.pnedu.pl/pneadm/storage/logs/analytics-abandonments.log 2>&1
+```
+
+**Sanity po catch-up (wykonane na produkcji 2026-06-25):**
+
+Wynik: **`sessions_total=38 buckets=38`** — kubełki terminalne sumują się do `sessions_total` (klasyfikacja spójna).
+
+```bash
+# liczba wierszy agregatów:
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo 'form='.DB::connection('analytics')->table('analytics_daily_form_abandonment_stats')->count().' campaign='.DB::connection('analytics')->table('analytics_daily_campaign_abandonment_stats')->count();"
+# spójność kubełków (sessions_total == suma kubełków terminalnych):
+/opt/alt/php82/usr/bin/php artisan tinker --execute="\$r=DB::connection('analytics')->table('analytics_daily_form_abandonment_stats')->selectRaw('SUM(sessions_total) st, SUM(viewed_not_started+started_not_submit_clicked+submit_clicked_not_attempted+submit_attempted_not_created+converted) b')->first(); echo 'sessions_total='.\$r->st.' buckets='.\$r->b;"
+```
+
 ---
 
 ## 9. Smoke test po deployu
@@ -882,9 +924,11 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
 [ ] failed_jobs bez nowych błędów
 [ ] cron agregacji (analytics:aggregate-daily, 02:15) dodany w pneadm
 [ ] catch-up agregacji uruchomiony (lejek sprzedaży pokazuje dane)
-[ ] migracja B3 (analytics_daily_*_abandonment_stats) wykonana
-[ ] cron porzuceń (analytics:aggregate-abandonments, 03:15) dodany w pneadm
-[ ] catch-up porzuceń uruchomiony (tabele abandonment mają wiersze)
+[x] migracja B3 (analytics_daily_*_abandonment_stats) wykonana — 2026-06-25
+[x] cron porzuceń (analytics:aggregate-abandonments, 03:15) dodany w pneadm — 2026-06-25
+[x] catch-up porzuceń uruchomiony — 2026-06-25: 9 kursów / 6 kampanii
+[x] sanity B3: sessions_total == suma kubełków — 2026-06-25: **38 = 38** (sekcja 8.7.1)
+[ ] B4 dashboard porzuceń — świadomie NIE wdrożony (następny etap)
 ```
 
 ---

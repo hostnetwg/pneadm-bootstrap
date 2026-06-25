@@ -527,8 +527,8 @@ Poza zakresem obecnego modelu (osobne przyszłe eventy/decyzje, NIE teraz): reko
 > Realizujemy w PR-ach B1→B4. Pełny, aktualny kontrakt i status: [`STAGE_B_CLIENT_TRACKING.md`](./STAGE_B_CLIENT_TRACKING.md).
 > - **PR B1 — wdrożony lokalnie (pnedu):** endpoint `POST /analytics/client-events` (batch, fail-silent 204, rate limit, limity rozmiaru), 4 eventy MVP (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`), whitelisty wartości, tryby (standard = MVP), 19 testów RODO/limity/tryby.
 > - **PR B2 — wdrożony produkcyjnie (pnedu `bdc74ca`):** inline, fail-silent JS collector na formularzu zamówienia.
-> - **PR B3 — zaimplementowany lokalnie (pneadm), czeka na commit + deploy:** porzucenia jako **agregacja** (NIE event JS). Komenda `analytics:aggregate-abandonments` (idempotentna, domyślnie 2 dni wstecz), dwie tabele `analytics_daily_*_abandonment_stats` (connection `analytics`). Sesje liczone wg **dnia pierwszego eventu** (Europe/Warsaw); kampania przypisywana **first-touch** w obrębie `order_form_session_id`; bez PII. 113 testów Analytics zielonych. Cron docelowo 03:15 Europe/Warsaw.
-> - **B4 (dashboard porzuceń) — do zrobienia później** (najpierw zbieramy dane produkcyjne).
+> - **PR B3 — wdrożony produkcyjnie (pneadm `b0b4535`, 2026-06-25):** porzucenia jako **agregacja** (NIE event JS). Komenda `analytics:aggregate-abandonments` (idempotentna, domyślnie 2 dni wstecz), dwie tabele `analytics_daily_*_abandonment_stats` (connection `analytics`). Sesje liczone wg **dnia pierwszego eventu** (Europe/Warsaw); kampania przypisywana **first-touch** w obrębie `order_form_session_id`; bez PII. Cron 03:15 Europe/Warsaw. Catch-up prod 2026-06-25: 9 kursów / 6 kampanii.
+> - **B4 (dashboard porzuceń) — następny etap** (po zebraniu danych produkcyjnych).
 >
 > Uwaga: poniższa lista eventów to wcześniejszy szerszy szkic; B1 świadomie startuje z węższym, bezpieczniejszym MVP (4 eventy), żeby ograniczyć szum i ryzyko PII.
 
