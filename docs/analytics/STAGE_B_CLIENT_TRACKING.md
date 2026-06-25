@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (dashboard porzuceń) — zaimplementowane w `pneadm`, czeka na deploy.**
+Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (dashboard porzuceń) — wdrożone do repo (`a6ee852`, pushed).** **B5 (CSV AI-safe) — zaimplementowane w `pneadm`, czeka na deploy.**
 
 ## Cel etapu
 
@@ -21,7 +21,8 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
 | **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ✅ ZROBIONE (`b0b4535`, deployed 2026-06-25) |
-| B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
+| B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm` `a6ee852`, pushed) |
+| B5 | CSV AI-safe export z dashboardu porzuceń | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
 
 ---
 
@@ -347,11 +348,59 @@ php artisan view:cache
 
 ---
 
+## PR B5 — CSV AI-safe export z dashboardu porzuceń (2026-06-26)
+
+Eksport CSV z dashboardu B4 gotowy do analizy w arkuszu / ChatGPT — **bez danych osobowych**.
+Czyta WYŁĄCZNIE agregaty B3/B4 (przez `AnalyticsFormAbandonmentDashboardService`), **nie skanuje `analytics_events`**,
+nie eksportuje raw eventów, sesji ani metadata. Tylko `pneadm`, bez migracji.
+
+### Endpointy (admin-only, te same middleware co dashboard)
+- `GET /analytics/form-abandonments/export/courses` → `analytics.form-abandonments.export.courses`
+- `GET /analytics/form-abandonments/export/campaigns` → `analytics.form-abandonments.export.campaigns`
+
+### Pliki
+- `app/Services/Analytics/AnalyticsFormAbandonmentCsvExportService.php` (NOWY) — buduje wiersze i streamuje CSV.
+- `app/Http/Controllers/Analytics/AnalyticsFormAbandonmentController.php` — metody `exportCourses`/`exportCampaigns`.
+- `app/Services/Analytics/AnalyticsFormAbandonmentDashboardService.php` — wiersze wzbogacone o `reached_viewed` i `abandoned_total` (reużycie filtrów/agregacji).
+- `resources/views/analytics/form-abandonments/index.blade.php` — przyciski „Eksport CSV — kursy/kampanie” (zachowują filtry) + info AI-safe.
+- `routes/web.php`.
+
+### Filtry i format
+- Te same filtry i domyślny zakres co B4 (`date_from`, `date_to`, `course_id`, `campaign_code`; domyślnie 14 dni do `dziś − lag(2)`, max 366 dni) — reużycie `AnalyticsFormAbandonmentDashboardService::build()`.
+- Separator `,`, **BOM UTF-8** (standard CSV w `pneadm`, zgodnie z `ActivityLogController`), `Content-Type: text/csv; charset=UTF-8`.
+- Nazwy plików: `pne-form-abandonments-courses-YYYY-MM-DD_YYYY-MM-DD.csv`, `pne-form-abandonments-campaigns-YYYY-MM-DD_YYYY-MM-DD.csv`.
+- Rates jako ułamek dziesiętny z kropką (np. `0.25`), pusty string przy braku sesji (bez `%`, bez dzielenia przez zero).
+- Stream przez `response()->stream()` (`StreamedResponse`).
+
+### Kolumny CSV
+- **per kurs**: `date_from, date_to, course_id, course_title_snapshot, sessions_total, reached_viewed, reached_started, reached_submit_clicked, reached_submit_attempted, reached_created, viewed_not_started, started_not_submit_clicked, submit_clicked_not_attempted, submit_attempted_not_created, converted, abandoned_total, conversion_rate, viewed_not_started_rate, started_not_submit_clicked_rate, submit_clicked_not_attempted_rate, submit_attempted_not_created_rate`.
+- **per kampania**: jak wyżej, ale `campaign_code, campaign_id, campaign_name` zamiast pól kursu (nazwa z `marketing_campaigns`, fail-safe try/catch jak w B4).
+
+### RODO / AI-safe
+CSV NIE zawiera: email, telefon, NIP, nazw nabywców/odbiorców/szkół, adresów, imion i nazwisk, danych uczestników, wartości pól formularza, metadata, raw eventów/URL/referrer, IP, user agent, `analytics_session_id`, `order_form_session_id`, `form_order_id`, `payment_order_id`, `invoice_number`. Tylko: id/tytuł kursu, kod/id/nazwa kampanii, daty agregacji, liczniki, rates.
+
+### Testy B5
+`--filter=Analytics` → **141 passed**, w tym 13 nowych dla B5 (pobranie CSV kursy/kampanie, dostęp gość/nie-admin, nagłówki kolumn, filtry data/course_id/campaign_code, poprawność liczników i rates, brak PII/zakazanych identyfikatorów, pusty CSV = sam nagłówek, linki eksportu z aktualnymi filtrami).
+
+### Deploy B5 (bez migracji)
+```bash
+cd /path/to/adm.pnedu.pl
+git pull
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+# restart PHP-FPM / workerów tylko jeśli obecny proces tego wymaga
+```
+
+---
+
 ## Status etapów — skrót
 
 - **B2**: ✅ wdrożone produkcyjnie (`pnedu` `bdc74ca`).
 - **B3**: ✅ wdrożone produkcyjnie (`pneadm` `b0b4535`, 2026-06-25). Migracja, catch-up 2026-06-25 (9 kursów / 6 kampanii), cron 03:15.
-- **B4**: ✅ zaimplementowane w `pneadm` (dashboard porzuceń, read-only, agregaty B3). **Czeka na deploy** (bez migracji).
+- **B4**: ✅ wypchnięte (`pneadm` `a6ee852`). Dashboard porzuceń, read-only, agregaty B3. Produkcyjny `git pull` po stronie Waldemara.
+- **B5**: ✅ zaimplementowane w `pneadm` (CSV AI-safe export). **Czeka na deploy** (bez migracji).
+- **Następny etap (po decyzji):** prosty wykres trendu dziennego `sessions_total` vs `converted`.
 
 ## Smoke test produkcyjny (po B2)
 

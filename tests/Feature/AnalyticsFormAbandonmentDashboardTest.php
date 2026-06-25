@@ -252,10 +252,10 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
 
         // Klucze wierszy kursów ograniczone do liczników + snapshot tytułu/id.
         $allowedCourseKeys = [
-            'course_id', 'course_title_snapshot', 'sessions_total',
+            'course_id', 'course_title_snapshot', 'sessions_total', 'reached_viewed',
             'reached_started', 'reached_submit_clicked', 'reached_submit_attempted', 'reached_created',
             'viewed_not_started', 'started_not_submit_clicked', 'submit_clicked_not_attempted',
-            'submit_attempted_not_created', 'converted', 'conversion_rate',
+            'submit_attempted_not_created', 'converted', 'abandoned_total', 'conversion_rate',
         ];
         $this->assertSame([], array_diff(array_keys($data['courses'][0]), $allowedCourseKeys));
     }
@@ -296,6 +296,256 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get(route('analytics.form-abandonments.index'))
             ->assertNotFound();
+    }
+
+    // ---------------------------------------------------------------------
+    // B5 — CSV AI-safe export
+    // ---------------------------------------------------------------------
+
+    public function test_admin_can_download_courses_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Szkolenie CSV', [
+            'sessions_total' => 8, 'reached_viewed' => 8, 'reached_started' => 5,
+            'converted' => 2, 'viewed_not_started' => 3, 'started_not_submit_clicked' => 3,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-form-abandonments-courses-2026-06-01_2026-06-30.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+        $this->assertStringContainsString('Szkolenie CSV', $this->csvBody($response));
+    }
+
+    public function test_admin_can_download_campaigns_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-15', 'PROMO-CSV', [
+            'sessions_total' => 6, 'reached_viewed' => 6, 'converted' => 1, 'viewed_not_started' => 5,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.form-abandonments.export.campaigns', [
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-form-abandonments-campaigns-2026-06-01_2026-06-30.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+        $this->assertStringContainsString('PROMO-CSV', $this->csvBody($response));
+    }
+
+    public function test_non_admin_cannot_download_csv(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->get(route('analytics.form-abandonments.export.courses'))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('analytics.form-abandonments.export.campaigns'))
+            ->assertForbidden();
+    }
+
+    public function test_guest_cannot_download_csv(): void
+    {
+        $this->get(route('analytics.form-abandonments.export.courses'))->assertRedirect(route('login'));
+        $this->get(route('analytics.form-abandonments.export.campaigns'))->assertRedirect(route('login'));
+    }
+
+    public function test_courses_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 1, 'reached_viewed' => 1, 'viewed_not_started' => 1]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $header = $this->csvLine($body, 0);
+        $this->assertSame([
+            'date_from', 'date_to', 'course_id', 'course_title_snapshot', 'sessions_total',
+            'reached_viewed', 'reached_started', 'reached_submit_clicked', 'reached_submit_attempted',
+            'reached_created', 'viewed_not_started', 'started_not_submit_clicked',
+            'submit_clicked_not_attempted', 'submit_attempted_not_created', 'converted',
+            'abandoned_total', 'conversion_rate', 'viewed_not_started_rate',
+            'started_not_submit_clicked_rate', 'submit_clicked_not_attempted_rate',
+            'submit_attempted_not_created_rate',
+        ], $header);
+    }
+
+    public function test_campaigns_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-15', 'C', ['sessions_total' => 1, 'reached_viewed' => 1, 'viewed_not_started' => 1]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.campaigns', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $header = $this->csvLine($body, 0);
+        $this->assertSame([
+            'date_from', 'date_to', 'campaign_code', 'campaign_id', 'campaign_name', 'sessions_total',
+            'reached_viewed', 'reached_started', 'reached_submit_clicked', 'reached_submit_attempted',
+            'reached_created', 'viewed_not_started', 'started_not_submit_clicked',
+            'submit_clicked_not_attempted', 'submit_attempted_not_created', 'converted',
+            'abandoned_total', 'conversion_rate', 'viewed_not_started_rate',
+            'started_not_submit_clicked_rate', 'submit_clicked_not_attempted_rate',
+            'submit_attempted_not_created_rate',
+        ], $header);
+    }
+
+    public function test_csv_respects_date_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-05', 100, 'W zakresie CSV', ['sessions_total' => 3, 'reached_viewed' => 3, 'viewed_not_started' => 3]);
+        $this->seedCourse('2026-05-01', 101, 'Poza zakresem CSV', ['sessions_total' => 9, 'reached_viewed' => 9, 'viewed_not_started' => 9]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $this->assertStringContainsString('W zakresie CSV', $body);
+        $this->assertStringNotContainsString('Poza zakresem CSV', $body);
+    }
+
+    public function test_courses_csv_respects_course_id_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-10', 200, 'Kurs 200', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+        $this->seedCourse('2026-06-10', 300, 'Kurs 300', ['sessions_total' => 8, 'reached_viewed' => 8, 'viewed_not_started' => 8]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200,
+        ])));
+
+        $this->assertStringContainsString('Kurs 200', $body);
+        $this->assertStringNotContainsString('Kurs 300', $body);
+    }
+
+    public function test_campaigns_csv_respects_campaign_code_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-10', 'KEEP-CSV', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+        $this->seedCampaign('2026-06-10', 'SKIP-CSV', ['sessions_total' => 8, 'reached_viewed' => 8, 'viewed_not_started' => 8]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.campaigns', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'campaign_code' => 'KEEP-CSV',
+        ])));
+
+        $this->assertStringContainsString('KEEP-CSV', $body);
+        $this->assertStringNotContainsString('SKIP-CSV', $body);
+    }
+
+    public function test_csv_counts_and_rates_are_correct(): void
+    {
+        $admin = $this->userWithRole('admin');
+        // sessions=8, converted=2 -> conversion_rate 0.25; viewed_not_started=4 -> 0.5
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'sessions_total' => 8, 'reached_viewed' => 8, 'reached_started' => 4,
+            'reached_submit_clicked' => 3, 'reached_submit_attempted' => 2, 'reached_created' => 2,
+            'viewed_not_started' => 4, 'started_not_submit_clicked' => 1,
+            'submit_clicked_not_attempted' => 1, 'submit_attempted_not_created' => 0, 'converted' => 2,
+        ]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $row = $this->csvLine($body, 1);
+        $map = array_combine($this->csvLine($body, 0), $row);
+
+        $this->assertSame('8', $map['sessions_total']);
+        $this->assertSame('2', $map['converted']);
+        $this->assertSame('6', $map['abandoned_total']);
+        $this->assertSame('0.25', $map['conversion_rate']);
+        $this->assertSame('0.5', $map['viewed_not_started_rate']);
+    }
+
+    public function test_csv_does_not_contain_pii_or_forbidden_identifiers(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+        $this->seedCampaign('2026-06-15', 'PROMO', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+
+        foreach (['courses', 'campaigns'] as $type) {
+            $body = $this->csvBody($this->actingAs($admin)->get(route("analytics.form-abandonments.export.{$type}", [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+            ])));
+
+            foreach ([
+                'analytics_session_id', 'order_form_session_id', 'form_order_id', 'payment_order_id',
+                'invoice_number', 'metadata', 'email', 'user_agent', 'referrer', '@',
+            ] as $forbidden) {
+                $this->assertStringNotContainsString($forbidden, $body, "CSV {$type} zawiera zakazane: {$forbidden}");
+            }
+        }
+    }
+
+    public function test_csv_with_no_data_returns_only_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.form-abandonments.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $lines = array_values(array_filter(explode("\n", trim($body)), fn ($l) => $l !== ''));
+        $this->assertCount(1, $lines, 'CSV bez danych powinien mieć tylko nagłówek.');
+        $this->assertStringContainsString('sessions_total', $lines[0]);
+    }
+
+    public function test_export_links_on_dashboard_carry_current_filters(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 200, 'Kurs', ['sessions_total' => 5, 'reached_viewed' => 5, 'viewed_not_started' => 5]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.form-abandonments.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+                'course_id' => 200,
+                'campaign_code' => 'PROMO',
+            ]))
+            ->assertOk()
+            ->assertSee(e(route('analytics.form-abandonments.export.courses', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200, 'campaign_code' => 'PROMO',
+            ])), false)
+            ->assertSee(e(route('analytics.form-abandonments.export.campaigns', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200, 'campaign_code' => 'PROMO',
+            ])), false);
+    }
+
+    private function csvBody(\Illuminate\Testing\TestResponse $response): string
+    {
+        $response->assertOk();
+        ob_start();
+        $response->sendContent();
+        $content = (string) ob_get_clean();
+
+        // Usuń BOM UTF-8 dla łatwiejszego porównywania.
+        return preg_replace('/^\xEF\xBB\xBF/', '', $content) ?? $content;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function csvLine(string $body, int $index): array
+    {
+        $lines = array_values(array_filter(explode("\n", trim($body)), fn ($l) => $l !== ''));
+
+        return str_getcsv($lines[$index] ?? '');
     }
 
     private function seedCourse(string $date, int $courseId, ?string $title, array $overrides = []): void

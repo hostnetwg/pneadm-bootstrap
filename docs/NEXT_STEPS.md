@@ -246,7 +246,9 @@ Po każdej implementacji należy:
 - **Deploy produkcyjny B2:** **GO** (decyzja Waldemara 2026-06-25). Instrukcja: `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 7.2, 7.3, 9.1. `pnedu`: `git pull` + `npm ci` + `npm run build` + cache + `queue:restart`. `pneadm`: `git pull` + cache (dokumentacja + linki w sales-funnel `60acc21`).
 - Testy: `--filter=Analytics` → **110 passed** (pnedu), **98 passed** (pneadm); sanity formularza → **15 passed**; `npm run build` → OK.
 - **B3 — agregacja porzuceń (wdrożone produkcyjnie 2026-06-25, `pneadm` `b0b4535`):** zakres **kurs + kampania**. Komenda `analytics:aggregate-abandonments`, domyślnie 2 dni wstecz. Klasyfikacja po `order_form_session_id`; kampania **first-touch**; bez PII. Catch-up prod 2026-06-25: 9 wierszy kursów, 6 kampanii. Cron 03:15 Europe/Warsaw.
-- **B4 — dashboard porzuceń:** ✅ zaimplementowane w `pneadm` (read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event day attribution; first-touch campaign attribution; brak PII). Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. **Czeka na deploy** (bez migracji). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **B4 — dashboard porzuceń:** ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. Produkcyjny `git pull` po stronie Waldemara.
+- **B5 — CSV AI-safe export:** ✅ zaimplementowane w `pneadm` (eksport CSV z dashboardu porzuceń per kurs i per kampania, na agregatach B3/B4, bez raw eventów/sesji/PII; rates jako ułamki dziesiętne; przyciski w UI zachowują filtry). Endpointy `analytics.form-abandonments.export.courses|campaigns`. **Czeka na deploy** (bez migracji). Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **Następny etap (po decyzji Waldemara):** prosty wykres trendu dziennego `sessions_total` vs `converted`.
 
 ## Do Aktualizacji Po Wdrożeniu
 

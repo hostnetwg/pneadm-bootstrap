@@ -216,6 +216,7 @@ class AnalyticsFormAbandonmentDashboardService
                     'course_id' => (int) $courseId,
                     'course_title_snapshot' => $this->latestTitle($rows),
                     'sessions_total' => $sessionsTotal,
+                    'reached_viewed' => (int) $rows->sum('reached_viewed'),
                     'reached_started' => (int) $rows->sum('reached_started'),
                     'reached_submit_clicked' => (int) $rows->sum('reached_submit_clicked'),
                     'reached_submit_attempted' => (int) $rows->sum('reached_submit_attempted'),
@@ -225,6 +226,7 @@ class AnalyticsFormAbandonmentDashboardService
                     'submit_clicked_not_attempted' => (int) $rows->sum('submit_clicked_not_attempted'),
                     'submit_attempted_not_created' => (int) $rows->sum('submit_attempted_not_created'),
                     'converted' => $converted,
+                    'abandoned_total' => max(0, $sessionsTotal - $converted),
                     'conversion_rate' => $this->rate($converted, $sessionsTotal),
                 ];
             })
@@ -251,6 +253,7 @@ class AnalyticsFormAbandonmentDashboardService
                     'campaign_id' => $campaignId !== null ? (int) $campaignId : null,
                     'campaign_name' => null,
                     'sessions_total' => $sessionsTotal,
+                    'reached_viewed' => (int) $group->sum('reached_viewed'),
                     'reached_started' => (int) $group->sum('reached_started'),
                     'reached_submit_clicked' => (int) $group->sum('reached_submit_clicked'),
                     'reached_submit_attempted' => (int) $group->sum('reached_submit_attempted'),
@@ -260,6 +263,7 @@ class AnalyticsFormAbandonmentDashboardService
                     'submit_clicked_not_attempted' => (int) $group->sum('submit_clicked_not_attempted'),
                     'submit_attempted_not_created' => (int) $group->sum('submit_attempted_not_created'),
                     'converted' => $converted,
+                    'abandoned_total' => max(0, $sessionsTotal - $converted),
                     'conversion_rate' => $this->rate($converted, $sessionsTotal),
                 ];
             })

@@ -11,6 +11,12 @@
         };
         $hasCourseLink = \Illuminate\Support\Facades\Route::has('courses.show');
         $hasCampaignLink = \Illuminate\Support\Facades\Route::has('marketing-campaigns.show');
+        $exportQuery = array_filter([
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'course_id' => $filters['course_id'] ?? null,
+            'campaign_code' => $filters['campaign_code'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
     @endphp
 
     <x-slot name="header">
@@ -19,6 +25,12 @@
                 Analityka — Porzucenia formularza
             </h2>
             <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ route('analytics.form-abandonments.export.courses', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — kursy
+                </a>
+                <a href="{{ route('analytics.form-abandonments.export.campaigns', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — kampanie
+                </a>
                 @if(\Illuminate\Support\Facades\Route::has('analytics.sales-funnel.index'))
                     <a href="{{ route('analytics.sales-funnel.index') }}" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-funnel"></i> Lejek sprzedaży
@@ -74,6 +86,11 @@
                     <p class="small text-muted mb-0 mt-2">
                         Domyślny zakres: ostatnie {{ (int) ($meta['default_days'] ?? 14) }} dni zakończone na dniu dojrzałym
                         (dziś − {{ (int) ($meta['lag_days'] ?? 2) }}). Maksymalny zakres: {{ (int) ($meta['max_days'] ?? 366) }} dni.
+                    </p>
+                    <p class="small text-muted mb-0 mt-1">
+                        <i class="bi bi-filetype-csv"></i>
+                        Eksport CSV zawiera wyłącznie agregaty bez danych osobowych i bez wartości pól formularza.
+                        Przyciski eksportu (u góry) zachowują aktualne filtry.
                     </p>
                 </div>
             </div>
