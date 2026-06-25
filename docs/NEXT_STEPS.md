@@ -25,7 +25,7 @@ Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Loka
 
 1. Otworzyć `adm.pnedu.pl -> Analityka -> Lejek sprzedaży` i zweryfikować dane po `analytics:aggregate-daily`.
 2. Porównać nowe agregaty ze starymi `course_page_stats_daily` / `marketing_campaign_stats_daily` (tylko odczyt).
-3. Zaplanować cron produkcyjny dla `analytics:aggregate-daily` (np. 02:15 Europe/Warsaw).
+3. ~~Zaplanować cron produkcyjny dla `analytics:aggregate-daily` (np. 02:15 Europe/Warsaw).~~ **ZROBIONE** — wdrożony jako zwykły cron z `flock` w `pneadm` (02:15 czasu serwera = Europe/Warsaw; serwer działa w Europe/Warsaw, a komenda i tak liczy datę w tej strefie). NIE użyto Laravel Scheduler, bo pneadm nie ma `schedule:run`, a jego włączenie zdublowałoby worker kolejki. Catch-up i kontrola: `docs/deploy/2026-06-analytics-production-deploy.md` sekcja 8.6.
 4. Wpisać produkcyjne hasło `pne_analytics` wyłącznie w `.env` produkcji obu aplikacji.
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.

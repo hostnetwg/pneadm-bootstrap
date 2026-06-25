@@ -22,6 +22,10 @@ return [
         'enabled' => (bool) env('ANALYTICS_SALES_FUNNEL_DASHBOARD_ENABLED', true),
         'timezone' => env('ANALYTICS_SALES_FUNNEL_DASHBOARD_TIMEZONE', 'Europe/Warsaw'),
         'default_days' => (int) env('ANALYTICS_SALES_FUNNEL_DASHBOARD_DEFAULT_DAYS', 14),
+        // Maksymalny zakres dni dla przycisku "Przelicz teraz" (ręczna agregacja z panelu).
+        // Chroni request HTTP przed timeoutem przy dużym wolumenie eventów. Domyślnie ~rok.
+        // Do bardzo dużych przeliczeń historycznych użyj komendy konsolowej (bez limitu).
+        'recompute_max_days' => (int) env('ANALYTICS_SALES_FUNNEL_RECOMPUTE_MAX_DAYS', 366),
     ],
 
     'queue' => [

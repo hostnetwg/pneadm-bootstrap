@@ -468,6 +468,102 @@ tail -n 20 storage/logs/queue-worker.log
 php artisan tinker --execute="echo DB::connection('analytics')->table('analytics_events')->count();"
 ```
 
+> Uwaga: na realnej produkcji PNEdu workery są wpięte w stylu DirectAdmin/SeoHost:
+> `/usr/bin/flock -n /tmp/<nazwa>.lock /opt/alt/php82/usr/bin/php <ścieżka>/artisan queue:work database --queue=default,analytics ...`
+> (lock w `/tmp`, jawna ścieżka PHP `/opt/alt/php82`). Powyższe przykłady ze `storage/locks` są
+> równoważne — utrzymuj jeden, spójny styl. Jeden worker `pneadm` i jeden `pnedu` (bez duplikatów).
+
+### 8.6 Agregacja dzienna (lejek sprzedaży) — cron `analytics:aggregate-daily`
+
+Dashboard **Lejek sprzedaży** (`/analytics/sales-funnel`) NIE czyta surowych eventów —
+czyta **dzienne agregaty** (`analytics_daily_course_stats`, `analytics_daily_campaign_stats`).
+Agregaty powstają wyłącznie po uruchomieniu komendy `analytics:aggregate-daily` (tylko `pneadm`).
+
+Zachowanie komendy:
+
+- bez opcji → liczy **dzień poprzedni** w strefie `Europe/Warsaw` (`config('analytics.aggregation.timezone')`),
+- `--date=YYYY-MM-DD` → jeden dzień; `--from=YYYY-MM-DD --to=YYYY-MM-DD` → zakres,
+- **idempotentna**: dla danego `stat_date` kasuje istniejące wiersze i liczy od zera (ponowne uruchomienie nie duplikuje),
+- liczy datę w `Europe/Warsaw` i tłumaczy granice doby na UTC przy odpytywaniu `occurred_at` — **poprawna niezależnie od strefy serwera**,
+- nie rusza starych tabel `marketing_campaign_stats_daily` / `course_page_stats_daily`, brak PII.
+
+**Mechanizm wybrany: zwykły cron z `flock` (NIE Laravel Scheduler).** Powód:
+`pneadm` na produkcji nie ma crona `schedule:run` (działa tylko bezpośredni `flock queue:work`).
+Włączenie `schedule:run` aktywowałoby też wpis `Schedule::command('queue:work ...')->everyMinute()`
+z `routes/console.php` → drugi worker kolejki (duplikat). Komenda agregacji i tak sama liczy datę
+w `Europe/Warsaw`, więc scheduler nie jest potrzebny do poprawnej strefy.
+
+Wpis crontab (`crontab -e`) — styl realnej produkcji PNEdu:
+
+```bash
+# Agregacja dzienna analityki — adm.pnedu.pl / pneadm (02:15 czasu serwera = Europe/Warsaw)
+15 2 * * * /usr/bin/flock -n /tmp/pneadm-aggregate.lock /opt/alt/php82/usr/bin/php /home/srv66127/domains/adm.pnedu.pl/pneadm/artisan analytics:aggregate-daily >> /home/srv66127/domains/adm.pnedu.pl/pneadm/storage/logs/analytics-aggregate.log 2>&1
+```
+
+```text
+TIMEZONE: serwer PNEdu działa w Europe/Warsaw (CEST/CET), więc 02:15 w cronie = 02:15 czasu polskiego,
+a zmiana czasu (DST) jest obsłużona przez strefę systemu. Nawet gdyby serwer kiedyś przeszedł na UTC,
+komenda i tak agreguje właściwą dobę polską (datę liczy w Europe/Warsaw) — przesunie się tylko
+godzina odpalenia. Uruchamiamy o 02:15, by mieć pewność, że poprzednia doba jest już zamknięta.
+```
+
+#### Przeliczanie z panelu (przycisk „Przelicz teraz")
+
+Na `/analytics/sales-funnel` (góra strony) jest przycisk **„Przelicz teraz"** — ręczne przeliczenie
+agregatów dla **aktualnie widocznego zakresu dat** (z filtra), bez wchodzenia do konsoli.
+
+- POST, **tylko admin** (middleware `analytics.debug.access`), idempotentne,
+- potwierdzenie przez **modal Bootstrap** (pokazuje wybrany zakres dat), nie natywne `confirm()`,
+- limit bezpieczeństwa **konfigurowalny**: `ANALYTICS_SALES_FUNNEL_RECOMPUTE_MAX_DAYS`
+  (config `analytics.sales_funnel_dashboard.recompute_max_days`, domyślnie **366** = rok);
+  większy zakres → komunikat o zawężeniu lub użyciu konsoli,
+- po wykonaniu: komunikat z liczbą przeliczonych dni/wierszy, zapis do `ActivityLog`
+  (`analytics_aggregates_recomputed`), powrót na dashboard z zachowanymi filtrami,
+- fail-safe: błąd przeliczenia nie wywala strony (komunikat + sugestia konsoli).
+
+Konsola pozostaje dostępna do dużych zakresów / automatyzacji (poniżej).
+
+#### Catch-up po wdrożeniu (jednorazowo)
+
+Najpierw ustal, od kiedy produkcja ma eventy:
+
+```sql
+SELECT MIN(occurred_at), MAX(occurred_at), COUNT(*) FROM pne_analytics.analytics_events;
+```
+
+lub przez artisan (bez wchodzenia do SQL):
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo DB::connection('analytics')->table('analytics_events')->min('occurred_at') . ' .. ' . DB::connection('analytics')->table('analytics_events')->max('occurred_at');"
+```
+
+Następnie przelicz zakres (przykład: ostatnie 7 dni — podstaw realne daty z zapytania wyżej):
+
+```bash
+# bieżący dzień (żeby lejek od razu coś pokazał):
+/opt/alt/php82/usr/bin/php artisan analytics:aggregate-daily --date=2026-06-25
+
+# zakres historyczny (podstaw daty wg MIN/MAX occurred_at):
+/opt/alt/php82/usr/bin/php artisan analytics:aggregate-daily --from=2026-06-19 --to=2026-06-25
+```
+
+#### Kontrola po agregacji
+
+```bash
+# 1) komenda kończy się sukcesem i wypisuje liczby (Dni / wiersze kursów / wiersze kampanii)
+# 2) tabele agregatów mają wiersze:
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo 'course=' . DB::connection('analytics')->table('analytics_daily_course_stats')->count() . ' campaign=' . DB::connection('analytics')->table('analytics_daily_campaign_stats')->count();"
+# 3) dashboard: https://adm.pnedu.pl/analytics/sales-funnel pokazuje dane w wybranym zakresie dat
+# 4) log agregacji:
+tail -n 20 storage/logs/analytics-aggregate.log
+# 5) brak nowych failed jobs:
+/opt/alt/php82/usr/bin/php artisan tinker --execute="echo DB::table('failed_jobs')->count();"
+# 6) ponowne uruchomienie tego samego dnia NIE duplikuje (idempotencja):
+/opt/alt/php82/usr/bin/php artisan analytics:aggregate-daily --date=2026-06-25
+#    -> liczby wierszy w punkcie 2 pozostają takie same
+```
+
 ---
 
 ## 9. Smoke test po deployu
@@ -559,6 +655,8 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
 [ ] debug-events pokazuje nowe eventy
 [ ] logi bez błędów
 [ ] failed_jobs bez nowych błędów
+[ ] cron agregacji (analytics:aggregate-daily, 02:15) dodany w pneadm
+[ ] catch-up agregacji uruchomiony (lejek sprzedaży pokazuje dane)
 ```
 
 ---
@@ -574,3 +672,9 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
   Jeśli worker nie obsługuje kolejki `analytics`, eventy czekają w tabeli `jobs` — nie wpływa to na sprzedaż.
 - Domyślny kod ma ANALYTICS_QUEUE_CONNECTION=redis — na prod z database **trzeba** nadpisać w `.env`.
 - `sample_rate` tylko podglądowy; brak edycji w panelu w tym etapie.
+- **Lejek sprzedaży zależy od agregacji dziennej** (sekcja 8.6). Bez crona `analytics:aggregate-daily`
+  dashboard pozostaje pusty mimo poprawnie zbieranych eventów (debug-events działa niezależnie).
+- Agregacja `pneadm` świadomie NIE używa `schedule:run` (brak tego crona na prod; włączenie zdublowałoby
+  worker kolejki). Jeśli w przyszłości pneadm dostanie `schedule:run`, najpierw skonsolidować worker kolejki,
+  by nie powstał duplikat.
+- Bieżąca doba pojawi się w lejku dopiero po nocnej agregacji (lub po ręcznym `--date=dzisiaj`).

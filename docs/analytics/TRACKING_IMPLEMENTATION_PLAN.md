@@ -701,7 +701,10 @@ Implementacja:
 - cele: `analytics_daily_course_stats`, `analytics_daily_campaign_stats`,
 - strefa czasowa agregacji: `Europe/Warsaw` (`ANALYTICS_AGGREGATION_TIMEZONE`),
 - idempotencja: delete wierszy dla danej daty + przeliczenie od zera + insert,
-- brak schedulera w kodzie — uruchamianie ręczne komendą.
+- brak schedulera w kodzie — na produkcji uruchamiane zwykłym cronem z `flock` o 02:15
+  (czas serwera = `Europe/Warsaw`; komenda i tak liczy datę w `Europe/Warsaw`). Świadomie NIE użyto
+  Laravel Scheduler/`schedule:run` w `pneadm`, bo aktywowałby też zaplanowany `queue:work` →
+  duplikat workera. Wpis crona, catch-up i kontrola: `docs/deploy/2026-06-analytics-production-deploy.md` sekcja 8.6.
 
 Komenda:
 

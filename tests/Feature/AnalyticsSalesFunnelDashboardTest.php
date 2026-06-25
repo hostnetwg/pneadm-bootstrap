@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Analytics\AnalyticsDailyCampaignStat;
 use App\Models\Analytics\AnalyticsDailyCourseStat;
+use App\Models\Analytics\AnalyticsEvent;
 use App\Models\FormOrder;
 use App\Models\Role;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Services\Analytics\AnalyticsSalesFunnelDashboardService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AnalyticsSalesFunnelDashboardTest extends TestCase
@@ -291,6 +293,107 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_guest_cannot_recompute_aggregates(): void
+    {
+        $this->post(route('analytics.sales-funnel.recompute'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_non_admin_cannot_recompute_aggregates(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->post(route('analytics.sales-funnel.recompute'))
+            ->assertForbidden();
+    }
+
+    public function test_recompute_is_not_available_when_feature_flag_is_off(): void
+    {
+        config()->set('analytics.sales_funnel_dashboard.enabled', false);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('analytics.sales-funnel.recompute'))
+            ->assertNotFound();
+    }
+
+    public function test_admin_can_recompute_selected_range_and_it_builds_daily_stats(): void
+    {
+        config()->set('analytics.aggregation.timezone', 'Europe/Warsaw');
+        $admin = $this->userWithRole('admin');
+
+        $this->createEvent([
+            'event_name' => 'course_description_viewed',
+            'event_category' => 'landing',
+            'course_id' => 777,
+            'course_title_snapshot' => 'Kurs do przeliczenia',
+            'occurred_at' => '2026-06-20 10:00:00',
+        ]);
+
+        $this->assertSame(0, AnalyticsDailyCourseStat::query()->count());
+
+        $this->actingAs($admin)
+            ->post(route('analytics.sales-funnel.recompute'), [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ])
+            ->assertRedirect(route('analytics.sales-funnel.index', [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ]))
+            ->assertSessionHas('recompute_status');
+
+        $this->assertSame(1, AnalyticsDailyCourseStat::query()->where('course_id', 777)->count());
+        $this->assertSame(1, (int) AnalyticsDailyCourseStat::query()->where('course_id', 777)->value('views_course_description'));
+    }
+
+    public function test_recompute_is_idempotent_and_does_not_duplicate(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $this->createEvent([
+            'event_name' => 'order_form_viewed',
+            'event_category' => 'order_form',
+            'course_id' => 888,
+            'occurred_at' => '2026-06-21 12:00:00',
+        ]);
+
+        $payload = ['date_from' => '2026-06-21', 'date_to' => '2026-06-21'];
+
+        $this->actingAs($admin)->post(route('analytics.sales-funnel.recompute'), $payload);
+        $this->actingAs($admin)->post(route('analytics.sales-funnel.recompute'), $payload);
+
+        $this->assertSame(1, AnalyticsDailyCourseStat::query()->where('course_id', 888)->count());
+    }
+
+    public function test_recompute_rejects_range_above_configured_limit(): void
+    {
+        config()->set('analytics.sales_funnel_dashboard.recompute_max_days', 31);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('analytics.sales-funnel.recompute'), [
+                'date_from' => '2026-01-01',
+                'date_to' => '2026-03-31',
+            ])
+            ->assertSessionHas('recompute_error');
+    }
+
+    public function test_recompute_allows_range_within_configured_limit(): void
+    {
+        config()->set('analytics.sales_funnel_dashboard.recompute_max_days', 366);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('analytics.sales-funnel.recompute'), [
+                'date_from' => '2025-07-01',
+                'date_to' => '2026-06-30',
+            ])
+            ->assertSessionHas('recompute_status')
+            ->assertSessionMissing('recompute_error');
+    }
+
     private function seedDashboardData(): void
     {
         AnalyticsDailyCourseStat::query()->create([
@@ -317,6 +420,21 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
             'orders_created' => 3,
             'revenue_snapshot' => 597,
         ]);
+    }
+
+    private function createEvent(array $overrides = []): AnalyticsEvent
+    {
+        return AnalyticsEvent::query()->create(array_merge([
+            'event_uuid' => (string) Str::uuid(),
+            'event_name' => 'course_description_viewed',
+            'event_category' => 'landing',
+            'occurred_at' => '2026-06-20 10:00:00',
+            'app_source' => 'pnedu',
+            'analytics_session_id' => (string) Str::uuid(),
+            'course_id' => null,
+            'course_title_snapshot' => null,
+            'campaign_code' => null,
+        ], $overrides));
     }
 
     private function userWithRole(string $roleName): User

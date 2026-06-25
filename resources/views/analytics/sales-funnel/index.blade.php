@@ -24,17 +24,82 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Analityka — Lejek sprzedaży
             </h2>
-            @if(config('analytics.debug_panel.enabled', false))
-                <a href="{{ route('analytics.debug-events.index') }}" class="btn btn-outline-secondary btn-sm">
-                    Panel debug eventów
-                </a>
-            @endif
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <form id="recomputeForm" method="POST" action="{{ route('analytics.sales-funnel.recompute') }}" class="d-inline">
+                    @csrf
+                    <input type="hidden" name="date_from" value="{{ $filters['date_from'] ?? '' }}">
+                    <input type="hidden" name="date_to" value="{{ $filters['date_to'] ?? '' }}">
+                    <input type="hidden" name="campaign_code" value="{{ $filters['campaign_code'] ?? '' }}">
+                    <input type="hidden" name="course_id" value="{{ $filters['course_id'] ?? '' }}">
+                    <input type="hidden" name="landing_target" value="{{ $filters['landing_target'] ?? '' }}">
+                    <input type="hidden" name="sort" value="{{ is_string($sort ?? null) ? $sort : '' }}">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#recomputeModal">
+                        <i class="bi bi-arrow-repeat"></i> Przelicz teraz
+                    </button>
+                </form>
+                @if(config('analytics.debug_panel.enabled', false))
+                    <a href="{{ route('analytics.debug-events.index') }}" class="btn btn-outline-secondary btn-sm">
+                        Panel debug eventów
+                    </a>
+                @endif
+            </div>
         </div>
     </x-slot>
 
     <div class="px-3 py-3">
         <div class="container-fluid px-0">
             @include('analytics.partials.status-banner', ['showSettingsLink' => true])
+
+            @if(session('recompute_status'))
+                <div class="alert alert-success alert-dismissible fade show small" role="alert">
+                    {{ session('recompute_status') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+
+            @if(session('recompute_error'))
+                <div class="alert alert-danger alert-dismissible fade show small" role="alert">
+                    {{ session('recompute_error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+
+            <div class="modal fade" id="recomputeModal" tabindex="-1" aria-labelledby="recomputeModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="recomputeModalLabel">
+                                <i class="bi bi-arrow-repeat"></i> Przeliczyć agregaty?
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2">Przeliczę dzienne agregaty lejka dla wybranego zakresu dat:</p>
+                            <p class="mb-3 fs-6">
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $filters['date_from'] ?? '—' }}</span>
+                                <span class="text-muted mx-1">→</span>
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $filters['date_to'] ?? '—' }}</span>
+                            </p>
+                            <p class="text-muted small mb-2">
+                                Operacja jest bezpieczna i można ją powtarzać (idempotentna).
+                                Nie zmienia surowych eventów ani danych sprzedażowych — przelicza tylko podsumowania dzienne.
+                            </p>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-info-circle"></i>
+                                Maksymalny zakres na jedno przeliczenie:
+                                <strong>{{ (int) config('analytics.sales_funnel_dashboard.recompute_max_days', 366) }}</strong> dni.
+                                Dla większych zakresów użyj komendy w konsoli.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Anuluj</button>
+                            <button type="submit" form="recomputeForm" class="btn btn-primary btn-sm">
+                                <i class="bi bi-arrow-repeat"></i> Tak, przelicz
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="alert alert-info small" role="alert">
                 <strong>Dashboard MVP.</strong>

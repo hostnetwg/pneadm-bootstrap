@@ -301,7 +301,17 @@ Kryteria ukończenia:
 Status po wdrożeniu 1C:
 
 - dzienne agregaty są dostępne w `pne_analytics`,
-- scheduler cron dla agregacji — tylko jako plan operacyjny (ręczna komenda na start),
+- produkcyjny cron agregacji wdrożony jako **zwykły cron z `flock`** (NIE Laravel Scheduler):
+  `15 2 * * * /usr/bin/flock -n /tmp/pneadm-aggregate.lock /opt/alt/php82/usr/bin/php .../pneadm/artisan analytics:aggregate-daily >> .../storage/logs/analytics-aggregate.log 2>&1`
+  (02:15 czasu serwera = `Europe/Warsaw`; komenda i tak liczy datę w `Europe/Warsaw`, więc jest poprawna
+  niezależnie od strefy serwera; idempotentna — `flock` chroni przed nakładaniem). Powód rezygnacji ze
+  schedulera: `pneadm` nie ma na prod `schedule:run`, a jego włączenie zdublowałoby worker kolejki
+  (`Schedule::command('queue:work ...')->everyMinute()` w `routes/console.php`). Szczegóły operacyjne:
+  `docs/deploy/2026-06-analytics-production-deploy.md` sekcja 8.6.
+- dodano przycisk **„Przelicz teraz"** na `/analytics/sales-funnel` (POST `analytics.sales-funnel.recompute`,
+  admin-only, idempotentny, potwierdzenie modalem Bootstrap, przelicza widoczny zakres dat) — ręczne
+  przeliczenie bez konsoli. Limit zakresu konfigurowalny `ANALYTICS_SALES_FUNNEL_RECOMPUTE_MAX_DAYS`
+  (domyślnie 366 dni).
 - nadal nie wdrożono: JS trackingu, porzuceń, A/B, AI, eksportów AI-safe, eventów płatności i faktur.
 
 #### Etap 1D — Dashboard Lejka Sprzedaży

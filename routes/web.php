@@ -246,6 +246,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->group(function () {
             Route::get('/debug-events', [AnalyticsDebugEventController::class, 'index'])->name('debug-events.index');
             Route::get('/sales-funnel', [AnalyticsSalesFunnelController::class, 'index'])->name('sales-funnel.index');
+            Route::post('/sales-funnel/recompute', [AnalyticsSalesFunnelController::class, 'recompute'])->name('sales-funnel.recompute');
             Route::get('/settings', [AnalyticsSettingsController::class, 'index'])->name('settings.index');
             Route::post('/settings', [AnalyticsSettingsController::class, 'update'])->name('settings.update');
         });
