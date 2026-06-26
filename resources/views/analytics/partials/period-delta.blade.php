@@ -15,6 +15,11 @@
         <span aria-hidden="true">{{ $arrow }}</span>
         @if($isRate)
             {{ $delta !== null ? (($delta > 0 ? '+' : '').number_format((float) $delta, 2, ',', ' ').' pp') : '—' }}
+        @elseif(($type ?? 'count') === 'money')
+            {{ $delta !== null ? (($delta > 0 ? '+' : '').number_format((float) $delta, 2, ',', ' ').' PLN') : '—' }}
+            @if(($metric['delta_percent'] ?? null) !== null)
+                <span class="text-muted">({{ ($metric['delta_percent'] > 0 ? '+' : '').number_format((float) $metric['delta_percent'], 1, ',', ' ') }}%)</span>
+            @endif
         @else
             {{ $delta !== null ? (($delta > 0 ? '+' : '').number_format((float) $delta, 0, ',', ' ')) : '—' }}
             @if(!$isRate && ($metric['delta_percent'] ?? null) !== null)

@@ -16,7 +16,18 @@ Powiązane: [ADR-005](../decisions/ADR-005-invoice-number-means-invoiced-not-pai
 > - **Metryki**: `orders_created`, `ordered_revenue_gross`, `online_paid_orders`, `online_paid_revenue_gross`, `deferred_invoiced_orders`, `deferred_invoiced_revenue_gross`, `online_invoiced_marker_orders`, `settled_orders_total`, `settled_revenue_gross`.
 > - **Settled** = `online_paid` + `deferred_invoiced` (faktura online = tylko `online_invoiced_marker_orders`, NIE wchodzi do settled → brak double-count).
 > - **Atrybucja kampanii**: `campaign_code` z eventu → fallback `FormOrder.fb_source` → `campaign_id` z `marketing_campaigns` (fail-safe). Brak kampanii → tylko liczniki diagnostyczne `*_without_campaign` w tabeli kursów.
-> - **Backfill** nieuruchomiony (instrukcja w sekcji deploy). **Cron 03:30** nie wdrożony produkcyjnie (instrukcja przygotowana). **Dashboard `Analityka → Rozliczenia`** dopiero w R2.
+> - **Backfill** nieuruchomiony (instrukcja w sekcji deploy). **Cron 03:30** nie wdrożony produkcyjnie (instrukcja przygotowana).
+>
+> ## R2 — dashboard Rozliczenia (wdrożone lokalnie 2026-06-26)
+>
+> - Trasa `GET /analytics/revenue` → `analytics.revenue.index` (admin-only, read-only).
+> - `AnalyticsRevenueController`, `AnalyticsRevenueDashboardService`, widok `resources/views/analytics/revenue/index.blade.php`.
+> - Menu: **Analityka → Rozliczenia** (`config analytics.revenue_dashboard.enabled`).
+> - Kafelki: Zamówione, Opłacone online, Zafakturowane odroczone, Rozliczone łącznie (+ porównanie okres-do-okresu).
+> - Tabele per kurs i per kampania; filtry dat (presety), `course_id`, `campaign_code`.
+> - Opis modelu dat (zamówienie / płatność / faktura — różne daty eventów).
+> - Testy: `tests/Feature/AnalyticsRevenueDashboardTest.php` (12 testów).
+> - **Poza R2:** CSV (R3), przycisk przelicz (agregacja tylko z konsoli/cron), wykresy, alerty.
 
 Ten etap następuje po zamkniętym pakiecie B (JS tracking, porzucenia, dashboard porzuceń, CSV AI-safe, wykres trendu, presety, healthcheck, porównanie okresów).
 

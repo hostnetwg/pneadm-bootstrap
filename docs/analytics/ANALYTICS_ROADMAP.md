@@ -719,6 +719,15 @@ Status: wdrożony.
   (dotyczy GA/GTM + cookie opt-out lejka, nie analityki `pne_analytics`).
 - Szczegóły decyzji: `docs/decisions/ADR-004-analytics-modes.md`.
 
+## Etap R2 — Dashboard Rozliczenia (wdrożony lokalnie 2026-06-26)
+
+- Osobny dashboard read-only: **Analityka → Rozliczenia** (`/analytics/revenue`).
+- Kafelki summary (4 pary liczba + kwota), tabele per kurs / per kampania, filtry + presety dat.
+- Porównanie okres-do-okresu (reużycie `AnalyticsPeriodComparison`, delta kwot jako `type=money` w partial).
+- Wyraźny opis modelu dat (ordered vs settled, różne daty eventów).
+- Bez CSV (R3), bez przycisku przelicz (agregacja: `analytics:aggregate-revenue`).
+- Szczegóły: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md` §10.
+
 ## Etap R1 — Agregaty rozliczeń płatności/faktur (wdrożony lokalnie 2026-06-26)
 
 Pierwszy etap pakietu „Rozliczenia”. Zakres: agregaty, komenda, migracje, modele, serwis, testy (bez dashboardu/CSV/alertów).

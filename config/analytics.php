@@ -34,6 +34,14 @@ return [
         'aggregation_lag_days' => (int) env('ANALYTICS_REVENUE_LAG_DAYS', 1),
     ],
 
+    // Etap R2 — dashboard rozliczeń (read-only, czyta wyłącznie agregaty R1).
+    'revenue_dashboard' => [
+        'enabled' => (bool) env('ANALYTICS_REVENUE_DASHBOARD_ENABLED', true),
+        'timezone' => env('ANALYTICS_REVENUE_DASHBOARD_TIMEZONE', env('ANALYTICS_REVENUE_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw'))),
+        'default_days' => (int) env('ANALYTICS_REVENUE_DASHBOARD_DEFAULT_DAYS', 14),
+        'max_days' => (int) env('ANALYTICS_REVENUE_DASHBOARD_MAX_DAYS', 366),
+    ],
+
     'sales_funnel_dashboard' => [
         'enabled' => (bool) env('ANALYTICS_SALES_FUNNEL_DASHBOARD_ENABLED', true),
         'timezone' => env('ANALYTICS_SALES_FUNNEL_DASHBOARD_TIMEZONE', 'Europe/Warsaw'),

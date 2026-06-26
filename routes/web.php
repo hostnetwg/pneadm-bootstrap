@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Analytics\AnalyticsDebugEventController;
 use App\Http\Controllers\Analytics\AnalyticsFormAbandonmentController;
+use App\Http\Controllers\Analytics\AnalyticsRevenueController;
 use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsSettingsController;
 use App\Http\Controllers\Admin\PneduUsersController;
@@ -253,6 +254,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/form-abandonments/export/campaigns', [AnalyticsFormAbandonmentController::class, 'exportCampaigns'])->name('form-abandonments.export.campaigns');
             Route::get('/form-abandonments/export/daily', [AnalyticsFormAbandonmentController::class, 'exportDaily'])->name('form-abandonments.export.daily');
             Route::post('/form-abandonments/recompute', [AnalyticsFormAbandonmentController::class, 'recompute'])->name('form-abandonments.recompute');
+            Route::get('/revenue', [AnalyticsRevenueController::class, 'index'])->name('revenue.index');
             Route::get('/settings', [AnalyticsSettingsController::class, 'index'])->name('settings.index');
             Route::post('/settings', [AnalyticsSettingsController::class, 'update'])->name('settings.update');
         });

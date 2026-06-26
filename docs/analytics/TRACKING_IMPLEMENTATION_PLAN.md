@@ -993,8 +993,16 @@ Zasady (model dat = data eventu, Europe/Warsaw → UTC do zapytań; idempotencja
 - `settled = online_paid + deferred_invoiced`; faktura online = tylko `online_invoiced_marker_orders`.
 - Atrybucja kampanii: `campaign_code` z eventu, fallback `FormOrder.fb_source`, `campaign_id` z `marketing_campaigns` (fail-safe).
 - Liczniki diagnostyczne `*_without_campaign` (tylko tabela kursów).
-- Cron docelowo 03:30 (po 02:15 daily, 03:15 abandonments) — instrukcja w deploy doc; backfill wg zakresu dat. Dashboard `Analityka → Rozliczenia` dopiero w R2.
+- Cron docelowo 03:30 (po 02:15 daily, 03:15 abandonments) — instrukcja w deploy doc; backfill wg zakresu dat (partiami miesięcznymi, od najstarszego eventu do wczoraj).
 - Szczegóły: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`.
+
+## Etap R2 — Dashboard Rozliczenia (wdrożone lokalnie 2026-06-26)
+
+- Trasa `analytics.revenue.index`, kontroler `AnalyticsRevenueController`, serwis `AnalyticsRevenueDashboardService`.
+- Widok `resources/views/analytics/revenue/index.blade.php`, menu **Analityka → Rozliczenia**.
+- Config `analytics.revenue_dashboard` (enabled, timezone, default_days, max_days).
+- Testy: `tests/Feature/AnalyticsRevenueDashboardTest.php` (12 testów).
+- CSV (R3) i alerty/submit_intent (R4) poza zakresem R2.
 
 ## Do Aktualizacji Po Wdrożeniu
 

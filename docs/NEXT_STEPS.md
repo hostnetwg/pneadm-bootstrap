@@ -274,7 +274,8 @@ Cały Etap B (B1–B6 + recompute + presety + healthcheck + porównanie okresów
 
 **Następne etapy (do decyzji właściciela, poza obecnym wdrożeniem):**
 - progi alertów na dashboardach (po kilku tygodniach obserwacji),
-- ~~agregaty rozliczeń płatności (online paid + invoiced)~~ **R1 WDROŻONE lokalnie (2026-06-26)** — `analytics:aggregate-revenue` + tabele `analytics_daily_*_revenue_stats`; po deployu: migracja na produkcji, backfill wg zakresu dat, cron 03:30 (instrukcje w `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`). Następne: **R2** dashboard `Analityka → Rozliczenia`, **R3** CSV AI-safe, **R4** `submit_intent`/alerty.
+- ~~agregaty rozliczeń płatności (online paid + invoiced)~~ **R1 WDROŻONE lokalnie (2026-06-26)** — `analytics:aggregate-revenue` + tabele `analytics_daily_*_revenue_stats`.
+- ~~dashboard Rozliczenia~~ **R2 WDROŻONE lokalnie (2026-06-26)** — `Analityka → Rozliczenia` (`/analytics/revenue`). Po deployu R1+R2: migracja, backfill partiami miesięcznymi (od najstarszego eventu do wczoraj), cron 03:30. Następne: **R3** CSV AI-safe, **R4** `submit_intent`/alerty.
 - pakiet AI-safe „kopiuj do ChatGPT”,
 - re-walidacja healthcheck za 3–5 dni na czystych danych post-B2.
 
