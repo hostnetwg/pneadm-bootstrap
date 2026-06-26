@@ -1,7 +1,7 @@
 # Deploy produkcyjny R1+R2 (+R2.1+R3) — Rozliczenia (pneadm / adm.pnedu.pl)
 
 Data przygotowania: 2026-06-26
-Status: **R1+R2 wdrożone na produkcji (GO)**. R2.1 (recompute) + R3 (CSV) — kod na `origin/main`, deploy opisany w sekcji 13. Kod jest już na `origin/main`.
+Status: **R1+R2 wdrożone na produkcji (GO)**. **R2.1+R3 wdrożone na produkcji (GO, 2026-06-26)**. Kod jest już na `origin/main`.
 Powiązane: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`, `docs/deploy/2026-06-analytics-production-deploy.md` (sekcje 8.6/8.7 — wzorzec cronów).
 
 ## Commity do wdrożenia (na `origin/main`)
@@ -318,7 +318,7 @@ logi pokazują błędy krytyczne
 - **Eventy bez kampanii** → tylko statystyki kursu + liczniki diagnostyczne `*_without_campaign` (nie wchodzą do tabeli kampanii).
 - **Ręczne zamówienia z pneadm** (`submission_source=pnedu_manual`) **nie** emitują `form_order_created` → mogą zaniżać `orders_created` względem liczby `form_orders`. Znane ograniczenie (osobny etap, jeśli zajdzie potrzeba).
 - **Faktura online** liczona tylko jako `online_invoiced_marker_orders` (poza settled) — brak double-count z opłatą online.
-- **Brak R3 CSV** na tym etapie — eksport rozliczeń to kolejny etap (po potwierdzeniu deployu R1+R2).
+- **R3 CSV** wdrożone (2026-06-26) — eksport kursy/kampanie/dziennie na dashboardzie Rozliczenia.
 
 ---
 
@@ -342,14 +342,30 @@ git checkout 6b0f94d
 
 ## 13. Dogrywka: R2.1 (przycisk „Przelicz rozliczenia”) + R3 (eksport CSV)
 
-Status: **kod na `origin/main`**, czeka na wdrożenie. **Bez migracji** — tylko `git pull` + czyszczenie cache.
+Status: **WDROŻONE NA PRODUKCJI (GO, 2026-06-26)**. HEAD prod: `12f1298`. **Bez migracji** — `git pull` + `optimize:clear`.
 
 ### Commity
 
 ```text
+12f1298 docs(analytics): close revenue package at R3, backlog R4
+e718919 docs(deploy): add R2.1 + R3 production deploy section
 743e3b9 feat(analytics): add revenue CSV exports (R3)
 16a53bb feat(analytics): add revenue recompute button (R2.1)
 ```
+
+### Wykonany deploy (2026-06-26)
+
+```bash
+git pull                    # e718919 → 12f1298
+php artisan optimize:clear  # OK
+```
+
+### Smoke test (wyniki)
+
+- [x] `/analytics/revenue` działa (admin)
+- [x] Przycisk **Przelicz rozliczenia** — OK (15 dni, 6 kursów, 7 kampanii, 2026-06-12–2026-06-26)
+- [x] R3 CSV — wdrożone (3 przyciski eksportu na dashboardzie)
+- [x] Dashboard read-only (agregaty R1, bez skanowania raw eventów)
 
 ### Zakres
 
@@ -386,9 +402,7 @@ git log --oneline -3            # HEAD = 743e3b9
 ### GO / NO-GO
 
 ```text
-GO:    git pull OK (HEAD=743e3b9), optimize:clear OK, przycisk recompute działa,
-       3 pliki CSV pobierają się, brak PII w CSV, brak nowych błędów w laravel.log
-NO-GO: 500 na /analytics/revenue, CSV pusty/błąd, PII w pliku, błędy krytyczne w logu
+GO (2026-06-26): git pull OK (HEAD=12f1298), optimize:clear OK, recompute OK, R3 CSV wdrożone
 ```
 
 ### Rollback

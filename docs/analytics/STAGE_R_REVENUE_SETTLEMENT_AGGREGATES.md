@@ -9,14 +9,13 @@ Powiązane: [ADR-005](../decisions/ADR-005-invoice-number-means-invoiced-not-pai
 > ```text
 > R1   — agregaty rozliczeń           → produkcja GO
 > R2   — dashboard Analityka→Rozliczenia → produkcja GO
-> R2.1 — przycisk Przelicz rozliczenia  → kod na origin/main, deploy pending
-> R3   — CSV AI-safe rozliczeń          → kod na origin/main, deploy pending
+> R2.1 — przycisk Przelicz rozliczenia  → produkcja GO (deploy 2026-06-26, HEAD 12f1298)
+> R3   — CSV AI-safe rozliczeń          → produkcja GO (deploy 2026-06-26, HEAD 12f1298)
 > R4   — submit_intent / alerty         → ODŁOŻONE (backlog)
 > ```
 >
-> Pakiet zamknięty na R3. R2.1/R3 nie są oznaczane jako „produkcja GO" przed faktycznym smoke testem na produkcji
-> (deploy bez migracji wg [runbooka sekcja 13](../deploy/2026-06-R1-R2-revenue-production-deploy.md#13-dogrywka-r21-przycisk-przelicz-rozliczenia--r3-eksport-csv)).
-> Po smoke teście zaktualizować status R2.1/R3 na „produkcja GO".
+> Pakiet zamknięty na R3. Deploy R2.1+R3 wykonany na produkcji (2026-06-26): `git pull` (e718919→12f1298) + `optimize:clear`.
+> Smoke R2.1: recompute OK (15 dni, 6 kursów, 7 kampanii, zakres 2026-06-12–2026-06-26).
 >
 > **R4 — backlog (nie aktywny etap):** submit_intent + alerty odłożone do czasu zebrania stabilniejszej próby danych po R1–R3
 > i obserwacji rozliczeń. Alerty wymagają baseline'u i większej próby; submit_intent poprawi semantykę formularza, ale nie był

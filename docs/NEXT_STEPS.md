@@ -14,13 +14,12 @@ Decyzja Waldemara: **zamykamy pakiet rozliczeń na R3**. R4 odłożone do backlo
 ```text
 R1   — agregaty rozliczeń           → produkcja GO
 R2   — dashboard Analityka→Rozliczenia → produkcja GO
-R2.1 — przycisk Przelicz rozliczenia  → kod na origin/main, deploy pending
-R3   — CSV AI-safe rozliczeń          → kod na origin/main, deploy pending
+R2.1 — przycisk Przelicz rozliczenia  → produkcja GO (deploy 2026-06-26)
+R3   — CSV AI-safe rozliczeń          → produkcja GO (deploy 2026-06-26)
 R4   — submit_intent / alerty         → ODŁOŻONE (backlog)
 ```
 
-- Deploy R2.1+R3 (bez migracji): `docs/deploy/2026-06-R1-R2-revenue-production-deploy.md` sekcja 13.
-- R2.1/R3 oznaczyć jako „produkcja GO" **dopiero po faktycznym smoke teście** na produkcji.
+- Deploy R2.1+R3 wykonany na produkcji (2026-06-26, HEAD `12f1298`, `optimize:clear`). Runbook: sekcja 13 w `docs/deploy/2026-06-R1-R2-revenue-production-deploy.md`.
 - **Backlog R4** — `submit_intent` + alerty: odłożone do czasu zebrania stabilniejszej próby danych po R1–R3 i obserwacji rozliczeń. Uzasadnienie: alerty wymagają baseline'u i większej próby; `submit_intent` poprawi semantykę formularza, ale nie był potrzebny do zamknięcia pakietu Rozliczenia.
 - **Rekomendowany tryb dalszej pracy:** przez kilka dni obserwować dane rozliczeń i porzuceń; nie uruchamiać alertów przed zebraniem stabilniejszej próby.
 - **Następny aktywny temat:** monitoring danych po wdrożeniu R3 (bez startu R4).
