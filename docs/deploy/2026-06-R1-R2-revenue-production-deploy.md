@@ -1,7 +1,7 @@
-# Deploy produkcyjny R1+R2 — Rozliczenia (pneadm / adm.pnedu.pl)
+# Deploy produkcyjny R1+R2 (+R2.1+R3) — Rozliczenia (pneadm / adm.pnedu.pl)
 
 Data przygotowania: 2026-06-26
-Status: **instrukcja gotowa do wykonania przez Waldemara**. Kod jest już na `origin/main`.
+Status: **R1+R2 wdrożone na produkcji (GO)**. R2.1 (recompute) + R3 (CSV) — kod na `origin/main`, deploy opisany w sekcji 13. Kod jest już na `origin/main`.
 Powiązane: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`, `docs/deploy/2026-06-analytics-production-deploy.md` (sekcje 8.6/8.7 — wzorzec cronów).
 
 ## Commity do wdrożenia (na `origin/main`)
@@ -337,3 +337,65 @@ git checkout 6b0f94d
 ```
 
 > Rollback rzadko potrzebny — zmiany nie dotykają płatności/faktur/eventów. Dashboard za flagą `ANALYTICS_REVENUE_DASHBOARD_ENABLED` (ustaw `false` w `.env`, by ukryć bez cofania kodu).
+
+---
+
+## 13. Dogrywka: R2.1 (przycisk „Przelicz rozliczenia”) + R3 (eksport CSV)
+
+Status: **kod na `origin/main`**, czeka na wdrożenie. **Bez migracji** — tylko `git pull` + czyszczenie cache.
+
+### Commity
+
+```text
+743e3b9 feat(analytics): add revenue CSV exports (R3)
+16a53bb feat(analytics): add revenue recompute button (R2.1)
+```
+
+### Zakres
+
+- **R2.1**: przycisk **Przelicz rozliczenia** na `/analytics/revenue` (ręczna agregacja R1 z panelu, idempotentna, admin-only). Limit zakresu: `ANALYTICS_REVENUE_RECOMPUTE_MAX_DAYS` (domyślnie 92 dni). Audyt: `analytics_revenue_recomputed`.
+- **R3**: 3 przyciski eksportu CSV „AI-safe” (kursy / kampanie / dziennie), te same filtry co dashboard. Bez danych osobowych, bez surowych eventów; kwoty z kropką (`150.00`), UTF-8 BOM.
+- **Bez** zmian w bazie, **bez** zmian w `pnedu`, płatnościach, fakturach, eventach.
+
+### Kroki wdrożenia
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+git status                      # MUSI być czysty
+git pull origin main
+git log --oneline -3            # HEAD = 743e3b9
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+```
+
+> **Brak `artisan migrate`** — R2.1/R3 nie tworzą tabel. (Jeśli `git status` dirty → STOP, jak w sekcji 2.)
+
+### Smoke test
+
+1. `https://adm.pnedu.pl/analytics/revenue` jako **admin**.
+2. R2.1:
+   - [ ] widoczny przycisk **Przelicz rozliczenia** + modal z zakresem dat,
+   - [ ] po „Tak, przelicz” — zielony komunikat (dni / wiersze kursów / wiersze kampanii),
+   - [ ] zbyt duży zakres (> limit) → czerwony komunikat o limicie.
+3. R3 (z aktywnymi filtrami dat):
+   - [ ] **Eksport CSV — kursy** pobiera `pne-revenue-courses-<from>_<to>.csv`,
+   - [ ] **Eksport CSV — kampanie** pobiera `pne-revenue-campaigns-<from>_<to>.csv`,
+   - [ ] **Eksport CSV — dziennie** pobiera `pne-revenue-daily-<from>_<to>.csv`,
+   - [ ] pliki otwierają się w Excelu z poprawnymi polskimi znakami,
+   - [ ] brak danych osobowych / `invoice_number` / `form_order_id` / raw metadata w plikach.
+
+### GO / NO-GO
+
+```text
+GO:    git pull OK (HEAD=743e3b9), optimize:clear OK, przycisk recompute działa,
+       3 pliki CSV pobierają się, brak PII w CSV, brak nowych błędów w laravel.log
+NO-GO: 500 na /analytics/revenue, CSV pusty/błąd, PII w pliku, błędy krytyczne w logu
+```
+
+### Rollback
+
+```bash
+git checkout 9d43a91          # stan po R1+R2 (przed R2.1/R3)
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+```
+
+> Addytywne, bez zmian w bazie — rollback to wyłącznie cofnięcie kodu. Flaga `ANALYTICS_REVENUE_DASHBOARD_ENABLED=false` ukrywa cały moduł (dashboard + recompute + eksporty) bez cofania kodu.
