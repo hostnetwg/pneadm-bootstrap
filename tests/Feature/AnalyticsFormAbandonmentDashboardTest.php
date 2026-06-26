@@ -684,6 +684,135 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
             ])), false);
     }
 
+    // ---------------------------------------------------------------------
+    // Przycisk "Przelicz porzucenia" (ręczna agregacja B3 z panelu)
+    // ---------------------------------------------------------------------
+
+    public function test_guest_cannot_recompute_abandonments(): void
+    {
+        $this->post(route('analytics.form-abandonments.recompute'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_non_admin_cannot_recompute_abandonments(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->post(route('analytics.form-abandonments.recompute'))
+            ->assertForbidden();
+    }
+
+    public function test_recompute_is_not_available_when_feature_disabled(): void
+    {
+        config()->set('analytics.form_abandonment_dashboard.enabled', false);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('analytics.form-abandonments.recompute'))
+            ->assertNotFound();
+    }
+
+    public function test_admin_can_recompute_selected_range_and_it_builds_stats(): void
+    {
+        config()->set('analytics.abandonment.timezone', 'Europe/Warsaw');
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->createFunnelEvent('order_form_viewed', 'order_form', 555, 'sess-recompute-1', '2026-06-20 10:00:00');
+
+        $this->assertSame(0, AnalyticsDailyFormAbandonmentStat::query()->count());
+
+        $this->actingAs($admin)
+            ->post(route('analytics.form-abandonments.recompute'), [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ])
+            ->assertRedirect(route('analytics.form-abandonments.index', [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ]))
+            ->assertSessionHas('recompute_status');
+
+        $this->assertSame(1, AnalyticsDailyFormAbandonmentStat::query()->where('course_id', 555)->count());
+    }
+
+    public function test_recompute_is_idempotent_and_does_not_duplicate(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->createFunnelEvent('order_form_viewed', 'order_form', 666, 'sess-recompute-2', '2026-06-21 12:00:00');
+
+        $payload = ['date_from' => '2026-06-21', 'date_to' => '2026-06-21'];
+
+        $this->actingAs($admin)->post(route('analytics.form-abandonments.recompute'), $payload);
+        $this->actingAs($admin)->post(route('analytics.form-abandonments.recompute'), $payload);
+
+        $this->assertSame(1, AnalyticsDailyFormAbandonmentStat::query()->where('course_id', 666)->count());
+    }
+
+    public function test_recompute_rejects_range_above_configured_limit(): void
+    {
+        config()->set('analytics.form_abandonment_dashboard.recompute_max_days', 31);
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->actingAs($admin)
+            ->post(route('analytics.form-abandonments.recompute'), [
+                'date_from' => '2026-01-01',
+                'date_to' => '2026-03-31',
+            ])
+            ->assertSessionHas('recompute_error');
+    }
+
+    public function test_dashboard_shows_recompute_button(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('analytics.form-abandonments.index'))
+            ->assertOk()
+            ->assertSee('Przelicz porzucenia')
+            ->assertSee(route('analytics.form-abandonments.recompute'), false);
+    }
+
+    private function createFunnelEvent(string $name, string $category, int $courseId, string $sessionId, string $occurredAt): void
+    {
+        \App\Models\Analytics\AnalyticsEvent::query()->create([
+            'event_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'event_name' => $name,
+            'event_category' => $category,
+            'occurred_at' => $occurredAt,
+            'app_source' => 'pnedu',
+            'order_form_session_id' => $sessionId,
+            'course_id' => $courseId,
+            'course_title_snapshot' => 'Kurs '.$courseId,
+            'campaign_code' => null,
+        ]);
+    }
+
+    private function createAnalyticsEventsTable(): void
+    {
+        Schema::connection('analytics')->dropIfExists('analytics_events');
+        Schema::connection('analytics')->create('analytics_events', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('event_uuid')->unique();
+            $table->string('event_name', 100);
+            $table->string('event_category', 50);
+            $table->timestamp('occurred_at');
+            $table->string('app_source', 32);
+            $table->uuid('analytics_session_id')->nullable();
+            $table->uuid('order_form_session_id')->nullable();
+            $table->unsignedBigInteger('course_id')->nullable();
+            $table->string('course_title_snapshot', 255)->nullable();
+            $table->string('campaign_code', 100)->nullable();
+            $table->unsignedBigInteger('campaign_id')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+    }
+
     private function csvBody(\Illuminate\Testing\TestResponse $response): string
     {
         $response->assertOk();

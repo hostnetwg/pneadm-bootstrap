@@ -432,6 +432,16 @@ Dzienny CSV i wykres zawierają wyłącznie daty agregacji, liczniki i rates. Br
 ### Testy B6
 `--filter=Analytics` → **151 passed**, w tym 10 nowych dla B6 (trend wypełnia zakres zerami, trend z tabeli kampanii przy filtrze kampanii, render `<canvas>`, pobranie dziennego CSV + nagłówek, dostęp nie-admin, jeden wiersz na dzień, poprawność rates, brak PII, link eksportu z filtrami).
 
+### Przycisk „Przelicz porzucenia” (ręczna agregacja B3 z panelu)
+Analogiczny do „Przelicz teraz” z lejka sprzedaży. Pozwala adminowi przeliczyć agregaty porzuceń (B3)
+dla widocznego zakresu dat bez czekania na cron 03:15.
+- Endpoint: `POST /analytics/form-abandonments/recompute` → `analytics.form-abandonments.recompute` (admin-only).
+- Uruchamia `AnalyticsAbandonmentAggregationService::aggregateForDateRange()` (to samo co komenda `analytics:aggregate-abandonments`).
+- Idempotentne (serwis kasuje i liczy per dzień), modal potwierdzenia Bootstrap, komunikaty flash, zachowuje filtry.
+- Limit zakresu: `analytics.form_abandonment_dashboard.recompute_max_days` (domyślnie **92 dni**; recompute skanuje `analytics_events`, więc limit ostrożniejszy niż 366 dni dashboardu). Większe zakresy → komenda w konsoli.
+- Audyt: `ActivityLog` `analytics_abandonments_recomputed` (fail-safe).
+- **To jedyne miejsce w dashboardzie, które pośrednio uruchamia agregację B3 — sam odczyt dashboardu nadal nie skanuje `analytics_events`.**
+
 ### Deploy B6 (bez migracji)
 ```bash
 cd /path/to/adm.pnedu.pl

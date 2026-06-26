@@ -252,6 +252,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/form-abandonments/export/courses', [AnalyticsFormAbandonmentController::class, 'exportCourses'])->name('form-abandonments.export.courses');
             Route::get('/form-abandonments/export/campaigns', [AnalyticsFormAbandonmentController::class, 'exportCampaigns'])->name('form-abandonments.export.campaigns');
             Route::get('/form-abandonments/export/daily', [AnalyticsFormAbandonmentController::class, 'exportDaily'])->name('form-abandonments.export.daily');
+            Route::post('/form-abandonments/recompute', [AnalyticsFormAbandonmentController::class, 'recompute'])->name('form-abandonments.recompute');
             Route::get('/settings', [AnalyticsSettingsController::class, 'index'])->name('settings.index');
             Route::post('/settings', [AnalyticsSettingsController::class, 'update'])->name('settings.update');
         });

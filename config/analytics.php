@@ -43,6 +43,9 @@ return [
         'default_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_DEFAULT_DAYS', 14),
         // Maksymalny zakres dni filtra (ochrona przed zbyt dużym zapytaniem). Domyślnie ~rok.
         'max_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_DASHBOARD_MAX_DAYS', 366),
+        // Maksymalny zakres dni dla przycisku "Przelicz porzucenia" (ręczna agregacja B3 z panelu).
+        // Chroni request HTTP przed timeoutem. Do większych przeliczeń użyj komendy konsolowej.
+        'recompute_max_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_RECOMPUTE_MAX_DAYS', 92),
     ],
 
     'queue' => [

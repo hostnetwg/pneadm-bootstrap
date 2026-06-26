@@ -25,6 +25,16 @@
                 Analityka — Porzucenia formularza
             </h2>
             <div class="d-flex flex-wrap align-items-center gap-2">
+                <form id="recomputeForm" method="POST" action="{{ route('analytics.form-abandonments.recompute') }}" class="d-inline">
+                    @csrf
+                    <input type="hidden" name="date_from" value="{{ $filters['date_from'] ?? '' }}">
+                    <input type="hidden" name="date_to" value="{{ $filters['date_to'] ?? '' }}">
+                    <input type="hidden" name="course_id" value="{{ $filters['course_id'] ?? '' }}">
+                    <input type="hidden" name="campaign_code" value="{{ $filters['campaign_code'] ?? '' }}">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#recomputeAbandonmentsModal">
+                        <i class="bi bi-arrow-repeat"></i> Przelicz porzucenia
+                    </button>
+                </form>
                 <a href="{{ route('analytics.form-abandonments.export.courses', $exportQuery) }}" class="btn btn-outline-success btn-sm">
                     <i class="bi bi-filetype-csv"></i> Eksport CSV — kursy
                 </a>
@@ -46,6 +56,57 @@
     <div class="px-3 py-3">
         <div class="container-fluid px-0">
             @includeIf('analytics.partials.status-banner', ['showSettingsLink' => true])
+
+            @if(session('recompute_status'))
+                <div class="alert alert-success alert-dismissible fade show small" role="alert">
+                    {{ session('recompute_status') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+
+            @if(session('recompute_error'))
+                <div class="alert alert-danger alert-dismissible fade show small" role="alert">
+                    {{ session('recompute_error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                </div>
+            @endif
+
+            <div class="modal fade" id="recomputeAbandonmentsModal" tabindex="-1" aria-labelledby="recomputeAbandonmentsModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="recomputeAbandonmentsModalLabel">
+                                <i class="bi bi-arrow-repeat"></i> Przeliczyć porzucenia?
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2">Przeliczę dzienne agregaty porzuceń (B3) dla wybranego zakresu dat:</p>
+                            <p class="mb-3 fs-6">
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $filters['date_from'] ?? '—' }}</span>
+                                <span class="text-muted mx-1">→</span>
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $filters['date_to'] ?? '—' }}</span>
+                            </p>
+                            <p class="text-muted small mb-2">
+                                Operacja jest bezpieczna i można ją powtarzać (idempotentna) — kasuje i liczy od zera per dzień.
+                                Nie zmienia surowych eventów ani danych sprzedażowych.
+                            </p>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-info-circle"></i>
+                                Maksymalny zakres na jedno przeliczenie:
+                                <strong>{{ (int) config('analytics.form_abandonment_dashboard.recompute_max_days', 92) }}</strong> dni.
+                                Dla większych zakresów użyj komendy <code>analytics:aggregate-abandonments</code> w konsoli.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Anuluj</button>
+                            <button type="submit" form="recomputeForm" class="btn btn-primary btn-sm">
+                                <i class="bi bi-arrow-repeat"></i> Tak, przelicz
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="alert alert-info small" role="alert">
                 <strong>Dashboard MVP (read-only).</strong>

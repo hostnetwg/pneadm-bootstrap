@@ -249,6 +249,7 @@ Po każdej implementacji należy:
 - **B4 — dashboard porzuceń:** ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. Produkcyjny `git pull` po stronie Waldemara.
 - **B5 — CSV AI-safe export:** ✅ wypchnięte (`pneadm` `cb8046a`). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII; przyciski w UI zachowują filtry.
 - **B6 — wykres trendu dziennego + dzienny CSV:** ✅ zaimplementowane w `pneadm`. Wykres Chart.js `sessions_total` vs `converted` na dashboardzie porzuceń (bez nowej biblioteki — Chart.js już z CDN) + dzienny wariant CSV (`analytics.form-abandonments.export.daily`, jeden wiersz na `stat_date`, totale dzienne). Bez PII, bez migracji. **Czeka na deploy.** Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
+- **Przycisk „Przelicz porzucenia”:** ✅ zaimplementowane w `pneadm` (analogiczny do „Przelicz teraz” z lejka). `POST analytics.form-abandonments.recompute`, admin-only, idempotentny, modal + flash, limit `recompute_max_days=92`, audyt `ActivityLog`. Uruchamia agregację B3 dla widocznego zakresu bez czekania na cron. **Czeka na deploy.**
 
 ## Do Aktualizacji Po Wdrożeniu
 
