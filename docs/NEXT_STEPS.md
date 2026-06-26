@@ -252,6 +252,16 @@ Po każdej implementacji należy:
 - **Przycisk „Przelicz porzucenia”:** ✅ zaimplementowane w `pneadm` (analogiczny do „Przelicz teraz” z lejka). `POST analytics.form-abandonments.recompute`, admin-only, idempotentny, modal + flash, limit `recompute_max_days=92`, audyt `ActivityLog`. Uruchamia agregację B3 dla widocznego zakresu bez czekania na cron. **Czeka na deploy.**
 - **Predefiniowane zakresy dat (oba dashboardy):** ✅ zaimplementowane w `pneadm`. Wspólny `AnalyticsDateRangePresets` (7/14/30/90 dni, ten miesiąc, poprzedni miesiąc). Pasek „Szybki zakres” w filtrach lejka i porzuceń, zachowuje pozostałe filtry, podświetla aktywny zakres. Presety porzuceń celują w dane dojrzałe (kotwica = dziś − lag), lejka — do dziś. Uwaga: w porzuceniach domyślne „data do” = dziś − 2 (lag agregacji), to celowe — najnowsze 2 dni dojrzewają. **Czeka na deploy.**
 
+## Walidacja produkcyjna B2/B3 (2026-06-26)
+
+- **Komenda `analytics:abandonment-healthcheck`** (read-only): sprawdza dopływ eventów lejka (w tym JS z B2), spójność kubełków B3 (`sessions_total == suma kubełków`, FAILURE gdy różnica ≠ 0) oraz kształt lejka + „ciemną strefę”. Opcje `--days` (domyślnie 7) lub `--from/--to`. Nic nie zapisuje.
+- **Wynik walidacji na kopii produkcji (25–26.06):**
+  - B3 spójność: ✅ `sesje=38 = kubełki=38, różnica=0`.
+  - Backend spójny: `proba=7 = zamówienia=7`, `viewed=41`.
+  - JS (B2) z 25.06 niski (`start=1–3`, `klik_submit=0`) — **oczekiwane**, bo B2 wdrożono 25.06; sesje sprzed wdrożenia wpadają do `viewed_not_started` (73,7%). 26.06 (po B2) `start=2`/`viewed=3` → JS działa.
+  - **Do potwierdzenia za kilka dni** na danych czysto po-B2: czy `submit_clicked` zaczyna się pojawiać na realnym ruchu.
+- Użycie na produkcji: `php artisan analytics:abandonment-healthcheck --days=14`.
+
 ## Do Aktualizacji Po Wdrożeniu
 
 - Odhaczyć wykonane kroki.
