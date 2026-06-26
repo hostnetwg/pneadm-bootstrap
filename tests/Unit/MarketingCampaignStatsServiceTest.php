@@ -55,4 +55,14 @@ class MarketingCampaignStatsServiceTest extends TestCase
         $this->assertSame('link_entries_count', $service->defaultSortForMetric('entries'));
         $this->assertSame('orders_count', $service->defaultSortForMetric('orders'));
     }
+
+    public function test_format_conversion_rate(): void
+    {
+        $service = app(MarketingCampaignStatsService::class);
+
+        $this->assertSame('-', $service->formatConversionRate(0, 0));
+        $this->assertSame('-', $service->formatConversionRate(5, 0));
+        $this->assertSame('5,0%', $service->formatConversionRate(1, 20));
+        $this->assertSame('33,3%', $service->formatConversionRate(1, 3));
+    }
 }

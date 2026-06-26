@@ -146,6 +146,14 @@ class MarketingCampaignStatsService
                 ->orderBy('marketing_campaigns.created_at', 'desc');
         }
 
+        if ($sortBy === 'conversion_rate') {
+            return $query
+                ->orderByRaw(
+                    'CASE WHEN COALESCE(link_entries_total, 0) = 0 THEN NULL ELSE form_orders_count / link_entries_total END '.$sortOrder
+                )
+                ->orderBy('marketing_campaigns.created_at', 'desc');
+        }
+
         return $query->orderBy($sortBy, $sortOrder);
     }
 
@@ -190,6 +198,15 @@ class MarketingCampaignStatsService
     public function defaultSortForMetric(string $activityMetric): string
     {
         return $activityMetric === 'orders' ? 'orders_count' : 'link_entries_count';
+    }
+
+    public function formatConversionRate(int $orders, int $linkEntries): string
+    {
+        if ($linkEntries <= 0) {
+            return '-';
+        }
+
+        return number_format(($orders / $linkEntries) * 100, 1, ',', '').'%';
     }
 
     public function linkEntriesSubquery(Carbon $from, Carbon $to): QueryBuilder

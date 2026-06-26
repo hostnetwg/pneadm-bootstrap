@@ -1,3 +1,5 @@
+@inject('campaignStats', 'App\Services\MarketingCampaignStatsService')
+
 @php
     $periodActive = $period !== null;
     $periodPreset = $period['preset'] ?? (string) request('period', '');
@@ -63,6 +65,7 @@
                     <p class="small text-muted mb-0">
                         <strong>Wejście</strong> — kliknięcia w link kampanii (UTM / skrócony <code>/l/</code>, max 1× gość/kampania/dzień).
                         <strong>Zam.</strong> — zamówienia z kodem kampanii (logika jak w lejku konwersji).
+                        <strong>Konw.</strong> — współczynnik konwersji (zamówienia ÷ wejścia).
                         @if($periodActive)
                             <span class="d-block mt-1">Tryb <strong>okresu</strong> — kolumny Wejś./Zam. dotyczą wybranego przedziału dat.</span>
                         @else
@@ -231,6 +234,11 @@
                                             Zam.@if($periodActive)<span class="text-muted fw-normal"> (okres)</span>@endif {!! $sortIcon('orders_count') !!}
                                         </a>
                                     </th>
+                                    <th class="text-center" title="conversion rate — współczynnik konwersji (zamówienia w stosunku do wejść w link)">
+                                        <a href="{{ $sortLink('conversion_rate') }}" class="text-dark text-decoration-none">
+                                            CR @if($periodActive)<span class="text-muted fw-normal">(okres)</span>@endif {!! $sortIcon('conversion_rate') !!}
+                                        </a>
+                                    </th>
                                     <th>
                                         <a href="{{ $sortLink('created_at') }}" class="text-dark text-decoration-none">
                                             Utworzono {!! $sortIcon('created_at') !!}
@@ -319,6 +327,19 @@
                                                 </a>
                                             @else
                                                 <span class="text-muted small">0</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @php
+                                                $conversionRate = $campaignStats->formatConversionRate(
+                                                    (int) ($campaign->form_orders_count ?? 0),
+                                                    (int) ($campaign->link_entries_total ?? 0),
+                                                );
+                                            @endphp
+                                            @if($conversionRate === '-')
+                                                <span class="text-muted small">-</span>
+                                            @else
+                                                <span class="small fw-medium" title="Współczynnik konwersji">{{ $conversionRate }}</span>
                                             @endif
                                         </td>
                                         <td class="text-muted small text-nowrap">
