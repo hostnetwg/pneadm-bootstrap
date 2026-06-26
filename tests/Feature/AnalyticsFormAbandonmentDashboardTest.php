@@ -777,6 +777,19 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
             ->assertSee(route('analytics.form-abandonments.recompute'), false);
     }
 
+    public function test_dashboard_shows_date_range_presets(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('analytics.form-abandonments.index'))
+            ->assertOk()
+            ->assertSee('Szybki zakres:')
+            ->assertSee('Ostatnie 7 dni')
+            ->assertSee('Ostatnie 30 dni')
+            ->assertSee('Poprzedni miesiąc');
+    }
+
     private function createFunnelEvent(string $name, string $category, int $courseId, string $sessionId, string $occurredAt): void
     {
         \App\Models\Analytics\AnalyticsEvent::query()->create([

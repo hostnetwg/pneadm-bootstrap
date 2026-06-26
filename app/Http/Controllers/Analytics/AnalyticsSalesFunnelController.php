@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Analytics;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Services\Analytics\AnalyticsDailyAggregationService;
+use App\Services\Analytics\AnalyticsDateRangePresets;
 use App\Services\Analytics\AnalyticsSalesFunnelDashboardService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -20,8 +21,11 @@ class AnalyticsSalesFunnelController extends Controller
      */
     private const DEFAULT_MAX_RECOMPUTE_DAYS = 366;
 
-    public function index(Request $request, AnalyticsSalesFunnelDashboardService $dashboard): View
-    {
+    public function index(
+        Request $request,
+        AnalyticsSalesFunnelDashboardService $dashboard,
+        AnalyticsDateRangePresets $presets,
+    ): View {
         if (! config('analytics.sales_funnel_dashboard.enabled', true)) {
             abort(404);
         }
@@ -34,6 +38,9 @@ class AnalyticsSalesFunnelController extends Controller
             'landing_target',
             'sort',
         ]));
+
+        // Lejek nie ma lagu agregacji — presety celują do dziś.
+        $data['date_presets'] = $presets->build($dashboard->timezone(), 0);
 
         return view('analytics.sales-funnel.index', $data);
     }

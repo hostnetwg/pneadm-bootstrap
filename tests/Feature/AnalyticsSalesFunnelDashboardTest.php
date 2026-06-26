@@ -115,6 +115,18 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
             ->assertSee('10');
     }
 
+    public function test_dashboard_shows_date_range_presets(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('analytics.sales-funnel.index'))
+            ->assertOk()
+            ->assertSee('Szybki zakres:')
+            ->assertSee('Ostatnie 7 dni')
+            ->assertSee('Poprzedni miesiąc');
+    }
+
     public function test_date_filter_limits_visible_aggregates(): void
     {
         $admin = $this->userWithRole('admin');

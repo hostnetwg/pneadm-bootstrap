@@ -123,6 +123,27 @@
                     <span class="small fw-semibold text-muted"><i class="bi bi-funnel"></i> Filtry</span>
                 </div>
                 <div class="card-body">
+                    @php
+                        $presetBase = array_filter([
+                            'course_id' => $filters['course_id'] ?? null,
+                            'campaign_code' => $filters['campaign_code'] ?? null,
+                        ], fn ($v) => $v !== null && $v !== '');
+                    @endphp
+                    @if(!empty($date_presets ?? []))
+                        <div class="d-flex flex-wrap gap-1 mb-3">
+                            <span class="small text-muted me-1 align-self-center">Szybki zakres:</span>
+                            @foreach($date_presets as $preset)
+                                @php
+                                    $isActive = ($filters['date_from'] ?? null) === $preset['date_from']
+                                        && ($filters['date_to'] ?? null) === $preset['date_to'];
+                                @endphp
+                                <a href="{{ route('analytics.form-abandonments.index', array_merge($presetBase, ['date_from' => $preset['date_from'], 'date_to' => $preset['date_to']])) }}"
+                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                    {{ $preset['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
                     <form method="GET" action="{{ route('analytics.form-abandonments.index') }}" class="row g-2 align-items-end">
                         <div class="col-md-2">
                             <label for="date_from" class="form-label small">Od</label>
