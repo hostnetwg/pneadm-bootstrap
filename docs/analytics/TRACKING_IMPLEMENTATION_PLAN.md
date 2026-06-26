@@ -977,6 +977,25 @@ Wykonane testy po Etapie 1A:
 - Panel nie odpytuje `pnedu` przez health endpoint.
 - Testy: `AnalyticsStatusBannerTest` (12). `--filter=Analytics` w `pneadm`: 89 passed.
 
+## Etap R1 — Agregaty rozliczeń (wdrożone lokalnie 2026-06-26)
+
+Pierwszy etap pakietu „Rozliczenia”: dzienne agregaty finansowe per kurs i per kampania, liczone z surowych eventów `analytics_events`.
+
+Wdrożone klasy/pliki w `pneadm`:
+- Migracja `database/migrations/2026_06_26_120000_create_analytics_daily_revenue_stats_tables.php` (connection `analytics`) → `analytics_daily_course_revenue_stats`, `analytics_daily_campaign_revenue_stats`.
+- Modele `App\Models\Analytics\AnalyticsDailyCourseRevenueStat`, `App\Models\Analytics\AnalyticsDailyCampaignRevenueStat`.
+- Serwis `App\Services\Analytics\AnalyticsRevenueAggregationService`.
+- Komenda `analytics:aggregate-revenue` (`--date` / `--from`+`--to` / `--force`; domyślnie wczoraj, lag=1).
+- Config: `config/analytics.php` → `revenue.timezone`, `revenue.aggregation_lag_days`.
+- Testy: `tests/Feature/AnalyticsRevenueAggregationTest.php` (26 testów).
+
+Zasady (model dat = data eventu, Europe/Warsaw → UTC do zapytań; idempotencja delete+insert; zero PII):
+- `settled = online_paid + deferred_invoiced`; faktura online = tylko `online_invoiced_marker_orders`.
+- Atrybucja kampanii: `campaign_code` z eventu, fallback `FormOrder.fb_source`, `campaign_id` z `marketing_campaigns` (fail-safe).
+- Liczniki diagnostyczne `*_without_campaign` (tylko tabela kursów).
+- Cron docelowo 03:30 (po 02:15 daily, 03:15 abandonments) — instrukcja w deploy doc; backfill wg zakresu dat. Dashboard `Analityka → Rozliczenia` dopiero w R2.
+- Szczegóły: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`.
+
 ## Do Aktualizacji Po Wdrożeniu
 
 - Dopisać finalne nazwy klas.

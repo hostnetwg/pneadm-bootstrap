@@ -719,6 +719,21 @@ Status: wdrożony.
   (dotyczy GA/GTM + cookie opt-out lejka, nie analityki `pne_analytics`).
 - Szczegóły decyzji: `docs/decisions/ADR-004-analytics-modes.md`.
 
+## Etap R1 — Agregaty rozliczeń płatności/faktur (wdrożony lokalnie 2026-06-26)
+
+Pierwszy etap pakietu „Rozliczenia”. Zakres: agregaty, komenda, migracje, modele, serwis, testy (bez dashboardu/CSV/alertów).
+
+- **Model dat = data eventu** (Europe/Warsaw): zamówienia wg `form_order_created`, płatności online wg `payment_status_changed:paid`, faktury odroczone wg `invoice_created`.
+- **Ordered vs settled**: `ordered_revenue_gross` to wartość zamówiona; `settled_*` to realnie rozliczone = `online_paid` + `deferred_invoiced`.
+- **Online paid vs deferred invoiced**: opłata online (bramka) vs faktura odroczona (pierwszy `invoice_number`, ADR-005).
+- **Online invoice marker poza settled**: `invoice_created` z `order_flow=online` liczone tylko jako `online_invoiced_marker_orders` (NIE wchodzi do `deferred`/`settled`), żeby nie dublować z opłatą online.
+- **Atrybucja kampanii**: `campaign_code` z eventu, fallback `FormOrder.fb_source`; `campaign_id` z `marketing_campaigns` (fail-safe).
+- **RODO**: zero PII w agregatach (tylko liczniki i sumy kwot, snapshot tytułu kursu).
+- **Backfill**: po wdrożeniu, wg zakresu dat (instrukcja w `STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md` i deploy doc). Nie uruchamiany automatycznie.
+- **Cron 03:30** Europe/Warsaw (po `aggregate-daily` 02:15 i `aggregate-abandonments` 03:15) — instrukcja przygotowana, nie wdrożona produkcyjnie.
+- **Dashboard `Analityka → Rozliczenia` dopiero w R2.**
+- Szczegóły: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`.
+
 ## Do Aktualizacji Po Wdrożeniu
 
 - Oznaczać każdy etap jako `planowany`, `w trakcie`, `wdrożony`, `utrzymanie`.

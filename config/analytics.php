@@ -26,6 +26,14 @@ return [
         'aggregation_lag_days' => (int) env('ANALYTICS_ABANDONMENT_LAG_DAYS', 2),
     ],
 
+    // Etap R1 — agregaty rozliczeń (zamówienia / płatności online / faktury odroczone).
+    // Metryki liczone wg DATY EVENTU w strefie biznesowej. Domyślny cel komendy (bez dat,
+    // np. z crona o 03:30): wczoraj (lag=1) — dzień jest już domknięty.
+    'revenue' => [
+        'timezone' => env('ANALYTICS_REVENUE_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw')),
+        'aggregation_lag_days' => (int) env('ANALYTICS_REVENUE_LAG_DAYS', 1),
+    ],
+
     'sales_funnel_dashboard' => [
         'enabled' => (bool) env('ANALYTICS_SALES_FUNNEL_DASHBOARD_ENABLED', true),
         'timezone' => env('ANALYTICS_SALES_FUNNEL_DASHBOARD_TIMEZONE', 'Europe/Warsaw'),

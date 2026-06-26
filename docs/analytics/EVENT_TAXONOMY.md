@@ -441,6 +441,23 @@ Status: wdrożone w Etapie 2 — `online_payment_selected`, `deferred_invoice_se
 - `referrer_domain`,
 - `metadata.price_variant_id`, jeśli dostępne i bezpieczne.
 
+## Eventy rozliczeniowe w agregatach R1 (2026-06-26)
+
+Etap R1 czyta trzy eventy źródłowe i mapuje je na dzienne agregaty rozliczeń (per kurs / per kampania). Wartości czytane wyłącznie z `metadata` (JSON), bez PII.
+
+| Event | Warunek | Kwota | Metryka R1 |
+|-------|---------|-------|------------|
+| `form_order_created` | zawsze | `metadata.amount_gross` | `orders_created`, `ordered_revenue_gross` |
+| `payment_status_changed` | `metadata.payment_status = paid` **i** `metadata.order_flow = online` | `metadata.amount_gross` | `online_paid_orders`, `online_paid_revenue_gross` |
+| `invoice_created` | `metadata.order_flow = deferred` | `metadata.amount_gross` | `deferred_invoiced_orders`, `deferred_invoiced_revenue_gross` |
+| `invoice_created` | `metadata.order_flow = online` | — | `online_invoiced_marker_orders` (marker, **poza settled**) |
+
+- `settled_orders_total = online_paid_orders + deferred_invoiced_orders`; `settled_revenue_gross` analogicznie.
+- Faktura online to wyłącznie marker — nie wchodzi do `deferred`/`settled` (brak double-count z opłatą online).
+- Atrybucja kampanii eventów bez `campaign_code` (`payment_status_changed`, `invoice_created`): przez `form_order_id → FormOrder.fb_source`.
+- Brak kampanii → tylko liczniki diagnostyczne `*_without_campaign` w tabeli kursów (bez PII).
+- Szczegóły: `docs/analytics/STAGE_R_REVENUE_SETTLEMENT_AGGREGATES.md`.
+
 ## Do Aktualizacji Po Wdrożeniu
 
 - Dopisać finalne payloady JSON dla każdego eventu.
