@@ -248,9 +248,11 @@ Po każdej implementacji należy:
 - **B3 — agregacja porzuceń (wdrożone produkcyjnie 2026-06-25, `pneadm` `b0b4535`):** zakres **kurs + kampania**. Komenda `analytics:aggregate-abandonments`, domyślnie 2 dni wstecz. Klasyfikacja po `order_form_session_id`; kampania **first-touch**; bez PII. Catch-up prod 2026-06-25: 9 wierszy kursów, 6 kampanii. Cron 03:15 Europe/Warsaw.
 - **B4 — dashboard porzuceń:** ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. Produkcyjny `git pull` po stronie Waldemara.
 - **B5 — CSV AI-safe export:** ✅ wypchnięte (`pneadm` `cb8046a`). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII; przyciski w UI zachowują filtry.
-- **B6 — wykres trendu dziennego + dzienny CSV:** ✅ zaimplementowane w `pneadm`. Wykres Chart.js `sessions_total` vs `converted` na dashboardzie porzuceń (bez nowej biblioteki — Chart.js już z CDN) + dzienny wariant CSV (`analytics.form-abandonments.export.daily`, jeden wiersz na `stat_date`, totale dzienne). Bez PII, bez migracji. **Czeka na deploy.** Szczegóły: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
-- **Przycisk „Przelicz porzucenia”:** ✅ zaimplementowane w `pneadm` (analogiczny do „Przelicz teraz” z lejka). `POST analytics.form-abandonments.recompute`, admin-only, idempotentny, modal + flash, limit `recompute_max_days=92`, audyt `ActivityLog`. Uruchamia agregację B3 dla widocznego zakresu bez czekania na cron. **Czeka na deploy.**
-- **Predefiniowane zakresy dat (oba dashboardy):** ✅ zaimplementowane w `pneadm`. Wspólny `AnalyticsDateRangePresets` (7/14/30/90 dni, ten miesiąc, poprzedni miesiąc). Pasek „Szybki zakres” w filtrach lejka i porzuceń, zachowuje pozostałe filtry, podświetla aktywny zakres. Presety porzuceń celują w dane dojrzałe (kotwica = dziś − lag), lejka — do dziś. Uwaga: w porzuceniach domyślne „data do” = dziś − 2 (lag agregacji), to celowe — najnowsze 2 dni dojrzewają. **Czeka na deploy.**
+- **B6 — wykres trendu dziennego + dzienny CSV:** ✅ wypchnięte (`pneadm` `5a2e2b5`). **Deploy prod: TAK (decyzja 2026-06-26).**
+- **Przycisk „Przelicz porzucenia”:** ✅ wypchnięte (`pneadm` `69d6e83`). **Deploy prod: TAK.**
+- **Predefiniowane zakresy dat (oba dashboardy):** ✅ wypchnięte (`pneadm` `9f9fd23`). **Deploy prod: TAK.**
+- **Healthcheck `analytics:abandonment-healthcheck`:** ✅ wypchnięte (`pneadm` `6608791`). **Deploy prod: TAK.**
+- **Porównanie okres-do-okresu (oba dashboardy):** ✅ zaimplementowane lokalnie — delty KPI vs poprzedni okres o tej samej długości. **Czeka na commit + deploy.**
 
 ## Walidacja produkcyjna B2/B3 (2026-06-26)
 

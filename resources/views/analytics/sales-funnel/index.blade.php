@@ -177,41 +177,67 @@
                 </div>
             </div>
 
+            @if(!empty($comparison['previous_period'] ?? null))
+                <p class="small text-muted mb-2">
+                    <i class="bi bi-arrow-left-right"></i>
+                    Porównanie z poprzednim okresem o tej samej długości:
+                    <strong>{{ $comparison['previous_period']['date_from'] }}</strong> – <strong>{{ $comparison['previous_period']['date_to'] }}</strong>
+                    ({{ (int) $comparison['previous_period']['days'] }} dni).
+                </p>
+            @endif
             <div class="row g-3 mb-3">
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Kliknięcia linków</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['short_link_visits']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'short_link_visits'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Wejścia w opis</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['description_views']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'description_views'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Wejścia w formularz</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['form_views']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'form_views'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Próby submitu</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['form_submits']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'form_submits'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Błędy walidacji</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['validation_errors']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'validation_errors'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Zamówienia</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['orders_created']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'orders_created'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">

@@ -130,6 +130,22 @@ class AnalyticsFormAbandonmentDashboardTest extends TestCase
         $this->assertSame(3, $data['courses'][0]['converted']);
     }
 
+    public function test_period_comparison_shows_delta_against_previous_period(): void
+    {
+        $this->seedCourse('2026-06-03', 100, 'Poprzedni', ['sessions_total' => 4, 'converted' => 1]);
+        $this->seedCourse('2026-06-10', 100, 'Bieżący', ['sessions_total' => 10, 'converted' => 3]);
+
+        $service = app(\App\Services\Analytics\AnalyticsFormAbandonmentDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-10', 'date_to' => '2026-06-16']);
+
+        $this->assertSame('2026-06-03', $data['comparison']['previous_period']['date_from']);
+        $this->assertSame('2026-06-09', $data['comparison']['previous_period']['date_to']);
+        $this->assertSame(7, $data['comparison']['previous_period']['days']);
+        $this->assertSame(10.0, $data['comparison']['metrics']['sessions_total']['current']);
+        $this->assertSame(4.0, $data['comparison']['metrics']['sessions_total']['previous']);
+        $this->assertSame(6.0, $data['comparison']['metrics']['sessions_total']['delta']);
+    }
+
     public function test_campaign_rows_are_summed_over_date_range(): void
     {
         $admin = $this->userWithRole('admin');

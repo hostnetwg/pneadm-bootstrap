@@ -45,6 +45,7 @@ class AnalyticsSalesFunnelDashboardService
         $rates = $this->buildRates($summary);
         $landingTargets = $this->buildLandingTargetComparison($filters, $courseRows);
         $alerts = $this->buildAlerts($campaignRows, $courseRows);
+        $comparison = $this->buildPeriodComparison($filters, $courseRows, $campaignRows, $summary, $rates);
 
         return [
             'filters' => $filters,
@@ -55,6 +56,7 @@ class AnalyticsSalesFunnelDashboardService
             'courses' => $this->buildCourseTable($courseRows),
             'landing_targets' => $landingTargets,
             'alerts' => $alerts,
+            'comparison' => $comparison,
             'sort' => $this->resolveSort((string) ($input['sort'] ?? self::SORT_ORDERS)),
             'has_utm_filters' => false,
             'column_map' => $this->columnMap(),
@@ -485,6 +487,57 @@ class AnalyticsSalesFunnelDashboardService
         }
 
         return round(((float) $numerator / (float) $denominator) * 100, 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  Collection<int, AnalyticsDailyCourseStat>  $courseRows
+     * @param  list<array<string, mixed>>  $campaignRows
+     * @param  array<string, int|float>  $summary
+     * @param  array<string, float|null>  $rates
+     * @return array<string, mixed>
+     */
+    private function buildPeriodComparison(
+        array $filters,
+        Collection $courseRows,
+        array $campaignRows,
+        array $summary,
+        array $rates,
+    ): array {
+        $periodComparison = app(AnalyticsPeriodComparison::class);
+        $previousPeriod = $periodComparison->previousPeriodDates(
+            (string) $filters['date_from'],
+            (string) $filters['date_to'],
+        );
+
+        $previousFilters = array_merge($filters, [
+            'date_from' => $previousPeriod['date_from'],
+            'date_to' => $previousPeriod['date_to'],
+        ]);
+
+        $previousCourseRows = $this->courseRows($previousFilters);
+        $previousCampaignRows = $this->campaignRows($previousFilters, self::SORT_ORDERS);
+        $previousSummary = $this->buildSummary($previousCourseRows, $previousCampaignRows);
+        $previousRates = $this->buildRates($previousSummary);
+
+        $currentMetrics = array_merge($summary, ['form_to_order' => $rates['form_to_order'] ?? null]);
+        $previousMetrics = array_merge($previousSummary, ['form_to_order' => $previousRates['form_to_order'] ?? null]);
+
+        return $periodComparison->build(
+            (string) $filters['date_from'],
+            (string) $filters['date_to'],
+            $currentMetrics,
+            $previousMetrics,
+            [
+                'short_link_visits',
+                'description_views',
+                'form_views',
+                'form_submits',
+                'validation_errors',
+                'orders_created',
+            ],
+            ['form_to_order'],
+        );
     }
 
     /**

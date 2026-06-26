@@ -181,47 +181,76 @@
             </div>
 
             {{-- Kafelki podsumowania --}}
+            @if(!empty($comparison['previous_period'] ?? null))
+                <p class="small text-muted mb-2">
+                    <i class="bi bi-arrow-left-right"></i>
+                    Porównanie z poprzednim okresem o tej samej długości:
+                    <strong>{{ $comparison['previous_period']['date_from'] }}</strong> – <strong>{{ $comparison['previous_period']['date_to'] }}</strong>
+                    ({{ (int) $comparison['previous_period']['days'] }} dni).
+                </p>
+            @endif
             <div class="row g-3 mb-3">
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Sesje formularza</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['sessions_total']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'sessions_total'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Rozpoczęto formularz</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['reached_started']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'reached_started'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Kliknięto submit</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['reached_submit_clicked']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'reached_submit_clicked'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Podjęto próbę submitu</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['reached_submit_attempted']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'reached_submit_attempted'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Utworzono zamówienie</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['reached_created']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'reached_created'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Porzucono łącznie</div>
                         <div class="fs-4 fw-semibold">{{ $formatNumber($summary['abandoned_total']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'abandoned_total'])
+                        @endif
                     </div></div>
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <div class="card shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Konwersja do zamówienia</div>
                         <div class="fs-4 fw-semibold">{{ $formatRate($summary['conversion_rate']) }}</div>
+                        @if(!empty($comparison))
+                            @include('analytics.partials.period-delta', ['comparison' => $comparison, 'metricKey' => 'conversion_rate', 'type' => 'rate'])
+                        @endif
                     </div></div>
                 </div>
             </div>

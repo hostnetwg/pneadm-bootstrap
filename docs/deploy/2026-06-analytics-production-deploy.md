@@ -950,3 +950,51 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
   worker kolejki). Jeśli w przyszłości pneadm dostanie `schedule:run`, najpierw skonsolidować worker kolejki,
   by nie powstał duplikat.
 - Bieżąca doba pojawi się w lejku dopiero po nocnej agregacji (lub po ręcznym `--date=dzisiaj`).
+
+---
+
+## 13. Deploy B4–B6 + recompute + presety + healthcheck + porównanie okresów (2026-06-26)
+
+Status: **do wdrożenia na prod** (kod na `origin/main`).
+
+### Commity (tylko `pneadm`)
+
+```text
+a6ee852 — B4 dashboard porzuceń
+cb8046a — B5 eksport CSV
+5a2e2b5 — B6 wykres trendu + CSV dzienny
+69d6e83 — przycisk „Przelicz porzucenia”
+9f9fd23 — presety zakresów dat (lejek + porzucenia)
+6608791 — komenda analytics:abandonment-healthcheck
+<nowy>  — porównanie okres-do-okresu na dashboardach
+```
+
+> **Brak nowych migracji** w tym pakiecie (poza B3 już wdrożonym). Tylko `git pull` + cache.
+
+### Kroki na produkcji (`adm.pnedu.pl` / pneadm)
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+git pull origin main
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+```
+
+### Smoke test po deployu
+
+```bash
+# 1) Healthcheck (read-only, exit 0 = OK)
+/opt/alt/php82/usr/bin/php artisan analytics:abandonment-healthcheck --days=14
+
+# 2) Dashboard porzuceń — wykres, presety, przycisk „Przelicz”, delty vs poprz. okres
+#    https://adm.pnedu.pl/analytics/form-abandonments
+
+# 3) Lejek sprzedaży — presety dat, delty vs poprz. okres
+#    https://adm.pnedu.pl/analytics/sales-funnel
+```
+
+### Co nowego w UI
+
+- **Porzucenia:** wykres trendu dzienny, eksport CSV dzienny, przycisk „Przelicz porzucenia”, szybkie zakresy dat, delty pod kafelkami KPI (vs poprzedni okres o tej samej długości).
+- **Lejek:** szybkie zakresy dat, delty pod kafelkami KPI.
+- **Konsola:** `analytics:abandonment-healthcheck` — kontrola dopływu eventów i spójności kubełków B3.
+

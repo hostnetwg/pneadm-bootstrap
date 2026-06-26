@@ -68,6 +68,8 @@ class AnalyticsFormAbandonmentDashboardService
         $summary = $this->buildSummary($courseRows);
         $buckets = $this->buildBuckets($courseRows, (int) $summary['sessions_total']);
 
+        $comparison = $this->buildPeriodComparison($filters, $summary);
+
         return [
             'filters' => $filters,
             'summary' => $summary,
@@ -75,6 +77,7 @@ class AnalyticsFormAbandonmentDashboardService
             'courses' => $this->buildCourseTable($courseRows),
             'campaigns' => $this->buildCampaignTable($campaignRows),
             'trend' => $this->buildDailyTrend($filters, $courseRows, $campaignRows),
+            'comparison' => $comparison,
             'meta' => [
                 'lag_days' => $this->aggregationLagDays(),
                 'default_days' => $this->defaultDays(),
@@ -396,5 +399,42 @@ class AnalyticsFormAbandonmentDashboardService
         }
 
         return round(((float) $numerator / (float) $denominator) * 100, 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, int|float|null>  $summary
+     * @return array<string, mixed>
+     */
+    private function buildPeriodComparison(array $filters, array $summary): array
+    {
+        $periodComparison = app(AnalyticsPeriodComparison::class);
+        $previousPeriod = $periodComparison->previousPeriodDates(
+            (string) $filters['date_from'],
+            (string) $filters['date_to'],
+        );
+
+        $previousFilters = array_merge($filters, [
+            'date_from' => $previousPeriod['date_from'],
+            'date_to' => $previousPeriod['date_to'],
+        ]);
+
+        $previousSummary = $this->buildSummary($this->filteredCourseQuery($previousFilters)->get());
+
+        return $periodComparison->build(
+            (string) $filters['date_from'],
+            (string) $filters['date_to'],
+            $summary,
+            $previousSummary,
+            [
+                'sessions_total',
+                'reached_started',
+                'reached_submit_clicked',
+                'reached_submit_attempted',
+                'reached_created',
+                'abandoned_total',
+            ],
+            ['conversion_rate'],
+        );
     }
 }
