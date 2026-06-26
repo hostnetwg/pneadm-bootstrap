@@ -61,6 +61,7 @@ class AnalyticsRevenueDashboardService
             'summary' => $summary,
             'courses' => $this->buildCourseTable($courseRows),
             'campaigns' => $this->buildCampaignTable($campaignRows),
+            'trend' => $this->buildDailyTrend($filters, $courseRows, $campaignRows),
             'comparison' => $comparison,
             'meta' => [
                 'lag_days' => $this->aggregationLagDays(),
@@ -206,6 +207,60 @@ class AnalyticsRevenueDashboardService
             ->all();
 
         return $this->enrichWithCampaignMetadata($rows);
+    }
+
+    /**
+     * Dzienny trend (jeden wiersz na każdy stat_date w zakresie, z wypełnieniem brakujących dni zerami).
+     *
+     * Źródło zależy od aktywnego filtra:
+     * - gdy ustawiono `campaign_code` → grupujemy tabelę kampanii po stat_date,
+     * - w przeciwnym razie → grupujemy tabelę kursów po stat_date (z filtrem course_id).
+     *
+     * @param  array<string, mixed>  $filters
+     * @param  Collection<int, AnalyticsDailyCourseRevenueStat>  $courseRows
+     * @param  Collection<int, AnalyticsDailyCampaignRevenueStat>  $campaignRows
+     * @return list<array<string, mixed>>
+     */
+    private function buildDailyTrend(array $filters, Collection $courseRows, Collection $campaignRows): array
+    {
+        $source = $filters['campaign_code'] !== null ? $campaignRows : $courseRows;
+        $includeDiagnostics = $filters['campaign_code'] === null;
+
+        $byDate = $source->groupBy(fn ($row): string => Carbon::parse($row->stat_date)->toDateString());
+
+        $rows = [];
+        $cursor = Carbon::parse($filters['date_from']);
+        $end = Carbon::parse($filters['date_to']);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $key = $cursor->toDateString();
+            /** @var Collection<int, mixed> $dayRows */
+            $dayRows = $byDate->get($key, collect());
+
+            $row = [
+                'stat_date' => $key,
+                'orders_created' => (int) $dayRows->sum('orders_created'),
+                'ordered_revenue_gross' => round((float) $dayRows->sum('ordered_revenue_gross'), 2),
+                'online_paid_orders' => (int) $dayRows->sum('online_paid_orders'),
+                'online_paid_revenue_gross' => round((float) $dayRows->sum('online_paid_revenue_gross'), 2),
+                'deferred_invoiced_orders' => (int) $dayRows->sum('deferred_invoiced_orders'),
+                'deferred_invoiced_revenue_gross' => round((float) $dayRows->sum('deferred_invoiced_revenue_gross'), 2),
+                'online_invoiced_marker_orders' => (int) $dayRows->sum('online_invoiced_marker_orders'),
+                'settled_orders_total' => (int) $dayRows->sum('settled_orders_total'),
+                'settled_revenue_gross' => round((float) $dayRows->sum('settled_revenue_gross'), 2),
+            ];
+
+            if ($includeDiagnostics) {
+                $row['orders_created_without_campaign'] = (int) $dayRows->sum('orders_created_without_campaign');
+                $row['online_paid_without_campaign'] = (int) $dayRows->sum('online_paid_without_campaign');
+                $row['deferred_invoiced_without_campaign'] = (int) $dayRows->sum('deferred_invoiced_without_campaign');
+            }
+
+            $rows[] = $row;
+            $cursor->addDay();
+        }
+
+        return $rows;
     }
 
     /**

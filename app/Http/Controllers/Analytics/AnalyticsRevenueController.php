@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Services\Analytics\AnalyticsDateRangePresets;
 use App\Services\Analytics\AnalyticsRevenueAggregationService;
+use App\Services\Analytics\AnalyticsRevenueCsvExportService;
 use App\Services\Analytics\AnalyticsRevenueDashboardService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class AnalyticsRevenueController extends Controller
@@ -36,6 +38,36 @@ class AnalyticsRevenueController extends Controller
         $data['date_presets'] = $presets->build($dashboard->timezone(), $dashboard->aggregationLagDays());
 
         return view('analytics.revenue.index', $data);
+    }
+
+    /**
+     * Eksport CSV "AI-safe" per kurs (Etap R3). Te same filtry co dashboard.
+     */
+    public function exportCourses(Request $request, AnalyticsRevenueCsvExportService $export): StreamedResponse
+    {
+        $this->ensureEnabled();
+
+        return $export->streamCourses($request->only(self::FILTER_KEYS));
+    }
+
+    /**
+     * Eksport CSV "AI-safe" per kampania (Etap R3). Te same filtry co dashboard.
+     */
+    public function exportCampaigns(Request $request, AnalyticsRevenueCsvExportService $export): StreamedResponse
+    {
+        $this->ensureEnabled();
+
+        return $export->streamCampaigns($request->only(self::FILTER_KEYS));
+    }
+
+    /**
+     * Eksport CSV "AI-safe" dziennego trendu (Etap R3) — jeden wiersz na stat_date.
+     */
+    public function exportDaily(Request $request, AnalyticsRevenueCsvExportService $export): StreamedResponse
+    {
+        $this->ensureEnabled();
+
+        return $export->streamDaily($request->only(self::FILTER_KEYS));
     }
 
     /**

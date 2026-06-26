@@ -5,6 +5,12 @@
         $formatMoney = fn (int|float $value): string => number_format((float) $value, 2, ',', ' ').' PLN';
         $hasCourseLink = \Illuminate\Support\Facades\Route::has('courses.show');
         $hasCampaignLink = \Illuminate\Support\Facades\Route::has('marketing-campaigns.show');
+        $exportQuery = array_filter([
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'course_id' => $filters['course_id'] ?? null,
+            'campaign_code' => $filters['campaign_code'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
     @endphp
 
     <x-slot name="header">
@@ -23,6 +29,15 @@
                         <i class="bi bi-arrow-repeat"></i> Przelicz rozliczenia
                     </button>
                 </form>
+                <a href="{{ route('analytics.revenue.export.courses', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — kursy
+                </a>
+                <a href="{{ route('analytics.revenue.export.campaigns', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — kampanie
+                </a>
+                <a href="{{ route('analytics.revenue.export.daily', $exportQuery) }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-filetype-csv"></i> Eksport CSV — dziennie
+                </a>
                 @if(\Illuminate\Support\Facades\Route::has('analytics.sales-funnel.index'))
                     <a href="{{ route('analytics.sales-funnel.index') }}" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-funnel"></i> Lejek sprzedaży

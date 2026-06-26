@@ -347,6 +347,323 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertSee(route('analytics.revenue.recompute'), false);
     }
 
+    // ---------------------------------------------------------------------
+    // R3 — CSV AI-safe export
+    // ---------------------------------------------------------------------
+
+    public function test_admin_can_download_courses_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Szkolenie CSV', [
+            'orders_created' => 3,
+            'ordered_revenue_gross' => 300.00,
+            'settled_orders_total' => 2,
+            'settled_revenue_gross' => 200.00,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-revenue-courses-2026-06-01_2026-06-30.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+        $this->assertStringContainsString('Szkolenie CSV', $this->csvBody($response));
+    }
+
+    public function test_admin_can_download_campaigns_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-15', 'PROMO-CSV', [
+            'orders_created' => 2,
+            'ordered_revenue_gross' => 150.00,
+            'settled_orders_total' => 1,
+            'settled_revenue_gross' => 75.00,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.revenue.export.campaigns', [
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-revenue-campaigns-2026-06-01_2026-06-30.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+        $this->assertStringContainsString('PROMO-CSV', $this->csvBody($response));
+    }
+
+    public function test_admin_can_download_daily_csv(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'orders_created' => 4,
+            'ordered_revenue_gross' => 400.00,
+            'settled_orders_total' => 3,
+            'settled_revenue_gross' => 300.00,
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('analytics.revenue.export.daily', [
+            'date_from' => '2026-06-15',
+            'date_to' => '2026-06-15',
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString(
+            'attachment; filename="pne-revenue-daily-2026-06-15_2026-06-15.csv"',
+            $response->headers->get('Content-Disposition')
+        );
+    }
+
+    public function test_non_admin_cannot_download_csv(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->get(route('analytics.revenue.export.courses'))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('analytics.revenue.export.campaigns'))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('analytics.revenue.export.daily'))
+            ->assertForbidden();
+    }
+
+    public function test_guest_cannot_download_csv(): void
+    {
+        $this->get(route('analytics.revenue.export.courses'))->assertRedirect(route('login'));
+        $this->get(route('analytics.revenue.export.campaigns'))->assertRedirect(route('login'));
+        $this->get(route('analytics.revenue.export.daily'))->assertRedirect(route('login'));
+    }
+
+    public function test_courses_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $this->assertSame([
+            'date_from', 'date_to', 'course_id', 'course_title_snapshot',
+            'orders_created', 'ordered_revenue_gross', 'online_paid_orders', 'online_paid_revenue_gross',
+            'deferred_invoiced_orders', 'deferred_invoiced_revenue_gross', 'online_invoiced_marker_orders',
+            'settled_orders_total', 'settled_revenue_gross',
+            'orders_created_without_campaign', 'online_paid_without_campaign', 'deferred_invoiced_without_campaign',
+        ], $this->csvLine($body, 0));
+    }
+
+    public function test_campaigns_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-15', 'C', ['orders_created' => 1, 'ordered_revenue_gross' => 50.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.campaigns', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $this->assertSame([
+            'date_from', 'date_to', 'campaign_code', 'campaign_id', 'campaign_name',
+            'orders_created', 'ordered_revenue_gross', 'online_paid_orders', 'online_paid_revenue_gross',
+            'deferred_invoiced_orders', 'deferred_invoiced_revenue_gross', 'online_invoiced_marker_orders',
+            'settled_orders_total', 'settled_revenue_gross',
+        ], $this->csvLine($body, 0));
+    }
+
+    public function test_daily_csv_has_expected_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.daily', [
+            'date_from' => '2026-06-15', 'date_to' => '2026-06-15',
+        ])));
+
+        $this->assertSame([
+            'stat_date', 'orders_created', 'ordered_revenue_gross', 'online_paid_orders', 'online_paid_revenue_gross',
+            'deferred_invoiced_orders', 'deferred_invoiced_revenue_gross', 'online_invoiced_marker_orders',
+            'settled_orders_total', 'settled_revenue_gross',
+            'orders_created_without_campaign', 'online_paid_without_campaign', 'deferred_invoiced_without_campaign',
+        ], $this->csvLine($body, 0));
+    }
+
+    public function test_csv_respects_date_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-05', 100, 'W zakresie CSV', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+        $this->seedCourse('2026-05-01', 101, 'Poza zakresem CSV', ['orders_created' => 9, 'ordered_revenue_gross' => 900.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $this->assertStringContainsString('W zakresie CSV', $body);
+        $this->assertStringNotContainsString('Poza zakresem CSV', $body);
+    }
+
+    public function test_courses_csv_respects_course_id_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-10', 200, 'Kurs 200', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+        $this->seedCourse('2026-06-10', 300, 'Kurs 300', ['orders_created' => 1, 'ordered_revenue_gross' => 200.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200,
+        ])));
+
+        $this->assertStringContainsString('Kurs 200', $body);
+        $this->assertStringNotContainsString('Kurs 300', $body);
+    }
+
+    public function test_campaigns_csv_respects_campaign_code_filter(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCampaign('2026-06-10', 'KEEP-CSV', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+        $this->seedCampaign('2026-06-10', 'SKIP-CSV', ['orders_created' => 1, 'ordered_revenue_gross' => 200.00]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.campaigns', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'campaign_code' => 'KEEP-CSV',
+        ])));
+
+        $this->assertStringContainsString('KEEP-CSV', $body);
+        $this->assertStringNotContainsString('SKIP-CSV', $body);
+    }
+
+    public function test_csv_counts_and_money_are_correct(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'orders_created' => 5,
+            'ordered_revenue_gross' => 500.50,
+            'online_paid_orders' => 3,
+            'online_paid_revenue_gross' => 300.25,
+            'settled_orders_total' => 4,
+            'settled_revenue_gross' => 400.75,
+        ]);
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $row = $this->csvLine($body, 1);
+        $map = array_combine($this->csvLine($body, 0), $row);
+
+        $this->assertSame('5', $map['orders_created']);
+        $this->assertSame('500.50', $map['ordered_revenue_gross']);
+        $this->assertSame('3', $map['online_paid_orders']);
+        $this->assertSame('300.25', $map['online_paid_revenue_gross']);
+        $this->assertSame('4', $map['settled_orders_total']);
+        $this->assertSame('400.75', $map['settled_revenue_gross']);
+    }
+
+    public function test_daily_trend_fills_range_with_zeros(): void
+    {
+        $this->seedCourse('2026-06-10', 100, 'Kurs', [
+            'orders_created' => 2,
+            'ordered_revenue_gross' => 200.00,
+            'settled_orders_total' => 1,
+            'settled_revenue_gross' => 100.00,
+        ]);
+
+        $service = app(\App\Services\Analytics\AnalyticsRevenueDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-09', 'date_to' => '2026-06-11']);
+
+        $this->assertCount(3, $data['trend']);
+        $this->assertSame('2026-06-09', $data['trend'][0]['stat_date']);
+        $this->assertSame(0, $data['trend'][0]['orders_created']);
+        $this->assertSame('2026-06-10', $data['trend'][1]['stat_date']);
+        $this->assertSame(2, $data['trend'][1]['orders_created']);
+        $this->assertSame('2026-06-11', $data['trend'][2]['stat_date']);
+        $this->assertSame(0, $data['trend'][2]['orders_created']);
+    }
+
+    public function test_daily_trend_uses_campaign_table_when_campaign_filter_set(): void
+    {
+        $this->seedCourse('2026-06-10', 100, 'Kurs', ['orders_created' => 50, 'ordered_revenue_gross' => 5000.00]);
+        $this->seedCampaign('2026-06-10', 'PROMO', [
+            'orders_created' => 3,
+            'ordered_revenue_gross' => 300.00,
+            'settled_orders_total' => 2,
+            'settled_revenue_gross' => 200.00,
+        ]);
+
+        $service = app(\App\Services\Analytics\AnalyticsRevenueDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-10', 'date_to' => '2026-06-10', 'campaign_code' => 'PROMO']);
+
+        $this->assertCount(1, $data['trend']);
+        $this->assertSame(3, $data['trend'][0]['orders_created']);
+        $this->assertSame(2, $data['trend'][0]['settled_orders_total']);
+        $this->assertArrayNotHasKey('orders_created_without_campaign', $data['trend'][0]);
+    }
+
+    public function test_csv_does_not_contain_pii_or_forbidden_identifiers(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+        $this->seedCampaign('2026-06-15', 'PROMO', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+
+        foreach (['courses', 'campaigns', 'daily'] as $type) {
+            $body = $this->csvBody($this->actingAs($admin)->get(route("analytics.revenue.export.{$type}", [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+            ])));
+
+            foreach ([
+                'analytics_session_id', 'order_form_session_id', 'form_order_id', 'payment_order_id',
+                'invoice_number', 'metadata', 'email', 'user_agent', 'referrer', '@',
+            ] as $forbidden) {
+                $this->assertStringNotContainsString($forbidden, $body, "CSV {$type} zawiera zakazane: {$forbidden}");
+            }
+        }
+    }
+
+    public function test_csv_with_no_data_returns_only_header(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $body = $this->csvBody($this->actingAs($admin)->get(route('analytics.revenue.export.courses', [
+            'date_from' => '2026-06-01', 'date_to' => '2026-06-30',
+        ])));
+
+        $lines = array_values(array_filter(explode("\n", trim($body)), fn ($l) => $l !== ''));
+        $this->assertCount(1, $lines, 'CSV bez danych powinien mieć tylko nagłówek.');
+        $this->assertStringContainsString('orders_created', $lines[0]);
+    }
+
+    public function test_export_links_on_dashboard_carry_current_filters(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 200, 'Kurs', ['orders_created' => 1, 'ordered_revenue_gross' => 100.00]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.revenue.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+                'course_id' => 200,
+                'campaign_code' => 'PROMO',
+            ]))
+            ->assertOk()
+            ->assertSee(e(route('analytics.revenue.export.courses', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200, 'campaign_code' => 'PROMO',
+            ])), false)
+            ->assertSee(e(route('analytics.revenue.export.campaigns', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200, 'campaign_code' => 'PROMO',
+            ])), false)
+            ->assertSee(e(route('analytics.revenue.export.daily', [
+                'date_from' => '2026-06-01', 'date_to' => '2026-06-30', 'course_id' => 200, 'campaign_code' => 'PROMO',
+            ])), false);
+    }
+
     private function seedCourse(string $date, int $courseId, ?string $title, array $overrides = []): void
     {
         AnalyticsDailyCourseRevenueStat::query()->create(array_merge([
@@ -406,6 +723,26 @@ class AnalyticsRevenueDashboardTest extends TestCase
         $this->createdUserIds[] = $user->id;
 
         return $user;
+    }
+
+    private function csvBody(\Illuminate\Testing\TestResponse $response): string
+    {
+        $response->assertOk();
+        ob_start();
+        $response->sendContent();
+        $content = (string) ob_get_clean();
+
+        return preg_replace('/^\xEF\xBB\xBF/', '', $content) ?? $content;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function csvLine(string $body, int $index): array
+    {
+        $lines = array_values(array_filter(explode("\n", trim($body)), fn ($l) => $l !== ''));
+
+        return str_getcsv($lines[$index] ?? '');
     }
 
     private function createAnalyticsEventsTable(): void
