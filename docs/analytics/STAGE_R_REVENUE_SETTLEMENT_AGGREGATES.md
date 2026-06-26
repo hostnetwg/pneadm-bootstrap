@@ -1,8 +1,26 @@
-# Etap R — Agregaty rozliczeń płatności/faktur (PLAN, bez kodu)
+# Etap R — Agregaty rozliczeń płatności/faktur
 
 Data utworzenia: 2026-06-26
-Status: **R1 WDROŻONE lokalnie** (2026-06-26) — agregaty, komenda, migracje, modele, serwis, testy. Dashboard (R2), CSV (R3), alerty/submit_intent (R4) pozostają poza zakresem R1.
-Powiązane: [ADR-005](../decisions/ADR-005-invoice-number-means-invoiced-not-paid.md), [STAGE_B_CLIENT_TRACKING.md](./STAGE_B_CLIENT_TRACKING.md), [DATABASE_SCHEMA_PLAN.md](./DATABASE_SCHEMA_PLAN.md).
+Status: **PAKIET ROZLICZENIA ZAMKNIĘTY NA R3** (decyzja Waldemara, 2026-06-26). R4 (submit_intent + alerty) odłożone do backlogu.
+Powiązane: [ADR-005](../decisions/ADR-005-invoice-number-means-invoiced-not-paid.md), [STAGE_B_CLIENT_TRACKING.md](./STAGE_B_CLIENT_TRACKING.md), [DATABASE_SCHEMA_PLAN.md](./DATABASE_SCHEMA_PLAN.md), [deploy R1+R2+R2.1+R3](../deploy/2026-06-R1-R2-revenue-production-deploy.md).
+
+> ## Status pakietu Rozliczenia (2026-06-26)
+>
+> ```text
+> R1   — agregaty rozliczeń           → produkcja GO
+> R2   — dashboard Analityka→Rozliczenia → produkcja GO
+> R2.1 — przycisk Przelicz rozliczenia  → kod na origin/main, deploy pending
+> R3   — CSV AI-safe rozliczeń          → kod na origin/main, deploy pending
+> R4   — submit_intent / alerty         → ODŁOŻONE (backlog)
+> ```
+>
+> Pakiet zamknięty na R3. R2.1/R3 nie są oznaczane jako „produkcja GO" przed faktycznym smoke testem na produkcji
+> (deploy bez migracji wg [runbooka sekcja 13](../deploy/2026-06-R1-R2-revenue-production-deploy.md#13-dogrywka-r21-przycisk-przelicz-rozliczenia--r3-eksport-csv)).
+> Po smoke teście zaktualizować status R2.1/R3 na „produkcja GO".
+>
+> **R4 — backlog (nie aktywny etap):** submit_intent + alerty odłożone do czasu zebrania stabilniejszej próby danych po R1–R3
+> i obserwacji rozliczeń. Alerty wymagają baseline'u i większej próby; submit_intent poprawi semantykę formularza, ale nie był
+> potrzebny do zamknięcia pakietu Rozliczenia.
 
 > ## R1 — stan wdrożenia (2026-06-26)
 >
@@ -28,6 +46,24 @@ Powiązane: [ADR-005](../decisions/ADR-005-invoice-number-means-invoiced-not-pai
 > - Opis modelu dat (zamówienie / płatność / faktura — różne daty eventów).
 > - Testy: `tests/Feature/AnalyticsRevenueDashboardTest.php` (12 testów).
 > - **Poza R2:** CSV (R3), przycisk przelicz (agregacja tylko z konsoli/cron), wykresy, alerty.
+>
+> ## R2.1 — przycisk „Przelicz rozliczenia" (kod gotowy 2026-06-26, commit 16a53bb)
+>
+> - Trasa `POST /analytics/revenue/recompute` → `analytics.revenue.recompute` (admin-only).
+> - `AnalyticsRevenueController::recompute()` — ręczna agregacja R1 dla widocznego zakresu, idempotentna (delete+insert per dzień).
+> - Limit zakresu: `config('analytics.revenue_dashboard.recompute_max_days', 92)` (env `ANALYTICS_REVENUE_RECOMPUTE_MAX_DAYS`).
+> - Audyt: `ActivityLog` typ `analytics_revenue_recomputed`. Flash `recompute_status` / `recompute_error`.
+> - Widok: przycisk + modal potwierdzenia w `resources/views/analytics/revenue/index.blade.php`.
+>
+> ## R3 — eksport CSV AI-safe (kod gotowy 2026-06-26, commit 743e3b9)
+>
+> - Serwis `App\Services\Analytics\AnalyticsRevenueCsvExportService` (streamCourses / streamCampaigns / streamDaily).
+> - Trasy `GET /analytics/revenue/export/{courses,campaigns,daily}` (admin-only, te same filtry co dashboard).
+> - `AnalyticsRevenueDashboardService::buildDailyTrend()` + pole `trend` (jeden wiersz na dzień, wypełnienie zerami).
+> - Pliki: `pne-revenue-{courses|campaigns|daily}-<from>_<to>.csv`, UTF-8 BOM, kwoty z kropką (`150.00`).
+> - **AI-safe**: wyłącznie agregaty (liczniki + kwoty + identyfikatory kursu/kampanii + snapshot tytułu). Zero PII, zero raw eventów, zero metadata.
+> - Testy: `tests/Feature/AnalyticsRevenueDashboardTest.php` (36 testów łącznie — R2 + R2.1 + R3).
+> - **Poza R3:** wykres trendu na dashboardzie (dane `trend` są gotowe w serwisie), alerty, submit_intent (R4 — backlog).
 
 Ten etap następuje po zamkniętym pakiecie B (JS tracking, porzucenia, dashboard porzuceń, CSV AI-safe, wykres trendu, presety, healthcheck, porównanie okresów).
 
