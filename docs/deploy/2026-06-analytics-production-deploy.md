@@ -1,6 +1,6 @@
 # Wdrożenie produkcyjne — Analityka PNEdu (czerwiec 2026)
 
-Status: **B2 + B3 wdrożone produkcyjnie** (2026-06-25). B3: commit `b0b4535`, migracja, catch-up, cron 03:15 — szczegóły w sekcji 8.7.1. **Następny etap: B4** (dashboard porzuceń).
+Status: **Etap B w pełni wdrożony produkcyjnie** (2026-06-26). Prod `pneadm` HEAD: `5526e96`. B3: commit `b0b4535`, migracja, catch-up, cron 03:15 — szczegóły w sekcji 8.7.1. Pakiet B4–B6 + recompute + presety + healthcheck + porównanie okresów — sekcja 13.
 
 Ten plik opisuje wdrożenie zakresu:
 
@@ -928,7 +928,14 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
 [x] cron porzuceń (analytics:aggregate-abandonments, 03:15) dodany w pneadm — 2026-06-25
 [x] catch-up porzuceń uruchomiony — 2026-06-25: 9 kursów / 6 kampanii
 [x] sanity B3: sessions_total == suma kubełków — 2026-06-25: **38 = 38** (sekcja 8.7.1)
-[ ] B4 dashboard porzuceń — świadomie NIE wdrożony (następny etap)
+[x] B4 dashboard porzuceń — wdrożony prod 2026-06-26 (`a6ee852`+)
+[x] B5 CSV AI-safe export — wdrożony prod 2026-06-26 (`cb8046a`+)
+[x] B6 wykres trendu + dzienny CSV — wdrożony prod 2026-06-26 (`5a2e2b5`+)
+[x] Przycisk „Przelicz porzucenia” — wdrożony prod 2026-06-26 (`69d6e83`+)
+[x] Presety zakresów dat (lejek + porzucenia) — wdrożone prod 2026-06-26 (`9f9fd23`+)
+[x] Komenda `analytics:abandonment-healthcheck` — wdrożona prod 2026-06-26 (`6608791`+)
+[x] Porównanie okres-do-okresu na dashboardach — wdrożone prod 2026-06-26 (`5526e96`)
+[x] Prod HEAD potwierdzony: `git log -1` = `5526e96` (srv66127@h30, 2026-06-26)
 ```
 
 ---
@@ -955,7 +962,7 @@ Nie usuwać jej bez świadomej decyzji (ewentualnie down() migracji).
 
 ## 13. Deploy B4–B6 + recompute + presety + healthcheck + porównanie okresów (2026-06-26)
 
-Status: **do wdrożenia na prod** (kod na `origin/main`).
+Status: **wdrożone produkcyjnie** (2026-06-26). Prod `pneadm` HEAD: `5526e96` (potwierdzone: `git log -1` na srv66127@h30).
 
 ### Commity (tylko `pneadm`)
 
@@ -966,12 +973,12 @@ cb8046a — B5 eksport CSV
 69d6e83 — przycisk „Przelicz porzucenia”
 9f9fd23 — presety zakresów dat (lejek + porzucenia)
 6608791 — komenda analytics:abandonment-healthcheck
-<nowy>  — porównanie okres-do-okresu na dashboardach
+5526e96 — porównanie okres-do-okresu na dashboardach
 ```
 
 > **Brak nowych migracji** w tym pakiecie (poza B3 już wdrożonym). Tylko `git pull` + cache.
 
-### Kroki na produkcji (`adm.pnedu.pl` / pneadm)
+### Kroki na produkcji (`adm.pnedu.pl` / pneadm) — wykonane 2026-06-26
 
 ```bash
 cd /home/srv66127/domains/adm.pnedu.pl/pneadm
@@ -979,11 +986,12 @@ git pull origin main
 /opt/alt/php82/usr/bin/php artisan optimize:clear
 ```
 
-### Smoke test po deployu
+### Smoke test po deployu — wykonany 2026-06-26
 
 ```bash
-# 1) Healthcheck (read-only, exit 0 = OK)
+# 1) Healthcheck (read-only, exit 0 = OK) — OK
 /opt/alt/php82/usr/bin/php artisan analytics:abandonment-healthcheck --days=14
+# Wynik: B3 spójne (25.06: 38=38, 26.06: 58=58); submit_clicked=2 na 26.06 (post-B2)
 
 # 2) Dashboard porzuceń — wykres, presety, przycisk „Przelicz”, delty vs poprz. okres
 #    https://adm.pnedu.pl/analytics/form-abandonments

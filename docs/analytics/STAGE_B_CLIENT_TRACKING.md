@@ -1,7 +1,7 @@
 # Etap B — JS tracking formularza zamówienia + porzucenia
 
 Data utworzenia: 2026-06-25
-Status: **PR B1 + B1a + B2 + B3 wdrożone produkcyjnie** (2026-06-25). **B4 (`a6ee852`) + B5 (`cb8046a`) wypchnięte.** **B6 (wykres trendu dziennego + dzienny CSV) — zaimplementowane w `pneadm`, czeka na deploy.**
+Status: **Etap B w pełni wdrożony produkcyjnie** (2026-06-26). Prod `pneadm` HEAD: `5526e96`. B1–B6 + recompute + presety + healthcheck + porównanie okresów.
 
 ## Cel etapu
 
@@ -21,9 +21,13 @@ Uzupełnić lukę między backendowym `order_form_viewed` a `order_form_submit_a
 | **B1a** | Hardening: same-origin guard + namespacowanie `event_uuid` | ✅ ZROBIONE |
 | **B2** | Lekki JS collector na formularzu zamówienia | ✅ ZROBIONE (`bdc74ca`, pushed) |
 | B3 | Agregacja porzuceń (komenda, idempotentna) | ✅ ZROBIONE (`b0b4535`, deployed 2026-06-25) |
-| B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm` `a6ee852`, pushed) |
-| B5 | CSV AI-safe export z dashboardu porzuceń | ✅ ZROBIONE (`pneadm` `cb8046a`, pushed) |
-| B6 | Wykres trendu dziennego + dzienny CSV | ✅ ZROBIONE (`pneadm`, czeka na deploy) |
+| B4 | Dashboard porzuceń (read-only, agregaty B3) | ✅ ZROBIONE (`pneadm` `a6ee852`, prod 2026-06-26) |
+| B5 | CSV AI-safe export z dashboardu porzuceń | ✅ ZROBIONE (`pneadm` `cb8046a`, prod 2026-06-26) |
+| B6 | Wykres trendu dziennego + dzienny CSV | ✅ ZROBIONE (`pneadm` `5a2e2b5`, prod 2026-06-26) |
+| — | Przycisk „Przelicz porzucenia” | ✅ ZROBIONE (`pneadm` `69d6e83`, prod 2026-06-26) |
+| — | Presety zakresów dat (lejek + porzucenia) | ✅ ZROBIONE (`pneadm` `9f9fd23`, prod 2026-06-26) |
+| — | Komenda `analytics:abandonment-healthcheck` | ✅ ZROBIONE (`pneadm` `6608791`, prod 2026-06-26) |
+| — | Porównanie okres-do-okresu (oba dashboardy) | ✅ ZROBIONE (`pneadm` `5526e96`, prod 2026-06-26) |
 
 ---
 
@@ -458,9 +462,10 @@ php artisan view:cache
 
 - **B2**: ✅ wdrożone produkcyjnie (`pnedu` `bdc74ca`).
 - **B3**: ✅ wdrożone produkcyjnie (`pneadm` `b0b4535`, 2026-06-25). Migracja, catch-up 2026-06-25 (9 kursów / 6 kampanii), cron 03:15.
-- **B4**: ✅ wypchnięte (`pneadm` `a6ee852`). Dashboard porzuceń, read-only, agregaty B3.
-- **B5**: ✅ wypchnięte (`pneadm` `cb8046a`). CSV AI-safe export (per kurs / per kampania).
-- **B6**: ✅ zaimplementowane w `pneadm` (wykres trendu dziennego + dzienny CSV). **Czeka na deploy** (bez migracji).
+- **B4**: ✅ wdrożone produkcyjnie (`pneadm` `a6ee852`, 2026-06-26). Dashboard porzuceń, read-only, agregaty B3.
+- **B5**: ✅ wdrożone produkcyjnie (`pneadm` `cb8046a`, 2026-06-26). CSV AI-safe export (per kurs / per kampania).
+- **B6**: ✅ wdrożone produkcyjnie (`pneadm` `5a2e2b5`, 2026-06-26). Wykres trendu dzienny + dzienny CSV.
+- **Recompute + presety + healthcheck + porównanie okresów**: ✅ wdrożone produkcyjnie (`69d6e83`–`5526e96`, 2026-06-26). Prod HEAD: `5526e96`.
 
 ## Smoke test produkcyjny (po B2)
 

@@ -246,13 +246,13 @@ Po każdej implementacji należy:
 - **Deploy produkcyjny B2:** **GO** (decyzja Waldemara 2026-06-25). Instrukcja: `docs/deploy/2026-06-analytics-production-deploy.md` sekcje 7.2, 7.3, 9.1. `pnedu`: `git pull` + `npm ci` + `npm run build` + cache + `queue:restart`. `pneadm`: `git pull` + cache (dokumentacja + linki w sales-funnel `60acc21`).
 - Testy: `--filter=Analytics` → **110 passed** (pnedu), **98 passed** (pneadm); sanity formularza → **15 passed**; `npm run build` → OK.
 - **B3 — agregacja porzuceń (wdrożone produkcyjnie 2026-06-25, `pneadm` `b0b4535`):** zakres **kurs + kampania**. Komenda `analytics:aggregate-abandonments`, domyślnie 2 dni wstecz. Klasyfikacja po `order_form_session_id`; kampania **first-touch**; bez PII. Catch-up prod 2026-06-25: 9 wierszy kursów, 6 kampanii. Cron 03:15 Europe/Warsaw.
-- **B4 — dashboard porzuceń:** ✅ wypchnięte (`pneadm` `a6ee852`). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`. Produkcyjny `git pull` po stronie Waldemara.
-- **B5 — CSV AI-safe export:** ✅ wypchnięte (`pneadm` `cb8046a`). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII; przyciski w UI zachowują filtry.
-- **B6 — wykres trendu dziennego + dzienny CSV:** ✅ wypchnięte (`pneadm` `5a2e2b5`). **Deploy prod: TAK (decyzja 2026-06-26).**
-- **Przycisk „Przelicz porzucenia”:** ✅ wypchnięte (`pneadm` `69d6e83`). **Deploy prod: TAK.**
-- **Predefiniowane zakresy dat (oba dashboardy):** ✅ wypchnięte (`pneadm` `9f9fd23`). **Deploy prod: TAK.**
-- **Healthcheck `analytics:abandonment-healthcheck`:** ✅ wypchnięte (`pneadm` `6608791`). **Deploy prod: TAK.**
-- **Porównanie okres-do-okresu (oba dashboardy):** ✅ zaimplementowane lokalnie — delty KPI vs poprzedni okres o tej samej długości. **Czeka na commit + deploy.**
+- **B4 — dashboard porzuceń:** ✅ wdrożone produkcyjnie (`pneadm` `a6ee852`, 2026-06-26). Read-only, czyta wyłącznie agregaty B3, nie skanuje `analytics_events`; dane per kurs i per kampania; `lag=2`; first-event/first-touch attribution; brak PII. Route `analytics.form-abandonments.index`, menu `Analityka → Porzucenia formularza`.
+- **B5 — CSV AI-safe export:** ✅ wdrożone produkcyjnie (`pneadm` `cb8046a`, 2026-06-26). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII; przyciski w UI zachowują filtry.
+- **B6 — wykres trendu dziennego + dzienny CSV:** ✅ wdrożone produkcyjnie (`pneadm` `5a2e2b5`, 2026-06-26).
+- **Przycisk „Przelicz porzucenia”:** ✅ wdrożone produkcyjnie (`pneadm` `69d6e83`, 2026-06-26).
+- **Predefiniowane zakresy dat (oba dashboardy):** ✅ wdrożone produkcyjnie (`pneadm` `9f9fd23`, 2026-06-26).
+- **Healthcheck `analytics:abandonment-healthcheck`:** ✅ wdrożone produkcyjnie (`pneadm` `6608791`, 2026-06-26).
+- **Porównanie okres-do-okresu (oba dashboardy):** ✅ wdrożone produkcyjnie (`pneadm` `5526e96`, 2026-06-26). Delty KPI vs poprzedni okres o tej samej długości.
 
 ## Walidacja produkcyjna B2/B3 (2026-06-26)
 
@@ -262,7 +262,21 @@ Po każdej implementacji należy:
   - Backend spójny: `proba=7 = zamówienia=7`, `viewed=41`.
   - JS (B2) z 25.06 niski (`start=1–3`, `klik_submit=0`) — **oczekiwane**, bo B2 wdrożono 25.06; sesje sprzed wdrożenia wpadają do `viewed_not_started` (73,7%). 26.06 (po B2) `start=2`/`viewed=3` → JS działa.
   - **Do potwierdzenia za kilka dni** na danych czysto po-B2: czy `submit_clicked` zaczyna się pojawiać na realnym ruchu.
+- **Wynik healthcheck na produkcji (26.06, `--days=14`):**
+  - B3 spójność: ✅ 25.06 `38=38`, 26.06 `58=58`.
+  - `submit_clicked=2` na 26.06 — end-to-end JS↔BE działa post-B2.
+  - Prod HEAD: `5526e96` (potwierdzone `git log -1` na srv66127@h30).
 - Użycie na produkcji: `php artisan analytics:abandonment-healthcheck --days=14`.
+
+## Etap B — zamknięty (2026-06-26)
+
+Cały Etap B (B1–B6 + recompute + presety + healthcheck + porównanie okresów) jest **wdrożony produkcyjnie**. Prod `pneadm` HEAD: `5526e96`.
+
+**Następne etapy (do decyzji właściciela, poza obecnym wdrożeniem):**
+- progi alertów na dashboardach (po kilku tygodniach obserwacji),
+- agregaty rozliczeń płatności (online paid + invoiced),
+- pakiet AI-safe „kopiuj do ChatGPT”,
+- re-walidacja healthcheck za 3–5 dni na czystych danych post-B2.
 
 ## Do Aktualizacji Po Wdrożeniu
 
