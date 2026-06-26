@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Analytics\AnalyticsDailyCampaignRevenueStat;
 use App\Models\Analytics\AnalyticsDailyCourseRevenueStat;
+use App\Models\Analytics\AnalyticsEvent;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AnalyticsRevenueDashboardTest extends TestCase
@@ -242,6 +244,109 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertSee('invoice_created');
     }
 
+    // ---------------------------------------------------------------------
+    // Przycisk "Przelicz rozliczenia" (ręczna agregacja R1 z panelu)
+    // ---------------------------------------------------------------------
+
+    public function test_guest_cannot_recompute_revenue(): void
+    {
+        $this->post(route('analytics.revenue.recompute'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_non_admin_cannot_recompute_revenue(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->post(route('analytics.revenue.recompute'))
+            ->assertForbidden();
+    }
+
+    public function test_recompute_is_not_available_when_feature_disabled(): void
+    {
+        config()->set('analytics.revenue_dashboard.enabled', false);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('analytics.revenue.recompute'))
+            ->assertNotFound();
+    }
+
+    public function test_admin_can_recompute_selected_range_and_it_builds_stats(): void
+    {
+        config()->set('analytics.revenue.timezone', 'Europe/Warsaw');
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->createRevenueEvent([
+            'event_name' => 'form_order_created',
+            'course_id' => 555,
+            'metadata' => ['amount_gross' => 100],
+            'occurred_at' => '2026-06-20 10:00:00',
+        ]);
+
+        $this->assertSame(0, AnalyticsDailyCourseRevenueStat::query()->count());
+
+        $this->actingAs($admin)
+            ->post(route('analytics.revenue.recompute'), [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ])
+            ->assertRedirect(route('analytics.revenue.index', [
+                'date_from' => '2026-06-20',
+                'date_to' => '2026-06-20',
+            ]))
+            ->assertSessionHas('recompute_status');
+
+        $this->assertSame(1, AnalyticsDailyCourseRevenueStat::query()->where('course_id', 555)->count());
+    }
+
+    public function test_recompute_is_idempotent_and_does_not_duplicate(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->createRevenueEvent([
+            'event_name' => 'form_order_created',
+            'course_id' => 666,
+            'metadata' => ['amount_gross' => 50],
+            'occurred_at' => '2026-06-21 12:00:00',
+        ]);
+
+        $payload = ['date_from' => '2026-06-21', 'date_to' => '2026-06-21'];
+
+        $this->actingAs($admin)->post(route('analytics.revenue.recompute'), $payload);
+        $this->actingAs($admin)->post(route('analytics.revenue.recompute'), $payload);
+
+        $this->assertSame(1, AnalyticsDailyCourseRevenueStat::query()->where('course_id', 666)->count());
+    }
+
+    public function test_recompute_rejects_range_above_configured_limit(): void
+    {
+        config()->set('analytics.revenue_dashboard.recompute_max_days', 31);
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEventsTable();
+
+        $this->actingAs($admin)
+            ->post(route('analytics.revenue.recompute'), [
+                'date_from' => '2026-01-01',
+                'date_to' => '2026-03-31',
+            ])
+            ->assertSessionHas('recompute_error');
+    }
+
+    public function test_dashboard_shows_recompute_button(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('analytics.revenue.index'))
+            ->assertOk()
+            ->assertSee('Przelicz rozliczenia')
+            ->assertSee(route('analytics.revenue.recompute'), false);
+    }
+
     private function seedCourse(string $date, int $courseId, ?string $title, array $overrides = []): void
     {
         AnalyticsDailyCourseRevenueStat::query()->create(array_merge([
@@ -301,6 +406,66 @@ class AnalyticsRevenueDashboardTest extends TestCase
         $this->createdUserIds[] = $user->id;
 
         return $user;
+    }
+
+    private function createAnalyticsEventsTable(): void
+    {
+        Schema::connection('analytics')->dropIfExists('analytics_events');
+        Schema::connection('analytics')->create('analytics_events', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('event_uuid')->unique();
+            $table->string('event_name', 100);
+            $table->string('event_category', 50);
+            $table->timestamp('occurred_at');
+            $table->string('app_source', 32);
+            $table->uuid('analytics_session_id')->nullable();
+            $table->uuid('order_form_session_id')->nullable();
+            $table->unsignedBigInteger('course_id')->nullable();
+            $table->string('course_title_snapshot', 255)->nullable();
+            $table->unsignedBigInteger('campaign_id')->nullable();
+            $table->string('campaign_code', 100)->nullable();
+            $table->string('campaign_channel', 50)->nullable();
+            $table->unsignedBigInteger('form_order_id')->nullable();
+            $table->unsignedBigInteger('payment_order_id')->nullable();
+            $table->string('route_name', 150)->nullable();
+            $table->string('path', 500)->nullable();
+            $table->string('device_type', 32)->nullable();
+            $table->string('browser_family', 64)->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+    }
+
+    private function createRevenueEvent(array $overrides = []): AnalyticsEvent
+    {
+        $occurredAt = $overrides['occurred_at'] ?? '2026-06-24 10:00:00';
+        if ($occurredAt instanceof \Carbon\Carbon) {
+            $occurredAt = $occurredAt->format('Y-m-d H:i:s');
+        }
+        unset($overrides['occurred_at']);
+
+        return AnalyticsEvent::query()->create(array_merge([
+            'event_uuid' => (string) Str::uuid(),
+            'event_name' => 'form_order_created',
+            'event_category' => 'conversion',
+            'occurred_at' => $occurredAt,
+            'app_source' => 'pnedu',
+            'analytics_session_id' => (string) Str::uuid(),
+            'order_form_session_id' => null,
+            'course_id' => null,
+            'course_title_snapshot' => null,
+            'campaign_id' => null,
+            'campaign_code' => null,
+            'campaign_channel' => null,
+            'form_order_id' => null,
+            'payment_order_id' => null,
+            'route_name' => null,
+            'path' => null,
+            'device_type' => 'desktop',
+            'browser_family' => 'chrome',
+            'metadata' => [],
+            'created_at' => now(),
+        ], $overrides));
     }
 
     private function createRevenueTables(): void

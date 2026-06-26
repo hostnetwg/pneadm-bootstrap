@@ -40,6 +40,9 @@ return [
         'timezone' => env('ANALYTICS_REVENUE_DASHBOARD_TIMEZONE', env('ANALYTICS_REVENUE_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw'))),
         'default_days' => (int) env('ANALYTICS_REVENUE_DASHBOARD_DEFAULT_DAYS', 14),
         'max_days' => (int) env('ANALYTICS_REVENUE_DASHBOARD_MAX_DAYS', 366),
+        // Maksymalny zakres dni dla przycisku "Przelicz rozliczenia" (ręczna agregacja R1 z panelu).
+        // Chroni request HTTP przed timeoutem. Do większych przeliczeń użyj komendy konsolowej.
+        'recompute_max_days' => (int) env('ANALYTICS_REVENUE_RECOMPUTE_MAX_DAYS', 92),
     ],
 
     'sales_funnel_dashboard' => [
