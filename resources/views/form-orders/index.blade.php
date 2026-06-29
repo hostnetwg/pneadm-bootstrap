@@ -105,7 +105,7 @@
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
                             'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury i niezakończone)'],
                             'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury lub oznaczone jako zakończone)'],
-                            'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (po terminie szkolenia, bez faktury i niezakończone)'],
+                            'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (minęła data i godzina zakończenia, bez faktury i niezaznaczone „Zakończone”)'],
                         ];
                     @endphp
                     <span class="badge {{ $processingLabels[$quickFilter][0] }}">
@@ -121,7 +121,7 @@
                     @if($archivalOnly)
                         <span class="badge bg-success text-white">
                             <i class="bi bi-archive"></i>
-                            Formularz: tylko archiwalne (minęła data zakończenia szkolenia)
+                            Formularz: tylko archiwalne (minęła data i godzina zakończenia szkolenia)
                         </span>
                     @endif
                 </div>
@@ -217,7 +217,7 @@
                                        placeholder="Imię, email, produkt, faktura, kod kampanii, nazwa kampanii, ID…">
                             </div>
                             <div class="col-12 col-md-3">
-                                <div class="form-check" title="Pokaż tylko zamówienia, dla których minęła data zakończenia szkolenia. Łączy się z polem „Przetwarzanie” i resztą filtrów.">
+                                <div class="form-check" title="Pokaż tylko zamówienia, dla których minęła data i godzina zakończenia szkolenia. Łączy się z polem „Przetwarzanie” i resztą filtrów.">
                                     <input class="form-check-input" type="checkbox" id="archival" name="archival" value="1" {{ $archivalOnly ? 'checked' : '' }}>
                                     <label class="form-check-label" for="archival">
                                         <i class="bi bi-archive"></i> Tylko archiwalne (po terminie szkolenia)

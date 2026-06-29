@@ -222,7 +222,7 @@ class FormOrdersController extends Controller
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
-                    ->where('courses.end_date', '<', \Carbon\Carbon::today())
+                    ->where('courses.end_date', '<', \Carbon\Carbon::now())
                     ->where(function ($match) {
                         $match->whereColumn('courses.id', 'form_orders.product_id')
                             ->orWhere(function ($legacy) {
@@ -317,17 +317,17 @@ class FormOrdersController extends Controller
     }
 
     /**
-     * Dokłada do zapytania wyłącznie warunek "archiwalne" = minęła data zakończenia
-     * szkolenia (courses.end_date < dziś). Używane przez checkbox formularza oraz
-     * jako część skrótu przycisku "Archiwalne". Nie nakłada warunku faktury —
-     * dzięki temu łączy się dowolnie z filtrem przetwarzania.
+     * Dokłada do zapytania wyłącznie warunek "archiwalne" = minęła data i godzina
+     * zakończenia szkolenia (courses.end_date < teraz). Używane przez checkbox
+     * formularza oraz jako część skrótu przycisku "Archiwalne". Nie nakłada warunku
+     * faktury — dzięki temu łączy się dowolnie z filtrem przetwarzania.
      */
     private function applyArchivalScope($query): void
     {
         $query->whereExists(function ($sub) {
             $sub->select(DB::raw(1))
                 ->from('courses')
-                ->where('courses.end_date', '<', Carbon::today())
+                ->where('courses.end_date', '<', Carbon::now())
                 ->where(function ($match) {
                     $match->whereColumn('courses.id', 'form_orders.product_id')
                         ->orWhere(function ($legacy) {
