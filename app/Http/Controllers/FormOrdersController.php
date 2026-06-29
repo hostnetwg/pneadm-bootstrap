@@ -31,7 +31,15 @@ class FormOrdersController extends Controller
         $search = $request->get('search', '');
         $orderIdFilter = trim((string) $request->get('order_id', ''));
         $courseIdFilter = trim((string) $request->get('course_id', ''));
-        $filter = $request->get('filter', ''); // nowy parametr dla filtra
+        // Status przetwarzania — dwa NIEZALEŻNE źródła o tej samej semantyce:
+        //  - 'quick'  => szybki filtr z górnych przycisków (działa samodzielnie),
+        //  - 'filter' => opcja w formularzu (łączy się z resztą pól formularza).
+        // Dozwolone wartości: '' (Wszystkie) | new | processed | archival.
+        $allowedProcessing = ['new', 'processed', 'archival'];
+        $quickFilter = $request->get('quick', '');
+        $quickFilter = in_array($quickFilter, $allowedProcessing, true) ? $quickFilter : '';
+        $filter = $request->get('filter', '');
+        $filter = in_array($filter, $allowedProcessing, true) ? $filter : '';
 
         $orderIdForExact = (ctype_digit($orderIdFilter) && $orderIdFilter !== '' && (int) $orderIdFilter > 0)
             ? (int) $orderIdFilter
@@ -44,40 +52,9 @@ class FormOrdersController extends Controller
         // Budujemy zapytanie używając modelu Eloquent
         $query = FormOrder::query();
 
-        // Dodajemy filtr dla wszystkich nieprzetworzonych zamówień (nowe + archiwalne)
-        // Nieprzetworzone = bez numeru faktury i nie ukończone
-        if ($filter === 'new') {
-            $query->new(); // Używamy scope z modelu - pokazuje wszystkie nieprzetworzone
-        }
-
-        // Dodajemy filtr dla archiwalnych zamówień (nieprzetworzone dla zakończonych szkoleń)
-        if ($filter === 'archival') {
-            $query->where(function ($q) {
-                // Bez numeru faktury
-                $q->whereNull('form_orders.invoice_number')
-                    ->orWhere('form_orders.invoice_number', '')
-                    ->orWhere('form_orders.invoice_number', '0');
-            })
-                ->where(function ($q) {
-                    // Nie ukończone (status_completed = 0 lub null)
-                    $q->where('form_orders.status_completed', '=', 0)
-                        ->orWhereNull('form_orders.status_completed');
-                })
-                ->whereExists(function ($sub) {
-                    $sub->select(DB::raw(1))
-                        ->from('courses')
-                        ->where('courses.end_date', '<', \Carbon\Carbon::today())
-                        ->where(function ($match) {
-                            $match->whereColumn('courses.id', 'form_orders.product_id')
-                                ->orWhere(function ($legacy) {
-                                    $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
-                                        ->whereNotNull('courses.id_old')
-                                        ->where('courses.id_old', '!=', '')
-                                        ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
-                                });
-                        });
-                });
-        }
+        // Stosujemy filtr przetwarzania niezależnie z przycisków (quick) i z formularza (filter).
+        $this->applyProcessingFilter($query, $quickFilter);
+        $this->applyProcessingFilter($query, $filter);
 
         // Konkretne ID zamówienia (priorytet nad polem „Wyszukaj”) — dokładnie jeden rekord lub brak
         if ($orderIdForExact !== null) {
@@ -230,20 +207,9 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz nieprzetworzone zamówienia dla zakończonych szkoleń (Archiwalne)
-        // Nieprzetworzone = bez numeru faktury (invoice_number) i nie ukończone (status_completed = 0 lub null)
+        // Policz archiwalne zamówienia = te, dla których minęła data zakończenia szkolenia
         $archivalCount = \DB::table('form_orders')
-            ->where(function ($q) {
-                // Bez numeru faktury
-                $q->whereNull('form_orders.invoice_number')
-                    ->orWhere('form_orders.invoice_number', '')
-                    ->orWhere('form_orders.invoice_number', '0');
-            })
-            ->where(function ($q) {
-                // Nie ukończone (status_completed = 0 lub null)
-                $q->where('form_orders.status_completed', '=', 0)
-                    ->orWhereNull('form_orders.status_completed');
-            })
+            ->whereNull('form_orders.deleted_at')
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
@@ -258,12 +224,14 @@ class FormOrdersController extends Controller
                             });
                     });
             })
-            ->whereNull('form_orders.deleted_at')
             ->count();
 
         // Policz wszystkie nieprzetworzone zamówienia (bez numeru faktury i nie ukończone)
         // To jest dokładnie to samo co pokazuje filtr "new"
         $newCount = FormOrder::new()->count();
+
+        // Policz przetworzone zamówienia = te z numerem faktury (filtr "processed")
+        $processedCount = FormOrder::withInvoice()->count();
 
         // Statystyki do wyświetlenia
         // `order_date` jest zapisywane w bazie jako UTC, ale UI pokazuje dzień wg strefy aplikacji
@@ -315,7 +283,36 @@ class FormOrdersController extends Controller
                 ->count();
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'archivalCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'processedCount', 'archivalCount'));
+    }
+
+    /**
+     * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
+     * Wartości: '' (brak filtra) | 'new' (bez faktury) | 'processed' (z fakturą)
+     * | 'archival' (minęła data zakończenia szkolenia).
+     */
+    private function applyProcessingFilter($query, string $value): void
+    {
+        if ($value === 'new') {
+            $query->new();
+        } elseif ($value === 'processed') {
+            $query->withInvoice();
+        } elseif ($value === 'archival') {
+            $query->whereExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('courses')
+                    ->where('courses.end_date', '<', Carbon::today())
+                    ->where(function ($match) {
+                        $match->whereColumn('courses.id', 'form_orders.product_id')
+                            ->orWhere(function ($legacy) {
+                                $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
+                                    ->whereNotNull('courses.id_old')
+                                    ->where('courses.id_old', '!=', '')
+                                    ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
+                            });
+                    });
+            });
+        }
     }
 
     /**
@@ -2725,6 +2722,9 @@ class FormOrdersController extends Controller
             }
             if ($request->has('search')) {
                 $redirectParams['search'] = $request->input('search');
+            }
+            if ($request->filled('quick')) {
+                $redirectParams['quick'] = $request->input('quick');
             }
             if ($request->has('filter')) {
                 $redirectParams['filter'] = $request->input('filter');

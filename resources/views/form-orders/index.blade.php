@@ -59,19 +59,25 @@
             {{-- Przyciski akcji i filtrów --}}
             <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center">
+                    {{-- Szybki, NIEZALEŻNY filtr (czyści pozostałe filtry formularza) --}}
                     <div class="btn-group" role="group">
-                        <a href="{{ route('form-orders.index') }}" 
-                           class="btn {{ $filter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
+                        <a href="{{ route('form-orders.index', ['quick' => '']) }}"
+                           class="btn {{ $quickFilter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
                             <i class="bi bi-list"></i> Wszystkie
                         </a>
-                        <a href="{{ route('form-orders.index', ['filter' => 'new']) }}" 
-                           class="btn {{ $filter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
-                            <i class="bi bi-exclamation-triangle"></i> NOWE 
+                        <a href="{{ route('form-orders.index', ['quick' => 'new']) }}"
+                           class="btn {{ $quickFilter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
+                            <i class="bi bi-exclamation-triangle"></i> Nieprzetworzone
                             <span class="badge bg-warning text-dark ms-1">{{ $newCount ?? 0 }}</span>
                         </a>
-                        <a href="{{ route('form-orders.index', ['filter' => 'archival']) }}" 
-                           class="btn {{ $filter === 'archival' ? 'btn-success' : 'btn-outline-success' }}">
-                            <i class="bi bi-archive"></i> Archiwalne 
+                        <a href="{{ route('form-orders.index', ['quick' => 'processed']) }}"
+                           class="btn {{ $quickFilter === 'processed' ? 'btn-info' : 'btn-outline-info' }}">
+                            <i class="bi bi-receipt"></i> Przetworzone
+                            <span class="badge bg-info text-dark ms-1">{{ $processedCount ?? 0 }}</span>
+                        </a>
+                        <a href="{{ route('form-orders.index', ['quick' => 'archival']) }}"
+                           class="btn {{ $quickFilter === 'archival' ? 'btn-success' : 'btn-outline-success' }}">
+                            <i class="bi bi-archive"></i> Archiwalne
                             <span class="badge bg-success text-white ms-1">{{ $archivalCount ?? 0 }}</span>
                         </a>
                         <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
@@ -93,40 +99,33 @@
                     </div>
                 </div>
                 
-                @if($filter === '')
-                    <div class="mt-2">
-                        <span class="badge bg-primary text-white">
-                            <i class="bi bi-info-circle"></i> 
-                            Pokazuję wszystkie zamówienia
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                    @php
+                        $processingLabels = [
+                            '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
+                            'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury)'],
+                            'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury)'],
+                            'archival' => ['bg-success text-white', 'Archiwalne (minęła data zakończenia szkolenia)'],
+                        ];
+                    @endphp
+                    <span class="badge {{ $processingLabels[$quickFilter][0] }}">
+                        <i class="bi bi-lightning-charge"></i>
+                        Szybki filtr: {{ $processingLabels[$quickFilter][1] }}
+                    </span>
+                    @if($filter !== '')
+                        <span class="badge {{ $processingLabels[$filter][0] }}">
+                            <i class="bi bi-funnel"></i>
+                            Formularz: {{ $processingLabels[$filter][1] }}
                         </span>
-                    </div>
-                @endif
-                
-                @if($filter === 'new')
-                    <div class="mt-2">
-                        <span class="badge bg-warning text-dark">
-                            <i class="bi bi-info-circle"></i> 
-                            Pokazuję tylko niezakończone zamówienia bez numeru faktury
-                        </span>
-                    </div>
-                @endif
-                
-                @if($filter === 'archival')
-                    <div class="mt-2">
-                        <span class="badge bg-success text-white">
-                            <i class="bi bi-info-circle"></i> 
-                            Pokazuję nieprzetworzone zamówienia (bez numeru faktury i nieoznaczone jako zakończone) dla zakończonych szkoleń
-                        </span>
-                    </div>
-                @endif
+                    @endif
+                </div>
             </div>
 
             {{-- Wyszukiwanie --}}
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET" action="{{ route('form-orders.index') }}">
-                        <input type="hidden" name="filter" value="{{ $filter }}">
-                        {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Rekordów na stronę --}}
+                        {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Przetwarzanie | Rekordów na stronę --}}
                         <div class="row g-3 align-items-end">
                             <div class="col-6 col-md-1">
                                 <label for="order_id" class="form-label small mb-1">ID zam.</label>
@@ -182,6 +181,15 @@
                                 </select>
                             </div>
                             <div class="col-6 col-md-2">
+                                <label for="filter" class="form-label small mb-1">Przetwarzanie</label>
+                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury; Archiwalne = minęła data zakończenia szkolenia">
+                                    <option value="" {{ $filter === '' ? 'selected' : '' }}>Wszystkie</option>
+                                    <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone</option>
+                                    <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>
+                                    <option value="archival" {{ $filter === 'archival' ? 'selected' : '' }}>Archiwalne</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
                                 <label for="per_page" class="form-label small mb-1">Rekordów na stronę:</label>
                                 <select id="per_page" name="per_page" class="form-select form-select-sm w-100">
                                     <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
@@ -207,8 +215,8 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '')
-                                    <a href="{{ route('form-orders.index', ['filter' => $filter]) }}" class="btn btn-outline-secondary">
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '')
+                                    <a href="{{ route('form-orders.index', $quickFilter !== '' ? ['quick' => $quickFilter] : []) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
                                 @endif
@@ -693,6 +701,7 @@
                                             <input type="hidden" name="search" value="{{ $search }}">
                                             <input type="hidden" name="order_id" value="{{ $orderIdFilter ?? '' }}">
                                             <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
+                                            <input type="hidden" name="quick" value="{{ $quickFilter }}">
                                             <input type="hidden" name="filter" value="{{ $filter }}">
                                             <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
                                             <button type="submit" class="btn btn-danger">
@@ -724,6 +733,9 @@
                                 <div>
                                     @php
                                         $paginationQuery = ['per_page' => $perPage, 'search' => $search, 'filter' => $filter];
+                                        if (($quickFilter ?? '') !== '') {
+                                            $paginationQuery['quick'] = $quickFilter;
+                                        }
                                         if (($orderIdFilter ?? '') !== '') {
                                             $paginationQuery['order_id'] = $orderIdFilter;
                                         }
