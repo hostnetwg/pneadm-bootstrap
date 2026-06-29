@@ -105,7 +105,7 @@
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
                             'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury i niezakończone)'],
                             'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury lub oznaczone jako zakończone)'],
-                            'archival' => ['bg-success text-white', 'Archiwalne i przetworzone (po terminie szkolenia, z fakturą lub oznaczone jako zakończone)'],
+                            'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (po terminie szkolenia, bez faktury i niezakończone)'],
                         ];
                     @endphp
                     <span class="badge {{ $processingLabels[$quickFilter][0] }}">

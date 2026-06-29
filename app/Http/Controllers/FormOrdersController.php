@@ -216,9 +216,9 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz archiwalne (skrót przycisku) = przetworzone (faktura LUB zakończone)
+        // Policz archiwalne (skrót przycisku) = nieprzetworzone (bez faktury i niezakończone)
         // ORAZ minęła data zakończenia szkolenia — spójnie z applyProcessingFilter('archival').
-        $archivalCount = FormOrder::processed()
+        $archivalCount = FormOrder::new()
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
@@ -299,8 +299,8 @@ class FormOrdersController extends Controller
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
      * Wartości: '' (brak filtra) | 'new' (bez faktury i niezakończone)
      * | 'processed' (z fakturą LUB oznaczone jako zakończone)
-     * | 'archival' (przetworzone ORAZ po terminie — odpowiednik formularza:
-     *   "Przetworzone" + zaznaczony checkbox "Archiwalne").
+     * | 'archival' (nieprzetworzone ORAZ po terminie — odpowiednik formularza:
+     *   "Nieprzetworzone" + zaznaczony checkbox "Archiwalne").
      */
     private function applyProcessingFilter($query, string $value): void
     {
@@ -310,8 +310,8 @@ class FormOrdersController extends Controller
             // Przetworzone = ma numer faktury LUB oznaczone jako zakończone.
             $query->processed();
         } elseif ($value === 'archival') {
-            // Skrót przycisku = dokładnie to samo co formularz: Przetworzone + Archiwalne.
-            $query->processed();
+            // Skrót przycisku = dokładnie to samo co formularz: Nieprzetworzone + Archiwalne.
+            $query->new();
             $this->applyArchivalScope($query);
         }
     }
