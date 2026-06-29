@@ -216,15 +216,9 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz archiwalne zamówienia = minęła data zakończenia szkolenia
-        // ORAZ zamówienie nieprzetworzone (bez numeru faktury)
-        $archivalCount = \DB::table('form_orders')
-            ->whereNull('form_orders.deleted_at')
-            ->where(function ($q) {
-                $q->whereNull('form_orders.invoice_number')
-                    ->orWhere('form_orders.invoice_number', '')
-                    ->orWhere('form_orders.invoice_number', '0');
-            })
+        // Policz archiwalne (skrót przycisku) = przetworzone (faktura LUB zakończone)
+        // ORAZ minęła data zakończenia szkolenia — spójnie z applyProcessingFilter('archival').
+        $archivalCount = FormOrder::processed()
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
@@ -305,8 +299,8 @@ class FormOrdersController extends Controller
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
      * Wartości: '' (brak filtra) | 'new' (bez faktury i niezakończone)
      * | 'processed' (z fakturą LUB oznaczone jako zakończone)
-     * | 'archival' (minęła data zakończenia szkolenia ORAZ brak numeru faktury —
-     *   szybki skrót z górnego przycisku).
+     * | 'archival' (przetworzone ORAZ po terminie — odpowiednik formularza:
+     *   "Przetworzone" + zaznaczony checkbox "Archiwalne").
      */
     private function applyProcessingFilter($query, string $value): void
     {
@@ -316,12 +310,8 @@ class FormOrdersController extends Controller
             // Przetworzone = ma numer faktury LUB oznaczone jako zakończone.
             $query->processed();
         } elseif ($value === 'archival') {
-            // Skrót dla przycisku: archiwalne (po terminie) I nieprzetworzone (bez faktury).
-            $query->where(function ($q) {
-                $q->whereNull('form_orders.invoice_number')
-                    ->orWhere('form_orders.invoice_number', '')
-                    ->orWhere('form_orders.invoice_number', '0');
-            });
+            // Skrót przycisku = dokładnie to samo co formularz: Przetworzone + Archiwalne.
+            $query->processed();
             $this->applyArchivalScope($query);
         }
     }
