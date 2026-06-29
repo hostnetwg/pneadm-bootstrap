@@ -207,9 +207,15 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz archiwalne zamówienia = te, dla których minęła data zakończenia szkolenia
+        // Policz archiwalne zamówienia = minęła data zakończenia szkolenia
+        // ORAZ zamówienie nieprzetworzone (bez numeru faktury)
         $archivalCount = \DB::table('form_orders')
             ->whereNull('form_orders.deleted_at')
+            ->where(function ($q) {
+                $q->whereNull('form_orders.invoice_number')
+                    ->orWhere('form_orders.invoice_number', '')
+                    ->orWhere('form_orders.invoice_number', '0');
+            })
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
@@ -289,7 +295,7 @@ class FormOrdersController extends Controller
     /**
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
      * Wartości: '' (brak filtra) | 'new' (bez faktury) | 'processed' (z fakturą)
-     * | 'archival' (minęła data zakończenia szkolenia).
+     * | 'archival' (minęła data zakończenia szkolenia ORAZ brak numeru faktury).
      */
     private function applyProcessingFilter($query, string $value): void
     {
@@ -298,7 +304,13 @@ class FormOrdersController extends Controller
         } elseif ($value === 'processed') {
             $query->withInvoice();
         } elseif ($value === 'archival') {
-            $query->whereExists(function ($sub) {
+            // Archiwalne = minęła data zakończenia szkolenia I jednocześnie
+            // zamówienie nieprzetworzone (bez numeru faktury).
+            $query->where(function ($q) {
+                $q->whereNull('form_orders.invoice_number')
+                    ->orWhere('form_orders.invoice_number', '')
+                    ->orWhere('form_orders.invoice_number', '0');
+            })->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
                     ->where('courses.end_date', '<', Carbon::today())

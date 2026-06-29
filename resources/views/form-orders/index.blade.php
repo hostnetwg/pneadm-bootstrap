@@ -105,7 +105,7 @@
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
                             'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury)'],
                             'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury)'],
-                            'archival' => ['bg-success text-white', 'Archiwalne (minęła data zakończenia szkolenia)'],
+                            'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (minęła data zakończenia szkolenia, bez numeru faktury)'],
                         ];
                     @endphp
                     <span class="badge {{ $processingLabels[$quickFilter][0] }}">
@@ -182,7 +182,7 @@
                             </div>
                             <div class="col-6 col-md-2">
                                 <label for="filter" class="form-label small mb-1">Przetwarzanie</label>
-                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury; Archiwalne = minęła data zakończenia szkolenia">
+                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury; Archiwalne = minęła data zakończenia szkolenia i brak numeru faktury">
                                     <option value="" {{ $filter === '' ? 'selected' : '' }}>Wszystkie</option>
                                     <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone</option>
                                     <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>
