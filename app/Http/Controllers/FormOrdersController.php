@@ -31,15 +31,19 @@ class FormOrdersController extends Controller
         $search = $request->get('search', '');
         $orderIdFilter = trim((string) $request->get('order_id', ''));
         $courseIdFilter = trim((string) $request->get('course_id', ''));
-        // Status przetwarzania — dwa NIEZALEŻNE źródła o tej samej semantyce:
-        //  - 'quick'  => szybki filtr z górnych przycisków (działa samodzielnie),
-        //  - 'filter' => opcja w formularzu (łączy się z resztą pól formularza).
-        // Dozwolone wartości: '' (Wszystkie) | new | processed | archival.
-        $allowedProcessing = ['new', 'processed', 'archival'];
+        // Status przetwarzania — dwa źródła:
+        //  - 'quick'  => szybki, NIEZALEŻNY filtr z górnych przycisków (działa samodzielnie).
+        //                Dozwolone: '' | new | processed | archival (archival = po terminie + bez faktury).
+        //  - 'filter' => opcja "Przetwarzanie" w formularzu (łączy się z resztą pól formularza).
+        //                Dozwolone: '' | new | processed (BEZ archival — archival to osobny checkbox).
         $quickFilter = $request->get('quick', '');
-        $quickFilter = in_array($quickFilter, $allowedProcessing, true) ? $quickFilter : '';
+        $quickFilter = in_array($quickFilter, ['new', 'processed', 'archival'], true) ? $quickFilter : '';
         $filter = $request->get('filter', '');
-        $filter = in_array($filter, $allowedProcessing, true) ? $filter : '';
+        $filter = in_array($filter, ['new', 'processed'], true) ? $filter : '';
+
+        // Osobny checkbox formularza: "Tylko archiwalne" = minęła data zakończenia szkolenia.
+        // Łączy się (AND) z listą "Przetwarzanie" i pozostałymi filtrami — daje więcej kombinacji.
+        $archivalOnly = $request->boolean('archival');
 
         $orderIdForExact = (ctype_digit($orderIdFilter) && $orderIdFilter !== '' && (int) $orderIdFilter > 0)
             ? (int) $orderIdFilter
@@ -55,6 +59,11 @@ class FormOrdersController extends Controller
         // Stosujemy filtr przetwarzania niezależnie z przycisków (quick) i z formularza (filter).
         $this->applyProcessingFilter($query, $quickFilter);
         $this->applyProcessingFilter($query, $filter);
+
+        // Checkbox "Tylko archiwalne" z formularza — dokłada warunek po terminie szkolenia.
+        if ($archivalOnly) {
+            $this->applyArchivalScope($query);
+        }
 
         // Konkretne ID zamówienia (priorytet nad polem „Wyszukaj”) — dokładnie jeden rekord lub brak
         if ($orderIdForExact !== null) {
@@ -289,13 +298,14 @@ class FormOrdersController extends Controller
                 ->count();
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'processedCount', 'archivalCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'processedCount', 'archivalCount'));
     }
 
     /**
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
      * Wartości: '' (brak filtra) | 'new' (bez faktury) | 'processed' (z fakturą)
-     * | 'archival' (minęła data zakończenia szkolenia ORAZ brak numeru faktury).
+     * | 'archival' (minęła data zakończenia szkolenia ORAZ brak numeru faktury —
+     *   szybki skrót z górnego przycisku).
      */
     private function applyProcessingFilter($query, string $value): void
     {
@@ -304,27 +314,38 @@ class FormOrdersController extends Controller
         } elseif ($value === 'processed') {
             $query->withInvoice();
         } elseif ($value === 'archival') {
-            // Archiwalne = minęła data zakończenia szkolenia I jednocześnie
-            // zamówienie nieprzetworzone (bez numeru faktury).
+            // Skrót dla przycisku: archiwalne (po terminie) I nieprzetworzone (bez faktury).
             $query->where(function ($q) {
                 $q->whereNull('form_orders.invoice_number')
                     ->orWhere('form_orders.invoice_number', '')
                     ->orWhere('form_orders.invoice_number', '0');
-            })->whereExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('courses')
-                    ->where('courses.end_date', '<', Carbon::today())
-                    ->where(function ($match) {
-                        $match->whereColumn('courses.id', 'form_orders.product_id')
-                            ->orWhere(function ($legacy) {
-                                $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
-                                    ->whereNotNull('courses.id_old')
-                                    ->where('courses.id_old', '!=', '')
-                                    ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
-                            });
-                    });
             });
+            $this->applyArchivalScope($query);
         }
+    }
+
+    /**
+     * Dokłada do zapytania wyłącznie warunek "archiwalne" = minęła data zakończenia
+     * szkolenia (courses.end_date < dziś). Używane przez checkbox formularza oraz
+     * jako część skrótu przycisku "Archiwalne". Nie nakłada warunku faktury —
+     * dzięki temu łączy się dowolnie z filtrem przetwarzania.
+     */
+    private function applyArchivalScope($query): void
+    {
+        $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('courses')
+                ->where('courses.end_date', '<', Carbon::today())
+                ->where(function ($match) {
+                    $match->whereColumn('courses.id', 'form_orders.product_id')
+                        ->orWhere(function ($legacy) {
+                            $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
+                                ->whereNotNull('courses.id_old')
+                                ->where('courses.id_old', '!=', '')
+                                ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
+                        });
+                });
+        });
     }
 
     /**
@@ -2740,6 +2761,9 @@ class FormOrdersController extends Controller
             }
             if ($request->has('filter')) {
                 $redirectParams['filter'] = $request->input('filter');
+            }
+            if ($request->filled('archival')) {
+                $redirectParams['archival'] = 1;
             }
             if ($request->has('page')) {
                 $redirectParams['page'] = $request->input('page');

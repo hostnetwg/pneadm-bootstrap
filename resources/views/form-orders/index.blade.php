@@ -118,6 +118,12 @@
                             Formularz: {{ $processingLabels[$filter][1] }}
                         </span>
                     @endif
+                    @if($archivalOnly)
+                        <span class="badge bg-success text-white">
+                            <i class="bi bi-archive"></i>
+                            Formularz: tylko archiwalne (minęła data zakończenia szkolenia)
+                        </span>
+                    @endif
                 </div>
             </div>
 
@@ -182,11 +188,10 @@
                             </div>
                             <div class="col-6 col-md-2">
                                 <label for="filter" class="form-label small mb-1">Przetwarzanie</label>
-                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury; Archiwalne = minęła data zakończenia szkolenia i brak numeru faktury">
+                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury">
                                     <option value="" {{ $filter === '' ? 'selected' : '' }}>Wszystkie</option>
                                     <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone</option>
                                     <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>
-                                    <option value="archival" {{ $filter === 'archival' ? 'selected' : '' }}>Archiwalne</option>
                                 </select>
                             </div>
                             <div class="col-6 col-md-2">
@@ -202,7 +207,7 @@
                         </div>
                         {{-- Wiersz 2: Wyszukaj + akcje --}}
                         <div class="row g-3 mt-1 align-items-end">
-                            <div class="col-12 col-md-8">
+                            <div class="col-12 col-md-6">
                                 <label for="search" class="form-label">Wyszukaj:</label>
                                 <input type="text"
                                        class="form-control"
@@ -211,11 +216,19 @@
                                        value="{{ $search }}"
                                        placeholder="Imię, email, produkt, faktura, kod kampanii, nazwa kampanii, ID…">
                             </div>
-                            <div class="col-12 col-md-4 d-flex align-items-end gap-2 flex-wrap">
+                            <div class="col-12 col-md-3">
+                                <div class="form-check" title="Pokaż tylko zamówienia, dla których minęła data zakończenia szkolenia. Łączy się z polem „Przetwarzanie” i resztą filtrów.">
+                                    <input class="form-check-input" type="checkbox" id="archival" name="archival" value="1" {{ $archivalOnly ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="archival">
+                                        <i class="bi bi-archive"></i> Tylko archiwalne (po terminie szkolenia)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-3 d-flex align-items-end gap-2 flex-wrap">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '')
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false))
                                     <a href="{{ route('form-orders.index', $quickFilter !== '' ? ['quick' => $quickFilter] : []) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -703,6 +716,7 @@
                                             <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
                                             <input type="hidden" name="quick" value="{{ $quickFilter }}">
                                             <input type="hidden" name="filter" value="{{ $filter }}">
+                                            <input type="hidden" name="archival" value="{{ ($archivalOnly ?? false) ? 1 : '' }}">
                                             <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
                                             <button type="submit" class="btn btn-danger">
                                                 <i class="bi bi-trash"></i> Usuń zamówienie
@@ -735,6 +749,9 @@
                                         $paginationQuery = ['per_page' => $perPage, 'search' => $search, 'filter' => $filter];
                                         if (($quickFilter ?? '') !== '') {
                                             $paginationQuery['quick'] = $quickFilter;
+                                        }
+                                        if (($archivalOnly ?? false)) {
+                                            $paginationQuery['archival'] = 1;
                                         }
                                         if (($orderIdFilter ?? '') !== '') {
                                             $paginationQuery['order_id'] = $orderIdFilter;
