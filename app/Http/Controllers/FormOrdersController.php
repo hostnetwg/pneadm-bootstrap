@@ -245,8 +245,8 @@ class FormOrdersController extends Controller
         // To jest dokładnie to samo co pokazuje filtr "new"
         $newCount = FormOrder::new()->count();
 
-        // Policz przetworzone zamówienia = te z numerem faktury (filtr "processed")
-        $processedCount = FormOrder::withInvoice()->count();
+        // Policz przetworzone zamówienia = z numerem faktury LUB oznaczone jako zakończone
+        $processedCount = FormOrder::processed()->count();
 
         // Statystyki do wyświetlenia
         // `order_date` jest zapisywane w bazie jako UTC, ale UI pokazuje dzień wg strefy aplikacji
@@ -303,7 +303,8 @@ class FormOrdersController extends Controller
 
     /**
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
-     * Wartości: '' (brak filtra) | 'new' (bez faktury) | 'processed' (z fakturą)
+     * Wartości: '' (brak filtra) | 'new' (bez faktury i niezakończone)
+     * | 'processed' (z fakturą LUB oznaczone jako zakończone)
      * | 'archival' (minęła data zakończenia szkolenia ORAZ brak numeru faktury —
      *   szybki skrót z górnego przycisku).
      */
@@ -312,7 +313,8 @@ class FormOrdersController extends Controller
         if ($value === 'new') {
             $query->new();
         } elseif ($value === 'processed') {
-            $query->withInvoice();
+            // Przetworzone = ma numer faktury LUB oznaczone jako zakończone.
+            $query->processed();
         } elseif ($value === 'archival') {
             // Skrót dla przycisku: archiwalne (po terminie) I nieprzetworzone (bez faktury).
             $query->where(function ($q) {

@@ -103,8 +103,8 @@
                     @php
                         $processingLabels = [
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
-                            'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury)'],
-                            'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury)'],
+                            'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury i niezakończone)'],
+                            'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury lub oznaczone jako zakończone)'],
                             'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (minęła data zakończenia szkolenia, bez numeru faktury)'],
                         ];
                     @endphp
@@ -188,7 +188,7 @@
                             </div>
                             <div class="col-6 col-md-2">
                                 <label for="filter" class="form-label small mb-1">Przetwarzanie</label>
-                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = z numerem faktury; Nieprzetworzone = bez faktury">
+                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = ma numer faktury lub oznaczone jako zakończone; Nieprzetworzone = bez faktury i niezakończone">
                                     <option value="" {{ $filter === '' ? 'selected' : '' }}>Wszystkie</option>
                                     <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone</option>
                                     <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>

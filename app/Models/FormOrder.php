@@ -363,6 +363,21 @@ class FormOrder extends Model
     }
 
     /**
+     * Scope - zamówienia przetworzone = mają numer faktury LUB są oznaczone
+     * jako zakończone (lub jedno i drugie). To dokładne dopełnienie scopeNew().
+     */
+    public function scopeProcessed($query)
+    {
+        return $query->where(function ($q) {
+            $q->where(function ($inv) {
+                $inv->whereNotNull('invoice_number')
+                    ->where('invoice_number', '!=', '')
+                    ->where('invoice_number', '!=', '0');
+            })->orWhere('status_completed', 1);
+        });
+    }
+
+    /**
      * Scope - zamówienia wysłane do Publigo
      */
     public function scopeSentToPubligo($query)
