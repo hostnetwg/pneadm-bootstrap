@@ -13,11 +13,16 @@ class OnlinePaymentOrderController extends Controller
         $perPage = $request->get('per_page', 25);
         $search = $request->get('search', '');
         $statusFilter = $request->get('status', '');
+        $courseId = $request->get('course_id', '');
 
         $query = OnlinePaymentOrder::with('course')->orderByDesc('id');
 
         if ($statusFilter) {
             $query->where('status', $statusFilter);
+        }
+
+        if ($courseId !== '' && $courseId !== null) {
+            $query->where('course_id', $courseId);
         }
 
         if ($search) {
@@ -40,7 +45,15 @@ class OnlinePaymentOrderController extends Controller
             'cancelled' => OnlinePaymentOrder::where('status', 'cancelled')->count(),
         ];
 
-        return view('online-payment-orders.index', compact('orders', 'search', 'statusFilter', 'perPage', 'statusCounts'));
+        $statusOptions = [
+            OnlinePaymentOrder::STATUS_PENDING => 'Oczekujące',
+            OnlinePaymentOrder::STATUS_CREATED => 'Utworzone (przekierowanie)',
+            OnlinePaymentOrder::STATUS_PAID => 'Opłacone',
+            OnlinePaymentOrder::STATUS_CANCELLED => 'Anulowane',
+            OnlinePaymentOrder::STATUS_FAILED => 'Nieudane',
+        ];
+
+        return view('online-payment-orders.index', compact('orders', 'search', 'statusFilter', 'courseId', 'perPage', 'statusCounts', 'statusOptions'));
     }
 
     public function show(int $id)

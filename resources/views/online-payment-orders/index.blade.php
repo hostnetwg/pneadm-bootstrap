@@ -16,24 +16,29 @@
 
             <div class="mb-3">
                 <div class="btn-group" role="group">
-                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page']), ['status' => ''])) }}"
+                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page', 'course_id']), ['status' => ''])) }}"
                        class="btn {{ $statusFilter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
                         Wszystkie
                     </a>
-                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page']), ['status' => 'created'])) }}"
+                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page', 'course_id']), ['status' => 'created'])) }}"
                        class="btn {{ $statusFilter === 'created' ? 'btn-info' : 'btn-outline-info' }}">
                         Utworzone (przekierowanie)
                         <span class="badge bg-white text-info ms-1">{{ $statusCounts['created'] ?? 0 }}</span>
                     </a>
-                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page']), ['status' => 'paid'])) }}"
+                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page', 'course_id']), ['status' => 'paid'])) }}"
                        class="btn {{ $statusFilter === 'paid' ? 'btn-success' : 'btn-outline-success' }}">
                         Opłacone
                         <span class="badge bg-white text-success ms-1">{{ $statusCounts['paid'] ?? 0 }}</span>
                     </a>
-                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page']), ['status' => 'pending'])) }}"
+                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page', 'course_id']), ['status' => 'pending'])) }}"
                        class="btn {{ $statusFilter === 'pending' ? 'btn-secondary' : 'btn-outline-secondary' }}">
                         Oczekujące
                         <span class="badge bg-white text-secondary ms-1">{{ $statusCounts['pending'] ?? 0 }}</span>
+                    </a>
+                    <a href="{{ route('online-payment-orders.index', array_merge(request()->only(['search', 'per_page', 'course_id']), ['status' => 'cancelled'])) }}"
+                       class="btn {{ $statusFilter === 'cancelled' ? 'btn-danger' : 'btn-outline-danger' }}">
+                        Anulowane
+                        <span class="badge bg-white text-danger ms-1">{{ $statusCounts['cancelled'] ?? 0 }}</span>
                     </a>
                 </div>
             </div>
@@ -41,19 +46,34 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET" action="{{ route('online-payment-orders.index') }}" class="row g-3">
-                        <input type="hidden" name="status" value="{{ $statusFilter }}">
-                        <div class="col-md-8">
+                        <div class="col-md-5">
+                            <label class="form-label small text-muted mb-1">Szukaj</label>
                             <input type="text" class="form-control" name="search" value="{{ $search }}"
-                                   placeholder="Szukaj: ident, e-mail, imię, nazwisko, payu_order_id...">
+                                   placeholder="ident, e-mail, imię, nazwisko, payu_order_id...">
                         </div>
                         <div class="col-md-2">
+                            <label class="form-label small text-muted mb-1">ID szkol.</label>
+                            <input type="number" class="form-control" name="course_id" value="{{ $courseId }}"
+                                   placeholder="np. 123" min="1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-1">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="">Wszystkie</option>
+                                @foreach($statusOptions as $value => $label)
+                                    <option value="{{ $value }}" {{ $statusFilter === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label small text-muted mb-1">Na stronę</label>
                             <select name="per_page" class="form-select">
                                 <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
                                 <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
                                 <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Szukaj</button>
                         </div>
                     </form>
