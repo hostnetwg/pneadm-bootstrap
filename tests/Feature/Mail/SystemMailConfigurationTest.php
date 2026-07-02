@@ -56,6 +56,15 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertStringNotContainsString('nowoczesna-edukacja.pl', $html);
     }
 
+    protected function assertCustomMailIsPolish(string $html): void
+    {
+        $this->assertStringNotContainsString('All rights reserved.', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/\b(Hello|Regards|Your password|Reset Password|Please click)\b/i',
+            strip_tags($html)
+        );
+    }
+
     public function test_instructor_training_links_mail_uses_system_mailer(): void
     {
         $mail = new InstructorTrainingLinksMail(
@@ -84,7 +93,10 @@ class SystemMailConfigurationTest extends TestCase
         );
 
         $this->assertSystemMailHeaders($mail);
-        $this->assertNoLegacyDomains($mail->build()->render());
+        $html = $mail->build()->render();
+        $this->assertNoLegacyDomains($html);
+        $this->assertCustomMailIsPolish($html);
+        $this->assertStringContainsString('Z poważaniem', $html);
     }
 
     public function test_certificate_link_mails_use_system_mailer(): void
@@ -94,9 +106,15 @@ class SystemMailConfigurationTest extends TestCase
 
         $listMail = new CertificateLinkMail($participant, $course, 'https://pnedu.pl/certificates/token');
         $this->assertSystemMailHeaders($listMail);
+        $listHtml = $listMail->build()->render();
+        $this->assertCustomMailIsPolish($listHtml);
+        $this->assertStringContainsString('Pobierz zaświadczenia', $listHtml);
 
         $singleMail = new CertificateSingleLinkMail($participant, $course, 'https://pnedu.pl/certificate/token/1');
         $this->assertSystemMailHeaders($singleMail);
+        $singleHtml = $singleMail->build()->render();
+        $this->assertCustomMailIsPolish($singleHtml);
+        $this->assertStringContainsString('Pobierz zaświadczenie', $singleHtml);
     }
 
     public function test_data_completion_mail_uses_system_mailer_and_brand_in_template(): void
@@ -117,6 +135,7 @@ class SystemMailConfigurationTest extends TestCase
 
         $html = $mail->build()->render();
         $this->assertNoLegacyDomains($html);
+        $this->assertCustomMailIsPolish($html);
         $this->assertStringContainsString('kontakt@pnedu.pl', $html);
         $this->assertStringContainsString('https://pnedu.pl', $html);
         $this->assertStringContainsString('www.pnedu.pl', $html);
@@ -166,5 +185,12 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertSame('ses', $message->mailer);
         $this->assertSame(['info@system.pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $message->from);
         $this->assertContains(['kontakt@pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $message->replyTo);
+        $this->assertSame('Powiadomienie o resetowaniu hasła', $message->subject);
+        $this->assertSame('Resetowanie hasła', $message->actionText);
+        $this->assertStringContainsString('Otrzymujesz tę wiadomość e-mail', $message->introLines[0]);
+        $this->assertStringContainsString('Link do resetowania hasła możesz wykorzystać', $message->outroLines[0]);
+        $this->assertStringContainsString('Jeśli nie prosiłeś o zresetowanie hasła', $message->outroLines[1]);
+        $this->assertStringContainsString('Wszelkie prawa zastrzeżone.', $message->render());
+        $this->assertStringNotContainsString('All rights reserved.', $message->render());
     }
 }

@@ -4,9 +4,15 @@
     "Remember me": "Zapamiętaj mnie",
     "Forgot your password?": "Zapomniałeś hasła?",
     "Log in": "Zaloguj się",
+    "Reset Password": "Resetowanie hasła",
+    "Reset Password Notification": "Powiadomienie o resetowaniu hasła",
+    "You are receiving this email because we received a password reset request for your account.": "Otrzymujesz tę wiadomość e-mail, ponieważ otrzymaliśmy prośbę o zresetowanie hasła dla Twojego konta.",
+    "This password reset link will expire in :count minutes.": "Link do resetowania hasła możesz wykorzystać w dowolnym momencie.",
+    "If you did not request a password reset, no further action is required.": "Jeśli nie prosiłeś o zresetowanie hasła, nie są wymagane żadne dalsze działania.",
     "Hello!": "Witaj!",
     "Whoops!": "Ups!",
     "Regards,": "Pozdrawiamy,",
+    "All rights reserved.": "Wszelkie prawa zastrzeżone.",
     "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\ninto your web browser:": "Jeśli przycisk „:actionText” nie działa, skopiuj poniższy adres i wklej go w pasku przeglądarki:"
 }
 
