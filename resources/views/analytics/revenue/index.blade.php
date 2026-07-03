@@ -274,6 +274,47 @@
                 </p>
             @endif
 
+            {{-- Wykres trendu dziennego --}}
+            @php
+                $trendData = $trend ?? [];
+                $trendHasData = collect($trendData)->sum('ordered_revenue_gross') > 0
+                    || collect($trendData)->sum('settled_revenue_gross') > 0;
+                $trendChart = array_map(static fn (array $r): array => [
+                    'date' => $r['stat_date'],
+                    'ordered' => round((float) $r['ordered_revenue_gross'], 2),
+                    'settled' => round((float) $r['settled_revenue_gross'], 2),
+                ], $trendData);
+            @endphp
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny — przychody</span>
+                    @if(($filters['campaign_code'] ?? null))
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis small">źródło: kampania {{ $filters['campaign_code'] }}</span>
+                    @elseif(($filters['course_id'] ?? null))
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis small">źródło: kurs ID {{ $filters['course_id'] }}</span>
+                    @endif
+                </div>
+                <div class="card-body">
+                    @unless($trendHasData)
+                        <p class="text-muted small mb-0">Brak danych do wykresu w wybranym zakresie.</p>
+                    @else
+                        <div style="position: relative; height: 280px;">
+                            <canvas id="revenueTrendChart"></canvas>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">
+                            Każdy punkt to suma z danego dnia agregacji (<code>stat_date</code>).
+                            <strong>Zamówione</strong> = kwota brutto zamówień z tego dnia;
+                            <strong>Rozliczone łącznie</strong> = opłaty online + faktury odroczone z tego dnia.
+                            Metryki mają różne daty źródłowe eventów — wykres nie jest jednym lejkiem sprzedaży.
+                            Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
+                            @if(($filters['campaign_code'] ?? null))
+                                Wykres pokazuje tylko wybraną kampanię.
+                            @endif
+                        </p>
+                    @endunless
+                </div>
+            </div>
+
             {{-- Tabela per kurs --}}
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white py-2">
@@ -387,4 +428,69 @@
             </div>
         </div>
     </div>
+
+    @if($trendHasData ?? false)
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const canvas = document.getElementById('revenueTrendChart');
+                    if (!canvas || typeof Chart === 'undefined') {
+                        return;
+                    }
+
+                    const trend = @json($trendChart ?? []);
+                    const formatPln = (value) => new Intl.NumberFormat('pl-PL', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    }).format(value) + ' PLN';
+
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: trend.map(r => r.date),
+                            datasets: [
+                                {
+                                    label: 'Zamówione (PLN)',
+                                    data: trend.map(r => r.ordered),
+                                    borderColor: '#0d6efd',
+                                    backgroundColor: 'rgba(13, 110, 253, 0.12)',
+                                    tension: 0.25,
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Rozliczone łącznie (PLN)',
+                                    data: trend.map(r => r.settled),
+                                    borderColor: '#198754',
+                                    backgroundColor: 'rgba(25, 135, 84, 0.12)',
+                                    tension: 0.25,
+                                    fill: true,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: (value) => formatPln(value),
+                                    },
+                                },
+                            },
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => ctx.dataset.label + ': ' + formatPln(ctx.parsed.y),
+                                    },
+                                },
+                            },
+                        },
+                    });
+                });
+            </script>
+        @endpush
+    @endif
 </x-app-layout>

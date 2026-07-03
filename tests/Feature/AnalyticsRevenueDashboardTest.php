@@ -347,6 +347,26 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertSee(route('analytics.revenue.recompute'), false);
     }
 
+    public function test_dashboard_renders_trend_chart_canvas_when_data_exists(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'orders_created' => 2,
+            'ordered_revenue_gross' => 200.00,
+            'settled_orders_total' => 1,
+            'settled_revenue_gross' => 100.00,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.revenue.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+            ]))
+            ->assertOk()
+            ->assertSee('revenueTrendChart')
+            ->assertSee('Trend dzienny — przychody');
+    }
+
     // ---------------------------------------------------------------------
     // R3 — CSV AI-safe export
     // ---------------------------------------------------------------------
