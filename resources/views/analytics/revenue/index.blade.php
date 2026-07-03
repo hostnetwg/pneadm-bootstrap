@@ -277,15 +277,18 @@
             {{-- Wykres trendu dziennego --}}
             @php
                 $trendData = $trend ?? [];
-                $trendHasData = collect($trendData)->sum('orders_created') > 0;
+                $trendHasData = collect($trendData)->sum('orders_created') > 0
+                    || collect($trendData)->sum('deferred_invoiced_orders') > 0
+                    || collect($trendData)->sum('online_invoiced_marker_orders') > 0;
                 $trendChart = array_map(static fn (array $r): array => [
                     'date' => $r['stat_date'],
                     'orders' => (int) $r['orders_created'],
+                    'invoiced' => (int) $r['deferred_invoiced_orders'] + (int) $r['online_invoiced_marker_orders'],
                 ], $trendData);
             @endphp
             <div class="card shadow-sm mb-3">
-                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny — złożone zamówienia</span>
+                <div class="card-header bg-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny</span>
                     @if(($filters['campaign_code'] ?? null))
                         <span class="badge bg-secondary-subtle text-secondary-emphasis small">źródło: kampania {{ $filters['campaign_code'] }}</span>
                     @elseif(($filters['course_id'] ?? null))
@@ -296,12 +299,30 @@
                     @unless($trendHasData)
                         <p class="text-muted small mb-0">Brak danych do wykresu w wybranym zakresie.</p>
                     @else
+                        <div class="d-flex flex-wrap gap-3 mb-3">
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" id="revenueTrendShowOrders" checked>
+                                <label class="form-check-label small" for="revenueTrendShowOrders">
+                                    <span class="d-inline-block rounded-circle align-middle me-1" style="width:10px;height:10px;background:#0d6efd;"></span>
+                                    Złożone zamówienia
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" id="revenueTrendShowInvoiced">
+                                <label class="form-check-label small" for="revenueTrendShowInvoiced">
+                                    <span class="d-inline-block rounded-circle align-middle me-1" style="width:10px;height:10px;background:#198754;"></span>
+                                    Zaksięgowane (dodana faktura)
+                                </label>
+                            </div>
+                        </div>
                         <div style="position: relative; height: 280px;">
                             <canvas id="revenueTrendChart"></canvas>
                         </div>
                         <p class="small text-muted mb-0 mt-2">
-                            Każdy punkt to liczba zamówień złożonych w danym dniu (<code>form_order_created</code>, data agregacji <code>stat_date</code>).
-                            Bez opłat online i faktur — tylko złożone zamówienia.
+                            <strong>Złożone zamówienia</strong> — wszystkie zamówienia złożone w danym dniu (<code>form_order_created</code>),
+                            niezależnie od trybu płatności (odroczona lub online). To <em>nie</em> jest suma opłat PayU/PayNow i faktur — liczymy moment złożenia formularza.
+                            <strong>Zaksięgowane (faktura)</strong> — faktury odroczone + znaczniki faktury online (<code>invoice_created</code>) w danym dniu.
+                            Opłaty online bez osobnej linii — widać je w kafelku „Opłacone online” i tabelach poniżej.
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -436,7 +457,7 @@
 
                     const trend = @json($trendChart ?? []);
 
-                    new Chart(canvas, {
+                    const chart = new Chart(canvas, {
                         type: 'line',
                         data: {
                             labels: trend.map(r => r.date),
@@ -449,6 +470,15 @@
                                     tension: 0.25,
                                     fill: true,
                                 },
+                                {
+                                    label: 'Zaksięgowane (dodana faktura)',
+                                    data: trend.map(r => r.invoiced),
+                                    borderColor: '#198754',
+                                    backgroundColor: 'rgba(25, 135, 84, 0.12)',
+                                    tension: 0.25,
+                                    fill: true,
+                                    hidden: true,
+                                },
                             ],
                         },
                         options: {
@@ -459,10 +489,24 @@
                                 y: { beginAtZero: true, ticks: { precision: 0 } },
                             },
                             plugins: {
-                                legend: { position: 'bottom' },
+                                legend: { display: false },
                             },
                         },
                     });
+
+                    const ordersToggle = document.getElementById('revenueTrendShowOrders');
+                    const invoicedToggle = document.getElementById('revenueTrendShowInvoiced');
+
+                    const syncDataset = (index, checkbox) => {
+                        if (!checkbox) {
+                            return;
+                        }
+                        chart.setDatasetVisibility(index, checkbox.checked);
+                        chart.update();
+                    };
+
+                    ordersToggle?.addEventListener('change', () => syncDataset(0, ordersToggle));
+                    invoicedToggle?.addEventListener('change', () => syncDataset(1, invoicedToggle));
                 });
             </script>
         @endpush

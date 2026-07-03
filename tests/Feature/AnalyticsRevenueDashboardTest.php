@@ -364,7 +364,10 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('revenueTrendChart')
-            ->assertSee('Trend dzienny — złożone zamówienia');
+            ->assertSee('revenueTrendShowOrders')
+            ->assertSee('revenueTrendShowInvoiced')
+            ->assertSee('Złożone zamówienia')
+            ->assertSee('Zaksięgowane (dodana faktura)');
     }
 
     // ---------------------------------------------------------------------
