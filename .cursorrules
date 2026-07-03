@@ -172,6 +172,7 @@ sail artisan test --filter TestName      # Run specific test
 - Bootstrap CSS/JS is imported in `resources/js/app.js` and `resources/css/app.css`
 - No jQuery dependency (Bootstrap 5 is vanilla JS)
 - Popper.js included for tooltips/popovers
+- **Potwierdzenia UI:** NIGDY natywnego `confirm()` / `alert()` / `prompt()` w panelu — zawsze modal Bootstrap 5. Szczegóły: `docs/UI_MODALS.md`
 
 ## When Suggesting Code
 - Assume Laravel Sail environment

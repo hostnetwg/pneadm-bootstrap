@@ -212,6 +212,12 @@ class FormOrder extends Model
         'invoice_number',
         'invoice_notes',
         'invoice_payment_delay',
+        'invoice_exempt_at',
+        'invoice_exempt_reason',
+        'invoice_exempt_by',
+        'legacy_handled_at',
+        'legacy_handled_reason',
+        'legacy_handled_by',
         'payment_mode',
         'payment_status',
         'submission_source',
@@ -231,6 +237,9 @@ class FormOrder extends Model
 
         // Status i notatki
         'status_completed',
+        'cancelled_at',
+        'cancelled_reason',
+        'cancelled_by',
         'notes',
         'updated_manually_at',
 
@@ -257,7 +266,10 @@ class FormOrder extends Model
         'pnedu_user_existed_before' => 'boolean',
         'pnedu_clickmeeting_synced_at' => 'datetime',
         'invoice_payment_delay' => 'integer',
+        'invoice_exempt_at' => 'datetime',
+        'legacy_handled_at' => 'datetime',
         'status_completed' => 'integer',
+        'cancelled_at' => 'datetime',
         'updated_manually_at' => 'datetime',
         'ksef_sent_at' => 'datetime',
         'created_at' => 'datetime',
@@ -330,18 +342,28 @@ class FormOrder extends Model
     }
 
     /**
-     * Scope - tylko nowe zamówienia (bez faktury i niezakończone)
+     * Scope - zamówienia wymagające obsługi (brak FV i/lub brak uczestnika na szkoleniu, nieanulowane).
+     */
+    public function scopeNeedsHandling($query)
+    {
+        return app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsOperationalHandling($query);
+    }
+
+    /**
+     * Scope - bieżąca kolejka operacyjna (aktywne szkolenia z rozpoznanym kursem).
+     */
+    public function scopeNeedsActiveHandling($query)
+    {
+        return app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsActiveOperationalHandling($query);
+    }
+
+    /**
+     * Scope - zamówienia wymagające dodania uczestnika(ów) (alias operacyjny „nieprzetworzone”).
+     * Faktura i status_completed nie decydują o tym filtrze.
      */
     public function scopeNew($query)
     {
-        return $query->where(function ($q) {
-            $q->whereNull('invoice_number')
-                ->orWhere('invoice_number', '')
-                ->orWhere('invoice_number', '0');
-        })->where(function ($q) {
-            $q->where('status_completed', '!=', 1)
-                ->orWhereNull('status_completed');
-        });
+        return app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsAttention($query);
     }
 
     /**
@@ -350,6 +372,14 @@ class FormOrder extends Model
     public function scopeCompleted($query)
     {
         return $query->where('status_completed', 1);
+    }
+
+    /**
+     * Scope - zamówienia anulowane operacyjnie (cancelled_at ustawione).
+     */
+    public function scopeCancelled($query)
+    {
+        return $query->whereNotNull('cancelled_at');
     }
 
     /**
@@ -363,18 +393,11 @@ class FormOrder extends Model
     }
 
     /**
-     * Scope - zamówienia przetworzone = mają numer faktury LUB są oznaczone
-     * jako zakończone (lub jedno i drugie). To dokładne dopełnienie scopeNew().
+     * Scope - zamówienia operacyjnie przetworzone (wszyscy uczestnicy na szkoleniu, nieanulowane).
      */
     public function scopeProcessed($query)
     {
-        return $query->where(function ($q) {
-            $q->where(function ($inv) {
-                $inv->whereNotNull('invoice_number')
-                    ->where('invoice_number', '!=', '')
-                    ->where('invoice_number', '!=', '0');
-            })->orWhere('status_completed', 1);
-        });
+        return app(\App\Services\FormOrderOperationalStatusService::class)->scopeProcessed($query);
     }
 
     /**
@@ -531,12 +554,21 @@ class FormOrder extends Model
     }
 
     /**
-     * Accessor - czy zamówienie jest nowe (bez faktury i niezakończone)
+     * Accessor - czy zamówienie wymaga uwagi operacyjnej (alias scopeNew).
      */
     public function getIsNewAttribute(): bool
     {
-        return (empty($this->invoice_number) || $this->invoice_number == '0')
-               && $this->status_completed != 1;
+        return app(\App\Services\FormOrderOperationalStatusService::class)->needsAttention($this);
+    }
+
+    /**
+     * Wyliczony status operacyjny (dostęp uczestników, nie faktura).
+     *
+     * @return array{status: string, label: string, badge_class: string, expected_count: int, provisioned_count: int, warnings: array<int, string>, course_id: int|null}
+     */
+    public function getOperationalStatusAttribute(): array
+    {
+        return app(\App\Services\FormOrderOperationalStatusService::class)->evaluate($this);
     }
 
     /**
@@ -546,6 +578,27 @@ class FormOrder extends Model
     {
         return ! empty($this->invoice_number)
                && $this->invoice_number != '0';
+    }
+
+    /**
+     * Oznaczone jako zamknięte rozliczeniowo bez FV (bezpłatny dostęp).
+     */
+    public function isInvoiceExempt(): bool
+    {
+        return $this->invoice_exempt_at !== null;
+    }
+
+    public function isLegacyHandled(): bool
+    {
+        return $this->legacy_handled_at !== null;
+    }
+
+    /**
+     * Rozliczenie uznane za zamknięte: wystawiona FV lub zwolnienie z FV.
+     */
+    public function isBillingComplete(): bool
+    {
+        return $this->has_invoice || $this->isInvoiceExempt();
     }
 
     /**
@@ -866,6 +919,29 @@ class FormOrder extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'product_id');
+    }
+
+    /**
+     * Administrator, który anulował zamówienie.
+     */
+    public function cancelledByUser()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function invoiceExemptByUser()
+    {
+        return $this->belongsTo(User::class, 'invoice_exempt_by');
+    }
+
+    public function legacyHandledByUser()
+    {
+        return $this->belongsTo(User::class, 'legacy_handled_by');
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->cancelled_at !== null;
     }
 
     /**

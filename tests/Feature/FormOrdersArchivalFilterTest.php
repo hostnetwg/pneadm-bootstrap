@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,13 @@ class FormOrdersArchivalFilterTest extends TestCase
             'status_completed' => 0,
             'orderer_email' => 'archival@example.test',
         ]);
+        FormOrderParticipant::create([
+            'form_order_id' => $archivalOrder->id,
+            'participant_firstname' => 'Arch',
+            'participant_lastname' => 'Test',
+            'participant_email' => 'archival@example.test',
+            'is_primary' => true,
+        ]);
 
         $nonArchivalOrder = FormOrder::create([
             'product_id' => $activeCourseId,
@@ -66,8 +74,15 @@ class FormOrdersArchivalFilterTest extends TestCase
             'status_completed' => 0,
             'orderer_email' => 'non-archival@example.test',
         ]);
+        FormOrderParticipant::create([
+            'form_order_id' => $nonArchivalOrder->id,
+            'participant_firstname' => 'Active',
+            'participant_lastname' => 'Test',
+            'participant_email' => 'non-archival@example.test',
+            'is_primary' => true,
+        ]);
 
-        $response = $this->actingAs($user)->get(route('form-orders.index', ['filter' => 'archival']));
+        $response = $this->actingAs($user)->get(route('form-orders.index', ['quick' => 'archival']));
 
         $response->assertOk();
         $response->assertSee('ID: #'.$archivalOrder->id, false);
@@ -107,8 +122,15 @@ class FormOrdersArchivalFilterTest extends TestCase
             'status_completed' => 0,
             'orderer_email' => 'legacy@example.test',
         ]);
+        FormOrderParticipant::create([
+            'form_order_id' => $legacyOrder->id,
+            'participant_firstname' => 'Legacy',
+            'participant_lastname' => 'Test',
+            'participant_email' => 'legacy@example.test',
+            'is_primary' => true,
+        ]);
 
-        $response = $this->actingAs($user)->get(route('form-orders.index', ['filter' => 'archival']));
+        $response = $this->actingAs($user)->get(route('form-orders.index', ['quick' => 'archival']));
 
         $response->assertOk();
         $response->assertSee('ID: #'.$legacyOrder->id, false);

@@ -99,7 +99,7 @@ class FormOrderPneduProvisionService
                         $order->submission_source === FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM
                     );
 
-                Participant::query()->create([
+                $createdParticipant = Participant::query()->create([
                     'course_id' => $course->id,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
@@ -109,6 +109,11 @@ class FormOrderPneduProvisionService
                     'order' => Participant::query()->where('course_id', $course->id)->count() + 1,
                     'access_expires_at' => $accessExpiresAt,
                 ]);
+
+                if ($p) {
+                    $p->participant_id = $createdParticipant->id;
+                    $p->save();
+                }
 
                 $order->pnedu_provisioned_at = now();
                 $order->pnedu_user_existed_before = $userExisted;

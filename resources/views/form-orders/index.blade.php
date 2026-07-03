@@ -65,11 +65,18 @@
                            class="btn {{ $quickFilter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
                             <i class="bi bi-list"></i> Wszystkie
                         </a>
-                        <a href="{{ route('form-orders.index', ['quick' => 'new']) }}"
-                           class="btn {{ $quickFilter === 'new' ? 'btn-warning' : 'btn-outline-warning' }}">
-                            <i class="bi bi-exclamation-triangle"></i> Nieprzetworzone
-                            <span class="badge bg-warning text-dark ms-1">{{ $newCount ?? 0 }}</span>
+                        <a href="{{ route('form-orders.index', ['quick' => 'handling']) }}"
+                           class="btn {{ $quickFilter === 'handling' ? 'btn-danger' : 'btn-outline-danger' }}">
+                            <i class="bi bi-exclamation-triangle"></i> Do obsługi (aktywne)
+                            <span class="badge bg-danger text-white ms-1">{{ $handlingCount ?? 0 }}</span>
                         </a>
+                        @if(($legacyBacklogCount ?? 0) > ($handlingCount ?? 0))
+                            <a href="{{ route('form-orders.index', ['filter' => 'handling_all']) }}"
+                               class="btn btn-outline-dark btn-sm align-self-center"
+                               title="Pełny backlog (w tym legacy do zamknięcia komendą form-orders:close-legacy-handled)">
+                                Backlog legacy: {{ $legacyBacklogCount }}
+                            </a>
+                        @endif
                         <a href="{{ route('form-orders.index', ['quick' => 'processed']) }}"
                            class="btn {{ $quickFilter === 'processed' ? 'btn-info' : 'btn-outline-info' }}">
                             <i class="bi bi-receipt"></i> Przetworzone
@@ -79,6 +86,11 @@
                            class="btn {{ $quickFilter === 'archival' ? 'btn-success' : 'btn-outline-success' }}">
                             <i class="bi bi-archive"></i> Archiwalne
                             <span class="badge bg-success text-white ms-1">{{ $archivalCount ?? 0 }}</span>
+                        </a>
+                        <a href="{{ route('form-orders.index', ['quick' => 'cancelled']) }}"
+                           class="btn {{ $quickFilter === 'cancelled' ? 'btn-secondary' : 'btn-outline-secondary' }}">
+                            <i class="bi bi-x-circle"></i> Anulowane
+                            <span class="badge bg-secondary text-white ms-1">{{ $cancelledCount ?? 0 }}</span>
                         </a>
                         <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
                            class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif"
@@ -103,9 +115,12 @@
                     @php
                         $processingLabels = [
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
-                            'new' => ['bg-warning text-dark', 'Nieprzetworzone (bez numeru faktury i niezakończone)'],
-                            'processed' => ['bg-info text-dark', 'Przetworzone (z numerem faktury lub oznaczone jako zakończone)'],
-                            'archival' => ['bg-success text-white', 'Archiwalne i nieprzetworzone (minęła data i godzina zakończenia, bez faktury i niezaznaczone „Zakończone”)'],
+                            'new' => ['bg-warning text-dark', 'Nieprzetworzone (brak dostępu uczestnika na szkoleniu)'],
+                            'handling' => ['bg-danger text-white', 'Do obsługi — aktywne szkolenia (brak FV i/lub uczestnika)'],
+                            'handling_all' => ['bg-dark text-white', 'Do obsługi — pełny backlog (w tym legacy)'],
+                            'processed' => ['bg-info text-dark', 'Przetworzone (FV + uczestnicy na szkoleniu)'],
+                            'cancelled' => ['bg-secondary text-white', 'Anulowane (cancelled_at)'],
+                            'archival' => ['bg-success text-white', 'Archiwalne i do obsługi (po terminie szkolenia, brak FV i/lub uczestnika)'],
                         ];
                     @endphp
                     <span class="badge {{ $processingLabels[$quickFilter][0] }}">
@@ -188,10 +203,13 @@
                             </div>
                             <div class="col-6 col-md-2">
                                 <label for="filter" class="form-label small mb-1">Przetwarzanie</label>
-                                <select id="filter" name="filter" class="form-select form-select-sm" title="Przetworzone = ma numer faktury lub oznaczone jako zakończone; Nieprzetworzone = bez faktury i niezakończone">
+                                <select id="filter" name="filter" class="form-select form-select-sm" title="Do obsługi = aktywne szkolenia; Backlog = także legacy">
                                     <option value="" {{ $filter === '' ? 'selected' : '' }}>Wszystkie</option>
-                                    <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone</option>
+                                    <option value="handling" {{ $filter === 'handling' ? 'selected' : '' }}>Do obsługi (aktywne)</option>
+                                    <option value="handling_all" {{ $filter === 'handling_all' ? 'selected' : '' }}>Do obsługi (backlog)</option>
+                                    <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone (uczestnik)</option>
                                     <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>
+                                    <option value="cancelled" {{ $filter === 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                                 </select>
                             </div>
                             <div class="col-6 col-md-2">
@@ -244,7 +262,10 @@
                 <div class="card-body">
                     <div class="text-center">
                         <strong>Wszystkie zamówienia:</strong> {{ number_format($stats['total'], 0, ',', ' ') }} | 
-                        <strong>Nowe:</strong> {{ $stats['new'] }} | 
+                        <strong>Do obsługi (aktywne):</strong> {{ $stats['handling'] }} |
+                        @if(($stats['handling_backlog'] ?? 0) > ($stats['handling'] ?? 0))
+                            <strong>Backlog legacy:</strong> {{ $stats['handling_backlog'] }} |
+                        @endif 
                         <strong>Wczoraj:</strong> {{ $stats['yesterday'] }} | 
                         <strong>Dzisiaj:</strong> {{ $stats['today'] }} | 
                         <strong>Archiwalne:</strong> {{ $stats['archival'] }} | 
@@ -364,6 +385,7 @@
                             </div>
                             
                             <div class="card-body">
+                                @include('form-orders.partials.operational-status', ['zamowienie' => $zamowienie])
                                 {{-- SZKOLENIE --}}
                                 <div class="mb-4">
                                     <h6 class="text-primary fw-bold mb-2">
@@ -536,8 +558,8 @@
                                                         <label class="form-label small">Status:</label>
                                                         <div class="form-check">
                                                             <input class="form-check-input" type="checkbox" id="status_completed_{{ $zamowienie->id }}" name="status_completed" value="1" {{ $zamowienie->status_completed == 1 ? 'checked' : '' }}>
-                                                            <label class="form-check-label small" for="status_completed_{{ $zamowienie->id }}">
-                                                                Zakończone
+                                                            <label class="form-check-label small text-muted" for="status_completed_{{ $zamowienie->id }}">
+                                                                Zakończone (legacy)
                                                             </label>
                                                         </div>
                                                     </div>

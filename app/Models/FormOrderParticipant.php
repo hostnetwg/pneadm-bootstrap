@@ -18,6 +18,7 @@ class FormOrderParticipant extends Model
         'participant_lastname',
         'participant_email',
         'is_primary',
+        'participant_id',
     ];
 
     protected $casts = [
@@ -32,6 +33,14 @@ class FormOrderParticipant extends Model
     public function formOrder()
     {
         return $this->belongsTo(FormOrder::class, 'form_order_id');
+    }
+
+    /**
+     * Rekord uczestnika szkolenia utworzony z tego zamówienia.
+     */
+    public function participant()
+    {
+        return $this->belongsTo(Participant::class, 'participant_id');
     }
 
     /**

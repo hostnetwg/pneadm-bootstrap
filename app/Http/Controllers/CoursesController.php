@@ -217,38 +217,12 @@ class CoursesController extends Controller
             }]);
         }
 
-        // Liczba „niewprowadzonych” zamówień (jak scope FormOrder::new): po product_id = courses.id
-        // (formularz uniwersalny pnedu) oraz — wsteczna zgodność Publigo — po publigo_product_id = courses.id_old.
+        // Liczba zamówień wymagających obsługi (brak FV i/lub uczestnika, nieanulowane).
         $courseIdsOnPage = $courses->getCollection()->pluck('id')->all();
 
         if (! empty($courseIdsOnPage)) {
-            $ordersCountsByCourseId = DB::connection('mysql')
-                ->table('courses as c')
-                ->join('form_orders as fo', function ($join) {
-                    $join->whereNull('fo.deleted_at')
-                        ->where(function ($q) {
-                            $q->whereColumn('fo.product_id', 'c.id')
-                                ->orWhere(function ($q2) {
-                                    $q2->whereNotNull('c.id_old')
-                                        ->where('c.id_old', '!=', '')
-                                        ->whereColumn('fo.publigo_product_id', 'c.id_old');
-                                });
-                        })
-                        ->where(function ($q) {
-                            $q->whereNull('fo.invoice_number')
-                                ->orWhere('fo.invoice_number', '')
-                                ->orWhere('fo.invoice_number', '0');
-                        })
-                        ->where(function ($q) {
-                            $q->whereNull('fo.status_completed')
-                                ->orWhere('fo.status_completed', 0);
-                        });
-                })
-                ->whereIn('c.id', $courseIdsOnPage)
-                ->groupBy('c.id')
-                ->select('c.id as course_id', DB::raw('COUNT(DISTINCT fo.id) as cnt'))
-                ->pluck('cnt', 'course_id')
-                ->toArray();
+            $operational = app(\App\Services\FormOrderOperationalStatusService::class);
+            $ordersCountsByCourseId = $operational->countNeedsHandlingByCourseIds($courseIdsOnPage);
 
             $closedPaidIds = $courses->getCollection()
                 ->filter(fn (Course $c) => $c->category === 'closed' && $c->is_paid)

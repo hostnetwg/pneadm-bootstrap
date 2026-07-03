@@ -197,12 +197,12 @@ class CourseFunnelStatsService
     }
 
     /**
-     * Zamówienie operacyjnie „złożone” w lejku (🛒): wyklucza ręcznie zakończone bez faktury.
+     * Zamówienie operacyjnie „złożone” w lejku (🛒): wyklucza anulowane (cancelled_at).
      */
     public function operationalSubmittedOrderSql(string $invoiceColumn = 'invoice_number', string $statusColumn = 'status_completed'): string
     {
-        $invoicePresent = $this->invoicePresentSql($invoiceColumn);
+        unset($invoiceColumn, $statusColumn);
 
-        return "NOT ({$statusColumn} = 1 AND NOT {$invoicePresent})";
+        return '(fo.cancelled_at IS NULL)';
     }
 }

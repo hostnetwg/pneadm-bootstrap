@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Services\FormOrderAccessExtensionService;
+use App\Services\FormOrderCancellationService;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
 use App\Services\PubligoApiService;
@@ -33,13 +34,16 @@ class FormOrdersController extends Controller
         $courseIdFilter = trim((string) $request->get('course_id', ''));
         // Status przetwarzania — dwa źródła:
         //  - 'quick'  => szybki, NIEZALEŻNY filtr z górnych przycisków (działa samodzielnie).
-        //                Dozwolone: '' | new | processed | archival (archival = po terminie + bez faktury).
+        //                Dozwolone: '' | handling | processed | archival | cancelled  (legacy: quick=new → handling)
         //  - 'filter' => opcja "Przetwarzanie" w formularzu (łączy się z resztą pól formularza).
-        //                Dozwolone: '' | new | processed (BEZ archival — archival to osobny checkbox).
+        //                Dozwolone: '' | handling | new | processed | cancelled (BEZ archival — archival to osobny checkbox).
         $quickFilter = $request->get('quick', '');
-        $quickFilter = in_array($quickFilter, ['new', 'processed', 'archival'], true) ? $quickFilter : '';
+        if ($quickFilter === 'new') {
+            $quickFilter = 'handling';
+        }
+        $quickFilter = in_array($quickFilter, ['handling', 'processed', 'archival', 'cancelled'], true) ? $quickFilter : '';
         $filter = $request->get('filter', '');
-        $filter = in_array($filter, ['new', 'processed'], true) ? $filter : '';
+        $filter = in_array($filter, ['new', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
 
         // Osobny checkbox formularza: "Tylko archiwalne" = minęła data zakończenia szkolenia.
         // Łączy się (AND) z listą "Przetwarzanie" i pozostałymi filtrami — daje więcej kombinacji.
@@ -185,7 +189,7 @@ class FormOrdersController extends Controller
 
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->get();
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -195,7 +199,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->paginate($perPage);
         }
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień
@@ -216,9 +220,8 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz archiwalne (skrót przycisku) = nieprzetworzone (bez faktury i niezakończone)
-        // ORAZ minęła data zakończenia szkolenia — spójnie z applyProcessingFilter('archival').
-        $archivalCount = FormOrder::new()
+        // Policz archiwalne (skrót przycisku) = do obsługi ORAZ minęła data zakończenia szkolenia.
+        $archivalCount = FormOrder::needsHandling()
             ->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
                     ->from('courses')
@@ -235,12 +238,15 @@ class FormOrdersController extends Controller
             })
             ->count();
 
-        // Policz wszystkie nieprzetworzone zamówienia (bez numeru faktury i nie ukończone)
-        // To jest dokładnie to samo co pokazuje filtr "new"
-        $newCount = FormOrder::new()->count();
+        // Policz bieżącą kolejkę (aktywne szkolenia) oraz pełny backlog legacy do zamknięcia komendą.
+        $handlingCount = FormOrder::needsActiveHandling()->count();
+        $legacyBacklogCount = FormOrder::needsHandling()->count();
 
-        // Policz przetworzone zamówienia = z numerem faktury LUB oznaczone jako zakończone
+        // Policz operacyjnie przetworzone (wszyscy uczestnicy na szkoleniu, nieanulowane)
         $processedCount = FormOrder::processed()->count();
+
+        // Policz anulowane (cancelled_at)
+        $cancelledCount = FormOrder::cancelled()->count();
 
         // Statystyki do wyświetlenia
         // `order_date` jest zapisywane w bazie jako UTC, ale UI pokazuje dzień wg strefy aplikacji
@@ -257,7 +263,8 @@ class FormOrdersController extends Controller
 
         $stats = [
             'total' => FormOrder::count(),
-            'new' => $newCount,
+            'handling' => $handlingCount,
+            'handling_backlog' => $legacyBacklogCount,
             'yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
                 ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->count(),
@@ -292,26 +299,33 @@ class FormOrdersController extends Controller
                 ->count();
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'newCount', 'processedCount', 'archivalCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'handlingCount', 'legacyBacklogCount', 'processedCount', 'archivalCount', 'cancelledCount'));
     }
 
     /**
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
-     * Wartości: '' (brak filtra) | 'new' (bez faktury i niezakończone)
-     * | 'processed' (z fakturą LUB oznaczone jako zakończone)
-     * | 'archival' (nieprzetworzone ORAZ po terminie — odpowiednik formularza:
-     *   "Nieprzetworzone" + zaznaczony checkbox "Archiwalne").
+     * Wartości: '' (brak filtra) | 'new' (brak dostępu uczestnika(ów) na szkoleniu, nieanulowane)
+     * | 'handling' (brak FV i/lub brak pełnego dostępu uczestników, nieanulowane)
+     * | 'processed' (wszyscy uczestnicy na szkoleniu, nieanulowane)
+     * | 'cancelled' (cancelled_at ustawione)
+     * | 'archival' (do obsługi ORAZ po terminie — odpowiednik formularza:
+     *   "Do obsługi" + zaznaczony checkbox "Archiwalne").
      */
     private function applyProcessingFilter($query, string $value): void
     {
         if ($value === 'new') {
             $query->new();
+        } elseif ($value === 'handling') {
+            $query->needsActiveHandling();
+        } elseif ($value === 'handling_all') {
+            $query->needsHandling();
         } elseif ($value === 'processed') {
-            // Przetworzone = ma numer faktury LUB oznaczone jako zakończone.
             $query->processed();
+        } elseif ($value === 'cancelled') {
+            $query->cancelled();
         } elseif ($value === 'archival') {
-            // Skrót przycisku = dokładnie to samo co formularz: Nieprzetworzone + Archiwalne.
-            $query->new();
+            // Skrót przycisku = dokładnie to samo co formularz: Do obsługi + Archiwalne.
+            $query->needsHandling();
             $this->applyArchivalScope($query);
         }
     }
@@ -625,7 +639,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -1048,6 +1062,88 @@ class FormOrdersController extends Controller
 
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Anuluje zamówienie (void) — opcjonalnie wypisuje uczestników powiązanych przez participant_id.
+     */
+    public function cancelOrder(Request $request, int $id)
+    {
+        $request->validate([
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        $order = FormOrder::with('participants')->find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'error' => 'Zamówienie nie zostało znalezione.'], 404);
+        }
+
+        $result = app(FormOrderCancellationService::class)->cancel(
+            $order,
+            $request->input('reason'),
+            auth()->id()
+        );
+
+        $http = ($result['success'] ?? false) ? 200 : 422;
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Cofa anulowanie zamówienia (bez automatycznego przywracania uczestników).
+     */
+    public function restoreOrder(int $id)
+    {
+        $order = FormOrder::find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'error' => 'Zamówienie nie zostało znalezione.'], 404);
+        }
+
+        $result = app(FormOrderCancellationService::class)->restore($order);
+        $http = ($result['success'] ?? false) ? 200 : 422;
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Oznacza zamówienie jako bez faktury (bezpłatny dostęp) — zamyka stronę rozliczeniową bez FV.
+     */
+    public function markInvoiceExempt(Request $request, int $id)
+    {
+        $request->validate([
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        $order = FormOrder::find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'error' => 'Zamówienie nie zostało znalezione.'], 404);
+        }
+
+        $result = app(\App\Services\FormOrderInvoiceExemptService::class)->markExempt(
+            $order,
+            $request->input('reason'),
+            auth()->id()
+        );
+
+        $http = ($result['success'] ?? false) ? 200 : 422;
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Cofa oznaczenie „bez faktury”.
+     */
+    public function clearInvoiceExempt(int $id)
+    {
+        $order = FormOrder::find($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'error' => 'Zamówienie nie zostało znalezione.'], 404);
+        }
+
+        $result = app(\App\Services\FormOrderInvoiceExemptService::class)->clearExempt($order);
+        $http = ($result['success'] ?? false) ? 200 : 422;
 
         return response()->json($result, $http);
     }
@@ -2997,8 +3093,11 @@ class FormOrdersController extends Controller
                 ], 400);
             }
 
-            // Oznacz jako zakończone
+            // Oznacz jako zakończone (duplikat) — jednocześnie anulowanie operacyjne
             $zamowienie->status_completed = 1;
+            $zamowienie->cancelled_at = now();
+            $zamowienie->cancelled_reason = 'duplicate';
+            $zamowienie->cancelled_by = auth()->id();
 
             // Dodaj notatkę jeśli podana
             $notes = $request->input('notes');

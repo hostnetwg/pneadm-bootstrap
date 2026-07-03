@@ -522,13 +522,13 @@
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $completeDataCount }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
                             @if($course->orders_count > 0)
-                                <a href="{{ route('form-orders.index', ['filter' => 'new', 'course_id' => $course->id]) }}" 
+                                <a href="{{ route('form-orders.index', ['filter' => 'handling', 'course_id' => $course->id]) }}" 
                                    class="badge bg-danger text-decoration-none" 
-                                   title="Kliknij, aby zobaczyć nieobsłużone zamówienia dla tego szkolenia (pole ID szkol.)">
+                                   title="Zamówienia wymagające obsługi: wystawienie FV, dodanie uczestników lub anulowanie">
                                     {{ $course->orders_count }}
                                 </a>
                             @else
-                                <span class="badge bg-secondary" title="Liczba nie wprowadzonych zamówień">0</span>
+                                <span class="badge bg-secondary" title="Brak zamówień wymagających obsługi (FV + uczestnicy lub anulowanie)">0</span>
                             @endif
                         </td>
                         <td class="text-center align-middle small" style="line-height: 1.35;">

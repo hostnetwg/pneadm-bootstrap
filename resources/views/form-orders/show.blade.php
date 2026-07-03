@@ -158,13 +158,6 @@
                 </div>
             @endif
 
-            {{-- Status zamówienia --}}
-            @if($zamowienie->is_new)
-                <div class="text-center mb-3" id="orderStatusAlert">
-                    <small class="text-danger fw-bold">ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!</small>
-                </div>
-            @endif
-
             {{-- SZKOLENIE - kompaktowe --}}
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white py-3">
@@ -655,6 +648,45 @@ nowoczesna-edukacja.pl </div>
                             </h6>
                         </div>
                         <div class="card-body py-2">
+                            <div class="border-bottom pb-2 mb-3">
+                                <div class="small text-muted fw-semibold mb-2">
+                                    <i class="bi bi-clipboard-check"></i> Status operacyjny
+                                </div>
+                                @include('form-orders.partials.operational-status', [
+                                    'zamowienie' => $zamowienie,
+                                    'hide_invoice_badge' => true,
+                                ])
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    @if($zamowienie->cancelled_at)
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#restoreOrderModal">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Przywróć zamówienie
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                                            <i class="bi bi-x-circle"></i> Anuluj zamówienie
+                                        </button>
+                                        @if($zamowienie->isInvoiceExempt())
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#clearInvoiceExemptModal">
+                                                <i class="bi bi-receipt-cutoff"></i> Cofnij „bez FV”
+                                            </button>
+                                        @elseif(!$zamowienie->has_invoice)
+                                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#invoiceExemptModal">
+                                                <i class="bi bi-gift"></i> Bezpłatny dostęp — bez FV
+                                            </button>
+                                        @endif
+                                    @endif
+                                </div>
+                                @if($zamowienie->isInvoiceExempt())
+                                    <p class="small text-muted mb-0 mt-2">
+                                        <i class="bi bi-info-circle"></i>
+                                        Oznaczone jako bez faktury
+                                        {{ $zamowienie->invoice_exempt_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                                        @if($zamowienie->invoice_exempt_reason)
+                                            — {{ $zamowienie->invoice_exempt_reason }}
+                                        @endif
+                                    </p>
+                                @endif
+                            </div>
                             @if($zamowienie->orderer_email)
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>
@@ -735,13 +767,13 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="status_completed" class="form-label small">
-                                            <strong>Status:</strong>
+                                            <strong>Status (legacy):</strong>
                                         </label>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="status_completed" name="status_completed" value="1" 
+                                            <input class="form-check-input" type="checkbox" id="status_completed" name="status_completed" value="1"
                                                    {{ $zamowienie->status_completed == 1 ? 'checked' : '' }}>
-                                            <label class="form-check-label small" for="status_completed">
-                                                Zakończone
+                                            <label class="form-check-label small text-muted" for="status_completed">
+                                                Zakończone — pole historyczne; do anulowania użyj „Anuluj zamówienie”
                                             </label>
                                         </div>
                                     </div>
@@ -2894,6 +2926,124 @@ nowoczesna-edukacja.pl `;
         </div>
     </div>
 
+    {{-- Modal zwolnienia z faktury (bezpłatny dostęp) --}}
+    <div class="modal fade" id="invoiceExemptModal" tabindex="-1" aria-labelledby="invoiceExemptModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title" id="invoiceExemptModalLabel"><i class="bi bi-gift"></i> Bezpłatny dostęp — bez faktury</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Zamówienie zostanie uznane za <strong>rozliczone bez FV</strong> (np. bezpłatny dostęp, promocja, voucher wewnętrzny).</p>
+                    <p class="small text-muted mb-3">Uczestnik nadal musi być na szkoleniu — to oznaczenie zastępuje tylko wymóg wystawienia faktury. Status „Przetworzone” pojawi się po dodaniu uczestnika.</p>
+                    <label for="invoiceExemptReason" class="form-label small">Powód (opcjonalnie)</label>
+                    <input type="text" class="form-control form-control-sm" id="invoiceExemptReason" maxlength="255" placeholder="np. bezpłatny dostęp, promocja">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <button type="button" class="btn btn-info" id="confirmInvoiceExemptBtn" data-order-id="{{ $zamowienie->id }}">
+                        Oznacz bez faktury
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal cofnięcia zwolnienia z faktury --}}
+    <div class="modal fade" id="clearInvoiceExemptModal" tabindex="-1" aria-labelledby="clearInvoiceExemptModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="clearInvoiceExemptModalLabel"><i class="bi bi-receipt-cutoff"></i> Cofnij „bez faktury”</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Oznaczenie <strong>bezpłatny dostęp — bez FV</strong> zostanie usunięte.</p>
+                    @if($zamowienie->isInvoiceExempt())
+                        <p class="small mb-2">
+                            <strong>Oznaczono:</strong>
+                            {{ $zamowienie->invoice_exempt_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                            @if($zamowienie->invoice_exempt_reason)
+                                <br><strong>Powód:</strong> {{ $zamowienie->invoice_exempt_reason }}
+                            @endif
+                        </p>
+                    @endif
+                    <div class="alert alert-warning small mb-0 py-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Zamówienie wróci do statusu <strong>Do wystawienia FV</strong>, jeśli uczestnik jest już dodany do szkolenia.
+                        Dostęp uczestnika <strong>nie zostanie usunięty</strong>.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <button type="button" class="btn btn-warning" id="confirmClearInvoiceExemptBtn" data-order-id="{{ $zamowienie->id }}">
+                        Cofnij oznaczenie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal anulowania zamówienia --}}
+    <div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="cancelOrderModalLabel"><i class="bi bi-x-circle"></i> Anuluj zamówienie</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Zamówienie zostanie oznaczone jako anulowane i zniknie z listy „Nieprzetworzone”.</p>
+                    <p class="small text-muted mb-3">Uczestnicy powiązani przez <code>participant_id</code> zostaną wypisani ze szkolenia. Pozostali wymagają ręcznej kontroli.</p>
+                    <label for="cancelOrderReason" class="form-label small">Powód (opcjonalnie)</label>
+                    <input type="text" class="form-control form-control-sm" id="cancelOrderReason" maxlength="255" placeholder="np. duplikat, rezygnacja telefoniczna">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <button type="button" class="btn btn-danger" id="confirmCancelOrderBtn" data-order-id="{{ $zamowienie->id }}">
+                        Anuluj zamówienie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal przywracania zamówienia --}}
+    <div class="modal fade" id="restoreOrderModal" tabindex="-1" aria-labelledby="restoreOrderModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="restoreOrderModalLabel"><i class="bi bi-arrow-counterclockwise"></i> Przywróć zamówienie</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Anulowanie zostanie cofnięte — zamówienie wróci do normalnej obsługi operacyjnej.</p>
+                    @if($zamowienie->cancelled_at)
+                        <p class="small mb-2">
+                            <strong>Anulowano:</strong>
+                            {{ $zamowienie->cancelled_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                            @if($zamowienie->cancelled_reason)
+                                <br><strong>Powód:</strong> {{ $zamowienie->cancelled_reason }}
+                            @endif
+                        </p>
+                    @endif
+                    <div class="alert alert-warning small mb-0 py-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Uczestnicy <strong>nie zostaną automatycznie przywróceni</strong> na szkolenie.
+                        Jeśli potrzeba dostępu — dodaj ich ponownie (np. „Dodaj do PNEDU” lub ręcznie na liście uczestników).
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <button type="button" class="btn btn-success" id="confirmRestoreOrderBtn" data-order-id="{{ $zamowienie->id }}">
+                        Przywróć zamówienie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal potwierdzenia usunięcia --}}
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -2947,6 +3097,114 @@ nowoczesna-edukacja.pl `;
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            document.getElementById('confirmCancelOrderBtn')?.addEventListener('click', async function () {
+                const orderId = this.dataset.orderId;
+                const reason = document.getElementById('cancelOrderReason')?.value || '';
+                this.disabled = true;
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                        body: JSON.stringify({ reason }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                    alert(data.error || 'Nie udało się anulować zamówienia.');
+                } catch (e) {
+                    alert('Błąd połączenia.');
+                } finally {
+                    this.disabled = false;
+                }
+            });
+
+            document.getElementById('confirmRestoreOrderBtn')?.addEventListener('click', async function () {
+                const orderId = this.dataset.orderId;
+                this.disabled = true;
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/restore`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                    alert(data.error || 'Nie udało się przywrócić zamówienia.');
+                } catch (e) {
+                    alert('Błąd połączenia.');
+                } finally {
+                    this.disabled = false;
+                }
+            });
+
+            document.getElementById('confirmInvoiceExemptBtn')?.addEventListener('click', async function () {
+                const orderId = this.dataset.orderId;
+                const reason = document.getElementById('invoiceExemptReason')?.value || '';
+                this.disabled = true;
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/invoice-exempt`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                        body: JSON.stringify({ reason }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                    alert(data.error || 'Nie udało się oznaczyć zamówienia.');
+                } catch (e) {
+                    alert('Błąd połączenia.');
+                } finally {
+                    this.disabled = false;
+                }
+            });
+
+            document.getElementById('confirmClearInvoiceExemptBtn')?.addEventListener('click', async function () {
+                const orderId = this.dataset.orderId;
+                this.disabled = true;
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/invoice-exempt/clear`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                    alert(data.error || 'Nie udało się cofnąć oznaczenia.');
+                } catch (e) {
+                    alert('Błąd połączenia.');
+                } finally {
+                    this.disabled = false;
+                }
+            });
+        })();
+    </script>
 </x-app-layout>
 
 

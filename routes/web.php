@@ -207,6 +207,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
             Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
             Route::post('/{id}/pnedu/provision', [FormOrdersController::class, 'provisionPneduAccess'])->name('pnedu.provision');
+            Route::post('/{id}/cancel', [FormOrdersController::class, 'cancelOrder'])->name('cancel');
+            Route::post('/{id}/restore', [FormOrdersController::class, 'restoreOrder'])->name('restore');
+            Route::post('/{id}/invoice-exempt', [FormOrdersController::class, 'markInvoiceExempt'])->name('invoice-exempt');
+            Route::post('/{id}/invoice-exempt/clear', [FormOrdersController::class, 'clearInvoiceExempt'])->name('invoice-exempt.clear');
             Route::post('/{id}/pnedu/extend-access', [FormOrdersController::class, 'extendPneduAccess'])->name('pnedu.extend-access');
             Route::post('/{id}/pnedu/reset', [FormOrdersController::class, 'resetPneduStatus'])->name('pnedu.reset');
             Route::get('/{id}/ifirma/check-invoice', [FormOrdersController::class, 'checkInvoiceStatus'])->name('ifirma.check-invoice');

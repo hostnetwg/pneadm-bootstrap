@@ -54,3 +54,4 @@ Dodatkowo, jeśli to istotne dla decyzji — asystent zadaje **kluczowe pytania 
 - Nie commituj zmian bez wyraźnej zgody człowieka.
 - Wszystkie komendy Laravel/PHP uruchamiaj przez Sail.
 - Zachowuj fail-silent i RODO w analityce (bez PII, bez raw payloadów).
+- **UI — potwierdzenia:** w panelu admina i we frontendzie nie używaj natywnych `confirm()` / `alert()` / `prompt()`; zawsze modal Bootstrap (wzorce: `docs/UI_MODALS.md`, np. `form-orders/show.blade.php`). Asystent stosuje to **proaktywnie**, bez przypomnień od człowieka.
