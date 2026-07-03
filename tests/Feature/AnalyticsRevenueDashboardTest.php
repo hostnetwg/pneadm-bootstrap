@@ -366,8 +366,10 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertSee('revenueTrendChart')
             ->assertSee('revenueTrendShowOrders')
             ->assertSee('revenueTrendShowInvoiced')
+            ->assertSee('revenueTrendShowOnlinePaid')
             ->assertSee('Złożone zamówienia')
-            ->assertSee('Zaksięgowane (dodana faktura)');
+            ->assertSee('Zaksięgowane (dodana faktura)')
+            ->assertSee('Opłacone online (PayU/PayNow)');
     }
 
     // ---------------------------------------------------------------------

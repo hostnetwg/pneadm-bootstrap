@@ -279,11 +279,13 @@
                 $trendData = $trend ?? [];
                 $trendHasData = collect($trendData)->sum('orders_created') > 0
                     || collect($trendData)->sum('deferred_invoiced_orders') > 0
-                    || collect($trendData)->sum('online_invoiced_marker_orders') > 0;
+                    || collect($trendData)->sum('online_invoiced_marker_orders') > 0
+                    || collect($trendData)->sum('online_paid_orders') > 0;
                 $trendChart = array_map(static fn (array $r): array => [
                     'date' => $r['stat_date'],
                     'orders' => (int) $r['orders_created'],
                     'invoiced' => (int) $r['deferred_invoiced_orders'] + (int) $r['online_invoiced_marker_orders'],
+                    'online_paid' => (int) $r['online_paid_orders'],
                 ], $trendData);
             @endphp
             <div class="card shadow-sm mb-3">
@@ -314,6 +316,13 @@
                                     Zaksięgowane (dodana faktura)
                                 </label>
                             </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" id="revenueTrendShowOnlinePaid">
+                                <label class="form-check-label small" for="revenueTrendShowOnlinePaid">
+                                    <span class="d-inline-block rounded-circle align-middle me-1" style="width:10px;height:10px;background:#fd7e14;"></span>
+                                    Opłacone online (PayU/PayNow)
+                                </label>
+                            </div>
                         </div>
                         <div style="position: relative; height: 280px;">
                             <canvas id="revenueTrendChart"></canvas>
@@ -322,7 +331,8 @@
                             <strong>Złożone zamówienia</strong> — wszystkie zamówienia złożone w danym dniu (<code>form_order_created</code>),
                             niezależnie od trybu płatności (odroczona lub online). To <em>nie</em> jest suma opłat PayU/PayNow i faktur — liczymy moment złożenia formularza.
                             <strong>Zaksięgowane (faktura)</strong> — faktury odroczone + znaczniki faktury online (<code>invoice_created</code>) w danym dniu.
-                            Opłaty online bez osobnej linii — widać je w kafelku „Opłacone online” i tabelach poniżej.
+                            <strong>Opłacone online</strong> — potwierdzone płatności PayU/PayNow (<code>payment_status_changed: paid</code>) w danym dniu.
+                            Każda linia ma własną datę źródłową — wykres nie jest jednym lejkiem sprzedaży.
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -479,6 +489,15 @@
                                     fill: true,
                                     hidden: true,
                                 },
+                                {
+                                    label: 'Opłacone online (PayU/PayNow)',
+                                    data: trend.map(r => r.online_paid),
+                                    borderColor: '#fd7e14',
+                                    backgroundColor: 'rgba(253, 126, 20, 0.12)',
+                                    tension: 0.25,
+                                    fill: true,
+                                    hidden: true,
+                                },
                             ],
                         },
                         options: {
@@ -496,6 +515,7 @@
 
                     const ordersToggle = document.getElementById('revenueTrendShowOrders');
                     const invoicedToggle = document.getElementById('revenueTrendShowInvoiced');
+                    const onlinePaidToggle = document.getElementById('revenueTrendShowOnlinePaid');
 
                     const syncDataset = (index, checkbox) => {
                         if (!checkbox) {
@@ -507,6 +527,7 @@
 
                     ordersToggle?.addEventListener('change', () => syncDataset(0, ordersToggle));
                     invoicedToggle?.addEventListener('change', () => syncDataset(1, invoicedToggle));
+                    onlinePaidToggle?.addEventListener('change', () => syncDataset(2, onlinePaidToggle));
                 });
             </script>
         @endpush
