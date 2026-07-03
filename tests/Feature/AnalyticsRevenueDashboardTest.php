@@ -364,7 +364,7 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('revenueTrendChart')
-            ->assertSee('Trend dzienny — przychody');
+            ->assertSee('Trend dzienny — złożone zamówienia');
     }
 
     // ---------------------------------------------------------------------

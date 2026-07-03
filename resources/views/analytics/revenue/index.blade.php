@@ -277,17 +277,15 @@
             {{-- Wykres trendu dziennego --}}
             @php
                 $trendData = $trend ?? [];
-                $trendHasData = collect($trendData)->sum('ordered_revenue_gross') > 0
-                    || collect($trendData)->sum('settled_revenue_gross') > 0;
+                $trendHasData = collect($trendData)->sum('orders_created') > 0;
                 $trendChart = array_map(static fn (array $r): array => [
                     'date' => $r['stat_date'],
-                    'ordered' => round((float) $r['ordered_revenue_gross'], 2),
-                    'settled' => round((float) $r['settled_revenue_gross'], 2),
+                    'orders' => (int) $r['orders_created'],
                 ], $trendData);
             @endphp
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny — przychody</span>
+                    <span class="small fw-semibold text-muted"><i class="bi bi-graph-up"></i> Trend dzienny — złożone zamówienia</span>
                     @if(($filters['campaign_code'] ?? null))
                         <span class="badge bg-secondary-subtle text-secondary-emphasis small">źródło: kampania {{ $filters['campaign_code'] }}</span>
                     @elseif(($filters['course_id'] ?? null))
@@ -302,10 +300,8 @@
                             <canvas id="revenueTrendChart"></canvas>
                         </div>
                         <p class="small text-muted mb-0 mt-2">
-                            Każdy punkt to suma z danego dnia agregacji (<code>stat_date</code>).
-                            <strong>Zamówione</strong> = kwota brutto zamówień z tego dnia;
-                            <strong>Rozliczone łącznie</strong> = opłaty online + faktury odroczone z tego dnia.
-                            Metryki mają różne daty źródłowe eventów — wykres nie jest jednym lejkiem sprzedaży.
+                            Każdy punkt to liczba zamówień złożonych w danym dniu (<code>form_order_created</code>, data agregacji <code>stat_date</code>).
+                            Bez opłat online i faktur — tylko złożone zamówienia.
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -439,10 +435,6 @@
                     }
 
                     const trend = @json($trendChart ?? []);
-                    const formatPln = (value) => new Intl.NumberFormat('pl-PL', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                    }).format(value) + ' PLN';
 
                     new Chart(canvas, {
                         type: 'line',
@@ -450,18 +442,10 @@
                             labels: trend.map(r => r.date),
                             datasets: [
                                 {
-                                    label: 'Zamówione (PLN)',
-                                    data: trend.map(r => r.ordered),
+                                    label: 'Złożone zamówienia',
+                                    data: trend.map(r => r.orders),
                                     borderColor: '#0d6efd',
                                     backgroundColor: 'rgba(13, 110, 253, 0.12)',
-                                    tension: 0.25,
-                                    fill: true,
-                                },
-                                {
-                                    label: 'Rozliczone łącznie (PLN)',
-                                    data: trend.map(r => r.settled),
-                                    borderColor: '#198754',
-                                    backgroundColor: 'rgba(25, 135, 84, 0.12)',
                                     tension: 0.25,
                                     fill: true,
                                 },
@@ -472,20 +456,10 @@
                             maintainAspectRatio: false,
                             interaction: { mode: 'index', intersect: false },
                             scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        callback: (value) => formatPln(value),
-                                    },
-                                },
+                                y: { beginAtZero: true, ticks: { precision: 0 } },
                             },
                             plugins: {
                                 legend: { position: 'bottom' },
-                                tooltip: {
-                                    callbacks: {
-                                        label: (ctx) => ctx.dataset.label + ': ' + formatPln(ctx.parsed.y),
-                                    },
-                                },
                             },
                         },
                     });
