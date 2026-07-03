@@ -70,13 +70,6 @@
                             <i class="bi bi-exclamation-triangle"></i> Do obsługi (aktywne)
                             <span class="badge bg-danger text-white ms-1">{{ $handlingCount ?? 0 }}</span>
                         </a>
-                        @if(($legacyBacklogCount ?? 0) > ($handlingCount ?? 0))
-                            <a href="{{ route('form-orders.index', ['filter' => 'handling_all']) }}"
-                               class="btn btn-outline-dark btn-sm align-self-center"
-                               title="Pełny backlog (w tym legacy do zamknięcia komendą form-orders:close-legacy-handled)">
-                                Backlog legacy: {{ $legacyBacklogCount }}
-                            </a>
-                        @endif
                         <a href="{{ route('form-orders.index', ['quick' => 'processed']) }}"
                            class="btn {{ $quickFilter === 'processed' ? 'btn-info' : 'btn-outline-info' }}">
                             <i class="bi bi-receipt"></i> Przetworzone
