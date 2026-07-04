@@ -344,7 +344,7 @@
                                         <i class="bi bi-calendar-event"></i>
                                         Terminy szkoleń w zakresie ({{ count($courseSchedule) }})
                                     </span>
-                                    <span class="small text-muted">Pełne tytuły — najedź na dzień wykresu po szczegóły</span>
+                                    <span class="small text-muted">Pełne tytuły — najedź na prostokąt 🎓 na wykresie</span>
                                 </div>
                                 <div class="revenue-course-schedule-list border rounded" style="max-height: 220px; overflow-y: auto;">
                                     <ul class="list-group list-group-flush small mb-0">
@@ -378,7 +378,7 @@
                             <strong>Zaksięgowane (faktura)</strong> — faktury odroczone + znaczniki faktury online (<code>invoice_created</code>) w danym dniu.
                             <strong>Opłacone online</strong> — potwierdzone płatności PayU/PayNow (<code>payment_status_changed: paid</code>) w danym dniu.
                             Każda linia ma własną datę źródłową — wykres nie jest jednym lejkiem sprzedaży.
-                            <strong>Terminy szkoleń</strong> — cienkie pionowe linie w dniu startu (<code>courses.start_date</code>); pełne tytuły w liście poniżej i w podpowiedzi po najechaniu na dzień.
+                            <strong>Terminy szkoleń</strong> — fioletowe prostokąty z ikoną 🎓 przy osi dat (najedź po szczegóły); pełna lista poniżej.
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -504,7 +504,6 @@
 
     @if($chartShow ?? false)
         @push('scripts')
-            <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
                     const canvas = document.getElementById('revenueTrendChart');
@@ -523,39 +522,66 @@
                         return acc;
                     }, {});
 
-                    const buildCourseAnnotations = (courses, enabled) => {
-                        if (!enabled || !courses.length) {
-                            return {};
+                    const scheduleDates = Object.keys(coursesByDate).sort();
+
+                    const roundRect = (ctx, x, y, w, h, r) => {
+                        const radius = Math.min(r, w / 2, h / 2);
+                        ctx.beginPath();
+                        ctx.moveTo(x + radius, y);
+                        ctx.lineTo(x + w - radius, y);
+                        ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                        ctx.lineTo(x + w, y + h - radius);
+                        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                        ctx.lineTo(x + radius, y + h);
+                        ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                        ctx.lineTo(x, y + radius);
+                        ctx.quadraticCurveTo(x, y, x + radius, y);
+                        ctx.closePath();
+                    };
+
+                    const createCourseMarkerIcon = (count) => {
+                        const w = count > 1 ? 30 : 26;
+                        const h = 22;
+                        const iconCanvas = document.createElement('canvas');
+                        iconCanvas.width = w;
+                        iconCanvas.height = h;
+                        const ctx = iconCanvas.getContext('2d');
+
+                        roundRect(ctx, 1, 1, w - 2, h - 2, 5);
+                        ctx.fillStyle = '#6f42c1';
+                        ctx.fill();
+                        ctx.strokeStyle = '#59359a';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '13px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🎓', w / 2, h / 2 + 1);
+
+                        if (count > 1) {
+                            ctx.fillStyle = '#ffc107';
+                            ctx.font = 'bold 9px sans-serif';
+                            ctx.textAlign = 'right';
+                            ctx.textBaseline = 'top';
+                            ctx.fillText(String(count), w - 3, 2);
                         }
 
-                        const annotations = {};
+                        return iconCanvas;
+                    };
 
-                        Object.keys(coursesByDate).forEach((date) => {
-                            const dayCourses = coursesByDate[date];
-                            const count = dayCourses.length;
+                    const courseScheduleTooltipLines = (date) => {
+                        const dayCourses = coursesByDate[date] || [];
+                        if (!dayCourses.length) {
+                            return [];
+                        }
 
-                            annotations['course_date_' + date] = {
-                                type: 'line',
-                                xMin: date,
-                                xMax: date,
-                                borderColor: 'rgba(111, 66, 193, 0.45)',
-                                borderWidth: 1,
-                                borderDash: [5, 4],
-                                label: {
-                                    display: count > 1,
-                                    content: String(count),
-                                    position: 'start',
-                                    backgroundColor: '#6f42c1',
-                                    color: '#fff',
-                                    font: { size: 10, weight: 'bold' },
-                                    padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                                    borderRadius: 4,
-                                    yAdjust: 6,
-                                },
-                            };
-                        });
-
-                        return annotations;
+                        return [
+                            '',
+                            dayCourses.length === 1 ? 'Szkolenie:' : 'Szkolenia (' + dayCourses.length + '):',
+                            ...dayCourses.map((c) => '• ' + c.start_time + ' — ' + c.title),
+                        ];
                     };
 
                     const scheduleToggle = document.getElementById('revenueTrendShowCourseSchedule');
@@ -569,38 +595,56 @@
 
                     syncCourseScheduleVisibility();
 
+                    const datasets = [
+                        {
+                            label: 'Złożone zamówienia',
+                            data: trend.map(r => r.orders),
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.12)',
+                            tension: 0.25,
+                            fill: true,
+                        },
+                        {
+                            label: 'Zaksięgowane (dodana faktura)',
+                            data: trend.map(r => r.invoiced),
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25, 135, 84, 0.12)',
+                            tension: 0.25,
+                            fill: true,
+                            hidden: true,
+                        },
+                        {
+                            label: 'Opłacone online (PayU/PayNow)',
+                            data: trend.map(r => r.online_paid),
+                            borderColor: '#fd7e14',
+                            backgroundColor: 'rgba(253, 126, 20, 0.12)',
+                            tension: 0.25,
+                            fill: true,
+                            hidden: true,
+                        },
+                    ];
+
+                    if (scheduleDates.length > 0) {
+                        datasets.push({
+                            type: 'scatter',
+                            label: 'Terminy szkoleń',
+                            _courseSchedule: true,
+                            order: 10,
+                            data: scheduleDates.map((date) => ({ x: date, y: 0 })),
+                            pointStyle: scheduleDates.map((date) => createCourseMarkerIcon(coursesByDate[date].length)),
+                            pointRadius: 12,
+                            pointHoverRadius: 14,
+                            hitRadius: 18,
+                            showLine: false,
+                            hidden: scheduleToggle ? !scheduleToggle.checked : false,
+                        });
+                    }
+
                     const chart = new Chart(canvas, {
                         type: 'line',
                         data: {
                             labels: trend.map(r => r.date),
-                            datasets: [
-                                {
-                                    label: 'Złożone zamówienia',
-                                    data: trend.map(r => r.orders),
-                                    borderColor: '#0d6efd',
-                                    backgroundColor: 'rgba(13, 110, 253, 0.12)',
-                                    tension: 0.25,
-                                    fill: true,
-                                },
-                                {
-                                    label: 'Zaksięgowane (dodana faktura)',
-                                    data: trend.map(r => r.invoiced),
-                                    borderColor: '#198754',
-                                    backgroundColor: 'rgba(25, 135, 84, 0.12)',
-                                    tension: 0.25,
-                                    fill: true,
-                                    hidden: true,
-                                },
-                                {
-                                    label: 'Opłacone online (PayU/PayNow)',
-                                    data: trend.map(r => r.online_paid),
-                                    borderColor: '#fd7e14',
-                                    backgroundColor: 'rgba(253, 126, 20, 0.12)',
-                                    tension: 0.25,
-                                    fill: true,
-                                    hidden: true,
-                                },
-                            ],
+                            datasets,
                         },
                         options: {
                             responsive: true,
@@ -611,31 +655,21 @@
                             },
                             plugins: {
                                 legend: { display: false },
-                                annotation: {
-                                    annotations: buildCourseAnnotations(
-                                        courseSchedule,
-                                        scheduleToggle ? scheduleToggle.checked : true
-                                    ),
-                                },
                                 tooltip: {
                                     callbacks: {
+                                        label: (ctx) => {
+                                            if (ctx.dataset._courseSchedule) {
+                                                return null;
+                                            }
+
+                                            return ctx.dataset.label + ': ' + ctx.parsed.y;
+                                        },
                                         afterBody: (items) => {
                                             if (!scheduleToggle?.checked || !items.length) {
                                                 return [];
                                             }
 
-                                            const date = items[0].label;
-                                            const dayCourses = coursesByDate[date] || [];
-
-                                            if (!dayCourses.length) {
-                                                return [];
-                                            }
-
-                                            return [
-                                                '',
-                                                dayCourses.length === 1 ? 'Szkolenie:' : 'Szkolenia (' + dayCourses.length + '):',
-                                                ...dayCourses.map((c) => '• ' + c.start_time + ' — ' + c.title),
-                                            ];
+                                            return courseScheduleTooltipLines(items[0].label);
                                         },
                                     },
                                 },
@@ -647,6 +681,8 @@
                     const invoicedToggle = document.getElementById('revenueTrendShowInvoiced');
                     const onlinePaidToggle = document.getElementById('revenueTrendShowOnlinePaid');
 
+                    const scheduleDatasetIndex = chart.data.datasets.findIndex((d) => d._courseSchedule);
+
                     const syncDataset = (index, checkbox) => {
                         if (!checkbox) {
                             return;
@@ -656,13 +692,12 @@
                     };
 
                     const syncCourseSchedule = () => {
-                        if (!scheduleToggle || !chart.options.plugins.annotation) {
+                        if (!scheduleToggle) {
                             return;
                         }
-                        chart.options.plugins.annotation.annotations = buildCourseAnnotations(
-                            courseSchedule,
-                            scheduleToggle.checked
-                        );
+                        if (scheduleDatasetIndex >= 0) {
+                            chart.setDatasetVisibility(scheduleDatasetIndex, scheduleToggle.checked);
+                        }
                         syncCourseScheduleVisibility();
                         chart.update();
                     };
