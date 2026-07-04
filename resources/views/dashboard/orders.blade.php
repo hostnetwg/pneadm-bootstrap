@@ -11,6 +11,11 @@
                 <div class="card mb-4 border-secondary-subtle" id="liveVisitorsCard">
                     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
                         <div class="d-flex align-items-center gap-2">
+                            <span class="live-visitors-indicator" id="liveVisitorsIndicator" title="Odświeżanie na żywo">
+                                <span class="live-visitors-indicator__ring" aria-hidden="true"></span>
+                                <span class="live-visitors-indicator__dot" aria-hidden="true"></span>
+                                <i class="bi bi-broadcast live-visitors-indicator__icon" aria-hidden="true"></i>
+                            </span>
                             <h5 class="mb-0 fs-6">Aktywni teraz na pnedu.pl</h5>
                             <span class="badge text-bg-success" id="liveVisitorsCount">—</span>
                         </div>
@@ -40,11 +45,69 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="px-3 py-2 border-top small text-muted" id="liveVisitorsFooter">
-                            Odświeżono: —
+                        <div class="px-3 py-2 border-top small text-muted d-flex align-items-center gap-2" id="liveVisitorsFooter">
+                            <i class="bi bi-arrow-repeat live-visitors-footer-spin" id="liveVisitorsFooterSpin" aria-hidden="true"></i>
+                            <span id="liveVisitorsFooterText">Odświeżono: —</span>
                         </div>
                     </div>
                 </div>
+                <style>
+                    .live-visitors-indicator {
+                        position: relative;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 1.75rem;
+                        height: 1.75rem;
+                        flex-shrink: 0;
+                    }
+                    .live-visitors-indicator__dot {
+                        position: absolute;
+                        width: 0.5rem;
+                        height: 0.5rem;
+                        border-radius: 50%;
+                        background: var(--bs-success);
+                        z-index: 2;
+                    }
+                    .live-visitors-indicator__ring {
+                        position: absolute;
+                        width: 0.5rem;
+                        height: 0.5rem;
+                        border-radius: 50%;
+                        background: var(--bs-success);
+                        opacity: 0.45;
+                        animation: liveVisitorsPing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+                    }
+                    .live-visitors-indicator__icon {
+                        font-size: 1.1rem;
+                        color: var(--bs-success);
+                        opacity: 0.85;
+                    }
+                    .live-visitors-indicator.is-fetching .live-visitors-indicator__icon {
+                        animation: liveVisitorsSpin 0.75s linear infinite;
+                    }
+                    .live-visitors-indicator.is-fetching .live-visitors-indicator__ring {
+                        animation: liveVisitorsSpin 0.75s linear infinite;
+                        opacity: 0.35;
+                    }
+                    .live-visitors-footer-spin {
+                        font-size: 0.85rem;
+                        opacity: 0.45;
+                        transition: opacity 0.2s ease;
+                    }
+                    .live-visitors-footer-spin.is-fetching {
+                        opacity: 1;
+                        animation: liveVisitorsSpin 0.75s linear infinite;
+                    }
+                    @keyframes liveVisitorsPing {
+                        0% { transform: scale(1); opacity: 0.5; }
+                        75%, 100% { transform: scale(2.6); opacity: 0; }
+                    }
+                    @keyframes liveVisitorsSpin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                </style>
             @endif
 
             <div class="row mb-4 g-3">
@@ -387,11 +450,22 @@
             const pollSeconds = {{ (int) ($liveVisitorsPollSeconds ?? 30) }};
             const countEl = document.getElementById('liveVisitorsCount');
             const bodyEl = document.getElementById('liveVisitorsBody');
-            const footerEl = document.getElementById('liveVisitorsFooter');
+            const footerEl = document.getElementById('liveVisitorsFooterText');
+            const footerSpinEl = document.getElementById('liveVisitorsFooterSpin');
+            const indicatorEl = document.getElementById('liveVisitorsIndicator');
             const metaEl = document.getElementById('liveVisitorsMeta');
 
             if (!countEl || !bodyEl || !footerEl) {
                 return;
+            }
+
+            function setFetching(isFetching) {
+                if (indicatorEl) {
+                    indicatorEl.classList.toggle('is-fetching', isFetching);
+                }
+                if (footerSpinEl) {
+                    footerSpinEl.classList.toggle('is-fetching', isFetching);
+                }
             }
 
             function formatAgo(seconds) {
@@ -454,6 +528,8 @@
             }
 
             function refreshLiveVisitors() {
+                setFetching(true);
+
                 fetch(pollUrl, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     credentials: 'same-origin',
@@ -468,6 +544,9 @@
                     .then(renderVisitors)
                     .catch(function () {
                         bodyEl.innerHTML = '<tr><td colspan="5" class="text-danger small py-3 px-3">Nie udało się pobrać danych o aktywnych sesjach.</td></tr>';
+                    })
+                    .finally(function () {
+                        setFetching(false);
                     });
             }
 
