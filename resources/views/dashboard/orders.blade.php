@@ -7,6 +7,46 @@
 
     <div class="py-3">
         <div class="container-fluid px-4">
+            @if($liveVisitorsEnabled ?? false)
+                <div class="card mb-4 border-secondary-subtle" id="liveVisitorsCard">
+                    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0 fs-6">Aktywni teraz na pnedu.pl</h5>
+                            <span class="badge text-bg-success" id="liveVisitorsCount">—</span>
+                        </div>
+                        <div class="small text-muted">
+                            <span id="liveVisitorsMeta">Lejek sprzedaży · odświeżanie co {{ $liveVisitorsPollSeconds ?? 30 }} s</span>
+                            @if(!empty($liveVisitorsDebugUrl))
+                                · <a href="{{ $liveVisitorsDebugUrl }}" class="text-decoration-none">Debug eventów</a>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Sesja</th>
+                                        <th>Podstrona</th>
+                                        <th>Szkolenie</th>
+                                        <th>Urządzenie</th>
+                                        <th class="text-end">Ostatnio</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="liveVisitorsBody">
+                                    <tr id="liveVisitorsLoading">
+                                        <td colspan="5" class="text-muted small py-3 px-3">Ładowanie…</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="px-3 py-2 border-top small text-muted" id="liveVisitorsFooter">
+                            Odświeżono: —
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="row mb-4 g-3">
                 <div class="col-sm-6 col-xl-3">
                     <div class="card border-primary h-100">
@@ -340,6 +380,101 @@
                 },
             });
         })();
+
+        @if($liveVisitorsEnabled ?? false)
+        (function () {
+            const pollUrl = @json(route('api.dashboard.live-visitors'));
+            const pollSeconds = {{ (int) ($liveVisitorsPollSeconds ?? 30) }};
+            const countEl = document.getElementById('liveVisitorsCount');
+            const bodyEl = document.getElementById('liveVisitorsBody');
+            const footerEl = document.getElementById('liveVisitorsFooter');
+            const metaEl = document.getElementById('liveVisitorsMeta');
+
+            if (!countEl || !bodyEl || !footerEl) {
+                return;
+            }
+
+            function formatAgo(seconds) {
+                if (seconds < 60) {
+                    return seconds + ' s temu';
+                }
+                if (seconds < 3600) {
+                    return Math.floor(seconds / 60) + ' min temu';
+                }
+
+                return Math.floor(seconds / 3600) + ' h temu';
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function deviceLabel(visitor) {
+                const parts = [];
+                if (visitor.device_type) {
+                    parts.push(visitor.device_type);
+                }
+                if (visitor.browser_family) {
+                    parts.push(visitor.browser_family);
+                }
+
+                return parts.length ? parts.join(' · ') : '—';
+            }
+
+            function renderVisitors(data) {
+                countEl.textContent = String(data.active_count ?? 0);
+
+                if (metaEl && data.window_minutes) {
+                    metaEl.textContent = 'Lejek sprzedaży · okno ' + data.window_minutes + ' min · odświeżanie co ' + pollSeconds + ' s';
+                }
+
+                const visitors = Array.isArray(data.visitors) ? data.visitors : [];
+
+                if (visitors.length === 0) {
+                    bodyEl.innerHTML = '<tr><td colspan="5" class="text-muted small py-3 px-3">Brak aktywnych sesji w ostatnich minutach.</td></tr>';
+                } else {
+                    bodyEl.innerHTML = visitors.map(function (visitor) {
+                        return '<tr>'
+                            + '<td><code class="small">' + escapeHtml(visitor.session_short) + '</code></td>'
+                            + '<td>' + escapeHtml(visitor.page_label) + '</td>'
+                            + '<td class="text-truncate" style="max-width: 240px;" title="' + escapeHtml(visitor.course_title || '') + '">'
+                            + escapeHtml(visitor.course_title || '—') + '</td>'
+                            + '<td class="small text-muted">' + escapeHtml(deviceLabel(visitor)) + '</td>'
+                            + '<td class="text-end small text-nowrap">' + escapeHtml(formatAgo(visitor.last_seen_ago_seconds ?? 0)) + '</td>'
+                            + '</tr>';
+                    }).join('');
+                }
+
+                const asOf = data.as_of ? new Date(data.as_of) : new Date();
+                footerEl.textContent = 'Odświeżono: ' + asOf.toLocaleTimeString('pl-PL');
+            }
+
+            function refreshLiveVisitors() {
+                fetch(pollUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+
+                        return response.json();
+                    })
+                    .then(renderVisitors)
+                    .catch(function () {
+                        bodyEl.innerHTML = '<tr><td colspan="5" class="text-danger small py-3 px-3">Nie udało się pobrać danych o aktywnych sesjach.</td></tr>';
+                    });
+            }
+
+            refreshLiveVisitors();
+            setInterval(refreshLiveVisitors, pollSeconds * 1000);
+        })();
+        @endif
     </script>
     @endpush
 </x-app-layout>

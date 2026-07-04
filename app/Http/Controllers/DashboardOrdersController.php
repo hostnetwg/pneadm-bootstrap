@@ -132,7 +132,13 @@ class DashboardOrdersController extends Controller
             'dailyChart',
             'chartGranularity',
             'tz',
-        ));
+        ) + [
+            'liveVisitorsEnabled' => (bool) config('analytics.live_visitors_dashboard.enabled', true),
+            'liveVisitorsPollSeconds' => max(10, (int) config('analytics.live_visitors_dashboard.poll_interval_seconds', 30)),
+            'liveVisitorsDebugUrl' => config('analytics.debug_panel.enabled', false)
+                ? route('analytics.debug-events.index')
+                : null,
+        ]);
     }
 
     /**

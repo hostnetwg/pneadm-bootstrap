@@ -15,6 +15,7 @@ use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardLiveVisitorsController;
 use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
@@ -53,6 +54,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     Route::get('/dashboard/ankiety', [DashboardController::class, 'index'])->name('dashboard.surveys');
     Route::post('/dashboard/ankiety/refresh', [DashboardController::class, 'refresh'])->name('dashboard.surveys.refresh');
+
+    Route::get('/api/dashboard/live-visitors', DashboardLiveVisitorsController::class)
+        ->name('api.dashboard.live-visitors');
 
     // User Preferences API
     Route::prefix('api/user')->name('api.user.')->group(function () {
