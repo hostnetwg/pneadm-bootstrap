@@ -13,7 +13,11 @@ class DashboardOrdersController extends Controller
 {
     private const DEFAULT_RANGE_DAYS = 14;
 
-    private const MAX_RANGE_DAYS = 366;
+    /** Najwcześniejsza dozwolona data filtra (włącznie). */
+    private const EARLIEST_DATE = '2020-01-01';
+
+    /** Powyżej tej liczby dni wykres pokazuje miesiące zamiast poszczególnych dni. */
+    private const DAILY_CHART_MAX_DAYS = 90;
 
     public function index(Request $request)
     {
@@ -45,8 +49,13 @@ class DashboardOrdersController extends Controller
                 throw new \InvalidArgumentException('Data „Od” nie może być późniejsza niż data „Do”.');
             }
 
-            if ($dateFrom->diffInDays($dateTo) + 1 > self::MAX_RANGE_DAYS) {
-                throw new \InvalidArgumentException('Maksymalny zakres to '.self::MAX_RANGE_DAYS.' dni.');
+            $earliest = Carbon::parse(self::EARLIEST_DATE, $tz)->startOfDay();
+            if ($dateFrom->lessThan($earliest)) {
+                throw new \InvalidArgumentException('Data „Od” nie może być wcześniejsza niż '.self::EARLIEST_DATE.'.');
+            }
+
+            if ($dateTo->greaterThan($todayLocal)) {
+                $dateTo = $todayLocal->copy();
             }
 
             $filters['date_from'] = $dateFrom->toDateString();
@@ -66,9 +75,18 @@ class DashboardOrdersController extends Controller
         }
 
         [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($dateFrom, $dateTo);
-        $dailyChart = $this->buildDailyOrderCounts($dateFrom, $dateTo, $fromUtc, $toUtc, $tz);
+        $dayCount = (int) $dateFrom->diffInDays($dateTo) + 1;
+        $chartGranularity = $dayCount > self::DAILY_CHART_MAX_DAYS ? 'month' : 'day';
+        $dailyChart = $this->buildInvoicedOrderChart(
+            $dateFrom,
+            $dateTo,
+            $fromUtc,
+            $toUtc,
+            $tz,
+            $chartGranularity,
+        );
 
-        $datePresets = $this->buildDatePresets($todayLocal);
+        [$datePresets, $datePresetsYears] = $this->buildDatePresets($tz, $todayLocal);
 
         $stats = [
             'form_total' => FormOrder::count(),
@@ -87,11 +105,14 @@ class DashboardOrdersController extends Controller
             'online_paid_today' => OnlinePaymentOrder::where('status', OnlinePaymentOrder::STATUS_PAID)
                 ->where('updated_at', '>=', $todayStartUtc)
                 ->count(),
-            'period_total' => array_sum($dailyChart['counts']),
-            'period_days' => count($dailyChart['counts']),
-            'period_avg' => count($dailyChart['counts']) > 0
-                ? round(array_sum($dailyChart['counts']) / count($dailyChart['counts']), 1)
+            'period_total' => array_sum($dailyChart['total']),
+            'period_online' => array_sum($dailyChart['online']),
+            'period_deferred' => array_sum($dailyChart['deferred']),
+            'period_days' => count($dailyChart['total']),
+            'period_avg' => count($dailyChart['total']) > 0
+                ? round(array_sum($dailyChart['total']) / count($dailyChart['total']), 1)
                 : 0,
+            'period_avg_label' => $chartGranularity === 'month' ? 'miesiąc' : 'dzień',
         ];
 
         $recentFormOrders = FormOrder::query()
@@ -106,87 +127,174 @@ class DashboardOrdersController extends Controller
             'todayLocal',
             'filters',
             'datePresets',
+            'datePresetsYears',
             'dateRangeError',
             'dailyChart',
+            'chartGranularity',
             'tz',
         ));
     }
 
     /**
-     * @return list<array{key: string, label: string, date_from: string, date_to: string}>
+     * @return array{0: list<array{key: string, label: string, date_from: string, date_to: string}>, 1: list<array{key: string, label: string, date_from: string, date_to: string}>}
      */
-    private function buildDatePresets(Carbon $todayLocal): array
+    private function buildDatePresets(string $tz, Carbon $todayLocal): array
     {
-        $tz = UtcStorageDate::appTimezone();
         $todayStr = $todayLocal->toDateString();
-        $yesterdayStr = $todayLocal->copy()->subDay()->toDateString();
+        $short = app(AnalyticsDateRangePresets::class)->build($tz, 0);
 
-        return array_merge([
-            [
-                'key' => 'today',
-                'label' => 'Dziś',
-                'date_from' => $todayStr,
-                'date_to' => $todayStr,
-            ],
-            [
-                'key' => 'yesterday',
-                'label' => 'Wczoraj',
-                'date_from' => $yesterdayStr,
-                'date_to' => $yesterdayStr,
-            ],
-        ], app(AnalyticsDateRangePresets::class)->build($tz, 0));
+        $years = [];
+
+        $years[] = [
+            'key' => 'ytd',
+            'label' => 'Ten rok',
+            'date_from' => $todayLocal->copy()->startOfYear()->toDateString(),
+            'date_to' => $todayStr,
+        ];
+
+        $prevYear = $todayLocal->copy()->subYear();
+        $years[] = [
+            'key' => 'prev_year',
+            'label' => 'Poprzedni rok',
+            'date_from' => $prevYear->copy()->startOfYear()->toDateString(),
+            'date_to' => $prevYear->copy()->endOfYear()->toDateString(),
+        ];
+
+        for ($year = (int) $todayLocal->year; $year >= 2020; $year--) {
+            $yearStart = Carbon::create($year, 1, 1, 0, 0, 0, $tz);
+            $yearEnd = $year === (int) $todayLocal->year
+                ? $todayLocal->copy()
+                : Carbon::create($year, 12, 31, 0, 0, 0, $tz);
+
+            $years[] = [
+                'key' => 'year_'.$year,
+                'label' => (string) $year,
+                'date_from' => $yearStart->toDateString(),
+                'date_to' => $yearEnd->toDateString(),
+            ];
+        }
+
+        $years[] = [
+            'key' => 'since_2020',
+            'label' => 'Od 2020',
+            'date_from' => self::EARLIEST_DATE,
+            'date_to' => $todayStr,
+        ];
+
+        return [$short, $years];
     }
 
     /**
-     * @return array{labels: list<string>, labels_short: list<string>, counts: list<int>}
+     * Wykres zamówień z numerem FV, wg daty złożenia (order_date), w strefie aplikacji.
+     *
+     * @return array{
+     *     labels: list<string>,
+     *     labels_short: list<string>,
+     *     online: list<int>,
+     *     deferred: list<int>,
+     *     total: list<int>
+     * }
      */
-    private function buildDailyOrderCounts(
+    private function buildInvoicedOrderChart(
         Carbon $dateFrom,
         Carbon $dateTo,
         string $fromUtc,
         string $toUtc,
         string $tz,
+        string $granularity,
     ): array {
-        $countsByDay = [];
-        $cursor = $dateFrom->copy();
-
-        while ($cursor->lessThanOrEqualTo($dateTo)) {
-            $countsByDay[$cursor->toDateString()] = 0;
-            $cursor->addDay();
-        }
+        $buckets = $this->initializeChartBuckets($dateFrom, $dateTo, $tz, $granularity);
 
         FormOrder::query()
+            ->withInvoice()
             ->whereBetween('order_date', [$fromUtc, $toUtc])
-            ->select(['id', 'order_date'])
+            ->select(['id', 'order_date', 'payment_mode'])
             ->orderBy('id')
-            ->each(function (FormOrder $order) use (&$countsByDay, $tz): void {
+            ->each(function (FormOrder $order) use (&$buckets, $tz, $granularity): void {
                 $raw = $order->getRawOriginal('order_date');
                 if (! $raw) {
                     return;
                 }
 
-                $day = Carbon::parse((string) $raw, 'UTC')->timezone($tz)->toDateString();
+                $local = Carbon::parse((string) $raw, 'UTC')->timezone($tz);
+                $key = $granularity === 'month'
+                    ? $local->format('Y-m')
+                    : $local->toDateString();
 
-                if (array_key_exists($day, $countsByDay)) {
-                    $countsByDay[$day]++;
+                if (! array_key_exists($key, $buckets)) {
+                    return;
+                }
+
+                $buckets[$key]['total']++;
+
+                if ($order->payment_mode === FormOrder::PAYMENT_MODE_ONLINE_GATEWAY) {
+                    $buckets[$key]['online']++;
+                } else {
+                    $buckets[$key]['deferred']++;
                 }
             });
 
         $labels = [];
         $labelsShort = [];
-        $counts = [];
+        $online = [];
+        $deferred = [];
+        $total = [];
 
-        foreach ($countsByDay as $day => $count) {
-            $dayCarbon = Carbon::parse($day, $tz)->locale('pl');
-            $labels[] = $dayCarbon->isoFormat('D MMM YYYY');
-            $labelsShort[] = $dayCarbon->isoFormat('D MMM');
-            $counts[] = $count;
+        foreach ($buckets as $key => $counts) {
+            if ($granularity === 'month') {
+                $labelCarbon = Carbon::createFromFormat('Y-m', $key, $tz)->locale('pl')->startOfMonth();
+                $labels[] = $labelCarbon->isoFormat('MMMM YYYY');
+                $labelsShort[] = $labelCarbon->isoFormat('MMM YY');
+            } else {
+                $labelCarbon = Carbon::parse($key, $tz)->locale('pl');
+                $labels[] = $labelCarbon->isoFormat('D MMM YYYY');
+                $labelsShort[] = $labelCarbon->isoFormat('D MMM');
+            }
+
+            $online[] = $counts['online'];
+            $deferred[] = $counts['deferred'];
+            $total[] = $counts['total'];
         }
 
         return [
             'labels' => $labels,
             'labels_short' => $labelsShort,
-            'counts' => $counts,
+            'online' => $online,
+            'deferred' => $deferred,
+            'total' => $total,
         ];
+    }
+
+    /**
+     * @return array<string, array{online: int, deferred: int, total: int}>
+     */
+    private function initializeChartBuckets(
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        string $tz,
+        string $granularity,
+    ): array {
+        $buckets = [];
+
+        if ($granularity === 'month') {
+            $cursor = $dateFrom->copy()->startOfMonth();
+            $end = $dateTo->copy()->startOfMonth();
+
+            while ($cursor->lessThanOrEqualTo($end)) {
+                $buckets[$cursor->format('Y-m')] = ['online' => 0, 'deferred' => 0, 'total' => 0];
+                $cursor->addMonth();
+            }
+
+            return $buckets;
+        }
+
+        $cursor = $dateFrom->copy();
+
+        while ($cursor->lessThanOrEqualTo($dateTo)) {
+            $buckets[$cursor->toDateString()] = ['online' => 0, 'deferred' => 0, 'total' => 0];
+            $cursor->addDay();
+        }
+
+        return $buckets;
     }
 }

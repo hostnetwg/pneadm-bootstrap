@@ -80,7 +80,13 @@
 
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">Zamówienia wg dnia</h5>
+                    <h5 class="mb-0">
+                        @if(($chartGranularity ?? 'day') === 'month')
+                            Zamówienia wg miesiąca
+                        @else
+                            Zamówienia wg dnia
+                        @endif
+                    </h5>
                 </div>
                 <div class="card-body">
                     @if($dateRangeError)
@@ -90,9 +96,25 @@
                     @endif
 
                     @if(!empty($datePresets))
-                        <div class="d-flex flex-wrap gap-1 mb-3">
-                            <span class="small text-muted me-1 align-self-center">Szybki zakres:</span>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <span class="small text-muted me-1 align-self-center">Krótki zakres:</span>
                             @foreach($datePresets as $preset)
+                                @php
+                                    $isActive = ($filters['date_from'] ?? null) === $preset['date_from']
+                                        && ($filters['date_to'] ?? null) === $preset['date_to'];
+                                @endphp
+                                <a href="{{ route('dashboard', ['date_from' => $preset['date_from'], 'date_to' => $preset['date_to']]) }}"
+                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                    {{ $preset['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if(!empty($datePresetsYears))
+                        <div class="d-flex flex-wrap gap-1 mb-3">
+                            <span class="small text-muted me-1 align-self-center">Lata:</span>
+                            @foreach($datePresetsYears as $preset)
                                 @php
                                     $isActive = ($filters['date_from'] ?? null) === $preset['date_from']
                                         && ($filters['date_to'] ?? null) === $preset['date_to'];
@@ -108,7 +130,7 @@
                     <form method="GET" action="{{ route('dashboard') }}" class="row g-2 align-items-end mb-4">
                         <div class="col-sm-6 col-md-3 col-lg-2">
                             <label for="date_from" class="form-label small mb-1">Od</label>
-                            <input type="date" class="form-control form-control-sm" id="date_from" name="date_from" value="{{ $filters['date_from'] ?? '' }}">
+                            <input type="date" class="form-control form-control-sm" id="date_from" name="date_from" value="{{ $filters['date_from'] ?? '' }}" min="2020-01-01">
                         </div>
                         <div class="col-sm-6 col-md-3 col-lg-2">
                             <label for="date_to" class="form-label small mb-1">Do</label>
@@ -132,9 +154,18 @@
                             <strong>{{ $filters['date_to'] }}</strong>
                             ({{ $tz }})
                         </span>
-                        <span>Łącznie: <strong>{{ number_format($stats['period_total']) }}</strong></span>
-                        <span>Średnio/dzień: <strong>{{ number_format($stats['period_avg'], 1, ',', ' ') }}</strong></span>
+                        <span>Łącznie (z FV): <strong>{{ number_format($stats['period_total']) }}</strong></span>
+                        <span>Online: <strong>{{ number_format($stats['period_online']) }}</strong></span>
+                        <span>Odroczone: <strong>{{ number_format($stats['period_deferred']) }}</strong></span>
+                        <span>Średnio/{{ $stats['period_avg_label'] ?? 'dzień' }}: <strong>{{ number_format($stats['period_avg'], 1, ',', ' ') }}</strong></span>
+                        @if(($chartGranularity ?? 'day') === 'month')
+                            <span class="text-muted">(wykres: agregacja miesięczna — zakres &gt; 90 dni)</span>
+                        @endif
                     </div>
+                    <p class="small text-muted mb-3 mb-md-2">
+                        Tylko zamówienia z numerem faktury · data złożenia zamówienia ·
+                        odroczone = faktura z odroczonym terminem (w tym starsze bez trybu płatności)
+                    </p>
 
                     <div style="position: relative; height: 320px;">
                         <canvas id="ordersDailyChart" aria-label="Wykres liczby zamówień wg dnia"></canvas>
@@ -234,27 +265,62 @@
             }
 
             const labels = @json($dailyChart['labels_short'] ?? []);
-            const counts = @json($dailyChart['counts'] ?? []);
+            const seriesOnline = @json($dailyChart['online'] ?? []);
+            const seriesDeferred = @json($dailyChart['deferred'] ?? []);
+            const seriesTotal = @json($dailyChart['total'] ?? []);
+            const pointRadius = labels.length > 31 ? 2 : 4;
 
             new Chart(canvas, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Zamówienia FORM',
-                        data: counts,
-                        backgroundColor: 'rgba(13, 110, 253, 0.65)',
-                        borderColor: 'rgba(13, 110, 253, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }],
+                    datasets: [
+                        {
+                            label: 'Suma (z FV)',
+                            data: seriesTotal,
+                            borderColor: 'rgba(13, 110, 253, 1)',
+                            backgroundColor: 'rgba(13, 110, 253, 0.08)',
+                            borderWidth: 2.5,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: pointRadius,
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'Płatność online (bramka)',
+                            data: seriesOnline,
+                            borderColor: 'rgba(25, 135, 84, 1)',
+                            backgroundColor: 'rgba(25, 135, 84, 0.08)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: pointRadius,
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'Faktura odroczona',
+                            data: seriesDeferred,
+                            borderColor: 'rgba(108, 117, 125, 1)',
+                            backgroundColor: 'rgba(108, 117, 125, 0.08)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: pointRadius,
+                            pointHoverRadius: 6,
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
                     plugins: {
                         legend: {
-                            display: false,
+                            display: true,
+                            position: 'top',
                         },
                         tooltip: {
                             callbacks: {
@@ -273,7 +339,7 @@
                                 maxRotation: 45,
                                 minRotation: 0,
                                 autoSkip: true,
-                                maxTicksLimit: labels.length > 31 ? 15 : 31,
+                                maxTicksLimit: labels.length > 31 ? 24 : 31,
                             },
                         },
                         y: {
