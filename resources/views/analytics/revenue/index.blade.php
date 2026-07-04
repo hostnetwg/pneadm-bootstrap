@@ -277,10 +277,12 @@
             {{-- Wykres trendu dziennego --}}
             @php
                 $trendData = $trend ?? [];
+                $courseSchedule = $course_schedule ?? [];
                 $trendHasData = collect($trendData)->sum('orders_created') > 0
                     || collect($trendData)->sum('deferred_invoiced_orders') > 0
                     || collect($trendData)->sum('online_invoiced_marker_orders') > 0
                     || collect($trendData)->sum('online_paid_orders') > 0;
+                $chartShow = $trendHasData || count($courseSchedule) > 0;
                 $trendChart = array_map(static fn (array $r): array => [
                     'date' => $r['stat_date'],
                     'orders' => (int) $r['orders_created'],
@@ -298,7 +300,7 @@
                     @endif
                 </div>
                 <div class="card-body">
-                    @unless($trendHasData)
+                    @unless($chartShow)
                         <p class="text-muted small mb-0">Brak danych do wykresu w wybranym zakresie.</p>
                     @else
                         <div class="d-flex flex-wrap gap-3 mb-3">
@@ -323,6 +325,13 @@
                                     Opłacone online (PayU/PayNow)
                                 </label>
                             </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="checkbox" id="revenueTrendShowCourseSchedule" checked>
+                                <label class="form-check-label small" for="revenueTrendShowCourseSchedule">
+                                    <span class="d-inline-block align-middle me-1" style="width:10px;border-top:2px dashed #6f42c1;"></span>
+                                    Terminy szkoleń (start)
+                                </label>
+                            </div>
                         </div>
                         <div style="position: relative; height: 280px;">
                             <canvas id="revenueTrendChart"></canvas>
@@ -333,6 +342,7 @@
                             <strong>Zaksięgowane (faktura)</strong> — faktury odroczone + znaczniki faktury online (<code>invoice_created</code>) w danym dniu.
                             <strong>Opłacone online</strong> — potwierdzone płatności PayU/PayNow (<code>payment_status_changed: paid</code>) w danym dniu.
                             Każda linia ma własną datę źródłową — wykres nie jest jednym lejkiem sprzedaży.
+                            <strong>Terminy szkoleń</strong> — pionowe linie w dniu rozpoczęcia (<code>courses.start_date</code>, wszystkie szkolenia w zakresie dat wykresu).
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -456,8 +466,9 @@
         </div>
     </div>
 
-    @if($trendHasData ?? false)
+    @if($chartShow ?? false)
         @push('scripts')
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
                     const canvas = document.getElementById('revenueTrendChart');
@@ -466,6 +477,54 @@
                     }
 
                     const trend = @json($trendChart ?? []);
+                    const courseSchedule = @json($courseSchedule ?? []);
+
+                    const truncateTitle = (title, maxLen = 42) => {
+                        if (!title || title.length <= maxLen) {
+                            return title || '';
+                        }
+
+                        return title.slice(0, maxLen - 1) + '…';
+                    };
+
+                    const buildCourseAnnotations = (courses, enabled) => {
+                        if (!enabled || !courses.length) {
+                            return {};
+                        }
+
+                        const perDateCounts = {};
+                        const annotations = {};
+
+                        courses.forEach((course) => {
+                            const stackIndex = perDateCounts[course.start_date] ?? 0;
+                            perDateCounts[course.start_date] = stackIndex + 1;
+                            const label = truncateTitle(course.title);
+
+                            annotations['course_' + course.course_id] = {
+                                type: 'line',
+                                xMin: course.start_date,
+                                xMax: course.start_date,
+                                borderColor: 'rgba(111, 66, 193, 0.55)',
+                                borderWidth: 1,
+                                borderDash: [4, 4],
+                                label: {
+                                    display: label !== '',
+                                    content: label,
+                                    position: 'start',
+                                    rotation: -90,
+                                    yAdjust: stackIndex * 16,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                                    color: '#6f42c1',
+                                    font: { size: 10 },
+                                    padding: 2,
+                                },
+                            };
+                        });
+
+                        return annotations;
+                    };
+
+                    const scheduleToggle = document.getElementById('revenueTrendShowCourseSchedule');
 
                     const chart = new Chart(canvas, {
                         type: 'line',
@@ -509,6 +568,12 @@
                             },
                             plugins: {
                                 legend: { display: false },
+                                annotation: {
+                                    annotations: buildCourseAnnotations(
+                                        courseSchedule,
+                                        scheduleToggle ? scheduleToggle.checked : true
+                                    ),
+                                },
                             },
                         },
                     });
@@ -525,9 +590,21 @@
                         chart.update();
                     };
 
+                    const syncCourseSchedule = () => {
+                        if (!scheduleToggle || !chart.options.plugins.annotation) {
+                            return;
+                        }
+                        chart.options.plugins.annotation.annotations = buildCourseAnnotations(
+                            courseSchedule,
+                            scheduleToggle.checked
+                        );
+                        chart.update();
+                    };
+
                     ordersToggle?.addEventListener('change', () => syncDataset(0, ordersToggle));
                     invoicedToggle?.addEventListener('change', () => syncDataset(1, invoicedToggle));
                     onlinePaidToggle?.addEventListener('change', () => syncDataset(2, onlinePaidToggle));
+                    scheduleToggle?.addEventListener('change', syncCourseSchedule);
                 });
             </script>
         @endpush

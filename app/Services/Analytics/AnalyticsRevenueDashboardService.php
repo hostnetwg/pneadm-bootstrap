@@ -4,6 +4,7 @@ namespace App\Services\Analytics;
 
 use App\Models\Analytics\AnalyticsDailyCampaignRevenueStat;
 use App\Models\Analytics\AnalyticsDailyCourseRevenueStat;
+use App\Models\Course;
 use App\Models\MarketingCampaign;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -62,6 +63,7 @@ class AnalyticsRevenueDashboardService
             'courses' => $this->buildCourseTable($courseRows),
             'campaigns' => $this->buildCampaignTable($campaignRows),
             'trend' => $this->buildDailyTrend($filters, $courseRows, $campaignRows),
+            'course_schedule' => $this->buildCourseScheduleMarkers($filters),
             'comparison' => $comparison,
             'meta' => [
                 'lag_days' => $this->aggregationLagDays(),
@@ -261,6 +263,42 @@ class AnalyticsRevenueDashboardService
         }
 
         return $rows;
+    }
+
+    /**
+     * Terminy szkoleń (start) w zakresie wykresu — odczyt z tabeli courses (nie z agregatów R1).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array{course_id: int, title: string, start_date: string, start_time: string}>
+     */
+    private function buildCourseScheduleMarkers(array $filters): array
+    {
+        $timezone = $this->timezone();
+        $from = Carbon::parse((string) $filters['date_from'], $timezone)->startOfDay();
+        $to = Carbon::parse((string) $filters['date_to'], $timezone)->endOfDay();
+
+        try {
+            return Course::query()
+                ->whereNotNull('start_date')
+                ->whereBetween('start_date', [$from, $to])
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->get(['id', 'title', 'start_date'])
+                ->map(function (Course $course) use ($timezone): array {
+                    $start = Carbon::parse($course->start_date)->timezone($timezone);
+
+                    return [
+                        'course_id' => (int) $course->id,
+                        'title' => (string) $course->title,
+                        'start_date' => $start->toDateString(),
+                        'start_time' => $start->format('H:i'),
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**

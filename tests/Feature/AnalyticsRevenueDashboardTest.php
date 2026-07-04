@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Analytics\AnalyticsDailyCampaignRevenueStat;
 use App\Models\Analytics\AnalyticsDailyCourseRevenueStat;
 use App\Models\Analytics\AnalyticsEvent;
+use App\Models\Course;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
@@ -18,6 +19,8 @@ class AnalyticsRevenueDashboardTest extends TestCase
     private array $createdUserIds = [];
 
     private array $createdRoleIds = [];
+
+    private array $createdCourseIds = [];
 
     private int $outputBufferLevel = 0;
 
@@ -59,6 +62,10 @@ class AnalyticsRevenueDashboardTest extends TestCase
 
         if ($this->createdRoleIds !== []) {
             Role::query()->whereIn('id', $this->createdRoleIds)->delete();
+        }
+
+        if ($this->createdCourseIds !== []) {
+            Course::query()->whereIn('id', $this->createdCourseIds)->forceDelete();
         }
 
         parent::tearDown();
@@ -370,6 +377,52 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertSee('Złożone zamówienia')
             ->assertSee('Zaksięgowane (dodana faktura)')
             ->assertSee('Opłacone online (PayU/PayNow)');
+    }
+
+    public function test_build_includes_course_schedule_markers_for_start_dates_in_range(): void
+    {
+        if (! Schema::hasTable('courses')) {
+            $this->markTestSkipped('Brak tabeli courses w testowej bazie adm.');
+        }
+
+        $course = $this->createAdminCourse('Szkolenie marker wykresu', '2026-06-18 10:00:00');
+
+        $service = app(\App\Services\Analytics\AnalyticsRevenueDashboardService::class);
+        $data = $service->build(['date_from' => '2026-06-01', 'date_to' => '2026-06-30']);
+
+        $this->assertSame(
+            [[
+                'course_id' => $course->id,
+                'title' => 'Szkolenie marker wykresu',
+                'start_date' => '2026-06-18',
+                'start_time' => '10:00',
+            ]],
+            $data['course_schedule'],
+        );
+    }
+
+    public function test_dashboard_shows_course_schedule_toggle_and_marker_data(): void
+    {
+        if (! Schema::hasTable('courses')) {
+            $this->markTestSkipped('Brak tabeli courses w testowej bazie adm.');
+        }
+
+        $admin = $this->userWithRole('admin');
+        $this->createAdminCourse('Szkolenie marker wykresu', '2026-06-18 10:00:00');
+        $this->seedCourse('2026-06-15', 100, 'Kurs', [
+            'orders_created' => 1,
+            'ordered_revenue_gross' => 100.00,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.revenue.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+            ]))
+            ->assertOk()
+            ->assertSee('revenueTrendShowCourseSchedule')
+            ->assertSee('Terminy szkoleń (start)')
+            ->assertSee('Szkolenie marker wykresu', false);
     }
 
     // ---------------------------------------------------------------------
@@ -748,6 +801,23 @@ class AnalyticsRevenueDashboardTest extends TestCase
         $this->createdUserIds[] = $user->id;
 
         return $user;
+    }
+
+    private function createAdminCourse(string $title, string $startDate): Course
+    {
+        $course = Course::query()->create([
+            'title' => $title,
+            'description' => 'Test course for revenue chart markers',
+            'start_date' => $startDate,
+            'end_date' => '2026-06-18 13:00:00',
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+        ]);
+        $this->createdCourseIds[] = $course->id;
+
+        return $course;
     }
 
     private function csvBody(\Illuminate\Testing\TestResponse $response): string
