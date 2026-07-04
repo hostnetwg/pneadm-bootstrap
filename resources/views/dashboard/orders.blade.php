@@ -385,6 +385,11 @@
         </div>
     </div>
 
+    @php
+        $dashboardMidnightReloadAt = \Carbon\Carbon::today($tz)->addDay()->startOfDay();
+        $dashboardDateKey = \Carbon\Carbon::today($tz)->toDateString();
+    @endphp
+
     @push('scripts')
     <script>
         (function () {
@@ -1089,6 +1094,39 @@
             refreshLiveVisitors();
         })();
         @endif
+
+        (function () {
+            const appTimezone = @json($tz);
+            let trackedDateKey = @json($dashboardDateKey);
+            const nextMidnightAt = new Date(@json($dashboardMidnightReloadAt->toIso8601String()));
+
+            function currentDateKeyInAppTz() {
+                return new Intl.DateTimeFormat('en-CA', { timeZone: appTimezone }).format(new Date());
+            }
+
+            function reloadForNewDay() {
+                const todayKey = currentDateKeyInAppTz();
+                if (todayKey !== trackedDateKey) {
+                    window.location.reload();
+                }
+            }
+
+            const msUntilMidnight = nextMidnightAt.getTime() - Date.now();
+            if (msUntilMidnight > 0) {
+                setTimeout(function () {
+                    window.location.reload();
+                }, msUntilMidnight + 500);
+            } else {
+                reloadForNewDay();
+            }
+
+            setInterval(reloadForNewDay, 30000);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                    reloadForNewDay();
+                }
+            });
+        })();
     </script>
     @endpush
 </x-app-layout>
