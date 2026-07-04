@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Analytics\AnalyticsEvent;
 use App\Services\Analytics\AnalyticsDebugPayloadInspector;
 use App\Support\UtcStorageDate;
-use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
