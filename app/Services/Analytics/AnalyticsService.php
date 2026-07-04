@@ -30,7 +30,7 @@ class AnalyticsService
                 'event_uuid' => $payload['event_uuid'] ?? (string) Str::uuid(),
                 'event_name' => $eventNameValue,
                 'event_category' => $eventCategory,
-                'occurred_at' => $payload['occurred_at'] ?? now()->toDateTimeString(),
+                'occurred_at' => $payload['occurred_at'] ?? now('UTC')->toDateTimeString(),
                 'app_source' => $payload['app_source'] ?? config('app.name', 'laravel'),
             ]);
 

@@ -1,17 +1,6 @@
 <x-app-layout>
     @php
         $displayTimezone = (string) config('analytics.debug_panel.timezone', 'Europe/Warsaw');
-        $formatAnalyticsTimestamp = function ($event, string $column) use ($displayTimezone): string {
-            $raw = $event->getRawOriginal($column);
-
-            if (! is_string($raw) || trim($raw) === '') {
-                return '';
-            }
-
-            return \Carbon\Carbon::parse($raw, 'UTC')
-                ->timezone($displayTimezone)
-                ->format('Y-m-d H:i:s');
-        };
     @endphp
 
     <x-slot name="header">
@@ -117,7 +106,7 @@
                                     $safeMetadata = $inspector->redacted($metadata);
                                 @endphp
                                 <tr>
-                                    <td class="text-nowrap">{{ $formatAnalyticsTimestamp($event, 'occurred_at') }}</td>
+                                    <td class="text-nowrap">{{ $event->formatUtcDatetimeLocal('occurred_at') ?? '' }}</td>
                                     <td>
                                         <code>{{ $event->event_name }}</code>
                                         @if($warnings !== [])
@@ -138,7 +127,7 @@
                                     <td><code class="small">{{ $event->path }}</code></td>
                                     <td>{{ $event->referrer_domain }}</td>
                                     <td>{{ $event->device_type }}</td>
-                                    <td class="text-nowrap">{{ $formatAnalyticsTimestamp($event, 'created_at') }}</td>
+                                    <td class="text-nowrap">{{ $event->formatUtcDatetimeLocal('created_at') ?? '' }}</td>
                                     <td style="min-width: 260px;">
                                         @if($warnings !== [])
                                             <div class="alert alert-danger py-1 px-2 mb-2 small">

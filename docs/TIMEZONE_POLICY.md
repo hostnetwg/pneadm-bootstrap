@@ -82,7 +82,44 @@ sail artisan form-orders:normalize-order-dates --scope=pnedu_bug --since=2025-10
 
 ## Analityka (`pne_analytics`)
 
-`occurred_at` zapisywane w UTC; debug panel od początku konwertował poprawnie — stąd zgodność z rzeczywistą godziną przy błędnym `order_date`.
+`occurred_at` — ten sam kontrakt co `order_date`: **UTC w bazie**, **Europe/Warsaw** w UI.
+
+### Zapis (pnedu / pneadm — `AnalyticsService`)
+
+```php
+'occurred_at' => now('UTC')->toDateTimeString();
+```
+
+Nie używać `now()->toDateTimeString()` — przy `DB_TIMEZONE=+00:00` zapisze czas polski jak UTC (+2 h w debug panelu).
+
+### Wyświetlanie (adm — debug eventów)
+
+```php
+$event->formatUtcDatetimeLocal('occurred_at');
+```
+
+Metoda na `AnalyticsModel` — ta sama logika co `FormOrder::formatOrderDateLocal()`.
+
+### Po wdrożeniu na prod
+
+```bash
+# pnedu — joby analityki muszą wczytać nowy kod
+php artisan queue:restart
+```
+
+### Eventy zapisane między wdrożeniem DB_TIMEZONE a fixem AnalyticsService
+
+Krótkie okno: `occurred_at` może mieć +2 h w bazie. Po fixie zapisu nowe eventy są OK. Korekta opcjonalna (SQL, tylko po audycie):
+
+```sql
+-- Tylko jeśli eventy z tego okna mają +2 h względem rzeczywistości
+UPDATE analytics_events
+SET occurred_at = DATE_SUB(occurred_at, INTERVAL 2 HOUR)
+WHERE occurred_at >= '2026-07-04 18:00:00'
+  AND occurred_at < '2026-07-04 22:00:00';
+```
+
+Dostosuj zakres dat do swojego wdrożenia.
 
 ## Eksport / import MySQL
 

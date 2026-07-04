@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Analytics;
 use App\Http\Controllers\Controller;
 use App\Models\Analytics\AnalyticsEvent;
 use App\Services\Analytics\AnalyticsDebugPayloadInspector;
+use App\Support\UtcStorageDate;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -63,11 +64,13 @@ class AnalyticsDebugEventController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->where('occurred_at', '>=', Carbon::parse((string) $request->query('date_from'))->startOfDay());
+            $fromUtc = UtcStorageDate::dayStartUtc((string) $request->query('date_from'));
+            $query->where('occurred_at', '>=', $fromUtc->format('Y-m-d H:i:s'));
         }
 
         if ($request->filled('date_to')) {
-            $query->where('occurred_at', '<=', Carbon::parse((string) $request->query('date_to'))->endOfDay());
+            $toUtc = UtcStorageDate::dayEndUtc((string) $request->query('date_to'));
+            $query->where('occurred_at', '<=', $toUtc->format('Y-m-d H:i:s'));
         }
 
         $events = $query
