@@ -132,13 +132,14 @@
                     opacity: 0;
                     z-index: 5;
                     border-radius: inherit;
-                    background-color: rgba(220, 53, 69, 0.62);
+                    background-color: rgba(13, 110, 253, 0.22);
                 }
                 .dashboard-refresh-surface.is-refresh-flash::after {
-                    animation: dashboardRefreshFlashFade 2.2s ease-out forwards;
+                    animation: dashboardRefreshFlashFade 1.6s ease-out forwards;
                 }
                 @keyframes dashboardRefreshFlashFade {
-                    0% { opacity: 1; }
+                    0% { opacity: 0; }
+                    18% { opacity: 0.42; }
                     100% { opacity: 0; }
                 }
             </style>
@@ -653,7 +654,7 @@
                         el.classList.add('is-refresh-flash');
                         window.setTimeout(function () {
                             el.classList.remove('is-refresh-flash');
-                        }, 2200);
+                        }, 1600);
                     });
                 }, 60);
             };
