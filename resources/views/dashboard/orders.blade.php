@@ -132,7 +132,7 @@
                                 <div>
                                     <h6 class="text-muted mb-1">Do obsługi</h6>
                                     <h2 class="mb-0 text-warning">{{ number_format($stats['form_handling']) }}</h2>
-                                    <small class="text-muted">aktywne szkolenia</small>
+                                    <small class="text-muted">brak FV lub dostępu · aktywne szkolenia</small>
                                 </div>
                                 <i class="bi bi-inbox fs-2 text-warning opacity-50"></i>
                             </div>
@@ -140,32 +140,36 @@
                     </div>
                 </div>
                 <div class="col-sm-6 col-xl-3">
-                    <div class="card border-success h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6 class="text-muted mb-1">Wartość z FV</h6>
-                                    <h2 class="mb-0 text-success">{{ number_format($stats['form_invoiced_value'], 0, ',', ' ') }} zł</h2>
-                                    <small class="text-muted">łącznie {{ number_format($stats['form_total']) }} zamówień</small>
+                    <a href="{{ route('form-orders.index', ['quick' => 'handling', 'settlement' => 'deferred']) }}" class="text-decoration-none">
+                        <div class="card border-success h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="text-muted mb-1">Odroczna płatność</h6>
+                                        <h2 class="mb-0 text-success">{{ number_format($stats['deferred_handling']) }}</h2>
+                                        <small class="text-muted">do obsługi · odroczona faktura</small>
+                                    </div>
+                                    <i class="bi bi-receipt fs-2 text-success opacity-50"></i>
                                 </div>
-                                <i class="bi bi-cash-stack fs-2 text-success opacity-50"></i>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-sm-6 col-xl-3">
-                    <div class="card border-info h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6 class="text-muted mb-1">Płatności online</h6>
-                                    <h2 class="mb-0 text-info">{{ number_format($stats['online_pending']) }}</h2>
-                                    <small class="text-muted">oczekujące · opłacone dziś: {{ number_format($stats['online_paid_today']) }}</small>
+                    <a href="{{ route('form-orders.index', ['quick' => 'handling', 'settlement' => 'online']) }}" class="text-decoration-none">
+                        <div class="card border-info h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="text-muted mb-1">Płatności online</h6>
+                                        <h2 class="mb-0 text-info">{{ number_format($stats['online_handling']) }}</h2>
+                                        <small class="text-muted">do obsługi · bramka płatności</small>
+                                    </div>
+                                    <i class="bi bi-credit-card fs-2 text-info opacity-50"></i>
                                 </div>
-                                <i class="bi bi-credit-card fs-2 text-info opacity-50"></i>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
             </div>
 

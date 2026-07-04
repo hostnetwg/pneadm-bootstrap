@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\FormOrder;
-use App\Models\OnlinePaymentOrder;
 use App\Services\Analytics\AnalyticsDateRangePresets;
 use App\Support\UtcStorageDate;
 use Carbon\Carbon;
@@ -89,7 +88,6 @@ class DashboardOrdersController extends Controller
         [$datePresets, $datePresetsYears] = $this->buildDatePresets($tz, $todayLocal);
 
         $stats = [
-            'form_total' => FormOrder::count(),
             'form_today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
                 ->count(),
@@ -97,14 +95,8 @@ class DashboardOrdersController extends Controller
                 ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->count(),
             'form_handling' => FormOrder::needsActiveHandling()->count(),
-            'form_invoiced_value' => FormOrder::withInvoice()->sum('product_price'),
-            'online_pending' => OnlinePaymentOrder::whereIn('status', [
-                OnlinePaymentOrder::STATUS_PENDING,
-                OnlinePaymentOrder::STATUS_CREATED,
-            ])->count(),
-            'online_paid_today' => OnlinePaymentOrder::where('status', OnlinePaymentOrder::STATUS_PAID)
-                ->where('updated_at', '>=', $todayStartUtc)
-                ->count(),
+            'deferred_handling' => $this->countHandlingBySettlement('deferred'),
+            'online_handling' => $this->countHandlingBySettlement('online'),
             'period_total' => array_sum($dailyChart['total']),
             'period_online' => array_sum($dailyChart['online']),
             'period_deferred' => array_sum($dailyChart['deferred']),
@@ -302,5 +294,21 @@ class DashboardOrdersController extends Controller
         }
 
         return $buckets;
+    }
+
+    private function countHandlingBySettlement(string $settlement): int
+    {
+        $query = FormOrder::needsActiveHandling();
+
+        if ($settlement === 'deferred') {
+            $query->where(function ($q) {
+                $q->where('payment_mode', FormOrder::PAYMENT_MODE_DEFERRED_INVOICE)
+                    ->orWhereNull('payment_mode');
+            });
+        } elseif ($settlement === 'online') {
+            $query->where('payment_mode', FormOrder::PAYMENT_MODE_ONLINE_GATEWAY);
+        }
+
+        return $query->count();
     }
 }
