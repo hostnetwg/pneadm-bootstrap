@@ -41,7 +41,9 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Sesja</th>
-                                        <th>Podstrona</th>
+                                        <th>Wejście</th>
+                                        <th>Ścieżka sesji</th>
+                                        <th>Teraz</th>
                                         <th>Szkolenie</th>
                                         <th>Urządzenie</th>
                                         <th class="text-end">Ostatnio</th>
@@ -49,7 +51,7 @@
                                 </thead>
                                 <tbody id="liveVisitorsBody">
                                     <tr id="liveVisitorsLoading">
-                                        <td colspan="5" class="text-muted small py-3 px-3">Ładowanie…</td>
+                                        <td colspan="7" class="text-muted small py-3 px-3">Ładowanie…</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1024,6 +1026,33 @@
                 return label;
             }
 
+            function entryCell(visitor) {
+                var parts = [];
+
+                if (visitor.entry_referrer_domain) {
+                    parts.push(escapeHtml(visitor.entry_referrer_domain));
+                }
+                if (visitor.entry_campaign_code) {
+                    parts.push('kamp. ' + escapeHtml(visitor.entry_campaign_code));
+                }
+
+                return parts.length ? parts.join(' · ') : '—';
+            }
+
+            function journeyCell(visitor) {
+                var label = visitor.journey_label || '—';
+                var title = label;
+
+                if (Array.isArray(visitor.journey_steps) && visitor.journey_steps.length > 0) {
+                    title = visitor.journey_steps.map(function (step) {
+                        return step.label || '—';
+                    }).join(' → ');
+                }
+
+                return '<span class="small text-primary" title="' + escapeHtml(title) + '">'
+                    + escapeHtml(label) + '</span>';
+            }
+
             function renderVisitors(data) {
                 countEl.textContent = String(data.active_count ?? 0);
 
@@ -1035,13 +1064,15 @@
                 const visitors = Array.isArray(data.visitors) ? data.visitors : [];
 
                 if (visitors.length === 0) {
-                    bodyEl.innerHTML = '<tr><td colspan="5" class="text-muted small py-3 px-3">Brak aktywnych sesji w ostatnich minutach.</td></tr>';
+                    bodyEl.innerHTML = '<tr><td colspan="7" class="text-muted small py-3 px-3">Brak aktywnych sesji w ostatnich minutach.</td></tr>';
                 } else {
                     bodyEl.innerHTML = visitors.map(function (visitor) {
                         return '<tr>'
                             + '<td><code class="small">' + escapeHtml(visitor.session_short) + '</code></td>'
+                            + '<td class="small text-muted">' + entryCell(visitor) + '</td>'
+                            + '<td class="text-truncate" style="max-width: 280px;">' + journeyCell(visitor) + '</td>'
                             + '<td>' + pageLabelCell(visitor) + '</td>'
-                            + '<td class="text-truncate" style="max-width: 240px;" title="' + escapeHtml(visitor.course_title || '') + '">'
+                            + '<td class="text-truncate" style="max-width: 200px;" title="' + escapeHtml(visitor.course_title || '') + '">'
                             + escapeHtml(visitor.course_title || '—') + '</td>'
                             + '<td class="small text-muted">' + escapeHtml(deviceLabel(visitor)) + '</td>'
                             + '<td class="text-end small text-nowrap">' + escapeHtml(formatAgo(visitor.last_seen_ago_seconds ?? 0)) + '</td>'
@@ -1080,7 +1111,7 @@
                         }
                     })
                     .catch(function () {
-                        bodyEl.innerHTML = '<tr><td colspan="5" class="text-danger small py-3 px-3">Nie udało się pobrać danych o aktywnych sesjach.</td></tr>';
+                        bodyEl.innerHTML = '<tr><td colspan="7" class="text-danger small py-3 px-3">Nie udało się pobrać danych o aktywnych sesjach.</td></tr>';
                     })
                     .finally(function () {
                         setFetching(false);

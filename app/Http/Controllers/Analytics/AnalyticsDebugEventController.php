@@ -5,16 +5,26 @@ namespace App\Http\Controllers\Analytics;
 use App\Http\Controllers\Controller;
 use App\Models\Analytics\AnalyticsEvent;
 use App\Services\Analytics\AnalyticsDebugPayloadInspector;
+use App\Services\Analytics\AnalyticsDebugSessionThreadService;
 use App\Support\UtcStorageDate;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class AnalyticsDebugEventController extends Controller
 {
-    public function index(Request $request, AnalyticsDebugPayloadInspector $inspector): View
-    {
+    public function index(
+        Request $request,
+        AnalyticsDebugPayloadInspector $inspector,
+        AnalyticsDebugSessionThreadService $threads,
+    ): View {
         if (! config('analytics.debug_panel.enabled', false)) {
             abort(404);
+        }
+
+        $layout = (string) $request->query('layout', 'threads');
+        if (! in_array($layout, ['threads', 'flat'], true)) {
+            $layout = 'threads';
         }
 
         $filters = $request->only([
@@ -25,8 +35,51 @@ class AnalyticsDebugEventController extends Controller
             'order_form_session_id',
             'date_from',
             'date_to',
+            'layout',
         ]);
+        $filters['layout'] = $layout;
 
+        $query = $this->filteredEventsQuery($request);
+
+        if ($layout === 'threads') {
+            $threadData = $threads->paginateThreads($query, 25);
+            $eventWarnings = $this->eventWarningsFor(
+                collect($threadData['threads']->items())
+                    ->flatMap(fn (array $thread): array => $thread['events'])
+                    ->merge($threadData['orphan_events']),
+                $inspector,
+            );
+
+            return view('analytics.debug-events.index', [
+                'layout' => $layout,
+                'threads' => $threadData['threads'],
+                'orphanEvents' => $threadData['orphan_events'],
+                'events' => null,
+                'filters' => $filters,
+                'eventWarnings' => $eventWarnings,
+                'inspector' => $inspector,
+            ]);
+        }
+
+        $events = $query
+            ->paginate(100)
+            ->withQueryString();
+
+        $eventWarnings = $this->eventWarningsFor($events->getCollection(), $inspector);
+
+        return view('analytics.debug-events.index', [
+            'layout' => $layout,
+            'threads' => null,
+            'orphanEvents' => [],
+            'events' => $events,
+            'filters' => $filters,
+            'eventWarnings' => $eventWarnings,
+            'inspector' => $inspector,
+        ]);
+    }
+
+    private function filteredEventsQuery(Request $request): Builder
+    {
         $query = AnalyticsEvent::query()
             ->select([
                 'id',
@@ -48,9 +101,7 @@ class AnalyticsDebugEventController extends Controller
                 'device_type',
                 'metadata',
                 'created_at',
-            ])
-            ->latest('occurred_at')
-            ->latest('id');
+            ]);
 
         foreach (['event_name', 'campaign_code', 'analytics_session_id', 'order_form_session_id'] as $field) {
             if ($request->filled($field)) {
@@ -72,39 +123,44 @@ class AnalyticsDebugEventController extends Controller
             $query->where('occurred_at', '<=', $toUtc->format('Y-m-d H:i:s'));
         }
 
-        $events = $query
-            ->paginate(100)
-            ->withQueryString();
+        return $query;
+    }
 
-        $eventWarnings = $events->getCollection()
-            ->mapWithKeys(function (AnalyticsEvent $event) use ($inspector): array {
-                $payload = array_filter([
-                    'event_name' => $event->event_name,
-                    'event_category' => $event->event_category,
-                    'analytics_session_id' => $event->analytics_session_id,
-                    'order_form_session_id' => $event->order_form_session_id,
-                    'course_id' => $event->course_id,
-                    'course_title_snapshot' => $event->course_title_snapshot,
-                    'campaign_code' => $event->campaign_code,
-                    'landing_target' => $event->landing_target,
-                    'utm_source' => $event->utm_source,
-                    'utm_medium' => $event->utm_medium,
-                    'utm_campaign' => $event->utm_campaign,
-                    'route_name' => $event->route_name,
-                    'path' => $event->path,
-                    'referrer_domain' => $event->referrer_domain,
-                    'device_type' => $event->device_type,
-                    'metadata_json' => $event->metadata ?? [],
-                ], static fn ($value): bool => $value !== null && $value !== '');
+    /**
+     * @param  iterable<int, AnalyticsEvent>  $events
+     * @return array<int, list<string>>
+     */
+    private function eventWarningsFor(iterable $events, AnalyticsDebugPayloadInspector $inspector): array
+    {
+        $warnings = [];
 
-                return [$event->id => $inspector->forbiddenKeysIn($payload)];
-            });
+        foreach ($events as $event) {
+            if (! $event instanceof AnalyticsEvent) {
+                continue;
+            }
 
-        return view('analytics.debug-events.index', [
-            'events' => $events,
-            'filters' => $filters,
-            'eventWarnings' => $eventWarnings,
-            'inspector' => $inspector,
-        ]);
+            $payload = array_filter([
+                'event_name' => $event->event_name,
+                'event_category' => $event->event_category,
+                'analytics_session_id' => $event->analytics_session_id,
+                'order_form_session_id' => $event->order_form_session_id,
+                'course_id' => $event->course_id,
+                'course_title_snapshot' => $event->course_title_snapshot,
+                'campaign_code' => $event->campaign_code,
+                'landing_target' => $event->landing_target,
+                'utm_source' => $event->utm_source,
+                'utm_medium' => $event->utm_medium,
+                'utm_campaign' => $event->utm_campaign,
+                'route_name' => $event->route_name,
+                'path' => $event->path,
+                'referrer_domain' => $event->referrer_domain,
+                'device_type' => $event->device_type,
+                'metadata_json' => $event->metadata ?? [],
+            ], static fn ($value): bool => $value !== null && $value !== '');
+
+            $warnings[$event->id] = $inspector->forbiddenKeysIn($payload);
+        }
+
+        return $warnings;
     }
 }

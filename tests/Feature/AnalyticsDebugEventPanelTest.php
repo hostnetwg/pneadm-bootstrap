@@ -93,8 +93,52 @@ class AnalyticsDebugEventPanelTest extends TestCase
             ->assertOk()
             ->assertSee('course_description_viewed')
             ->assertSee('debug-campaign')
-            ->assertSee('Debug Course')
-            ->assertSee('Panel techniczny');
+            ->assertSee('Panel techniczny')
+            ->assertSee('Wątki sesji');
+
+        $this->actingAs($admin)
+            ->get(route('analytics.debug-events.index', ['layout' => 'flat']))
+            ->assertOk()
+            ->assertSee('Debug Course');
+    }
+
+    public function test_debug_panel_threads_view_groups_events_by_session_and_shows_journey(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'campaign_short_link_visit',
+            'analytics_session_id' => $sessionId,
+            'referrer_domain' => 'facebook.com',
+            'campaign_code' => 'thread-campaign',
+            'path' => '/c/thread',
+            'occurred_at' => now('UTC')->subMinutes(3),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'course_description_viewed',
+            'analytics_session_id' => $sessionId,
+            'path' => '/courses/10',
+            'occurred_at' => now('UTC')->subMinutes(2),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'analytics_session_id' => $sessionId,
+            'path' => '/courses/10/order',
+            'occurred_at' => now('UTC')->subMinute(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.debug-events.index', ['layout' => 'threads']))
+            ->assertOk()
+            ->assertSee('Wątki sesji')
+            ->assertSee('Skąd wszedł')
+            ->assertSee('facebook.com')
+            ->assertSee('thread-campaign')
+            ->assertSee('Link kampanii')
+            ->assertSee('Opis szkolenia')
+            ->assertSee('Formularz zamówienia')
+            ->assertSee('Tylko ta sesja');
     }
 
     public function test_event_name_campaign_code_and_course_id_filters_work(): void
@@ -165,9 +209,9 @@ class AnalyticsDebugEventPanelTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('analytics.debug-events.index'))
+            ->get(route('analytics.debug-events.index', ['layout' => 'flat']))
             ->assertOk()
-            ->assertSee('Uwaga: wykryto niedozwolony klucz w metadata_json')
+            ->assertSee('Niedozwolone klucze')
             ->assertSee('raw_url')
             ->assertSee('raw_referrer')
             ->assertSee('safe_flag')
@@ -184,6 +228,22 @@ class AnalyticsDebugEventPanelTest extends TestCase
         $this->actingAs($admin)
             ->get(route('analytics.debug-events.index'))
             ->assertNotFound();
+    }
+
+    public function test_flat_layout_still_shows_event_table(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'campaign_code' => 'flat-layout',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('analytics.debug-events.index', ['layout' => 'flat']))
+            ->assertOk()
+            ->assertSee('Lista płaska')
+            ->assertSee('order_form_viewed')
+            ->assertSee('flat-layout');
     }
 
     private function userWithRole(string $roleName): User

@@ -93,6 +93,7 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
         $this->createAnalyticsEvent([
             'event_name' => 'course_description_viewed',
             'analytics_session_id' => $sessionId,
+            'referrer_domain' => 'google.com',
             'occurred_at' => now('UTC')->subMinutes(2),
         ]);
         $this->createAnalyticsEvent([
@@ -105,7 +106,9 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->getJson(route('api.dashboard.live-visitors'))
             ->assertOk()
             ->assertJsonPath('active_count', 1)
-            ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny');
+            ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny')
+            ->assertJsonPath('visitors.0.entry_referrer_domain', 'google.com')
+            ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny');
     }
 
     public function test_form_order_created_shows_order_submitted_label(): void

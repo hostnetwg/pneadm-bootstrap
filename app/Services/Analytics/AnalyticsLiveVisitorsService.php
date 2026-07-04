@@ -30,6 +30,10 @@ class AnalyticsLiveVisitorsService
         'form_order_created',
     ];
 
+    public function __construct(
+        private readonly AnalyticsSessionJourneyService $journey,
+    ) {}
+
     /**
      * @return array{
      *     enabled: bool,
@@ -45,7 +49,16 @@ class AnalyticsLiveVisitorsService
      *         last_seen_at: string,
      *         last_seen_ago_seconds: int,
      *         form_order_id: int|null,
-     *         form_order_url: string|null
+     *         form_order_url: string|null,
+     *         entry_referrer_domain: string|null,
+     *         entry_campaign_code: string|null,
+     *         journey_label: string,
+     *         journey_steps: list<array{
+     *             label: string,
+     *             event_name: string,
+     *             path: string|null,
+     *             occurred_at: string|null
+     *         }>
      *     }>
      * }
      */
@@ -82,34 +95,53 @@ class AnalyticsLiveVisitorsService
                 'event_name',
                 'landing_target',
                 'course_title_snapshot',
+                'course_id',
                 'path',
                 'device_type',
                 'browser_family',
                 'occurred_at',
                 'form_order_id',
                 'metadata',
+                'referrer_domain',
+                'campaign_code',
+                'utm_source',
+                'utm_medium',
+                'utm_campaign',
+                'id',
             ]);
 
         $latestBySession = [];
+        $eventsBySession = [];
+
         foreach ($recentEvents as $event) {
             $sessionId = (string) $event->analytics_session_id;
-            if ($sessionId === '' || isset($latestBySession[$sessionId])) {
+            if ($sessionId === '') {
                 continue;
             }
-            $latestBySession[$sessionId] = $event;
+
+            if (! isset($latestBySession[$sessionId])) {
+                $latestBySession[$sessionId] = $event;
+            }
+
+            $eventsBySession[$sessionId][] = $event;
         }
 
         $visitors = collect($latestBySession)
             ->sortByDesc(fn (AnalyticsEvent $event) => $event->getRawOriginal('occurred_at'))
             ->take($maxVisitors)
-            ->map(function (AnalyticsEvent $event) use ($timezone, $asOf): array {
+            ->map(function (AnalyticsEvent $event) use ($timezone, $asOf, $eventsBySession): array {
+                $sessionId = (string) $event->analytics_session_id;
+                $sessionEvents = collect($eventsBySession[$sessionId] ?? [$event]);
+                $journeySteps = $this->journey->buildSteps($sessionEvents);
+                $entry = $this->journey->buildEntry($sessionEvents);
+
                 $lastSeenUtc = Carbon::parse((string) $event->getRawOriginal('occurred_at'), 'UTC');
                 $lastSeenLocal = $lastSeenUtc->copy()->timezone($timezone);
                 $formOrderId = $event->form_order_id !== null ? (int) $event->form_order_id : null;
 
                 return [
-                    'session_short' => $this->shortSessionId((string) $event->analytics_session_id),
-                    'page_label' => $this->pageLabel($event),
+                    'session_short' => $this->journey->shortSessionId($sessionId),
+                    'page_label' => $this->journey->pageLabel($event),
                     'course_title' => filled($event->course_title_snapshot) ? (string) $event->course_title_snapshot : null,
                     'device_type' => $event->device_type,
                     'browser_family' => $event->browser_family,
@@ -119,6 +151,10 @@ class AnalyticsLiveVisitorsService
                     'form_order_url' => $formOrderId !== null
                         ? route('form-orders.show', $formOrderId)
                         : null,
+                    'entry_referrer_domain' => $entry['referrer_domain'],
+                    'entry_campaign_code' => $entry['campaign_code'],
+                    'journey_label' => $this->journey->compactJourneyLabel($journeySteps),
+                    'journey_steps' => $journeySteps,
                 ];
             })
             ->values()
@@ -133,47 +169,11 @@ class AnalyticsLiveVisitorsService
         ];
     }
 
+    /**
+     * @deprecated Use AnalyticsSessionJourneyService::pageLabel()
+     */
     public function pageLabel(AnalyticsEvent $event): string
     {
-        return match ($event->event_name) {
-            'course_description_viewed' => 'Opis szkolenia',
-            'order_form_viewed' => 'Formularz zamówienia',
-            'order_form_started',
-            'order_form_section_interacted',
-            'order_form_cta_clicked',
-            'order_form_submit_clicked',
-            'order_form_submit_attempted' => 'Formularz — aktywny',
-            'form_order_created' => $this->orderSubmittedPageLabel($event),
-            'campaign_short_link_visit' => 'Link kampanii',
-            'campaign_redirect_resolved' => 'Przekierowanie kampanii',
-            default => match ($event->landing_target) {
-                'course_description' => 'Opis szkolenia',
-                'order_form_direct' => 'Formularz zamówienia',
-                default => filled($event->path) ? (string) $event->path : 'Lejek sprzedaży',
-            },
-        };
-    }
-
-    private function orderSubmittedPageLabel(AnalyticsEvent $event): string
-    {
-        $metadata = is_array($event->metadata) ? $event->metadata : [];
-        $flow = $metadata['order_flow'] ?? $metadata['payment_type'] ?? null;
-
-        return match ($flow) {
-            'online' => 'Złożył zamówienie (online)',
-            'deferred', 'deferred_invoice' => 'Złożył zamówienie (odroczone)',
-            default => 'Złożył zamówienie',
-        };
-    }
-
-    private function shortSessionId(string $sessionId): string
-    {
-        $sessionId = trim($sessionId);
-
-        if (strlen($sessionId) <= 8) {
-            return $sessionId;
-        }
-
-        return '…'.substr($sessionId, -4);
+        return $this->journey->pageLabel($event);
     }
 }
