@@ -68,9 +68,9 @@ class DashboardController extends Controller
             // Zapisz timestamp aktualizacji
             Cache::put(self::CACHE_KEY . '_timestamp', now(), self::CACHE_TTL);
 
-            return redirect()->route('dashboard')->with('success', 'Statystyki zostały odświeżone.');
+            return redirect()->route('dashboard.surveys')->with('success', 'Statystyki zostały odświeżone.');
         } catch (\Exception $e) {
-            return redirect()->route('dashboard')->with('error', 'Nie udało się odświeżyć statystyk: ' . $e->getMessage());
+            return redirect()->route('dashboard.surveys')->with('error', 'Nie udało się odświeżyć statystyk: ' . $e->getMessage());
         }
     }
 

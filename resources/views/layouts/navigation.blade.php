@@ -16,7 +16,9 @@
 
         <!-- Dashboard -->
         <li class="mb-1">
-            <a href="{{ route('dashboard') }}" class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#dashboard-collapse"
+                    aria-expanded="{{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#home"></use>
                 </svg>
@@ -24,7 +26,25 @@
                 <svg class="bi pe-none ms-auto" width="16" height="16">
                     <use xlink:href="#chevron-right"></use>
                 </svg>
-            </a>
+            </button>
+            <div class="collapse {{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? 'show' : '' }}" id="dashboard-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('dashboard') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('dashboard') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Zamówienia
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('dashboard.surveys') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('dashboard.surveys*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Ankiety
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </li>
 
         <!-- Szkolenia -->

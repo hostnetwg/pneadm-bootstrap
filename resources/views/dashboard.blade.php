@@ -4,7 +4,7 @@
             <h2 class="fw-semibold fs-4 text-dark mb-0">
                 Monitorowanie jakości szkoleń
             </h2>
-            <form action="{{ route('dashboard.refresh') }}" method="POST" class="d-inline">
+            <form action="{{ route('dashboard.surveys.refresh') }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-outline-primary btn-sm" title="Odśwież statystyki">
                     <i class="bi bi-arrow-clockwise me-1"></i>

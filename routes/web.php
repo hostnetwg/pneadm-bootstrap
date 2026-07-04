@@ -15,6 +15,7 @@ use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\IfirmaController;
@@ -45,13 +46,13 @@ use App\Http\Controllers\ZamowieniaController;
 use App\Http\Controllers\ZamowieniaProdController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
-
 Route::middleware(['auth', 'check.user.status'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/dashboard/refresh', [DashboardController::class, 'refresh'])->name('dashboard.refresh');
+    Route::get('/', [DashboardOrdersController::class, 'index'])->name('dashboard');
+    Route::redirect('/dashboard', '/');
+    Route::redirect('/dashboard/zamowienia', '/');
+
+    Route::get('/dashboard/ankiety', [DashboardController::class, 'index'])->name('dashboard.surveys');
+    Route::post('/dashboard/ankiety/refresh', [DashboardController::class, 'refresh'])->name('dashboard.surveys.refresh');
 
     // User Preferences API
     Route::prefix('api/user')->name('api.user.')->group(function () {
