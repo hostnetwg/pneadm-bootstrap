@@ -397,7 +397,51 @@
             const seriesDeferred = @json($dailyChart['deferred'] ?? []);
             const seriesTotal = @json($dailyChart['total'] ?? []);
             const pointRadius = labels.length > 31 ? 2 : 4;
+            const labelFontSize = labels.length > 31 ? 9 : 11;
             window.dashboardChartFullLabels = @json($dailyChart['labels'] ?? []);
+
+            if (!window.dashboardOrdersTotalLabelsPluginRegistered) {
+                Chart.register({
+                    id: 'dashboardOrdersTotalLabels',
+                    afterDatasetsDraw: function (chart) {
+                        if (chart.canvas.id !== 'ordersDailyChart') {
+                            return;
+                        }
+
+                        const dataset = chart.data.datasets[0];
+                        const meta = chart.getDatasetMeta(0);
+
+                        if (!dataset || !meta || meta.hidden) {
+                            return;
+                        }
+
+                        const ctx = chart.ctx;
+                        ctx.save();
+                        ctx.font = '600 ' + (window.dashboardChartLabelFontSize || 11) + 'px system-ui, sans-serif';
+                        ctx.fillStyle = 'rgba(13, 110, 253, 1)';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+
+                        meta.data.forEach(function (point, index) {
+                            if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
+                                return;
+                            }
+
+                            const value = dataset.data[index];
+                            if (value === null || value === undefined) {
+                                return;
+                            }
+
+                            ctx.fillText(String(value), point.x, point.y - 6);
+                        });
+
+                        ctx.restore();
+                    },
+                });
+                window.dashboardOrdersTotalLabelsPluginRegistered = true;
+            }
+
+            window.dashboardChartLabelFontSize = labelFontSize;
 
             window.ordersDailyChartInstance = new Chart(canvas, {
                 type: 'line',
@@ -686,6 +730,7 @@
 
                 const labels = Array.isArray(chartData.labels_short) ? chartData.labels_short : [];
                 window.dashboardChartFullLabels = Array.isArray(chartData.labels) ? chartData.labels : [];
+                window.dashboardChartLabelFontSize = labels.length > 31 ? 9 : 11;
 
                 chart.data.labels = labels;
                 chart.data.datasets[0].data = chartData.total || [];
