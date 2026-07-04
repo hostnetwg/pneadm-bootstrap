@@ -17,6 +17,7 @@ use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardLiveVisitorsController;
 use App\Http\Controllers\DashboardOrdersController;
+use App\Http\Controllers\DashboardOrdersStatsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\IfirmaController;
@@ -57,6 +58,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     Route::get('/api/dashboard/live-visitors', DashboardLiveVisitorsController::class)
         ->name('api.dashboard.live-visitors');
+
+    Route::get('/api/dashboard/orders-stats', DashboardOrdersStatsController::class)
+        ->name('api.dashboard.orders-stats');
 
     // User Preferences API
     Route::prefix('api/user')->name('api.user.')->group(function () {

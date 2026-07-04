@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FormOrder;
 use App\Services\Analytics\AnalyticsDateRangePresets;
+use App\Services\Dashboard\DashboardOrdersStatsService;
 use App\Support\UtcStorageDate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -18,15 +19,10 @@ class DashboardOrdersController extends Controller
     /** Powyżej tej liczby dni wykres pokazuje miesiące zamiast poszczególnych dni. */
     private const DAILY_CHART_MAX_DAYS = 90;
 
-    public function index(Request $request)
+    public function index(Request $request, DashboardOrdersStatsService $ordersStats)
     {
         $tz = UtcStorageDate::appTimezone();
         $todayLocal = Carbon::today($tz);
-        $yesterdayLocal = Carbon::yesterday($tz);
-
-        $todayStartUtc = UtcStorageDate::dayStartUtc($todayLocal);
-        $tomorrowStartUtc = UtcStorageDate::dayStartUtc($todayLocal->copy()->addDay());
-        $yesterdayStartUtc = UtcStorageDate::dayStartUtc($yesterdayLocal);
 
         $defaultDateFrom = $todayLocal->copy()->subDays(self::DEFAULT_RANGE_DAYS - 1)->toDateString();
         $defaultDateTo = $todayLocal->toDateString();
@@ -87,16 +83,14 @@ class DashboardOrdersController extends Controller
 
         [$datePresets, $datePresetsYears] = $this->buildDatePresets($tz, $todayLocal);
 
+        $headlineStats = $ordersStats->snapshot();
+
         $stats = [
-            'form_today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
-                ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
-                ->count(),
-            'form_yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
-                ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
-                ->count(),
-            'form_handling' => FormOrder::needsActiveHandling()->count(),
-            'deferred_handling' => $this->countHandlingBySettlement('deferred'),
-            'online_handling' => $this->countHandlingBySettlement('online'),
+            'form_today' => $headlineStats['form_today'],
+            'form_yesterday' => $headlineStats['form_yesterday'],
+            'form_handling' => $headlineStats['form_handling'],
+            'deferred_handling' => $headlineStats['deferred_handling'],
+            'online_handling' => $headlineStats['online_handling'],
             'period_total' => array_sum($dailyChart['total']),
             'period_online' => array_sum($dailyChart['online']),
             'period_deferred' => array_sum($dailyChart['deferred']),
@@ -126,7 +120,8 @@ class DashboardOrdersController extends Controller
             'tz',
         ) + [
             'liveVisitorsEnabled' => (bool) config('analytics.live_visitors_dashboard.enabled', true),
-            'liveVisitorsPollSeconds' => max(10, (int) config('analytics.live_visitors_dashboard.poll_interval_seconds', 30)),
+            'liveVisitorsPollSeconds' => max(10, (int) config('analytics.live_visitors_dashboard.poll_interval_seconds', 15)),
+            'dashboardPollSeconds' => max(10, (int) config('analytics.live_visitors_dashboard.poll_interval_seconds', 15)),
             'liveVisitorsDebugUrl' => config('analytics.debug_panel.enabled', false)
                 ? route('analytics.debug-events.index')
                 : null,
@@ -294,21 +289,5 @@ class DashboardOrdersController extends Controller
         }
 
         return $buckets;
-    }
-
-    private function countHandlingBySettlement(string $settlement): int
-    {
-        $query = FormOrder::needsActiveHandling();
-
-        if ($settlement === 'deferred') {
-            $query->where(function ($q) {
-                $q->where('payment_mode', FormOrder::PAYMENT_MODE_DEFERRED_INVOICE)
-                    ->orWhereNull('payment_mode');
-            });
-        } elseif ($settlement === 'online') {
-            $query->where('payment_mode', FormOrder::PAYMENT_MODE_ONLINE_GATEWAY);
-        }
-
-        return $query->count();
     }
 }

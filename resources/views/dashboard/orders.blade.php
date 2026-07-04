@@ -8,7 +8,7 @@
     <div class="py-3">
         <div class="container-fluid px-4">
             @if($liveVisitorsEnabled ?? false)
-                <div class="card mb-4 border-secondary-subtle" id="liveVisitorsCard">
+                <div class="card mb-4 border-secondary-subtle dashboard-refresh-surface" id="liveVisitorsCard">
                     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
                         <div class="d-flex align-items-center gap-2">
                             <span class="live-visitors-indicator" id="liveVisitorsIndicator" title="Odświeżanie na żywo">
@@ -110,15 +110,39 @@
                 </style>
             @endif
 
-            <div class="row mb-4 g-3">
+            <style>
+                .dashboard-refresh-surface {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .dashboard-refresh-surface::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                    opacity: 0;
+                    z-index: 5;
+                    border-radius: inherit;
+                    background-color: rgba(220, 53, 69, 0.62);
+                }
+                .dashboard-refresh-surface.is-refresh-flash::after {
+                    animation: dashboardRefreshFlashFade 2.2s ease-out forwards;
+                }
+                @keyframes dashboardRefreshFlashFade {
+                    0% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+            </style>
+
+            <div class="row mb-4 g-3" id="dashboardOrdersStatsRow">
                 <div class="col-sm-6 col-xl-3">
-                    <div class="card border-primary h-100">
+                    <div class="card border-primary h-100 dashboard-refresh-surface">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="text-muted mb-1">Dziś (FORM)</h6>
-                                    <h2 class="mb-0 text-primary">{{ number_format($stats['form_today']) }}</h2>
-                                    <small class="text-muted">wczoraj: {{ number_format($stats['form_yesterday']) }}</small>
+                                    <h2 class="mb-0 text-primary" id="dashboardStatFormToday">{{ number_format($stats['form_today']) }}</h2>
+                                    <small class="text-muted">wczoraj: <span id="dashboardStatFormYesterday">{{ number_format($stats['form_yesterday']) }}</span></small>
                                 </div>
                                 <i class="bi bi-calendar-check fs-2 text-primary opacity-50"></i>
                             </div>
@@ -126,12 +150,12 @@
                     </div>
                 </div>
                 <div class="col-sm-6 col-xl-3">
-                    <div class="card border-warning h-100">
+                    <div class="card border-warning h-100 dashboard-refresh-surface">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="text-muted mb-1">Do obsługi</h6>
-                                    <h2 class="mb-0 text-warning">{{ number_format($stats['form_handling']) }}</h2>
+                                    <h2 class="mb-0 text-warning" id="dashboardStatFormHandling">{{ number_format($stats['form_handling']) }}</h2>
                                     <small class="text-muted">brak FV lub dostępu · aktywne szkolenia</small>
                                 </div>
                                 <i class="bi bi-inbox fs-2 text-warning opacity-50"></i>
@@ -141,12 +165,12 @@
                 </div>
                 <div class="col-sm-6 col-xl-3">
                     <a href="{{ route('form-orders.index', ['quick' => 'handling', 'settlement' => 'deferred']) }}" class="text-decoration-none">
-                        <div class="card border-success h-100">
+                        <div class="card border-success h-100 dashboard-refresh-surface">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <h6 class="text-muted mb-1">Odroczna płatność</h6>
-                                        <h2 class="mb-0 text-success">{{ number_format($stats['deferred_handling']) }}</h2>
+                                        <h2 class="mb-0 text-success" id="dashboardStatDeferredHandling">{{ number_format($stats['deferred_handling']) }}</h2>
                                         <small class="text-muted">do obsługi · odroczona faktura</small>
                                     </div>
                                     <i class="bi bi-receipt fs-2 text-success opacity-50"></i>
@@ -157,12 +181,12 @@
                 </div>
                 <div class="col-sm-6 col-xl-3">
                     <a href="{{ route('form-orders.index', ['quick' => 'handling', 'settlement' => 'online']) }}" class="text-decoration-none">
-                        <div class="card border-info h-100">
+                        <div class="card border-info h-100 dashboard-refresh-surface">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <h6 class="text-muted mb-1">Płatności online</h6>
-                                        <h2 class="mb-0 text-info">{{ number_format($stats['online_handling']) }}</h2>
+                                        <h2 class="mb-0 text-info" id="dashboardStatOnlineHandling">{{ number_format($stats['online_handling']) }}</h2>
                                         <small class="text-muted">do obsługi · bramka płatności</small>
                                     </div>
                                     <i class="bi bi-credit-card fs-2 text-info opacity-50"></i>
@@ -448,6 +472,91 @@
             });
         })();
 
+        (function () {
+            var flashDebounceTimer = null;
+
+            window.dashboardTriggerRefreshFlash = function () {
+                if (flashDebounceTimer) {
+                    clearTimeout(flashDebounceTimer);
+                }
+
+                flashDebounceTimer = setTimeout(function () {
+                    flashDebounceTimer = null;
+
+                    document.querySelectorAll('.dashboard-refresh-surface').forEach(function (el) {
+                        el.classList.remove('is-refresh-flash');
+                        void el.offsetWidth;
+                        el.classList.add('is-refresh-flash');
+                        window.setTimeout(function () {
+                            el.classList.remove('is-refresh-flash');
+                        }, 2200);
+                    });
+                }, 60);
+            };
+        })();
+
+        (function () {
+            const pollUrl = @json(route('api.dashboard.orders-stats'));
+            const pollSeconds = {{ (int) ($dashboardPollSeconds ?? 15) }};
+            const formTodayEl = document.getElementById('dashboardStatFormToday');
+            const formYesterdayEl = document.getElementById('dashboardStatFormYesterday');
+            const formHandlingEl = document.getElementById('dashboardStatFormHandling');
+            const deferredHandlingEl = document.getElementById('dashboardStatDeferredHandling');
+            const onlineHandlingEl = document.getElementById('dashboardStatOnlineHandling');
+            let pollCount = 0;
+
+            if (!formTodayEl || !formHandlingEl) {
+                return;
+            }
+
+            function formatCount(value) {
+                return new Intl.NumberFormat('pl-PL').format(Number(value) || 0);
+            }
+
+            function renderStats(data) {
+                formTodayEl.textContent = formatCount(data.form_today);
+                if (formYesterdayEl) {
+                    formYesterdayEl.textContent = formatCount(data.form_yesterday);
+                }
+                if (formHandlingEl) {
+                    formHandlingEl.textContent = formatCount(data.form_handling);
+                }
+                if (deferredHandlingEl) {
+                    deferredHandlingEl.textContent = formatCount(data.deferred_handling);
+                }
+                if (onlineHandlingEl) {
+                    onlineHandlingEl.textContent = formatCount(data.online_handling);
+                }
+            }
+
+            function refreshOrdersStats() {
+                fetch(pollUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        renderStats(data);
+                        pollCount += 1;
+                        if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
+                            window.dashboardTriggerRefreshFlash();
+                        }
+                    })
+                    .catch(function () {
+                        // fail-silent — pierwsze wartości z SSR pozostają widoczne
+                    });
+            }
+
+            refreshOrdersStats();
+            setInterval(refreshOrdersStats, pollSeconds * 1000);
+        })();
+
         @if($liveVisitorsEnabled ?? false)
         (function () {
             const pollUrl = @json(route('api.dashboard.live-visitors'));
@@ -458,6 +567,7 @@
             const footerSpinEl = document.getElementById('liveVisitorsFooterSpin');
             const indicatorEl = document.getElementById('liveVisitorsIndicator');
             const metaEl = document.getElementById('liveVisitorsMeta');
+            let pollCount = 0;
 
             if (!countEl || !bodyEl || !footerEl) {
                 return;
@@ -560,7 +670,13 @@
 
                         return response.json();
                     })
-                    .then(renderVisitors)
+                    .then(function (data) {
+                        renderVisitors(data);
+                        pollCount += 1;
+                        if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
+                            window.dashboardTriggerRefreshFlash();
+                        }
+                    })
                     .catch(function () {
                         bodyEl.innerHTML = '<tr><td colspan="5" class="text-danger small py-3 px-3">Nie udało się pobrać danych o aktywnych sesjach.</td></tr>';
                     })

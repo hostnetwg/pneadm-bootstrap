@@ -1,9 +1,11 @@
 <div class="flex-shrink-0 p-3 text-bg-dark h-100 overflow-auto" style="width: 100%;" data-bs-theme="dark">
     <div class="d-flex align-items-center pb-3 mb-3 link-light text-decoration-none border-bottom">
-        <svg class="bi pe-none me-2" width="30" height="24" fill="white">
-            <use xlink:href="#bootstrap"></use>
-        </svg>
-        <span class="fs-5 fw-semibold">Panel Administracyjny</span>
+        <a href="{{ route('dashboard') }}" class="d-flex align-items-center link-light text-decoration-none flex-grow-1 min-w-0">
+            <svg class="bi pe-none me-2" width="30" height="24" fill="white">
+                <use xlink:href="#bootstrap"></use>
+            </svg>
+            <span class="fs-5 fw-semibold">Panel Administracyjny</span>
+        </a>
         
         <!-- Dodajemy przycisk zamykania na mobilnych -->
         <button id="close-sidebar" class="btn btn-link text-light ms-auto d-md-none">
