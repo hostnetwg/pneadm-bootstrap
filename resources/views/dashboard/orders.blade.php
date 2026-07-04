@@ -1,8 +1,17 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">
-            Dashboard zamówień
-        </h2>
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
+                Dashboard zamówień
+            </h2>
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    id="dashboardOrderSoundToggle"
+                    title="Dźwięk przy nowym zamówieniu">
+                <i class="bi bi-volume-up-fill" id="dashboardOrderSoundIcon" aria-hidden="true"></i>
+                <span class="visually-hidden">Dźwięk przy nowym zamówieniu</span>
+            </button>
+        </div>
     </x-slot>
 
     <div class="py-3">
@@ -474,6 +483,116 @@
         })();
 
         (function () {
+            const STORAGE_KEY = 'dashboard_new_order_sound_enabled';
+            let audioCtx = null;
+            let soundEnabled = localStorage.getItem(STORAGE_KEY) !== 'false';
+
+            function getAudioContext() {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) {
+                    return null;
+                }
+
+                if (!audioCtx) {
+                    audioCtx = new AudioContextClass();
+                }
+
+                return audioCtx;
+            }
+
+            function unlockAudio() {
+                try {
+                    const ctx = getAudioContext();
+                    if (ctx && ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+                } catch (e) {
+                    // fail-silent
+                }
+            }
+
+            function playTone(ctx, frequency, startAt, duration) {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.value = frequency;
+                gain.gain.setValueAtTime(0.0001, startAt);
+                gain.gain.exponentialRampToValueAtTime(0.14, startAt + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(startAt);
+                oscillator.stop(startAt + duration + 0.05);
+            }
+
+            function playNewOrderChime() {
+                if (!soundEnabled) {
+                    return;
+                }
+
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) {
+                        return;
+                    }
+
+                    if (ctx.state === 'suspended') {
+                        ctx.resume().then(function () {
+                            playNewOrderChime();
+                        });
+
+                        return;
+                    }
+
+                    const start = ctx.currentTime;
+                    playTone(ctx, 523.25, start, 0.28);
+                    playTone(ctx, 659.25, start + 0.14, 0.32);
+                } catch (e) {
+                    // fail-silent
+                }
+            }
+
+            window.dashboardPlayNewOrderSound = function () {
+                playNewOrderChime();
+            };
+
+            document.addEventListener('click', unlockAudio, { once: true, passive: true });
+            document.addEventListener('keydown', unlockAudio, { once: true });
+
+            const toggleBtn = document.getElementById('dashboardOrderSoundToggle');
+            const toggleIcon = document.getElementById('dashboardOrderSoundIcon');
+
+            function updateToggleUi() {
+                if (!toggleBtn || !toggleIcon) {
+                    return;
+                }
+
+                toggleBtn.classList.toggle('btn-outline-secondary', soundEnabled);
+                toggleBtn.classList.toggle('btn-outline-warning', !soundEnabled);
+                toggleIcon.className = soundEnabled ? 'bi bi-volume-up-fill' : 'bi bi-volume-mute-fill';
+                toggleBtn.setAttribute(
+                    'title',
+                    soundEnabled ? 'Wyłącz dźwięk przy nowym zamówieniu' : 'Włącz dźwięk przy nowym zamówieniu'
+                );
+            }
+
+            if (toggleBtn) {
+                updateToggleUi();
+                toggleBtn.addEventListener('click', function () {
+                    soundEnabled = !soundEnabled;
+                    localStorage.setItem(STORAGE_KEY, soundEnabled ? 'true' : 'false');
+                    updateToggleUi();
+                    unlockAudio();
+
+                    if (soundEnabled) {
+                        playNewOrderChime();
+                    }
+                });
+            }
+        })();
+
+        (function () {
             var flashDebounceTimer = null;
 
             window.dashboardTriggerRefreshFlash = function () {
@@ -712,11 +831,20 @@
                         renderHeadlineStats(data);
                         pollCount += 1;
 
-                        if (nextFormToday !== previousFormToday) {
+                        if (nextFormToday > previousFormToday) {
                             lastFormToday = nextFormToday;
                             formTodayEl.dataset.initialValue = String(lastFormToday);
 
+                            if (typeof window.dashboardPlayNewOrderSound === 'function') {
+                                window.dashboardPlayNewOrderSound();
+                            }
+
                             return fetchDashboardSections();
+                        }
+
+                        if (nextFormToday !== previousFormToday) {
+                            lastFormToday = nextFormToday;
+                            formTodayEl.dataset.initialValue = String(lastFormToday);
                         }
 
                         if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
