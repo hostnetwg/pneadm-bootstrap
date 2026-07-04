@@ -20,7 +20,7 @@
                             <span class="badge text-bg-success" id="liveVisitorsCount">—</span>
                         </div>
                         <div class="small text-muted">
-                            <span id="liveVisitorsMeta">Lejek sprzedaży · odświeżanie co {{ $liveVisitorsPollSeconds ?? 30 }} s</span>
+                            <span id="liveVisitorsMeta">Lejek sprzedaży · odświeżanie za {{ $liveVisitorsPollSeconds ?? 15 }} s</span>
                             @if(!empty($liveVisitorsDebugUrl))
                                 · <a href="{{ $liveVisitorsDebugUrl }}" class="text-decoration-none">Debug eventów</a>
                             @endif
@@ -568,9 +568,51 @@
             const indicatorEl = document.getElementById('liveVisitorsIndicator');
             const metaEl = document.getElementById('liveVisitorsMeta');
             let pollCount = 0;
+            let windowMinutes = null;
+            let countdownSeconds = pollSeconds;
+            let countdownTimer = null;
+            let refreshInFlight = false;
 
             if (!countEl || !bodyEl || !footerEl) {
                 return;
+            }
+
+            function updateMetaText() {
+                if (!metaEl) {
+                    return;
+                }
+
+                var windowPart = windowMinutes ? (' · okno ' + windowMinutes + ' min') : '';
+                metaEl.textContent = 'Lejek sprzedaży' + windowPart + ' · odświeżanie za ' + countdownSeconds + ' s';
+            }
+
+            function resetCountdown() {
+                countdownSeconds = pollSeconds;
+                updateMetaText();
+            }
+
+            function startCountdown() {
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                }
+
+                countdownTimer = setInterval(function () {
+                    if (refreshInFlight) {
+                        return;
+                    }
+
+                    countdownSeconds -= 1;
+
+                    if (countdownSeconds <= 0) {
+                        countdownSeconds = 0;
+                        updateMetaText();
+                        refreshLiveVisitors();
+
+                        return;
+                    }
+
+                    updateMetaText();
+                }, 1000);
             }
 
             function setFetching(isFetching) {
@@ -631,9 +673,10 @@
             function renderVisitors(data) {
                 countEl.textContent = String(data.active_count ?? 0);
 
-                if (metaEl && data.window_minutes) {
-                    metaEl.textContent = 'Lejek sprzedaży · okno ' + data.window_minutes + ' min · odświeżanie co ' + pollSeconds + ' s';
+                if (data.window_minutes) {
+                    windowMinutes = data.window_minutes;
                 }
+                updateMetaText();
 
                 const visitors = Array.isArray(data.visitors) ? data.visitors : [];
 
@@ -657,6 +700,11 @@
             }
 
             function refreshLiveVisitors() {
+                if (refreshInFlight) {
+                    return;
+                }
+
+                refreshInFlight = true;
                 setFetching(true);
 
                 fetch(pollUrl, {
@@ -682,11 +730,14 @@
                     })
                     .finally(function () {
                         setFetching(false);
+                        refreshInFlight = false;
+                        resetCountdown();
                     });
             }
 
+            resetCountdown();
+            startCountdown();
             refreshLiveVisitors();
-            setInterval(refreshLiveVisitors, pollSeconds * 1000);
         })();
         @endif
     </script>
