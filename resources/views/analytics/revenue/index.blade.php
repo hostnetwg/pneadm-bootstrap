@@ -283,6 +283,7 @@
                     || collect($trendData)->sum('online_invoiced_marker_orders') > 0
                     || collect($trendData)->sum('online_paid_orders') > 0;
                 $chartShow = $trendHasData || count($courseSchedule) > 0;
+                $courseScheduleByDate = collect($courseSchedule)->groupBy('start_date')->sortKeys();
                 $trendChart = array_map(static fn (array $r): array => [
                     'date' => $r['stat_date'],
                     'orders' => (int) $r['orders_created'],
@@ -336,13 +337,48 @@
                         <div style="position: relative; height: 280px;">
                             <canvas id="revenueTrendChart"></canvas>
                         </div>
+                        @if(count($courseSchedule) > 0)
+                            <div id="revenueCourseScheduleList" class="mt-3 border-top pt-3">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <span class="small fw-semibold text-muted">
+                                        <i class="bi bi-calendar-event"></i>
+                                        Terminy szkoleń w zakresie ({{ count($courseSchedule) }})
+                                    </span>
+                                    <span class="small text-muted">Pełne tytuły — najedź na dzień wykresu po szczegóły</span>
+                                </div>
+                                <div class="revenue-course-schedule-list border rounded" style="max-height: 220px; overflow-y: auto;">
+                                    <ul class="list-group list-group-flush small mb-0">
+                                        @foreach($courseScheduleByDate as $date => $items)
+                                            @foreach($items as $item)
+                                                <li class="list-group-item py-2 px-3">
+                                                    <div class="d-flex flex-wrap align-items-start gap-2">
+                                                        <span class="badge bg-primary-subtle text-primary-emphasis text-nowrap">{{ $date }}</span>
+                                                        <span class="badge bg-light text-muted text-nowrap">{{ $item['start_time'] ?? '—' }}</span>
+                                                        <span class="flex-grow-1">
+                                                            @if($hasCourseLink)
+                                                                <a href="{{ route('courses.show', $item['course_id']) }}" class="text-decoration-none">
+                                                                    {{ $item['title'] }}
+                                                                </a>
+                                                            @else
+                                                                {{ $item['title'] }}
+                                                            @endif
+                                                            <span class="text-muted">· ID {{ $item['course_id'] }}</span>
+                                                        </span>
+                                                    </div>
+                                                </li>
+                                            @endforeach
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
                         <p class="small text-muted mb-0 mt-2">
                             <strong>Złożone zamówienia</strong> — wszystkie zamówienia złożone w danym dniu (<code>form_order_created</code>),
                             niezależnie od trybu płatności (odroczona lub online). To <em>nie</em> jest suma opłat PayU/PayNow i faktur — liczymy moment złożenia formularza.
                             <strong>Zaksięgowane (faktura)</strong> — faktury odroczone + znaczniki faktury online (<code>invoice_created</code>) w danym dniu.
                             <strong>Opłacone online</strong> — potwierdzone płatności PayU/PayNow (<code>payment_status_changed: paid</code>) w danym dniu.
                             Każda linia ma własną datę źródłową — wykres nie jest jednym lejkiem sprzedaży.
-                            <strong>Terminy szkoleń</strong> — pionowe linie w dniu rozpoczęcia (<code>courses.start_date</code>, wszystkie szkolenia w zakresie dat wykresu).
+                            <strong>Terminy szkoleń</strong> — cienkie pionowe linie w dniu startu (<code>courses.start_date</code>); pełne tytuły w liście poniżej i w podpowiedzi po najechaniu na dzień.
                             Dane z lagiem {{ (int) ($meta['lag_days'] ?? 1) }} dni.
                             @if(($filters['campaign_code'] ?? null))
                                 Wykres pokazuje tylko wybraną kampanię.
@@ -479,44 +515,42 @@
                     const trend = @json($trendChart ?? []);
                     const courseSchedule = @json($courseSchedule ?? []);
 
-                    const truncateTitle = (title, maxLen = 42) => {
-                        if (!title || title.length <= maxLen) {
-                            return title || '';
+                    const coursesByDate = courseSchedule.reduce((acc, course) => {
+                        if (!acc[course.start_date]) {
+                            acc[course.start_date] = [];
                         }
-
-                        return title.slice(0, maxLen - 1) + '…';
-                    };
+                        acc[course.start_date].push(course);
+                        return acc;
+                    }, {});
 
                     const buildCourseAnnotations = (courses, enabled) => {
                         if (!enabled || !courses.length) {
                             return {};
                         }
 
-                        const perDateCounts = {};
                         const annotations = {};
 
-                        courses.forEach((course) => {
-                            const stackIndex = perDateCounts[course.start_date] ?? 0;
-                            perDateCounts[course.start_date] = stackIndex + 1;
-                            const label = truncateTitle(course.title);
+                        Object.keys(coursesByDate).forEach((date) => {
+                            const dayCourses = coursesByDate[date];
+                            const count = dayCourses.length;
 
-                            annotations['course_' + course.course_id] = {
+                            annotations['course_date_' + date] = {
                                 type: 'line',
-                                xMin: course.start_date,
-                                xMax: course.start_date,
-                                borderColor: 'rgba(111, 66, 193, 0.55)',
+                                xMin: date,
+                                xMax: date,
+                                borderColor: 'rgba(111, 66, 193, 0.45)',
                                 borderWidth: 1,
-                                borderDash: [4, 4],
+                                borderDash: [5, 4],
                                 label: {
-                                    display: label !== '',
-                                    content: label,
+                                    display: count > 1,
+                                    content: String(count),
                                     position: 'start',
-                                    rotation: -90,
-                                    yAdjust: stackIndex * 16,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-                                    color: '#6f42c1',
-                                    font: { size: 10 },
-                                    padding: 2,
+                                    backgroundColor: '#6f42c1',
+                                    color: '#fff',
+                                    font: { size: 10, weight: 'bold' },
+                                    padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                                    borderRadius: 4,
+                                    yAdjust: 6,
                                 },
                             };
                         });
@@ -525,6 +559,15 @@
                     };
 
                     const scheduleToggle = document.getElementById('revenueTrendShowCourseSchedule');
+                    const scheduleList = document.getElementById('revenueCourseScheduleList');
+
+                    const syncCourseScheduleVisibility = () => {
+                        if (scheduleList && scheduleToggle) {
+                            scheduleList.classList.toggle('d-none', !scheduleToggle.checked);
+                        }
+                    };
+
+                    syncCourseScheduleVisibility();
 
                     const chart = new Chart(canvas, {
                         type: 'line',
@@ -574,6 +617,28 @@
                                         scheduleToggle ? scheduleToggle.checked : true
                                     ),
                                 },
+                                tooltip: {
+                                    callbacks: {
+                                        afterBody: (items) => {
+                                            if (!scheduleToggle?.checked || !items.length) {
+                                                return [];
+                                            }
+
+                                            const date = items[0].label;
+                                            const dayCourses = coursesByDate[date] || [];
+
+                                            if (!dayCourses.length) {
+                                                return [];
+                                            }
+
+                                            return [
+                                                '',
+                                                dayCourses.length === 1 ? 'Szkolenie:' : 'Szkolenia (' + dayCourses.length + '):',
+                                                ...dayCourses.map((c) => '• ' + c.start_time + ' — ' + c.title),
+                                            ];
+                                        },
+                                    },
+                                },
                             },
                         },
                     });
@@ -598,6 +663,7 @@
                             courseSchedule,
                             scheduleToggle.checked
                         );
+                        syncCourseScheduleVisibility();
                         chart.update();
                     };
 

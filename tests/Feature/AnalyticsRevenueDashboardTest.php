@@ -422,6 +422,8 @@ class AnalyticsRevenueDashboardTest extends TestCase
             ->assertOk()
             ->assertSee('revenueTrendShowCourseSchedule')
             ->assertSee('Terminy szkoleń (start)')
+            ->assertSee('Terminy szkoleń w zakresie')
+            ->assertSee('revenueCourseScheduleList')
             ->assertSee('Szkolenie marker wykresu', false);
     }
 
