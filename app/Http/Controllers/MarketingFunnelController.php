@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\MarketingSourceType;
 use App\Services\CourseFunnelStatsService;
+use App\Support\UtcStorageDate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,9 +63,11 @@ class MarketingFunnelController extends Controller
             ->limit(300)
             ->get(['id', 'title', 'start_date']);
 
+        [$ordersFromUtc, $ordersToUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
+
         $ordersWithoutCampaign = (int) DB::table('form_orders')
             ->whereNull('deleted_at')
-            ->whereBetween('order_date', [$from, $to])
+            ->whereBetween('order_date', [$ordersFromUtc, $ordersToUtc])
             ->where(function ($q) {
                 $q->whereNull('fb_source')->orWhere('fb_source', '');
             })

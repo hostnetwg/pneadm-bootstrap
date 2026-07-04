@@ -316,7 +316,7 @@ class AccountingController extends Controller
             'matches' => $matches->map(fn (FormOrder $order) => [
                 'id' => $order->id,
                 'invoice_number' => $order->invoice_number,
-                'order_date' => $this->formatDateTime($order->order_date),
+                'order_date' => $order->formatOrderDateLocal('Y-m-d H:i'),
                 'product_name' => $order->product_name,
                 'buyer_name' => $order->buyer_name,
                 'recipient_name' => $order->recipient_name,
@@ -324,7 +324,7 @@ class AccountingController extends Controller
             'selected' => [
                 'id' => $selected->id,
                 'invoice_number' => $selected->invoice_number,
-                'order_date' => $this->formatDateTime($selected->order_date),
+                'order_date' => $selected->formatOrderDateLocal('Y-m-d H:i'),
                 'invoice_date' => $this->formatDate($selected->order_date),
                 'product_name' => $selected->product_name,
                 'product_price' => (float) ($selected->product_price ?? 0),
@@ -447,7 +447,7 @@ class AccountingController extends Controller
                 return [
                     'id' => $order->id,
                     'invoice_number' => $order->invoice_number,
-                    'order_date' => $this->formatDateTime($order->order_date),
+                    'order_date' => $order->formatOrderDateLocal('Y-m-d H:i'),
                     'product_name' => $order->product_name,
                     'product_price' => (float) ($order->product_price ?? 0),
                     'invoice_date' => $this->formatDate($order->order_date),

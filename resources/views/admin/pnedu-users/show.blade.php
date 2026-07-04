@@ -139,7 +139,7 @@
                                 <tbody>
                                     @foreach($relatedFormOrders as $order)
                                         <tr>
-                                            <td class="text-nowrap small">{{ $order->order_date?->format('d.m.Y') ?? '—' }}</td>
+                                            <td class="text-nowrap small">{{ $order->formatOrderDateLocal('d.m.Y') ?? '—' }}</td>
                                             <td class="small"><code>{{ $order->ident ?: $order->id }}</code></td>
                                             <td class="text-nowrap">
                                                 @if($order->orderer_phone)

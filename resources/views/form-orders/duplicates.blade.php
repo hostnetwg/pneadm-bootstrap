@@ -332,14 +332,9 @@
                                                         <div class="col-6">
                                                             <strong>Data:</strong><br>
                                                         @php
-                                                            $orderDateRaw = $order->getRawOriginal('order_date');
-                                                            $orderDateFormatted = $orderDateRaw
-                                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                                                    ->setTimezone(config('app.timezone', 'Europe/Warsaw'))
-                                                                    ->format('d.m.Y H:i')
-                                                                : '—';
+                                                            $orderDateFormatted = $order->formatOrderDateLocal() ?? '—';
                                                         @endphp
-                                                        {{ $orderDateFormatted ?? '—' }}
+                                                        {{ $orderDateFormatted }}
                                                         </div>
                                                         <div class="col-6">
                                                             <strong>Status:</strong><br>

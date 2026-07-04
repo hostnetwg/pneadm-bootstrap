@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CoursePageStatsDaily;
 use App\Models\MarketingCampaign;
+use App\Support\UtcStorageDate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -106,6 +107,8 @@ class CourseFunnelStatsService
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
         $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
+        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
+
         $rows = DB::table('form_orders as fo')
             ->join('courses as c', function ($join) {
                 $join->on('fo.product_id', '=', 'c.id')
@@ -117,7 +120,7 @@ class CourseFunnelStatsService
             })
             ->whereNull('fo.deleted_at')
             ->whereIn('c.id', $courseIds)
-            ->whereBetween('fo.order_date', [$from, $to])
+            ->whereBetween('fo.order_date', [$fromUtc, $toUtc])
             ->groupBy('c.id')
             ->selectRaw('c.id as course_id')
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$operationalSubmitted} THEN fo.id END) as submitted")
@@ -143,6 +146,8 @@ class CourseFunnelStatsService
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
         $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
+        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
+
         $entriesSubquery = DB::table('marketing_campaign_stats_daily')
             ->selectRaw('campaign_code, SUM(link_entries) as link_entries')
             ->whereBetween('stat_date', [$from->toDateString(), $to->toDateString()])
@@ -153,10 +158,10 @@ class CourseFunnelStatsService
             ->leftJoinSub($entriesSubquery, 'mcs_agg', function ($join) {
                 $join->on('mcs_agg.campaign_code', '=', 'mc.campaign_code');
             })
-            ->leftJoin('form_orders as fo', function ($join) use ($from, $to) {
+            ->leftJoin('form_orders as fo', function ($join) use ($fromUtc, $toUtc) {
                 $join->on('fo.fb_source', '=', 'mc.campaign_code')
                     ->whereNull('fo.deleted_at')
-                    ->whereBetween('fo.order_date', [$from, $to]);
+                    ->whereBetween('fo.order_date', [$fromUtc, $toUtc]);
             })
             ->whereNull('mc.deleted_at')
             ->groupBy('mc.id', 'mc.campaign_code', 'mc.name', 'mst.name', 'mst.color', 'mc.is_active')

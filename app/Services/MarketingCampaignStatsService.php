@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\UtcStorageDate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -182,10 +183,12 @@ class MarketingCampaignStatsService
 
         $operationalSubmitted = $this->funnelStats->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
+        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($period['from'], $period['to']);
+
         $orders = (int) DB::table('form_orders as fo')
             ->whereNull('fo.deleted_at')
             ->whereIn('fo.fb_source', $campaignCodes)
-            ->whereBetween('fo.order_date', [$period['from'], $period['to']])
+            ->whereBetween('fo.order_date', [$fromUtc, $toUtc])
             ->whereRaw($operationalSubmitted)
             ->count();
 
@@ -221,11 +224,13 @@ class MarketingCampaignStatsService
     {
         $operationalSubmitted = $this->funnelStats->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
+        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
+
         return DB::table('form_orders as fo')
             ->selectRaw('COUNT(*)')
             ->whereColumn('fo.fb_source', 'marketing_campaigns.campaign_code')
             ->whereNull('fo.deleted_at')
-            ->whereBetween('fo.order_date', [$from, $to])
+            ->whereBetween('fo.order_date', [$fromUtc, $toUtc])
             ->whereRaw($operationalSubmitted);
     }
 
@@ -243,12 +248,13 @@ class MarketingCampaignStatsService
     private function campaignCodesWithOrdersSubquery(Carbon $from, Carbon $to): \Closure
     {
         $operationalSubmitted = $this->funnelStats->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
+        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
 
-        return function (QueryBuilder $sub) use ($from, $to, $operationalSubmitted) {
+        return function (QueryBuilder $sub) use ($fromUtc, $toUtc, $operationalSubmitted) {
             $sub->select('fo.fb_source')
                 ->from('form_orders as fo')
                 ->whereNull('fo.deleted_at')
-                ->whereBetween('fo.order_date', [$from, $to])
+                ->whereBetween('fo.order_date', [$fromUtc, $toUtc])
                 ->whereRaw($operationalSubmitted)
                 ->groupBy('fo.fb_source');
         };

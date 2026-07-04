@@ -369,19 +369,7 @@
                                             @endif
                                         </h5>
                                         @php
-                                            // Pobierz surową wartość z bazy (zapisana w UTC)
-                                            $orderDateRaw = $zamowienie->getRawOriginal('order_date');
-                                            if ($orderDateRaw) {
-                                                // Parsuj surową wartość jako datę w UTC (jak jest zapisana w bazie)
-                                                // Następnie przekonwertuj na czas lokalny (Europe/Warsaw) dla wyświetlenia
-                                                $orderDateFormatted = \Carbon\Carbon::createFromFormat(
-                                                    'Y-m-d H:i:s',
-                                                    $orderDateRaw,
-                                                    'UTC'
-                                                )->setTimezone(config('app.timezone', 'Europe/Warsaw'))->format('d.m.Y H:i');
-                                            } else {
-                                                $orderDateFormatted = null;
-                                            }
+                                            $orderDateFormatted = $zamowienie->formatOrderDateLocal();
                                         @endphp
                                         <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
                                             @if($orderDateFormatted)
@@ -736,12 +724,7 @@
                                                 <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
                                                 <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                                                 @php
-                                                    $orderDateRaw = $zamowienie->getRawOriginal('order_date');
-                                                    $orderDateFormatted = $orderDateRaw
-                                                        ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                                            ->setTimezone(config('app.timezone', 'Europe/Warsaw'))
-                                                            ->format('d.m.Y H:i')
-                                                        : null;
+                                                    $orderDateFormatted = $zamowienie->formatOrderDateLocal();
                                                 @endphp
                                                 <li><strong>Data:</strong> {{ $orderDateFormatted ?? '—' }}</li>
                                             </ul>

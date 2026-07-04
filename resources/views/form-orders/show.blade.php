@@ -887,12 +887,7 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                     <div class="card-body py-2">
                                         @php
-                                            $orderDateRaw = $zamowienie->getRawOriginal('order_date');
-                                            $orderDateFormatted = $orderDateRaw
-                                                ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                                    ->setTimezone(config('app.timezone', 'Europe/Warsaw'))
-                                                    ->format('d.m.Y H:i')
-                                                : null;
+                                            $orderDateFormatted = $zamowienie->formatOrderDateLocal();
                                         @endphp
                                         @if($orderDateFormatted)
                                             <div class="mb-1">
@@ -3063,12 +3058,7 @@ nowoczesna-edukacja.pl `;
                             <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
                             @php
-                                $orderDateRaw = $zamowienie->getRawOriginal('order_date');
-                                $orderDateFormatted = $orderDateRaw
-                                    ? \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $orderDateRaw, 'UTC')
-                                        ->setTimezone(config('app.timezone', 'Europe/Warsaw'))
-                                        ->format('d.m.Y H:i')
-                                    : '—';
+                                $orderDateFormatted = $zamowienie->formatOrderDateLocal() ?? '—';
                             @endphp
                             <li><strong>Data:</strong> {{ $orderDateFormatted ?? '—' }}</li>
                             <li><strong>Status:</strong> {{ $zamowienie->is_new ? 'Niewprowadzone' : 'Wprowadzone' }}</li>
