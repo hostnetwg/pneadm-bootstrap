@@ -62,6 +62,33 @@ class DashboardOrdersStatsApiTest extends TestCase
             ]);
     }
 
+    public function test_authenticated_user_can_fetch_orders_stats_with_sections(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('users') || ! \Illuminate\Support\Facades\Schema::hasTable('roles')) {
+            $this->markTestSkipped('Brak tabel users/roles w testowej bazie adm.');
+        }
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('form_orders')
+            || ! \Illuminate\Support\Facades\Schema::hasColumn('form_orders', 'cancelled_at')) {
+            $this->markTestSkipped('Brak aktualnej tabeli form_orders w testowej bazie adm.');
+        }
+
+        $user = $this->userWithRole('manager');
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.orders-stats', ['sections' => 1]))
+            ->assertOk()
+            ->assertJsonStructure([
+                'form_today',
+                'sections' => [
+                    'period' => ['total', 'online', 'deferred', 'avg', 'avg_label'],
+                    'chart' => ['labels', 'labels_short', 'online', 'deferred', 'total'],
+                    'recent_orders',
+                    'shortcuts' => ['form_handling'],
+                ],
+            ]);
+    }
+
     private function userWithRole(string $roleName): User
     {
         $role = Role::query()->where('name', $roleName)->first();

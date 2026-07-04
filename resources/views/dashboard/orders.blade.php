@@ -141,7 +141,7 @@
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="text-muted mb-1">Dziś (FORM)</h6>
-                                    <h2 class="mb-0 text-primary" id="dashboardStatFormToday">{{ number_format($stats['form_today']) }}</h2>
+                                    <h2 class="mb-0 text-primary" id="dashboardStatFormToday" data-initial-value="{{ $stats['form_today'] }}">{{ number_format($stats['form_today']) }}</h2>
                                     <small class="text-muted">wczoraj: <span id="dashboardStatFormYesterday">{{ number_format($stats['form_yesterday']) }}</span></small>
                                 </div>
                                 <i class="bi bi-calendar-check fs-2 text-primary opacity-50"></i>
@@ -197,7 +197,7 @@
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 dashboard-refresh-surface" id="dashboardChartCard">
                 <div class="card-header">
                     <h5 class="mb-0">
                         @if(($chartGranularity ?? 'day') === 'month')
@@ -265,7 +265,7 @@
                         </div>
                     </form>
 
-                    <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
+                    <div class="d-flex flex-wrap gap-3 mb-3 small text-muted" id="dashboardPeriodSummary">
                         <span>
                             Okres:
                             <strong>{{ $filters['date_from'] }}</strong>
@@ -273,10 +273,10 @@
                             <strong>{{ $filters['date_to'] }}</strong>
                             ({{ $tz }})
                         </span>
-                        <span>Łącznie: <strong>{{ number_format($stats['period_total']) }}</strong></span>
-                        <span>Online: <strong>{{ number_format($stats['period_online']) }}</strong></span>
-                        <span>Odroczone: <strong>{{ number_format($stats['period_deferred']) }}</strong></span>
-                        <span>Średnio/{{ $stats['period_avg_label'] ?? 'dzień' }}: <strong>{{ number_format($stats['period_avg'], 1, ',', ' ') }}</strong></span>
+                        <span>Łącznie: <strong id="dashboardPeriodTotal">{{ number_format($stats['period_total']) }}</strong></span>
+                        <span>Online: <strong id="dashboardPeriodOnline">{{ number_format($stats['period_online']) }}</strong></span>
+                        <span>Odroczone: <strong id="dashboardPeriodDeferred">{{ number_format($stats['period_deferred']) }}</strong></span>
+                        <span>Średnio/<span id="dashboardPeriodAvgLabel">{{ $stats['period_avg_label'] ?? 'dzień' }}</span>: <strong id="dashboardPeriodAvg">{{ number_format($stats['period_avg'], 1, ',', ' ') }}</strong></span>
                         @if(($chartGranularity ?? 'day') === 'month')
                             <span class="text-muted">(wykres: agregacja miesięczna — zakres &gt; 90 dni)</span>
                         @endif
@@ -294,18 +294,18 @@
 
             <div class="row g-4">
                 <div class="col-lg-8">
-                    <div class="card h-100">
+                    <div class="card h-100 dashboard-refresh-surface" id="dashboardRecentOrdersCard">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Ostatnie zamówienia FORM</h5>
                             <a href="{{ route('form-orders.index') }}" class="btn btn-sm btn-outline-primary">
                                 Pełna lista
                             </a>
                         </div>
-                        <div class="card-body p-0">
+                        <div class="card-body p-0" id="dashboardRecentOrdersContainer">
                             @if($recentFormOrders->isEmpty())
-                                <p class="text-muted p-3 mb-0">Brak zamówień do wyświetlenia.</p>
+                                <p class="text-muted p-3 mb-0" id="dashboardRecentOrdersEmpty">Brak zamówień do wyświetlenia.</p>
                             @else
-                                <div class="table-responsive">
+                                <div class="table-responsive" id="dashboardRecentOrdersTableWrap">
                                     <table class="table table-hover table-sm mb-0 align-middle">
                                         <thead class="table-light">
                                             <tr>
@@ -316,7 +316,7 @@
                                                 <th></th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody id="dashboardRecentOrdersBody">
                                             @foreach($recentFormOrders as $order)
                                                 <tr>
                                                     <td><code>{{ $order->ident }}</code></td>
@@ -345,7 +345,7 @@
                 </div>
 
                 <div class="col-lg-4">
-                    <div class="card h-100">
+                    <div class="card h-100 dashboard-refresh-surface" id="dashboardShortcutsCard">
                         <div class="card-header">
                             <h5 class="mb-0">Szybkie skróty</h5>
                         </div>
@@ -356,7 +356,7 @@
                             </a>
                             <a href="{{ route('form-orders.index', ['quick' => 'handling']) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-inbox me-2"></i>Kolejka do obsługi</span>
-                                <span class="badge text-bg-warning rounded-pill">{{ $stats['form_handling'] }}</span>
+                                <span class="badge text-bg-warning rounded-pill" id="dashboardShortcutHandling">{{ $stats['form_handling'] }}</span>
                             </a>
                             <a href="{{ route('online-payment-orders.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-credit-card me-2"></i>Płatności online</span>
@@ -388,8 +388,9 @@
             const seriesDeferred = @json($dailyChart['deferred'] ?? []);
             const seriesTotal = @json($dailyChart['total'] ?? []);
             const pointRadius = labels.length > 31 ? 2 : 4;
+            window.dashboardChartFullLabels = @json($dailyChart['labels'] ?? []);
 
-            new Chart(canvas, {
+            window.ordersDailyChartInstance = new Chart(canvas, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -445,7 +446,7 @@
                             callbacks: {
                                 title: function (items) {
                                     const idx = items[0]?.dataIndex ?? 0;
-                                    const fullLabels = @json($dailyChart['labels'] ?? []);
+                                    const fullLabels = window.dashboardChartFullLabels || [];
 
                                     return fullLabels[idx] ?? items[0]?.label ?? '';
                                 },
@@ -498,12 +499,23 @@
         (function () {
             const pollUrl = @json(route('api.dashboard.orders-stats'));
             const pollSeconds = {{ (int) ($dashboardPollSeconds ?? 15) }};
+            const chartDateFrom = @json($filters['date_from'] ?? '');
+            const chartDateTo = @json($filters['date_to'] ?? '');
             const formTodayEl = document.getElementById('dashboardStatFormToday');
             const formYesterdayEl = document.getElementById('dashboardStatFormYesterday');
             const formHandlingEl = document.getElementById('dashboardStatFormHandling');
             const deferredHandlingEl = document.getElementById('dashboardStatDeferredHandling');
             const onlineHandlingEl = document.getElementById('dashboardStatOnlineHandling');
+            const periodTotalEl = document.getElementById('dashboardPeriodTotal');
+            const periodOnlineEl = document.getElementById('dashboardPeriodOnline');
+            const periodDeferredEl = document.getElementById('dashboardPeriodDeferred');
+            const periodAvgEl = document.getElementById('dashboardPeriodAvg');
+            const periodAvgLabelEl = document.getElementById('dashboardPeriodAvgLabel');
+            const recentOrdersContainer = document.getElementById('dashboardRecentOrdersContainer');
+            const shortcutHandlingEl = document.getElementById('dashboardShortcutHandling');
             let pollCount = 0;
+            let lastFormToday = parseInt(formTodayEl?.dataset.initialValue || '0', 10);
+            let sectionsFetchInFlight = false;
 
             if (!formTodayEl || !formHandlingEl) {
                 return;
@@ -513,7 +525,22 @@
                 return new Intl.NumberFormat('pl-PL').format(Number(value) || 0);
             }
 
-            function renderStats(data) {
+            function formatDecimal(value) {
+                return new Intl.NumberFormat('pl-PL', {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                }).format(Number(value) || 0);
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function renderHeadlineStats(data) {
                 formTodayEl.textContent = formatCount(data.form_today);
                 if (formYesterdayEl) {
                     formYesterdayEl.textContent = formatCount(data.form_yesterday);
@@ -527,6 +554,143 @@
                 if (onlineHandlingEl) {
                     onlineHandlingEl.textContent = formatCount(data.online_handling);
                 }
+                if (shortcutHandlingEl) {
+                    shortcutHandlingEl.textContent = formatCount(data.form_handling);
+                }
+            }
+
+            function updateChart(chartData) {
+                const chart = window.ordersDailyChartInstance;
+                if (!chart || !chartData) {
+                    return;
+                }
+
+                const labels = Array.isArray(chartData.labels_short) ? chartData.labels_short : [];
+                window.dashboardChartFullLabels = Array.isArray(chartData.labels) ? chartData.labels : [];
+
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = chartData.total || [];
+                chart.data.datasets[1].data = chartData.online || [];
+                chart.data.datasets[2].data = chartData.deferred || [];
+
+                const nextRadius = labels.length > 31 ? 2 : 4;
+                chart.data.datasets.forEach(function (dataset) {
+                    dataset.pointRadius = nextRadius;
+                });
+
+                chart.update();
+            }
+
+            function renderRecentOrders(orders) {
+                if (!recentOrdersContainer) {
+                    return;
+                }
+
+                const items = Array.isArray(orders) ? orders : [];
+
+                if (items.length === 0) {
+                    recentOrdersContainer.innerHTML = '<p class="text-muted p-3 mb-0" id="dashboardRecentOrdersEmpty">Brak zamówień do wyświetlenia.</p>';
+
+                    return;
+                }
+
+                const rows = items.map(function (order) {
+                    return '<tr>'
+                        + '<td><code>' + escapeHtml(order.ident) + '</code></td>'
+                        + '<td class="text-truncate" style="max-width: 220px;" title="' + escapeHtml(order.course_title || '—') + '">'
+                        + escapeHtml(order.course_title || '—') + '</td>'
+                        + '<td>' + escapeHtml(order.order_date || '—') + '</td>'
+                        + '<td class="text-end">' + escapeHtml(order.product_price || '—') + '</td>'
+                        + '<td class="text-end"><a href="' + escapeHtml(order.show_url) + '" class="btn btn-sm btn-link">Szczegóły</a></td>'
+                        + '</tr>';
+                }).join('');
+
+                recentOrdersContainer.innerHTML = ''
+                    + '<div class="table-responsive" id="dashboardRecentOrdersTableWrap">'
+                    + '<table class="table table-hover table-sm mb-0 align-middle">'
+                    + '<thead class="table-light"><tr>'
+                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th class="text-end">Kwota</th><th></th>'
+                    + '</tr></thead>'
+                    + '<tbody id="dashboardRecentOrdersBody">' + rows + '</tbody>'
+                    + '</table></div>';
+            }
+
+            function renderSections(sections) {
+                if (!sections) {
+                    return;
+                }
+
+                if (sections.period) {
+                    if (periodTotalEl) {
+                        periodTotalEl.textContent = formatCount(sections.period.total);
+                    }
+                    if (periodOnlineEl) {
+                        periodOnlineEl.textContent = formatCount(sections.period.online);
+                    }
+                    if (periodDeferredEl) {
+                        periodDeferredEl.textContent = formatCount(sections.period.deferred);
+                    }
+                    if (periodAvgEl) {
+                        periodAvgEl.textContent = formatDecimal(sections.period.avg);
+                    }
+                    if (periodAvgLabelEl && sections.period.avg_label) {
+                        periodAvgLabelEl.textContent = sections.period.avg_label;
+                    }
+                }
+
+                if (sections.chart) {
+                    updateChart(sections.chart);
+                }
+
+                if (sections.recent_orders) {
+                    renderRecentOrders(sections.recent_orders);
+                }
+
+                if (sections.shortcuts && shortcutHandlingEl) {
+                    shortcutHandlingEl.textContent = formatCount(sections.shortcuts.form_handling);
+                }
+            }
+
+            function fetchDashboardSections() {
+                if (sectionsFetchInFlight) {
+                    return Promise.resolve();
+                }
+
+                sectionsFetchInFlight = true;
+
+                const params = new URLSearchParams({
+                    sections: '1',
+                    date_from: chartDateFrom,
+                    date_to: chartDateTo,
+                });
+
+                return fetch(pollUrl + '?' + params.toString(), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        renderHeadlineStats(data);
+                        lastFormToday = Number(data.form_today) || 0;
+                        formTodayEl.dataset.initialValue = String(lastFormToday);
+                        renderSections(data.sections);
+
+                        if (typeof window.dashboardTriggerRefreshFlash === 'function') {
+                            window.dashboardTriggerRefreshFlash();
+                        }
+                    })
+                    .catch(function () {
+                        // fail-silent
+                    })
+                    .finally(function () {
+                        sectionsFetchInFlight = false;
+                    });
             }
 
             function refreshOrdersStats() {
@@ -542,8 +706,19 @@
                         return response.json();
                     })
                     .then(function (data) {
-                        renderStats(data);
+                        const previousFormToday = lastFormToday;
+                        const nextFormToday = Number(data.form_today) || 0;
+
+                        renderHeadlineStats(data);
                         pollCount += 1;
+
+                        if (nextFormToday !== previousFormToday) {
+                            lastFormToday = nextFormToday;
+                            formTodayEl.dataset.initialValue = String(lastFormToday);
+
+                            return fetchDashboardSections();
+                        }
+
                         if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
                             window.dashboardTriggerRefreshFlash();
                         }
