@@ -393,6 +393,20 @@ class FormOrder extends Model
     }
 
     /**
+     * Dashboard zamówień: wystawiona FV lub otwarta kolejka operacyjna (do obsługi).
+     */
+    public function scopeWithInvoiceOrNeedsHandling(Builder $query): Builder
+    {
+        return $query->where(function (Builder $outer): void {
+            $outer->where(function (Builder $withInvoice): void {
+                $withInvoice->withInvoice();
+            })->orWhere(function (Builder $needsHandling): void {
+                $needsHandling->needsHandling();
+            });
+        });
+    }
+
+    /**
      * Scope - zamówienia operacyjnie przetworzone (wszyscy uczestnicy na szkoleniu, nieanulowane).
      */
     public function scopeProcessed($query)

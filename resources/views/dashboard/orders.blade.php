@@ -1,24 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h2 class="fw-semibold fs-4 text-dark mb-0">
-                Dashboard zamówień
-            </h2>
-            <span class="badge text-bg-secondary">Widok startowy · MVP</span>
-        </div>
+        <h2 class="fw-semibold fs-4 text-dark mb-0">
+            Dashboard zamówień
+        </h2>
     </x-slot>
 
     <div class="py-3">
         <div class="container-fluid px-4">
-            <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
-                <i class="bi bi-info-circle fs-5 flex-shrink-0"></i>
-                <div>
-                    <strong>Przykładowy widok startowy panelu.</strong>
-                    Poniżej skrót najważniejszych liczb i ostatnich zamówień FORM.
-                    Pełna obsługa jest w menu <em>Zamówienia</em>.
-                </div>
-            </div>
-
             <div class="row mb-4 g-3">
                 <div class="col-sm-6 col-xl-3">
                     <div class="card border-primary h-100">
@@ -154,7 +142,7 @@
                             <strong>{{ $filters['date_to'] }}</strong>
                             ({{ $tz }})
                         </span>
-                        <span>Łącznie (z FV): <strong>{{ number_format($stats['period_total']) }}</strong></span>
+                        <span>Łącznie: <strong>{{ number_format($stats['period_total']) }}</strong></span>
                         <span>Online: <strong>{{ number_format($stats['period_online']) }}</strong></span>
                         <span>Odroczone: <strong>{{ number_format($stats['period_deferred']) }}</strong></span>
                         <span>Średnio/{{ $stats['period_avg_label'] ?? 'dzień' }}: <strong>{{ number_format($stats['period_avg'], 1, ',', ' ') }}</strong></span>
@@ -163,7 +151,7 @@
                         @endif
                     </div>
                     <p class="small text-muted mb-3 mb-md-2">
-                        Tylko zamówienia z numerem faktury · data złożenia zamówienia ·
+                        Z numerem faktury lub w kolejce do obsługi (bez pełnego zamknięcia) · data złożenia zamówienia ·
                         odroczone = faktura z odroczonym terminem (w tym starsze bez trybu płatności)
                     </p>
 
@@ -276,7 +264,7 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Suma (z FV)',
+                            label: 'Suma',
                             data: seriesTotal,
                             borderColor: 'rgba(13, 110, 253, 1)',
                             backgroundColor: 'rgba(13, 110, 253, 0.08)',

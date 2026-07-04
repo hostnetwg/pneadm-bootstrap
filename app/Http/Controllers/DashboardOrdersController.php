@@ -77,7 +77,7 @@ class DashboardOrdersController extends Controller
         [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($dateFrom, $dateTo);
         $dayCount = (int) $dateFrom->diffInDays($dateTo) + 1;
         $chartGranularity = $dayCount > self::DAILY_CHART_MAX_DAYS ? 'month' : 'day';
-        $dailyChart = $this->buildInvoicedOrderChart(
+        $dailyChart = $this->buildDashboardOrderChart(
             $dateFrom,
             $dateTo,
             $fromUtc,
@@ -185,7 +185,7 @@ class DashboardOrdersController extends Controller
     }
 
     /**
-     * Wykres zamówień z numerem FV, wg daty złożenia (order_date), w strefie aplikacji.
+     * Wykres zamówień: z numerem FV lub w kolejce do obsługi, wg daty złożenia (order_date).
      *
      * @return array{
      *     labels: list<string>,
@@ -195,7 +195,7 @@ class DashboardOrdersController extends Controller
      *     total: list<int>
      * }
      */
-    private function buildInvoicedOrderChart(
+    private function buildDashboardOrderChart(
         Carbon $dateFrom,
         Carbon $dateTo,
         string $fromUtc,
@@ -206,7 +206,7 @@ class DashboardOrdersController extends Controller
         $buckets = $this->initializeChartBuckets($dateFrom, $dateTo, $tz, $granularity);
 
         FormOrder::query()
-            ->withInvoice()
+            ->withInvoiceOrNeedsHandling()
             ->whereBetween('order_date', [$fromUtc, $toUtc])
             ->select(['id', 'order_date', 'payment_mode'])
             ->orderBy('id')
