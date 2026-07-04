@@ -187,6 +187,37 @@ class FormOrdersController extends Controller
             }
         }
 
+        $dateFromFilter = trim((string) $request->get('date_from', ''));
+        $dateToFilter = trim((string) $request->get('date_to', ''));
+        if ($dateFromFilter !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFromFilter)) {
+            $dateFromFilter = '';
+        }
+        if ($dateToFilter !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateToFilter)) {
+            $dateToFilter = '';
+        }
+
+        $dateRangeError = null;
+        $orderDateTz = config('app.timezone', 'Europe/Warsaw');
+        if ($dateFromFilter !== '' && $dateToFilter !== '') {
+            $fromLocal = Carbon::parse($dateFromFilter, $orderDateTz)->startOfDay();
+            $toLocal = Carbon::parse($dateToFilter, $orderDateTz)->startOfDay();
+            if ($fromLocal->greaterThan($toLocal)) {
+                $dateRangeError = 'Data „od” nie może być późniejsza niż data „do”.';
+            }
+        }
+
+        // order_date w bazie = UTC; granice dnia liczymy w strefie aplikacji (jak statystyki „dziś/wczoraj”).
+        if ($dateRangeError === null) {
+            if ($dateFromFilter !== '') {
+                $fromUtc = Carbon::parse($dateFromFilter, $orderDateTz)->startOfDay()->utc();
+                $query->where($formOrdersTable.'.order_date', '>=', $fromUtc->format('Y-m-d H:i:s'));
+            }
+            if ($dateToFilter !== '') {
+                $toUtc = Carbon::parse($dateToFilter, $orderDateTz)->endOfDay()->utc();
+                $query->where($formOrdersTable.'.order_date', '<=', $toUtc->format('Y-m-d H:i:s'));
+            }
+        }
+
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
             $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->get();
@@ -299,7 +330,7 @@ class FormOrdersController extends Controller
                 ->count();
         }
 
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'handlingCount', 'processedCount', 'archivalCount', 'cancelledCount'));
+        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'dateFromFilter', 'dateToFilter', 'dateRangeError', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'handlingCount', 'processedCount', 'archivalCount', 'cancelledCount'));
     }
 
     /**

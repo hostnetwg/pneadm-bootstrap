@@ -132,6 +132,17 @@
                             Formularz: tylko archiwalne (minęła data i godzina zakończenia szkolenia)
                         </span>
                     @endif
+                    @if(($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
+                        @if(empty($dateRangeError))
+                        <span class="badge bg-dark text-white">
+                            <i class="bi bi-calendar-range"></i>
+                            Data zamówienia:
+                            {{ ($dateFromFilter ?? '') !== '' ? \Carbon\Carbon::parse($dateFromFilter)->format('d.m.Y') : '…' }}
+                            –
+                            {{ ($dateToFilter ?? '') !== '' ? \Carbon\Carbon::parse($dateToFilter)->format('d.m.Y') : '…' }}
+                        </span>
+                        @endif
+                    @endif
                 </div>
             </div>
 
@@ -139,6 +150,9 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET" action="{{ route('form-orders.index') }}">
+                        @if(($quickFilter ?? '') !== '')
+                            <input type="hidden" name="quick" value="{{ $quickFilter }}">
+                        @endif
                         {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Przetwarzanie | Rekordów na stronę --}}
                         <div class="row g-3 align-items-end">
                             <div class="col-6 col-md-1">
@@ -216,9 +230,30 @@
                                 </select>
                             </div>
                         </div>
-                        {{-- Wiersz 2: Wyszukaj + akcje --}}
+                        {{-- Wiersz 2: zakres dat | Wyszukaj + akcje --}}
                         <div class="row g-3 mt-1 align-items-end">
-                            <div class="col-12 col-md-6">
+                            <div class="col-6 col-md-2">
+                                <label for="date_from" class="form-label small mb-1">Data od</label>
+                                <input type="date"
+                                       class="form-control form-control-sm @if(!empty($dateRangeError)) is-invalid @endif"
+                                       id="date_from"
+                                       name="date_from"
+                                       value="{{ $dateFromFilter ?? '' }}"
+                                       title="Data złożenia zamówienia (order_date) — włącznie od początku dnia">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="date_to" class="form-label small mb-1">Data do</label>
+                                <input type="date"
+                                       class="form-control form-control-sm @if(!empty($dateRangeError)) is-invalid @endif"
+                                       id="date_to"
+                                       name="date_to"
+                                       value="{{ $dateToFilter ?? '' }}"
+                                       title="Data złożenia zamówienia (order_date) — włącznie do końca dnia">
+                                @if(!empty($dateRangeError))
+                                    <div class="invalid-feedback d-block">{{ $dateRangeError }}</div>
+                                @endif
+                            </div>
+                            <div class="col-12 col-md-4">
                                 <label for="search" class="form-label">Wyszukaj:</label>
                                 <input type="text"
                                        class="form-control"
@@ -239,7 +274,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false))
+                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index', $quickFilter !== '' ? ['quick' => $quickFilter] : []) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -731,6 +766,8 @@
                                             <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
                                             <input type="hidden" name="quick" value="{{ $quickFilter }}">
                                             <input type="hidden" name="filter" value="{{ $filter }}">
+                                            <input type="hidden" name="date_from" value="{{ $dateFromFilter ?? '' }}">
+                                            <input type="hidden" name="date_to" value="{{ $dateToFilter ?? '' }}">
                                             <input type="hidden" name="archival" value="{{ ($archivalOnly ?? false) ? 1 : '' }}">
                                             <input type="hidden" name="page" value="{{ request()->get('page', 1) }}">
                                             <button type="submit" class="btn btn-danger">
@@ -782,6 +819,12 @@
                                         }
                                         if (($placementFilter ?? '') !== '') {
                                             $paginationQuery['placement'] = $placementFilter;
+                                        }
+                                        if (($dateFromFilter ?? '') !== '') {
+                                            $paginationQuery['date_from'] = $dateFromFilter;
+                                        }
+                                        if (($dateToFilter ?? '') !== '') {
+                                            $paginationQuery['date_to'] = $dateToFilter;
                                         }
                                     @endphp
                                     {{ $zamowienia->appends($paginationQuery)->links() }}
