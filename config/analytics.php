@@ -71,7 +71,7 @@ return [
     'live_visitors_dashboard' => [
         'enabled' => (bool) env('ANALYTICS_LIVE_VISITORS_DASHBOARD_ENABLED', true),
         'timezone' => env('ANALYTICS_LIVE_VISITORS_DASHBOARD_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw')),
-        'active_window_minutes' => (int) env('ANALYTICS_LIVE_VISITORS_ACTIVE_WINDOW_MINUTES', 5),
+        'active_window_minutes' => (int) env('ANALYTICS_LIVE_VISITORS_ACTIVE_WINDOW_MINUTES', 30),
         'poll_interval_seconds' => (int) env('ANALYTICS_LIVE_VISITORS_POLL_INTERVAL_SECONDS', 15),
         'max_listed' => (int) env('ANALYTICS_LIVE_VISITORS_MAX_LISTED', 12),
     ],

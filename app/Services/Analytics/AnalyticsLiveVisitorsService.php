@@ -27,6 +27,7 @@ class AnalyticsLiveVisitorsService
         'order_form_cta_clicked',
         'order_form_submit_clicked',
         'order_form_submit_attempted',
+        'form_order_created',
     ];
 
     /**
@@ -42,14 +43,16 @@ class AnalyticsLiveVisitorsService
      *         device_type: string|null,
      *         browser_family: string|null,
      *         last_seen_at: string,
-     *         last_seen_ago_seconds: int
+     *         last_seen_ago_seconds: int,
+     *         form_order_id: int|null,
+     *         form_order_url: string|null
      *     }>
      * }
      */
     public function snapshot(): array
     {
         $enabled = (bool) config('analytics.live_visitors_dashboard.enabled', true);
-        $windowMinutes = max(1, (int) config('analytics.live_visitors_dashboard.active_window_minutes', 5));
+        $windowMinutes = max(1, (int) config('analytics.live_visitors_dashboard.active_window_minutes', 30));
         $maxVisitors = max(1, (int) config('analytics.live_visitors_dashboard.max_listed', 12));
         $timezone = (string) config('analytics.live_visitors_dashboard.timezone', config('app.timezone', 'Europe/Warsaw'));
         $asOf = Carbon::now($timezone);
@@ -83,6 +86,8 @@ class AnalyticsLiveVisitorsService
                 'device_type',
                 'browser_family',
                 'occurred_at',
+                'form_order_id',
+                'metadata',
             ]);
 
         $latestBySession = [];
@@ -100,6 +105,7 @@ class AnalyticsLiveVisitorsService
             ->map(function (AnalyticsEvent $event) use ($timezone, $asOf): array {
                 $lastSeenUtc = Carbon::parse((string) $event->getRawOriginal('occurred_at'), 'UTC');
                 $lastSeenLocal = $lastSeenUtc->copy()->timezone($timezone);
+                $formOrderId = $event->form_order_id !== null ? (int) $event->form_order_id : null;
 
                 return [
                     'session_short' => $this->shortSessionId((string) $event->analytics_session_id),
@@ -109,6 +115,10 @@ class AnalyticsLiveVisitorsService
                     'browser_family' => $event->browser_family,
                     'last_seen_at' => $lastSeenLocal->format('H:i:s'),
                     'last_seen_ago_seconds' => max(0, (int) $lastSeenUtc->diffInSeconds($asOf->copy()->utc())),
+                    'form_order_id' => $formOrderId,
+                    'form_order_url' => $formOrderId !== null
+                        ? route('form-orders.show', $formOrderId)
+                        : null,
                 ];
             })
             ->values()
@@ -133,6 +143,7 @@ class AnalyticsLiveVisitorsService
             'order_form_cta_clicked',
             'order_form_submit_clicked',
             'order_form_submit_attempted' => 'Formularz — aktywny',
+            'form_order_created' => $this->orderSubmittedPageLabel($event),
             'campaign_short_link_visit' => 'Link kampanii',
             'campaign_redirect_resolved' => 'Przekierowanie kampanii',
             default => match ($event->landing_target) {
@@ -140,6 +151,18 @@ class AnalyticsLiveVisitorsService
                 'order_form_direct' => 'Formularz zamówienia',
                 default => filled($event->path) ? (string) $event->path : 'Lejek sprzedaży',
             },
+        };
+    }
+
+    private function orderSubmittedPageLabel(AnalyticsEvent $event): string
+    {
+        $metadata = is_array($event->metadata) ? $event->metadata : [];
+        $flow = $metadata['order_flow'] ?? $metadata['payment_type'] ?? null;
+
+        return match ($flow) {
+            'online' => 'Złożył zamówienie (online)',
+            'deferred', 'deferred_invoice' => 'Złożył zamówienie (odroczone)',
+            default => 'Złożył zamówienie',
         };
     }
 

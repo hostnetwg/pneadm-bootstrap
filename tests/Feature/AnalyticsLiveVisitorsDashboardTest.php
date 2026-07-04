@@ -108,6 +108,62 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny');
     }
 
+    public function test_form_order_created_shows_order_submitted_label(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'form_order_created',
+            'analytics_session_id' => $sessionId,
+            'form_order_id' => 4242,
+            'metadata' => ['order_flow' => 'deferred'],
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.page_label', 'Złożył zamówienie (odroczone)')
+            ->assertJsonPath('visitors.0.form_order_id', 4242)
+            ->assertJsonPath('visitors.0.form_order_url', route('form-orders.show', 4242));
+    }
+
+    public function test_form_order_created_overrides_earlier_funnel_events_in_session(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_submit_clicked',
+            'analytics_session_id' => $sessionId,
+            'occurred_at' => now('UTC')->subMinute(),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'form_order_created',
+            'analytics_session_id' => $sessionId,
+            'form_order_id' => 99,
+            'metadata' => ['order_flow' => 'online'],
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.page_label', 'Złożył zamówienie (online)');
+    }
+
+    public function test_page_label_mapping_for_form_order_created(): void
+    {
+        $service = app(AnalyticsLiveVisitorsService::class);
+        $event = new AnalyticsEvent([
+            'event_name' => 'form_order_created',
+            'metadata' => ['order_flow' => 'online'],
+        ]);
+
+        $this->assertSame('Złożył zamówienie (online)', $service->pageLabel($event));
+    }
+
     public function test_page_label_mapping_for_course_description(): void
     {
         $service = app(AnalyticsLiveVisitorsService::class);
@@ -187,6 +243,7 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             $table->string('app_source', 32)->index();
             $table->uuid('analytics_session_id')->nullable()->index();
             $table->uuid('order_form_session_id')->nullable()->index();
+            $table->unsignedBigInteger('form_order_id')->nullable()->index();
             $table->unsignedBigInteger('course_id')->nullable()->index();
             $table->string('course_title_snapshot', 255)->nullable();
             $table->string('campaign_code', 100)->nullable()->index();

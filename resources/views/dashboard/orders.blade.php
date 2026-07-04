@@ -499,6 +499,21 @@
                 return parts.length ? parts.join(' · ') : '—';
             }
 
+            function pageLabelCell(visitor) {
+                var label = escapeHtml(visitor.page_label || '—');
+
+                if (visitor.form_order_id) {
+                    var orderLink = visitor.form_order_url
+                        ? ' <a href="' + escapeHtml(visitor.form_order_url) + '" class="small text-decoration-none fw-semibold">#'
+                            + escapeHtml(String(visitor.form_order_id)) + '</a>'
+                        : '';
+
+                    return '<span class="badge text-bg-success">' + label + '</span>' + orderLink;
+                }
+
+                return label;
+            }
+
             function renderVisitors(data) {
                 countEl.textContent = String(data.active_count ?? 0);
 
@@ -514,7 +529,7 @@
                     bodyEl.innerHTML = visitors.map(function (visitor) {
                         return '<tr>'
                             + '<td><code class="small">' + escapeHtml(visitor.session_short) + '</code></td>'
-                            + '<td>' + escapeHtml(visitor.page_label) + '</td>'
+                            + '<td>' + pageLabelCell(visitor) + '</td>'
                             + '<td class="text-truncate" style="max-width: 240px;" title="' + escapeHtml(visitor.course_title || '') + '">'
                             + escapeHtml(visitor.course_title || '—') + '</td>'
                             + '<td class="small text-muted">' + escapeHtml(deviceLabel(visitor)) + '</td>'
