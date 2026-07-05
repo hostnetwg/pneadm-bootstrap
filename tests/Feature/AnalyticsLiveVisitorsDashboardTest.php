@@ -111,6 +111,40 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny');
     }
 
+    public function test_journey_label_includes_current_step_event_count(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'analytics_session_id' => $sessionId,
+            'occurred_at' => now('UTC')->subMinutes(3),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_section_interacted',
+            'analytics_session_id' => $sessionId,
+            'occurred_at' => now('UTC')->subMinutes(2),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_section_interacted',
+            'analytics_session_id' => $sessionId,
+            'occurred_at' => now('UTC')->subMinute(),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_cta_clicked',
+            'analytics_session_id' => $sessionId,
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.current_step_event_count', 3)
+            ->assertJsonPath('visitors.0.session_event_count', 4)
+            ->assertJsonPath('visitors.0.journey_label', 'Formularz zamówienia → Formularz — aktywny (3)');
+    }
+
     public function test_form_order_created_shows_order_submitted_label(): void
     {
         $user = $this->userWithRole('manager');

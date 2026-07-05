@@ -1041,12 +1041,23 @@
 
             function journeyCell(visitor) {
                 var label = visitor.journey_label || '—';
-                var title = label;
+                var titleParts = [];
 
                 if (Array.isArray(visitor.journey_steps) && visitor.journey_steps.length > 0) {
-                    title = visitor.journey_steps.map(function (step) {
-                        return step.label || '—';
-                    }).join(' → ');
+                    titleParts = visitor.journey_steps.map(function (step) {
+                        var stepLabel = step.label || '—';
+                        var count = Number(step.event_count) || 0;
+
+                        return count > 1 ? stepLabel + ' (' + count + ' zdarz.)' : stepLabel;
+                    });
+                }
+
+                var title = titleParts.length
+                    ? titleParts.join(' → ')
+                    : label;
+
+                if (visitor.session_event_count) {
+                    title += ' · łącznie ' + visitor.session_event_count + ' zdarz. w sesji';
                 }
 
                 return '<span class="small text-primary" title="' + escapeHtml(title) + '">'

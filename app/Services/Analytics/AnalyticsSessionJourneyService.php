@@ -17,6 +17,59 @@ class AnalyticsSessionJourneyService
      *     label: string,
      *     event_name: string,
      *     path: string|null,
+     *     occurred_at: string|null,
+     *     event_count: int
+     * }>
+     */
+    public function buildStepsWithCounts(Collection $events): array
+    {
+        if ($events->isEmpty()) {
+            return [];
+        }
+
+        $sorted = $events
+            ->sortBy(fn (AnalyticsEvent $event): array => [
+                (string) $event->getRawOriginal('occurred_at'),
+                (int) $event->id,
+            ])
+            ->values();
+
+        /** @var array<string, array{label: string, event_name: string, path: string|null, occurred_at: string|null, event_count: int}> $stepsByKey */
+        $stepsByKey = [];
+        $stepOrder = [];
+
+        foreach ($sorted as $event) {
+            $stepKey = $this->stepKey($event);
+            $occurredAt = $event->getRawOriginal('occurred_at');
+            $occurredAtIso = $occurredAt !== null
+                ? Carbon::parse((string) $occurredAt, 'UTC')->toIso8601String()
+                : null;
+
+            if (! isset($stepsByKey[$stepKey])) {
+                $stepOrder[] = $stepKey;
+                $stepsByKey[$stepKey] = [
+                    'label' => $this->pageLabel($event),
+                    'event_name' => (string) $event->event_name,
+                    'path' => filled($event->path) ? (string) $event->path : null,
+                    'occurred_at' => $occurredAtIso,
+                    'event_count' => 0,
+                ];
+            }
+
+            $stepsByKey[$stepKey]['event_count']++;
+        }
+
+        return array_map(
+            static fn (string $stepKey): array => $stepsByKey[$stepKey],
+            $stepOrder,
+        );
+    }
+
+    /**
+     * @return list<array{
+     *     label: string,
+     *     event_name: string,
+     *     path: string|null,
      *     occurred_at: string|null
      * }>
      */
@@ -115,7 +168,7 @@ class AnalyticsSessionJourneyService
     }
 
     /**
-     * @param  list<array{label: string}>  $steps
+     * @param  list<array{label: string, event_count?: int}>  $steps
      */
     public function compactJourneyLabel(array $steps): string
     {
@@ -127,6 +180,50 @@ class AnalyticsSessionJourneyService
             static fn (array $step): string => (string) ($step['label'] ?? '—'),
             $steps,
         ));
+    }
+
+    /**
+     * Ścieżka z licznikiem zdarzeń na bieżącym (ostatnim) kroku, np. „Formularz — aktywny (4)”.
+     *
+     * @param  list<array{label: string, event_count?: int}>  $steps
+     */
+    public function compactJourneyLabelWithCurrentCount(array $steps): string
+    {
+        if ($steps === []) {
+            return '—';
+        }
+
+        $lastIndex = count($steps) - 1;
+        $parts = [];
+
+        foreach ($steps as $index => $step) {
+            $label = (string) ($step['label'] ?? '—');
+
+            if ($index === $lastIndex) {
+                $count = (int) ($step['event_count'] ?? 1);
+                if ($count > 1) {
+                    $label .= ' ('.$count.')';
+                }
+            }
+
+            $parts[] = $label;
+        }
+
+        return implode(' → ', $parts);
+    }
+
+    /**
+     * @param  list<array{label: string, event_count?: int}>  $steps
+     */
+    public function currentStepEventCount(array $steps): int
+    {
+        if ($steps === []) {
+            return 0;
+        }
+
+        $last = $steps[array_key_last($steps)];
+
+        return (int) ($last['event_count'] ?? 1);
     }
 
     public function pageLabel(AnalyticsEvent $event): string
