@@ -183,33 +183,40 @@ class AnalyticsSessionJourneyService
     }
 
     /**
-     * Ścieżka z licznikiem zdarzeń na bieżącym (ostatnim) kroku, np. „Formularz — aktywny (4)”.
+     * Ścieżka z licznikiem zdarzeń przy każdym kroku, gdy count &gt; 1, np. „Opis (3) → Formularz (4)”.
      *
      * @param  list<array{label: string, event_count?: int}>  $steps
      */
-    public function compactJourneyLabelWithCurrentCount(array $steps): string
+    public function compactJourneyLabelWithCounts(array $steps): string
     {
         if ($steps === []) {
             return '—';
         }
 
-        $lastIndex = count($steps) - 1;
         $parts = [];
 
-        foreach ($steps as $index => $step) {
+        foreach ($steps as $step) {
             $label = (string) ($step['label'] ?? '—');
+            $count = (int) ($step['event_count'] ?? 1);
 
-            if ($index === $lastIndex) {
-                $count = (int) ($step['event_count'] ?? 1);
-                if ($count > 1) {
-                    $label .= ' ('.$count.')';
-                }
+            if ($count > 1) {
+                $label .= ' ('.$count.')';
             }
 
             $parts[] = $label;
         }
 
         return implode(' → ', $parts);
+    }
+
+    /**
+     * @param  list<array{label: string, event_count?: int}>  $steps
+     *
+     * @deprecated Use compactJourneyLabelWithCounts()
+     */
+    public function compactJourneyLabelWithCurrentCount(array $steps): string
+    {
+        return $this->compactJourneyLabelWithCounts($steps);
     }
 
     /**

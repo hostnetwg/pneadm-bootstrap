@@ -1039,28 +1039,27 @@
                 return parts.length ? parts.join(' · ') : '—';
             }
 
+            function journeyStepDisplayLabel(step) {
+                var stepLabel = step.label || '—';
+                var count = Number(step.event_count) || 0;
+
+                return count > 1 ? stepLabel + ' (' + count + ')' : stepLabel;
+            }
+
             function journeyCell(visitor) {
                 var label = visitor.journey_label || '—';
-                var titleParts = [];
 
                 if (Array.isArray(visitor.journey_steps) && visitor.journey_steps.length > 0) {
-                    titleParts = visitor.journey_steps.map(function (step) {
-                        var stepLabel = step.label || '—';
-                        var count = Number(step.event_count) || 0;
-
-                        return count > 1 ? stepLabel + ' (' + count + ' zdarz.)' : stepLabel;
-                    });
+                    label = visitor.journey_steps.map(journeyStepDisplayLabel).join(' → ');
                 }
 
-                var title = titleParts.length
-                    ? titleParts.join(' → ')
-                    : label;
+                var title = label;
 
                 if (visitor.session_event_count) {
                     title += ' · łącznie ' + visitor.session_event_count + ' zdarz. w sesji';
                 }
 
-                return '<span class="small text-primary" title="' + escapeHtml(title) + '">'
+                return '<span class="small text-primary fw-semibold" title="' + escapeHtml(title) + '">'
                     + escapeHtml(label) + '</span>';
             }
 

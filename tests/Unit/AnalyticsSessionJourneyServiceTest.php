@@ -135,8 +135,19 @@ class AnalyticsSessionJourneyServiceTest extends TestCase
         $this->assertSame('Formularz — aktywny', $steps[1]['label']);
         $this->assertSame(
             'Formularz zamówienia → Formularz — aktywny (3)',
-            $this->service->compactJourneyLabelWithCurrentCount($steps),
+            $this->service->compactJourneyLabelWithCounts($steps),
         );
+    }
+
+    public function test_compact_journey_label_with_counts_annotates_every_step_above_one(): void
+    {
+        $label = $this->service->compactJourneyLabelWithCounts([
+            ['label' => 'Opis szkolenia', 'event_count' => 3],
+            ['label' => 'Formularz zamówienia', 'event_count' => 1],
+            ['label' => 'Formularz — aktywny', 'event_count' => 4],
+        ]);
+
+        $this->assertSame('Opis szkolenia (3) → Formularz zamówienia → Formularz — aktywny (4)', $label);
     }
 }
 

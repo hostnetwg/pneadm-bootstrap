@@ -156,7 +156,7 @@ class AnalyticsLiveVisitorsService
                         : null,
                     'entry_referrer_domain' => $entry['referrer_domain'],
                     'entry_campaign_code' => $entry['campaign_code'],
-                    'journey_label' => $this->journey->compactJourneyLabelWithCurrentCount($journeySteps),
+                    'journey_label' => $this->journey->compactJourneyLabelWithCounts($journeySteps),
                     'current_step_event_count' => $this->journey->currentStepEventCount($journeySteps),
                     'session_event_count' => $sessionEvents->count(),
                     'journey_steps' => $journeySteps,
