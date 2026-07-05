@@ -9,7 +9,9 @@ use Illuminate\Pagination\Paginator;
 use App\Models\Course;
 use App\Models\FormOrder;
 use App\Models\Participant;
+use App\Models\CoursePriceVariant;
 use App\Observers\CourseObserver;
+use App\Observers\CoursePriceVariantObserver;
 use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 
@@ -37,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
         Participant::observe(ParticipantObserver::class);
 
         Course::observe(CourseObserver::class);
+        CoursePriceVariant::observe(CoursePriceVariantObserver::class);
 
         Event::listen(MessageSent::class, [OutboundMailCapture::class, 'record']);
     }

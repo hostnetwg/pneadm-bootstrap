@@ -87,6 +87,15 @@ return [
     // APP_KEY z aplikacji pnedu.pl — podpis linków weryfikacji e-mail wysyłanych z adm
     'pnedu_app_key' => env('PNEDU_APP_KEY'),
 
+    // Server-to-server: invalidacja cache oferty na pnedu po zapisie kursu w adm
+    'pnedu' => [
+        'internal_url' => rtrim(
+            env('PNEDU_INTERNAL_URL', env('APP_ENV') === 'local' ? 'http://pnedu-app' : env('PNEDU_PUBLIC_URL', 'https://pnedu.pl')),
+            '/'
+        ),
+        'internal_api_token' => env('PNEDU_INTERNAL_API_TOKEN', env('PNEADM_API_TOKEN')),
+    ],
+
     'teryt' => [
         'username' => env('TERYT_USERNAME', 'WaldemarGrabowski'),
         'password' => env('TERYT_PASSWORD', 'k1Yc4S0ius'),
