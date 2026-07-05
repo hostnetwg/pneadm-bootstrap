@@ -235,7 +235,11 @@
                                         && ($filters['date_to'] ?? null) === $preset['date_to'];
                                 @endphp
                                 <a href="{{ route('dashboard', ['date_from' => $preset['date_from'], 'date_to' => $preset['date_to']]) }}"
-                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                   data-dashboard-date-preset="1"
+                                   data-date-from="{{ $preset['date_from'] }}"
+                                   data-date-to="{{ $preset['date_to'] }}"
+                                   @if(($preset['key'] ?? '') === '14d') data-default-range-preset="1" @endif>
                                     {{ $preset['label'] }}
                                 </a>
                             @endforeach
@@ -251,7 +255,10 @@
                                         && ($filters['date_to'] ?? null) === $preset['date_to'];
                                 @endphp
                                 <a href="{{ route('dashboard', ['date_from' => $preset['date_from'], 'date_to' => $preset['date_to']]) }}"
-                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                   class="btn btn-sm {{ $isActive ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                   data-dashboard-date-preset="1"
+                                   data-date-from="{{ $preset['date_from'] }}"
+                                   data-date-to="{{ $preset['date_to'] }}">
                                     {{ $preset['label'] }}
                                 </a>
                             @endforeach
@@ -280,9 +287,9 @@
                     <div class="d-flex flex-wrap gap-3 mb-3 small text-muted" id="dashboardPeriodSummary">
                         <span>
                             Okres:
-                            <strong>{{ $filters['date_from'] }}</strong>
+                            <strong id="dashboardOkresFrom">{{ $filters['date_from'] }}</strong>
                             →
-                            <strong>{{ $filters['date_to'] }}</strong>
+                            <strong id="dashboardOkresTo">{{ $filters['date_to'] }}</strong>
                             ({{ $tz }})
                         </span>
                         <span>Łącznie: <strong id="dashboardPeriodTotal">{{ number_format($stats['period_total']) }}</strong></span>
@@ -388,7 +395,6 @@
     </div>
 
     @php
-        $dashboardMidnightReloadAt = \Carbon\Carbon::today($tz)->addDay()->startOfDay();
         $dashboardDateKey = \Carbon\Carbon::today($tz)->toDateString();
     @endphp
 
@@ -670,8 +676,12 @@
         (function () {
             const pollUrl = @json(route('api.dashboard.orders-stats'));
             const pollSeconds = {{ (int) ($dashboardPollSeconds ?? 15) }};
-            const chartDateFrom = @json($filters['date_from'] ?? '');
-            const chartDateTo = @json($filters['date_to'] ?? '');
+            const appTimezone = @json($tz);
+            const dashboardBaseUrl = @json(route('dashboard'));
+            const defaultRangeDays = 14;
+            let chartDateFrom = @json($filters['date_from'] ?? '');
+            let chartDateTo = @json($filters['date_to'] ?? '');
+            let trackedDateKey = @json($dashboardDateKey);
             const formTodayEl = document.getElementById('dashboardStatFormToday');
             const formYesterdayEl = document.getElementById('dashboardStatFormYesterday');
             const formHandlingEl = document.getElementById('dashboardStatFormHandling');
@@ -690,6 +700,83 @@
 
             if (!formTodayEl || !formHandlingEl) {
                 return;
+            }
+
+            function todayDateKeyInAppTz() {
+                return new Intl.DateTimeFormat('en-CA', { timeZone: appTimezone }).format(new Date());
+            }
+
+            function shiftDateKeyInAppTz(dateKey, dayDelta) {
+                const parts = String(dateKey).split('-').map(Number);
+                const anchor = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
+                anchor.setUTCDate(anchor.getUTCDate() + dayDelta);
+
+                return new Intl.DateTimeFormat('en-CA', { timeZone: appTimezone }).format(anchor);
+            }
+
+            function defaultChartDateRange() {
+                const dateTo = todayDateKeyInAppTz();
+
+                return {
+                    dateFrom: shiftDateKeyInAppTz(dateTo, -(defaultRangeDays - 1)),
+                    dateTo: dateTo,
+                };
+            }
+
+            function updateDateFilterUi(dateFrom, dateTo) {
+                const fromInput = document.getElementById('date_from');
+                const toInput = document.getElementById('date_to');
+                const okresFrom = document.getElementById('dashboardOkresFrom');
+                const okresTo = document.getElementById('dashboardOkresTo');
+
+                if (fromInput) {
+                    fromInput.value = dateFrom;
+                }
+                if (toInput) {
+                    toInput.value = dateTo;
+                }
+                if (okresFrom) {
+                    okresFrom.textContent = dateFrom;
+                }
+                if (okresTo) {
+                    okresTo.textContent = dateTo;
+                }
+
+                document.querySelectorAll('[data-dashboard-date-preset]').forEach(function (btn) {
+                    const isActive = btn.getAttribute('data-date-from') === dateFrom
+                        && btn.getAttribute('data-date-to') === dateTo;
+
+                    btn.classList.toggle('btn-primary', isActive);
+                    btn.classList.toggle('btn-outline-secondary', !isActive);
+                });
+            }
+
+            function clearUrlDateFilters() {
+                if (window.history && typeof window.history.replaceState === 'function') {
+                    window.history.replaceState(null, '', dashboardBaseUrl);
+                }
+            }
+
+            function resetDashboardForNewDay() {
+                const range = defaultChartDateRange();
+
+                trackedDateKey = todayDateKeyInAppTz();
+                chartDateFrom = range.dateFrom;
+                chartDateTo = range.dateTo;
+                updateDateFilterUi(chartDateFrom, chartDateTo);
+                clearUrlDateFilters();
+
+                return fetchDashboardSections();
+            }
+
+            function maybeRefreshForNewDay() {
+                if (todayDateKeyInAppTz() === trackedDateKey) {
+                    return Promise.resolve(false);
+                }
+
+                return resetDashboardForNewDay().then(function () {
+                    return true;
+                });
             }
 
             function formatCount(value) {
@@ -866,43 +953,52 @@
             }
 
             function refreshOrdersStats() {
-                fetch(pollUrl, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    credentials: 'same-origin',
-                })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('HTTP ' + response.status);
+                maybeRefreshForNewDay()
+                    .then(function (dayChanged) {
+                        if (dayChanged) {
+                            pollCount += 1;
+
+                            return;
                         }
 
-                        return response.json();
-                    })
-                    .then(function (data) {
-                        const previousFormToday = lastFormToday;
-                        const nextFormToday = Number(data.form_today) || 0;
+                        return fetch(pollUrl, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        })
+                            .then(function (response) {
+                                if (!response.ok) {
+                                    throw new Error('HTTP ' + response.status);
+                                }
 
-                        renderHeadlineStats(data);
-                        pollCount += 1;
+                                return response.json();
+                            })
+                            .then(function (data) {
+                                const previousFormToday = lastFormToday;
+                                const nextFormToday = Number(data.form_today) || 0;
 
-                        if (nextFormToday > previousFormToday) {
-                            lastFormToday = nextFormToday;
-                            formTodayEl.dataset.initialValue = String(lastFormToday);
+                                renderHeadlineStats(data);
+                                pollCount += 1;
 
-                            if (typeof window.dashboardPlayNewOrderSound === 'function') {
-                                window.dashboardPlayNewOrderSound();
-                            }
+                                if (nextFormToday > previousFormToday) {
+                                    lastFormToday = nextFormToday;
+                                    formTodayEl.dataset.initialValue = String(lastFormToday);
 
-                            return fetchDashboardSections();
-                        }
+                                    if (typeof window.dashboardPlayNewOrderSound === 'function') {
+                                        window.dashboardPlayNewOrderSound();
+                                    }
 
-                        if (nextFormToday !== previousFormToday) {
-                            lastFormToday = nextFormToday;
-                            formTodayEl.dataset.initialValue = String(lastFormToday);
-                        }
+                                    return fetchDashboardSections();
+                                }
 
-                        if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
-                            window.dashboardTriggerRefreshFlash();
-                        }
+                                if (nextFormToday !== previousFormToday) {
+                                    lastFormToday = nextFormToday;
+                                    formTodayEl.dataset.initialValue = String(lastFormToday);
+                                }
+
+                                if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
+                                    window.dashboardTriggerRefreshFlash();
+                                }
+                            });
                     })
                     .catch(function () {
                         // fail-silent — pierwsze wartości z SSR pozostają widoczne
@@ -911,6 +1007,11 @@
 
             refreshOrdersStats();
             setInterval(refreshOrdersStats, pollSeconds * 1000);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                    refreshOrdersStats();
+                }
+            });
         })();
 
         @if($liveVisitorsEnabled ?? false)
@@ -1135,39 +1236,6 @@
             refreshLiveVisitors();
         })();
         @endif
-
-        (function () {
-            const appTimezone = @json($tz);
-            let trackedDateKey = @json($dashboardDateKey);
-            const nextMidnightAt = new Date(@json($dashboardMidnightReloadAt->toIso8601String()));
-
-            function currentDateKeyInAppTz() {
-                return new Intl.DateTimeFormat('en-CA', { timeZone: appTimezone }).format(new Date());
-            }
-
-            function reloadForNewDay() {
-                const todayKey = currentDateKeyInAppTz();
-                if (todayKey !== trackedDateKey) {
-                    window.location.reload();
-                }
-            }
-
-            const msUntilMidnight = nextMidnightAt.getTime() - Date.now();
-            if (msUntilMidnight > 0) {
-                setTimeout(function () {
-                    window.location.reload();
-                }, msUntilMidnight + 500);
-            } else {
-                reloadForNewDay();
-            }
-
-            setInterval(reloadForNewDay, 30000);
-            document.addEventListener('visibilitychange', function () {
-                if (document.visibilityState === 'visible') {
-                    reloadForNewDay();
-                }
-            });
-        })();
     </script>
     @endpush
 </x-app-layout>
