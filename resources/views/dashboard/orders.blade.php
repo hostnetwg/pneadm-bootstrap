@@ -1043,7 +1043,7 @@
                 var shortId = visitor.session_short || '—';
                 var count = Number(visitor.session_event_count) || 0;
 
-                if (count > 0) {
+                if (count > 1) {
                     return '<code class="small">' + escapeHtml(shortId) + ' (' + count + ')</code>';
                 }
 
