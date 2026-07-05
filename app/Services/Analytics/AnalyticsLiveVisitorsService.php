@@ -53,14 +53,12 @@ class AnalyticsLiveVisitorsService
      *         entry_referrer_domain: string|null,
      *         entry_campaign_code: string|null,
      *         journey_label: string,
-     *         current_step_event_count: int,
      *         session_event_count: int,
      *         journey_steps: list<array{
      *             label: string,
      *             event_name: string,
      *             path: string|null,
-     *             occurred_at: string|null,
-     *             event_count: int
+     *             occurred_at: string|null
      *         }>
      *     }>
      * }
@@ -135,7 +133,7 @@ class AnalyticsLiveVisitorsService
             ->map(function (AnalyticsEvent $event) use ($timezone, $asOf, $eventsBySession): array {
                 $sessionId = (string) $event->analytics_session_id;
                 $sessionEvents = collect($eventsBySession[$sessionId] ?? [$event]);
-                $journeySteps = $this->journey->buildStepsWithCounts($sessionEvents);
+                $journeySteps = $this->journey->buildSteps($sessionEvents);
                 $entry = $this->journey->buildEntry($sessionEvents);
 
                 $lastSeenUtc = Carbon::parse((string) $event->getRawOriginal('occurred_at'), 'UTC');
@@ -156,8 +154,7 @@ class AnalyticsLiveVisitorsService
                         : null,
                     'entry_referrer_domain' => $entry['referrer_domain'],
                     'entry_campaign_code' => $entry['campaign_code'],
-                    'journey_label' => $this->journey->compactJourneyLabelWithCounts($journeySteps),
-                    'current_step_event_count' => $this->journey->currentStepEventCount($journeySteps),
+                    'journey_label' => $this->journey->compactJourneyLabel($journeySteps),
                     'session_event_count' => $sessionEvents->count(),
                     'journey_steps' => $journeySteps,
                 ];

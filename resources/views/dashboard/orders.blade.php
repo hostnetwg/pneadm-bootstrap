@@ -1039,27 +1039,27 @@
                 return parts.length ? parts.join(' · ') : '—';
             }
 
-            function journeyStepDisplayLabel(step) {
-                var stepLabel = step.label || '—';
-                var count = Number(step.event_count) || 0;
+            function sessionCell(visitor) {
+                var shortId = visitor.session_short || '—';
+                var count = Number(visitor.session_event_count) || 0;
 
-                return count > 1 ? stepLabel + ' (' + count + ')' : stepLabel;
+                if (count > 0) {
+                    return '<code class="small">' + escapeHtml(shortId) + ' (' + count + ')</code>';
+                }
+
+                return '<code class="small">' + escapeHtml(shortId) + '</code>';
             }
 
             function journeyCell(visitor) {
                 var label = visitor.journey_label || '—';
 
                 if (Array.isArray(visitor.journey_steps) && visitor.journey_steps.length > 0) {
-                    label = visitor.journey_steps.map(journeyStepDisplayLabel).join(' → ');
+                    label = visitor.journey_steps.map(function (step) {
+                        return step.label || '—';
+                    }).join(' → ');
                 }
 
-                var title = label;
-
-                if (visitor.session_event_count) {
-                    title += ' · łącznie ' + visitor.session_event_count + ' zdarz. w sesji';
-                }
-
-                return '<span class="small text-primary fw-semibold" title="' + escapeHtml(title) + '">'
+                return '<span class="small text-primary" title="' + escapeHtml(label) + '">'
                     + escapeHtml(label) + '</span>';
             }
 
@@ -1078,7 +1078,7 @@
                 } else {
                     bodyEl.innerHTML = visitors.map(function (visitor) {
                         return '<tr>'
-                            + '<td><code class="small">' + escapeHtml(visitor.session_short) + '</code></td>'
+                            + '<td>' + sessionCell(visitor) + '</td>'
                             + '<td class="small text-muted">' + entryCell(visitor) + '</td>'
                             + '<td class="text-truncate" style="max-width: 280px;">' + journeyCell(visitor) + '</td>'
                             + '<td>' + pageLabelCell(visitor) + '</td>'

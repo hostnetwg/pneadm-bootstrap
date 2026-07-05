@@ -111,7 +111,7 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny');
     }
 
-    public function test_journey_label_includes_current_step_event_count(): void
+    public function test_session_event_count_is_total_events_in_session_window(): void
     {
         $user = $this->userWithRole('manager');
         $sessionId = (string) Str::uuid();
@@ -140,9 +140,8 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
         $this->actingAs($user)
             ->getJson(route('api.dashboard.live-visitors'))
             ->assertOk()
-            ->assertJsonPath('visitors.0.current_step_event_count', 3)
             ->assertJsonPath('visitors.0.session_event_count', 4)
-            ->assertJsonPath('visitors.0.journey_label', 'Formularz zamówienia → Formularz — aktywny (3)');
+            ->assertJsonPath('visitors.0.journey_label', 'Formularz zamówienia → Formularz — aktywny');
     }
 
     public function test_form_order_created_shows_order_submitted_label(): void
