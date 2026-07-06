@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\RspoApiResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -75,7 +76,7 @@ class TerytService
                         'itemsPerPage' => 100
                     ]);
                 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     $wojewodztwa = [];
                     
@@ -103,7 +104,7 @@ class TerytService
                                 'itemsPerPage' => 100
                             ]);
                         
-                        if ($pageResponse->successful()) {
+                        if (RspoApiResponse::hasUsableBody($pageResponse)) {
                             $pageData = $pageResponse->json();
                             if (isset($pageData['hydra:member'])) {
                                 foreach ($pageData['hydra:member'] as $placowka) {
@@ -298,7 +299,7 @@ class TerytService
                         'itemsPerPage' => 100
                     ]);
                 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     $powiaty = [];
                     
@@ -336,7 +337,7 @@ class TerytService
                                 'itemsPerPage' => 100
                             ]);
                         
-                        if ($pageResponse->successful()) {
+                        if (RspoApiResponse::hasUsableBody($pageResponse)) {
                             $pageData = $pageResponse->json();
                             if (isset($pageData['hydra:member'])) {
                                 foreach ($pageData['hydra:member'] as $powiat) {
@@ -411,7 +412,7 @@ class TerytService
                     'itemsPerPage' => 100
                 ]);
             
-            if ($response->successful()) {
+            if (RspoApiResponse::hasUsableBody($response)) {
                 $data = $response->json();
                 $powiaty = [];
                 $totalItems = $data['hydra:totalItems'] ?? 0;
@@ -426,7 +427,7 @@ class TerytService
                                 'page' => $page,
                                 'itemsPerPage' => 100
                             ]);
-                        if (!$response->successful()) {
+                        if (!RspoApiResponse::hasUsableBody($response)) {
                             break;
                         }
                         $data = $response->json();
@@ -617,7 +618,7 @@ class TerytService
                     ->timeout(30)
                     ->get('https://api-rspo.men.gov.pl/api/placowki/', $params);
                 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     $gminy = [];
                     
@@ -667,7 +668,7 @@ class TerytService
                             ->timeout(30)
                             ->get('https://api-rspo.men.gov.pl/api/placowki/', $pageParams);
                         
-                        if ($pageResponse->successful()) {
+                        if (RspoApiResponse::hasUsableBody($pageResponse)) {
                             $pageData = $pageResponse->json();
                             if (isset($pageData['hydra:member'])) {
                                 foreach ($pageData['hydra:member'] as $placowka) {
@@ -751,7 +752,7 @@ class TerytService
                     ->timeout(30)
                     ->get('https://api-rspo.men.gov.pl/api/placowki/', $params);
                 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     $miejscowosci = [];
                     
@@ -801,7 +802,7 @@ class TerytService
                             ->timeout(30)
                             ->get('https://api-rspo.men.gov.pl/api/placowki/', $pageParams);
                         
-                        if ($pageResponse->successful()) {
+                        if (RspoApiResponse::hasUsableBody($pageResponse)) {
                             $pageData = $pageResponse->json();
                             if (isset($pageData['hydra:member'])) {
                                 foreach ($pageData['hydra:member'] as $placowka) {

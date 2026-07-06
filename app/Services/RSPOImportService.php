@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\RspoApiResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -34,7 +35,7 @@ class RSPOImportService
                     ->timeout(30)
                     ->get(self::API_BASE_URL . '/placowki/', $params);
 
-                if (!$response->successful()) {
+                if (!RspoApiResponse::hasUsableBody($response)) {
                     Log::warning("RSPO API Error - fetchSchools", [
                         'status' => $response->status(),
                         'page' => $page,
@@ -106,7 +107,7 @@ class RSPOImportService
                 ->timeout(10)
                 ->get(self::API_BASE_URL . '/typ/');
 
-            if ($response->successful()) {
+            if (RspoApiResponse::hasUsableBody($response)) {
                 $data = $response->json();
                 if (is_array($data)) {
                     usort($data, function($a, $b) {
@@ -134,7 +135,7 @@ class RSPOImportService
                 ->timeout(10)
                 ->get(self::API_BASE_URL . '/wojewodztwa/');
 
-            if ($response->successful()) {
+            if (RspoApiResponse::hasUsableBody($response)) {
                 $data = $response->json();
                 if (is_array($data)) {
                     usort($data, function($a, $b) {

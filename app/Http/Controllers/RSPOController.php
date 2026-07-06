@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\TerytService;
+use App\Support\RspoApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +32,7 @@ class RSPOController extends Controller
                     ->timeout(10)
                     ->get(self::API_BASE_URL . '/typ/');
                 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     // API zwraca prostą tablicę obiektów z id i nazwa
                     if (is_array($data) && count($data) > 0) {
@@ -61,7 +62,7 @@ class RSPOController extends Controller
                                                     'itemsPerPage' => 1, // Minimalna ilość danych - potrzebujemy tylko metadanych
                                                 ]);
                                             
-                                            if ($countResponse->successful()) {
+                                            if (RspoApiResponse::hasUsableBody($countResponse)) {
                                                 $countData = $countResponse->json();
                                                 $totalItems = $countData['hydra:totalItems'] ?? null;
                                                 if ($totalItems !== null) {
@@ -168,7 +169,7 @@ class RSPOController extends Controller
                     ->timeout(30)
                     ->get(self::API_BASE_URL . '/placowki/', $params);
 
-                if ($response->successful()) {
+                if (RspoApiResponse::hasUsableBody($response)) {
                     $data = $response->json();
                     
                     // Pobierz wartości filtrów do późniejszego filtrowania
@@ -225,7 +226,7 @@ class RSPOController extends Controller
                                         ->timeout(30)
                                         ->get(self::API_BASE_URL . '/placowki/', $pageParams);
                                     
-                                    if ($pageResponse->successful()) {
+                                    if (RspoApiResponse::hasUsableBody($pageResponse)) {
                                         $pageData = $pageResponse->json();
                                         if (isset($pageData['hydra:member'])) {
                                             $allResults = array_merge($allResults, $pageData['hydra:member']);
