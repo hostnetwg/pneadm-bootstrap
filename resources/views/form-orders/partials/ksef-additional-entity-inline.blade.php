@@ -91,8 +91,8 @@
         <div id="ksefRoleHintVat" class="small text-info mb-1 @if(!($isRoleVatGroup && $isRecipient)) d-none @endif">
             <i class="bi bi-info-circle"></i> Grupa VAT: NIP członka obowiązkowy.
         </div>
-        <div id="ksefIdTypeWarning" class="small text-warning mb-1 @if(!($ksefIdType !== null && $ksefIdType !== '' && $ksefIdType !== FormOrder::KSEF_ID_TYPE_NIP && $isRecipient)) d-none @endif">
-            <i class="bi bi-exclamation-triangle"></i> Typ ≠ NIP — fail-fast przy wystawianiu.
+        <div id="ksefIdTypeWarning" class="small text-warning mb-1 @if(!($ksefIdType !== null && $ksefIdType !== '' && ! FormOrder::isKsefIdTypeSupported($ksefIdType) && $isRecipient)) d-none @endif">
+            <i class="bi bi-exclamation-triangle"></i> Typ nieobsługiwany — fail-fast przy wystawianiu.
         </div>
 
         <p class="mb-1">

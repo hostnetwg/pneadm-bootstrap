@@ -83,14 +83,14 @@ class FormOrderKsefHelpersTest extends TestCase
         $this->assertNull(FormOrder::ksefRoleIfirmaCode('factor'));
     }
 
-    public function test_is_id_type_supported_only_accepts_nip_or_null(): void
+    public function test_is_id_type_supported_accepts_nip_idwew_or_null(): void
     {
         $this->assertTrue(FormOrder::isKsefIdTypeSupported(null));
         $this->assertTrue(FormOrder::isKsefIdTypeSupported(''));
         $this->assertTrue(FormOrder::isKsefIdTypeSupported(FormOrder::KSEF_ID_TYPE_NIP));
+        $this->assertTrue(FormOrder::isKsefIdTypeSupported(FormOrder::KSEF_ID_TYPE_IDWEW));
 
         $this->assertFalse(FormOrder::isKsefIdTypeSupported('PESEL'));
-        $this->assertFalse(FormOrder::isKsefIdTypeSupported('IDWew'));
         $this->assertFalse(FormOrder::isKsefIdTypeSupported('BrakID'));
         $this->assertFalse(FormOrder::isKsefIdTypeSupported('nip')); // case-sensitive, kanoniczne = 'NIP'
     }

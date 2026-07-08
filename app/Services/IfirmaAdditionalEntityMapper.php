@@ -17,7 +17,7 @@ use RuntimeException;
  * Zasada fail-fast (patrz docs/KSEF_FORM_ORDERS.md — sekcja „Reguła fail-fast”):
  *  - `ksef_entity_source = 'none'`              ⇒ build() zwraca null,
  *  - rola spoza obsługiwanej listy              ⇒ RuntimeException,
- *  - `id_type` inny niż NULL/''/'NIP'           ⇒ RuntimeException (zero cichego fallbacku),
+ *  - `id_type` inny niż NULL/''/'NIP'/'IDWew'     ⇒ RuntimeException (zero cichego fallbacku),
  *  - niekompletne dane `recipient_*`            ⇒ RuntimeException,
  *  - rola wymagająca NIP (JST, grupa VAT) + pusty NIP ⇒ RuntimeException.
  *
@@ -64,7 +64,7 @@ class IfirmaAdditionalEntityMapper
         if (! FormOrder::isKsefIdTypeSupported($idType)) {
             throw new RuntimeException(
                 'KSeF Podmiot3: typ identyfikatora "'.$idType.'" nie jest obsługiwany. '
-                .'Dozwolona wartość: "'.FormOrder::KSEF_ID_TYPE_NIP.'" (lub brak, wtedy używamy recipient_nip). '
+                .'Dozwolone wartości: "'.FormOrder::KSEF_ID_TYPE_NIP.'", "'.FormOrder::KSEF_ID_TYPE_IDWEW.'" (lub brak, wtedy używamy recipient_nip). '
                 .'Nie wykonujemy cichego fallbacku do recipient_nip dla innych typów identyfikatora.'
             );
         }
@@ -80,16 +80,6 @@ class IfirmaAdditionalEntityMapper
             );
         }
 
-        $nip = $this->resolveNip($order);
-
-        if (FormOrder::isKsefRoleRequiringNip($role) && ($nip === null || $nip === '')) {
-            throw new RuntimeException(
-                'KSeF Podmiot3: rola "'.$role.'" (iFirma: '.FormOrder::ksefRoleIfirmaCode($role).') wymaga niepustego NIP. '
-                .'Uzupełnij recipient_nip lub ksef_additional_entity_identifier (typ NIP). '
-                .'KSeF nie przyjmie JST ani członka grupy VAT bez NIP podmiotu — blokujemy request przed uderzeniem do iFirma.'
-            );
-        }
-
         $odbiorca = [
             'UzywajDanychOdbiorcyNaFakturach' => true,
             'Nazwa' => $recipientName,
@@ -102,8 +92,35 @@ class IfirmaAdditionalEntityMapper
             $odbiorca['Ulica'] = $recipientAddress;
         }
 
-        if ($nip !== null) {
-            $odbiorca['NIP'] = $nip;
+        if ($idType === FormOrder::KSEF_ID_TYPE_IDWEW) {
+            if (FormOrder::isKsefRoleRequiringNip($role)) {
+                throw new RuntimeException(
+                    'KSeF Podmiot3: rola "'.$role.'" wymaga NIP — identyfikator wewnętrzny (IDWew) jest dostępny tylko dla roli odbiorcy.'
+                );
+            }
+
+            $idwew = $this->normalizeIdwewIdentifier(trim((string) $order->ksef_additional_entity_identifier));
+            if ($idwew === null) {
+                throw new RuntimeException(
+                    'KSeF Podmiot3: brak lub niepoprawny identyfikator wewnętrzny (IDWew) w ksef_additional_entity_identifier.'
+                );
+            }
+
+            $odbiorca['IdentyfikatorWewnetrznyZNip'] = $idwew;
+        } else {
+            $nip = $this->resolveNip($order);
+
+            if (FormOrder::isKsefRoleRequiringNip($role) && ($nip === null || $nip === '')) {
+                throw new RuntimeException(
+                    'KSeF Podmiot3: rola "'.$role.'" (iFirma: '.FormOrder::ksefRoleIfirmaCode($role).') wymaga niepustego NIP. '
+                    .'Uzupełnij recipient_nip lub ksef_additional_entity_identifier (typ NIP). '
+                    .'KSeF nie przyjmie JST ani członka grupy VAT bez NIP podmiotu — blokujemy request przed uderzeniem do iFirma.'
+                );
+            }
+
+            if ($nip !== null) {
+                $odbiorca['NIP'] = $nip;
+            }
         }
 
         $odbiorca['Kraj'] = 'Polska';
@@ -113,16 +130,29 @@ class IfirmaAdditionalEntityMapper
     }
 
     /**
+     * Normalizacja IDWew do postaci NIP (10 cyfr) + „-” + 5 cyfr (format KSeF FA(3)).
+     */
+    private function normalizeIdwewIdentifier(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/^[0-9]{10}-[0-9]{5}$/', $raw)) {
+            return $raw;
+        }
+
+        if (preg_match('/^([0-9]{10})([0-9]{5})$/', $raw, $matches)) {
+            return $matches[1].'-'.$matches[2];
+        }
+
+        return null;
+    }
+
+    /**
      * Zbuduj `OdbiorcaNaFakturze` wyłącznie z kolumn `recipient_*` (rola ODBIORCA w iFirma),
      * bez udziału metadanych KSeF (`ksef_*`).
-     *
-     * Ścieżka dla przycisku „Wystaw Fakturę iFirma z Odbiorcą”, gdy
-     * `ksef_entity_source = 'none'`: jeśli dane fizyczne odbiorcy są kompletne,
-     * zwraca payload; w przeciwnym razie `null` (faktura tylko z nabywcą).
-     *
-     * Celowo **nie** czyta `ksef_additional_entity_identifier` — przy wyłączonym
-     * źródle Podmiotu3 metadane mogą być nieaktualne; unikamy cichego wysłania
-     * obcego NIP.
      *
      * @return array<string,mixed>|null
      */

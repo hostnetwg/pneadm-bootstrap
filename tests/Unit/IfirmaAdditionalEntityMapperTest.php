@@ -135,12 +135,40 @@ class IfirmaAdditionalEntityMapperTest extends TestCase
     public function test_fail_fast_on_unsupported_id_type(): void
     {
         $order = $this->makeOrder($this->baseRecipientAttributes([
-            'ksef_additional_entity_id_type' => 'IDWew',
-            'ksef_additional_entity_identifier' => 'ABC-123',
+            'ksef_additional_entity_id_type' => 'PESEL',
+            'ksef_additional_entity_identifier' => '90010112345',
         ]));
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/nie jest obsługiwany/');
+        $this->mapper->build($order);
+    }
+
+    public function test_builds_payload_with_idwew_for_odbiorca(): void
+    {
+        $order = $this->makeOrder($this->baseRecipientAttributes([
+            'recipient_nip' => null,
+            'ksef_additional_entity_id_type' => FormOrder::KSEF_ID_TYPE_IDWEW,
+            'ksef_additional_entity_identifier' => '1234563218-00001',
+        ]));
+
+        $payload = $this->mapper->build($order);
+
+        $this->assertArrayNotHasKey('NIP', $payload);
+        $this->assertSame('1234563218-00001', $payload['IdentyfikatorWewnetrznyZNip']);
+        $this->assertSame('ODBIORCA', $payload['Rola']);
+    }
+
+    public function test_fail_fast_on_idwew_for_jst_role(): void
+    {
+        $order = $this->makeOrder($this->baseRecipientAttributes([
+            'ksef_additional_entity_role' => FormOrder::KSEF_ROLE_JST_RECIPIENT,
+            'ksef_additional_entity_id_type' => FormOrder::KSEF_ID_TYPE_IDWEW,
+            'ksef_additional_entity_identifier' => '1234563218-00001',
+        ]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/wymaga NIP/');
         $this->mapper->build($order);
     }
 

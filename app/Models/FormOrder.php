@@ -90,6 +90,12 @@ class FormOrder extends Model
     public const KSEF_ID_TYPE_NIP = 'NIP';
 
     /**
+     * KSeF Podmiot3 — identyfikator wewnętrzny z NIP nabywcy (IDWew, 15 znaków).
+     * Mapowany w iFirma do OdbiorcaNaFakturze.IdentyfikatorWewnetrznyZNip.
+     */
+    public const KSEF_ID_TYPE_IDWEW = 'IDWew';
+
+    /**
      * Wszystkie kanoniczne kody ról KSeF Podmiot3 dozwolone do zapisu w bazie (walidacja).
      * Mapowanie na UI i iFirma realizowane osobno (nigdy nie odwrotnie).
      *
@@ -1165,7 +1171,7 @@ class FormOrder extends Model
      */
     public static function isKsefIdTypeSupported(?string $idType): bool
     {
-        return in_array($idType, [null, '', self::KSEF_ID_TYPE_NIP], true);
+        return in_array($idType, [null, '', self::KSEF_ID_TYPE_NIP, self::KSEF_ID_TYPE_IDWEW], true);
     }
 
     /**

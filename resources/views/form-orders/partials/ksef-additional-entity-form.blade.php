@@ -137,14 +137,14 @@
                     </option>
                     @foreach (FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES as $idTypeOption)
                         <option value="{{ $idTypeOption }}" @selected($ksefIdType === $idTypeOption)>
-                            {{ $idTypeOption }}{{ $idTypeOption === FormOrder::KSEF_ID_TYPE_NIP ? ' — obsługiwane' : ' — nieobsługiwane (fail-fast)' }}
+                            {{ $idTypeOption }}{{ in_array($idTypeOption, [FormOrder::KSEF_ID_TYPE_NIP, FormOrder::KSEF_ID_TYPE_IDWEW], true) ? ' — obsługiwane' : ' — nieobsługiwane (fail-fast)' }}
                         </option>
                     @endforeach
                 </select>
                 @error('ksef_additional_entity_id_type')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
-                @if ($ksefIdType !== null && $ksefIdType !== '' && $ksefIdType !== FormOrder::KSEF_ID_TYPE_NIP && $isRecipient)
+                @if ($ksefIdType !== null && $ksefIdType !== '' && ! FormOrder::isKsefIdTypeSupported($ksefIdType) && $isRecipient)
                     <div class="alert alert-warning py-1 mt-2 mb-0 small">
                         <i class="bi bi-exclamation-triangle"></i>
                         Typ <code>{{ $ksefIdType }}</code> nie jest obsługiwany. Wystawienie faktury z Podmiotem3 zostanie zablokowane (fail-fast, bez cichego fallbacku do recipient_nip).
