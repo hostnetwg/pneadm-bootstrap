@@ -9,6 +9,9 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Services\Certificate\CertificateGeneratorService;
 use App\Services\Certificate\CertificateNumberGenerator;
+use App\Models\OnlineCourseEnrollment;
+use App\Services\Certificate\OnlineCourseCertificateIssueService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -20,19 +23,28 @@ class CertificateApiController extends Controller
 {
     public function __construct(
         private CertificateGeneratorService $certificateGenerator,
-        private CertificateNumberGenerator $numberGenerator
+        private CertificateNumberGenerator $numberGenerator,
+        private OnlineCourseCertificateIssueService $onlineCourseCertificateIssue,
     ) {}
 
     /**
-     * Generuje PDF certyfikatu dla uczestnika
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
+     * Generuje PDF certyfikatu dla uczestnika lub zapisu na kurs online.
      */
     public function generate(Request $request)
     {
+        $hasParticipant = $request->filled('participant_id');
+        $hasEnrollment = $request->filled('online_course_enrollment_id');
+
+        if ($hasParticipant === $hasEnrollment) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'messages' => ['subject' => ['Podaj participant_id lub online_course_enrollment_id.']],
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'participant_id' => 'required|integer|min:1',
+            'participant_id' => 'nullable|integer|min:1|required_without:online_course_enrollment_id',
+            'online_course_enrollment_id' => 'nullable|integer|min:1|required_without:participant_id',
             'connection' => 'nullable|string',
             'save_to_storage' => 'nullable|boolean',
             'cache' => 'nullable|boolean',
@@ -41,34 +53,34 @@ class CertificateApiController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'error' => 'Validation failed',
-                'messages' => $validator->errors()
+                'messages' => $validator->errors(),
             ], 422);
         }
 
         try {
-            $participantId = $request->input('participant_id');
             $connection = $this->normalizeConnection($request->input('connection'));
-            $saveToStorage = $request->input('save_to_storage', false);
-            $cache = $request->input('cache', true);
+            $saveToStorage = $request->boolean('save_to_storage');
+            $cache = $request->boolean('cache', false);
 
-            // Jeśli plik PDF jest już zapisany na serwerze, zwróć go (mniejsze obciążenie i ryzyko alertów AV)
+            if ($hasEnrollment) {
+                return $this->generateForEnrollment(
+                    (int) $request->input('online_course_enrollment_id'),
+                    $connection,
+                    $saveToStorage,
+                    $cache
+                );
+            }
+
+            $participantId = (int) $request->input('participant_id');
             $certificate = Certificate::where('participant_id', $participantId)->first();
-            if ($certificate && !empty($certificate->file_path)) {
+            if ($certificate && ! empty($certificate->file_path)) {
                 $storagePath = Str::replaceFirst('storage/', '', $certificate->file_path);
                 if (Storage::disk('public')->exists($storagePath)) {
-                    Log::info('Certificate API: Serving existing PDF from storage', ['participant_id' => $participantId]);
                     return response(Storage::disk('public')->get($storagePath), 200)
                         ->header('Content-Type', 'application/pdf')
                         ->header('Content-Disposition', 'inline; filename="certificate.pdf"');
                 }
             }
-
-            Log::info('Certificate API: Generating PDF', [
-                'participant_id' => $participantId,
-                'connection' => $connection,
-                'save_to_storage' => $saveToStorage,
-                'cache' => $cache,
-            ]);
 
             $pdf = $this->certificateGenerator->generatePdf($participantId, [
                 'connection' => $connection,
@@ -79,19 +91,44 @@ class CertificateApiController extends Controller
             return response($pdf->output(), 200)
                 ->header('Content-Type', 'application/pdf')
                 ->header('Content-Disposition', 'inline; filename="certificate.pdf"');
-
         } catch (\Exception $e) {
             Log::error('Certificate API: Error generating PDF', [
                 'participant_id' => $request->input('participant_id'),
+                'online_course_enrollment_id' => $request->input('online_course_enrollment_id'),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'error' => 'Certificate generation failed',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function generateForEnrollment(int $enrollmentId, ?string $connection, bool $saveToStorage, bool $cache)
+    {
+        $certificate = Certificate::query()
+            ->where('online_course_enrollment_id', $enrollmentId)
+            ->first();
+
+        if ($certificate && ! empty($certificate->file_path)) {
+            $storagePath = Str::replaceFirst('storage/', '', $certificate->file_path);
+            if (Storage::disk('public')->exists($storagePath)) {
+                return response(Storage::disk('public')->get($storagePath), 200)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'inline; filename="certificate.pdf"');
+            }
+        }
+
+        $pdf = $this->certificateGenerator->generatePdfForEnrollment($enrollmentId, [
+            'connection' => $connection,
+            'save_to_storage' => $saveToStorage,
+            'cache' => $cache,
+        ]);
+
+        return response($pdf->output(), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="certificate.pdf"');
     }
 
     /**
@@ -102,9 +139,25 @@ class CertificateApiController extends Controller
      */
     public function ensure(Request $request)
     {
+        $hasParticipant = $request->filled('participant_id');
+        $hasEnrollment = $request->filled('online_course_enrollment_id');
+
+        if ($hasParticipant === $hasEnrollment) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'messages' => ['subject' => ['Podaj participant_id lub online_course_enrollment_id.']],
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'participant_id' => 'required|integer|min:1',
+            'participant_id' => 'nullable|integer|min:1|required_without:online_course_enrollment_id',
+            'online_course_enrollment_id' => 'nullable|integer|min:1|required_without:participant_id',
             'connection' => 'nullable|string',
+            'holder_email' => 'required_with:online_course_enrollment_id|email|max:255',
+            'holder_first_name' => 'required_with:online_course_enrollment_id|string|max:255',
+            'holder_last_name' => 'required_with:online_course_enrollment_id|string|max:255',
+            'holder_birth_date' => 'nullable|date',
+            'holder_birth_place' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -112,7 +165,39 @@ class CertificateApiController extends Controller
         }
 
         try {
-            $participantId = $request->input('participant_id');
+            if ($hasEnrollment) {
+                $enrollment = OnlineCourseEnrollment::query()
+                    ->with('onlineCourse')
+                    ->findOrFail((int) $request->input('online_course_enrollment_id'));
+
+                $existing = Certificate::query()
+                    ->where('online_course_enrollment_id', $enrollment->id)
+                    ->first();
+
+                if ($existing) {
+                    return response()->json([
+                        'success' => true,
+                        'certificate_number' => $existing->certificate_number,
+                        'already_existed' => true,
+                    ]);
+                }
+
+                $certificate = $this->onlineCourseCertificateIssue->ensure($enrollment, [
+                    'email' => (string) $request->input('holder_email'),
+                    'first_name' => (string) $request->input('holder_first_name'),
+                    'last_name' => (string) $request->input('holder_last_name'),
+                    'birth_date' => $request->input('holder_birth_date'),
+                    'birth_place' => $request->input('holder_birth_place'),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'certificate_number' => $certificate->certificate_number,
+                    'already_existed' => false,
+                ]);
+            }
+
+            $participantId = (int) $request->input('participant_id');
             $participant = Participant::findOrFail($participantId);
             $course = Course::findOrFail($participant->course_id);
 
@@ -131,11 +216,15 @@ class CertificateApiController extends Controller
             $courseYear = $this->numberGenerator->resolveCourseYear($course);
             $nextSequence = $this->numberGenerator->determineNextSequence($course, $courseYear);
             $certificateNumber = $this->numberGenerator->formatCertificateNumber($course, $nextSequence, $courseYear);
+            $issueDate = $course->issue_date_certyficates
+                ? Carbon::parse($course->issue_date_certyficates)->toDateString()
+                : Carbon::now()->toDateString();
 
             Certificate::create([
                 'participant_id' => $participant->id,
                 'course_id' => $course->id,
                 'certificate_number' => $certificateNumber,
+                'issue_date' => $issueDate,
                 'generated_at' => now(),
             ]);
 
@@ -147,8 +236,10 @@ class CertificateApiController extends Controller
         } catch (\Exception $e) {
             Log::error('Certificate API: ensure failed', [
                 'participant_id' => $request->input('participant_id'),
+                'online_course_enrollment_id' => $request->input('online_course_enrollment_id'),
                 'error' => $e->getMessage(),
             ]);
+
             return response()->json([
                 'error' => 'Certificate ensure failed',
                 'message' => $e->getMessage(),
@@ -164,41 +255,60 @@ class CertificateApiController extends Controller
      */
     public function getData(Request $request)
     {
+        $hasParticipant = $request->filled('participant_id');
+        $hasEnrollment = $request->filled('online_course_enrollment_id');
+
+        if ($hasParticipant === $hasEnrollment) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'messages' => ['subject' => ['Podaj participant_id lub online_course_enrollment_id.']],
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'participant_id' => 'required|integer|min:1',
+            'participant_id' => 'nullable|integer|min:1|required_without:online_course_enrollment_id',
+            'online_course_enrollment_id' => 'nullable|integer|min:1|required_without:participant_id',
             'connection' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'error' => 'Validation failed',
-                'messages' => $validator->errors()
+                'messages' => $validator->errors(),
             ], 422);
         }
 
         try {
-            $participantId = $request->input('participant_id');
             $connection = $this->normalizeConnection($request->input('connection'));
 
-            $data = $this->certificateGenerator->getCertificateData($participantId, $connection);
+            if ($hasEnrollment) {
+                $data = $this->certificateGenerator->getCertificateDataForEnrollment(
+                    (int) $request->input('online_course_enrollment_id'),
+                    $connection
+                );
+            } else {
+                $data = $this->certificateGenerator->getCertificateData(
+                    (int) $request->input('participant_id'),
+                    $connection
+                );
+            }
 
-            // Usuń wrażliwe dane przed zwróceniem (opcjonalnie)
             unset($data['certificate']);
 
             return response()->json([
                 'success' => true,
-                'data' => $data
+                'data' => $data,
             ]);
-
         } catch (\Exception $e) {
             Log::error('Certificate API: Error getting certificate data', [
                 'participant_id' => $request->input('participant_id'),
+                'online_course_enrollment_id' => $request->input('online_course_enrollment_id'),
                 'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'error' => 'Failed to get certificate data',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -351,6 +461,42 @@ class CertificateApiController extends Controller
             ->where('course_id', $courseId)
             ->first();
         if (!$certificate) {
+            return response()->json(['error' => 'Certificate not found'], 404);
+        }
+
+        $now = now();
+        $updates = [
+            'download_count' => DB::raw('download_count + 1'),
+            'last_downloaded_at' => $now,
+        ];
+        if (empty($certificate->first_downloaded_at)) {
+            $updates['first_downloaded_at'] = $now;
+        }
+
+        Certificate::where('id', $certificate->id)->update($updates);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Oznacza pobranie zaświadczenia kursu online (statystyki).
+     */
+    public function markOnlineDownloaded(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'online_course_enrollment_id' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => 'Validation failed', 'messages' => $validator->errors()], 422);
+        }
+
+        $enrollmentId = (int) $request->input('online_course_enrollment_id');
+        $certificate = Certificate::query()
+            ->where('online_course_enrollment_id', $enrollmentId)
+            ->first();
+
+        if (! $certificate) {
             return response()->json(['error' => 'Certificate not found'], 404);
         }
 

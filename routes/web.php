@@ -411,6 +411,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('online-courses/{online_course}/enrollments/{enrollment}/edit', [OnlineCourseEnrollmentController::class, 'edit'])->name('online-courses.enrollments.edit');
     Route::put('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'update'])->name('online-courses.enrollments.update');
     Route::delete('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'destroy'])->name('online-courses.enrollments.destroy');
+    Route::get('online-courses/{online_course}/enrollments/{enrollment}/certificate', [OnlineCourseEnrollmentController::class, 'storeCertificate'])->name('online-courses.enrollments.certificate.store');
+    Route::get('online-courses/{online_course}/enrollments/{enrollment}/certificate/generate', [OnlineCourseEnrollmentController::class, 'generateCertificate'])->name('online-courses.enrollments.certificate.generate');
 
     // Uzupełnienie danych uczestników
     Route::prefix('data-completion')->name('data-completion.')->group(function () {

@@ -59,8 +59,12 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="description" class="form-label">Opis</label>
+                    <label for="description" class="form-label">Zakres szkolenia / Zagadnienia</label>
                     <textarea name="description" class="form-control" id="description" rows="6">{{ $course->description }}</textarea>
+                    <div class="form-text">
+                        Treść na zaświadczeniu PDF, gdy w szablonie włączona jest opcja „Pokaż zakres szkolenia”.
+                        Możesz wpisać listę numerowaną (każdy punkt od nowej linii, np. <code>1. Zagadnienie</code>).
+                    </div>
                 </div>
 
                 <!-- Sekcja opisu oferty -->

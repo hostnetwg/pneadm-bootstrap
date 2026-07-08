@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Certificate\CertificateTemplateVariableResolver;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -33,7 +34,10 @@ class TemplateBuilderService
         }
         
         try {
-            File::put($appPath, $bladeContent);
+            if (File::put($appPath, $bladeContent) === false || ! File::exists($appPath)) {
+                throw new \RuntimeException('Plik Blade nie został utworzony (brak uprawnień do zapisu?).');
+            }
+
             \Log::info('Template saved to app (production)', [
                 'slug' => $slug,
                 'app_path' => $appPath
@@ -358,16 +362,25 @@ class TemplateBuilderService
         $marginLeft = $settings['margin_left'] ?? 50;
         $marginRight = $settings['margin_right'] ?? 50;
         $completionText = $config['completion_text'] ?? 'ukończył/a szkolenie';
-        $eventText = $config['event_text'] ?? 'zorganizowanym w dniu';
-        // Nie używamy htmlspecialchars, aby umożliwić HTML
+        $eventTextStored = array_key_exists('event_text', $config)
+            ? $config['event_text']
+            : CertificateTemplateVariableResolver::DEFAULT_EVENT_TEXT;
+        $showDuration = ! empty($config['show_duration']);
+
         $html = "    <p>" . $completionText . "</p>\n";
-        $html .= "    <p>" . $eventText . " {{ \\Carbon\\Carbon::parse(\$course->start_date)->format('d.m.Y') }}r. ";
-        
-        if (!empty($config['show_duration'])) {
-            $html .= "w wymiarze {{ \$durationMinutes }} minut, ";
-        }
-        
-        $html .= "przez</p>\n\n";
+        $html .= "    <p>@php\n";
+        $html .= "        \$__eventTemplate = " . var_export($eventTextStored, true) . ";\n";
+        $html .= "        \$__eventResolved = app(\\App\\Services\\Certificate\\CertificateTemplateVariableResolver::class)->resolveEventText(\n";
+        $html .= "            \$__eventTemplate,\n";
+        $html .= "            [\n";
+        $html .= "                'course' => \$course,\n";
+        $html .= "                'effective_completion_date' => \$effective_completion_date ?? null,\n";
+        $html .= "                'duration_minutes' => (int) (\$durationMinutes ?? 0),\n";
+        $html .= "                'show_duration' => " . ($showDuration ? 'true' : 'false') . ",\n";
+        $html .= "            ]\n";
+        $html .= "        );\n";
+        $html .= "        echo \$__eventResolved ?? '';\n";
+        $html .= "    @endphp</p>\n\n";
         $html .= "    <p class=\"bold\">" . ($config['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji') . "</p>\n\n";
         
         $subjectLabel = $config['subject_label'] ?? 'TEMAT SZKOLENIA';
@@ -598,11 +611,16 @@ class TemplateBuilderService
                 'description' => 'Temat szkolenia, organizator, czas trwania',
                 'fields' => [
                     'completion_text' => ['type' => 'textarea', 'label' => 'Tekst ukończenia (obsługuje HTML, np. "ukończył/a szkolenie z cyklu <h3>TIK w pracy NAUCZYCIELA</h3>")', 'default' => 'ukończył/a szkolenie'],
-                    'event_text' => ['type' => 'text', 'label' => 'Tekst wydarzenia (np. "zorganizowanym w dniu", "zorganizowane w dniu", "które odbyło się")', 'default' => 'zorganizowanym w dniu'],
-                    'subject_label' => ['type' => 'textarea', 'label' => 'Etykieta tematu (obsługuje HTML, np. "TEMAT SZKOLENIA", "TEMAT WEBINARU")', 'default' => 'TEMAT SZKOLENIA'],
+                    'event_text' => [
+                        'type' => 'textarea',
+                        'label' => 'Tekst wydarzenia (zmienne w nawiasach klamrowych, np. {data_zakonczenia})',
+                        'default' => CertificateTemplateVariableResolver::DEFAULT_EVENT_TEXT,
+                        'variables_help' => CertificateTemplateVariableResolver::variableHelp(),
+                    ],
                     'show_duration' => ['type' => 'checkbox', 'label' => 'Pokaż czas trwania', 'default' => true],
+                    'organizer_name' => ['type' => 'textarea', 'label' => 'Nazwa organizatora', 'default' => 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji'],
+                    'subject_label' => ['type' => 'textarea', 'label' => 'Etykieta tematu (obsługuje HTML, np. "TEMAT SZKOLENIA", "TEMAT WEBINARU")', 'default' => 'TEMAT SZKOLENIA'],
                     'show_description' => ['type' => 'checkbox', 'label' => 'Pokaż zakres szkolenia', 'default' => true],
-                    'organizer_name' => ['type' => 'textarea', 'label' => 'Nazwa organizatora', 'default' => 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji']
                 ]
             ],
             'instructor_signature' => [

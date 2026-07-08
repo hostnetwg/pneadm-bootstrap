@@ -407,10 +407,18 @@
                                                                        name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
                                                                        value="{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}">
                                                             @elseif($fieldConfig['type'] === 'textarea')
+                                                                @php
+                                                                    $fieldValue = $fieldName === 'event_text'
+                                                                        ? \App\Services\Certificate\CertificateTemplateVariableResolver::formEventTextValue($block['config'] ?? [])
+                                                                        : ($block['config'][$fieldName] ?? $fieldConfig['default'] ?? '');
+                                                                @endphp
                                                                 <textarea class="form-control" 
                                                                           id="{{ $blockId }}_{{ $fieldName }}" 
                                                                           name="blocks[{{ $blockId }}][config][{{ $fieldName }}]" 
-                                                                          rows="3">{{ $block['config'][$fieldName] ?? $fieldConfig['default'] ?? '' }}</textarea>
+                                                                          rows="3">{{ $fieldValue }}</textarea>
+                                                                @if($fieldName === 'event_text')
+                                                                    @include('admin.certificate-templates.partials.event-text-variables-help')
+                                                                @endif
                                                             @elseif($fieldConfig['type'] === 'checkbox')
                                                                 <div class="form-check">
                                                                     <input class="form-check-input" 
@@ -1158,6 +1166,20 @@
             // Nie dodajemy event listenera tutaj - delegacja eventów obsługuje to globalnie
         }
 
+        function appendEventTextVariablesHelp(config) {
+            if (!config.variables_help) {
+                return '';
+            }
+
+            let html = '<small class="text-muted d-block mt-1">Dostępne zmienne:<ul class="mb-0 ps-3">';
+            for (const [variable, description] of Object.entries(config.variables_help)) {
+                html += `<li><code>${variable}</code> — ${description}</li>`;
+            }
+            html += '</ul><span class="d-block mt-1">Przykład: <code>zorganizowanym w dniu {data_zakonczenia} r. {czas_trwania}przez</code>. Tekst bez zmiennych trafia na certyfikat dokładnie taki, jaki wpiszesz. Puste pole — brak akapitu.</span></small>';
+
+            return html;
+        }
+
         function renderField(blockId, fieldName, config) {
             const fullName = `blocks[${blockId}][config][${fieldName}]`;
             const id = `${blockId}_${fieldName}`;
@@ -1185,6 +1207,9 @@
                     break;
                 case 'textarea':
                     html += `<textarea class="form-control" id="${id}" name="${fullName}" rows="3">${config.default || ''}</textarea>`;
+                    if (fieldName === 'event_text') {
+                        html += appendEventTextVariablesHelp(config);
+                    }
                     break;
                 case 'checkbox':
                     const checked = config.default ? 'checked' : '';

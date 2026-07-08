@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Certificate;
 use App\Models\Participant;
 use App\Models\Course;
+use App\Models\OnlineCourse;
 use App\Jobs\GenerateCertificatePdfJob;
 use App\Services\Certificate\CertificateGeneratorService;
 use Illuminate\Bus\Batch;
@@ -99,7 +100,15 @@ class CertificateController extends Controller
     
         // Usunięcie certyfikatu z bazy danych
         $course = Course::find($certificate->course_id);
+        $onlineCourse = $certificate->online_course_id
+            ? OnlineCourse::find($certificate->online_course_id)
+            : null;
         $certificate->delete();
+
+        if ($onlineCourse) {
+            return redirect()->route('online-courses.enrollments.index', $onlineCourse)
+                ->with('success', 'Certyfikat został usunięty.');
+        }
 
         if ($course) {
             return redirect()->route('participants.index', $course)->with('success', 'Certyfikat został usunięty.');
@@ -393,21 +402,27 @@ class CertificateController extends Controller
     public function downloadCertificatePdf(Certificate $certificate)
     {
         $course = Course::find($certificate->course_id);
+        $onlineCourse = $certificate->online_course_id
+            ? OnlineCourse::find($certificate->online_course_id)
+            : null;
 
         if (empty($certificate->file_path)) {
-            $redirect = $course ? redirect()->route('participants.index', $course) : redirect()->back();
+            $redirect = $this->certificateRedirect($course, $onlineCourse);
+
             return $redirect->with('error', 'Brak pliku PDF na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
         }
 
         $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
-        if (!Storage::disk('public')->exists($relativePath)) {
-            $redirect = $course ? redirect()->route('participants.index', $course) : redirect()->back();
+        if (! Storage::disk('public')->exists($relativePath)) {
+            $redirect = $this->certificateRedirect($course, $onlineCourse);
+
             return $redirect->with('error', 'Plik PDF nie istnieje na serwerze. Użyj linku z numerem zaświadczenia, aby wygenerować plik.');
         }
 
         $certificateNumber = $certificate->certificate_number;
-        $downloadFileName = 'zaswiadczenie_' . str_replace('/', '-', $certificateNumber) . '.pdf';
-        return response()->download(storage_path('app/public/' . $relativePath), $downloadFileName);
+        $downloadFileName = 'zaswiadczenie_'.str_replace('/', '-', $certificateNumber).'.pdf';
+
+        return response()->download(storage_path('app/public/'.$relativePath), $downloadFileName);
     }
 
     /**
@@ -416,13 +431,21 @@ class CertificateController extends Controller
     public function deleteCertificatePdf(Certificate $certificate)
     {
         $course = Course::find($certificate->course_id);
+        $onlineCourse = $certificate->online_course_id
+            ? OnlineCourse::find($certificate->online_course_id)
+            : null;
 
-        if (!empty($certificate->file_path)) {
+        if (! empty($certificate->file_path)) {
             $relativePath = Str::replaceFirst('storage/', '', $certificate->file_path);
             if ($relativePath !== '' && Storage::disk('public')->exists($relativePath)) {
                 Storage::disk('public')->delete($relativePath);
             }
             $certificate->update(['file_path' => null]);
+        }
+
+        if ($onlineCourse) {
+            return redirect()->route('online-courses.enrollments.index', $onlineCourse)
+                ->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
         }
 
         if ($course) {
@@ -432,6 +455,19 @@ class CertificateController extends Controller
 
         return redirect()->back()
             ->with('success', 'Plik PDF zaświadczenia został usunięty. Możesz wygenerować go ponownie (link z numerem zaświadczenia).');
+    }
+
+    private function certificateRedirect(?Course $course, ?OnlineCourse $onlineCourse)
+    {
+        if ($onlineCourse) {
+            return redirect()->route('online-courses.enrollments.index', $onlineCourse);
+        }
+
+        if ($course) {
+            return redirect()->route('participants.index', $course);
+        }
+
+        return redirect()->back();
     }
 
     public function bulkDelete(Course $course)

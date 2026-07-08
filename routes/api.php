@@ -91,6 +91,7 @@ Route::prefix('certificates')->name('api.certificates.')->middleware('api.token'
     Route::post('/ensure', [CertificateApiController::class, 'ensure'])->name('ensure');
     Route::post('/data', [CertificateApiController::class, 'getData'])->name('data');
     Route::post('/mark-downloaded', [CertificateApiController::class, 'markDownloaded'])->name('mark-downloaded');
+    Route::post('/mark-online-downloaded', [CertificateApiController::class, 'markOnlineDownloaded'])->name('mark-online-downloaded');
     Route::get('/health', [CertificateApiController::class, 'health'])->name('health');
 });
 

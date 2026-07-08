@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OnlineCourseEnrollment extends Model
 {
@@ -55,6 +56,11 @@ class OnlineCourseEnrollment extends Model
     public function lessonNotes(): HasMany
     {
         return $this->hasMany(OnlineCourseLessonNote::class, 'online_course_enrollment_id');
+    }
+
+    public function certificate(): HasOne
+    {
+        return $this->hasOne(Certificate::class, 'online_course_enrollment_id');
     }
 
     public function hasExpiredAccess(): bool

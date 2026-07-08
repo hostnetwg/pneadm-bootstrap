@@ -7,6 +7,15 @@ use Illuminate\Support\Facades\Storage;
 
 class TemplateRenderer
 {
+    public function __construct(
+        private ?CertificateTemplateVariableResolver $variableResolver = null,
+    ) {}
+
+    private function variables(): CertificateTemplateVariableResolver
+    {
+        return $this->variableResolver ??= app(CertificateTemplateVariableResolver::class);
+    }
+
     /**
      * Renderuje szablon z JSON konfiguracji do HTML
      * (bez użycia plików Blade - bezpośrednie renderowanie)
@@ -39,6 +48,7 @@ class TemplateRenderer
             'durationMinutes' => $durationMinutes,
             'isPdfMode' => $isPdfMode,
             'templateSettings' => $settings,
+            'effective_completion_date' => $data['effective_completion_date'] ?? null,
         ]);
         
         return $html;
@@ -331,24 +341,23 @@ class TemplateRenderer
     protected function buildCourseInfoBlock(array $config, array $settings, array $data): string
     {
         $course = $data['course'];
-        $durationMinutes = $data['durationMinutes'];
+        $durationMinutes = (int) ($data['durationMinutes'] ?? 0);
         $completionText = $config['completion_text'] ?? 'ukończył/a szkolenie';
-        $eventText = $config['event_text'] ?? 'zorganizowanym w dniu';
-        
-        // Nie używamy htmlspecialchars dla completionText i eventText, aby umożliwić HTML
+
         $html = "    <p>{$completionText}</p>\n";
-        
-        if ($course) {
-            $startDate = Carbon::parse($course->start_date)->format('d.m.Y');
-            $html .= "    <p>{$eventText} {$startDate}&nbsp;r. ";
-            
-            if (!empty($config['show_duration'])) {
-                $html .= "w wymiarze {$durationMinutes} minut, ";
-            }
-            
-            $html .= "przez</p>\n\n";
+
+        $eventTextRaw = array_key_exists('event_text', $config) ? $config['event_text'] : null;
+        $resolvedEvent = $this->variables()->resolveEventText($eventTextRaw, [
+            'course' => $course,
+            'effective_completion_date' => $data['effective_completion_date'] ?? null,
+            'duration_minutes' => $durationMinutes,
+            'show_duration' => ! empty($config['show_duration']),
+        ]);
+
+        if ($resolvedEvent !== null && $resolvedEvent !== '') {
+            $html .= "    <p>{$resolvedEvent}</p>\n\n";
         }
-        
+
         $organizerName = $config['organizer_name'] ?? 'Niepubliczny Ośrodek Doskonalenia Nauczycieli<br>Platforma Nowoczesnej Edukacji';
         $html .= "    <p class=\"bold\">{$organizerName}</p>\n\n";
         

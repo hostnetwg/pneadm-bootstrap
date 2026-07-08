@@ -27,7 +27,7 @@
                     <div class="card">
                         <div class="card-header">Podstawowe</div>
                         <div class="card-body">
-                            @include('online-courses.partials.form', ['course' => $course, 'instructors' => $instructors])
+                            @include('online-courses.partials.form', ['course' => $course, 'instructors' => $instructors, 'certificateTemplates' => $certificateTemplates])
                             <hr>
                             <form method="post" action="{{ route('online-courses.destroy', $course) }}" onsubmit="return confirm('Przenieść kurs do kosza?');">
                                 @csrf

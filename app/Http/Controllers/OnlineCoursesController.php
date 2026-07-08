@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CertificateTemplate;
 use App\Models\Instructor;
 use App\Models\OnlineCourse;
 use Illuminate\Http\JsonResponse;
@@ -36,8 +37,9 @@ class OnlineCoursesController extends Controller
     public function create(): View
     {
         $instructors = Instructor::query()->orderBy('last_name')->orderBy('first_name')->get();
+        $certificateTemplates = CertificateTemplate::query()->where('is_active', true)->orderBy('name')->get();
 
-        return view('online-courses.create', compact('instructors'));
+        return view('online-courses.create', compact('instructors', 'certificateTemplates'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -65,9 +67,14 @@ class OnlineCoursesController extends Controller
     public function edit(OnlineCourse $online_course): View
     {
         $instructors = Instructor::query()->orderBy('last_name')->orderBy('first_name')->get();
+        $certificateTemplates = CertificateTemplate::query()->where('is_active', true)->orderBy('name')->get();
         $online_course->load(['modules.lessons.embeds', 'modules.lessons.resourceLinks']);
 
-        return view('online-courses.edit', ['course' => $online_course, 'instructors' => $instructors]);
+        return view('online-courses.edit', [
+            'course' => $online_course,
+            'instructors' => $instructors,
+            'certificateTemplates' => $certificateTemplates,
+        ]);
     }
 
     public function update(Request $request, OnlineCourse $online_course): RedirectResponse
@@ -111,12 +118,20 @@ class OnlineCoursesController extends Controller
             'slug' => ['nullable', 'string', 'max:191'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'training_scope' => ['nullable', 'string'],
             'offer_description_html' => ['nullable', 'string'],
             'instructor_id' => ['nullable', 'exists:instructors,id'],
             'is_active' => ['sometimes', 'boolean'],
             'visible_in_dashboard' => ['sometimes', 'boolean'],
             'internal_notes' => ['nullable', 'string'],
             'legacy_publigo_product_id' => ['nullable', 'string', 'max:190'],
+            'certificate_download_status' => ['nullable', 'string', 'in:download_enabled,in_preparation,no_certificate'],
+            'certificate_template_id' => ['nullable', 'integer', 'exists:certificate_templates,id'],
+            'certificate_format' => ['nullable', 'string', 'max:191'],
+            'certificate_issue_date' => ['nullable', 'date'],
+            'certificate_duration_minutes' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'certificate_collect_birth_data' => ['sometimes', 'boolean'],
+            'certificate_birth_data_required' => ['sometimes', 'boolean'],
         ]);
 
         $validated['slug'] = trim((string) ($validated['slug'] ?? ''));
@@ -139,8 +154,26 @@ class OnlineCoursesController extends Controller
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['visible_in_dashboard'] = $request->boolean('visible_in_dashboard');
+        $validated['certificate_collect_birth_data'] = $request->boolean('certificate_collect_birth_data');
+        $validated['certificate_birth_data_required'] = $request->boolean('certificate_birth_data_required');
+        $validated['certificate_download_status'] = $validated['certificate_download_status'] ?? 'no_certificate';
+        $validated['certificate_format'] = trim((string) ($validated['certificate_format'] ?? '{nr}/{online_course_id}/{year}/PNE-KO'));
+        if ($validated['certificate_format'] === '') {
+            $validated['certificate_format'] = '{nr}/{online_course_id}/{year}/PNE-KO';
+        }
+        $validated['certificate_template_id'] = ! empty($validated['certificate_template_id'])
+            ? (int) $validated['certificate_template_id']
+            : null;
+        $validated['certificate_issue_date'] = ! empty($validated['certificate_issue_date'])
+            ? $validated['certificate_issue_date']
+            : null;
+        $validated['certificate_duration_minutes'] = isset($validated['certificate_duration_minutes'])
+            && $validated['certificate_duration_minutes'] !== ''
+            && $validated['certificate_duration_minutes'] !== null
+            ? max(0, (int) $validated['certificate_duration_minutes'])
+            : null;
 
-        foreach (['description', 'offer_description_html', 'internal_notes'] as $nullable) {
+        foreach (['description', 'training_scope', 'offer_description_html', 'internal_notes'] as $nullable) {
             if (! array_key_exists($nullable, $validated)) {
                 $validated[$nullable] = null;
             }

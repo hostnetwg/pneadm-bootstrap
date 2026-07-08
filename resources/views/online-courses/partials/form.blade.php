@@ -44,6 +44,15 @@
     </div>
 
     <div class="mb-3">
+        <label class="form-label" for="training_scope">Zakres szkolenia / Zagadnienia</label>
+        <textarea id="training_scope" name="training_scope" class="form-control" rows="6">{{ old('training_scope', $c?->training_scope) }}</textarea>
+        <div class="form-text">
+            Treść na zaświadczeniu PDF, gdy w szablonie włączona jest opcja „Pokaż zakres szkolenia”.
+            Jak w szkoleniach stacjonarnych — możesz wpisać listę numerowaną (każdy punkt od nowej linii, np. <code>1. Zagadnienie</code>).
+        </div>
+    </div>
+
+    <div class="mb-3">
         <label class="form-label" for="offer_description_html">Opis oferty (HTML, opcjonalnie — na później na froncie)</label>
         <textarea id="offer_description_html" name="offer_description_html" class="form-control" rows="4">{{ old('offer_description_html', $c?->offer_description_html) }}</textarea>
     </div>
@@ -79,6 +88,10 @@
         <label class="form-label" for="internal_notes">Notatki wewnętrzne</label>
         <textarea id="internal_notes" name="internal_notes" class="form-control" rows="2">{{ old('internal_notes', $c?->internal_notes) }}</textarea>
     </div>
+
+    @if(isset($certificateTemplates))
+        @include('online-courses.partials.certificate-fields', ['c' => $c, 'certificateTemplates' => $certificateTemplates])
+    @endif
 
     <button type="submit" class="btn btn-primary">{{ $c ? 'Zapisz zmiany' : 'Utwórz kurs' }}</button>
     @if($c)

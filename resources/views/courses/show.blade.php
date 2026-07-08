@@ -80,7 +80,7 @@
                         </div>
                         <div class="card-body">
                             @if($course->description)
-                                <h5>Opis szkolenia</h5>
+                                <h5>Zakres szkolenia / Zagadnienia</h5>
                                 <p class="text-muted">{{ $course->description }}</p>
                             @endif
 

@@ -15,8 +15,16 @@ class CertificateNumberGenerator
      */
     public function resolveCourseYear($course): string
     {
-        $startDate = is_object($course) ? $course->start_date : ($course['start_date'] ?? null);
-        
+        $issueDate = is_object($course)
+            ? ($course->certificate_issue_date ?? $course->issue_date_certyficates ?? null)
+            : ($course['certificate_issue_date'] ?? $course['issue_date_certyficates'] ?? null);
+
+        if ($issueDate) {
+            return Carbon::parse($issueDate)->format('Y');
+        }
+
+        $startDate = is_object($course) ? ($course->start_date ?? null) : ($course['start_date'] ?? null);
+
         return $startDate
             ? Carbon::parse($startDate)->format('Y')
             : date('Y');
@@ -84,10 +92,11 @@ class CertificateNumberGenerator
             : ($course['certificate_format'] ?? '{nr}/{course_id}/{year}');
         
         $courseId = is_object($course) ? $course->id : ($course['id'] ?? '');
+        $onlineCourseId = is_object($course) ? $course->id : ($course['id'] ?? '');
 
         return str_replace(
-            ['{nr}', '{year}', '{course_id}'],
-            [$sequence, $courseYear, $courseId],
+            ['{nr}', '{year}', '{course_id}', '{online_course_id}'],
+            [$sequence, $courseYear, $courseId, $onlineCourseId],
             $format
         );
     }
@@ -124,7 +133,7 @@ class CertificateNumberGenerator
             ? ($course->certificate_format ?? '{nr}/{course_id}/{year}')
             : ($course['certificate_format'] ?? '{nr}/{course_id}/{year}');
 
-        $tokens = preg_split('/(\{(?:nr|year|course_id)\})/', $format, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        $tokens = preg_split('/(\{(?:nr|year|course_id|online_course_id)\})/', $format, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
 
         if (!$tokens) {
             return null;
@@ -143,6 +152,12 @@ class CertificateNumberGenerator
                 case '{course_id}':
                     $courseId = is_object($course) ? $course->id : ($course['id'] ?? '');
                     $pattern .= preg_quote((string) $courseId, '/');
+                    break;
+                case '{online_course_id}':
+                    $onlineCourseId = is_object($course)
+                        ? ($course->id ?? '')
+                        : ($course['id'] ?? '');
+                    $pattern .= preg_quote((string) $onlineCourseId, '/');
                     break;
                 default:
                     $pattern .= preg_quote($token, '/');

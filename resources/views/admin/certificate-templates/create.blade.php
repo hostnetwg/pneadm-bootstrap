@@ -8,6 +8,47 @@
     </x-slot>
 
     <div class="container-fluid">
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @if(session('warning'))
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>{{ session('warning') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>{{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @if(session('info'))
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle me-2"></i>{{ session('info') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Nie udało się zapisać szablonu.</strong>
+                <ul class="mb-0 mt-2">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
         @if(isset($templateToClone))
             <div class="alert alert-info mb-4">
                 <i class="bi bi-info-circle me-2"></i>
@@ -611,8 +652,16 @@
                 });
                 
                 for (const [fieldName, fieldConfig] of Object.entries(blockData.fields)) {
-                    // Użyj wartości z blockConfigData jeśli istnieje, w przeciwnym razie użyj default
-                    const fieldValue = blockConfigData[fieldName] !== undefined ? blockConfigData[fieldName] : (fieldConfig.default ?? '');
+                    let fieldValue;
+                    if (fieldName === 'event_text') {
+                        if (blockConfigData[fieldName] === undefined || blockConfigData[fieldName] === null) {
+                            fieldValue = fieldConfig.default ?? '';
+                        } else {
+                            fieldValue = blockConfigData[fieldName];
+                        }
+                    } else {
+                        fieldValue = blockConfigData[fieldName] !== undefined ? blockConfigData[fieldName] : (fieldConfig.default ?? '');
+                    }
                     
                     console.log(`  Pole ${fieldName}: wartość z konfiguracji = ${blockConfigData[fieldName]}, wartość użyta = ${fieldValue}`);
                     
@@ -644,6 +693,20 @@
             updateBlockOrder();
         }
 
+        function appendEventTextVariablesHelp(config) {
+            if (!config.variables_help) {
+                return '';
+            }
+
+            let html = '<small class="text-muted d-block mt-1">Dostępne zmienne:<ul class="mb-0 ps-3">';
+            for (const [variable, description] of Object.entries(config.variables_help)) {
+                html += `<li><code>${variable}</code> — ${description}</li>`;
+            }
+            html += '</ul><span class="d-block mt-1">Przykład: <code>zorganizowanym w dniu {data_zakonczenia} r. {czas_trwania}przez</code>. Tekst bez zmiennych trafia na certyfikat dokładnie taki, jaki wpiszesz. Puste pole — brak akapitu.</span></small>';
+
+            return html;
+        }
+
         function renderField(blockId, fieldName, config, value = null) {
             const fullName = `blocks[${blockId}][config][${fieldName}]`;
             const id = `${blockId}_${fieldName}`;
@@ -672,6 +735,9 @@
                     break;
                 case 'textarea':
                     html += `<textarea class="form-control" id="${id}" name="${fullName}" rows="3">${fieldValue}</textarea>`;
+                    if (fieldName === 'event_text') {
+                        html += appendEventTextVariablesHelp(config);
+                    }
                     break;
                 case 'checkbox':
                     const checked = fieldValue ? 'checked' : '';

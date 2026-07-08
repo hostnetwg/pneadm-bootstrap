@@ -245,21 +245,23 @@ class CertificateTemplateController extends Controller
         // Zaktualizuj slug w bazie
         $template->update(['slug' => $finalSlug]);
 
-        // Generowanie pliku blade z finalnym slugiem
+        // Generowanie pliku blade z finalnym slugiem (legacy — PDF renderuje się z JSON w bazie)
         try {
             $this->templateBuilder->generateBladeFile($config, $finalSlug);
-            
+
             return redirect()
                 ->route('admin.certificate-templates.index')
                 ->with('success', "Szablon \"{$template->name}\" został utworzony.");
         } catch (\Exception $e) {
-            // Usunięcie szablonu z bazy jeśli generowanie nie powiodło się
-            $template->delete();
-            
+            \Log::warning('Certificate template stored without blade file', [
+                'template_id' => $template->id,
+                'slug' => $finalSlug,
+                'error' => $e->getMessage(),
+            ]);
+
             return redirect()
-                ->back()
-                ->withInput()
-                ->with('error', 'Błąd podczas generowania pliku szablonu: ' . $e->getMessage());
+                ->route('admin.certificate-templates.index')
+                ->with('warning', "Szablon \"{$template->name}\" został zapisany, ale nie udało się wygenerować pliku Blade: {$e->getMessage()}");
         }
     }
 

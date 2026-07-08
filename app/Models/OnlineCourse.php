@@ -19,6 +19,7 @@ class OnlineCourse extends Model
         'slug',
         'title',
         'description',
+        'training_scope',
         'offer_description_html',
         'instructor_id',
         'image',
@@ -26,11 +27,23 @@ class OnlineCourse extends Model
         'visible_in_dashboard',
         'internal_notes',
         'legacy_publigo_product_id',
+        'certificate_download_status',
+        'certificate_template_id',
+        'certificate_format',
+        'certificate_issue_date',
+        'certificate_duration_minutes',
+        'certificate_collect_birth_data',
+        'certificate_birth_data_required',
+        'certificate_completion_threshold_percent',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'visible_in_dashboard' => 'boolean',
+        'certificate_issue_date' => 'date',
+        'certificate_duration_minutes' => 'integer',
+        'certificate_collect_birth_data' => 'boolean',
+        'certificate_birth_data_required' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -81,6 +94,21 @@ class OnlineCourse extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(OnlineCourseEnrollment::class);
+    }
+
+    public function certificateTemplate(): BelongsTo
+    {
+        return $this->belongsTo(CertificateTemplate::class, 'certificate_template_id');
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(Certificate::class, 'online_course_id');
+    }
+
+    public function certificatesEnabledForDownload(): bool
+    {
+        return ($this->certificate_download_status ?? '') === 'download_enabled';
     }
 
     /** Moduły z lekcjami (widok nauki po stronie pnedu). */
