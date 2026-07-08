@@ -23,12 +23,16 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 - `2026_05_11_120000_create_online_courses_structure.php` — rdzeń
 - `2026_05_11_200000_create_online_course_lesson_completions_table.php` — ukończenia lekcji
 - `2026_05_12_000001_create_online_course_lesson_notes_table.php` — notatki per zapis
+- `2026_07_07_120000_add_certificate_fields_to_online_courses_table.php` — pola zaświadczeń na kursie
+- `2026_07_07_120001_extend_certificates_for_online_courses.php` — certyfikaty powiązane z enrollment
+- `2026_07_08_120000_add_training_scope_to_online_courses_table.php` — zakres na PDF
+- `2026_07_08_130000_add_certificate_duration_minutes_to_online_courses_table.php` — czas trwania (min) na PDF
 
 ### Tabele i znaczenie
 
 | Tabela | Opis |
 |--------|------|
-| `online_courses` | Kurs: slug (unikalny), tytuł, opisy HTML, `instructor_id`, obrazek, `is_active`, `visible_in_dashboard` (czy pokazać w dashboardzie pnedu), notatki wewnętrzne, soft delete |
+| `online_courses` | Kurs: slug (unikalny), tytuł, opisy HTML, `instructor_id`, obrazek, `is_active`, `visible_in_dashboard` (czy pokazać w dashboardzie pnedu), notatki wewnętrzne, pola zaświadczeń (`certificate_*`, `training_scope`), soft delete |
 | `online_course_modules` | Moduł w kursie: tytuł, `sort_order` |
 | `online_course_lessons` | Lekcja: tytuł, `body_html`, `is_published`, `sort_order` |
 | `online_course_lesson_embeds` | Wideo: `video_url`, `platform` enum: `youtube` \| `vimeo` \| `other`, opcjonalny tytuł, kolejność |
@@ -58,7 +62,8 @@ erDiagram
 - **Moduły:** `OnlineCourseModuleController` — dodawanie / edycja / usuwanie; kolejność modułów (drag & drop na stronie edycji kursu): POST `online-courses/{course}/modules/reorder` (`OnlineCoursesController::reorderModules`), body JSON `{ "order": [id_modułu, …] }`.
 - **Lekcje:** `OnlineCourseLessonController` — tworzenie z domyślnym `sort_order` = max+1 w module; walidacja tytułu i `body_html`; **embedy i linki** synchronizowane z pól formularza `embeds[]` oraz `resource_links[]` (puste URL są pomijane). Kolejność i przenoszenie między modułami: POST `online-courses/{course}/lessons/reorder`, body JSON `{ "modules": [ { "id": id_modułu, "lesson_ids": [id_lekcji, …] }, … ] }` — kolejność tablicy modułów = kolejność kart na stronie; każda lekcja musi wystąpić dokładnie raz.
 - **UI struktury:** `resources/views/online-courses/edit.blade.php` + SortableJS (`partials/structure-sortable.blade.php`) — przeciąganie modułów i lekcji, zapis przez AJAX.
-- **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu.
+- **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu; akcje certyfikatów (generuj / usuń / PDF).
+- **Zaświadczenia:** sekcja w formularzu edycji kursu (`certificate-fields`); pobieranie na pnedu przez API adm — patrz [CERTIFICATES.md](./CERTIFICATES.md).
 
 Widoki Blade: `resources/views/online-courses/`.
 
@@ -84,6 +89,10 @@ Wszystkie modele `App\Models\OnlineCourse*` w pnedu mają `protected $connection
 | GET | `/dashboard/kursy-online/{enrollment}/lekcje/{lesson}` | `lesson` — widok nauki |
 | POST | `…/lekcje/{lesson}/ukonczenie` | `toggleLessonCompletion` (throttle 120/min), obsługa JSON |
 | POST | `…/lekcje/{lesson}/notatka` | `saveLessonNote` (throttle 60/min), obsługa JSON |
+| GET | `/dashboard/kursy-online/{enrollment}/zaswiadczenie` | `OnlineCourseCertificateController@show` |
+| GET | `…/zaswiadczenie/pobierz` | pobranie PDF (API adm) |
+
+Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/docs/CERTIFICATES.md`.
 
 ### Reguły dostępu (`DashboardOnlineCoursesController`)
 
@@ -129,4 +138,4 @@ Wszystkie modele `App\Models\OnlineCourse*` w pnedu mają `protected $connection
 
 ---
 
-*Ostatnia synchronizacja opisu z kodem: maj 2026.*
+*Ostatnia synchronizacja opisu z kodem: lipiec 2026.*

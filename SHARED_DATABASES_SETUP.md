@@ -111,7 +111,7 @@ DB::connection('certgen')->select('SELECT DATABASE()');
 1. Utwórz/edytuj szablon w `http://localhost:8083/admin/certificate-templates`
 2. Sprawdź w `http://localhost:8081` czy zmiany są widoczne (bez restartu!)
 
-**Linki do pobierania zaświadczeń (token per e-mail):** Opis tabeli `participant_download_tokens`, flagi `certificates_download_enabled` i przepływu – patrz [docs/CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md).
+**Zaświadczenia:** kanon [docs/CERTIFICATES.md](docs/CERTIFICATES.md). Linki bez logowania (token): [docs/CERTIFICATE_DOWNLOAD_LINKS.md](docs/CERTIFICATE_DOWNLOAD_LINKS.md).
 
 ### Test 3: phpMyAdmin widzi wszystkie bazy
 1. Otwórz `http://localhost:8084` (pneadm-bootstrap)

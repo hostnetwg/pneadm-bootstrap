@@ -12,6 +12,8 @@ Zakres:
 
 ## 1. Przed wdrożeniem (lokalnie)
 
+> Dokumentacja systemu po wdrożeniu: [docs/CERTIFICATES.md](../CERTIFICATES.md).
+
 ### 1.1 Commit i push — **oba** repozytoria
 
 ```bash

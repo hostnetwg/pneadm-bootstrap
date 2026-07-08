@@ -1,5 +1,8 @@
 # Linki do pobierania zaświadczeń (token per e-mail)
 
+> **Uwaga:** Ten dokument dotyczy **szkoleń klasycznych** (`courses`). Kursy online — tylko przez zalogowany dashboard.  
+> Pełny przegląd systemu: [CERTIFICATES.md](./CERTIFICATES.md).
+
 ## Cel
 
 Uczestnicy z przypisanym adresem e-mail mogą pobrać swoje zaświadczenia ze strony **pnedu.pl** przez unikalny link **bez logowania**. Jeden link pokazuje listę wszystkich szkoleń danego uczestnika; przy każdym szkoleniu widać status (Pobierz / W przygotowaniu) i – po aktywacji przez admina – możliwość pobrania PDF.
@@ -15,10 +18,11 @@ Uczestnicy z przypisanym adresem e-mail mogą pobrać swoje zaświadczenia ze st
   - `created_at`, `updated_at`
 - **Indeksy:** UNIQUE na `email_normalized`, UNIQUE na `token`.
 
-## Flaga `certificates_download_enabled` (tabela `courses`)
+## Status zaświadczeń na kursie (`certificate_download_status`)
 
-- **Kolumna:** `certificates_download_enabled` (boolean, domyślnie false).
-- **Znaczenie:** Włączenie przez admina w edycji kursu umożliwia uczestnikom pobieranie zaświadczeń dla tego kursu przez link z tokenem. Dopóki flaga jest wyłączona, przy szkoleniu wyświetla się status „W przygotowaniu”.
+- **Kolumna:** `certificate_download_status` (string: `download_enabled` | `in_preparation` | `no_certificate`).
+- **Znaczenie:** Włączenie przez admina w edycji kursu umożliwia uczestnikom pobieranie zaświadczeń dla tego kursu przez link z tokenem lub dashboard. Dopóki status to `in_preparation` lub `no_certificate`, przy szkoleniu wyświetla się odpowiedni komunikat.
+- **Migracja:** `2026_03_15_000001_replace_certificates_download_enabled_with_status.php` (zastąpiła starą kolumnę `certificates_download_enabled`).
 
 ## Generowanie tokenów
 
@@ -36,14 +40,14 @@ Uczestnicy z przypisanym adresem e-mail mogą pobrać swoje zaświadczenia ze st
 
 ## Admin
 
-- **Gdzie włączyć pobieranie:** Panel pneadm-bootstrap → Szkolenia → Edycja kursu → checkbox „Udostępnij pobieranie zaświadczeń (link na pnedu.pl)”.
+- **Gdzie włączyć pobieranie:** Panel pneadm → Szkolenia → Edycja kursu → **Status zaświadczeń** → „Udostępnij pobieranie zaświadczeń (link na pnedu.pl)”.
 
 ## Pliki / miejsca w kodzie
 
 | Zadanie | Projekt | Plik / miejsce |
 |--------|---------|------------------|
 | Migracja tabeli tokenów | pneadm-bootstrap | `database/migrations/2026_03_14_000001_create_participant_download_tokens_table.php` |
-| Migracja flagi na kursie | pneadm-bootstrap | `database/migrations/2026_03_14_000002_add_certificates_download_enabled_to_courses_table.php` |
+| Migracja flagi/statusu | pneadm | `database/migrations/2026_03_15_000001_replace_certificates_download_enabled_with_status.php` |
 | Model tokenu | pneadm-bootstrap | `app/Models/ParticipantDownloadToken.php` |
 | Model tokenu (odczyt) | pnedu | `app/Models/ParticipantDownloadToken.php` (connection pneadm) |
 | Observer | pneadm-bootstrap | `app/Observers/ParticipantObserver.php` (created) |
@@ -51,7 +55,9 @@ Uczestnicy z przypisanym adresem e-mail mogą pobrać swoje zaświadczenia ze st
 | Lista szkoleń po tokenie | pnedu | `CertificateController::showListByToken`, route `certificates.list-by-token` |
 | Pobieranie PDF po tokenie | pnedu | `CertificateController::downloadByToken`, route `certificates.download-by-token` |
 | Widok listy | pnedu | `resources/views/certificates/list-by-token.blade.php` |
-| Checkbox w edycji kursu | pneadm-bootstrap | `resources/views/courses/edit.blade.php`, `CoursesController::update` |
+| Checkbox w edycji kursu | pneadm | `resources/views/courses/edit.blade.php`, `CoursesController::update` |
+
+Zobacz też: [CERTIFICATES.md](./CERTIFICATES.md).
 
 ## Uruchomienie backfillu (jednorazowo)
 
