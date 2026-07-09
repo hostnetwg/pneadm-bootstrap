@@ -53,6 +53,7 @@ return new class extends Migration
             $table->string('traffic_medium', 50)->nullable();
             $table->string('traffic_campaign', 255)->nullable();
             $table->string('conversion_reporting_channel', 50);
+            $table->unsignedSmallInteger('tracking_schema_version')->default(2);
             $this->funnelMetricColumns($table);
             $table->boolean('internal_promo_touched')->default(false);
             $table->string('internal_promo_placement', 100)->nullable();
