@@ -84,7 +84,7 @@ class AnalyticsOrderFormFunnelHealthcheckCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->info('WERDYKT: OK — brak alertów CRITICAL/WARNING (low_volume i warmup pomijają twarde progi).');
+        $this->info('WERDYKT: OK — brak alertów CRITICAL/WARNING (low_volume, warmup i dane sprzed atrybucji 2F pomijają twarde progi).');
 
         return self::SUCCESS;
     }

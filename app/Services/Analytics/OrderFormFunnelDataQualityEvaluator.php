@@ -40,6 +40,16 @@ class OrderFormFunnelDataQualityEvaluator
 
         $flags = [];
 
+        if ($this->isPreAttributionHistorical($statDate, $timezone)) {
+            $flags[] = 'pre_attribution_historical';
+
+            return [
+                'status' => 'pre_attribution_historical',
+                'flags' => $flags,
+                'score' => 0,
+            ];
+        }
+
         if ($this->isWarmupOrDeployWindow($statDate, $timezone, $dataQuality)) {
             $flags[] = 'warmup_or_deploy_window';
         }
@@ -101,6 +111,19 @@ class OrderFormFunnelDataQualityEvaluator
             'flags' => array_values(array_unique($flags)),
             'score' => $this->calculateScore($frontendRate, $trafficRate, $attrRate, $schemaV2Rate, $serverOnlyRate, $ordersWithoutAttrRate),
         ];
+    }
+
+    private function isPreAttributionHistorical(string $statDate, string $timezone): bool
+    {
+        $deployedAt = config('analytics.order_form_funnel.attribution_deployed_at');
+        if (! filled($deployedAt)) {
+            return false;
+        }
+
+        $deploy = Carbon::parse((string) $deployedAt, $timezone)->startOfDay();
+        $stat = Carbon::parse($statDate, $timezone)->startOfDay();
+
+        return $stat->lessThan($deploy);
     }
 
     /**
@@ -235,6 +258,16 @@ class OrderFormFunnelDataQualityEvaluator
 
         if ($status === 'warmup_or_deploy_window') {
             $info[] = 'Okno warmup/deploy — pominięto twarde alerty (dane mogą być niepełne).';
+
+            return $this->alertResult('info', $critical, $warning, $info, true, $evaluation);
+        }
+
+        if ($status === 'pre_attribution_historical') {
+            $deployedAt = (string) config('analytics.order_form_funnel.attribution_deployed_at', '2026-07-09');
+            $info[] = sprintf(
+                'Dane sprzed wdrożenia atrybucji 2F (%s) — brak kanałów i niski score to oczekiwane; nie traktuj jako awarię.',
+                $deployedAt
+            );
 
             return $this->alertResult('info', $critical, $warning, $info, true, $evaluation);
         }

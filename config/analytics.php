@@ -77,6 +77,9 @@ return [
         'warmup_hours' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_WARMUP_HOURS', 24),
         // Data pierwszego wdrożenia trackingu v2 — okno warmup_or_deploy_window (Europe/Warsaw).
         'tracking_deployed_at' => env('ANALYTICS_ORDER_FORM_V2_DEPLOYED_AT', '2026-07-01'),
+        // Pełna atrybucja 2F (order_form_attributions + TrafficChannelClassifier) — dni wcześniejsze
+        // mają oczekiwanie brak kanałów; nie traktuj CRITICAL jako awarię deployu.
+        'attribution_deployed_at' => env('ANALYTICS_ORDER_FORM_ATTRIBUTION_DEPLOYED_AT', '2026-07-09'),
         'healthcheck_v2_window_minutes' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_HC_V2_WINDOW_MINUTES', 60),
     ],
 

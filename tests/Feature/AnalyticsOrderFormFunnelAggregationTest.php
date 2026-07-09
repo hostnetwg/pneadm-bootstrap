@@ -26,6 +26,7 @@ class AnalyticsOrderFormFunnelAggregationTest extends TestCase
 
         config()->set('analytics.order_form_funnel.timezone', 'Europe/Warsaw');
         config()->set('analytics.order_form_funnel.aggregation_lag_days', 2);
+        config()->set('analytics.order_form_funnel.attribution_deployed_at', '2020-01-01');
 
         config()->set('database.connections.analytics', [
             'driver' => 'sqlite',

@@ -17,6 +17,7 @@ class AnalyticsOrderFormFunnelHealthcheckCommandTest extends TestCase
         config()->set('analytics.order_form_funnel.aggregation_lag_days', 2);
         config()->set('analytics.order_form_funnel.data_quality_min_sessions', 30);
         config()->set('analytics.order_form_funnel.tracking_deployed_at', '2020-01-01');
+        config()->set('analytics.order_form_funnel.attribution_deployed_at', '2020-01-01');
 
         config()->set('database.connections.analytics', [
             'driver' => 'sqlite',
@@ -90,6 +91,33 @@ class AnalyticsOrderFormFunnelHealthcheckCommandTest extends TestCase
         $this->artisan('analytics:order-form-funnel-healthcheck', ['--from' => '2026-06-15', '--to' => '2026-06-25'])
             ->expectsOutputToContain('CRITICAL')
             ->assertExitCode(1);
+    }
+
+    public function test_healthcheck_skips_hard_alerts_for_pre_attribution_historical_days(): void
+    {
+        config()->set('analytics.order_form_funnel.attribution_deployed_at', '2026-07-09');
+
+        $this->seedDataQualityRow([
+            'stat_date' => '2026-06-25',
+            'sessions_total' => 100,
+            'sessions_with_frontend_events' => 10,
+            'sessions_backend_only' => 90,
+            'sessions_without_attribution' => 100,
+            'orders_total' => 24,
+            'orders_without_attribution' => 24,
+            'frontend_tracking_coverage_rate' => 0.1,
+            'attribution_coverage_rate' => 0.0,
+            'traffic_channel_coverage_rate' => 0.0,
+            'schema_v2_event_rate' => 0.0,
+            'tracking_data_quality_status' => 'backend_only',
+            'tracking_data_quality_score' => 0,
+        ]);
+
+        $this->artisan('analytics:order-form-funnel-healthcheck', ['--from' => '2026-06-25', '--to' => '2026-06-25'])
+            ->expectsOutputToContain('pre_attribution_historical')
+            ->expectsOutputToContain('Dane sprzed wdrożenia atrybucji 2F')
+            ->expectsOutputToContain('WERDYKT: OK')
+            ->assertExitCode(0);
     }
 
     public function test_healthcheck_fails_when_required_tables_missing(): void

@@ -51,6 +51,7 @@ class OrderFormFunnelDashboardService
         $qualityRows = $this->qualityQuery($filters)->orderBy('stat_date')->get();
 
         $summary = $this->buildChannelSummary($channelRows);
+        $attributionDeployedAt = (string) config('analytics.order_form_funnel.attribution_deployed_at', '');
 
         return [
             'filters' => $filters,
@@ -63,6 +64,9 @@ class OrderFormFunnelDashboardService
             'meta' => [
                 'lag_days' => $this->aggregationLagDays(),
                 'timezone' => $this->timezone(),
+                'attribution_deployed_at' => $attributionDeployedAt !== '' ? $attributionDeployedAt : null,
+                'includes_pre_attribution_days' => $attributionDeployedAt !== ''
+                    && ($filters['date_from'] ?? '') < $attributionDeployedAt,
                 'source_tables' => [
                     'analytics_daily_channel_funnels',
                     'analytics_daily_course_channel_funnels',

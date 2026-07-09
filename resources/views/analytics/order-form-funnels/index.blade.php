@@ -46,6 +46,17 @@
             <code>internal_promo_placement</code> jest wymiarem diagnostycznym (filtr), nie głównym wykresem.
         </div>
 
+        @if(!empty($meta['includes_pre_attribution_days']) && !empty($meta['attribution_deployed_at']))
+            <div class="alert alert-warning small mb-0">
+                <strong>Dane historyczne sprzed {{ $meta['attribution_deployed_at'] }}.</strong>
+                W tym okresie nie było jeszcze pełnej atrybucji kanałów (Etap 2F) ani tabeli
+                <code>order_form_attributions</code> — kanały mogą pokazywać się jako
+                <code>unknown</code>, a w tabeli jakości status <code>pre_attribution_historical</code>
+                lub niski score. To <strong>oczekiwane</strong>, nie oznacza awarii trackingu po wdrożeniu.
+                Od {{ $meta['attribution_deployed_at'] }} oczekuj pełniejszych danych po zebraniu ruchu.
+            </div>
+        @endif
+
         <form method="GET" class="row g-2 mb-4">
             <div class="col-md-2"><input type="date" name="date_from" value="{{ $filters['date_from'] }}" class="form-control form-control-sm"></div>
             <div class="col-md-2"><input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="form-control form-control-sm"></div>
@@ -167,7 +178,19 @@
                             <td>{{ $formatRate($row->attribution_coverage_rate) }}</td>
                             <td>{{ $formatRate($row->traffic_channel_coverage_rate) }}</td>
                             <td>{{ $row->tracking_data_quality_score ?? '—' }}</td>
-                            <td><code>{{ $row->tracking_data_quality_status }}</code></td>
+                            <td>
+                                @php
+                                    $statDate = $row->stat_date?->format('Y-m-d');
+                                    $isPreAttribution = !empty($meta['attribution_deployed_at'])
+                                        && $statDate
+                                        && $statDate < $meta['attribution_deployed_at'];
+                                @endphp
+                                @if($isPreAttribution || $row->tracking_data_quality_status === 'pre_attribution_historical')
+                                    <code title="Sprzed wdrożenia atrybucji 2F — oczekiwane">pre_attribution_historical</code>
+                                @else
+                                    <code>{{ $row->tracking_data_quality_status }}</code>
+                                @endif
+                            </td>
                             <td class="small text-muted">{{ is_array($row->tracking_data_quality_flags) ? implode(', ', $row->tracking_data_quality_flags) : '—' }}</td>
                         </tr>
                     @empty
