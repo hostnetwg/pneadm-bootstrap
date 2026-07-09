@@ -158,8 +158,36 @@ Zweryfikowane na prod (09.07 ~17:06): pierwszy schema v2 **`form_section_viewed`
 |---------|-------------|
 | `Unknown column tracking_schema_version` przy agregacji | `c18bb0a` + migracja `170000` |
 | Healthcheck CRITICAL na dniach sprzed 09.07 | `7acdb69` — `pre_attribution_historical` |
-| Healthcheck CRITICAL w dniu deployu 09.07 | `attribution_deployed_at` → `warmup_or_deploy_window` (flaga `attribution_deploy_window`) |
+| Healthcheck CRITICAL w dniu deployu 09.07 | `ff137b1` — `attribution_deployed_at` → `warmup_or_deploy_window` |
 | Wykres / ostatnie FORM nie odświeżały się po usunięciu zamówienia | `33ab603` — polling sekcji przy każdej zmianie statystyk |
+| Kreseczki w kolumnie Wejście | `cb4d732` — fallback UTM / direct |
+
+### Deploy hotfix `ff137b1` (warmup dnia atrybucji 2F)
+
+**Brak migracji** — wystarczy `git pull` + cache.
+
+```bash
+cd ~/domains/adm.pnedu.pl/pneadm
+git pull
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+# opcjonalnie (bezpieczne): php artisan migrate --force
+
+# opcjonalnie — status w analytics_daily_data_quality zgodny z healthcheckiem:
+php artisan analytics:aggregate-order-forms --date=2026-07-09 --rebuild
+
+php artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-09
+```
+
+**Oczekiwany healthcheck dla 2026-07-09:**
+- Status: `warmup_or_deploy_window`
+- Flaga: `attribution_deploy_window` (w evaluatorze; w tabeli UI po rebuild agregatu)
+- Skipped: `tak`
+- WERDYKT: **OK** (brak CRITICAL z powodu niskiego attribution / v2 / orders_without_attribution)
+
+---
 | Kreseczki w kolumnie Wejście | `cb4d732` — fallback UTM / direct |
 
 ---
