@@ -52,7 +52,9 @@ run_mysql_analytics() {
   pass="$(read_env DB_ANALYTICS_PASSWORD "$PNEADM_DIR/.env")"
   host="${host:-localhost}"
   port="${port:-3306}"
-  MYSQL_PWD="$pass" mysql -h"$host" -P"$port" -u"$user" "$db" -e "$sql"
+  if ! MYSQL_PWD="$pass" mysql -h"$host" -P"$port" -u"$user" "$db" -e "$sql"; then
+    echo ">>> UWAGA: zapytanie SQL nie powiodło się (skrypt kontynuuje)" >&2
+  fi
 }
 
 section "META — $NOW | pneadm=$PNEADM_DIR | pnedu=$PNEDU_DIR"
@@ -92,12 +94,14 @@ WHERE JSON_EXTRACT(metadata, '\$.tracking_schema_version') = 2
    OR event_name IN ('form_visible', 'form_first_interaction', 'gus_lookup_clicked');
 "
 
-section "2) Migracje B4+ (pne_analytics.migrations)"
+section "2) Migracje B4+ (wpisy w pneadm.migrations, NIE w pne_analytics)"
+echo "--- artisan migrate:status (filtr 2026_07_09)"
+(cd "$PNEADM_DIR" && "$PHP_BIN" artisan migrate:status 2>/dev/null | grep '2026_07_09' || true)
+echo "--- tabele B4+ w pne_analytics (SHOW TABLES)"
 run_mysql_analytics "
-SELECT migration, batch
-FROM migrations
-WHERE migration LIKE '%2026_07_09%'
-ORDER BY migration;
+SHOW TABLES LIKE 'order_form_attributions';
+SHOW TABLES LIKE 'analytics_daily_%_funnels';
+SHOW TABLES LIKE 'analytics_daily_data_quality';
 "
 
 section "3) Cron / scheduler — wpis w kodzie (routes/console.php)"
@@ -165,10 +169,10 @@ GROUP BY tracking_schema_version;
 
 section "10) Healthcheck B4+ (ostatnie 3 dni z lag=2 → nie obejmuje dziś)"
 cd "$PNEADM_DIR"
-"$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --days=3
+"$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --days=3 || true
 
 section "10b) Healthcheck — dni historyczne przed atrybucją 2F"
-"$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --from=2026-06-25 --to=2026-07-08
+"$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --from=2026-06-25 --to=2026-07-08 || true
 
 section "10c) Healthcheck — dzień wdrożeniowy 2F (jeśli są agregaty)"
 "$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-09 || true
