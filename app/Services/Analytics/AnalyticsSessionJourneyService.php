@@ -168,6 +168,44 @@ class AnalyticsSessionJourneyService
     }
 
     /**
+     * Etykieta kolumny „Wejście” na dashboardzie (referrer → kampania → UTM → direct).
+     *
+     * @param  array{
+     *     referrer_domain?: string|null,
+     *     campaign_code?: string|null,
+     *     utm_source?: string|null,
+     *     utm_medium?: string|null
+     * }  $entry
+     */
+    public function formatEntryDisplayLabel(array $entry): string
+    {
+        $parts = [];
+
+        if (filled($entry['referrer_domain'] ?? null)) {
+            $parts[] = (string) $entry['referrer_domain'];
+        }
+
+        if (filled($entry['campaign_code'] ?? null)) {
+            $parts[] = 'kamp. '.(string) $entry['campaign_code'];
+        }
+
+        if ($parts !== []) {
+            return implode(' · ', $parts);
+        }
+
+        if (filled($entry['utm_source'] ?? null)) {
+            $label = (string) $entry['utm_source'];
+            if (filled($entry['utm_medium'] ?? null)) {
+                $label .= ' / '.(string) $entry['utm_medium'];
+            }
+
+            return $label;
+        }
+
+        return 'direct (bezpośrednio)';
+    }
+
+    /**
      * @param  list<array{label: string, event_count?: int}>  $steps
      */
     public function compactJourneyLabel(array $steps): string

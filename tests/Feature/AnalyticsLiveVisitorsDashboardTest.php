@@ -108,7 +108,58 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertJsonPath('active_count', 1)
             ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny')
             ->assertJsonPath('visitors.0.entry_referrer_domain', 'google.com')
+            ->assertJsonPath('visitors.0.entry_label', 'google.com')
             ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny');
+    }
+
+    public function test_entry_label_falls_back_to_utm_when_no_referrer_or_campaign(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'course_description_viewed',
+            'analytics_session_id' => $sessionId,
+            'utm_source' => 'google',
+            'utm_medium' => 'cpc',
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.entry_label', 'google / cpc');
+    }
+
+    public function test_entry_label_shows_direct_when_entry_signals_missing(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'analytics_session_id' => (string) Str::uuid(),
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.entry_label', 'direct (bezpośrednio)');
+    }
+
+    public function test_entry_label_includes_campaign_after_referrer(): void
+    {
+        $journey = app(\App\Services\Analytics\AnalyticsSessionJourneyService::class);
+
+        $this->assertSame(
+            'facebook.com · kamp. WIOSNA2026',
+            $journey->formatEntryDisplayLabel([
+                'referrer_domain' => 'facebook.com',
+                'campaign_code' => 'WIOSNA2026',
+                'utm_source' => null,
+                'utm_medium' => null,
+            ])
+        );
     }
 
     public function test_session_event_count_is_total_events_in_session_window(): void
@@ -260,6 +311,8 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             'route_name' => 'courses.show',
             'path' => '/courses/1',
             'referrer_domain' => null,
+            'utm_source' => null,
+            'utm_medium' => null,
             'device_type' => 'desktop',
             'browser_family' => 'chrome',
             'metadata' => [],
@@ -287,6 +340,8 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             $table->string('route_name', 150)->nullable()->index();
             $table->string('path', 500)->nullable();
             $table->string('referrer_domain', 255)->nullable();
+            $table->string('utm_source', 100)->nullable();
+            $table->string('utm_medium', 50)->nullable();
             $table->string('device_type', 32)->nullable();
             $table->string('browser_family', 64)->nullable();
             $table->json('metadata')->nullable();

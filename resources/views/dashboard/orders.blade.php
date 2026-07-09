@@ -1149,16 +1149,27 @@
             }
 
             function entryCell(visitor) {
-                var parts = [];
+                var label = visitor.entry_label || '';
 
-                if (visitor.entry_referrer_domain) {
-                    parts.push(escapeHtml(visitor.entry_referrer_domain));
-                }
-                if (visitor.entry_campaign_code) {
-                    parts.push('kamp. ' + escapeHtml(visitor.entry_campaign_code));
+                if (!label) {
+                    var parts = [];
+                    if (visitor.entry_referrer_domain) {
+                        parts.push(visitor.entry_referrer_domain);
+                    }
+                    if (visitor.entry_campaign_code) {
+                        parts.push('kamp. ' + visitor.entry_campaign_code);
+                    }
+                    label = parts.length ? parts.join(' · ') : '—';
                 }
 
-                return parts.length ? parts.join(' · ') : '—';
+                var title = '';
+                if (label === 'direct (bezpośrednio)') {
+                    title = ' title="Wejście bez odsyłacza i bez parametrów kampanii w URL (wpisany adres, zakładka itd.)"';
+                } else if (visitor.entry_utm_source && !visitor.entry_referrer_domain && !visitor.entry_campaign_code) {
+                    title = ' title="Źródło z parametrów UTM w adresie (utm_source / utm_medium)"';
+                }
+
+                return '<span class="small text-muted"' + title + '>' + escapeHtml(label) + '</span>';
             }
 
             function sessionCell(visitor) {
