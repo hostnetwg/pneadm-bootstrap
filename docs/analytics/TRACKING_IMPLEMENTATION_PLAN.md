@@ -54,16 +54,22 @@ Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został w
 - bez pełnych `fbclid`/`gclid`/`msclkid`; tylko flagi `*_present`,
 - testy: `AnalyticsTrafficChannelStage2FTest` (25).
 
-**Form v2 — Etap B4+ agregaty lejka per kanał (2026-07-09, `pneadm`):**
+**Form v2 — Etap 2F atrybucja kanałów (2026-07-09, prod `pnedu` `bc6deca`):**
+
+- `TrafficChannelClassifier`, `OrderFormAttributionService`, tabela `order_form_attributions` (migracja `pneadm`),
+- testy: `AnalyticsTrafficChannelStage2FTest` (25).
+
+**Form v2 — Etap B4+ agregaty lejka per kanał (2026-07-09, prod `pneadm` `cb4d732`):**
 
 - 5 tabel `analytics_daily_*_funnels` na `pne_analytics` (nie rozszerza B3),
-- komenda `analytics:aggregate-order-forms` (idempotentna, unikalne `form_session_id`),
+- komenda `analytics:aggregate-order-forms` (idempotentna, unikalne `form_session_id`, cron 03:45),
 - dashboard `analytics.order-form-funnels.index` + CSV (kanały, kursy, kampanie, GUS, jakość),
-- `gus_conversion_delta` = korelacja obserwacyjna; `internal_promo_placement` = wymiar diagnostyczny,
-- testy: `AnalyticsOrderFormFunnelAggregationTest` (16),
+- healthcheck `analytics:order-form-funnel-healthcheck`; dni przed `attribution_deployed_at` (2026-07-09) = `pre_attribution_historical`,
+- testy: `AnalyticsOrderFormFunnelAggregationTest` + `AnalyticsOrderFormFunnelHealthcheckCommandTest` (25),
+- runbook prod: `docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`,
 - pełna spec: `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`.
 
-Następny krok formularza (opcjonalnie): cron prod 03:45, backfill historyczny, rozszerzenie UI dashboardu.
+Następny krok: obserwacja jakości danych od 09.07; opcjonalnie progi alertów po tygodniu.
 
 Analityka nie może blokować:
 

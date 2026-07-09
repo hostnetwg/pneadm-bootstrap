@@ -165,15 +165,18 @@ Szczegóły: `docs/deploy/`, `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGAT
 
 **Źródło prawdy dla roadmapy:** `docs/NEXT_STEPS.md`, `docs/analytics/ANALYTICS_ROADMAP.md`.
 
-Skrót na 2026-07-09:
+Skrót na 2026-07-09 (po wdrożeniu prod):
 
 | Obszar | Stan |
 |--------|------|
 | Etap B (B1–B6), R1–R3 | Wdrożone produkcyjnie (wcześniejsze commity) |
-| Form v2 + 2F (traffic_channel, atrybucja) | Wdrożone **lokalnie** (`pnedu`) |
-| B4+ (agregaty lejka per kanał) | Wdrożone **lokalnie** (`pneadm`); **prod — do wdrożenia** |
-| Healthcheck B4+ | `analytics:order-form-funnel-healthcheck` — lokalnie |
-| Następny krok biznesowy | Deploy prod 2F + B4+; backfill od pierwszego eventu v2; cron 03:45 |
+| Form v2 + 2F (traffic_channel, atrybucja) | Wdrożone **produkcyjnie** (`pnedu` `bc6deca`, 2026-07-09) |
+| B4+ (agregaty lejka per kanał) | Wdrożone **produkcyjnie** (`pneadm` `cb4d732`, 2026-07-09) |
+| Healthcheck B4+ | `analytics:order-form-funnel-healthcheck` — prod; dni przed 09.07 = `pre_attribution_historical` |
+| Dashboard `/` (polling, Aktywni teraz) | Hotfixy `33ab603`, `cb4d732` na prod |
+| Następny krok biznesowy | Obserwacja kanałów od 09.07; healthcheck `--days=7` po tygodniu ruchu |
+
+Runbook: `docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`.
 
 Ten punkt w **tym** dokumencie jest tylko skrótem — po każdym większym etapie aktualizuj `NEXT_STEPS.md`.
 

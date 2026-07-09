@@ -1,6 +1,6 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-06-26  
+Data utworzenia/aktualizacji: 2026-07-09  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -47,7 +47,7 @@ Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Loka
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.
 7. Przetestować filtry dashboardu (daty, kampania, kurs, landing target) na realnych danych.
-8. Taksonomia formularza v2 — Etap 2F (`traffic_channel` / atrybucja) wdrożony. Następny krok: agregaty i raporty jakości danych cięte po kanałach (przed pełnym dashboardem GUS).
+8. ~~Taksonomia formularza v2 — Etap 2F (`traffic_channel` / atrybucja) wdrożony.~~ **ZROBIONE prod 2026-07-09** (`pnedu` `bc6deca`). **B4+ agregaty lejka** — **ZROBIONE prod** (`pneadm` `cb4d732`). Następny krok: obserwacja jakości danych od 09.07 (nie backfill historyczny atrybucji).
 9. Rozważyć progi alertów dashboardu po pierwszych tygodniach obserwacji.
 10. Skonsultować z ChatGPT kolejny etap (płatności, JS, porzucenia) po akceptacji właściciela.
 
@@ -272,13 +272,49 @@ Po każdej implementacji należy:
 - **Healthcheck `analytics:abandonment-healthcheck`:** ✅ wdrożone produkcyjnie (`pneadm` `6608791`, 2026-06-26).
 - **Porównanie okres-do-okresu (oba dashboardy):** ✅ wdrożone produkcyjnie (`pneadm` `5526e96`, 2026-06-26). Delty KPI vs poprzedni okres o tej samej długości.
 
-## Form v2 + B4+ agregaty lejka (2026-07-09, lokalnie)
+## Form v2 + 2F + B4+ — wdrożone produkcyjnie (2026-07-09)
+
+Runbook: [`docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`](deploy/2026-07-B4-order-form-funnel-production-deploy.md).
+
+### pnedu (`bc6deca`)
+
+- Form v2 eventy (`form_visible`, `form_first_interaction`, …), GUS tracking (`GusAnalyticsTracker`).
+- **2F:** `TrafficChannelClassifier`, `OrderFormAttributionService`, zapis do `order_form_attributions` (connection `analytics`).
+- Tracking JS = inline Blade — **npm nie wymagany** na prod do analityki formularza.
+- Deploy prod: `git pull` + cache + `queue:restart` (wykonane).
+
+### pneadm (`5d08134` … `cb4d732`)
+
+- **B4+:** 5 tabel dziennych, `analytics:aggregate-order-forms`, dashboard `analytics.order-form-funnels.index`, CSV, healthcheck.
+- Migracje + hotfix `tracking_schema_version` (`c18bb0a`).
+- `pre_attribution_historical` dla dni przed `2026-07-09` (`7acdb69`).
+- Dashboard `/`: fix pollingu po usunięciu zamówienia (`33ab603`); „Aktywni teraz” — UTM/direct w Wejściu (`cb4d732`).
+- **B3 abandonments bez zmian** (osobna komenda i tabele).
+- Testy lokalne przed push: `AnalyticsOrderFormFunnel*` — 25 passed.
+
+### Produkcja — wykonane
+
+- Backfill B4: `--from=2026-06-25 --to=2026-07-08` (14 dni; pierwszy event v2 = 2026-06-25).
+- Backfill B3/R1: `--from=2026-06-20 --to=2026-07-08` (19 dni).
+- Cron **03:45** `analytics:aggregate-order-forms` — OK.
+
+### Obserwacja po wdrożeniu (nie blokery)
+
+- Healthcheck na dniach **przed 09.07** — `pre_attribution_historical` / niski score: **oczekiwane**.
+- Od **09.07** oczekuj rosnącej `attribution_coverage` i kanałów w dashboardzie B4.
+- Ręczna weryfikacja: `php artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-08` (wczoraj względem dnia uruchomienia — podstaw aktualną datę).
+
+### Dokumentacja
+
+- Spec: `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`
+- Deploy: `docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`
+
+## Form v2 + B4+ agregaty lejka (2026-07-09, lokalnie) — ARCHIWUM
+
+> Sekcja zastąpiona przez „wdrożone produkcyjnie” powyżej. Zachowana dla historii PRzed prod.
 
 - **2F traffic_channel / atrybucja (`pnedu`):** `TrafficChannelClassifier`, `OrderFormAttributionService`, tabela `order_form_attributions`, touch model, `conversion_reporting_channel`. Testy: 25 passed.
-- **B4+ agregaty lejka (`pneadm`):** 5 tabel dziennych na `pne_analytics`, komenda `analytics:aggregate-order-forms`, dashboard `analytics.order-form-funnels.index`, CSV AI-safe. **B3 abandonments bez zmian.** Testy: `AnalyticsOrderFormFunnelAggregationTest` — 16 passed.
-- **Deploy prod (jedno okno):** najpierw migracje `pneadm` na `pne_analytics`, potem deploy `pnedu` (jeśli 2F jeszcze nie na prod), backfill **od początku eventów v2**, cron **03:45 od razu**.
-- **Dashboard:** tabele kurs × kanał i kampanie widoczne w UI (nie tylko CSV).
-- **Dokumentacja:** `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`.
+- **B4+ agregaty lejka (`pneadm`):** 5 tabel dziennych na `pne_analytics`, komenda `analytics:aggregate-order-forms`, dashboard `analytics.order-form-funnels.index`, CSV AI-safe. **B3 abandonments bez zmian.** Testy: `AnalyticsOrderFormFunnelAggregationTest` — 20 passed.
 
 ## Walidacja produkcyjna B2/B3 (2026-06-26)
 

@@ -121,7 +121,8 @@ Raporty dzienne finalizowane z `lag=2` — sesje z dnia D+2 są traktowane jako 
 `tracking_data_quality_status` (główny status):
 - `complete`, `partial_frontend_tracking`, `backend_only`, `missing_attribution`,
 - `low_volume` (sesje < 30 — bez twardych alertów),
-- `warmup_or_deploy_window` (pierwsze 24h po wdrożeniu v2 lub mieszane `tracking_schema_version` w dniu).
+- `warmup_or_deploy_window` (pierwsze 24h po wdrożeniu v2 lub mieszane `tracking_schema_version` w dniu),
+- `pre_attribution_historical` (dni przed `attribution_deployed_at`, domyślnie **2026-07-09** — brak retroaktywnej atrybucji 2F; oczekiwane po backfillu).
 
 Dodatkowo:
 - `tracking_data_quality_flags` (JSON array, np. `frontend_coverage_low`, `server_only_conversions_elevated`),
@@ -169,16 +170,16 @@ W Laravel Scheduler (`routes/console.php`): `analytics:aggregate-order-forms` da
 **Decyzja biznesowa:** od **początku eventów v2** (nie tylko od wdrożenia 2F).
 
 ```bash
-sail artisan analytics:aggregate-order-forms --from=2026-07-01 --to=YESTERDAY --rebuild
+sail artisan analytics:aggregate-order-forms --from=2026-06-25 --to=2026-07-08 --rebuild
 ```
 
-Ustal `--from` jako datę pierwszego eventu v2 w `analytics_events`.
+Ustal `--from` jako datę pierwszego eventu v2 w `analytics_events` (prod: **2026-06-25**). Używaj formatu `YYYY-MM-DD`, nie placeholderów tekstowych.
 
 ## Raporty admin (`adm.pnedu.pl`)
 
 - Route: `analytics.order-form-funnels.index` — menu **Analityka → Lejek formularza (kanały)**.
 - Read-only: `OrderFormFunnelDashboardService` czyta wyłącznie tabele `analytics_daily_*_funnels`.
-- UI: tabele **kanały**, **kurs × kanał**, **kampanie**, **jakość danych** (score + flagi).
+- UI: tabele **kanały**, **kurs × kanał**, **kampanie**, **jakość danych** (score + flagi); baner dla dni przed `attribution_deployed_at`.
 - CSV: kanały, kursy, kampanie, GUS, jakość danych.
 - Ręczne przeliczenie z UI (limit dni w config).
 
@@ -191,19 +192,32 @@ Klasy:
 - `OrderFormFunnelCsvExportService` — eksport
 - `AnalyticsOrderFormFunnelController` — UI + CSV + recompute
 
-## Deploy produkcyjny (jedno okno, kolejność techniczna)
+## Deploy produkcyjny — status 2026-07-09 ✅
 
-1. Wdrożyć `pneadm` z migracjami.
-2. `php artisan migrate --force` (tabele na `pne_analytics`).
-3. Potwierdzić istnienie nowych tabel.
-4. Wdrożyć `pnedu` (bez zmian w tym etapie, jeśli 2F już jest).
-5. Test wejścia na formularz + zapis eventu.
-6. Backfill: `analytics:aggregate-order-forms --from=... --to=... --rebuild`.
-7. Dodać cron 03:45 (opcjonalnie po walidacji).
+**Wdrożone.** Runbook: [`docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`](../deploy/2026-07-B4-order-form-funnel-production-deploy.md).
+
+1. ~~Wdrożyć `pneadm` z migracjami.~~ ✅ (`5d08134` + hotfixy do `cb4d732`)
+2. ~~`php artisan migrate --force`~~ ✅
+3. ~~Wdrożyć `pnedu` (2F)~~ ✅ (`bc6deca`)
+4. ~~Backfill od pierwszego eventu v2~~ ✅ (`2026-06-25` … `2026-07-08`)
+5. ~~Cron 03:45~~ ✅
+
+### Po wdrożeniu (operacyjne)
+
+- Obserwacja od **2026-07-09** (`attribution_deployed_at` w config).
+- Healthcheck na dniach historycznych: `pre_attribution_historical` — nie traktować jako awaria.
+- Hotfixy post-deploy: `tracking_schema_version`, polling dashboardu, kolumna Wejście (UTM/direct).
+
+### Kolejność techniczna (dla przyszłych deployów)
+
+1. `pneadm`: `git pull` → `migrate --force` → cache.
+2. `pnedu`: `git pull` → cache → `queue:restart`.
+3. Smoke: formularz + debug-events + dashboard B4.
+4. Backfill tylko przy zmianie logiki agregacji (z prawdziwymi datami `YYYY-MM-DD`).
 
 ## Testy
 
-`tests/Feature/AnalyticsOrderFormFunnelAggregationTest.php` — 20 testów (kanały, GUS, idempotencja, data quality, grace period submit, regresja B3).
+`tests/Feature/AnalyticsOrderFormFunnelAggregationTest.php` — 20 testów + `AnalyticsOrderFormFunnelHealthcheckCommandTest` — 5 testów (kanały, GUS, idempotencja, data quality, grace period submit, regresja B3, pre_attribution).
 
 ```bash
 sail test --filter=AnalyticsOrderFormFunnelAggregationTest
@@ -219,7 +233,7 @@ sail artisan analytics:order-form-funnel-healthcheck --days=14
 
 - **NIE** zastępuje `analytics:abandonment-healthcheck` (B3).
 - Sprawdza: dopływ eventów v2 (okno 60 min), agregaty `analytics_daily_data_quality`, progi CRITICAL/WARNING z `OrderFormFunnelDataQualityEvaluator`.
-- `low_volume` i `warmup_or_deploy_window` — pomija twarde alerty (brak fałszywych alarmów po deployu / małym ruchu).
+- `low_volume`, `warmup_or_deploy_window` i **`pre_attribution_historical`** (dni przed `attribution_deployed_at`, domyślnie 2026-07-09) — pomijają twarde alerty.
 - Exit code `1` tylko przy CRITICAL.
 
 Testy: `AnalyticsOrderFormFunnelHealthcheckCommandTest` (4).
