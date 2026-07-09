@@ -696,6 +696,7 @@
             const shortcutHandlingEl = document.getElementById('dashboardShortcutHandling');
             let pollCount = 0;
             let lastFormToday = parseInt(formTodayEl?.dataset.initialValue || '0', 10);
+            let lastStatsSnapshot = null;
             let sectionsFetchInFlight = false;
 
             if (!formTodayEl || !formHandlingEl) {
@@ -788,6 +789,16 @@
                     minimumFractionDigits: 1,
                     maximumFractionDigits: 1,
                 }).format(Number(value) || 0);
+            }
+
+            function statsSnapshotKey(data) {
+                return JSON.stringify({
+                    form_today: Number(data.form_today) || 0,
+                    form_yesterday: Number(data.form_yesterday) || 0,
+                    form_handling: Number(data.form_handling) || 0,
+                    deferred_handling: Number(data.deferred_handling) || 0,
+                    online_handling: Number(data.online_handling) || 0,
+                });
             }
 
             function escapeHtml(value) {
@@ -975,24 +986,34 @@
                             .then(function (data) {
                                 const previousFormToday = lastFormToday;
                                 const nextFormToday = Number(data.form_today) || 0;
+                                const snapshotKey = statsSnapshotKey(data);
 
                                 renderHeadlineStats(data);
                                 pollCount += 1;
 
-                                if (nextFormToday > previousFormToday) {
+                                if (lastStatsSnapshot === null) {
+                                    lastStatsSnapshot = snapshotKey;
                                     lastFormToday = nextFormToday;
                                     formTodayEl.dataset.initialValue = String(lastFormToday);
 
-                                    if (typeof window.dashboardPlayNewOrderSound === 'function') {
+                                    if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
+                                        window.dashboardTriggerRefreshFlash();
+                                    }
+
+                                    return;
+                                }
+
+                                if (snapshotKey !== lastStatsSnapshot) {
+                                    if (nextFormToday > previousFormToday
+                                        && typeof window.dashboardPlayNewOrderSound === 'function') {
                                         window.dashboardPlayNewOrderSound();
                                     }
 
-                                    return fetchDashboardSections();
-                                }
-
-                                if (nextFormToday !== previousFormToday) {
+                                    lastStatsSnapshot = snapshotKey;
                                     lastFormToday = nextFormToday;
                                     formTodayEl.dataset.initialValue = String(lastFormToday);
+
+                                    return fetchDashboardSections();
                                 }
 
                                 if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
