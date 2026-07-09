@@ -302,7 +302,8 @@ Runbook: [`docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`](deplo
 
 - Healthcheck na dniach **przed 09.07** — `pre_attribution_historical` / niski score: **oczekiwane**.
 - Od **09.07** oczekuj rosnącej `attribution_coverage` i kanałów w dashboardzie B4.
-- Ręczna weryfikacja: `php artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-08` (wczoraj względem dnia uruchomienia — podstaw aktualną datę).
+- **09.07** = `warmup_or_deploy_window` (dzień deployu 2F) — nie traktuj 80% `orders_without_attribution` jako błąd kodu.
+- **Pełna ocena:** `2026-07-10` po cronie `2026-07-12 03:45`.
 
 ### Dokumentacja
 

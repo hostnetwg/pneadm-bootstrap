@@ -121,7 +121,7 @@ Raporty dzienne finalizowane z `lag=2` — sesje z dnia D+2 są traktowane jako 
 `tracking_data_quality_status` (główny status):
 - `complete`, `partial_frontend_tracking`, `backend_only`, `missing_attribution`,
 - `low_volume` (sesje < 30 — bez twardych alertów),
-- `warmup_or_deploy_window` (pierwsze 24h po wdrożeniu v2 lub mieszane `tracking_schema_version` w dniu),
+- `warmup_or_deploy_window` (pierwsze 24h po `tracking_deployed_at`, mieszane `tracking_schema_version`, **lub kalendarzowy dzień `attribution_deployed_at`** — flaga `attribution_deploy_window`),
 - `pre_attribution_historical` (dni przed `attribution_deployed_at`, domyślnie **2026-07-09** — brak retroaktywnej atrybucji 2F; oczekiwane po backfillu).
 
 Dodatkowo:

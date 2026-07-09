@@ -50,6 +50,14 @@ class OrderFormFunnelDataQualityEvaluator
             ];
         }
 
+        if ($this->isAttributionDeployWindow($statDate, $timezone)) {
+            return [
+                'status' => 'warmup_or_deploy_window',
+                'flags' => ['warmup_or_deploy_window', 'attribution_deploy_window'],
+                'score' => $this->calculateScore($frontendRate, $trafficRate, $attrRate, $schemaV2Rate, $serverOnlyRate, $ordersWithoutAttrRate),
+            ];
+        }
+
         if ($this->isWarmupOrDeployWindow($statDate, $timezone, $dataQuality)) {
             $flags[] = 'warmup_or_deploy_window';
         }
@@ -124,6 +132,22 @@ class OrderFormFunnelDataQualityEvaluator
         $stat = Carbon::parse($statDate, $timezone)->startOfDay();
 
         return $stat->lessThan($deploy);
+    }
+
+    /**
+     * Kalendarzowy dzień wdrożenia atrybucji 2F — mieszany start schema v2/2F; healthcheck pomija twarde progi.
+     */
+    private function isAttributionDeployWindow(string $statDate, string $timezone): bool
+    {
+        $deployedAt = config('analytics.order_form_funnel.attribution_deployed_at');
+        if (! filled($deployedAt)) {
+            return false;
+        }
+
+        $deploy = Carbon::parse((string) $deployedAt, $timezone)->startOfDay();
+        $stat = Carbon::parse($statDate, $timezone)->startOfDay();
+
+        return $stat->equalTo($deploy);
     }
 
     /**
@@ -257,7 +281,15 @@ class OrderFormFunnelDataQualityEvaluator
         }
 
         if ($status === 'warmup_or_deploy_window') {
-            $info[] = 'Okno warmup/deploy — pominięto twarde alerty (dane mogą być niepełne).';
+            if (in_array('attribution_deploy_window', $evaluation['flags'], true)) {
+                $deployedAt = (string) config('analytics.order_form_funnel.attribution_deployed_at', '2026-07-09');
+                $info[] = sprintf(
+                    'Dzień wdrożenia atrybucji 2F (%s) — pominięto twarde alerty (mieszany dzień deployu; oceniaj pełny dzień od następnego dnia kalendarzowego).',
+                    $deployedAt
+                );
+            } else {
+                $info[] = 'Okno warmup/deploy — pominięto twarde alerty (dane mogą być niepełne).';
+            }
 
             return $this->alertResult('info', $critical, $warning, $info, true, $evaluation);
         }

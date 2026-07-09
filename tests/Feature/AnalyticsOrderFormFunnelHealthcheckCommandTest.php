@@ -120,6 +120,34 @@ class AnalyticsOrderFormFunnelHealthcheckCommandTest extends TestCase
             ->assertExitCode(0);
     }
 
+    public function test_healthcheck_skips_hard_alerts_for_attribution_deploy_day(): void
+    {
+        config()->set('analytics.order_form_funnel.attribution_deployed_at', '2026-07-09');
+        config()->set('analytics.order_form_funnel.tracking_deployed_at', '2026-07-01');
+
+        $this->seedDataQualityRow([
+            'stat_date' => '2026-07-09',
+            'sessions_total' => 99,
+            'sessions_with_frontend_events' => 19,
+            'sessions_backend_only' => 80,
+            'sessions_without_attribution' => 85,
+            'orders_total' => 10,
+            'orders_without_attribution' => 8,
+            'frontend_tracking_coverage_rate' => 0.192,
+            'attribution_coverage_rate' => 0.141,
+            'traffic_channel_coverage_rate' => 0.141,
+            'schema_v2_event_rate' => 0.121,
+            'tracking_data_quality_status' => 'backend_only',
+            'tracking_data_quality_score' => 0,
+        ]);
+
+        $this->artisan('analytics:order-form-funnel-healthcheck', ['--from' => '2026-07-09', '--to' => '2026-07-09'])
+            ->expectsOutputToContain('warmup_or_deploy_window')
+            ->expectsOutputToContain('Dzień wdrożenia atrybucji 2F')
+            ->expectsOutputToContain('WERDYKT: OK')
+            ->assertExitCode(0);
+    }
+
     public function test_healthcheck_fails_when_required_tables_missing(): void
     {
         Schema::connection('analytics')->drop('analytics_daily_data_quality');

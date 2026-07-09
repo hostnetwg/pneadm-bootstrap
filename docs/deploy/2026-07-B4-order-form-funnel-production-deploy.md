@@ -117,13 +117,32 @@ Log opcjonalny: `storage/logs/analytics-order-forms.log` (po pierwszym udanym ur
 | Dashboard zamówień | `/` — karty operacyjne + „Aktywni teraz” (live z `analytics_events`) |
 | Debug eventów | `/analytics/debug-events` |
 
-### Interpretacja healthcheck po backfillu historycznym
+### Interpretacja healthcheck
 
-Dni **przed 2026-07-09**: healthcheck → **`pre_attribution_historical`** (INFO, skipped) — oczekiwane (`7acdb69`).
+| Okres | Status healthcheck | Działanie |
+|-------|-------------------|-----------|
+| **Przed 2026-07-09** | `pre_attribution_historical` (INFO) | Oczekiwane — brak retroaktywnej 2F (`7acdb69`) |
+| **2026-07-09** (dzień deployu) | `warmup_or_deploy_window` + flaga `attribution_deploy_window` | **Nie traktuj 80% `orders_without_attribution` jako błąd kodu** — mieszany dzień (schema v2 od ~14:11, atrybucja od ~16:11). Healthcheck pomija twarde progi. |
+| **Od 2026-07-10** | Normalne progi | Pierwszy **pełny** dzień schema v2 + 2F |
 
-**Dzień wdrożenia 2026-07-09:** może być **CRITICAL** (`backend_only`, niski % v2/atrybucji w agregacie dziennym) — **mieszany dzień** (rano B1/B2, od ~14:11 schema v2, od ~16:11 `order_form_attributions`). **Nie traktuj jako awarii deployu.** Oceniaj pełny dzień v2 od **10.07** (healthcheck + agregat).
+**Ręczna ocena zamówień w dniu deployu** — tylko po starcie 2F (~16:15 Europe/Warsaw):
 
-Zweryfikowane na prod (09.07 ~17:06): `order_form_attributions` **215**; pierwszy v2 **14:11:15**; healthcheck 25.06–08.07 = OK + `pre_attribution_historical`; 09.07 = CRITICAL w agregacie, live v2 działa (ostatnia godz.: wejścia formularza + eventy v2).
+```sql
+SELECT COUNT(*) FROM order_form_attributions
+WHERE created_at >= '2026-07-09 16:15:00';
+
+-- porównaj z zamówieniami z tego samego okna (pneadm / analytics_events form_order_created)
+```
+
+**`direct` ~91% w pierwszej próbce atrybucji (09.07)** — **nie jest jeszcze problemem**: `direct` to poprawnie sklasyfikowany kanał; próbka może być testowa / bez UTM.
+
+**Pełna ocena operacyjna:** dane **`2026-07-10`** po cronie **`2026-07-12 03:45`** (`aggregation_lag_days=2` → automatyczny dzień statystyki = D−2).
+
+```bash
+php artisan analytics:order-form-funnel-healthcheck --from=2026-07-10 --to=2026-07-10
+```
+
+Zweryfikowane na prod (09.07 ~17:06): pierwszy schema v2 **`form_section_viewed` 14:11:15**; `order_form_attributions` **215** (16:10–18:57); healthcheck 25.06–08.07 = OK; po poprawce kodu 09.07 → `warmup_or_deploy_window`.
 
 ### Dashboard „Aktywni teraz”
 
@@ -139,6 +158,7 @@ Zweryfikowane na prod (09.07 ~17:06): `order_form_attributions` **215**; pierwsz
 |---------|-------------|
 | `Unknown column tracking_schema_version` przy agregacji | `c18bb0a` + migracja `170000` |
 | Healthcheck CRITICAL na dniach sprzed 09.07 | `7acdb69` — `pre_attribution_historical` |
+| Healthcheck CRITICAL w dniu deployu 09.07 | `attribution_deployed_at` → `warmup_or_deploy_window` (flaga `attribution_deploy_window`) |
 | Wykres / ostatnie FORM nie odświeżały się po usunięciu zamówienia | `33ab603` — polling sekcji przy każdej zmianie statystyk |
 | Kreseczki w kolumnie Wejście | `cb4d732` — fallback UTM / direct |
 
@@ -149,7 +169,7 @@ Zweryfikowane na prod (09.07 ~17:06): `order_form_attributions` **215**; pierwsz
 - [x] `Analityka → Lejek formularza (kanały)` — dane od 25.06 (lejek B1/B2), baner historyczny przed 09.07.
 - [x] Formularz na pnedu.pl — eventy schema v2 w `/analytics/debug-events` (prod: od 09.07 ~14:11).
 - [x] `order_form_attributions` rośnie po ruchu (prod 09.07: 215 rekordów).
-- [ ] Healthcheck **pełnego dnia v2** — od **10.07** (09.07 = dzień mieszany, CRITICAL oczekiwany).
+- [ ] Healthcheck **pełnego dnia v2** — **`2026-07-10`** po cronie **`2026-07-12 03:45`** (09.07 = warmup deployu).
 - [ ] Dashboard `/` — usunięcie testowego zamówienia odświeża wykres (max ~15 s).
 
 Weryfikacja automatyczna (SSH):
@@ -164,7 +184,7 @@ bash docs/deploy/scripts/prod-b4-2f-post-deploy-verify.sh 2>&1 | tee ~/b4-2f-ver
 
 ## 9. Następne kroki (operacyjne)
 
-- Obserwacja metryk B4 od **2026-07-10** (pierwszy **pełny** dzień schema v2 + 2F) — min. 3–7 dni.
+- Obserwacja metryk B4 od **2026-07-10** (pierwszy pełny dzień schema v2 + 2F) — min. 3–7 dni.
 - Przeliczenie wczoraj codziennie przez cron 03:45; ręcznie tylko przy incydencie.
-- **10.07 rano:** `aggregate-order-forms --date=2026-07-10 --rebuild` + healthcheck `--from=2026-07-10`.
-- Backlog: progi alertów na dzień deployu, grupowanie sesji live, rozszerzenie kolumny Wejście.
+- **Pełna ocena:** healthcheck **`2026-07-10`** po cronie **`2026-07-12 03:45`** (`aggregation_lag_days=2`).
+- Backlog: grupowanie sesji live, rozszerzenie kolumny Wejście.
