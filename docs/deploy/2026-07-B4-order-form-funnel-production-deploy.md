@@ -1,7 +1,7 @@
 # Wdrożenie produkcyjne — Form v2 / 2F / B4+ lejek formularza (lipiec 2026)
 
 Status: **wdrożone produkcyjnie** (2026-07-09).  
-Prod HEAD `pneadm`: `cb4d732`. Prod HEAD `pnedu`: `bc6deca`.
+Prod HEAD `pneadm`: `39a1079` (weryfikacja: skrypt `docs/deploy/scripts/prod-b4-2f-post-deploy-verify.sh`). Prod HEAD `pnedu`: `bc6deca`.
 
 > Bez sekretów. Ścieżki serwera: `~/domains/adm.pnedu.pl/pneadm`, `~/domains/pnedu.pl/app`.
 
@@ -54,22 +54,42 @@ Powiązane: [`STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`](../analytics/STAGE_B4_O
 
 ## 4. Backfill i daty
 
-- **Pierwszy event v2** w prod (SQL na `analytics_events`): **2026-06-25**.
-- **Backfill B4 wykonany:** `2026-06-25` … `2026-07-08` → 14 dni, 295 wierszy kurs×kanał, 395 kampanii.
-- **Pełna atrybucja 2F** (`order_form_attributions`) od wdrożenia **2026-07-09** — dni wcześniejsze mają `pre_attribution_historical` (oczekiwane, nie awaria).
+**Ważne — dwie różne daty (nie mylić):**
+
+| Pojęcie | Data prod (zweryfikowane 2026-07-09) | Znaczenie |
+|---------|--------------------------------------|-----------|
+| **Pierwszy event lejka formularza (B1/B2)** | **2026-06-25** | `order_form_viewed` / `order_form_started` itd. — podstawa **backfillu B4** `--from` |
+| **Pierwszy event schema v2** (`tracking_schema_version=2` w `metadata`) | **2026-07-09 ~14:11:15** | `form_section_viewed` (pnedu `bc6deca`) — pełna taksonomia v2 + GUS |
+| **Pełna atrybucja 2F** (`order_form_attributions`) | **2026-07-09** od ~16:11 | `TrafficChannelClassifier` — dni wcześniejsze: `pre_attribution_historical` |
+
+SQL — pierwszy event **schema v2** (nie B1/B2):
+
+```sql
+SELECT id, event_name, occurred_at, order_form_session_id, course_id,
+       JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.tracking_schema_version')) AS schema_v
+FROM analytics_events
+WHERE JSON_EXTRACT(metadata, '$.tracking_schema_version') = 2
+   OR event_name IN ('form_visible', 'form_section_viewed', 'gus_lookup_clicked')
+ORDER BY occurred_at ASC, id ASC
+LIMIT 1;
+-- Prod 2026-07-09: form_section_viewed, 2026-07-09 14:11:15, course_id=535
+```
+
+- **Backfill B4 wykonany:** `2026-06-25` … `2026-07-08` → 14 dni (pierwszy **dzień lejka** B1/B2, nie schema v2).
+- Po deployu 09.07: agregat dnia **09.07** ręcznie — 8 kanałów, 21 kurs×kanał, 25 kampanii, 60 GUS, 1 jakość.
 - Config: `analytics.order_form_funnel.attribution_deployed_at` = `2026-07-09` (env: `ANALYTICS_ORDER_FORM_ATTRIBUTION_DEPLOYED_AT`).
 
 ### Komendy (placeholdery dat — używaj `YYYY-MM-DD`)
 
 ```bash
-# backfill B4 (od pierwszego eventu v2 do wczoraj)
+# backfill B4 (od pierwszego DNIA lejka B1/B2, nie od schema v2)
 php artisan analytics:aggregate-order-forms --from=2026-06-25 --to=2026-07-08 --rebuild
 
-# dzień bieżący po zebraniu ruchu z 2F
+# dzień po zebraniu ruchu z 2F / v2 (np. dzień po deployu)
 php artisan analytics:aggregate-order-forms --date=2026-07-09 --rebuild
 
-# healthcheck (dni z pełną atrybucją — od 09.07)
-php artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-09
+# healthcheck — dni z pełną atrybucją (od 09.07); pierwszy pełny dzień v2: oceniaj od 10.07
+php artisan analytics:order-form-funnel-healthcheck --from=2026-07-10 --to=2026-07-10
 ```
 
 **Uwaga:** nie wklejaj literałów `FIRST_V2`, `YESTERDAY`, `...` — to były przykłady; Artisan oczekuje prawdziwych dat.
@@ -99,7 +119,11 @@ Log opcjonalny: `storage/logs/analytics-order-forms.log` (po pierwszym udanym ur
 
 ### Interpretacja healthcheck po backfillu historycznym
 
-CRITICAL na dniach **przed 2026-07-09** (0% atrybucji, `backend_only`) jest **oczekiwane** — brak retroaktywnej tabeli `order_form_attributions`. Po `7acdb69` healthcheck oznacza te dni jako `pre_attribution_historical` (INFO).
+Dni **przed 2026-07-09**: healthcheck → **`pre_attribution_historical`** (INFO, skipped) — oczekiwane (`7acdb69`).
+
+**Dzień wdrożenia 2026-07-09:** może być **CRITICAL** (`backend_only`, niski % v2/atrybucji w agregacie dziennym) — **mieszany dzień** (rano B1/B2, od ~14:11 schema v2, od ~16:11 `order_form_attributions`). **Nie traktuj jako awarii deployu.** Oceniaj pełny dzień v2 od **10.07** (healthcheck + agregat).
+
+Zweryfikowane na prod (09.07 ~17:06): `order_form_attributions` **215**; pierwszy v2 **14:11:15**; healthcheck 25.06–08.07 = OK + `pre_attribution_historical`; 09.07 = CRITICAL w agregacie, live v2 działa (ostatnia godz.: wejścia formularza + eventy v2).
 
 ### Dashboard „Aktywni teraz”
 
@@ -122,16 +146,25 @@ CRITICAL na dniach **przed 2026-07-09** (0% atrybucji, `backend_only`) jest **oc
 
 ## 8. Smoke test po deployu
 
-- [ ] `Analityka → Lejek formularza (kanały)` — dane od 25.06, baner historyczny jeśli filtr obejmuje dni przed 09.07.
-- [ ] Formularz na pnedu.pl — eventy v2 w `/analytics/debug-events`.
-- [ ] `php artisan analytics:order-form-funnel-healthcheck --days=1` (po 09.07, po zebraniu ruchu).
-- [ ] Dashboard `/` — usunięcie testowego zamówienia odświeża wykres i tabelę (max ~15 s).
-- [ ] `SELECT COUNT(*) FROM order_form_attributions WHERE created_at >= '2026-07-09'` — rośnie po ruchu na formularzu.
+- [x] `Analityka → Lejek formularza (kanały)` — dane od 25.06 (lejek B1/B2), baner historyczny przed 09.07.
+- [x] Formularz na pnedu.pl — eventy schema v2 w `/analytics/debug-events` (prod: od 09.07 ~14:11).
+- [x] `order_form_attributions` rośnie po ruchu (prod 09.07: 215 rekordów).
+- [ ] Healthcheck **pełnego dnia v2** — od **10.07** (09.07 = dzień mieszany, CRITICAL oczekiwany).
+- [ ] Dashboard `/` — usunięcie testowego zamówienia odświeża wykres (max ~15 s).
+
+Weryfikacja automatyczna (SSH):
+
+```bash
+cd ~/domains/adm.pnedu.pl/pneadm && git pull
+export PHP_BIN=/opt/alt/php82/usr/bin/php
+bash docs/deploy/scripts/prod-b4-2f-post-deploy-verify.sh 2>&1 | tee ~/b4-2f-verify.log
+```
 
 ---
 
 ## 9. Następne kroki (operacyjne)
 
-- Obserwacja metryk B4 od **2026-07-09** (kanały, atrybucja) — min. 3–7 dni.
+- Obserwacja metryk B4 od **2026-07-10** (pierwszy **pełny** dzień schema v2 + 2F) — min. 3–7 dni.
 - Przeliczenie wczoraj codziennie przez cron 03:45; ręcznie tylko przy incydencie.
-- Backlog: progi alertów, grupowanie podejrzanych sesji live, ewentualne rozszerzenie kolumny Wejście o `utm_source` w UI debug.
+- **10.07 rano:** `aggregate-order-forms --date=2026-07-10 --rebuild` + healthcheck `--from=2026-07-10`.
+- Backlog: progi alertów na dzień deployu, grupowanie sesji live, rozszerzenie kolumny Wejście.

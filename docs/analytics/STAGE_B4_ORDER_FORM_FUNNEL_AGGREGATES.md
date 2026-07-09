@@ -167,13 +167,14 @@ W Laravel Scheduler (`routes/console.php`): `analytics:aggregate-order-forms` da
 
 ### Backfill historyczny
 
-**Decyzja biznesowa:** od **początku eventów v2** (nie tylko od wdrożenia 2F).
+**Decyzja biznesowa:** backfill B4 od **pierwszego dnia lejka B1/B2** (nie od schema v2).
 
 ```bash
 sail artisan analytics:aggregate-order-forms --from=2026-06-25 --to=2026-07-08 --rebuild
 ```
 
-Ustal `--from` jako datę pierwszego eventu v2 w `analytics_events` (prod: **2026-06-25**). Używaj formatu `YYYY-MM-DD`, nie placeholderów tekstowych.
+`--from`: data pierwszego eventu **lejka formularza** (`order_form_viewed` / B1/B2) — prod: **2026-06-25**.  
+**Schema v2** (`tracking_schema_version=2`) na prod od **2026-07-09** (wdrożenie `bc6deca`) — osobna data; nie używać jej jako `--from` backfillu historycznego.
 
 ## Raporty admin (`adm.pnedu.pl`)
 
@@ -199,7 +200,7 @@ Klasy:
 1. ~~Wdrożyć `pneadm` z migracjami.~~ ✅ (`5d08134` + hotfixy do `cb4d732`)
 2. ~~`php artisan migrate --force`~~ ✅
 3. ~~Wdrożyć `pnedu` (2F)~~ ✅ (`bc6deca`)
-4. ~~Backfill od pierwszego eventu v2~~ ✅ (`2026-06-25` … `2026-07-08`)
+4. ~~Backfill od pierwszego dnia lejka B1/B2~~ ✅ (`2026-06-25` … `2026-07-08`). Schema v2 na prod od `2026-07-09`.
 5. ~~Cron 03:45~~ ✅
 
 ### Po wdrożeniu (operacyjne)

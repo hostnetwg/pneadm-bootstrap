@@ -294,7 +294,7 @@ Runbook: [`docs/deploy/2026-07-B4-order-form-funnel-production-deploy.md`](deplo
 
 ### Produkcja — wykonane
 
-- Backfill B4: `--from=2026-06-25 --to=2026-07-08` (14 dni; pierwszy event v2 = 2026-06-25).
+- Backfill B4: `--from=2026-06-25 --to=2026-07-08` (14 dni; pierwszy **dzień lejka B1/B2** = 2026-06-25; **schema v2** od 2026-07-09).
 - Backfill B3/R1: `--from=2026-06-20 --to=2026-07-08` (19 dni).
 - Cron **03:45** `analytics:aggregate-order-forms` — OK.
 
