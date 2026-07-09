@@ -57,9 +57,14 @@ run_mysql_analytics() {
   fi
 }
 
+# Kalendarzowy dzień wdrożenia atrybucji 2F (env lub domyślnie z config/analytics.php)
+ATTRIBUTION_DEPLOY_DAY="$(read_env ANALYTICS_ORDER_FORM_ATTRIBUTION_DEPLOYED_AT "$PNEADM_DIR/.env" 2>/dev/null || true)"
+ATTRIBUTION_DEPLOY_DAY="${ATTRIBUTION_DEPLOY_DAY:-2026-07-09}"
+
 section "META — $NOW | pneadm=$PNEADM_DIR | pnedu=$PNEDU_DIR"
 echo "Git pneadm: $(cd "$PNEADM_DIR" && git rev-parse --short HEAD 2>/dev/null || echo '?')"
 echo "Git pnedu:  $(cd "$PNEDU_DIR" && git rev-parse --short HEAD 2>/dev/null || echo '?')"
+echo "attribution_deploy_day: $ATTRIBUTION_DEPLOY_DAY (healthcheck 10c wymaga ff137b1+)"
 
 section "1) Pierwszy event v2 (analytics_events)"
 run_mysql_analytics "
@@ -149,12 +154,17 @@ WHERE stat_date >= DATE_SUB('$TODAY', INTERVAL 20 DAY)
 ORDER BY stat_date DESC;
 "
 
-section "8) Dzień wdrożeniowy 2026-07-09 (warmup / deploy)"
+section "8) Dzień wdrożeniowy $ATTRIBUTION_DEPLOY_DAY (warmup / deploy, ff137b1+)"
+echo "Oczekiwany status w analytics_daily_data_quality: warmup_or_deploy_window (+ flaga attribution_deploy_window po rebuild)"
 run_mysql_analytics "
 SELECT stat_date, tracking_data_quality_status, tracking_data_quality_flags,
        sessions_total, attribution_coverage_rate, schema_v2_event_rate
 FROM analytics_daily_data_quality
-WHERE stat_date IN ('2026-07-07', '2026-07-08', '2026-07-09')
+WHERE stat_date IN (
+  DATE_SUB('$ATTRIBUTION_DEPLOY_DAY', INTERVAL 2 DAY),
+  DATE_SUB('$ATTRIBUTION_DEPLOY_DAY', INTERVAL 1 DAY),
+  '$ATTRIBUTION_DEPLOY_DAY'
+)
 ORDER BY stat_date;
 "
 
@@ -174,8 +184,42 @@ cd "$PNEADM_DIR"
 section "10b) Healthcheck — dni historyczne przed atrybucją 2F"
 "$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --from=2026-06-25 --to=2026-07-08 || true
 
-section "10c) Healthcheck — dzień wdrożeniowy 2F (jeśli są agregaty)"
-"$PHP_BIN" artisan analytics:order-form-funnel-healthcheck --from=2026-07-09 --to=2026-07-09 || true
+section "10c) Healthcheck — dzień wdrożeniowy 2F ($ATTRIBUTION_DEPLOY_DAY, wymaga ff137b1+)"
+echo "Oczekiwane: status=warmup_or_deploy_window, Skipped=tak, WERDYKT: OK"
+echo "Nie oczekuj CRITICAL za niski attribution / v2 / orders_without_attribution w tym dniu."
+DEPLOY_DAY_HC_OUTPUT="$(
+  "$PHP_BIN" artisan analytics:order-form-funnel-healthcheck \
+    --from="$ATTRIBUTION_DEPLOY_DAY" --to="$ATTRIBUTION_DEPLOY_DAY" 2>&1
+)" || true
+echo "$DEPLOY_DAY_HC_OUTPUT"
+
+HC10C_OK=1
+if echo "$DEPLOY_DAY_HC_OUTPUT" | grep -q 'warmup_or_deploy_window'; then
+  echo ">>> PASS: warmup_or_deploy_window"
+else
+  echo ">>> FAIL: brak warmup_or_deploy_window (wdroż ff137b1 + config:cache?)" >&2
+  HC10C_OK=0
+fi
+if echo "$DEPLOY_DAY_HC_OUTPUT" | grep -qE '\|[[:space:]]*tak[[:space:]]*\|'; then
+  echo ">>> PASS: hard alerts skipped"
+else
+  echo ">>> WARN: brak Skipped=tak w tabeli healthchecku" >&2
+fi
+if echo "$DEPLOY_DAY_HC_OUTPUT" | grep -q 'WERDYKT: OK'; then
+  echo ">>> PASS: WERDYKT OK"
+else
+  echo ">>> FAIL: brak WERDYKT OK" >&2
+  HC10C_OK=0
+fi
+if echo "$DEPLOY_DAY_HC_OUTPUT" | grep -q 'CRITICAL'; then
+  echo ">>> FAIL: CRITICAL w dniu deployu — stary kod (przed ff137b1) lub brak rebuild agregatu" >&2
+  HC10C_OK=0
+fi
+if [[ "$HC10C_OK" -eq 1 ]]; then
+  echo ">>> Sekcja 10c: PASS"
+else
+  echo ">>> Sekcja 10c: FAIL — sprawdź git rev-parse (ff137b1+), optimize:clear, rebuild --date=$ATTRIBUTION_DEPLOY_DAY" >&2
+fi
 
 section "11) Logi — cron B4 (jeśli istnieje)"
 LOG_B4="$PNEADM_DIR/storage/logs/analytics-order-forms.log"
@@ -234,7 +278,11 @@ WHERE occurred_at >= UTC_TIMESTAMP() - INTERVAL 60 MINUTE
 section "GOTOWE"
 echo "Wklej cały output do ChatGPT / dokumentacji deploy."
 echo ""
+echo "Kryteria PASS (po ff137b1):"
+echo "  - 10b) 2026-06-25 … dzień przed $ATTRIBUTION_DEPLOY_DAY: WERDYKT OK (pre_attribution_historical)"
+echo "  - 10c) $ATTRIBUTION_DEPLOY_DAY: warmup_or_deploy_window, Skipped=tak, WERDYKT OK, brak CRITICAL"
+echo ""
 echo "Opcjonalnie (NIE uruchamiaj w tym skrypcie automatycznie):"
 echo "  cd $PNEADM_DIR"
-echo "  $PHP_BIN artisan analytics:aggregate-order-forms --date=$TODAY --rebuild"
-echo "  $PHP_BIN artisan analytics:order-form-funnel-healthcheck --from=$TODAY --to=$TODAY"
+echo "  $PHP_BIN artisan analytics:aggregate-order-forms --date=$ATTRIBUTION_DEPLOY_DAY --rebuild"
+echo "  $PHP_BIN artisan analytics:order-form-funnel-healthcheck --from=$ATTRIBUTION_DEPLOY_DAY --to=$ATTRIBUTION_DEPLOY_DAY"
