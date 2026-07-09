@@ -47,7 +47,7 @@ Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Loka
 5. Po konfiguracji produkcji zrotować ujawnione w rozmowie hasło do bazy analitycznej.
 6. Zweryfikować connection `analytics`, worker kolejki `analytics`, dashboard i panel debug na produkcji.
 7. Przetestować filtry dashboardu (daty, kampania, kurs, landing target) na realnych danych.
-8. Etap 2C-1 wdrożony (`invoice_created`; observer w `pneadm`, zgodnie z ADR-005: zafakturowane ≠ opłacone). Następny krok: agregaty rozliczeń (`paid_orders` online + `invoiced_orders` z `invoice_created`) lub komenda rekonsyliacyjna dla zaległych `invoice_number` ustawionych poza Eloquent.
+8. Taksonomia formularza v2 — Etap 2F (`traffic_channel` / atrybucja) wdrożony. Następny krok: agregaty i raporty jakości danych cięte po kanałach (przed pełnym dashboardem GUS).
 9. Rozważyć progi alertów dashboardu po pierwszych tygodniach obserwacji.
 10. Skonsultować z ChatGPT kolejny etap (płatności, JS, porzucenia) po akceptacji właściciela.
 
@@ -87,6 +87,7 @@ Etap 1:
 - utworzenie zamówienia płatności online: wdrożono w 2A-2 (`payment_order_created`),
 - status płatności: wdrożono w 2B-1 (`payment_status_changed`; webhook + return sync PayU/PayNow),
 - zafakturowanie: wdrożono w 2C-1 (`invoice_created`; observer `FormOrderObserver` w `pneadm`, przejście invoice_number empty→present),
+- taksonomia formularza v2: wdrożono pierwszy fundament (`AnalyticsEventContract`, `form_session_id`, endpoint JS akceptuje nowe eventy),
 - agregaty/dashboard płatności i faktur: nie wdrożono.
 
 ### Decyzja terminologiczna: `invoice_number` = zafakturowane, nie opłacone (ADR-005) — ZAAKCEPTOWANA
@@ -270,6 +271,14 @@ Po każdej implementacji należy:
 - **Predefiniowane zakresy dat (oba dashboardy):** ✅ wdrożone produkcyjnie (`pneadm` `9f9fd23`, 2026-06-26).
 - **Healthcheck `analytics:abandonment-healthcheck`:** ✅ wdrożone produkcyjnie (`pneadm` `6608791`, 2026-06-26).
 - **Porównanie okres-do-okresu (oba dashboardy):** ✅ wdrożone produkcyjnie (`pneadm` `5526e96`, 2026-06-26). Delty KPI vs poprzedni okres o tej samej długości.
+
+## Form v2 + B4+ agregaty lejka (2026-07-09, lokalnie)
+
+- **2F traffic_channel / atrybucja (`pnedu`):** `TrafficChannelClassifier`, `OrderFormAttributionService`, tabela `order_form_attributions`, touch model, `conversion_reporting_channel`. Testy: 25 passed.
+- **B4+ agregaty lejka (`pneadm`):** 5 tabel dziennych na `pne_analytics`, komenda `analytics:aggregate-order-forms`, dashboard `analytics.order-form-funnels.index`, CSV AI-safe. **B3 abandonments bez zmian.** Testy: `AnalyticsOrderFormFunnelAggregationTest` — 16 passed.
+- **Deploy prod (jedno okno):** najpierw migracje `pneadm` na `pne_analytics`, potem deploy `pnedu` (jeśli 2F jeszcze nie na prod), backfill **od początku eventów v2**, cron **03:45 od razu**.
+- **Dashboard:** tabele kurs × kanał i kampanie widoczne w UI (nie tylko CSV).
+- **Dokumentacja:** `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`.
 
 ## Walidacja produkcyjna B2/B3 (2026-06-26)
 

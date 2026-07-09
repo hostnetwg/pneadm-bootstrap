@@ -351,6 +351,29 @@ Nie wdrażać teraz:
 
 Status: nie wdrożono.
 
+#### Taksonomia Formularza v2 — Fundament Dalszej Analityki
+
+Status: kontrakt 2A/2B + emisja podstawowych eventów v2 z JS (Etap 2C) + jawne sekcje v2 i `form_field_changed` (Etap 2D) + eventy GUS/NIP (Etap 2E) wdrożone lokalnie w `pnedu.pl` (2026-07-09).
+
+Zakres wdrożony:
+
+- kontrakt `AnalyticsEventContract` i `tracking_schema_version=2`,
+- akceptacja docelowych eventów klienta w `POST /analytics/client-events`,
+- zgodność wsteczna z legacy eventami B1/B2,
+- `form_session_id` jako alias istniejącego `order_form_session_id`, dostępny w konfiguracji JS i backendzie,
+- rozszerzona whitelistowana sanitizacja metadanych technicznych,
+- emisja JS: `form_visible`, `form_first_interaction`, `form_section_viewed/started/completed`, `form_submit_clicked`, `client_validation_failed`, `form_last_activity`,
+- jawne `data-analytics-section-v2` w HTML + `form_field_changed` (max raz na pole/sesję, bez wartości pól),
+- `form_last_activity.last_activity_type` dla aktywności bez osobnego eventu,
+- eventy GUS/NIP (Etap 2E): clicked/started/success/error/applied/edited_after_gus/manual_fallback.
+- `traffic_channel` i first/last/current/last_external/internal touch (Etap 2F): klasyfikacja kanałów, tabela `order_form_attributions`, snapshoty w `order_form_viewed` / `form_order_created`.
+
+Nadal do wdrożenia w kolejnych podetapach:
+
+- agregaty i raporty jakości danych cięte po `traffic_channel`,
+- sanity checki atrybucji,
+- fundament Google Search Console.
+
 ### Kryteria Gotowości Do Implementacji Etapu 0
 
 Spełnione lokalnie:
@@ -532,6 +555,7 @@ Poza zakresem obecnego modelu (osobne przyszłe eventy/decyzje, NIE teraz): reko
 > - **B5 (CSV AI-safe export)** — ✅ wdrożone produkcyjnie (`pneadm` `cb8046a`, 2026-06-26). Eksport CSV per kurs i per kampania, agregaty B3/B4, bez raw eventów/sesji/PII.
 > - **B6 (wykres trendu dziennego + dzienny CSV)** — ✅ wdrożone produkcyjnie (`pneadm` `5a2e2b5`, 2026-06-26). Wykres Chart.js `sessions_total` vs `converted` + dzienny CSV (jeden wiersz na `stat_date`). Bez PII, bez migracji.
 > - **Dodatki UI/ops (prod 2026-06-26):** przycisk „Przelicz porzucenia” (`69d6e83`), presety zakresów dat (`9f9fd23`), komenda `analytics:abandonment-healthcheck` (`6608791`), porównanie okres-do-okresu na dashboardach (`5526e96`). Prod HEAD: `5526e96`.
+> - **B4+ (agregaty lejka per kanał, 2026-07-09, lokalnie `pneadm`):** tabele `analytics_daily_channel_funnels`, `analytics_daily_course_channel_funnels`, `analytics_daily_campaign_funnels`, `analytics_daily_gus_channel_funnels`, `analytics_daily_data_quality`. Komenda `analytics:aggregate-order-forms`. Dashboard `Lejek formularza (kanały)`. B3 abandonments **bez zmian**. Spec: [`STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`](./STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md).
 >
 > Uwaga: poniższa lista eventów to wcześniejszy szerszy szkic; B1 świadomie startuje z węższym, bezpieczniejszym MVP (4 eventy), żeby ograniczyć szum i ryzyko PII.
 

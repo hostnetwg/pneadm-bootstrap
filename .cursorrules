@@ -218,19 +218,20 @@ Schema::create('online_payment_orders', ...); // Domyślnie baza pneadm
 
 **ZASADA:** Migracja zawsze w projekcie, który odpowiada za bazę danych, do której należy tabela!
 
-## 💬 Forma komunikacji AI ↔ Człowiek ↔ ChatGPT (OBOWIĄZKOWE)
+## 💬 Forma komunikacji Waldemar ↔ ChatGPT ↔ Cursor (OBOWIĄZKOWE)
 
-Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md`.
+Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.0).
 
-Po KAŻDEJ zakończonej akcji/kroku przygotuj **dwa podsumowania**:
+**Role:** Waldemar — decyzje biznesowe i prod; ChatGPT — konsultant i prompty wdrożeniowe; Cursor — implementacja, testy, fakty z repo.
 
-1. **Dla człowieka (proste)** — krótko, prostym językiem (po polsku), bez żargonu: co zrobiono, co to znaczy w praktyce, co dalej.
-2. **Techniczne jako prompt do ChatGPT** — w **bloku kodu Markdown** do skopiowania; samowystarczalne (ChatGPT nie zna historii czatu w Cursorze): zmienione pliki, miejsca podłączenia, payloady/kontrakty, decyzje, RODO/bezpieczeństwo, wyniki testów, czego nie ruszono, ryzyka. Bez sekretów.
+**Zasada główna:** najpierw pytania i decyzje, potem prompt/implementacja. Jeśli brakuje decyzji, ryzyko UX/zamówień lub są dwa warianty — **zatrzymaj się (tryb B)**, nie wdrażaj. Pytania decyzyjne **przed** kodowaniem, nie na końcu zakończonego etapu.
 
-Na końcu zadawaj **kluczowe pytania**:
-- decyzyjne/biznesowe → do człowieka (to on podejmuje decyzje, jest najważniejszy),
-- techniczne/architektoniczne/weryfikacja modelu → do ChatGPT w prompcie.
+**Tryby:** A = jasny zakres → wdrażaj | B = brak decyzji → pytaj | C = brak faktów → diagnozuj, potem propozycja.
 
-Kolejność odpowiedzi: (1) info o akcji, (2) podsumowanie dla człowieka, (3) prompt do ChatGPT, (4) następny rekomendowany krok, (5) pytania.
+Po **znaczącym** etapie: raport **11 punktów** (kontekst, wdrożone, nie wdrożone, pliki, migracje/komendy, testy, ryzyka tech/prod, pytania→Waldemar, pytania→ChatGPT, następny krok) oraz:
+1. Podsumowanie dla Waldemara (proste, po polsku)
+2. Prompt techniczny do ChatGPT (blok kodu Markdown, bez sekretów)
 
-Pełna struktura **tylko po znaczących krokach** (wdrożenie etapu, większa zmiana, analiza/decyzja, commit). Przy drobnych akcjach — nie wymagana.
+Kolejność odpowiedzi: akcja → podsumowanie człowiek → prompt ChatGPT → następny krok → pytania uzupełniające.
+
+Przy **drobnych** akcjach pełna struktura nie jest wymagana. Nie commituj bez prośby Waldemara.

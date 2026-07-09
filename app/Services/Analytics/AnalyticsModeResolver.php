@@ -60,6 +60,12 @@ class AnalyticsModeResolver
             AnalyticsEventName::PaymentOrderCreated->value,
             AnalyticsEventName::PaymentStatusChanged->value,
             AnalyticsEventName::InvoiceCreated->value,
+            AnalyticsEventName::OrderFormStarted->value,
+            AnalyticsEventName::OrderFormSubmitClicked->value,
+            AnalyticsEventName::FormFirstInteraction->value,
+            AnalyticsEventName::FormSubmitClicked->value,
+            AnalyticsEventName::ServerSubmitAttempted->value,
+            AnalyticsEventName::OrderCreated->value,
         ];
 
         if ($mode === AnalyticsMode::Light) {
@@ -71,6 +77,7 @@ class AnalyticsModeResolver
             AnalyticsEventName::CourseDescriptionViewed->value,
             AnalyticsEventName::OrderFormViewed->value,
             AnalyticsEventName::FormOrderCreated->value,
+            AnalyticsEventName::OrderCreated->value,
         ];
 
         return $mode === AnalyticsMode::AggregateOnly

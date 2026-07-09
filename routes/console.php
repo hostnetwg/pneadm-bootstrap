@@ -27,3 +27,10 @@ Schedule::command('participants:send-access-expiry-reminders')
     ->dailyAt($reminderTime)
     ->timezone($reminderTimezone)
     ->when(fn () => (bool) config('participant_access.expiry_reminder.enabled', true));
+
+$analyticsTimezone = (string) config('analytics.order_form_funnel.timezone', 'Europe/Warsaw');
+
+Schedule::command('analytics:aggregate-order-forms')
+    ->dailyAt('03:45')
+    ->timezone($analyticsTimezone)
+    ->withoutOverlapping(30);

@@ -11,7 +11,59 @@ Kod Etapu 0, 1A, 1A-Debug, 1B-1, 1B-2, 1C, 1D, 2A-1, 2A-2, 2B-1 i 2C-1 został w
 
 **Etap B (JS tracking):** wdrożono produkcyjnie **B1** + **B1a** (`pnedu` `6b32a4d`), **B2** (`pnedu` `bdc74ca`), **B3** (`pneadm` `b0b4535`, agregacja porzuceń, 2026-06-25), **B4–B6** + recompute + presety + healthcheck + porównanie okresów (`pneadm` `a6ee852`–`5526e96`, 2026-06-26) oraz **linki w sales-funnel** (`pneadm` `60acc21`). Prod HEAD: `5526e96`. Pełny opis: `docs/analytics/STAGE_B_CLIENT_TRACKING.md`.
 
-## Zasada Nadrzędna
+**Taksonomia formularza v2 (2026-07-09):** wdrożono lokalnie pierwszy bezpieczny krok rozbudowy analityki formularza bez zmian UI:
+
+- `App\Services\Analytics\AnalyticsEventContract` w `pnedu`,
+- `tracking_schema_version=2` w metadata eventów klienta,
+- docelowe eventy klienta przyjmowane przez endpoint: `form_visible`, `form_first_interaction`, `form_section_viewed`, `form_section_started`, `form_section_completed`, `form_field_changed`, `form_submit_clicked`, `client_validation_failed`, `form_last_activity`,
+- legacy eventy B1/B2 nadal działają,
+- `form_session_id` jest bezpiecznym aliasem istniejącego `order_form_session_id`; frontend dostaje UUID w configu JS, a backend zapisuje go w kolumnie `order_form_session_id`,
+- sanitizer przepuszcza wyłącznie techniczne metadane v2, bez wartości pól i bez PII.
+
+**Form v2 JS — Etap 2C (2026-07-09):** wdrożono lokalnie minimalną emisję eventów v2 z `resources/views/courses/partials/order-form-client-tracking.blade.php`:
+
+- 8 eventów v2 (visible, first_interaction, section viewed/started/completed, submit_clicked, client_validation_failed, last_activity),
+- IntersectionObserver dla `form_visible` i `form_section_viewed`,
+- idempotencja po stronie JS (flagi per sesja/sekcja),
+- mapowanie legacy `data-analytics-section` → sekcje v2 bez zmiany markupu,
+- legacy B1/B2 nadal emitowane,
+- testy: `tests/Feature/AnalyticsOrderFormClientTrackingV2Test.php` (13 testów).
+
+**Form v2 — Etap 2D (2026-07-09):** jawne `data-analytics-section-v2` w HTML formularza + kontrolowany `form_field_changed`:
+
+- atrybuty v2 na wszystkich sekcjach lejka (consents jako niewidoczny marker),
+- JS preferuje `data-analytics-section-v2`, fallback legacy,
+- `form_field_changed` max raz na pole/sesję, debounce + blur, bez wartości pól,
+- `form_last_activity.last_activity_type` dla typu aktywności,
+- testy: `AnalyticsOrderFormClientTrackingStage2DTest` (13).
+
+**Form v2 — Etap 2E GUS/NIP (2026-07-09):** tracking przycisków „Pobierz dane z GUS”:
+
+- `GusAnalyticsTracker` + rozszerzony `GusLookupController` (backend started/success/error),
+- JS bridge `window.pneOrderFormAnalytics` + collector (frontend clicked/applied/edited/fallback),
+- `data-gus-target` na przyciskach, opcjonalny kontekst analityczny w żądaniu GUS (`course_id`, `form_session_id`),
+- testy: `AnalyticsGusTrackingStage2ETest` (13).
+
+**Form v2 — Etap 2F traffic_channel / atrybucja (2026-07-09):**
+
+- `TrafficChannelClassifier` + `OrderFormAttributionService` (first/last/current/last_external/internal touch),
+- tabela `order_form_attributions` w `pne_analytics` (migracja `pneadm`),
+- `CaptureMarketingSource` aktualizuje touch model przy każdym żądaniu,
+- `order_form_viewed` — pełny snapshot; `form_order_created` — snapshot raportowy z DB,
+- eventy JS v2 i GUS dostają `traffic_channel` / `conversion_reporting_channel` z serwera,
+- bez pełnych `fbclid`/`gclid`/`msclkid`; tylko flagi `*_present`,
+- testy: `AnalyticsTrafficChannelStage2FTest` (25).
+
+**Form v2 — Etap B4+ agregaty lejka per kanał (2026-07-09, `pneadm`):**
+
+- 5 tabel `analytics_daily_*_funnels` na `pne_analytics` (nie rozszerza B3),
+- komenda `analytics:aggregate-order-forms` (idempotentna, unikalne `form_session_id`),
+- dashboard `analytics.order-form-funnels.index` + CSV (kanały, kursy, kampanie, GUS, jakość),
+- `gus_conversion_delta` = korelacja obserwacyjna; `internal_promo_placement` = wymiar diagnostyczny,
+- testy: `AnalyticsOrderFormFunnelAggregationTest` (16),
+- pełna spec: `docs/analytics/STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`.
+
+Następny krok formularza (opcjonalnie): cron prod 03:45, backfill historyczny, rozszerzenie UI dashboardu.
 
 Analityka nie może blokować:
 

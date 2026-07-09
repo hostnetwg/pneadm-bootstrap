@@ -109,6 +109,66 @@ Dozwolone przykłady:
 > - **Same-origin guard** — żądania z obcego hosta (`Origin`/`Referer` po HOŚCIE) są ciche (`204`), bez zapisu; przy obu pustych nagłówkach: best-effort (nie blokujemy). CSRF-exempt zostaje (wsparcie `sendBeacon`). Nie logujemy URL-i/referrerów; do analityki trafia tylko `referrer_domain`.
 > - **`event_uuid` namespacowany serwerowo** — klientowski UUID jest **tylko seedem deduplikacji**; finalny `event_uuid` to deterministyczny UUIDv5 z `client_js|{order_form_session_id}|{event_name}|{client_event_uuid}` (mieści się w `char(36)`). Brak/niepoprawny UUID klienta → serwer generuje własny. `client_event_uuid` nie jest zapisywany do metadata.
 >
+> **Taksonomia formularza v2 — kontrakt 2A/2B (2026-07-09):** wdrożono w `pnedu` bez zmiany UI formularza:
+>
+> - centralny kontrakt `AnalyticsEventContract` z `tracking_schema_version=2`,
+> - akceptację docelowych eventów klienta: `form_visible`, `form_first_interaction`, `form_section_viewed`, `form_section_started`, `form_section_completed`, `form_field_changed`, `form_submit_clicked`, `client_validation_failed`, `form_last_activity`,
+> - kompatybilność legacy: `order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked` nadal działają,
+> - bezpieczny alias sesji: `form_session_id` = `order_form_session_id` (UUID), dostępny dla JS i backendu, zapisywany w istniejącej kolumnie `order_form_session_id`,
+> - whitelisty sekcji, pól, typów pól, źródeł zmiany i kodów walidacji; wartości pól nadal są zakazane.
+>
+> **Form v2 JS — Etap 2C (2026-07-09):** wdrożono emisję podstawowych eventów lejka z JS (`order-form-client-tracking.blade.php`) bez zmiany UI:
+>
+> - `form_visible` — IntersectionObserver na formularzu, raz na `form_session_id`,
+> - `form_first_interaction` — pierwszy focus/click/change/input, raz na sesję,
+> - `form_section_viewed` — IntersectionObserver per sekcja v2 (`contact`, `invoice_buyer`, `invoice_recipient`, `participants`, `payment`, `submit`; `consents` pomijane gdy brak w DOM),
+> - `form_section_started` — pierwsza akcja w sekcji, raz na sekcję,
+> - `form_section_completed` — lokalna kompletność wymaganych widocznych pól, raz na sekcję,
+> - `form_submit_clicked` — klik submit (bez `preventDefault`), metadane: `completed_sections_count`, `visible_validation_errors_count`, `selected_payment_method`, `seconds_from_page_load`,
+> - `client_validation_failed` — gdy HTML5 `checkValidity()` blokuje submit; tylko klucze pól/sekcji i kody walidacji,
+> - `form_last_activity` — throttle 5 s przy istotnych akcjach,
+> - legacy B1/B2 (`order_form_started`, `order_form_section_interacted`, `order_form_cta_clicked`, `order_form_submit_clicked`) nadal emitowane równolegle,
+> - mapowanie legacy `data-analytics-section` → kanoniczne sekcje v2 po stronie JS (bez zmiany markupu),
+> - `form_field_changed` NIE jest jeszcze emitowany jako osobny event (tylko wewnętrznie do `form_last_activity`),
+> - testy: `AnalyticsOrderFormClientTrackingV2Test` + rozszerzenie B2.
+>
+> **Form v2 — Etap 2D (2026-07-09):** jawne sekcje HTML + kontrolowany `form_field_changed`:
+>
+> - `data-analytics-section-v2` na sekcjach: contact, invoice_buyer, invoice_recipient, participants, payment, consents (marker `visually-hidden`), submit,
+> - legacy `data-analytics-section` zachowane dla B1/B2,
+> - JS v2 preferuje `data-analytics-section-v2`, fallback do mapowania legacy,
+> - `form_field_changed`: max raz na `field_key` / sesję, debounce 400 ms + blur/change, bez wartości pól,
+> - payload: `section_key`, `field_key`, `field_type`, `source` (manual/browser_autofill/copied/unknown), `has_value`, `seconds_from_page_load`,
+> - `form_last_activity` używa `last_activity_type` (np. `field_changed`); `last_event_name` tylko gdy event faktycznie wysłany,
+> - `source=gus` i eventy GUS/NIP — następny Etap 2E,
+> - testy: `AnalyticsOrderFormClientTrackingStage2DTest` (13).
+>
+> **Form v2 — Etap 2E GUS/NIP (2026-07-09):** eventy analityczne dla przycisków „Pobierz dane z GUS”:
+>
+> - frontend: `gus_lookup_clicked`, `gus_data_applied`, `form_field_edited_after_gus`, `gus_manual_fallback_started`,
+> - backend: `gus_lookup_started`, `gus_lookup_success`, `gus_lookup_error` (`GusAnalyticsTracker` + `GusLookupController`),
+> - `data-gus-target="buyer|recipient"` na przyciskach GUS (bez zmiany tekstu/wyglądu),
+> - brak NIP-u i danych z GUS w payloadach; `nip_present` / `nip_format_valid_client` to wyłącznie flagi techniczne,
+> - `form_field_edited_after_gus` max 1× na `field_key`/sesję po uzupełnieniu z GUS,
+> - `gus_manual_fallback_started` max 1× na `target` po błędzie GUS,
+> - następny etap: `traffic_channel` / podstawowa atrybucja źródeł ruchu.
+>
+> **Form v2 — Etap 2F traffic_channel / atrybucja (2026-07-09):**
+>
+> - kanały: `newsletter`, `paid_social`, `organic_search`, `direct`, `referral`, `internal_site`, `paid_search`, `organic_social`, `unknown`, `other`,
+> - model touch: `first_touch`, `last_touch`, `current_touch`, `last_external_touch`, `internal_touch` — zapisywane równolegle (nie tylko first/last),
+> - `conversion_reporting_channel` = `last_external_touch_channel` (fallback: `current_channel` → `unknown`),
+> - `traffic_channel` domyślnie = `conversion_reporting_channel`; **ruch wewnętrzny `internal_site` nie nadpisuje** zewnętrznego źródła pozyskania,
+> - **direct nie nadpisuje** znanego `first_touch` w tej samej ścieżce,
+> - pełne click ID (`fbclid`, `gclid`, `msclkid`) **nie są zapisywane** — tylko flagi `*_present`,
+> - tabela `order_form_attributions` (connection `analytics`, migracja w `pneadm`), powiązanie po `form_session_id`,
+> - `order_form_viewed` zapisuje pełny snapshot atrybucji w metadata; `form_order_created` — snapshot raportowy z DB,
+> - eventy JS v2 i GUS/NIP dostają uproszczone pola (`traffic_channel`, `conversion_reporting_channel`, …) z serwera,
+> - testy: `AnalyticsTrafficChannelStage2FTest` (25),
+> - następny etap: agregaty / raporty jakości danych cięte po `traffic_channel` (GUS, porzucenia, konwersje per kanał).
+>
+> **B4+ (2026-07-09) — agregaty lejka formularza per kanał/kurs/kampania/GUS (`pneadm`):** nowa warstwa tabel `analytics_daily_*_funnels` (nie rozszerza B3). Komenda `analytics:aggregate-order-forms` (idempotentna, unikalne `form_session_id`, `lag=2`). Źródła: eventy v2 + legacy + `order_form_attributions`. Dashboard `analytics.order-form-funnels.index`, CSV AI-safe. `gus_conversion_delta` = korelacja, nie przyczynowość. `internal_promo_placement` = wymiar diagnostyczny. Pełna spec: [`STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md`](./STAGE_B4_ORDER_FORM_FUNNEL_AGGREGATES.md).
+>
 > **B3 (2026-06-25) — porzucenia to AGREGACJA, nie event JS (`pneadm` `b0b4535`, wdrożone produkcyjnie):** NIE ma eventu `order_form_abandoned`. Komenda `analytics:aggregate-abandonments` przelicza dzienne kubełki porzuceń z istniejących eventów funnelowych (`order_form_viewed`, `order_form_started`, `order_form_submit_clicked`, `order_form_submit_attempted`, `form_order_created`) grupując po `order_form_session_id`. Sesja liczona wg **dnia pierwszego eventu** (Europe/Warsaw); kampania przypisywana **first-touch** w obrębie sesji; `lag=2` dni; bez PII. Tabele `analytics_daily_form_abandonment_stats` / `analytics_daily_campaign_abandonment_stats` (connection `analytics`). Cron 03:15 Europe/Warsaw.
 >
 > **B4 (dashboard porzuceń, `pneadm`):** dashboard read-only `analytics.form-abandonments.index` (menu `Analityka → Porzucenia formularza`) czyta WYŁĄCZNIE agregaty B3 (`analytics_daily_form_abandonment_stats`, `analytics_daily_campaign_abandonment_stats`) — **nie skanuje `analytics_events`**. Pokazuje dane per kurs i per kampania, kubełki porzuceń (rozłączne, sumują się do `sessions_total`), `lag=2`, first-event day attribution, first-touch campaign attribution, brak PII.

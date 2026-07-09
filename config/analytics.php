@@ -67,6 +67,27 @@ return [
         'recompute_max_days' => (int) env('ANALYTICS_FORM_ABANDONMENT_RECOMPUTE_MAX_DAYS', 92),
     ],
 
+    // Etap B4+ — agregaty lejka formularza per traffic_channel / kurs / kampania / GUS / jakość danych.
+    'order_form_funnel' => [
+        'timezone' => env('ANALYTICS_ORDER_FORM_FUNNEL_TIMEZONE', env('ANALYTICS_AGGREGATION_TIMEZONE', 'Europe/Warsaw')),
+        'aggregation_lag_days' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_LAG_DAYS', 2),
+        'grace_period_soft_minutes' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_GRACE_SOFT_MINUTES', 15),
+        'grace_period_final_minutes' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_GRACE_FINAL_MINUTES', 60),
+        'data_quality_min_sessions' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_DQ_MIN_SESSIONS', 30),
+        'warmup_hours' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_WARMUP_HOURS', 24),
+        // Data pierwszego wdrożenia trackingu v2 — okno warmup_or_deploy_window (Europe/Warsaw).
+        'tracking_deployed_at' => env('ANALYTICS_ORDER_FORM_V2_DEPLOYED_AT', '2026-07-01'),
+        'healthcheck_v2_window_minutes' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_HC_V2_WINDOW_MINUTES', 60),
+    ],
+
+    'order_form_funnel_dashboard' => [
+        'enabled' => (bool) env('ANALYTICS_ORDER_FORM_FUNNEL_DASHBOARD_ENABLED', true),
+        'timezone' => env('ANALYTICS_ORDER_FORM_FUNNEL_DASHBOARD_TIMEZONE', env('ANALYTICS_ORDER_FORM_FUNNEL_TIMEZONE', 'Europe/Warsaw')),
+        'default_days' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_DASHBOARD_DEFAULT_DAYS', 14),
+        'max_days' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_DASHBOARD_MAX_DAYS', 366),
+        'recompute_max_days' => (int) env('ANALYTICS_ORDER_FORM_FUNNEL_RECOMPUTE_MAX_DAYS', 92),
+    ],
+
     // Blok „Aktywni teraz” na dashboardzie zamówień (polling z analytics_events, lejek sprzedaży).
     'live_visitors_dashboard' => [
         'enabled' => (bool) env('ANALYTICS_LIVE_VISITORS_DASHBOARD_ENABLED', true),
