@@ -126,4 +126,74 @@ class MarketingCampaignUrlBuilderTest extends TestCase
         $this->assertStringContainsString('utm_content=carousel-ad', $urls['utm']);
         $this->assertSame('carousel-ad', $urls['utm_content']);
     }
+
+    public function test_campaign_order_form_path_uses_stored_legacy_variant(): void
+    {
+        $sourceType = new MarketingSourceType([
+            'utm_source' => 'newsletter',
+            'default_utm_medium' => 'email',
+        ]);
+
+        $campaign = new MarketingCampaign([
+            'campaign_code' => '2002',
+            'course_id' => 527,
+            'landing_target' => 'order_form',
+            'order_form_variant' => 'legacy',
+        ]);
+        $campaign->setRelation('sourceType', $sourceType);
+
+        $urls = (new MarketingCampaignUrlBuilder)->buildForCampaign($campaign);
+
+        $this->assertStringContainsString('/courses/527/order-form?', $urls['utm']);
+        $this->assertStringContainsString('form_variant=legacy', $urls['utm']);
+        $this->assertStringNotContainsString('order-form-v2', $urls['utm']);
+    }
+
+    public function test_build_for_campaign_uses_order_form_v2_path_when_configured(): void
+    {
+        $sourceType = new MarketingSourceType([
+            'utm_source' => 'newsletter',
+            'default_utm_medium' => 'email',
+        ]);
+
+        $campaign = new MarketingCampaign([
+            'campaign_code' => '2001',
+            'course_id' => 527,
+            'landing_target' => 'order_form',
+            'order_form_variant' => 'v2',
+        ]);
+        $campaign->setRelation('sourceType', $sourceType);
+
+        $urls = (new MarketingCampaignUrlBuilder)->buildForCampaign($campaign);
+
+        $this->assertStringContainsString('/courses/527/order-form?', $urls['utm']);
+        $this->assertStringContainsString('form_variant=v2', $urls['utm']);
+        $this->assertStringContainsString('/courses/527/order-form?', $urls['legacy']);
+        $this->assertStringContainsString('form_variant=v2', $urls['legacy']);
+    }
+
+    public function test_campaign_order_form_global_omits_form_variant_from_urls(): void
+    {
+        $sourceType = new MarketingSourceType([
+            'utm_source' => 'facebook',
+            'default_utm_medium' => 'paid',
+        ]);
+
+        $campaign = new MarketingCampaign([
+            'campaign_code' => '2003',
+            'course_id' => 527,
+            'landing_target' => 'order_form',
+            'order_form_variant' => 'global',
+        ]);
+        $campaign->setRelation('sourceType', $sourceType);
+
+        $urls = (new MarketingCampaignUrlBuilder)->buildForCampaign($campaign);
+
+        $this->assertStringContainsString('/courses/527/order-form?', $urls['utm']);
+        $this->assertStringNotContainsString('form_variant=', $urls['utm']);
+        $this->assertStringContainsString('utm_campaign=2003', $urls['utm']);
+        $this->assertStringContainsString('/courses/527/order-form?', $urls['legacy']);
+        $this->assertStringNotContainsString('form_variant=', $urls['legacy']);
+        $this->assertStringContainsString('fb=2003', $urls['legacy']);
+    }
 }

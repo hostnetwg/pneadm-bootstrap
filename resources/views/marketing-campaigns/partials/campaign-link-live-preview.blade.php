@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const customMediumCheckbox = document.getElementById('utm_medium_custom');
     const courseSelect = document.getElementById('course_id');
     const landingTargetSelect = document.getElementById('landing_target');
+    const orderFormVariantInputs = document.querySelectorAll('input[name="order_form_variant"]');
     const utmContentInput = document.getElementById('utm_content');
     const utmPreview = document.getElementById('campaign-link-preview-utm');
     const shortPreview = document.getElementById('campaign-link-preview-short');
@@ -123,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function () {
             || (typeMeta?.default_utm_content || '').trim();
         const courseId = (courseSelect?.value || '').trim();
         const landingTarget = landingTargetSelect?.value || 'order_form';
+        const orderFormVariantInput = document.querySelector('input[name="order_form_variant"]:checked');
+        const orderFormVariant = orderFormVariantInput?.value || 'global';
 
         let paramsText = 'utm_source=' + utmSource
             + ', utm_medium=' + utmMedium
@@ -155,10 +158,17 @@ document.addEventListener('DOMContentLoaded', function () {
         if (utmContent) {
             utmParams.utm_content = utmContent;
         }
+        if (landingTarget === 'order_form' && orderFormVariant !== 'global') {
+            utmParams.form_variant = orderFormVariant;
+        }
 
         const utmQuery = buildQuery(utmParams);
 
-        const legacyQuery = 'fb=' + encodeURIComponent(utmCampaign || '');
+        const legacyQuery = landingTarget === 'order_form'
+            ? buildQuery(orderFormVariant === 'global'
+                ? { fb: utmCampaign || '' }
+                : { fb: utmCampaign || '', form_variant: orderFormVariant })
+            : ('fb=' + encodeURIComponent(utmCampaign || ''));
 
         utmPreview.textContent = pneduBaseUrl + path + '?' + utmQuery;
         if (shortPreview && utmCampaign) {

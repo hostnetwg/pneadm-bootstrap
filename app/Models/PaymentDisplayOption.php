@@ -20,11 +20,18 @@ class PaymentDisplayOption extends Model
 
     protected $table = 'payment_display_options';
 
+    protected $attributes = [
+        'show_order_form_v2' => false,
+        'default_signup_order_form_variant' => 'legacy',
+    ];
+
     protected $fillable = [
         'show_pay_publigo',
         'show_pay_online',
         'show_deferred_order',
         'show_order_form',
+        'show_order_form_v2',
+        'default_signup_order_form_variant',
         'show_order_form_alt',
         'order_form_auto_fill_test_data',
         'order_form_auto_fill_test_data_enabled_at',
@@ -38,6 +45,7 @@ class PaymentDisplayOption extends Model
         'show_pay_online' => 'boolean',
         'show_deferred_order' => 'boolean',
         'show_order_form' => 'boolean',
+        'show_order_form_v2' => 'boolean',
         'show_order_form_alt' => 'boolean',
         'order_form_auto_fill_test_data' => 'boolean',
         'order_form_auto_fill_test_data_enabled_at' => 'datetime',
@@ -120,6 +128,8 @@ class PaymentDisplayOption extends Model
                 'show_pay_online' => true,
                 'show_deferred_order' => true,
                 'show_order_form' => true,
+                'show_order_form_v2' => false,
+                'default_signup_order_form_variant' => 'legacy',
                 'show_order_form_alt' => true,
                 'order_form_auto_fill_test_data' => false,
                 'order_form_auto_fill_test_data_enabled_at' => null,
@@ -134,6 +144,8 @@ class PaymentDisplayOption extends Model
             $fallback->show_pay_online = true;
             $fallback->show_deferred_order = true;
             $fallback->show_order_form = true;
+            $fallback->show_order_form_v2 = false;
+            $fallback->default_signup_order_form_variant = 'legacy';
             $fallback->show_order_form_alt = true;
             $fallback->order_form_auto_fill_test_data = false;
             $fallback->order_form_auto_fill_test_data_enabled_at = null;

@@ -53,12 +53,30 @@
                         'show_pay_publigo' => 'Zapłać online (Publigo — niebieski przycisk)',
                         'show_pay_online' => 'Zapłać online (PayU / PayNow — fioletowy przycisk)',
                         'show_deferred_order' => 'Formularz zamówienia z odroczonym terminem płatności (w PNEDU)',
-                        'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz zamówienia i płatności online)',
                         'show_order_form_alt' => 'Formularz zamówienia z odroczonym terminem płatności (link zdalna-lekcja.pl)',
                     ] as $key => $label)
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" name="{{ $key }}" id="{{ $key }}" value="1"
                                 {{ (optional($options)->{$key} ?? true) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="{{ $key }}">{{ $label }}</label>
+                        </div>
+                    @endforeach
+
+                    <hr class="my-4">
+
+                    <h6 class="text-uppercase text-muted small fw-semibold mb-3">Wersje formularza zamówienia</h6>
+                    <div class="alert alert-info py-2 px-3 small mb-3" role="note">
+                        <strong>Bezpieczeństwo sprzedaży:</strong> te checkboxy ukrywają lub pokazują przycisk „Zamawiam szkolenie” na stronie kursu.
+                        Linki kampanii (<code>/l/…</code>, UTM) i adres <code>/courses/&#123;id&#125;/order-form</code> nadal otwierają formularz — z parametrem
+                        <code>form_variant</code> lub bez niego (wariant globalny). Nie da się zapisać ustawień z wyłączonymi oboma wariantami naraz.
+                    </div>
+                    @foreach([
+                        'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz zamówienia i płatności online)',
+                        'show_order_form_v2' => 'Zamawiam szkolenie v2',
+                    ] as $key => $label)
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="{{ $key }}" id="{{ $key }}" value="1"
+                                {{ (optional($options)->{$key} ?? ($key !== 'show_order_form_v2')) ? 'checked' : '' }}>
                             <label class="form-check-label" for="{{ $key }}">
                                 @if($key === 'show_order_form')
                                     <span class="fw-bold">Zamawiam szkolenie</span> (uniwersalny formularz zamówienia i płatności online)
@@ -66,8 +84,34 @@
                                     {{ $label }}
                                 @endif
                             </label>
+                            @if($key === 'show_order_form_v2')
+                                <div class="form-text text-muted small">
+                                    Włącza wariant V2 (kreator). Wyłączenie nie psuje linków kampanii z <code>form_variant=v2</code> — pokażą formularz legacy, jeśli jest włączony.
+                                </div>
+                            @elseif($key === 'show_order_form')
+                                <div class="form-text text-muted small">
+                                    Główny formularz uniwersalny (legacy). Zalecane: zawsze włączony na produkcji.
+                                </div>
+                            @endif
                         </div>
                     @endforeach
+
+                    <div class="mt-3 pt-3 border-top">
+                        @include('settings.partials.order-form-variant-radios', [
+                            'fieldName' => 'default_signup_order_form_variant',
+                            'fieldIdPrefix' => 'default_signup_order_form_variant',
+                            'selectedVariant' => old(
+                                'default_signup_order_form_variant',
+                                optional($options)->default_signup_order_form_variant ?? 'legacy'
+                            ),
+                            'legend' => 'Domyślna wersja formularza zamówienia',
+                            'hint' => 'Przycisk „Zapisz się” (strona główna, oferta) oraz „Zamawiam szkolenie” na stronie kursu — zawsze jeden aktywny wariant.',
+                        ])
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h6 class="text-uppercase text-muted small fw-semibold mb-3">Automatyczne wypełnianie formularza (testy)</h6>
 
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox"
@@ -79,7 +123,7 @@
                             Automatyczne wypełnianie formularza zamówienia danymi testowymi (wyłącznie dla kont waldemar.grabowski@hostnet.pl oraz luman0599@gmail.com)
                         </label>
                         <div class="form-text text-muted small">
-                            Działa tylko dla zalogowanych użytkowników z podanymi adresami e-mail. Nie wyłącza się automatycznie.
+                            Pokazuje przycisk „Wypełnij dane testowe” na formularzu zamówienia (legacy i V2) dla zalogowanych kont z podanych adresów. Pola nie są wypełniane automatycznie — dopiero po kliknięciu przycisku.
                         </div>
                     </div>
                     <div class="form-check mb-3">
@@ -92,7 +136,7 @@
                             Automatyczne wypełnianie formularza zamówienia danymi testowymi (ułatwia testy; niewidoczne na stronie kursu)
                         </label>
                         <div class="form-text text-danger small">
-                            Bez ograniczeń e-mail (także dla niezalogowanych). Na produkcji wyłącza się automatycznie po {{ \App\Models\PaymentDisplayOption::UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES }} min od włączenia — także w tym panelu, bez ręcznego odznaczania.
+                            Pokazuje przycisk „Wypełnij dane testowe” na formularzu (legacy i V2) dla <strong>wszystkich</strong> odwiedzających — także niezalogowanych. Pola <strong>nie</strong> wypełniają się automatycznie; tylko po kliknięciu przycisku. Na produkcji opcja wyłącza się automatycznie po {{ \App\Models\PaymentDisplayOption::UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES }} min od włączenia (także w tym panelu).
                         </div>
                     </div>
                 </div>

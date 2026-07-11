@@ -19,6 +19,7 @@ class MarketingCampaign extends Model
         'utm_content',
         'course_id',
         'landing_target',
+        'order_form_variant',
         'is_active',
     ];
 

@@ -7,6 +7,7 @@ use App\Models\MarketingSourceType;
 use App\Models\Course;
 use App\Services\MarketingCampaignUrlBuilder;
 use App\Services\MarketingCampaignStatsService;
+use App\Support\OrderFormVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -131,6 +132,7 @@ class MarketingCampaignController extends Controller
             'utm_content' => 'nullable|string|max:100',
             'course_id' => 'nullable|integer|exists:courses,id',
             'landing_target' => 'nullable|in:course_show,order_form',
+            'order_form_variant' => 'nullable|in:legacy,v2,global',
             'is_active' => 'boolean',
         ]);
 
@@ -153,7 +155,7 @@ class MarketingCampaignController extends Controller
 
         $data = $request->only([
             'name', 'description', 'source_type_id',
-            'course_id', 'landing_target', 'is_active',
+            'course_id', 'landing_target', 'order_form_variant', 'is_active',
         ]);
         $data['campaign_code'] = $campaignCode;
         $data['utm_medium'] = $this->resolveCampaignUtmMedium($request);
@@ -161,6 +163,10 @@ class MarketingCampaignController extends Controller
         if (blank($data['landing_target'] ?? null)) {
             $data['landing_target'] = 'order_form';
         }
+        $data['order_form_variant'] = OrderFormVariant::normalizeCampaignVariant(
+            $data['order_form_variant'] ?? null,
+            OrderFormVariant::GLOBAL
+        );
 
         $campaign = MarketingCampaign::create($data);
 
@@ -186,6 +192,7 @@ class MarketingCampaignController extends Controller
             'source_type_id' => $marketingCampaign->source_type_id,
             'course_id' => $marketingCampaign->course_id,
             'landing_target' => $marketingCampaign->landing_target ?: 'order_form',
+            'order_form_variant' => $marketingCampaign->order_form_variant ?: OrderFormVariant::LEGACY,
             'utm_content' => $marketingCampaign->utm_content
                 ?: $marketingCampaign->sourceType?->default_utm_content,
             'utm_medium_custom' => $hasCustomMedium ? '1' : null,
@@ -307,6 +314,7 @@ class MarketingCampaignController extends Controller
             'utm_content' => 'nullable|string|max:100',
             'course_id' => 'nullable|integer|exists:courses,id',
             'landing_target' => 'nullable|in:course_show,order_form',
+            'order_form_variant' => 'nullable|in:legacy,v2,global',
             'is_active' => 'boolean',
         ]);
 
@@ -315,10 +323,14 @@ class MarketingCampaignController extends Controller
         $marketingCampaign->update([
             ...$request->only([
                 'campaign_code', 'name', 'description', 'source_type_id',
-                'course_id', 'landing_target', 'is_active',
+                'course_id', 'landing_target', 'order_form_variant', 'is_active',
             ]),
             'utm_medium' => $this->resolveCampaignUtmMedium($request),
             'utm_content' => $this->normalizeCampaignUtmContent($request),
+            'order_form_variant' => OrderFormVariant::normalizeCampaignVariant(
+                $request->input('order_form_variant'),
+                OrderFormVariant::GLOBAL
+            ),
         ]);
 
         return redirect()->route('marketing-campaigns.show', $marketingCampaign)

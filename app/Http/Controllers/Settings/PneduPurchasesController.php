@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentDisplayOption;
 use App\Services\FunnelSkipService;
+use App\Support\OrderFormVariant;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -141,6 +142,8 @@ class PneduPurchasesController extends Controller
             'show_pay_online' => 'boolean',
             'show_deferred_order' => 'boolean',
             'show_order_form' => 'boolean',
+            'show_order_form_v2' => 'boolean',
+            'default_signup_order_form_variant' => 'nullable|in:legacy,v2',
             'show_order_form_alt' => 'boolean',
             'order_form_auto_fill_test_data_developers_only' => 'boolean',
             'order_form_auto_fill_test_data' => 'boolean',
@@ -151,6 +154,7 @@ class PneduPurchasesController extends Controller
             'show_pay_online' => 'Zapłać online (PayU / PayNow)',
             'show_deferred_order' => 'Formularz z odroczonym terminem (PNEDU)',
             'show_order_form' => 'Zamawiam szkolenie (uniwersalny formularz)',
+            'show_order_form_v2' => 'Zamawiam szkolenie v2',
             'show_order_form_alt' => 'Formularz z odroczonym terminem (zdalna-lekcja.pl)',
             'order_form_auto_fill_test_data_developers_only' => 'Auto-wypełnianie formularza danymi testowymi (konta deweloperskie)',
             'order_form_auto_fill_test_data' => 'Auto-wypełnianie formularza danymi testowymi',
@@ -168,11 +172,29 @@ class PneduPurchasesController extends Controller
                 ->with('error', 'Nie można zapisać opcji dla kont deweloperskich — brak kolumny w bazie. Na serwerze produkcyjnym uruchom: php artisan migrate --force');
         }
 
+        $showLegacyForm = $request->boolean('show_order_form');
+        $showV2Form = $request->boolean('show_order_form_v2');
+        $defaultVariant = OrderFormVariant::normalize(
+            $request->input('default_signup_order_form_variant')
+        );
+
+        $orderFormErrors = $this->orderFormVisibilityErrors($showLegacyForm, $showV2Form, $defaultVariant);
+        if ($orderFormErrors !== []) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->withInput()
+                ->withErrors($orderFormErrors);
+        }
+
         $updateData = [
             'show_pay_publigo' => $request->boolean('show_pay_publigo'),
             'show_pay_online' => $request->boolean('show_pay_online'),
             'show_deferred_order' => $request->boolean('show_deferred_order'),
             'show_order_form' => $request->boolean('show_order_form'),
+            'show_order_form_v2' => $request->boolean('show_order_form_v2'),
+            'default_signup_order_form_variant' => OrderFormVariant::normalize(
+                $request->input('default_signup_order_form_variant')
+            ),
             'show_order_form_alt' => $request->boolean('show_order_form_alt'),
             'order_form_auto_fill_test_data' => $autoFillEnabled,
             'order_form_auto_fill_test_data_enabled_at' => $autoFillEnabled ? Carbon::now() : null,
@@ -191,5 +213,29 @@ class PneduPurchasesController extends Controller
         return redirect()
             ->route('settings.pnedu-purchases.index')
             ->with('success', 'Ustawienia widoczności opcji płatności zostały zapisane.');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function orderFormVisibilityErrors(bool $showLegacyForm, bool $showV2Form, string $defaultVariant): array
+    {
+        $errors = [];
+
+        if (! $showLegacyForm && ! $showV2Form) {
+            $message = 'Włącz co najmniej jeden wariant formularza (legacy lub V2). Wyłączenie obu ukrywa przycisk „Zamawiam szkolenie” na stronie kursu.';
+            $errors['show_order_form'] = $message;
+            $errors['show_order_form_v2'] = $message;
+        }
+
+        if ($defaultVariant === OrderFormVariant::LEGACY && ! $showLegacyForm) {
+            $errors['default_signup_order_form_variant'] = 'Domyślna wersja „legacy” wymaga włączonego checkboxa „Zamawiam szkolenie” (formularz uniwersalny).';
+        }
+
+        if ($defaultVariant === OrderFormVariant::V2 && ! $showV2Form) {
+            $errors['default_signup_order_form_variant'] = 'Domyślna wersja „V2” wymaga włączonego checkboxa „Zamawiam szkolenie v2”.';
+        }
+
+        return $errors;
     }
 }

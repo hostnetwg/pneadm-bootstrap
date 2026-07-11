@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MarketingCampaign;
 use App\Models\MarketingSourceType;
+use App\Support\OrderFormVariant;
 
 class MarketingCampaignUrlBuilder
 {
@@ -39,23 +40,37 @@ class MarketingCampaignUrlBuilder
         }
 
         $landing = $landingTarget ?? $campaign->landing_target ?? 'course_show';
-        $path = $landing === 'order_form'
-            ? "/courses/{$courseId}/order-form"
-            : "/courses/{$courseId}";
+        $orderFormVariant = null;
+        if ($landing === 'order_form') {
+            $orderFormVariant = OrderFormVariant::storedCampaignVariant($campaign->order_form_variant ?? null);
+            $path = "/courses/{$courseId}/order-form";
+        } else {
+            $path = "/courses/{$courseId}";
+        }
 
         $utmSource = $this->resolveUtmSource($campaign->sourceType);
         $utmMedium = $this->resolveUtmMedium($campaign);
         $utmCampaign = (string) $campaign->campaign_code;
 
-        $utmQuery = http_build_query($this->utmQueryParams($campaign, $utmSource, $utmMedium, $utmCampaign));
+        $utmParams = $this->utmQueryParams($campaign, $utmSource, $utmMedium, $utmCampaign);
+        if ($orderFormVariant !== null && ! OrderFormVariant::usesGlobalGateway($orderFormVariant)) {
+            $utmParams = array_merge($utmParams, OrderFormVariant::gatewayQuery($orderFormVariant));
+        }
+
+        $utmQuery = http_build_query($utmParams);
 
         if ($landing === 'order_form' && $priceVariantId) {
             $utmQuery = 'price_variant_id='.$priceVariantId.'&'.$utmQuery;
         }
 
-        $legacyQuery = $landing === 'order_form' && $priceVariantId
-            ? 'price_variant_id='.$priceVariantId.'&fb='.rawurlencode($utmCampaign)
-            : 'fb='.rawurlencode($utmCampaign);
+        $legacyParams = ['fb' => $utmCampaign];
+        if ($landing === 'order_form' && $priceVariantId) {
+            $legacyParams['price_variant_id'] = $priceVariantId;
+        }
+        if ($orderFormVariant !== null && ! OrderFormVariant::usesGlobalGateway($orderFormVariant)) {
+            $legacyParams = array_merge($legacyParams, OrderFormVariant::gatewayQuery($orderFormVariant));
+        }
+        $legacyQuery = http_build_query($legacyParams);
 
         return [
             'utm' => $this->pneduBaseUrl().$path.'?'.$utmQuery,

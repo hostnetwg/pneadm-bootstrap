@@ -4,6 +4,9 @@
     $landingDefault = $isCreate
         ? 'order_form'
         : ($marketingCampaign->landing_target ?? 'order_form');
+    $orderFormVariantDefault = $isCreate
+        ? \App\Support\OrderFormVariant::GLOBAL
+        : OrderFormVariant::normalizeCampaignVariant($marketingCampaign->order_form_variant ?? OrderFormVariant::GLOBAL);
     $selectedSourceTypeId = old(
         'source_type_id',
         $isCreate ? null : $marketingCampaign->source_type_id,
@@ -46,6 +49,7 @@
         <div class="col-12">
             @include('marketing-campaigns.partials.campaign-landing-target-fields', [
                 'landingDefault' => $landingDefault,
+                'orderFormVariantDefault' => $orderFormVariantDefault,
             ])
         </div>
     </div>
