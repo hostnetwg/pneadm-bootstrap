@@ -62,6 +62,7 @@ services:
       - 'sail-redis:/data'
     networks:
       - sail
+      - pne-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       retries: 3

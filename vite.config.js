@@ -13,7 +13,8 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         hmr: {
-            host: 'localhost',
+            host: 'adm.localhost',
         },
+        origin: 'http://adm.localhost:5173',
     },
 });

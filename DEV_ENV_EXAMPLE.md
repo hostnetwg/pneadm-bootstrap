@@ -16,8 +16,8 @@ DB_PASSWORD=password
 # API Token (ten sam w obu projektach)
 PNEADM_API_TOKEN=dev-api-token-12345
 
-# URL aplikacji
-APP_URL=http://localhost:8083
+# URL aplikacji (dev — używaj http://adm.localhost:8083)
+APP_URL=http://adm.localhost:8083
 ```
 
 ---
