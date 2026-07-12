@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Models\Analytics\AnalyticsEvent;
+use App\Models\Course;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -30,6 +31,19 @@ class AnalyticsLiveVisitorsService
         'form_order_created',
     ];
 
+    /**
+     * Eventy oznaczające, że użytkownik wypełnia formularz (nie samo wejście na stronę).
+     *
+     * @var list<string>
+     */
+    private const FORM_FILLING_EVENT_NAMES = [
+        'order_form_started',
+        'order_form_section_interacted',
+        'order_form_cta_clicked',
+        'order_form_submit_clicked',
+        'order_form_submit_attempted',
+    ];
+
     public function __construct(
         private readonly AnalyticsSessionJourneyService $journey,
     ) {}
@@ -50,6 +64,8 @@ class AnalyticsLiveVisitorsService
      *         last_seen_ago_seconds: int,
      *         form_order_id: int|null,
      *         form_order_url: string|null,
+     *         is_form_active: bool,
+     *         is_order_submitted: bool,
      *         entry_referrer_domain: string|null,
      *         entry_campaign_code: string|null,
      *         journey_label: string,
@@ -127,23 +143,31 @@ class AnalyticsLiveVisitorsService
             $eventsBySession[$sessionId][] = $event;
         }
 
+        $courseTitlesById = $this->resolveCourseTitlesById($eventsBySession);
+
         $visitors = collect($latestBySession)
             ->sortByDesc(fn (AnalyticsEvent $event) => $event->getRawOriginal('occurred_at'))
             ->take($maxVisitors)
-            ->map(function (AnalyticsEvent $event) use ($timezone, $asOf, $eventsBySession): array {
+            ->map(function (AnalyticsEvent $event) use ($timezone, $asOf, $eventsBySession, $courseTitlesById): array {
                 $sessionId = (string) $event->analytics_session_id;
                 $sessionEvents = collect($eventsBySession[$sessionId] ?? [$event]);
                 $journeySteps = $this->journey->buildSteps($sessionEvents);
                 $entry = $this->journey->buildEntry($sessionEvents);
+                $submittedOrderEvent = $this->findSubmittedOrderEvent($sessionEvents);
+                $isOrderSubmitted = $submittedOrderEvent !== null;
+                $formOrderId = $submittedOrderEvent?->form_order_id !== null
+                    ? (int) $submittedOrderEvent->form_order_id
+                    : null;
+                $statusEvent = $isOrderSubmitted ? $submittedOrderEvent : $event;
+                $isFormActive = ! $isOrderSubmitted && $this->isFormFillingEvent($event);
 
                 $lastSeenUtc = Carbon::parse((string) $event->getRawOriginal('occurred_at'), 'UTC');
                 $lastSeenLocal = $lastSeenUtc->copy()->timezone($timezone);
-                $formOrderId = $event->form_order_id !== null ? (int) $event->form_order_id : null;
 
                 return [
                     'session_short' => $this->journey->shortSessionId($sessionId),
-                    'page_label' => $this->journey->pageLabel($event),
-                    'course_title' => filled($event->course_title_snapshot) ? (string) $event->course_title_snapshot : null,
+                    'page_label' => $this->journey->pageLabel($statusEvent),
+                    'course_title' => $this->resolveSessionCourseTitle($sessionEvents, $courseTitlesById),
                     'device_type' => $event->device_type,
                     'browser_family' => $event->browser_family,
                     'last_seen_at' => $lastSeenLocal->format('H:i:s'),
@@ -152,6 +176,8 @@ class AnalyticsLiveVisitorsService
                     'form_order_url' => $formOrderId !== null
                         ? route('form-orders.show', $formOrderId)
                         : null,
+                    'is_form_active' => $isFormActive,
+                    'is_order_submitted' => $isOrderSubmitted,
                     'entry_referrer_domain' => $entry['referrer_domain'],
                     'entry_campaign_code' => $entry['campaign_code'],
                     'entry_utm_source' => $entry['utm_source'],
@@ -180,5 +206,82 @@ class AnalyticsLiveVisitorsService
     public function pageLabel(AnalyticsEvent $event): string
     {
         return $this->journey->pageLabel($event);
+    }
+
+    /**
+     * @param  array<string, list<AnalyticsEvent>>  $eventsBySession
+     * @return array<int, string>
+     */
+    private function resolveCourseTitlesById(array $eventsBySession): array
+    {
+        $courseIds = collect($eventsBySession)
+            ->flatten(1)
+            ->map(fn (AnalyticsEvent $event): ?int => $event->course_id !== null && (int) $event->course_id > 0
+                ? (int) $event->course_id
+                : null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($courseIds === []) {
+            return [];
+        }
+
+        return Course::query()
+            ->whereIn('id', $courseIds)
+            ->pluck('title', 'id')
+            ->map(fn (mixed $title): string => (string) $title)
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, AnalyticsEvent>  $sessionEvents
+     * @param  array<int, string>  $courseTitlesById
+     */
+    private function resolveSessionCourseTitle(Collection $sessionEvents, array $courseTitlesById): ?string
+    {
+        $sorted = $sessionEvents
+            ->sortBy(fn (AnalyticsEvent $event): array => [
+                (string) $event->getRawOriginal('occurred_at'),
+                (int) $event->id,
+            ])
+            ->values();
+
+        foreach ($sorted as $event) {
+            if (filled($event->course_title_snapshot)) {
+                return (string) $event->course_title_snapshot;
+            }
+        }
+
+        foreach ($sorted as $event) {
+            $courseId = $event->course_id !== null ? (int) $event->course_id : 0;
+            if ($courseId > 0 && isset($courseTitlesById[$courseId])) {
+                return $courseTitlesById[$courseId];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, AnalyticsEvent>  $sessionEvents
+     */
+    private function findSubmittedOrderEvent(Collection $sessionEvents): ?AnalyticsEvent
+    {
+        return $sessionEvents
+            ->filter(fn (AnalyticsEvent $event): bool => $event->event_name === 'form_order_created'
+                && $event->form_order_id !== null
+                && (int) $event->form_order_id > 0)
+            ->sortByDesc(fn (AnalyticsEvent $event): array => [
+                (string) $event->getRawOriginal('occurred_at'),
+                (int) $event->id,
+            ])
+            ->first();
+    }
+
+    private function isFormFillingEvent(AnalyticsEvent $event): bool
+    {
+        return in_array((string) $event->event_name, self::FORM_FILLING_EVENT_NAMES, true);
     }
 }

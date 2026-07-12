@@ -109,7 +109,87 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny')
             ->assertJsonPath('visitors.0.entry_referrer_domain', 'google.com')
             ->assertJsonPath('visitors.0.entry_label', 'google.com')
-            ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny');
+            ->assertJsonPath('visitors.0.journey_label', 'Opis szkolenia → Formularz — aktywny')
+            ->assertJsonPath('visitors.0.is_form_active', true)
+            ->assertJsonPath('visitors.0.is_order_submitted', false);
+    }
+
+    public function test_course_title_comes_from_session_not_only_latest_event(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'analytics_session_id' => $sessionId,
+            'course_id' => 1,
+            'course_title_snapshot' => 'Szkolenie z Excela',
+            'occurred_at' => now('UTC')->subMinute(),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_started',
+            'analytics_session_id' => $sessionId,
+            'course_id' => 1,
+            'course_title_snapshot' => null,
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.page_label', 'Formularz — aktywny')
+            ->assertJsonPath('visitors.0.course_title', 'Szkolenie z Excela')
+            ->assertJsonPath('visitors.0.is_form_active', true);
+    }
+
+    public function test_order_form_viewed_without_interaction_is_not_form_active(): void
+    {
+        $user = $this->userWithRole('manager');
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_viewed',
+            'analytics_session_id' => (string) Str::uuid(),
+            'course_title_snapshot' => 'Szkolenie testowe',
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.page_label', 'Formularz zamówienia')
+            ->assertJsonPath('visitors.0.is_form_active', false)
+            ->assertJsonPath('visitors.0.is_order_submitted', false);
+    }
+
+    public function test_submitted_order_is_marked_even_when_later_funnel_event_is_latest(): void
+    {
+        $user = $this->userWithRole('manager');
+        $sessionId = (string) Str::uuid();
+
+        $this->createAnalyticsEvent([
+            'event_name' => 'form_order_created',
+            'analytics_session_id' => $sessionId,
+            'form_order_id' => 4242,
+            'course_title_snapshot' => 'Szkolenie AI',
+            'metadata' => ['order_flow' => 'deferred'],
+            'occurred_at' => now('UTC')->subSeconds(30),
+        ]);
+        $this->createAnalyticsEvent([
+            'event_name' => 'order_form_submit_clicked',
+            'analytics_session_id' => $sessionId,
+            'course_id' => 1,
+            'course_title_snapshot' => null,
+            'occurred_at' => now('UTC'),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('api.dashboard.live-visitors'))
+            ->assertOk()
+            ->assertJsonPath('visitors.0.page_label', 'Złożył zamówienie (odroczone)')
+            ->assertJsonPath('visitors.0.form_order_id', 4242)
+            ->assertJsonPath('visitors.0.course_title', 'Szkolenie AI')
+            ->assertJsonPath('visitors.0.is_order_submitted', true)
+            ->assertJsonPath('visitors.0.is_form_active', false);
     }
 
     public function test_entry_label_falls_back_to_utm_when_no_referrer_or_campaign(): void
@@ -213,7 +293,9 @@ class AnalyticsLiveVisitorsDashboardTest extends TestCase
             ->assertOk()
             ->assertJsonPath('visitors.0.page_label', 'Złożył zamówienie (odroczone)')
             ->assertJsonPath('visitors.0.form_order_id', 4242)
-            ->assertJsonPath('visitors.0.form_order_url', route('form-orders.show', 4242));
+            ->assertJsonPath('visitors.0.form_order_url', route('form-orders.show', 4242))
+            ->assertJsonPath('visitors.0.is_order_submitted', true)
+            ->assertJsonPath('visitors.0.is_form_active', false);
     }
 
     public function test_form_order_created_overrides_earlier_funnel_events_in_session(): void

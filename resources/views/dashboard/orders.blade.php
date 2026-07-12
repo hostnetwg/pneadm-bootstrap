@@ -118,6 +118,18 @@
                         from { transform: rotate(0deg); }
                         to { transform: rotate(360deg); }
                     }
+                    #liveVisitorsBody tr.live-visitors-row--form-active > td {
+                        background-color: rgba(220, 53, 69, 0.14);
+                    }
+                    #liveVisitorsBody tr.live-visitors-row--form-active:hover > td {
+                        background-color: rgba(220, 53, 69, 0.22);
+                    }
+                    #liveVisitorsBody tr.live-visitors-row--order-submitted > td {
+                        background-color: rgba(25, 135, 84, 0.18);
+                    }
+                    #liveVisitorsBody tr.live-visitors-row--order-submitted:hover > td {
+                        background-color: rgba(25, 135, 84, 0.28);
+                    }
                 </style>
             @endif
 
@@ -1133,10 +1145,22 @@
                 return parts.length ? parts.join(' · ') : '—';
             }
 
+            function visitorRowClass(visitor) {
+                if (visitor.is_order_submitted) {
+                    return 'live-visitors-row--order-submitted';
+                }
+
+                if (visitor.is_form_active) {
+                    return 'live-visitors-row--form-active';
+                }
+
+                return '';
+            }
+
             function pageLabelCell(visitor) {
                 var label = escapeHtml(visitor.page_label || '—');
 
-                if (visitor.form_order_id) {
+                if (visitor.is_order_submitted && visitor.form_order_id) {
                     var orderLink = visitor.form_order_url
                         ? ' <a href="' + escapeHtml(visitor.form_order_url) + '" class="small text-decoration-none fw-semibold">#'
                             + escapeHtml(String(visitor.form_order_id)) + '</a>'
@@ -1210,7 +1234,9 @@
                     bodyEl.innerHTML = '<tr><td colspan="7" class="text-muted small py-3 px-3">Brak aktywnych sesji w ostatnich minutach.</td></tr>';
                 } else {
                     bodyEl.innerHTML = visitors.map(function (visitor) {
-                        return '<tr>'
+                        var rowClass = visitorRowClass(visitor);
+
+                        return '<tr' + (rowClass ? ' class="' + rowClass + '"' : '') + '>'
                             + '<td>' + sessionCell(visitor) + '</td>'
                             + '<td class="small text-muted">' + entryCell(visitor) + '</td>'
                             + '<td class="text-truncate" style="max-width: 280px;">' + journeyCell(visitor) + '</td>'
