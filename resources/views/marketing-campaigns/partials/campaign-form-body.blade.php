@@ -1,11 +1,13 @@
 @php
+    use App\Support\OrderFormVariant;
+
     $isCreate = $isCreate ?? true;
     $marketingCampaign = $marketingCampaign ?? null;
     $landingDefault = $isCreate
         ? 'order_form'
         : ($marketingCampaign->landing_target ?? 'order_form');
     $orderFormVariantDefault = $isCreate
-        ? \App\Support\OrderFormVariant::GLOBAL
+        ? OrderFormVariant::GLOBAL
         : OrderFormVariant::normalizeCampaignVariant($marketingCampaign->order_form_variant ?? OrderFormVariant::GLOBAL);
     $selectedSourceTypeId = old(
         'source_type_id',
