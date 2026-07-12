@@ -36,6 +36,8 @@ class PaymentDisplayOption extends Model
         'order_form_auto_fill_test_data',
         'order_form_auto_fill_test_data_enabled_at',
         'order_form_auto_fill_test_data_developers_only',
+        'developer_online_payment_test_enabled',
+        'developer_online_payment_sandbox_gateway',
         'default_post_end_access_duration_value',
         'default_post_end_access_duration_unit',
     ];
@@ -50,6 +52,8 @@ class PaymentDisplayOption extends Model
         'order_form_auto_fill_test_data' => 'boolean',
         'order_form_auto_fill_test_data_enabled_at' => 'datetime',
         'order_form_auto_fill_test_data_developers_only' => 'boolean',
+        'developer_online_payment_test_enabled' => 'boolean',
+        'developer_online_payment_sandbox_gateway' => 'boolean',
         'default_post_end_access_duration_value' => 'integer',
     ];
 
@@ -134,6 +138,8 @@ class PaymentDisplayOption extends Model
                 'order_form_auto_fill_test_data' => false,
                 'order_form_auto_fill_test_data_enabled_at' => null,
                 'order_form_auto_fill_test_data_developers_only' => false,
+                'developer_online_payment_test_enabled' => false,
+                'developer_online_payment_sandbox_gateway' => true,
                 'default_post_end_access_duration_value' => 2,
                 'default_post_end_access_duration_unit' => 'months',
             ]);
@@ -150,6 +156,8 @@ class PaymentDisplayOption extends Model
             $fallback->order_form_auto_fill_test_data = false;
             $fallback->order_form_auto_fill_test_data_enabled_at = null;
             $fallback->order_form_auto_fill_test_data_developers_only = false;
+            $fallback->developer_online_payment_test_enabled = false;
+            $fallback->developer_online_payment_sandbox_gateway = true;
             $fallback->default_post_end_access_duration_value = 2;
             $fallback->default_post_end_access_duration_unit = 'months';
 

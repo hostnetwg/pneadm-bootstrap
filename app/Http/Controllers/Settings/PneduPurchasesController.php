@@ -19,10 +19,12 @@ class PneduPurchasesController extends Controller
     {
         $options = PaymentDisplayOption::getSettings();
         $developersOnlyColumnReady = $this->developersOnlyColumnReady();
+        $developerOnlinePaymentColumnReady = $this->developerOnlinePaymentColumnReady();
 
         return view('settings.pnedu-purchases', compact(
             'options',
             'developersOnlyColumnReady',
+            'developerOnlinePaymentColumnReady',
         ));
     }
 
@@ -68,6 +70,16 @@ class PneduPurchasesController extends Controller
     {
         try {
             return Schema::hasColumn('payment_display_options', 'order_form_auto_fill_test_data_developers_only');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function developerOnlinePaymentColumnReady(): bool
+    {
+        try {
+            return Schema::hasColumn('payment_display_options', 'developer_online_payment_test_enabled')
+                && Schema::hasColumn('payment_display_options', 'developer_online_payment_sandbox_gateway');
         } catch (\Throwable) {
             return false;
         }
@@ -147,6 +159,8 @@ class PneduPurchasesController extends Controller
             'show_order_form_alt' => 'boolean',
             'order_form_auto_fill_test_data_developers_only' => 'boolean',
             'order_form_auto_fill_test_data' => 'boolean',
+            'developer_online_payment_test_enabled' => 'boolean',
+            'developer_online_payment_sandbox_gateway' => 'boolean',
             'default_post_end_access_duration_value' => 'required|integer|min:1|max:999',
             'default_post_end_access_duration_unit' => 'required|in:days,weeks,months,years',
         ], [], [
@@ -158,6 +172,8 @@ class PneduPurchasesController extends Controller
             'show_order_form_alt' => 'Formularz z odroczonym terminem (zdalna-lekcja.pl)',
             'order_form_auto_fill_test_data_developers_only' => 'Auto-wypełnianie formularza danymi testowymi (konta deweloperskie)',
             'order_form_auto_fill_test_data' => 'Auto-wypełnianie formularza danymi testowymi',
+            'developer_online_payment_test_enabled' => 'Płatność testowa online (kwota 5 PLN)',
+            'developer_online_payment_sandbox_gateway' => 'Bramka płatności dla testów deweloperskich',
             'default_post_end_access_duration_value' => 'Domyślny okres dostępu po zakończeniu szkolenia',
             'default_post_end_access_duration_unit' => 'Jednostka domyślnego okresu dostępu po zakończeniu szkolenia',
         ]);
@@ -170,6 +186,13 @@ class PneduPurchasesController extends Controller
             return redirect()
                 ->route('settings.pnedu-purchases.index')
                 ->with('error', 'Nie można zapisać opcji dla kont deweloperskich — brak kolumny w bazie. Na serwerze produkcyjnym uruchom: php artisan migrate --force');
+        }
+
+        $developerOnlinePaymentEnabled = $request->boolean('developer_online_payment_test_enabled');
+        if ($developerOnlinePaymentEnabled && ! $this->developerOnlinePaymentColumnReady()) {
+            return redirect()
+                ->route('settings.pnedu-purchases.index')
+                ->with('error', 'Nie można zapisać opcji płatności testowej online — brak kolumn w bazie. Uruchom: php artisan migrate --force');
         }
 
         $showLegacyForm = $request->boolean('show_order_form');
@@ -204,6 +227,11 @@ class PneduPurchasesController extends Controller
 
         if ($this->developersOnlyColumnReady()) {
             $updateData['order_form_auto_fill_test_data_developers_only'] = $developersOnlyEnabled;
+        }
+
+        if ($this->developerOnlinePaymentColumnReady()) {
+            $updateData['developer_online_payment_test_enabled'] = $developerOnlinePaymentEnabled;
+            $updateData['developer_online_payment_sandbox_gateway'] = $request->boolean('developer_online_payment_sandbox_gateway');
         }
 
         $options->update($updateData);

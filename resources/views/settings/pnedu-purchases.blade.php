@@ -139,6 +139,58 @@
                             Pokazuje przycisk „Wypełnij dane testowe” na formularzu (legacy i V2) dla <strong>wszystkich</strong> odwiedzających — także niezalogowanych. Pola <strong>nie</strong> wypełniają się automatycznie; tylko po kliknięciu przycisku. Na produkcji opcja wyłącza się automatycznie po {{ \App\Models\PaymentDisplayOption::UNRESTRICTED_AUTO_FILL_PRODUCTION_TTL_MINUTES }} min od włączenia (także w tym panelu).
                         </div>
                     </div>
+
+                    <hr class="my-3">
+
+                    <h6 class="text-uppercase text-muted small fw-semibold mb-3">Płatność testowa online (konta deweloperskie)</h6>
+                    @if(empty($developerOnlinePaymentColumnReady))
+                        <div class="alert alert-danger py-2 px-3 small mb-3" role="alert">
+                            Brak kolumn płatności testowej w bazie — uruchom migrację: <code>php artisan migrate --force</code>
+                        </div>
+                    @endif
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               name="developer_online_payment_test_enabled"
+                               id="developer_online_payment_test_enabled"
+                               value="1"
+                            {{ optional($options)->developer_online_payment_test_enabled ? 'checked' : '' }}
+                            @disabled(empty($developerOnlinePaymentColumnReady))>
+                        <label class="form-check-label" for="developer_online_payment_test_enabled">
+                            Symboliczna kwota <strong>5 PLN</strong> przy płatności online (PayU / PayNow) dla zalogowanych kont
+                            <code>waldemar.grabowski@hostnet.pl</code> oraz <code>luman0599@gmail.com</code>
+                        </label>
+                        <div class="form-text text-muted small">
+                            Dotyczy wyłącznie formularza zamówienia (legacy i V2) oraz fioletowego przycisku „Zapłać online” (PayU/PayNow), gdy użytkownik jest <strong>zalogowany</strong> na jedno z powyższych kont.
+                            Goście i inni użytkownicy płacą normalną cenę. Zamówienia trafiają do systemu jak zwykle — z kwotą 5 PLN.
+                        </div>
+                    </div>
+                    <fieldset class="mb-0" @disabled(empty($developerOnlinePaymentColumnReady))>
+                        <legend class="form-label fs-6 mb-2">Bramka płatności podczas testów deweloperskich</legend>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio"
+                                   name="developer_online_payment_sandbox_gateway"
+                                   id="developer_online_payment_sandbox_gateway_sandbox"
+                                   value="1"
+                                {{ old('developer_online_payment_sandbox_gateway', optional($options)->developer_online_payment_sandbox_gateway ?? true) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="developer_online_payment_sandbox_gateway_sandbox">
+                                Sandbox (testowa bramka PayU / PayNow)
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio"
+                                   name="developer_online_payment_sandbox_gateway"
+                                   id="developer_online_payment_sandbox_gateway_production"
+                                   value="0"
+                                {{ ! old('developer_online_payment_sandbox_gateway', optional($options)->developer_online_payment_sandbox_gateway ?? true) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="developer_online_payment_sandbox_gateway_production">
+                                Produkcyjna (prawdziwa bramka — płatność 5 PLN)
+                            </label>
+                        </div>
+                        <div class="form-text text-muted small">
+                            Wybór działa tylko przy włączonej opcji powyżej i zalogowanym koncie deweloperskim. Na serwerze produkcyjnym do trybu sandbox potrzebne są osobne klucze API w <code>.env</code>
+                            (<code>PAYU_SANDBOX_*</code>, <code>PAYNOW_SANDBOX_*</code>) — w przeciwnym razie używane są domyślne klucze z konfiguracji.
+                        </div>
+                    </fieldset>
                 </div>
 
                 <hr class="my-4">
