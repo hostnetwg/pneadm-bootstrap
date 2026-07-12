@@ -17,6 +17,7 @@ class DashboardOrdersDashboardService
 
     public function __construct(
         private readonly DashboardOrdersStatsService $stats,
+        private readonly DashboardCourseScheduleService $courseSchedule,
     ) {}
 
     /**
@@ -121,6 +122,7 @@ class DashboardOrdersDashboardService
      *     form_handling: int,
      *     deferred_handling: int,
      *     online_handling: int,
+     *     latest_form_order_id: int,
      *     sections: array{
      *         period: array{total: int, online: int, deferred: int, avg: float, avg_label: string},
      *         chart: array{
@@ -138,6 +140,16 @@ class DashboardOrdersDashboardService
      *             product_price: string|null,
      *             show_url: string
      *         }>,
+     *         course_schedule: list<array{
+     *             course_id: int,
+     *             title: string,
+     *             start_date: string,
+     *             start_time: string,
+     *             schedule_key: string,
+     *             instructor_label: string|null
+     *         }>,
+     *         chart_granularity: string,
+     *         date_range: array{from: string, to: string},
      *         shortcuts: array{form_handling: int}
      *     }
      * }
@@ -146,17 +158,53 @@ class DashboardOrdersDashboardService
     {
         $context = $this->chartContextFromRequest($request);
         $headline = $this->stats->snapshot();
+        $dateFrom = Carbon::parse($context['filters']['date_from'], $context['tz'])->startOfDay();
+        $dateTo = Carbon::parse($context['filters']['date_to'], $context['tz'])->startOfDay();
 
         return array_merge($headline, [
             'sections' => [
                 'period' => $context['period'],
                 'chart' => $context['daily_chart'],
                 'recent_orders' => $this->recentOrdersPayload(),
+                'course_schedule' => $this->courseSchedule->buildForRange(
+                    $dateFrom,
+                    $dateTo,
+                    $context['tz'],
+                    $context['chart_granularity'],
+                ),
+                'chart_granularity' => $context['chart_granularity'],
+                'date_range' => [
+                    'from' => $context['filters']['date_from'],
+                    'to' => $context['filters']['date_to'],
+                ],
                 'shortcuts' => [
                     'form_handling' => $headline['form_handling'],
                 ],
             ],
         ]);
+    }
+
+    /**
+     * @return list<array{
+     *     course_id: int,
+     *     title: string,
+     *     start_date: string,
+     *     start_time: string,
+     *     schedule_key: string,
+     *     instructor_label: string|null
+     * }>
+     */
+    public function courseScheduleForContext(array $context): array
+    {
+        $dateFrom = Carbon::parse($context['filters']['date_from'], $context['tz'])->startOfDay();
+        $dateTo = Carbon::parse($context['filters']['date_to'], $context['tz'])->startOfDay();
+
+        return $this->courseSchedule->buildForRange(
+            $dateFrom,
+            $dateTo,
+            $context['tz'],
+            $context['chart_granularity'],
+        );
     }
 
     /**
@@ -217,6 +265,8 @@ class DashboardOrdersDashboardService
      * @return array{
      *     labels: list<string>,
      *     labels_short: list<string>,
+     *     labels_weekday: list<string>,
+     *     date_keys: list<string>,
      *     online: list<int>,
      *     deferred: list<int>,
      *     total: list<int>
@@ -263,6 +313,7 @@ class DashboardOrdersDashboardService
 
         $labels = [];
         $labelsShort = [];
+        $labelsWeekday = [];
         $online = [];
         $deferred = [];
         $total = [];
@@ -272,10 +323,13 @@ class DashboardOrdersDashboardService
                 $labelCarbon = Carbon::createFromFormat('Y-m', $key, $tz)->locale('pl')->startOfMonth();
                 $labels[] = $labelCarbon->isoFormat('MMMM YYYY');
                 $labelsShort[] = $labelCarbon->isoFormat('MMM YY');
+                $labelsWeekday[] = '';
             } else {
                 $labelCarbon = Carbon::parse($key, $tz)->locale('pl');
-                $labels[] = $labelCarbon->isoFormat('D MMM YYYY');
+                $weekday = mb_lcfirst($labelCarbon->isoFormat('dddd'));
+                $labels[] = $labelCarbon->isoFormat('D MMM YYYY').' ('.$weekday.')';
                 $labelsShort[] = $labelCarbon->isoFormat('D MMM');
+                $labelsWeekday[] = $weekday;
             }
 
             $online[] = $counts['online'];
@@ -286,6 +340,8 @@ class DashboardOrdersDashboardService
         return [
             'labels' => $labels,
             'labels_short' => $labelsShort,
+            'labels_weekday' => $labelsWeekday,
+            'date_keys' => array_keys($buckets),
             'online' => $online,
             'deferred' => $deferred,
             'total' => $total,

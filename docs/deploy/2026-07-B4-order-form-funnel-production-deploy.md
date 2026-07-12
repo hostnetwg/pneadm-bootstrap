@@ -114,7 +114,7 @@ Log opcjonalny: `storage/logs/analytics-order-forms.log` (po pierwszym udanym ur
 | Miejsce | Route / opis |
 |---------|----------------|
 | Lejek formularza (kanały) | `/analytics/order-form-funnels` — agregaty B4+ |
-| Dashboard zamówień | `/` — karty operacyjne + „Aktywni teraz” (live z `analytics_events`) |
+| Dashboard zamówień | `/` — karty operacyjne, wykres z markerami szkoleń, dźwięk nowego FORM, „Aktywni teraz” (live z `analytics_events`). Szczegóły: **`docs/DASHBOARD_ORDERS.md`**. |
 | Debug eventów | `/analytics/debug-events` |
 
 ### Interpretacja healthcheck
@@ -147,7 +147,10 @@ Zweryfikowane na prod (09.07 ~17:06): pierwszy schema v2 **`form_section_viewed`
 ### Dashboard „Aktywni teraz”
 
 - Źródło: ostatnie eventy lejka z `analytics_events` (okno ~30 min), nie agregaty B4.
-- Kolumna **Wejście:** referrer → kampania → UTM → `direct (bezpośrednio)`.
+- Kolumna **Wejście:** referrer → kampania → UTM → `direct (bezpośrednio)` (`cb4d732`).
+- Tytuł szkolenia z całej sesji; zielony wiersz po `form_order_created`; czerwony przy aktywnym wypełnianiu formularza (2026-07).
+
+Pełny opis dashboardu (wykres, dźwięk, terminy szkoleń): **`docs/DASHBOARD_ORDERS.md`**.
 - Wiele sesji `direct` na stary kurs w krótkim czasie — często bot/test/brak ciasteczka sesji, niekoniecznie wielu ludzi.
 
 ---

@@ -15,7 +15,8 @@ class DashboardOrdersStatsService
      *     form_yesterday: int,
      *     form_handling: int,
      *     deferred_handling: int,
-     *     online_handling: int
+     *     online_handling: int,
+     *     latest_form_order_id: int
      * }
      */
     public function snapshot(): array
@@ -39,6 +40,7 @@ class DashboardOrdersStatsService
             'form_handling' => FormOrder::needsActiveHandling()->count(),
             'deferred_handling' => $this->countHandlingBySettlement('deferred'),
             'online_handling' => $this->countHandlingBySettlement('online'),
+            'latest_form_order_id' => (int) (FormOrder::query()->max('id') ?? 0),
         ];
     }
 

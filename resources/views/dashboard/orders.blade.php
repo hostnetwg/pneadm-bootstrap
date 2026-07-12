@@ -165,7 +165,7 @@
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="text-muted mb-1">Dziś (FORM)</h6>
-                                    <h2 class="mb-0 text-primary" id="dashboardStatFormToday" data-initial-value="{{ $stats['form_today'] }}">{{ number_format($stats['form_today']) }}</h2>
+                                    <h2 class="mb-0 text-primary" id="dashboardStatFormToday" data-initial-value="{{ $stats['form_today'] }}" data-initial-latest-form-order-id="{{ $stats['latest_form_order_id'] ?? 0 }}">{{ number_format($stats['form_today']) }}</h2>
                                     <small class="text-muted">wczoraj: <span id="dashboardStatFormYesterday">{{ number_format($stats['form_yesterday']) }}</span></small>
                                 </div>
                                 <i class="bi bi-calendar-check fs-2 text-primary opacity-50"></i>
@@ -317,15 +317,28 @@
                         odroczone = faktura z odroczonym terminem (w tym starsze bez trybu płatności)
                     </p>
 
-                    <div style="position: relative; height: 320px;">
+                    <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="dashboardChartShowCourseSchedule" checked>
+                            <label class="form-check-label small" for="dashboardChartShowCourseSchedule">
+                                <span class="d-inline-block align-middle me-1" style="width:10px;border-top:2px dashed #6f42c1;"></span>
+                                Terminy szkoleń (start)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="position: relative; height: 340px;">
                         <canvas id="ordersDailyChart" aria-label="Wykres liczby zamówień wg dnia"></canvas>
                     </div>
+                    <p class="small text-muted mb-0 mt-2">
+                        Fioletowe prostokąty 🎓 na osi dat oznaczają start szkolenia — najedź kursorem po szczegóły (w tym instruktor).
+                    </p>
                 </div>
             </div>
 
             <div class="row g-4">
                 <div class="col-lg-8">
-                    <div class="card h-100 dashboard-refresh-surface" id="dashboardRecentOrdersCard">
+                    <div class="card dashboard-refresh-surface" id="dashboardRecentOrdersCard">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Ostatnie zamówienia FORM</h5>
                             <a href="{{ route('form-orders.index') }}" class="btn btn-sm btn-outline-primary">
@@ -373,6 +386,12 @@
                             @endif
                         </div>
                     </div>
+
+                    @include('dashboard.partials.course-schedule-table', [
+                        'courseSchedule' => $courseSchedule ?? [],
+                        'courseScheduleRangeLabel' => $courseScheduleRangeLabel ?? '',
+                        'class' => 'mt-4',
+                    ])
                 </div>
 
                 <div class="col-lg-4">
@@ -413,6 +432,161 @@
     @push('scripts')
     <script>
         (function () {
+            window.dashboardCourseScheduleState = {
+                schedule: @json($courseSchedule ?? []),
+                dateKeys: @json($dailyChart['date_keys'] ?? []),
+            };
+
+            window.dashboardBuildCoursesByKey = function (schedule) {
+                return (Array.isArray(schedule) ? schedule : []).reduce(function (acc, course) {
+                    const key = course.schedule_key || course.start_date;
+                    if (!key) {
+                        return acc;
+                    }
+                    if (!acc[key]) {
+                        acc[key] = [];
+                    }
+                    acc[key].push(course);
+
+                    return acc;
+                }, {});
+            };
+
+            window.dashboardRoundRect = function (ctx, x, y, w, h, r) {
+                const radius = Math.min(r, w / 2, h / 2);
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + w - radius, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                ctx.lineTo(x + w, y + h - radius);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                ctx.lineTo(x + radius, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+            };
+
+            window.dashboardCreateCourseMarkerIcon = function (count) {
+                const w = count > 1 ? 30 : 26;
+                const h = 22;
+                const iconCanvas = document.createElement('canvas');
+                iconCanvas.width = w;
+                iconCanvas.height = h;
+                const ctx = iconCanvas.getContext('2d');
+
+                window.dashboardRoundRect(ctx, 1, 1, w - 2, h - 2, 5);
+                ctx.fillStyle = '#6f42c1';
+                ctx.fill();
+                ctx.strokeStyle = '#59359a';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '13px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🎓', w / 2, h / 2 + 1);
+
+                if (count > 1) {
+                    ctx.fillStyle = '#ffc107';
+                    ctx.font = 'bold 9px sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(String(count), w - 3, 2);
+                }
+
+                return iconCanvas;
+            };
+
+            window.dashboardCourseScheduleTooltipLines = function (key) {
+                const coursesByKey = window.dashboardBuildCoursesByKey(window.dashboardCourseScheduleState.schedule || []);
+                const dayCourses = coursesByKey[key] || [];
+
+                if (!dayCourses.length) {
+                    return [];
+                }
+
+                return [
+                    '',
+                    dayCourses.length === 1 ? 'Szkolenie:' : 'Szkolenia (' + dayCourses.length + '):',
+                ].concat(dayCourses.map(function (course) {
+                    let line = '• ' + (course.start_time || '—') + ' — ' + (course.title || '—');
+                    if (course.instructor_label) {
+                        line += ' (' + course.instructor_label + ')';
+                    }
+
+                    return line;
+                }));
+            };
+
+            window.dashboardApplyCourseScheduleToChart = function () {
+                const chart = window.ordersDailyChartInstance;
+                const toggle = document.getElementById('dashboardChartShowCourseSchedule');
+                if (!chart) {
+                    return;
+                }
+
+                const labels = chart.data.labels || [];
+                const dateKeys = window.dashboardCourseScheduleState.dateKeys || [];
+                const coursesByKey = window.dashboardBuildCoursesByKey(window.dashboardCourseScheduleState.schedule || []);
+                const markerPoints = [];
+
+                dateKeys.forEach(function (key, index) {
+                    const dayCourses = coursesByKey[key];
+                    if (!dayCourses || !dayCourses.length || !labels[index]) {
+                        return;
+                    }
+
+                    markerPoints.push({
+                        x: labels[index],
+                        y: 0,
+                        _scheduleKey: key,
+                        _count: dayCourses.length,
+                    });
+                });
+
+                let scheduleDatasetIndex = chart.data.datasets.findIndex(function (dataset) {
+                    return dataset._courseSchedule === true;
+                });
+
+                if (markerPoints.length === 0) {
+                    if (scheduleDatasetIndex >= 0) {
+                        chart.data.datasets.splice(scheduleDatasetIndex, 1);
+                    }
+                    chart.update();
+
+                    return;
+                }
+
+                const scheduleDataset = {
+                    type: 'scatter',
+                    label: 'Terminy szkoleń',
+                    _courseSchedule: true,
+                    order: 10,
+                    data: markerPoints,
+                    pointStyle: markerPoints.map(function (point) {
+                        return window.dashboardCreateCourseMarkerIcon(point._count);
+                    }),
+                    pointRadius: 12,
+                    pointHoverRadius: 14,
+                    hitRadius: 18,
+                    showLine: false,
+                };
+
+                if (scheduleDatasetIndex >= 0) {
+                    chart.data.datasets[scheduleDatasetIndex] = scheduleDataset;
+                } else {
+                    chart.data.datasets.push(scheduleDataset);
+                    scheduleDatasetIndex = chart.data.datasets.length - 1;
+                }
+
+                chart.setDatasetVisibility(scheduleDatasetIndex, toggle ? toggle.checked : true);
+                chart.update();
+            };
+        })();
+
+        (function () {
             const canvas = document.getElementById('ordersDailyChart');
             if (!canvas) {
                 return;
@@ -425,6 +599,36 @@
             const pointRadius = labels.length > 31 ? 2 : 4;
             const labelFontSize = labels.length > 31 ? 9 : 11;
             window.dashboardChartFullLabels = @json($dailyChart['labels'] ?? []);
+            window.dashboardChartDateKeys = @json($dailyChart['date_keys'] ?? []);
+            window.dashboardChartWeekdayLabels = @json($dailyChart['labels_weekday'] ?? []);
+            window.dashboardCourseScheduleState.dateKeys = window.dashboardChartDateKeys;
+
+            const scheduleToggle = document.getElementById('dashboardChartShowCourseSchedule');
+
+            window.dashboardOrdersChartXAxisTicks = function (labelCount) {
+                const count = labelCount
+                    || window.ordersDailyChartInstance?.data?.labels?.length
+                    || 31;
+
+                return {
+                    maxRotation: 0,
+                    minRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: count > 31 ? 24 : 31,
+                    callback: function (value, index) {
+                        const chart = this.chart;
+                        const tickIndex = typeof index === 'number' ? index : chart.data.labels.indexOf(String(value));
+                        const dateLabel = chart.data.labels[tickIndex] ?? '';
+                        const weekday = (window.dashboardChartWeekdayLabels || [])[tickIndex] ?? '';
+
+                        if (weekday) {
+                            return [String(dateLabel), String(weekday)];
+                        }
+
+                        return dateLabel;
+                    },
+                };
+            };
 
             if (!window.dashboardOrdersTotalLabelsPluginRegistered) {
                 Chart.register({
@@ -529,17 +733,40 @@
 
                                     return fullLabels[idx] ?? items[0]?.label ?? '';
                                 },
+                                label: function (ctx) {
+                                    if (ctx.dataset._courseSchedule) {
+                                        return null;
+                                    }
+
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y;
+                                },
+                                afterBody: function (items) {
+                                    if (!scheduleToggle?.checked || !items.length) {
+                                        return [];
+                                    }
+
+                                    const item = items[0];
+                                    let scheduleKey = null;
+
+                                    if (item.dataset._courseSchedule) {
+                                        scheduleKey = item.raw?._scheduleKey ?? null;
+                                    } else {
+                                        const idx = item.dataIndex ?? 0;
+                                        scheduleKey = (window.dashboardCourseScheduleState.dateKeys || [])[idx] ?? null;
+                                    }
+
+                                    if (!scheduleKey) {
+                                        return [];
+                                    }
+
+                                    return window.dashboardCourseScheduleTooltipLines(scheduleKey);
+                                },
                             },
                         },
                     },
                     scales: {
                         x: {
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: labels.length > 31 ? 24 : 31,
-                            },
+                            ticks: window.dashboardOrdersChartXAxisTicks(labels.length),
                         },
                         y: {
                             beginAtZero: true,
@@ -550,6 +777,14 @@
                     },
                 },
             });
+
+            window.dashboardApplyCourseScheduleToChart();
+
+            if (scheduleToggle) {
+                scheduleToggle.addEventListener('change', function () {
+                    window.dashboardApplyCourseScheduleToChart();
+                });
+            }
         })();
 
         (function () {
@@ -627,8 +862,17 @@
                 playNewOrderChime();
             };
 
+            window.dashboardUnlockOrderSound = function () {
+                unlockAudio();
+            };
+
             document.addEventListener('click', unlockAudio, { once: true, passive: true });
             document.addEventListener('keydown', unlockAudio, { once: true });
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                    unlockAudio();
+                }
+            });
 
             const toggleBtn = document.getElementById('dashboardOrderSoundToggle');
             const toggleIcon = document.getElementById('dashboardOrderSoundIcon');
@@ -708,6 +952,8 @@
             const shortcutHandlingEl = document.getElementById('dashboardShortcutHandling');
             let pollCount = 0;
             let lastFormToday = parseInt(formTodayEl?.dataset.initialValue || '0', 10);
+            let lastKnownLatestFormOrderId = parseInt(formTodayEl?.dataset.initialLatestFormOrderId || '0', 10);
+            let latestFormOrderIdBaselineReady = true;
             let lastStatsSnapshot = null;
             let sectionsFetchInFlight = false;
 
@@ -810,7 +1056,50 @@
                     form_handling: Number(data.form_handling) || 0,
                     deferred_handling: Number(data.deferred_handling) || 0,
                     online_handling: Number(data.online_handling) || 0,
+                    latest_form_order_id: Number(data.latest_form_order_id) || 0,
                 });
+            }
+
+            function syncLatestFormOrderIdBaseline(data) {
+                const nextLatestId = Number(data.latest_form_order_id) || 0;
+                lastKnownLatestFormOrderId = nextLatestId;
+                latestFormOrderIdBaselineReady = true;
+
+                if (formTodayEl) {
+                    formTodayEl.dataset.initialLatestFormOrderId = String(nextLatestId);
+                }
+            }
+
+            function hasNewFormOrderSinceBaseline(data) {
+                const nextLatestId = Number(data.latest_form_order_id) || 0;
+
+                if (!latestFormOrderIdBaselineReady) {
+                    syncLatestFormOrderIdBaseline(data);
+
+                    return false;
+                }
+
+                if (nextLatestId > lastKnownLatestFormOrderId) {
+                    lastKnownLatestFormOrderId = nextLatestId;
+
+                    if (formTodayEl) {
+                        formTodayEl.dataset.initialLatestFormOrderId = String(nextLatestId);
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            function maybePlayNewOrderSound(data) {
+                if (!hasNewFormOrderSinceBaseline(data)) {
+                    return;
+                }
+
+                if (typeof window.dashboardPlayNewOrderSound === 'function') {
+                    window.dashboardPlayNewOrderSound();
+                }
             }
 
             function escapeHtml(value) {
@@ -849,18 +1138,83 @@
                 const labels = Array.isArray(chartData.labels_short) ? chartData.labels_short : [];
                 window.dashboardChartFullLabels = Array.isArray(chartData.labels) ? chartData.labels : [];
                 window.dashboardChartLabelFontSize = labels.length > 31 ? 9 : 11;
+                window.dashboardChartDateKeys = Array.isArray(chartData.date_keys) ? chartData.date_keys : [];
+                window.dashboardChartWeekdayLabels = Array.isArray(chartData.labels_weekday) ? chartData.labels_weekday : [];
+                window.dashboardCourseScheduleState.dateKeys = window.dashboardChartDateKeys;
 
                 chart.data.labels = labels;
+                chart.options.scales.x.ticks = window.dashboardOrdersChartXAxisTicks(labels.length);
                 chart.data.datasets[0].data = chartData.total || [];
                 chart.data.datasets[1].data = chartData.online || [];
                 chart.data.datasets[2].data = chartData.deferred || [];
 
                 const nextRadius = labels.length > 31 ? 2 : 4;
                 chart.data.datasets.forEach(function (dataset) {
-                    dataset.pointRadius = nextRadius;
+                    if (!dataset._courseSchedule) {
+                        dataset.pointRadius = nextRadius;
+                    }
                 });
 
                 chart.update();
+                window.dashboardApplyCourseScheduleToChart();
+            }
+
+            function courseShowUrl(courseId) {
+                return @json(url('/courses')) + '/' + encodeURIComponent(String(courseId));
+            }
+
+            function renderCourseScheduleTable(schedule, dateRange) {
+                const container = document.getElementById('dashboardCourseScheduleContainer');
+                const countEl = document.getElementById('dashboardCourseScheduleCount');
+                const rangeEl = document.getElementById('dashboardCourseScheduleRange');
+
+                if (!container) {
+                    return;
+                }
+
+                const items = Array.isArray(schedule) ? schedule.slice() : [];
+                items.sort(function (a, b) {
+                    const dateCmp = String(a.start_date || '').localeCompare(String(b.start_date || ''));
+                    if (dateCmp !== 0) {
+                        return dateCmp;
+                    }
+
+                    return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+                });
+
+                if (countEl) {
+                    countEl.textContent = String(items.length);
+                }
+
+                if (rangeEl && dateRange) {
+                    rangeEl.textContent = (dateRange.from || '') + ' → ' + (dateRange.to || '');
+                }
+
+                if (items.length === 0) {
+                    container.innerHTML = '<p class="text-muted small p-3 mb-0" id="dashboardCourseScheduleEmpty">Brak szkoleń w wybranym zakresie dat.</p>';
+
+                    return;
+                }
+
+                const rows = items.map(function (item) {
+                    return '<tr>'
+                        + '<td class="text-nowrap">' + escapeHtml(item.start_date || '—') + '</td>'
+                        + '<td class="text-nowrap">' + escapeHtml(item.start_time || '—') + '</td>'
+                        + '<td><a href="' + escapeHtml(courseShowUrl(item.course_id)) + '" class="text-decoration-none">'
+                        + escapeHtml(item.title || '—') + '</a>'
+                        + ' <span class="text-muted small">· #' + escapeHtml(String(item.course_id || '')) + '</span></td>'
+                        + '<td class="text-muted">' + escapeHtml(item.instructor_label || '—') + '</td>'
+                        + '</tr>';
+                }).join('');
+
+                container.innerHTML = ''
+                    + '<div class="table-responsive" id="dashboardCourseScheduleTableWrap">'
+                    + '<table class="table table-sm table-hover mb-0 align-middle">'
+                    + '<thead class="table-light"><tr>'
+                    + '<th>Data</th><th>Godzina</th><th>Szkolenie</th><th>Instruktor</th>'
+                    + '</tr></thead>'
+                    + '<tbody id="dashboardCourseScheduleBody">' + rows + '</tbody>'
+                    + '</table></div>';
             }
 
             function renderRecentOrders(orders) {
@@ -920,13 +1274,24 @@
                     }
                 }
 
+                if (sections.course_schedule) {
+                    window.dashboardCourseScheduleState.schedule = sections.course_schedule;
+                }
+
                 if (sections.chart) {
                     updateChart(sections.chart);
+                } else if (sections.course_schedule) {
+                    window.dashboardApplyCourseScheduleToChart();
                 }
 
                 if (sections.recent_orders) {
                     renderRecentOrders(sections.recent_orders);
                 }
+
+                renderCourseScheduleTable(
+                    sections.course_schedule || window.dashboardCourseScheduleState.schedule || [],
+                    sections.date_range || null
+                );
 
                 if (sections.shortcuts && shortcutHandlingEl) {
                     shortcutHandlingEl.textContent = formatCount(sections.shortcuts.form_handling);
@@ -961,6 +1326,8 @@
                         renderHeadlineStats(data);
                         lastFormToday = Number(data.form_today) || 0;
                         formTodayEl.dataset.initialValue = String(lastFormToday);
+                        syncLatestFormOrderIdBaseline(data);
+                        lastStatsSnapshot = statsSnapshotKey(data);
                         renderSections(data.sections);
 
                         if (typeof window.dashboardTriggerRefreshFlash === 'function') {
@@ -996,8 +1363,6 @@
                                 return response.json();
                             })
                             .then(function (data) {
-                                const previousFormToday = lastFormToday;
-                                const nextFormToday = Number(data.form_today) || 0;
                                 const snapshotKey = statsSnapshotKey(data);
 
                                 renderHeadlineStats(data);
@@ -1005,8 +1370,9 @@
 
                                 if (lastStatsSnapshot === null) {
                                     lastStatsSnapshot = snapshotKey;
-                                    lastFormToday = nextFormToday;
+                                    lastFormToday = Number(data.form_today) || 0;
                                     formTodayEl.dataset.initialValue = String(lastFormToday);
+                                    syncLatestFormOrderIdBaseline(data);
 
                                     if (pollCount > 1 && typeof window.dashboardTriggerRefreshFlash === 'function') {
                                         window.dashboardTriggerRefreshFlash();
@@ -1016,13 +1382,10 @@
                                 }
 
                                 if (snapshotKey !== lastStatsSnapshot) {
-                                    if (nextFormToday > previousFormToday
-                                        && typeof window.dashboardPlayNewOrderSound === 'function') {
-                                        window.dashboardPlayNewOrderSound();
-                                    }
+                                    maybePlayNewOrderSound(data);
 
                                     lastStatsSnapshot = snapshotKey;
-                                    lastFormToday = nextFormToday;
+                                    lastFormToday = Number(data.form_today) || 0;
                                     formTodayEl.dataset.initialValue = String(lastFormToday);
 
                                     return fetchDashboardSections();
@@ -1042,6 +1405,9 @@
             setInterval(refreshOrdersStats, pollSeconds * 1000);
             document.addEventListener('visibilitychange', function () {
                 if (document.visibilityState === 'visible') {
+                    if (typeof window.dashboardUnlockOrderSound === 'function') {
+                        window.dashboardUnlockOrderSound();
+                    }
                     refreshOrdersStats();
                 }
             });

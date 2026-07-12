@@ -59,6 +59,7 @@ class DashboardOrdersStatsApiTest extends TestCase
                 'form_handling',
                 'deferred_handling',
                 'online_handling',
+                'latest_form_order_id',
             ]);
     }
 
@@ -80,10 +81,14 @@ class DashboardOrdersStatsApiTest extends TestCase
             ->assertOk()
             ->assertJsonStructure([
                 'form_today',
+                'latest_form_order_id',
                 'sections' => [
                     'period' => ['total', 'online', 'deferred', 'avg', 'avg_label'],
                     'chart' => ['labels', 'labels_short', 'online', 'deferred', 'total'],
                     'recent_orders',
+                    'course_schedule',
+                    'chart_granularity',
+                    'date_range' => ['from', 'to'],
                     'shortcuts' => ['form_handling'],
                 ],
             ]);

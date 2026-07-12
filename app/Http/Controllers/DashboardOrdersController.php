@@ -28,6 +28,7 @@ class DashboardOrdersController extends Controller
             'form_handling' => $headlineStats['form_handling'],
             'deferred_handling' => $headlineStats['deferred_handling'],
             'online_handling' => $headlineStats['online_handling'],
+            'latest_form_order_id' => $headlineStats['latest_form_order_id'],
             'period_total' => $period['total'],
             'period_online' => $period['online'],
             'period_deferred' => $period['deferred'],
@@ -42,6 +43,8 @@ class DashboardOrdersController extends Controller
             ->limit(8)
             ->get();
 
+        $courseSchedule = $dashboard->courseScheduleForContext($context);
+
         return view('dashboard.orders', [
             'stats' => $stats,
             'recentFormOrders' => $recentFormOrders,
@@ -52,6 +55,8 @@ class DashboardOrdersController extends Controller
             'dateRangeError' => $context['date_range_error'],
             'dailyChart' => $dailyChart,
             'chartGranularity' => $context['chart_granularity'],
+            'courseSchedule' => $courseSchedule,
+            'courseScheduleRangeLabel' => ($context['filters']['date_from'] ?? '').' → '.($context['filters']['date_to'] ?? ''),
             'tz' => $context['tz'],
             'liveVisitorsEnabled' => (bool) config('analytics.live_visitors_dashboard.enabled', true),
             'liveVisitorsPollSeconds' => max(10, (int) config('analytics.live_visitors_dashboard.poll_interval_seconds', 15)),
