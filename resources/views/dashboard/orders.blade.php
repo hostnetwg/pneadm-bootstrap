@@ -336,7 +336,7 @@
                 </div>
             </div>
 
-            <div class="row g-4">
+            <div class="row g-4 align-items-start">
                 <div class="col-lg-8">
                     <div class="card dashboard-refresh-surface" id="dashboardRecentOrdersCard">
                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -386,16 +386,10 @@
                             @endif
                         </div>
                     </div>
-
-                    @include('dashboard.partials.course-schedule-table', [
-                        'courseSchedule' => $courseSchedule ?? [],
-                        'courseScheduleRangeLabel' => $courseScheduleRangeLabel ?? '',
-                        'class' => 'mt-4',
-                    ])
                 </div>
 
                 <div class="col-lg-4">
-                    <div class="card h-100 dashboard-refresh-surface" id="dashboardShortcutsCard">
+                    <div class="card dashboard-refresh-surface" id="dashboardShortcutsCard">
                         <div class="card-header">
                             <h5 class="mb-0">Szybkie skróty</h5>
                         </div>
@@ -422,6 +416,12 @@
                     </div>
                 </div>
             </div>
+
+            @include('dashboard.partials.course-schedule-table', [
+                'courseSchedule' => $courseSchedule ?? [],
+                'courseScheduleRangeLabel' => $courseScheduleRangeLabel ?? '',
+                'class' => 'mt-4',
+            ])
         </div>
     </div>
 
