@@ -346,6 +346,9 @@
                                                 <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1" title="Status płatności / zamówienia">
                                                     {{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}
                                                 </span>
+                                                @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
+                                            @elseif($zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM)
+                                                @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
                                             @endif
                                             @if($isDuplicate)
                                                 <span class="badge bg-danger ms-2" 

@@ -233,6 +233,8 @@ class DashboardOrdersDashboardService
      *     course_title: string|null,
      *     order_date: string|null,
      *     product_price: string|null,
+     *     order_form_variant_label: string,
+     *     order_form_variant_badge: string,
      *     show_url: string
      * }>
      */
@@ -254,6 +256,8 @@ class DashboardOrdersDashboardService
                     'course_title' => $order->course?->title,
                     'order_date' => $order->formatOrderDateLocal('d.m.Y H:i'),
                     'product_price' => $price,
+                    'order_form_variant_label' => $order->orderFormVariantAdminLabel(),
+                    'order_form_variant_badge' => $order->orderFormVariantBadgeClass(),
                     'show_url' => route('form-orders.show', $order->id),
                 ];
             })

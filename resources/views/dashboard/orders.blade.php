@@ -356,6 +356,7 @@
                                                 <th>Ident</th>
                                                 <th>Szkolenie</th>
                                                 <th>Data</th>
+                                                <th>Formularz</th>
                                                 <th class="text-end">Kwota</th>
                                                 <th></th>
                                             </tr>
@@ -368,6 +369,11 @@
                                                         {{ $order->course?->title ?? '—' }}
                                                     </td>
                                                     <td>{{ $order->formatOrderDateLocal('d.m.Y H:i') ?? '—' }}</td>
+                                                    <td>
+                                                        <span class="badge bg-{{ $order->orderFormVariantBadgeClass() }}">
+                                                            {{ $order->orderFormVariantAdminLabel() }}
+                                                        </span>
+                                                    </td>
                                                     <td class="text-end">
                                                         @if($order->product_price)
                                                             {{ number_format((float) $order->product_price, 2, ',', ' ') }} zł
@@ -1231,11 +1237,15 @@
                 }
 
                 const rows = items.map(function (order) {
+                    const variantBadge = order.order_form_variant_badge || 'light text-dark border';
+                    const variantLabel = order.order_form_variant_label || '—';
+
                     return '<tr>'
                         + '<td><code>' + escapeHtml(order.ident) + '</code></td>'
                         + '<td class="text-truncate" style="max-width: 220px;" title="' + escapeHtml(order.course_title || '—') + '">'
                         + escapeHtml(order.course_title || '—') + '</td>'
                         + '<td>' + escapeHtml(order.order_date || '—') + '</td>'
+                        + '<td><span class="badge bg-' + escapeHtml(variantBadge) + '">' + escapeHtml(variantLabel) + '</span></td>'
                         + '<td class="text-end">' + escapeHtml(order.product_price || '—') + '</td>'
                         + '<td class="text-end"><a href="' + escapeHtml(order.show_url) + '" class="btn btn-sm btn-link">Szczegóły</a></td>'
                         + '</tr>';
@@ -1245,7 +1255,7 @@
                     + '<div class="table-responsive" id="dashboardRecentOrdersTableWrap">'
                     + '<table class="table table-hover table-sm mb-0 align-middle">'
                     + '<thead class="table-light"><tr>'
-                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th class="text-end">Kwota</th><th></th>'
+                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th>Formularz</th><th class="text-end">Kwota</th><th></th>'
                     + '</tr></thead>'
                     + '<tbody id="dashboardRecentOrdersBody">' + rows + '</tbody>'
                     + '</table></div>';

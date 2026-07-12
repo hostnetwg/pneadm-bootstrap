@@ -247,6 +247,7 @@
                         <span class="text-muted small me-2">Rozliczenie:</span>
                         <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6">{{ $zamowienie->paymentModeLabelWithGateway() }}</span>
                         <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
+                        @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
                     </div>
                 @endif
             </div>
@@ -878,7 +879,7 @@ nowoczesna-edukacja.pl </div>
                             </div>
 
                             {{-- DODATKOWE INFORMACJE - kompaktowe --}}
-                            @if($zamowienie->order_date || $zamowienie->ip_address)
+                            @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM)
                                 <div class="card mt-3">
                                     <div class="card-header bg-info text-white py-2">
                                         <h6 class="mb-0">
@@ -886,6 +887,16 @@ nowoczesna-edukacja.pl </div>
                                         </h6>
                                     </div>
                                     <div class="card-body py-2">
+                                        @if($zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM || filled($zamowienie->order_form_variant))
+                                            <div class="mb-1">
+                                                <small>
+                                                    <strong>Wersja formularza:</strong>
+                                                    <span class="badge bg-{{ $zamowienie->orderFormVariantBadgeClass() }} ms-1">
+                                                        {{ $zamowienie->orderFormVariantAdminLabel() }}
+                                                    </span>
+                                                </small>
+                                            </div>
+                                        @endif
                                         @php
                                             $orderDateFormatted = $zamowienie->formatOrderDateLocal();
                                         @endphp

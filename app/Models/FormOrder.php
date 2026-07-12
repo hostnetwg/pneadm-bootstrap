@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\OrderFormVariant;
 use App\Traits\LogsActivity;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -227,6 +228,7 @@ class FormOrder extends Model
         'payment_mode',
         'payment_status',
         'submission_source',
+        'order_form_variant',
 
         // Dane KSeF
         'ksef_number',
@@ -994,6 +996,24 @@ class FormOrder extends Model
         }
 
         return self::paymentModeLabel($this->payment_mode, $gatewayCode);
+    }
+
+    public function orderFormVariantAdminLabel(): string
+    {
+        if ($this->submission_source === self::SUBMISSION_SOURCE_PNEADM_MANUAL) {
+            return 'Panel adm (ręcznie)';
+        }
+
+        return OrderFormVariant::adminShortLabel($this->order_form_variant);
+    }
+
+    public function orderFormVariantBadgeClass(): string
+    {
+        if ($this->submission_source === self::SUBMISSION_SOURCE_PNEADM_MANUAL) {
+            return 'dark';
+        }
+
+        return OrderFormVariant::adminBadgeClass($this->order_form_variant);
     }
 
     public static function paymentModeLabel(?string $mode, ?string $onlinePaymentGateway = null): string

@@ -33,4 +33,12 @@ class OrderFormVariantTest extends TestCase
             OrderFormVariant::label(OrderFormVariant::GLOBAL)
         );
     }
+
+    public function test_admin_short_label_for_stored_order_variant(): void
+    {
+        $this->assertSame('Formularz V2', OrderFormVariant::adminShortLabel('v2'));
+        $this->assertSame('Formularz legacy', OrderFormVariant::adminShortLabel('legacy'));
+        $this->assertSame('Legacy (domyślnie)', OrderFormVariant::adminShortLabel(null));
+        $this->assertSame('Legacy (domyślnie)', OrderFormVariant::adminShortLabel(''));
+    }
 }

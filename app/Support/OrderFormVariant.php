@@ -112,4 +112,30 @@ final class OrderFormVariant
             default => 'Formularz uniwersalny (brama /order-form?form_variant=legacy)',
         };
     }
+
+    /** Krótka etykieta w panelu adm (lista / szczegóły zamówienia). */
+    public static function adminShortLabel(?string $stored): string
+    {
+        if ($stored === null || trim($stored) === '') {
+            return 'Legacy (domyślnie)';
+        }
+
+        return match (self::normalize($stored)) {
+            self::V2 => 'Formularz V2',
+            default => 'Formularz legacy',
+        };
+    }
+
+    /** Klasa Bootstrap badge (bez prefiksu bg-). */
+    public static function adminBadgeClass(?string $stored): string
+    {
+        if ($stored === null || trim($stored) === '') {
+            return 'light text-dark border';
+        }
+
+        return match (self::normalize($stored)) {
+            self::V2 => 'primary',
+            default => 'secondary',
+        };
+    }
 }
