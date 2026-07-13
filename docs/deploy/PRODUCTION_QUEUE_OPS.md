@@ -149,6 +149,17 @@ tail -50 ~/domains/adm.pnedu.pl/pneadm/storage/logs/cron-queue.log
 
 ### Szybka naprawa (najczęściej skuteczna)
 
+**Dlaczego ręczny `queue:work` działa, a cron nie:** komenda w SSH **nie używa `flock`** i często ma dłuższy `--max-time=300`. Cron z `flock -n` co minutę **cicho pomija** start, gdy lock jest zajęty (wiszący stary proces) — wtedy w logu **nie ma** nowych linii, a joby się piętrzą.
+
+**Dwa workery (nie mylić):**
+
+| Aplikacja | Cron | Kto przetwarza |
+|-----------|------|----------------|
+| **pnedu.pl** | #6 `pnedu-queue.lock` | Eventy z wizyt na stronie (analityka, „Aktywni teraz”) |
+| **adm.pnedu.pl** | #7 `pneadm-queue.lock` | Joby z panelu adm (PDF, e-mail, eventy backendowe z adm) |
+
+Ręczne `queue:work` na **pneadm** nie zastępuje crona **pnedu** — przy testach wejść na pnedu.pl sprawdzaj oba logi.
+
 ```bash
 bash ~/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-queue-healthcheck.sh --restart
 # poczekaj ~60 s
@@ -169,20 +180,42 @@ cd ~/domains/pnedu.pl/app
 /opt/alt/php82/usr/bin/php artisan queue:work database --queue=default,analytics --stop-when-empty --max-time=300
 ```
 
-### Zablokowany flock (worker „martwy”, cron nie startuje nowego)
+### Cron z logowaniem flock (zalecana zmiana w DirectAdmin)
 
-1. Sprawdź procesy: `ps aux | grep "[q]ueue:work"`.
-2. Jeśli **brak** procesu, a cron działa — poszukaj starych locków:
-   ```bash
-   ls -la /tmp/pneadm*.lock /tmp/pnedu*.lock
-   ls -la ~/domains/pnedu.pl/app/storage/locks/
-   ls -la ~/domains/adm.pnedu.pl/pneadm/storage/locks/
-   ```
-3. Usuń lock **tylko gdy** nie ma żywego `queue:work` dla danej aplikacji:
-   ```bash
-   rm -f /tmp/pneadm-analytics-abandonments.lock   # przykład — użyj nazw z TWOJEGO crontab
-   ```
-4. Nie usuwaj locków „w ciemno” przy działającym workerze.
+Zamiast długiej komendy z `flock -n` inline użyj skryptu (loguje `OK` lub `SKIP flock busy`):
+
+**pnedu** — zamień cron #6 na:
+
+```bash
+* * * * * /bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-cron-queue-worker.sh /home/srv66127/domains/pnedu.pl/app /tmp/pnedu-queue.lock >> /home/srv66127/domains/pnedu.pl/app/storage/logs/cron-queue.log 2>&1
+```
+
+**pneadm** — zamień cron #7 na:
+
+```bash
+* * * * * /bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-cron-queue-worker.sh /home/srv66127/domains/adm.pnedu.pl/pneadm /tmp/pneadm-queue.lock >> /home/srv66127/domains/adm.pnedu.pl/pneadm/storage/logs/cron-queue.log 2>&1
+```
+
+Po zmianie: `tail -f .../cron-queue.log` — co minutę powinno być `OK` lub `SKIP flock busy` (nie cisza).
+
+### Wiszący worker / zajęty flock
+
+```bash
+# 1. Zabij wszystkie workery (po tym cron lub ręczny start od nowa)
+ps aux | grep "[q]ueue:work"
+kill <PID>   # powtórz dla każdego PID
+
+# 2. Restart sygnału Laravel
+cd ~/domains/pnedu.pl/app && /opt/alt/php82/usr/bin/php artisan queue:restart
+cd ~/domains/adm.pnedu.pl/pneadm && /opt/alt/php82/usr/bin/php artisan queue:restart
+
+# 3. Test flock (powinno wypisać ok — jeśli nic, lock trzyma inny proces)
+/usr/bin/flock -n /tmp/pneadm-queue.lock echo "pneadm lock wolny"
+/usr/bin/flock -n /tmp/pnedu-queue.lock echo "pnedu lock wolny"
+
+# 4. Dopiero gdy brak queue:work — ewentualnie usuń lock (rzadko potrzebne)
+# rm -f /tmp/pneadm-queue.lock /tmp/pnedu-queue.lock
+```
 
 ### Inne przyczyny (rzadsze)
 
