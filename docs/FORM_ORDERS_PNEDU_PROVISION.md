@@ -1,5 +1,8 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
+Data aktualizacji: 2026-07-13  
+Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
+
 Panel: `/form-orders/{id}` → przycisk **Dodaj tylko do PNEDU** (lub wariant z Sendy).
 
 Serwis: `App\Services\FormOrderPneduProvisionService`  
@@ -125,7 +128,10 @@ Cron: codziennie 04:15 (`routes/console.php`) — usuwa całe rekordy `participa
 sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
 sail test --filter=ParticipantLiveAccessServiceTest
+sail test   # pełny suite — patrz docs/TESTING.md
 ```
+
+Konfiguracja testów (izolacja bazy analityki, `is_active` w fabryce): **[TESTING.md](./TESTING.md)**.
 
 ## Konfiguracja kursu online
 

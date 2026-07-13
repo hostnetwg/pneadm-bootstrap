@@ -1,6 +1,6 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-07-09  
+Data utworzenia/aktualizacji: 2026-07-13  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -37,6 +37,18 @@ Po sklonowaniu ostatniego commita:
 - [ ] Worker kolejki `analytics` (opcjonalnie lokalnie): `sail artisan queue:work redis --queue=analytics`.
 
 Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Lokalna konfiguracja `pne_analytics` na nowym komputerze developerskim”.
+
+## Wdrożone lokalnie (2026-07-13) — do deploy prod adm
+
+| Temat | Commit(y) | Docs / runbook |
+|-------|-----------|----------------|
+| `participant_live_access` (tokeny CM per uczestnik) | `e7f4389` | `docs/FORM_ORDERS_PNEDU_PROVISION.md`, `docs/deploy/2026-07-participant-live-access-and-tests.md` |
+| KSeF dwufazowy + podgląd etapów po sukcesie | `9ef8045`, `97518ff` | `docs/KSEF_FORM_ORDERS.md` |
+| Pełny `sail test` na zielono (510 passed) | `8963e23` | `docs/TESTING.md` |
+
+**Prod adm — checklist:** `git pull` → `php artisan migrate --force` → `participants:cleanup-live-access --dry-run` → smoke provision + CM z listy uczestników.
+
+**Backlog (uzgodnione, nie wdrożone):** wysyłka maili z linkiem live z listy uczestników (hurt/indywidualnie).
 
 ## Najbliższe 10 Kroków
 

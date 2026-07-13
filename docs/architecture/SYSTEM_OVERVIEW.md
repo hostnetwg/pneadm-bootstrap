@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-06-24  
+Data utworzenia/aktualizacji: 2026-07-13  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -101,6 +101,9 @@ Najważniejsze miejsca w kodzie:
 - `app/Services/MarketingCampaignStatsService.php`,
 - `app/Services/CourseFunnelStatsService.php`,
 - `app/Services/FormOrderPneduProvisionService.php`.
+- `app/Services/ParticipantLiveAccessService.php`.
+
+Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
 
 ## Bazy Danych I Relacje
 
@@ -125,7 +128,7 @@ Najważniejsze miejsca w kodzie:
 | płatności | `online_payment_orders`, `payment_webhook_logs` | oba |
 | kampanie | `marketing_campaigns`, `marketing_source_types` | `adm.pnedu.pl`, wejścia w `pnedu.pl` |
 | statystyki obecne | `marketing_campaign_stats_daily`, `course_page_stats_daily` | oba |
-| uczestnicy | `participants`, `participant_emails` | `adm.pnedu.pl`, panel w `pnedu.pl` |
+| uczestnicy | `participants`, `participant_emails`, `participant_live_access` | `adm.pnedu.pl`, panel w `pnedu.pl` |
 | certyfikaty | `certificates`, `certificate_templates`, `certificate_email_logs` | oba |
 | ankiety | `surveys`, `survey_questions`, `survey_responses` | `adm.pnedu.pl` |
 | LMS | `online_courses`, `online_course_modules`, `online_course_lessons` | oba |

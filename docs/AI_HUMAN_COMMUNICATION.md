@@ -4,8 +4,8 @@ Ten dokument definiuje **obowiązującą** formę współpracy nad projektami `p
 
 > Plik w `pnedu`: `docs/AI_HUMAN_COMMUNICATION.md` (skrót + wskazanie na ten kanon). Zasada jest też w `.cursorrules` obu projektów.
 
-**Ostatnia aktualizacja:** 2026-07-09  
-**Wersja:** 2.0 (współpraca trójstronna)
+**Ostatnia aktualizacja:** 2026-07-13  
+**Wersja:** 2.1 (współpraca trójstronna + obowiązek aktualizacji docs)
 
 ---
 
@@ -189,6 +189,33 @@ Ten punkt w **tym** dokumencie jest tylko skrótem — po każdym większym etap
 - **Zmiany techniczne** (Sail, PII, deploy): Cursor może aktualizować po uzgodnieniu z Waldemarem.  
 - Po aktualizacji kanonu: zsynchronizuj skrót w `pnedu/docs/AI_HUMAN_COMMUNICATION.md` i sekcję w `.cursorrules` obu projektów.  
 - Nie duplikuj całej roadmapy analityki tutaj — linkuj do `NEXT_STEPS.md`.
+
+---
+
+## 14. Aktualizacja dokumentacji po nowych funkcjonalnościach (OBOWiĄZKOWE)
+
+Po **każdej nowej funkcjonalności** lub **znaczącym etapie** (feature, większy bugfix wpływający na prod, naprawa całego suite testów) Cursor **zawsze**:
+
+1. **Aktualizuje dokumentację techniczną** w `docs/` — nie tylko kod:
+   - moduł domenowy (np. `FORM_ORDERS_PNEDU_PROVISION.md`, `KSEF_FORM_ORDERS.md`),
+   - runbook deploy w `docs/deploy/YYYY-MM-*.md` (changelog + komendy prod),
+   - `docs/TESTING.md` gdy zmienia się konfiguracja testów lub wzorce,
+   - `docs/NEXT_STEPS.md` — co zamknięte / co następne,
+   - `docs/architecture/SYSTEM_OVERVIEW.md` gdy zmienia się model danych lub integracja.
+2. **Dostarcza podsumowanie dla Waldemara** (proste, po polsku) — co zrobiono, co to znaczy biznesowo, co uruchomić na prod.
+3. **Nie kończy etapu** samym commitem — brak aktualizacji docs traktuj jak niedokończony etap (wyjątek: drobny typo bez zmiany zachowania).
+
+### Minimalny checklist docs (kopiuj mentalnie)
+
+| Typ zmiany | Pliki do rozważenia |
+|------------|---------------------|
+| Nowy moduł / flow biznesowy | `docs/<MODUŁ>.md`, `docs/deploy/…`, `SYSTEM_OVERVIEW.md` |
+| Integracja zewnętrzna (API) | moduł + runbook + sekcja integracji w overview |
+| Migracje DB | runbook deploy + tabela w dokumencie modułu |
+| Testy / CI lokalne | `docs/TESTING.md` |
+| Roadmapa | `NEXT_STEPS.md` |
+
+Szablon runbooka deploy: patrz `docs/deploy/2026-07-participant-live-access-and-tests.md`.
 
 ---
 

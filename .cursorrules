@@ -220,13 +220,15 @@ Schema::create('online_payment_orders', ...); // Domyślnie baza pneadm
 
 ## 💬 Forma komunikacji Waldemar ↔ ChatGPT ↔ Cursor (OBOWIĄZKOWE)
 
-Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.0).
+Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.1).
 
 **Role:** Waldemar — decyzje biznesowe i prod; ChatGPT — konsultant i prompty wdrożeniowe; Cursor — implementacja, testy, fakty z repo.
 
 **Zasada główna:** najpierw pytania i decyzje, potem prompt/implementacja. Jeśli brakuje decyzji, ryzyko UX/zamówień lub są dwa warianty — **zatrzymaj się (tryb B)**, nie wdrażaj. Pytania decyzyjne **przed** kodowaniem, nie na końcu zakończonego etapu.
 
 **Tryby:** A = jasny zakres → wdrażaj | B = brak decyzji → pytaj | C = brak faktów → diagnozuj, potem propozycja.
+
+**Dokumentacja po funkcjonalnościach (OBOWIĄZKOWE):** po każdej nowej funkcji / znaczącym etapie aktualizuj `docs/` (moduł, `docs/deploy/`, `TESTING.md`, `NEXT_STEPS.md`, `architecture/SYSTEM_OVERVIEW.md` gdy trzeba) + podsumowanie dla Waldemara. Szczegóły: `AI_HUMAN_COMMUNICATION.md` sekcja 14. Sam commit bez docs = niedokończony etap.
 
 Po **znaczącym** etapie: raport **11 punktów** (kontekst, wdrożone, nie wdrożone, pliki, migracje/komendy, testy, ryzyka tech/prod, pytania→Waldemar, pytania→ChatGPT, następny krok) oraz:
 1. Podsumowanie dla Waldemara (proste, po polsku)

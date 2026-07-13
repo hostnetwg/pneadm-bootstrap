@@ -602,7 +602,7 @@ Testy:
 - `pneadm`: `sail artisan test --filter=Analytics` — 10 testów, 28 asercji, wynik pozytywny.
 - `pnedu`: `sail artisan test --filter=Analytics` — 18 testów, 55 asercji, wynik pozytywny.
 
-Uwaga: w `pneadm` podczas testów występuje istniejące ostrzeżenie o braku uprawnień do zapisu `.phpunit.result.cache`; testy przechodzą.
+Uwaga: w `pneadm` izolacja bazy analityki w testach — patrz `docs/TESTING.md` (2026-07-13: pełny `sail test` 510 passed).
 
 ## Plan Etapu 1 — Do Implementacji
 
