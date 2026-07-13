@@ -2089,18 +2089,28 @@ nowoczesna-edukacja.pl `;
             if (data.success) {
                 const alertClass = force ? 'alert-warning' : 'alert-success';
                 const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
-                let ksefInfo = data.ksef_number
-                    ? `<br><small>Numer KSeF: <strong class="text-success">${data.ksef_number}</strong></small>`
+                const invoiceLine = data.invoice_number
+                    ? `<div class="small mt-1">Numer faktury: <strong>${data.invoice_number}</strong></div>`
+                    : '';
+                const ksefLine = data.ksef_number
+                    ? `<div class="small">Numer KSeF: <strong class="text-success">${data.ksef_number}</strong></div>`
+                    : '';
+                const prevLine = (data.existing_invoice_number && force)
+                    ? `<div class="small text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></div>`
+                    : '';
+                const emailLine = (data.email_sent && data.emails_sent)
+                    ? `<div class="small text-muted">E-mail wysłany na: ${data.emails_sent.join(', ')}</div>`
                     : '';
 
-                resultDiv.innerHTML = `
-                    <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                // Nie chowaj podglądu etapów po sukcesie — dołóż tylko podsumowanie na końcu.
+                const summaryHtml = `
+                    <div class="alert ${alertClass} alert-dismissible fade show mt-2 mb-0" role="alert">
                         <i class="bi ${alertIcon}"></i>
-                        <strong>Sukces!</strong> ${data.message || 'Proces zakończony.'}
-                        ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
-                        ${ksefInfo}
-                        ${data.existing_invoice_number && force ? `<br><small class="text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></small>` : ''}
-                        ${data.email_sent && data.emails_sent ? `<br><small class="text-muted">E-mail wysłany na: ${data.emails_sent.join(', ')}</small>` : ''}
+                        <strong>Fakturę wystawiono.</strong>
+                        ${invoiceLine}
+                        ${ksefLine}
+                        ${prevLine}
+                        ${emailLine}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                     <div class="mt-2 d-flex gap-2">
@@ -2109,6 +2119,13 @@ nowoczesna-edukacja.pl `;
                         </button>
                     </div>
                 `;
+
+                // Jeśli w divie jest już progres (najczęściej), dopisz. W przeciwnym razie wyświetl samo podsumowanie.
+                if (resultDiv && resultDiv.innerHTML && resultDiv.innerHTML.trim().length > 0) {
+                    resultDiv.innerHTML = resultDiv.innerHTML + summaryHtml;
+                } else {
+                    resultDiv.innerHTML = summaryHtml;
+                }
                 return;
             }
 
@@ -2223,6 +2240,17 @@ nowoczesna-edukacja.pl `;
                     phase: 'ksef',
                     invoice_id: createData.invoice_id,
                 });
+
+                // Po sukcesie nie chowamy etapów: ustaw progres na "done", a render wyniku dopisze podsumowanie.
+                if (ksefData && ksefData.success) {
+                    resultDiv.innerHTML = renderIfirmaKsefProgress([
+                        { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
+                        { label: 'Zapis numeru faktury w zamówieniu', status: 'done' },
+                        { label: 'Przesyłanie do KSeF', status: 'done' },
+                        { label: 'Oczekiwanie na numer KSeF (MF)', status: 'done', detail: ksefData.ksef_number ? `KSeF: ${ksefData.ksef_number}` : '' },
+                        { label: sendEmail ? 'Wysyłka e-mail z fakturą' : 'Zakończenie procesu', status: 'done' },
+                    ]);
+                }
 
                 renderIfirmaKsefResult(ksefData, force, resultDiv);
             } catch (error) {
