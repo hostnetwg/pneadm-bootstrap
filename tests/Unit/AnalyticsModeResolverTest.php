@@ -18,6 +18,8 @@ class AnalyticsModeResolverTest extends TestCase
 
     public function test_aggregate_only_allows_only_aggregate_safe_events(): void
     {
+        config()->set('analytics.enabled', true);
+
         $resolver = new AnalyticsModeResolver;
 
         $this->assertTrue($resolver->shouldTrack(

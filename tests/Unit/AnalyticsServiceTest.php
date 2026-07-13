@@ -17,6 +17,8 @@ class AnalyticsServiceTest extends TestCase
 {
     public function test_track_dispatches_store_job_on_analytics_queue_with_event_uuid(): void
     {
+        config()->set('analytics.enabled', true);
+
         Queue::fake();
 
         $tracked = app(AnalyticsService::class)->track(AnalyticsEventName::CourseDescriptionViewed, [

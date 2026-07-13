@@ -64,7 +64,7 @@ class InstructorInvoicesModuleTest extends TestCase
             'instructor_id' => $instructor->id,
             'settlement_type' => InstructorInvoice::SETTLEMENT_TYPE_INVOICE,
             'invoice_number' => 'FV/MOD/1',
-            'invoice_date' => '2026-05-10',
+            'invoice_date' => now()->format('Y-m-d'),
             'notes' => 'Notatka modułu',
             'payment_status' => InstructorInvoice::PAYMENT_STATUS_UNPAID,
         ]);

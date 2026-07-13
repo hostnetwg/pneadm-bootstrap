@@ -105,7 +105,10 @@ class AnalyticsSalesFunnelDashboardTest extends TestCase
         $this->seedDashboardData();
 
         $this->actingAs($admin)
-            ->get(route('analytics.sales-funnel.index'))
+            ->get(route('analytics.sales-funnel.index', [
+                'date_from' => '2026-06-01',
+                'date_to' => '2026-06-30',
+            ]))
             ->assertOk()
             ->assertSee('Lejek sprzedaży')
             ->assertSee('KEEP-CAMP')

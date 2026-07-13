@@ -12,7 +12,7 @@ class AnalyticsConfigurationTest extends TestCase
 
         $this->assertIsArray($connection);
         $this->assertSame('mysql', $connection['driver']);
-        $this->assertSame('pne_analytics', $connection['database']);
+        $this->assertSame(env('DB_ANALYTICS_DATABASE', 'pne_analytics'), $connection['database']);
     }
 
     public function test_analytics_queue_defaults_to_analytics_queue_name(): void

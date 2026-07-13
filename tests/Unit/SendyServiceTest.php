@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\SendyService;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class SendyServiceTest extends TestCase
@@ -85,8 +86,12 @@ class SendyServiceTest extends TestCase
     /** @test */
     public function it_handles_invalid_subscription_status_gracefully()
     {
+        Http::fake([
+            '*' => Http::response('Invalid request', 500),
+        ]);
+
         $status = $this->sendyService->getSubscriptionStatus('test@example.com', 'invalid_list_id');
-        
+
         $this->assertEquals('Unknown', $status);
     }
 }

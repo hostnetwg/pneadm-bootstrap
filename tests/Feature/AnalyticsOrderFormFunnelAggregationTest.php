@@ -263,18 +263,24 @@ class AnalyticsOrderFormFunnelAggregationTest extends TestCase
 
     public function test_recent_submit_without_backend_is_pending_not_abandoned(): void
     {
-        $submitAt = Carbon::now('Europe/Warsaw')->subMinutes(5);
-        $today = $submitAt->toDateString();
-        $this->createSession('pending-1', 401, [
-            'order_form_viewed',
-            'form_submit_clicked',
-        ], occurredAt: $submitAt->format('Y-m-d H:i:s'));
+        Carbon::setTestNow(Carbon::parse('2026-07-10 14:00:00', 'Europe/Warsaw'));
 
-        $this->service->aggregateForDate($today);
+        try {
+            $submitAt = Carbon::now('Europe/Warsaw')->subMinutes(5)->utc();
+            $today = '2026-07-10';
+            $this->createSession('pending-1', 401, [
+                'order_form_viewed',
+                'form_submit_clicked',
+            ], occurredAt: $submitAt->format('Y-m-d H:i:s'));
 
-        $row = AnalyticsDailyChannelFunnel::query()->firstOrFail();
-        $this->assertSame(1, $row->pending_after_submit_clicked);
-        $this->assertSame(0, $row->abandoned_after_submit_clicked);
+            $this->service->aggregateForDate($today);
+
+            $row = AnalyticsDailyChannelFunnel::query()->firstOrFail();
+            $this->assertSame(1, $row->pending_after_submit_clicked);
+            $this->assertSame(0, $row->abandoned_after_submit_clicked);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_mature_submit_without_backend_is_abandoned(): void

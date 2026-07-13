@@ -22,12 +22,21 @@ class ParticipantAccessExpiryReminderServiceTest extends TestCase
     {
         parent::setUp();
 
+        Carbon::setTestNow(Carbon::parse('2026-06-09 08:00:00', 'Europe/Warsaw'));
+
         config([
             'participant_access.expiry_reminder.timezone' => 'Europe/Warsaw',
             'participant_access.expiry_reminder.days_before' => [7, 1],
         ]);
 
         $this->service = app(ParticipantAccessExpiryReminderService::class);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     private function createPaidCourseWithVideo(): Course
