@@ -364,20 +364,11 @@ nowoczesna-edukacja.pl </div>
                                                 <div>
                                                     <strong>Krok 1: Uczestnik w szkoleniu</strong>
                                                     <div class="text-muted">Dodano rekord do tabeli participants.</div>
-                                                </div>
-                                                <span class="badge bg-success">Wykonano</span>
-                                            </div>
-
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <div>
-                                                    <strong>Krok 2: Konto na pnedu.pl + e-mail</strong>
                                                     <div class="text-muted">
                                                         @if($zamowienie->pnedu_user_existed_before === true)
-                                                            Konto już istniało; wysłano e-mail informacyjny.
+                                                            Konto PNEDU: już istniało.
                                                         @elseif($zamowienie->pnedu_user_existed_before === false)
-                                                            Utworzono konto i wysłano e-mail do uczestnika.
-                                                        @else
-                                                            Konto PNEDU zostało obsłużone.
+                                                            Konto PNEDU: utworzone.
                                                         @endif
                                                     </div>
                                                 </div>
@@ -404,15 +395,38 @@ nowoczesna-edukacja.pl </div>
                                                     ? $zamowienie->pnedu_clickmeeting_message
                                                     : 'Status kroku ClickMeeting będzie widoczny po wykonaniu akcji w nowej wersji procesu.';
                                             @endphp
-                                            <div class="d-flex justify-content-between align-items-start">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <div>
-                                                    <strong>Krok 3: ClickMeeting</strong>
+                                                    <strong>Krok 2: ClickMeeting</strong>
                                                     @if($zamowienie->pnedu_clickmeeting_synced_at)
                                                         <div class="text-muted">Ostatnia próba: {{ $zamowienie->pnedu_clickmeeting_synced_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</div>
                                                     @endif
                                                     <div class="text-muted">{{ $cmDetail }}</div>
+                                                    @if(!empty($zamowienie->pnedu_clickmeeting_token))
+                                                        <div class="mt-1">
+                                                            <span class="text-muted">Token dostępu:</span>
+                                                            <code class="user-select-all">{{ e($zamowienie->pnedu_clickmeeting_token) }}</code>
+                                                            <span class="text-muted">(jednorazowy)</span>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                                 <span class="badge {{ $cmBadgeClass }}">{{ $cmLabel }}</span>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong>Krok 3: E-mail do uczestnika</strong>
+                                                    <div class="text-muted">
+                                                        @if($zamowienie->pnedu_user_existed_before === true)
+                                                            Wysłano e-mail informacyjny na adres uczestnika.
+                                                        @elseif($zamowienie->pnedu_user_existed_before === false)
+                                                            Wysłano e-mail z linkiem do ustawienia hasła.
+                                                        @else
+                                                            Wysłano wiadomość e-mail do uczestnika.
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-success">Wykonano</span>
                                             </div>
                                         </div>
                                         @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))

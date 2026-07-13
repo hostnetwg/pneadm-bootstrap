@@ -1271,6 +1271,9 @@ class FormOrdersController extends Controller
             if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_message')) {
                 $zamowienie->pnedu_clickmeeting_message = null;
             }
+            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_token')) {
+                $zamowienie->pnedu_clickmeeting_token = null;
+            }
             $updated = $zamowienie->save();
 
             if ($updated) {

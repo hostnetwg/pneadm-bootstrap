@@ -190,7 +190,7 @@ Faktury i proformy: `IfirmaApiService::sendInvoiceByEmail`, nadawca `IFIRMA_SEND
 | ID | Wiadomość | Klasyfikacja | From docelowo | Reply-To | Aplikacja / uwagi |
 |----|-----------|--------------|---------------|----------|-------------------|
 | **B1** | `OrderNotificationMail` | systemowa / transakcyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (pnedu); wysyłka z pnedu.pl |
-| **B2** | Weryfikacja konta, reset hasła, provision (`PneduFormOrderProvisioned*`) | systemowa / konto | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (pnedu + adm); reset admina adm — bez zmian |
+| **B2** | Weryfikacja konta, reset hasła, provision (`PneduFormOrderProvisioned*`) | systemowa / konto | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (pnedu + adm); provision z adm zawiera link live ClickMeeting / inne platformy — patrz `docs/FORM_ORDERS_PNEDU_PROVISION.md`; reset admina adm — bez zmian |
 | **B3** | `DataCompletionRequestMail` | systemowa | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (adm, commit `26237ca`); usunięty legacy mailer SMTP |
 | **B4** | Faktury / proformy iFirma | transakcyjne / finansowe | poza etapem 1 | — | Osobna decyzja: `IFIRMA_SENDER_EMAIL` legacy vs spójność z system / kontakt |
 | **B5** | `InstructorTrainingLinksMail` | systemowa / organizacyjna | `info@system.pnedu.pl` | `kontakt@pnedu.pl` | **wdrożone** (adm); potwierdzone na produkcji |

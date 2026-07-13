@@ -18,6 +18,10 @@ sail artisan migrate
 
 Rollback kolumn (np. na stagingu): `sail artisan migrate:rollback --step=1` (przywraca `participant_name` / `participant_email`).
 
+## Provision PNEDU (Dodaj tylko do PNEDU)
+
+Pełny opis flow (participants → ClickMeeting → e-mail, tokeny, linki live): **[FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md)**.
+
 ## Stare skrypty zewnętrzne
 
 Jeśli masz PHP/SQL poza tymi repozytoriami, które jeszcze odwołują się do `form_orders.participant_*`, zaktualizuj je do **`form_order_participants`**.

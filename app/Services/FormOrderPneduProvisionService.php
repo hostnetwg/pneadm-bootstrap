@@ -10,11 +10,13 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
+use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -48,7 +50,7 @@ class FormOrderPneduProvisionService
                     ];
                 }
 
-                $course = Course::query()->with('instructor')->find($order->product_id);
+                $course = Course::query()->with(['instructor', 'onlineDetails'])->find($order->product_id);
                 if (! $course) {
                     return ['success' => false, 'error' => 'Nie znaleziono szkolenia (kursu) dla product_id tego zamówienia.', 'http_code' => 400];
                 }
@@ -156,14 +158,14 @@ class FormOrderPneduProvisionService
 
                 return array_merge($payload, [
                     'success' => true,
-                    'message' => $payload['message'].' Uwaga: nie znaleziono rekordu użytkownika w bazie PNEDU do wysyłki e-maila.',
+                    'message' => 'Uczestnik i konto PNEDU zapisane. Uwaga: nie znaleziono rekordu użytkownika w bazie PNEDU do wysyłki e-maila.',
                     'email_warning' => 'Nie wysłano e-maila — brak użytkownika w bazie pnedu.',
                 ]);
             }
 
             $clickMeetingResult = $this->provisionClickMeetingIfConfigured($afterCommit);
             $this->persistClickMeetingProvisionResult($formOrderId, $clickMeetingResult);
-            if (! $clickMeetingResult['success']) {
+            if (! empty($clickMeetingResult['warning'])) {
                 $clickMeetingWarning = $clickMeetingResult['warning'];
             }
 
@@ -183,12 +185,18 @@ class FormOrderPneduProvisionService
                 ]);
             }
 
+            $course = Course::query()->with('onlineDetails')->find($afterCommit['course_id']);
+            $liveAccess = $course
+                ? app(PneduProvisionEmailContextBuilder::class)->build($course, $clickMeetingResult)
+                : new PneduProvisionLiveAccessContext;
+
             try {
                 if ($afterCommit['user_existed']) {
                     $pneduUser->notify(new PneduFormOrderProvisionedExistingUser(
                         $afterCommit['course_title'],
                         $afterCommit['instructor_line'] ?? null,
                         $afterCommit['start_date_line'] ?? null,
+                        $liveAccess,
                     ));
                 } else {
                     $token = Password::broker('pnedu_users')->createToken($pneduUser);
@@ -197,6 +205,7 @@ class FormOrderPneduProvisionService
                         $afterCommit['course_title'],
                         $afterCommit['instructor_line'] ?? null,
                         $afterCommit['start_date_line'] ?? null,
+                        $liveAccess,
                     ));
                 }
             } catch (Throwable $e) {
@@ -378,7 +387,7 @@ class FormOrderPneduProvisionService
      *   platform: string,
      *   clickmeeting_event_id: string
      * } $afterCommit
-     * @return array{success: bool, warning?: string, status: string, detail: string}
+     * @return array{success: bool, warning?: string, status: string, detail: string, token?: string|null}
      */
     private function provisionClickMeetingIfConfigured(array $afterCommit): array
     {
@@ -402,7 +411,8 @@ class FormOrderPneduProvisionService
             ];
         }
 
-        $result = app(ClickMeetingService::class)->registerParticipant(
+        $clickMeetingService = app(ClickMeetingService::class);
+        $result = $clickMeetingService->registerParticipant(
             $eventId,
             $afterCommit['first_name'],
             $afterCommit['last_name'],
@@ -410,11 +420,11 @@ class FormOrderPneduProvisionService
         );
 
         if ($result['success'] ?? false) {
-            return [
-                'success' => true,
-                'status' => 'success',
-                'detail' => 'Uczestnik został dodany do ClickMeeting (event_id: '.$eventId.').',
-            ];
+            return $this->buildSuccessfulClickMeetingResult(
+                $clickMeetingService,
+                $eventId,
+                (string) $afterCommit['email']
+            );
         }
 
         Log::warning('FormOrderPneduProvisionService: ClickMeeting best-effort failed', [
@@ -433,16 +443,84 @@ class FormOrderPneduProvisionService
     }
 
     /**
-     * @param  array{status?: string, detail?: string}  $clickMeetingResult
+     * @return array{
+     *   success: true,
+     *   status: string,
+     *   detail: string,
+     *   token?: string|null,
+     *   room_url?: string|null,
+     *   access_type?: int|null,
+     *   warning?: string
+     * }
+     */
+    private function buildSuccessfulClickMeetingResult(
+        ClickMeetingService $clickMeetingService,
+        string $eventId,
+        string $email
+    ): array {
+        $detail = 'Uczestnik został dodany do ClickMeeting (event_id: '.$eventId.').';
+        $token = null;
+        $warning = null;
+        $roomUrl = null;
+        $accessType = null;
+
+        $conference = $clickMeetingService->getConference($eventId);
+        if ($conference['success'] ?? false) {
+            $accessType = isset($conference['access_type']) ? (int) $conference['access_type'] : null;
+            $roomUrl = $clickMeetingService->extractRoomUrl($conference['conference'] ?? []);
+
+            if ($accessType === ClickMeetingService::ACCESS_TYPE_TOKEN) {
+                $tokenResult = $clickMeetingService->getAccessTokenForEmail($eventId, $email);
+                if ($tokenResult['success'] ?? false) {
+                    $token = trim((string) ($tokenResult['token'] ?? ''));
+                    if ($token !== '') {
+                        $detail .= ' Pobrano token dostępu.';
+                    }
+                } else {
+                    $warning = 'Uwaga: uczestnik dodany do ClickMeeting, ale nie udało się pobrać tokenu dostępu. '
+                        .($tokenResult['error'] ?? '');
+                    Log::warning('FormOrderPneduProvisionService: ClickMeeting token fetch failed', [
+                        'event_id' => $eventId,
+                        'email' => $email,
+                        'error' => $tokenResult['error'] ?? 'unknown',
+                    ]);
+                }
+            }
+        }
+
+        $payload = [
+            'success' => true,
+            'status' => 'success',
+            'detail' => $detail,
+            'token' => $token !== '' ? $token : null,
+            'room_url' => $roomUrl,
+            'access_type' => $accessType,
+        ];
+
+        if ($warning !== null) {
+            $payload['warning'] = $warning;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array{status?: string, detail?: string, token?: string|null}  $clickMeetingResult
      */
     private function persistClickMeetingProvisionResult(int $formOrderId, array $clickMeetingResult): void
     {
         try {
-            FormOrder::query()->whereKey($formOrderId)->update([
+            $update = [
                 'pnedu_clickmeeting_status' => $clickMeetingResult['status'] ?? null,
                 'pnedu_clickmeeting_synced_at' => now(),
                 'pnedu_clickmeeting_message' => $clickMeetingResult['detail'] ?? null,
-            ]);
+            ];
+
+            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_token')) {
+                $update['pnedu_clickmeeting_token'] = $clickMeetingResult['token'] ?? null;
+            }
+
+            FormOrder::query()->whereKey($formOrderId)->update($update);
         } catch (Throwable $e) {
             Log::error('FormOrderPneduProvisionService: błąd zapisu statusu ClickMeeting', [
                 'form_order_id' => $formOrderId,

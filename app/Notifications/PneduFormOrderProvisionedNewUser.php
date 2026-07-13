@@ -3,7 +3,9 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\FormatsPneduProvisionEmailDetails;
+use App\Notifications\Concerns\FormatsPneduProvisionLiveAccess;
 use App\Notifications\Concerns\UsesSystemMailSettings;
+use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,6 +13,7 @@ use Illuminate\Notifications\Notification;
 class PneduFormOrderProvisionedNewUser extends Notification
 {
     use FormatsPneduProvisionEmailDetails;
+    use FormatsPneduProvisionLiveAccess;
     use Queueable;
     use UsesSystemMailSettings;
 
@@ -19,6 +22,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         protected string $courseTitle,
         protected ?string $instructorLine = null,
         protected ?string $startDateLine = null,
+        protected ?PneduProvisionLiveAccessContext $liveAccess = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -30,6 +34,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
     {
         $base = rtrim((string) config('services.pnedu_frontend_url'), '/');
         $url = $base.'/reset-password/'.$this->token.'?email='.urlencode($notifiable->getEmailForPasswordReset());
+        $liveAccess = $this->liveAccess ?? new PneduProvisionLiveAccessContext;
 
         $hasInstructor = $this->instructorLine !== null && $this->instructorLine !== '';
         $hasDate = $this->startDateLine !== null && $this->startDateLine !== '';
@@ -53,8 +58,15 @@ class PneduFormOrderProvisionedNewUser extends Notification
         if ($html = $this->colonPrefixedDetailHtml(
             $this->startDateLine,
             $hasInstructor ? '0' : '6px',
-            '1em'
+            $liveAccess->showLiveSection || $liveAccess->showPostEventSection ? null : '1em'
         )) {
+            $message->line($html);
+        }
+
+        if ($html = $this->liveAccessSectionHtml($liveAccess)) {
+            $message->line($html);
+        }
+        if ($html = $this->postEventSectionHtml($liveAccess)) {
             $message->line($html);
         }
 
