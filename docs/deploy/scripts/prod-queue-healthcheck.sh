@@ -170,12 +170,15 @@ section "5) Logi queue-worker (tail)"
 for label_dir in "pnedu:$PNEDU_DIR" "pneadm:$PNEADM_DIR"; do
   label="${label_dir%%:*}"
   dir="${label_dir#*:}"
-  log="$dir/storage/logs/queue-worker.log"
-  echo "--- $label: $log"
-  if [[ -f "$log" ]]; then
-    tail -n 15 "$log" 2>/dev/null || true
-  else
-    echo "(brak pliku — cron może logować gdzie indziej lub jeszcze nie było uruchomienia)"
+  for log in "$dir/storage/logs/cron-queue.log" "$dir/storage/logs/queue-worker.log"; do
+    echo "--- $label: $log"
+    if [[ -f "$log" ]]; then
+      tail -n 15 "$log" 2>/dev/null || true
+      break
+    fi
+  done
+  if [[ ! -f "$dir/storage/logs/cron-queue.log" && ! -f "$dir/storage/logs/queue-worker.log" ]]; then
+    echo "(brak cron-queue.log / queue-worker.log)"
   fi
 done
 

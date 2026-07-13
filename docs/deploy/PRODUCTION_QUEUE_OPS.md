@@ -48,6 +48,32 @@ Sendy (newsletter) = **osobny** cron PHP (`scheduled.php`), nie Laravel.
 
 ---
 
+## Cron pnedu.pl (prod SeoHost) — jeden worker kolejki
+
+Na prod **pnedu** muszą współistnieć **dwa** crony co minutę, ale **różne role**:
+
+| Cron | Rola |
+|------|------|
+| `schedule:run` (flock `pnedu-schedule.lock`) | Tylko zadania **daily** z `routes/console.php` (weryfikacja e-mail, purge) |
+| `queue:work database --queue=default,analytics` (flock `pnedu-queue.lock`) | **Jedyny** worker kolejki — w tym **analytics** („Aktywni teraz”) |
+
+**Nie dodawaj** `queue:work` z powrotem do schedulera w `pnedu/routes/console.php`. Wcześniejsza konfiguracja uruchamiała drugi worker bez `--queue=analytics` — eventy analityki zależały wyłącznie od crona z `flock`, a przy zablokowanym locku cała analityka padała mimo działającego `schedule:run`.
+
+Logi prod:
+
+```text
+~/domains/pnedu.pl/app/storage/logs/cron-queue.log   # worker kolejki
+~/domains/pnedu.pl/app/storage/logs/scheduler.log    # schedule:run (daily)
+```
+
+Wzorzec crona #6 (queue):
+
+```bash
+* * * * * /usr/bin/flock -n /tmp/pnedu-queue.lock /opt/alt/php82/usr/bin/php /home/srv66127/domains/pnedu.pl/app/artisan queue:work database --queue=default,analytics --stop-when-empty --max-time=55 --sleep=1 --tries=2 >> /home/srv66127/domains/pnedu.pl/app/storage/logs/cron-queue.log 2>&1
+```
+
+---
+
 ## Checklist po każdym deployu na prod
 
 Wykonaj na **obu** projektach po `git pull` + cache (+ `npm run build` na pnedu jeśli był frontend):
@@ -115,9 +141,10 @@ echo DB::connection('analytics')->table('analytics_events')
   ->where('occurred_at','>=',now()->subMinutes(15))->count().' events / 15 min';
 "
 
-# 5. Logi
-tail -50 ~/domains/pnedu.pl/app/storage/logs/queue-worker.log
-tail -50 ~/domains/adm.pnedu.pl/pneadm/storage/logs/queue-worker.log
+# 5. Logi (prod: cron-queue.log; starsze instalacje: queue-worker.log)
+tail -50 ~/domains/pnedu.pl/app/storage/logs/cron-queue.log
+tail -50 ~/domains/pnedu.pl/app/storage/logs/scheduler.log
+tail -50 ~/domains/adm.pnedu.pl/pneadm/storage/logs/cron-queue.log
 ```
 
 ### Szybka naprawa (najczęściej skuteczna)
