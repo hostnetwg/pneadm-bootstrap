@@ -102,13 +102,22 @@ Od tej pory **co minutę** cron uruchomi `php artisan schedule:run`, a scheduler
 
 ## Krok 6: Po wdrożeniu nowego kodu
 
-Po każdym `git pull` lub wgraniu zmian na produkcję warto zrestartować worker (żeby wziął nowy kod). Przy cronie nie ma „długo działającego” workera, więc wystarczy:
+Po każdym `git pull` lub wgraniu zmian na produkcję **zawsze** zrestartuj worker na **obu** aplikacjach (pnedu + pneadm):
 
 ```bash
-php artisan queue:restart
+cd ~/domains/pnedu.pl/app && /opt/alt/php82/usr/bin/php artisan queue:restart
+cd ~/domains/adm.pnedu.pl/pneadm && /opt/alt/php82/usr/bin/php artisan queue:restart
 ```
 
-(nie zatrzyma to crona; kolejne uruchomienie `schedule:run` i tak użyje już nowego kodu).
+`queue:restart` nie zabija procesu natychmiast — sygnalizuje workerom graceful exit; następny tick crona uruchamia świeży proces.
+
+Pełna checklista deployu, incydent „Aktywni teraz = 0” i skrypt diagnostyczny: **[`docs/deploy/PRODUCTION_QUEUE_OPS.md`](deploy/PRODUCTION_QUEUE_OPS.md)**.
+
+```bash
+bash docs/deploy/scripts/prod-queue-healthcheck.sh
+```
+
+> **Prod pneadm:** worker analityki/PDF często jest **bezpośrednim** cronem `flock queue:work` (nie `schedule:run`). Nie włączaj obu mechanizmów naraz — zob. `docs/deploy/2026-06-analytics-production-deploy.md` sekcja 8.5.
 
 ---
 

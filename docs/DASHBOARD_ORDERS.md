@@ -39,6 +39,19 @@ Serwis: `App\Services\Analytics\AnalyticsLiveVisitorsService`.
 
 Kolumna **Wejście:** referrer → kampania → UTM → `direct (bezpośrednio)`.
 
+### Rozwiązywanie problemów („Aktywni teraz” = 0)
+
+Blok czyta **wyłącznie** `analytics_events` (nie Google Analytics). Ruch w GA przy zerze w panelu zwykle oznacza, że **worker kolejki na pnedu.pl** nie zapisuje eventów — szczegóły i checklista: [`docs/deploy/PRODUCTION_QUEUE_OPS.md`](deploy/PRODUCTION_QUEUE_OPS.md).
+
+Szybka diagnostyka na prod (SSH):
+
+```bash
+bash docs/deploy/scripts/prod-queue-healthcheck.sh --strict
+bash docs/deploy/scripts/prod-queue-healthcheck.sh --restart   # jeśli worker zawieszony
+```
+
+Weryfikacja w panelu: `/analytics/debug-events` — po wejściu na kurs na pnedu.pl powinien pojawić się świeży event (np. `course_description_viewed`).
+
 ## Wykres — terminy szkoleń
 
 Wzorowane na wykresie w **Analityka → Rozliczenia** (`/analytics/revenue`):

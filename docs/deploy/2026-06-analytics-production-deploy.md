@@ -514,15 +514,19 @@ ANALYTICS_QUEUE_CONNECTION=redis
 
 ### 8.4 Restart workera po deployu
 
-Jeśli po deployu worker wymaga przeładowania kodu:
+**Obowiązkowo po każdym deployu** na prod (pnedu **i** pneadm):
 
 ```bash
-php artisan queue:restart
+cd ~/domains/pnedu.pl/app && /opt/alt/php82/usr/bin/php artisan queue:restart
+cd ~/domains/adm.pnedu.pl/pneadm && /opt/alt/php82/usr/bin/php artisan queue:restart
 ```
 
 ```text
-queue:restart nie zabija jobów natychmiast — każe workerom zakończyć bieżący job i wystartować ponownie
-(przez Supervisor). Wykonać po deployach, które zmieniają kod obsługiwany przez worker.
+queue:restart nie zabija jobów natychmiast — każe workerom zakończyć bieżący job i wystartować ponownie.
+Na SeoHost (cron+flock) następny tick crona uruchamia świeży worker.
+
+Runbook incydentów (Aktywni teraz = 0, backlog, flock): docs/deploy/PRODUCTION_QUEUE_OPS.md
+Skrypt: bash docs/deploy/scripts/prod-queue-healthcheck.sh [--strict] [--restart]
 ```
 
 ### 8.5 Stały worker bez Supervisora (cron + flock) — PRODUKCJA PNEdu

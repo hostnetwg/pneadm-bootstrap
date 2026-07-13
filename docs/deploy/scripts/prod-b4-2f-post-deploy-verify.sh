@@ -276,6 +276,9 @@ WHERE occurred_at >= UTC_TIMESTAMP() - INTERVAL 60 MINUTE
 "
 
 section "GOTOWE"
+echo "Kolejka / Aktywni teraz: bash $PNEADM_DIR/docs/deploy/scripts/prod-queue-healthcheck.sh"
+echo "Runbook: $PNEADM_DIR/docs/deploy/PRODUCTION_QUEUE_OPS.md"
+echo ""
 echo "Wklej cały output do ChatGPT / dokumentacji deploy."
 echo ""
 echo "Kryteria PASS (po ff137b1):"
