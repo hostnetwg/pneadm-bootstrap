@@ -671,7 +671,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant.participant.liveAccess', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -1252,13 +1252,18 @@ class FormOrdersController extends Controller
         }
 
         try {
-            $zamowienie = FormOrder::find($id);
+            $zamowienie = FormOrder::with('primaryParticipant')->find($id);
 
             if (! $zamowienie) {
                 return response()->json([
                     'success' => false,
                     'error' => 'Zamówienie nie zostało znalezione.',
                 ], 404);
+            }
+
+            $participantId = $zamowienie->primaryParticipant?->participant_id;
+            if ($participantId) {
+                app(\App\Services\ParticipantLiveAccessService::class)->deleteForParticipant((int) $participantId);
             }
 
             $zamowienie->pnedu_provisioned_at = null;
@@ -1271,9 +1276,6 @@ class FormOrdersController extends Controller
             }
             if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_message')) {
                 $zamowienie->pnedu_clickmeeting_message = null;
-            }
-            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_token')) {
-                $zamowienie->pnedu_clickmeeting_token = null;
             }
             $updated = $zamowienie->save();
 

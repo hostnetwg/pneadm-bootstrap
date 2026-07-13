@@ -446,6 +446,39 @@
                                         E-mail: nagranie
                                     </button>
                                 @endif
+                                @if(($courseLiveAccessAvailable ?? false) && !empty($participant->email))
+                                    @php
+                                        $liveAccessRegistered = $participant->liveAccess?->isSuccessful();
+                                        $liveAccessConfirmMessage = $liveAccessRegistered
+                                            ? 'Ponownie zarejestrować uczestnika w ClickMeeting i odświeżyć token dostępu?'
+                                            : 'Zarejestrować uczestnika w ClickMeeting i pobrać token dostępu (przypisany do jego adresu e-mail)?';
+                                    @endphp
+                                    <form id="provisionLiveAccessForm{{ $participant->id }}" action="{{ route('participants.provision-live-access', [$course, $participant]) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="button"
+                                                class="btn btn-outline-success btn-sm px-2 py-0 small text-nowrap"
+                                                title="Integracja ClickMeeting (token przypisany do e-maila uczestnika)"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#formConfirmModal"
+                                                data-confirm-title="ClickMeeting"
+                                                data-confirm-message="{{ $liveAccessConfirmMessage }}"
+                                                data-confirm-form="#provisionLiveAccessForm{{ $participant->id }}"
+                                                data-confirm-btn-class="btn-success"
+                                                data-confirm-btn-text="{{ $liveAccessRegistered ? 'Odśwież' : 'Zarejestruj' }}"
+                                                data-confirm-header-class="bg-success text-white">
+                                            @if($liveAccessRegistered)
+                                                <i class="bi bi-check-circle"></i> CM OK
+                                            @else
+                                                ClickMeeting
+                                            @endif
+                                        </button>
+                                    </form>
+                                    @if(!empty($participant->liveAccess?->token))
+                                        <span class="small text-muted d-block" title="Token przypisany do e-maila uczestnika">
+                                            CM: <code class="user-select-all">{{ e($participant->liveAccess->token) }}</code>
+                                        </span>
+                                    @endif
+                                @endif
                                 @php
                                     $reminderEligibility = $accessExpiryReminderEligibilityByParticipantId[$participant->id] ?? ['eligible' => false, 'reason' => null];
                                     $reminderDaysLeft = $reminderEligibility['days_until'] ?? null;

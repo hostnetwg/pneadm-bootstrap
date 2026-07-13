@@ -2,15 +2,15 @@
 
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Admin\PneduUsersController;
+use App\Http\Controllers\Admin\StatisticsController;
+use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Analytics\AnalyticsDebugEventController;
 use App\Http\Controllers\Analytics\AnalyticsFormAbandonmentController;
 use App\Http\Controllers\Analytics\AnalyticsOrderFormFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsRevenueController;
 use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsSettingsController;
-use App\Http\Controllers\Admin\PneduUsersController;
-use App\Http\Controllers\Admin\StatisticsController;
-use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\CoursePriceVariantController;
@@ -449,6 +449,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{participant}/send-certificate-link', [ParticipantController::class, 'sendCertificateLink'])->name('participants.send-certificate-link'); // Wyślij e-mail z linkiem do zaświadczeń
         Route::post('/{participant}/send-single-certificate-link', [ParticipantController::class, 'sendSingleCertificateLink'])->name('participants.send-single-certificate-link'); // Wyślij e-mail z linkiem do konkretnego zaświadczenia
         Route::post('/{participant}/send-course-access-email', [ParticipantController::class, 'sendCourseAccessEmail'])->name('participants.send-course-access-email'); // Wyślij e-mail o dostępie do nagrań/materiałów
+        Route::post('/{participant}/provision-live-access', [ParticipantController::class, 'provisionLiveAccess'])->name('participants.provision-live-access'); // ClickMeeting: rejestracja + token
         Route::post('/{participant}/send-access-expiry-reminder', [ParticipantController::class, 'sendAccessExpiryReminder'])->name('participants.send-access-expiry-reminder'); // Przypomnienie o wygaśnięciu dostępu
         Route::post('/send-access-expiry-reminders-bulk', [ParticipantController::class, 'sendAccessExpiryRemindersBulk'])->name('participants.send-access-expiry-reminders-bulk'); // Masowa wysyłka przypomnień o wygaśnięciu dostępu
         Route::post('/send-certificate-links-bulk', [ParticipantController::class, 'sendCertificateLinksBulk'])->name('participants.send-certificate-links-bulk'); // Masowa wysyłka linków do zaświadczeń

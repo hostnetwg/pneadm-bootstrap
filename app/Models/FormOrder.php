@@ -25,7 +25,6 @@ use Illuminate\Support\Str;
  * @property string|null $pnedu_clickmeeting_status Status kroku ClickMeeting po akcji „Dodaj tylko do PNEDU”.
  * @property \Carbon\Carbon|null $pnedu_clickmeeting_synced_at Data ostatniej próby integracji z ClickMeeting.
  * @property string|null $pnedu_clickmeeting_message Szczegóły wyniku integracji ClickMeeting.
- * @property string|null $pnedu_clickmeeting_token Token dostępu ClickMeeting (access_type = 3).
  * @property string|null $submission_source Kanał zapisu (pnedu_order_form, pneadm_manual); null = historia / inny kanał.
  */
 class FormOrder extends Model
@@ -193,7 +192,6 @@ class FormOrder extends Model
         'pnedu_clickmeeting_status',
         'pnedu_clickmeeting_synced_at',
         'pnedu_clickmeeting_message',
-        'pnedu_clickmeeting_token',
 
         // Dane zamawiającego (kontaktowe)
         'orderer_name',

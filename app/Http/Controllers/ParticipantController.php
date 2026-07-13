@@ -17,6 +17,7 @@ use App\Models\PneduUser;
 use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
+use App\Services\ParticipantLiveAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -596,7 +597,8 @@ class ParticipantController extends Controller
      */
     public function index(Request $request, Course $course)
     {
-        $query = Participant::with('certificate')->where('participants.course_id', $course->id);
+        $course->loadMissing('onlineDetails');
+        $query = Participant::with(['certificate', 'liveAccess'])->where('participants.course_id', $course->id);
 
         // Obsługa wyszukiwania
         if ($request->filled('search')) {
@@ -781,6 +783,12 @@ class ParticipantController extends Controller
             $accessExpiryReminderEligibilityByParticipantId[(int) $p->id] = $eligibility;
         }
 
+        $courseClickMeetingPlatform = strtolower(trim((string) optional($course->onlineDetails)->platform)) === 'clickmeeting';
+        $courseClickMeetingEventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
+        $courseLiveAccessAvailable = $courseClickMeetingPlatform
+            && $courseClickMeetingEventId !== ''
+            && ! $course->hasEnded();
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -805,7 +813,8 @@ class ParticipantController extends Controller
             'accessExpiryReminderCanBulkSend',
             'accessExpiryReminderEligibleCount',
             'accessExpiryReminderUnsentCount',
-            'accessExpiryReminderEligibilityByParticipantId'
+            'accessExpiryReminderEligibilityByParticipantId',
+            'courseLiveAccessAvailable',
         ));
     }
 
@@ -981,6 +990,55 @@ class ParticipantController extends Controller
         }
 
         return redirect()->route('participants.index', $course)->with('success', 'E-mail o dostępie do szkolenia został wysłany na adres '.$email);
+    }
+
+    /**
+     * Rejestruje uczestnika w ClickMeeting i zapisuje token/link w participant_live_access.
+     */
+    public function provisionLiveAccess(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        if ($course->hasEnded()) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Szkolenie zostało zakończone — rejestracja w ClickMeeting nie jest dostępna.'
+            );
+        }
+
+        $email = trim((string) $participant->email);
+        if ($email === '' || ! str_contains($email, '@')) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma prawidłowego adresu e-mail.');
+        }
+
+        $course->loadMissing('onlineDetails');
+        $result = app(ParticipantLiveAccessService::class)->provisionClickMeetingForParticipant(
+            $participant,
+            $course
+        );
+
+        if (($result['status'] ?? '') === 'success') {
+            $message = 'Uczestnik został zarejestrowany w ClickMeeting.';
+            if (! empty($result['token'])) {
+                $message .= ' Token dostępu zapisany w systemie.';
+            }
+
+            return redirect()->route('participants.index', $course)->with('success', $message);
+        }
+
+        if (($result['status'] ?? '') === 'skipped_missing_event_id') {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                $result['detail'] ?? 'Brak ID wydarzenia ClickMeeting w konfiguracji kursu.'
+            );
+        }
+
+        return redirect()->route('participants.index', $course)->with(
+            'error',
+            $result['detail'] ?? ($result['warning'] ?? 'Nie udało się zarejestrować uczestnika w ClickMeeting.')
+        );
     }
 
     /**

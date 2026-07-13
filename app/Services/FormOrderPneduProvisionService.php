@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -128,6 +127,7 @@ class FormOrderPneduProvisionService
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'user_existed' => $userExisted,
+                    'participant_id' => (int) $createdParticipant->id,
                     'course_title' => (string) $course->title,
                     'course_id' => (int) $course->id,
                     'platform' => trim((string) optional($course->onlineDetails)->platform),
@@ -163,8 +163,7 @@ class FormOrderPneduProvisionService
                 ]);
             }
 
-            $clickMeetingResult = $this->provisionClickMeetingIfConfigured($afterCommit);
-            $this->persistClickMeetingProvisionResult($formOrderId, $clickMeetingResult);
+            $clickMeetingResult = $this->provisionClickMeetingIfConfigured($formOrderId, $afterCommit);
             if (! empty($clickMeetingResult['warning'])) {
                 $clickMeetingWarning = $clickMeetingResult['warning'];
             }
@@ -379,153 +378,33 @@ class FormOrderPneduProvisionService
     }
 
     /**
-     * @param array{
-     *   email: string,
-     *   first_name: string,
-     *   last_name: string,
-     *   course_id: int,
-     *   platform: string,
-     *   clickmeeting_event_id: string
-     * } $afterCommit
-     * @return array{success: bool, warning?: string, status: string, detail: string, token?: string|null}
+     * @param  array<string, mixed>  $afterCommit
+     * @return array<string, mixed>
      */
-    private function provisionClickMeetingIfConfigured(array $afterCommit): array
+    private function provisionClickMeetingIfConfigured(int $formOrderId, array $afterCommit): array
     {
-        $platform = strtolower(trim($afterCommit['platform'] ?? ''));
-        $eventId = trim($afterCommit['clickmeeting_event_id'] ?? '');
+        $participant = Participant::query()->find($afterCommit['participant_id'] ?? 0);
+        $course = Course::query()->with('onlineDetails')->find($afterCommit['course_id'] ?? 0);
 
-        if ($platform !== 'clickmeeting') {
-            return [
-                'success' => true,
-                'status' => 'skipped_not_clickmeeting',
-                'detail' => 'Krok ClickMeeting pominięty: platforma kursu nie jest ustawiona na ClickMeeting.',
-            ];
-        }
-
-        if ($eventId === '') {
-            return [
+        if (! $participant || ! $course) {
+            $result = [
                 'success' => false,
-                'status' => 'skipped_missing_event_id',
-                'detail' => 'Brak ID wydarzenia ClickMeeting w konfiguracji kursu online.',
-                'warning' => 'Uwaga: uczestnik zapisany, ale nie dodano do ClickMeeting (brak ID wydarzenia w konfiguracji kursu online).',
+                'status' => 'failed',
+                'detail' => 'Nie znaleziono uczestnika lub kursu do integracji ClickMeeting.',
             ];
+            app(ParticipantLiveAccessService::class)->syncFormOrderClickMeetingSnapshot($formOrderId, $result);
+
+            return $result;
         }
 
-        $clickMeetingService = app(ClickMeetingService::class);
-        $result = $clickMeetingService->registerParticipant(
-            $eventId,
-            $afterCommit['first_name'],
-            $afterCommit['last_name'],
-            $afterCommit['email']
+        $liveAccessService = app(ParticipantLiveAccessService::class);
+        $result = $liveAccessService->provisionClickMeetingForParticipant(
+            $participant,
+            $course,
+            $formOrderId
         );
+        $liveAccessService->syncFormOrderClickMeetingSnapshot($formOrderId, $result);
 
-        if ($result['success'] ?? false) {
-            return $this->buildSuccessfulClickMeetingResult(
-                $clickMeetingService,
-                $eventId,
-                (string) $afterCommit['email']
-            );
-        }
-
-        Log::warning('FormOrderPneduProvisionService: ClickMeeting best-effort failed', [
-            'course_id' => $afterCommit['course_id'],
-            'event_id' => $eventId,
-            'email' => $afterCommit['email'],
-            'error' => $result['error'] ?? 'unknown',
-        ]);
-
-        return [
-            'success' => false,
-            'status' => 'failed',
-            'detail' => (string) ($result['error'] ?? 'Nieznany błąd ClickMeeting.'),
-            'warning' => 'Uwaga: uczestnik zapisany, ale nieudane dodanie do ClickMeeting. '.($result['error'] ?? ''),
-        ];
-    }
-
-    /**
-     * @return array{
-     *   success: true,
-     *   status: string,
-     *   detail: string,
-     *   token?: string|null,
-     *   room_url?: string|null,
-     *   access_type?: int|null,
-     *   warning?: string
-     * }
-     */
-    private function buildSuccessfulClickMeetingResult(
-        ClickMeetingService $clickMeetingService,
-        string $eventId,
-        string $email
-    ): array {
-        $detail = 'Uczestnik został dodany do ClickMeeting (event_id: '.$eventId.').';
-        $token = null;
-        $warning = null;
-        $roomUrl = null;
-        $accessType = null;
-
-        $conference = $clickMeetingService->getConference($eventId);
-        if ($conference['success'] ?? false) {
-            $accessType = isset($conference['access_type']) ? (int) $conference['access_type'] : null;
-            $roomUrl = $clickMeetingService->extractRoomUrl($conference['conference'] ?? []);
-
-            if ($accessType === ClickMeetingService::ACCESS_TYPE_TOKEN) {
-                $tokenResult = $clickMeetingService->getAccessTokenForEmail($eventId, $email);
-                if ($tokenResult['success'] ?? false) {
-                    $token = trim((string) ($tokenResult['token'] ?? ''));
-                    if ($token !== '') {
-                        $detail .= ' Pobrano token dostępu.';
-                    }
-                } else {
-                    $warning = 'Uwaga: uczestnik dodany do ClickMeeting, ale nie udało się pobrać tokenu dostępu. '
-                        .($tokenResult['error'] ?? '');
-                    Log::warning('FormOrderPneduProvisionService: ClickMeeting token fetch failed', [
-                        'event_id' => $eventId,
-                        'email' => $email,
-                        'error' => $tokenResult['error'] ?? 'unknown',
-                    ]);
-                }
-            }
-        }
-
-        $payload = [
-            'success' => true,
-            'status' => 'success',
-            'detail' => $detail,
-            'token' => $token !== '' ? $token : null,
-            'room_url' => $roomUrl,
-            'access_type' => $accessType,
-        ];
-
-        if ($warning !== null) {
-            $payload['warning'] = $warning;
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @param  array{status?: string, detail?: string, token?: string|null}  $clickMeetingResult
-     */
-    private function persistClickMeetingProvisionResult(int $formOrderId, array $clickMeetingResult): void
-    {
-        try {
-            $update = [
-                'pnedu_clickmeeting_status' => $clickMeetingResult['status'] ?? null,
-                'pnedu_clickmeeting_synced_at' => now(),
-                'pnedu_clickmeeting_message' => $clickMeetingResult['detail'] ?? null,
-            ];
-
-            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_token')) {
-                $update['pnedu_clickmeeting_token'] = $clickMeetingResult['token'] ?? null;
-            }
-
-            FormOrder::query()->whereKey($formOrderId)->update($update);
-        } catch (Throwable $e) {
-            Log::error('FormOrderPneduProvisionService: błąd zapisu statusu ClickMeeting', [
-                'form_order_id' => $formOrderId,
-                'exception' => $e->getMessage(),
-            ]);
-        }
+        return $result;
     }
 }

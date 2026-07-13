@@ -41,6 +41,11 @@ class Participant extends Model
         return $this->hasOne(Certificate::class, 'participant_id');
     }
 
+    public function liveAccess()
+    {
+        return $this->hasOne(ParticipantLiveAccess::class, 'participant_id');
+    }
+
     protected static function booted(): void
     {
         static::saving(function (Participant $participant) {

@@ -402,11 +402,14 @@ nowoczesna-edukacja.pl </div>
                                                         <div class="text-muted">Ostatnia próba: {{ $zamowienie->pnedu_clickmeeting_synced_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</div>
                                                     @endif
                                                     <div class="text-muted">{{ $cmDetail }}</div>
-                                                    @if(!empty($zamowienie->pnedu_clickmeeting_token))
+                                                    @php
+                                                        $pneduLiveAccess = $zamowienie->primaryParticipant?->participant?->liveAccess;
+                                                    @endphp
+                                                    @if(!empty($pneduLiveAccess?->token))
                                                         <div class="mt-1">
                                                             <span class="text-muted">Token dostępu:</span>
-                                                            <code class="user-select-all">{{ e($zamowienie->pnedu_clickmeeting_token) }}</code>
-                                                            <span class="text-muted">(jednorazowy)</span>
+                                                            <code class="user-select-all">{{ e($pneduLiveAccess->token) }}</code>
+                                                            <span class="text-muted">(przypisany do e-maila uczestnika)</span>
                                                         </div>
                                                     @endif
                                                 </div>

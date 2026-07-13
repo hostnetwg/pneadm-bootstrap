@@ -33,16 +33,33 @@ Stałe `access_type` (API ClickMeeting):
 | `2` | Hasło |
 | `3` | Token (jednorazowy na uczestnika) |
 
-### Pola w bazie (`form_orders`)
+### Pola w bazie
+
+**Snapshot na zamówieniu (`form_orders`)** — widoczny w kroku 2 panelu zamówienia:
 
 | Kolumna | Opis |
 |---------|------|
 | `pnedu_clickmeeting_status` | `success`, `failed`, `skipped_not_clickmeeting`, `skipped_missing_event_id` |
 | `pnedu_clickmeeting_synced_at` | Ostatnia próba integracji |
 | `pnedu_clickmeeting_message` | Szczegóły dla panelu |
-| `pnedu_clickmeeting_token` | Token dostępu (gdy pobrany) |
 
-Migracje: `2026_04_09_000003_*`, `2026_07_13_160000_add_pnedu_clickmeeting_token_to_form_orders_table.php`
+**Token i link na żywo (`participant_live_access`)** — źródło prawdy per uczestnik:
+
+| Kolumna | Opis |
+|---------|------|
+| `participant_id` | FK → `participants` (unikalny rekord na uczestnika) |
+| `form_order_id` | nullable — skąd przyszedł provision |
+| `course_id` | FK → `courses` |
+| `token` | Token CM (gdy `access_type = 3`) |
+| `room_url`, `access_type`, `clickmeeting_event_id` | Kontekst linku |
+| `status`, `message`, `synced_at` | Status integracji |
+| `expires_at` | Koniec szkolenia — rekord kasowany przez `participants:cleanup-live-access` |
+
+Serwis: `App\Services\ParticipantLiveAccessService`
+
+Migracje: `2026_04_09_000003_*`, `2026_07_13_210000_create_participant_live_access_table.php`, `2026_07_13_210001_migrate_clickmeeting_tokens_to_participant_live_access.php`
+
+**Token ClickMeeting:** przypisany do **e-maila uczestnika** — blokuje równoległe wejście tą samą parą e-mail+token; po wyjściu ze spotkania można użyć ponownie (zgodnie z testami prod/dev). Nie mylić z trybem „Hasło” / „Dostępny dla wszystkich”, gdzie link można swobodnie udostępniać.
 
 ### Link do spotkania w e-mailu
 
@@ -85,13 +102,29 @@ Maile provision używają **`MAIL_SYSTEM_MAILER`** — przy wartości `log` traf
 
 ## Reset statusu PNEDU
 
-Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_provisioned_at`, `pnedu_clickmeeting_*` (w tym token).
+Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_provisioned_at`, `pnedu_clickmeeting_*` oraz rekord `participant_live_access` powiązany z uczestnikiem zamówienia.
+
+## Uczestnicy kursu — ręczna rejestracja ClickMeeting
+
+Lista: `/courses/{id}/participants` → przycisk **ClickMeeting** (gdy platforma = clickmeeting, jest event_id, szkolenie nie zakończone).
+
+Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
+
+## Cleanup tokenów po szkoleniu
+
+```bash
+sail artisan participants:cleanup-live-access
+sail artisan participants:cleanup-live-access --dry-run
+```
+
+Cron: codziennie 04:15 (`routes/console.php`) — usuwa całe rekordy `participant_live_access` z `expires_at` w przeszłości.
 
 ## Testy
 
 ```bash
 sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
+sail test --filter=ParticipantLiveAccessServiceTest
 ```
 
 ## Konfiguracja kursu online
