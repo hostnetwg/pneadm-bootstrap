@@ -9,6 +9,7 @@ use App\Services\FormOrderAccessExtensionService;
 use App\Services\FormOrderCancellationService;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
+use App\Services\IfirmaFormOrderKsefSubmissionService;
 use App\Services\PubligoApiService;
 use Carbon\Carbon;
 use Exception;
@@ -2443,6 +2444,26 @@ class FormOrdersController extends Controller
             $hasInvoice = $zamowienie->has_invoice;
             $existingInvoiceNumber = $zamowienie->invoice_number;
             $force = $request->input('force', false);
+            $phase = (string) $request->input('phase', 'full');
+
+            if ($phase === 'ksef') {
+                $invoiceId = trim((string) $request->input('invoice_id', ''));
+                if ($invoiceId === '') {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Brak identyfikatora faktury iFirma do przesłania do KSeF.',
+                        'step' => 'ksef_send',
+                    ], 400);
+                }
+
+                return app(IfirmaFormOrderKsefSubmissionService::class)->submit(
+                    $zamowienie,
+                    new IfirmaApiService,
+                    $invoiceId,
+                    $zamowienie->invoice_number,
+                    $request
+                );
+            }
 
             // Jeśli faktura już istnieje w bazie i nie ma parametru force, zwróć błąd
             if ($hasInvoice && ! $force) {
@@ -2629,221 +2650,28 @@ class FormOrdersController extends Controller
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
             $zamowienie->save();
 
-            // KROK 2: Przesłanie faktury do KSeF
-            Log::info('iFirma Invoice With KSeF: Przesyłanie do KSeF', [
-                'order_id' => $zamowienie->id,
-                'invoice_id' => $invoiceId,
-                'invoice_number' => $invoiceNumber,
-            ]);
+            $resolvedInvoiceNumber = (string) ($invoiceNumber ?: $invoiceId);
 
-            $ksefResult = $ifirmaService->sendInvoiceToKsef($invoiceId, 'fakturakraj');
-
-            $ksefNumber = null;
-
-            if ($ksefResult['status'] !== 'success') {
-                $ksefError = $ksefResult['message'] ?? 'Nieznany błąd przesyłania do KSeF';
-
-                $zamowienie->ksef_status = 'failed';
-                $zamowienie->ksef_error = $ksefError;
-                $zamowienie->save();
-
-                Log::error('iFirma Invoice With KSeF: Błąd przesyłania do KSeF', [
-                    'order_id' => $zamowienie->id,
-                    'invoice_id' => $invoiceId,
-                    'error' => $ksefError,
-                    'ksef_response' => $ksefResult,
-                ]);
-
+            if ($phase === 'create') {
                 return response()->json([
-                    'success' => false,
-                    'error' => 'Faktura została wystawiona, ale nie udało się przesłać do KSeF',
-                    'step' => 'ksef_send',
+                    'success' => true,
+                    'phase' => 'create',
+                    'step' => 'invoice_created',
+                    'message' => 'Faktura wystawiona w iFirma. Numer zapisany w zamówieniu.',
                     'invoice_id' => $invoiceId,
-                    'invoice_number' => $invoiceNumber,
-                    'ksef_error' => $ksefError,
-                    'can_retry' => true,
-                ], 500);
+                    'invoice_number' => $resolvedInvoiceNumber,
+                    'invoice_created' => true,
+                    'ifirma_response' => $result['data'] ?? null,
+                ]);
             }
 
-            // POST …/ksef/send/ zwykle kończy się zanim MF nada numer („Przekazana do wysyłki”).
-            // Dopiero po przetworzeniu pojawia się NumerKSeF — polling GET faktury (patrz pomoc iFirma).
-            $ksefNumber = $ifirmaService->extractNumerKSeFFromInvoicePayload(
-                isset($ksefResult['data']) && is_array($ksefResult['data']) ? $ksefResult['data'] : null
+            return app(IfirmaFormOrderKsefSubmissionService::class)->submit(
+                $zamowienie,
+                $ifirmaService,
+                $invoiceId,
+                $resolvedInvoiceNumber,
+                $request
             );
-
-            $poll = ($ksefNumber === null || $ksefNumber === '')
-                ? $ifirmaService->waitForKsefInvoiceAccepted($invoiceId)
-                : ['outcome' => 'accepted', 'numer_ksef' => $ksefNumber, 'rejection_message' => null, 'attempts' => 0];
-
-            if ($poll['outcome'] === 'timeout') {
-                $pendingMsg = 'Faktura została przekazana do KSeF, ale w czasie oczekiwania nie nadano numeru KSeF '
-                    .'(sprawdź status w iFirma / MF). E-mail z fakturą nie został wysłany.';
-
-                $zamowienie->ksef_status = 'pending';
-                $zamowienie->ksef_error = $pendingMsg;
-                $zamowienie->ksef_sent_at = null;
-                $zamowienie->save();
-
-                Log::warning('iFirma Invoice With KSeF: timeout oczekiwania na NumerKSeF', [
-                    'order_id' => $zamowienie->id,
-                    'invoice_id' => $invoiceId,
-                    'poll_attempts' => $poll['attempts'],
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'error' => $pendingMsg,
-                    'step' => 'ksef_acceptance_timeout',
-                    'invoice_id' => $invoiceId,
-                    'invoice_number' => $invoiceNumber,
-                    'poll_attempts' => $poll['attempts'],
-                    'can_retry' => true,
-                ], 504);
-            }
-
-            if ($poll['outcome'] === 'rejected') {
-                $ksefError = $poll['rejection_message'] ?? 'KSeF odrzucił lub nie przyjął faktury';
-
-                $zamowienie->ksef_status = 'failed';
-                $zamowienie->ksef_error = $ksefError;
-                $zamowienie->save();
-
-                Log::error('iFirma Invoice With KSeF: odrzucenie / błąd po przekazaniu do KSeF', [
-                    'order_id' => $zamowienie->id,
-                    'invoice_id' => $invoiceId,
-                    'error' => $ksefError,
-                    'poll_attempts' => $poll['attempts'],
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Faktura została wystawiona w iFirma, ale nie została zaakceptowana w KSeF',
-                    'step' => 'ksef_rejected',
-                    'invoice_id' => $invoiceId,
-                    'invoice_number' => $invoiceNumber,
-                    'ksef_error' => $ksefError,
-                    'can_retry' => true,
-                ], 500);
-            }
-
-            $ksefNumber = $poll['numer_ksef'];
-
-            $updateData = [
-                'ksef_status' => 'sent',
-                'ksef_sent_at' => now(),
-                'ksef_error' => null,
-                'ksef_number' => $ksefNumber,
-            ];
-
-            Log::info('iFirma Invoice With KSeF: Przed zapisem do bazy (zaakceptowano w KSeF)', [
-                'order_id' => $zamowienie->id,
-                'update_data' => $updateData,
-                'poll_attempts' => $poll['attempts'],
-            ]);
-
-            $zamowienie->update($updateData);
-            $zamowienie->refresh();
-
-            Log::info('iFirma Invoice With KSeF: Po zapisie do bazy', [
-                'order_id' => $zamowienie->id,
-                'ksef_status' => $zamowienie->ksef_status,
-                'ksef_sent_at' => $zamowienie->ksef_sent_at,
-                'ksef_number' => $zamowienie->ksef_number,
-            ]);
-
-            // KROK 3: Wysyłka e-mailem — dopiero po potwierdzeniu nadania numeru KSeF (polling powyżej).
-            $sendEmail = $request->input('send_email', false);
-            $emailsSent = [];
-            $emailErrors = [];
-
-            if ($sendEmail && ! empty($invoiceId)) {
-                // Zbierz unikalne adresy e-mail
-                $emails = [];
-
-                if (! empty($zamowienie->orderer_email)) {
-                    $emails[] = strtolower(trim($zamowienie->orderer_email));
-                }
-
-                if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                    $participantEmail = strtolower(trim($zamowienie->display_participant_email));
-                    if (! in_array($participantEmail, $emails)) {
-                        $emails[] = $participantEmail;
-                    }
-                }
-
-                // Wysyłka do wszystkich adresów
-                foreach ($emails as $email) {
-                    try {
-                        // Dodaj informację o numerze KSeF do treści wiadomości
-                        $emailMessage = "W załączeniu przesyłamy fakturę nr {$invoiceNumber}";
-                        if ($ksefNumber) {
-                            $emailMessage .= " (numer KSeF: {$ksefNumber})";
-                        }
-                        $emailMessage .= " dotyczącą zamówienia nr {$zamowienie->id}.";
-
-                        $sendResult = $ifirmaService->sendInvoiceByEmail(
-                            $invoiceId,
-                            $email,
-                            $invoiceNumber,
-                            $zamowienie->id,
-                            'invoice'
-                        );
-
-                        if ($sendResult['status'] === 'success') {
-                            $emailsSent[] = $email;
-                            Log::info('Faktura z KSeF wysłana e-mailem', [
-                                'invoice_id' => $invoiceId,
-                                'email' => $email,
-                                'ksef_number' => $ksefNumber,
-                            ]);
-                        } else {
-                            $emailErrors[] = [
-                                'email' => $email,
-                                'error' => $sendResult['message'] ?? 'Nieznany błąd',
-                            ];
-                            Log::warning('Błąd wysyłki faktury z KSeF', [
-                                'invoice_id' => $invoiceId,
-                                'email' => $email,
-                                'error' => $sendResult['message'] ?? 'Nieznany błąd',
-                            ]);
-                        }
-                    } catch (Exception $e) {
-                        $emailErrors[] = [
-                            'email' => $email,
-                            'error' => $e->getMessage(),
-                        ];
-                        Log::error('Exception podczas wysyłki faktury z KSeF', [
-                            'invoice_id' => $invoiceId,
-                            'email' => $email,
-                            'exception' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            }
-
-            // Przygotowanie komunikatu sukcesu
-            $message = 'Faktura została wystawiona w iFirma.pl';
-            if ($ksefNumber) {
-                $message .= " i przesłana do KSeF (nr: {$ksefNumber})";
-            }
-            if (! empty($emailsSent)) {
-                $message .= ' i wysłana na: '.implode(', ', $emailsSent);
-            }
-            if (! empty($emailErrors)) {
-                $message .= ' (Błędy wysyłki e-mail: '.count($emailErrors).')';
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'invoice_id' => $invoiceId,
-                'invoice_number' => $invoiceNumber,
-                'ksef_number' => $ksefNumber,
-                'ksef_sent_at' => $zamowienie->ksef_sent_at ? $zamowienie->ksef_sent_at->toDateTimeString() : null,
-                'email_sent' => ! empty($emailsSent),
-                'emails_sent' => $emailsSent,
-                'email_errors' => $emailErrors,
-            ]);
 
         } catch (Exception $e) {
             Log::error('Exception podczas wystawiania faktury z KSeF', [

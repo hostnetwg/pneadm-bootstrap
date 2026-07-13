@@ -266,6 +266,12 @@ z twardym wymogiem Podmiotu3 — obecnie kontroler `form_orders` go nie używa.
 wykonywana dopiero po **sukcesie** `sendInvoiceToKsef` (przy błędzie KSeF
 kontroler zwraca odpowiedź błędu przed blokiem wysyłki e-mail).
 
+**UI / API (2026-07):** przycisk czerwony wywołuje endpoint w **dwóch fazach**
+(`phase=create` → zapis `invoice_number` w zamówieniu i odświeżenie pola w
+formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
+faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
+Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
+
 ### Wspólny builder — `App\Services\IfirmaKontrahentBuilder`
 
 Wszystkie cztery metody kontrolera budują `Kontrahent` przez jedno miejsce:

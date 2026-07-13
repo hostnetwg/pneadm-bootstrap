@@ -2032,8 +2032,142 @@ nowoczesna-edukacja.pl `;
             createIfirmaInvoiceWithKsef(orderId, true);
         }
 
+        function applyInvoiceNumberFieldValue(invoiceNumber) {
+            if (!invoiceNumber) {
+                return;
+            }
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            if (!invoiceNumberInput) {
+                return;
+            }
+            invoiceNumberInput.value = invoiceNumber;
+            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+            invoiceNumberInput.style.borderWidth = '';
+            invoiceNumberInput.style.boxShadow = '';
+            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+            invoiceNumberInput.style.borderWidth = '2px';
+            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
+            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
+            invoiceNumberInput.style.backgroundColor = '#d4edda';
+            setTimeout(() => {
+                invoiceNumberInput.style.backgroundColor = '';
+            }, 2000);
+        }
+
+        function renderIfirmaKsefProgress(stages) {
+            const items = stages.map((stage) => {
+                const icon = stage.status === 'done'
+                    ? '<i class="bi bi-check-circle-fill text-success me-2"></i>'
+                    : (stage.status === 'active'
+                        ? '<span class="spinner-border spinner-border-sm text-primary me-2" role="status"></span>'
+                        : (stage.status === 'error'
+                            ? '<i class="bi bi-x-circle-fill text-danger me-2"></i>'
+                            : '<i class="bi bi-circle text-muted me-2"></i>'));
+                const textClass = stage.status === 'active' ? 'fw-semibold' : (stage.status === 'error' ? 'text-danger' : 'text-muted');
+                const detail = stage.detail ? `<div class="small text-muted ms-4">${stage.detail}</div>` : '';
+                return `<li class="mb-1 ${textClass}">${icon}${stage.label}${detail}</li>`;
+            }).join('');
+
+            return `
+                <div class="alert alert-info mb-0">
+                    <strong>Postęp wystawiania faktury z KSeF</strong>
+                    <ul class="list-unstyled mb-2 mt-2">${items}</ul>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped ${stages.some(s => s.status === 'active') ? 'progress-bar-animated' : ''}" role="progressbar" style="width: ${Math.round((stages.filter(s => s.status === 'done').length / stages.length) * 100)}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderIfirmaKsefResult(data, force, resultDiv) {
+            if (data.invoice_number) {
+                applyInvoiceNumberFieldValue(data.invoice_number);
+            }
+
+            window.ifirmaResponseData = data;
+
+            if (data.success) {
+                const alertClass = force ? 'alert-warning' : 'alert-success';
+                const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
+                let ksefInfo = data.ksef_number
+                    ? `<br><small>Numer KSeF: <strong class="text-success">${data.ksef_number}</strong></small>`
+                    : '';
+
+                resultDiv.innerHTML = `
+                    <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                        <i class="bi ${alertIcon}"></i>
+                        <strong>Sukces!</strong> ${data.message || 'Proces zakończony.'}
+                        ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
+                        ${ksefInfo}
+                        ${data.existing_invoice_number && force ? `<br><small class="text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></small>` : ''}
+                        ${data.email_sent && data.emails_sent ? `<br><small class="text-muted">E-mail wysłany na: ${data.emails_sent.join(', ')}</small>` : ''}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    <div class="mt-2 d-flex gap-2">
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
+                            <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const isPartial = data.partial_success || data.invoice_created;
+            const alertClass = isPartial ? 'alert-warning' : 'alert-danger';
+            const alertTitle = isPartial ? 'Faktura w iFirma — dalszy etap nieudany' : 'Błąd';
+
+            let stepInfo = '';
+            if (data.step === 'ksef_send') {
+                stepInfo = '<br><small>Faktura jest już w iFirma. Numer faktury zapisano w zamówieniu. Nie udało się rozpocząć wysyłki do KSeF.</small>';
+            } else if (data.step === 'ksef_acceptance_timeout') {
+                stepInfo = '<br><small>Faktura jest w iFirma i została przekazana do KSeF, ale MF nie nadało numeru KSeF w czasie oczekiwania. Sprawdź status w panelu iFirma. E-mail z fakturą nie został wysłany.</small>';
+                if (typeof data.poll_attempts !== 'undefined') {
+                    stepInfo += `<br><small class="text-muted">Próby odświeżenia statusu: ${data.poll_attempts}</small>`;
+                }
+            } else if (data.step === 'ksef_rejected') {
+                stepInfo = '<br><small>Faktura jest w iFirma, ale KSeF odrzucił dokument. E-mail nie został wysłany.</small>';
+            }
+
+            resultDiv.innerHTML = `
+                <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                    <i class="bi ${isPartial ? 'bi-exclamation-triangle' : 'bi-x-circle'}"></i>
+                    <strong>${alertTitle}:</strong> ${data.error || 'Nieznany błąd'}
+                    ${data.invoice_number ? `<br><small>Numer faktury (zapisany): <strong>${data.invoice_number}</strong></small>` : ''}
+                    ${stepInfo}
+                    ${data.ksef_error ? `<br><small class="text-muted">Szczegóły KSeF: ${data.ksef_error}</small>` : ''}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                ${data.ifirma_response ? `
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="showIfirmaDetails()">
+                            <i class="bi bi-info-circle"></i> Pokaż szczegóły
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        async function postIfirmaInvoiceWithKsef(orderId, payload) {
+            const response = await fetch(`/form-orders/${orderId}/ifirma/invoice-with-ksef`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 409) {
+                const data = await response.json();
+                throw new Error(data.error || 'Faktura już została wystawiona');
+            }
+
+            const data = await response.json();
+            return { response, data };
+        }
+
         // Funkcja do wystawiania faktury z KSeF w iFirma
-        function createIfirmaInvoiceWithKsef(orderId, force = false) {
+        async function createIfirmaInvoiceWithKsef(orderId, force = false) {
             const button = document.getElementById('ifirmaInvoiceWithKsefBtn');
             const resultDiv = document.getElementById('ifirmaResult');
 
@@ -2041,174 +2175,61 @@ nowoczesna-edukacja.pl `;
             const invoiceRemarksTextarea = document.getElementById('invoice_api_remarks');
             const customRemarks = invoiceRemarksTextarea ? invoiceRemarksTextarea.value.trim() : '';
 
-            // Pobierz stan checkboxa "Wyślij automatycznie na e-mail"
             const sendEmailCheckbox = document.getElementById('sendEmailCheckboxInvoiceWithKsef');
             const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : false;
-            
-            // Zmiana stanu przycisku
+
             button.disabled = true;
             button.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
-            
-            // Wyczyść poprzednie komunikaty
-            resultDiv.innerHTML = '';
-            
-            // Pokaż progress indicator
-            resultDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm me-2" role="status">
-                            <span class="visually-hidden">Ładowanie...</span>
-                        </div>
-                        <div>
-                            <strong>Wystawianie faktury...</strong>
-                            <div class="progress mt-2" style="height: 5px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 33%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Przygotuj dane do wysłania
-            const requestData = {
+            resultDiv.innerHTML = renderIfirmaKsefProgress([
+                { label: 'Wystawianie faktury w iFirma', status: 'active' },
+                { label: 'Zapis numeru faktury w zamówieniu', status: 'pending' },
+                { label: 'Przesyłanie do KSeF', status: 'pending' },
+                { label: 'Oczekiwanie na numer KSeF (MF)', status: 'pending' },
+                { label: sendEmail ? 'Wysyłka e-mail z fakturą' : 'Zakończenie procesu', status: 'pending' },
+            ]);
+
+            const basePayload = {
                 custom_remarks: customRemarks,
                 send_email: sendEmail,
                 prefix_szkolenie_in_product_name: ifirmaPrefixSzkolenieInProductName(),
             };
-            
-            // Dodaj parametr force tylko jeśli jest true
             if (force) {
-                requestData.force = true;
+                basePayload.force = true;
             }
-            
-            // Wysłanie zapytania AJAX
-            fetch(`/form-orders/${orderId}/ifirma/invoice-with-ksef`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify(requestData)
-            })
-            .then(response => {
-                // Sprawdź status odpowiedzi
-                if (response.status === 409) {
-                    // Konflikt - faktura już istnieje
-                    return response.json().then(data => {
-                        throw new Error(data.error || 'Faktura już została wystawiona');
-                    });
+
+            try {
+                const { data: createData } = await postIfirmaInvoiceWithKsef(orderId, {
+                    ...basePayload,
+                    phase: 'create',
+                });
+
+                if (!createData.success) {
+                    renderIfirmaKsefResult(createData, force, resultDiv);
+                    return;
                 }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Sukces
-                    const alertClass = force ? 'alert-warning' : 'alert-success';
-                    const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
-                    const alertMessage = force 
-                        ? `<strong>Uwaga!</strong> Faktura z KSeF została wystawiona mimo istniejącego numeru. ${data.message}`
-                        : `<strong>Sukces!</strong> ${data.message}`;
-                    
-                    let ksefInfo = '';
-                    if (data.ksef_number) {
-                        ksefInfo = `<br><small>Numer KSeF: <strong class="text-success">${data.ksef_number}</strong></small>`;
-                    }
-                    
-                    resultDiv.innerHTML = `
-                        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-                            <i class="bi ${alertIcon}"></i>
-                            ${alertMessage}
-                            ${data.invoice_number ? `<br><small>Numer faktury: <strong>${data.invoice_number}</strong></small>` : ''}
-                            ${ksefInfo}
-                            ${data.existing_invoice_number && force ? `<br><small class="text-muted">Poprzedni numer: <del>${data.existing_invoice_number}</del></small>` : ''}
-                            ${data.email_sent && data.emails_sent ? `<br><small class="text-muted">E-mail wysłany na: ${data.emails_sent.join(', ')}</small>` : ''}
-                            ${data.email_errors && data.email_errors.length > 0 ? `<br><small class="text-danger">Błędy wysyłki e-mail: ${data.email_errors.length}</small>` : ''}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                        <div class="mt-2 d-flex gap-2">
-                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
-                                <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
-                            </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
-                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
-                            </button>
-                        </div>
-                    `;
-                    
-                    // Przechowanie danych do wyświetlenia szczegółów
-                    window.ifirmaResponseData = data;
-                    
-                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
-                    if (data.invoice_number) {
-                        const invoiceNumberInput = document.getElementById('invoice_number');
-                        if (invoiceNumberInput) {
-                            invoiceNumberInput.value = data.invoice_number;
-                            
-                            // Zmień podświetlenie na zielone
-                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
-                            invoiceNumberInput.style.borderWidth = '';
-                            invoiceNumberInput.style.boxShadow = '';
-                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
-                            invoiceNumberInput.style.borderWidth = '2px';
-                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
-                            
-                            // Wizualny efekt - podświetlenie tła na zielono na moment
-                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
-                            invoiceNumberInput.style.backgroundColor = '#d4edda';
-                            setTimeout(() => {
-                                invoiceNumberInput.style.backgroundColor = '';
-                            }, 2000);
-                        }
-                    }
-                } else {
-                    // Błąd
-                    let errorMessage = data.error || 'Nieznany błąd';
-                    let stepInfo = '';
-                    if (data.step === 'ksef_send') {
-                        stepInfo = '<br><small class="text-muted">Faktura została wystawiona, ale nie udało się przesłać do KSeF.</small>';
-                        if (data.can_retry) {
-                            stepInfo += '<br><small class="text-muted">Możesz spróbować ponownie później.</small>';
-                        }
-                    } else if (data.step === 'ksef_acceptance_timeout') {
-                        stepInfo = '<br><small class="text-muted">Przekroczono czas oczekiwania na nadanie numeru KSeF przez Ministerstwo Finansów. Sprawdź status dokumentu w iFirma. <strong>E-mail z fakturą nie został wysłany.</strong></small>';
-                        if (typeof data.poll_attempts !== 'undefined') {
-                            stepInfo += `<br><small class="text-muted">Próby odświeżenia statusu: ${data.poll_attempts}</small>`;
-                        }
-                    } else if (data.step === 'ksef_rejected') {
-                        stepInfo = '<br><small class="text-muted">Faktura jest w iFirma, ale nie została zaakceptowana w KSeF. <strong>E-mail nie został wysłany.</strong></small>';
-                        if (data.can_retry) {
-                            stepInfo += '<br><small class="text-muted">Możesz skorygować dane lub ponowić proces po konsultacji z księgowością.</small>';
-                        }
-                    }
-                    
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>Błąd:</strong> ${errorMessage}
-                            ${stepInfo}
-                            ${data.ksef_error ? `<br><small class="text-muted">Szczegóły błędu KSeF: ${data.ksef_error}</small>` : ''}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                        ${data.ifirma_response ? `
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showIfirmaDetails()">
-                                    <i class="bi bi-info-circle"></i> Pokaż szczegóły błędu
-                                </button>
-                            </div>
-                        ` : ''}
-                    `;
-                    
-                    // Przechowanie danych do wyświetlenia szczegółów
-                    window.ifirmaResponseData = data;
-                }
-            })
-            .catch(error => {
+
+                applyInvoiceNumberFieldValue(createData.invoice_number);
+
+                resultDiv.innerHTML = renderIfirmaKsefProgress([
+                    { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
+                    { label: 'Zapis numeru faktury w zamówieniu', status: 'done' },
+                    { label: 'Przesyłanie do KSeF', status: 'active' },
+                    { label: 'Oczekiwanie na numer KSeF (MF) — może potrwać kilka minut', status: 'pending' },
+                    { label: sendEmail ? 'Wysyłka e-mail z fakturą' : 'Zakończenie procesu', status: 'pending' },
+                ]);
+
+                const { data: ksefData } = await postIfirmaInvoiceWithKsef(orderId, {
+                    ...basePayload,
+                    phase: 'ksef',
+                    invoice_id: createData.invoice_id,
+                });
+
+                renderIfirmaKsefResult(ksefData, force, resultDiv);
+            } catch (error) {
                 console.error('Error:', error);
-                
-                // Sprawdź czy to błąd 409 (konflikt - faktura już istnieje)
                 const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
                 const isConflict = errorMessage.includes('już została wystawiona') || errorMessage.includes('already');
-                
+
                 resultDiv.innerHTML = `
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -2217,12 +2238,10 @@ nowoczesna-edukacja.pl `;
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 `;
-            })
-            .finally(() => {
-                // Przywrócenie stanu przycisku
+            } finally {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF';
-            });
+            }
         }
 
         // Funkcja do wyświetlania szczegółów odpowiedzi iFirma
