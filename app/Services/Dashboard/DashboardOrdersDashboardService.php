@@ -235,35 +235,80 @@ class DashboardOrdersDashboardService
      *     product_price: string|null,
      *     order_form_variant_label: string,
      *     order_form_variant_badge: string,
+     *     payment_mode_label: string,
+     *     payment_mode_badge: string,
+     *     payment_tooltip: string,
+     *     is_processed: bool,
      *     show_url: string
      * }>
      */
     public function recentOrdersPayload(): array
     {
-        return FormOrder::query()
-            ->includedInDashboardMetrics()
-            ->with(['course:id,title'])
-            ->orderByDesc('order_date')
-            ->limit(8)
+        return $this->recentFormOrdersQuery()
             ->get()
-            ->map(function (FormOrder $order): array {
-                $price = $order->product_price !== null
-                    ? number_format((float) $order->product_price, 2, ',', ' ').' zł'
-                    : null;
-
-                return [
-                    'id' => (int) $order->id,
-                    'ident' => (string) $order->ident,
-                    'course_title' => $order->course?->title,
-                    'order_date' => $order->formatOrderDateLocal('d.m.Y H:i'),
-                    'product_price' => $price,
-                    'order_form_variant_label' => $order->orderFormVariantAdminLabel(),
-                    'order_form_variant_badge' => $order->orderFormVariantBadgeClass(),
-                    'show_url' => route('form-orders.show', $order->id),
-                ];
-            })
+            ->map(fn (FormOrder $order): array => $this->mapRecentOrderRow($order))
             ->values()
             ->all();
+    }
+
+    /**
+     * Stały limit ostatnich zamówień na dashboardzie (nie zależy od filtra dat wykresu).
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>
+     */
+    public function recentFormOrdersQuery()
+    {
+        return FormOrder::query()
+            ->includedInDashboardMetrics()
+            ->with([
+                'course:id,title',
+                'onlinePaymentOrders',
+                'participants',
+                'primaryParticipant',
+            ])
+            ->orderByDesc('order_date')
+            ->limit(15);
+    }
+
+    /**
+     * @return array{
+     *     id: int,
+     *     ident: string,
+     *     course_title: string|null,
+     *     order_date: string|null,
+     *     product_price: string|null,
+     *     order_form_variant_label: string,
+     *     order_form_variant_badge: string,
+     *     payment_mode_label: string,
+     *     payment_mode_badge: string,
+     *     payment_tooltip: string,
+     *     is_processed: bool,
+     *     show_url: string
+     * }
+     */
+    public function mapRecentOrderRow(FormOrder $order): array
+    {
+        $price = $order->product_price !== null
+            ? number_format((float) $order->product_price, 2, ',', ' ').' zł'
+            : null;
+
+        $isProcessed = ($order->operational_status['status'] ?? null)
+            === \App\Services\FormOrderOperationalStatusService::STATUS_PROCESSED;
+
+        return [
+            'id' => (int) $order->id,
+            'ident' => (string) $order->ident,
+            'course_title' => $order->course?->title,
+            'order_date' => $order->formatOrderDateLocal('d.m.Y H:i'),
+            'product_price' => $price,
+            'order_form_variant_label' => $order->orderFormVariantAdminLabel(),
+            'order_form_variant_badge' => $order->orderFormVariantBadgeClass(),
+            'payment_mode_label' => $order->paymentModeShortLabel(),
+            'payment_mode_badge' => $order->dashboardSettlementBadgeClass(),
+            'payment_tooltip' => $order->dashboardSettlementTooltip(),
+            'is_processed' => $isProcessed,
+            'show_url' => route('form-orders.show', $order->id),
+        ];
     }
 
     /**

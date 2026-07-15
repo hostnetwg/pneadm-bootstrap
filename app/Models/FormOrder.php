@@ -1027,6 +1027,57 @@ class FormOrder extends Model
         return OrderFormVariant::adminBadgeClass($this->order_form_variant);
     }
 
+    /**
+     * Krótka etykieta rozliczenia (dashboard / listy).
+     */
+    public function paymentModeShortLabel(): string
+    {
+        if ($this->payment_mode === self::PAYMENT_MODE_ONLINE_GATEWAY) {
+            $opo = $this->relationLoaded('onlinePaymentOrders')
+                ? $this->onlinePaymentOrders->sortByDesc('id')->first()
+                : $this->onlinePaymentOrders()->orderByDesc('id')->first();
+            $gateway = strtolower((string) ($opo?->payment_gateway ?? ''));
+
+            return match ($gateway) {
+                'payu' => 'Online · PayU',
+                'paynow' => 'Online · PayNow',
+                default => 'Online',
+            };
+        }
+
+        return 'Odroczona FV';
+    }
+
+    /**
+     * Kolor plakietki rozliczenia na dashboardzie.
+     * Odroczona FV → niebieski (odróżnienie od online „w trakcie”).
+     * Online → zielony / żółty / czerwony wg statusu płatności.
+     */
+    public function dashboardSettlementBadgeClass(): string
+    {
+        if ($this->payment_mode !== self::PAYMENT_MODE_ONLINE_GATEWAY) {
+            return match ($this->payment_status) {
+                self::PAYMENT_STATUS_CANCELLED, self::PAYMENT_STATUS_FAILED => 'danger',
+                default => 'primary',
+            };
+        }
+
+        return match ($this->payment_status) {
+            self::PAYMENT_STATUS_PAID => 'success',
+            self::PAYMENT_STATUS_AWAITING_PAYMENT, self::PAYMENT_STATUS_SUBMITTED => 'warning text-dark',
+            self::PAYMENT_STATUS_CANCELLED, self::PAYMENT_STATUS_FAILED => 'danger',
+            default => 'secondary',
+        };
+    }
+
+    /**
+     * Tooltip: pełny tryb rozliczenia + status płatności.
+     */
+    public function dashboardSettlementTooltip(): string
+    {
+        return $this->paymentModeLabelWithGateway().' · '.self::paymentStatusLabel($this->payment_status);
+    }
+
     public static function paymentModeLabel(?string $mode, ?string $onlinePaymentGateway = null): string
     {
         return match ($mode) {

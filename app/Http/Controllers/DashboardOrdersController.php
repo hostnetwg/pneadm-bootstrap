@@ -37,11 +37,7 @@ class DashboardOrdersController extends Controller
             'period_avg_label' => $period['avg_label'],
         ];
 
-        $recentFormOrders = \App\Models\FormOrder::query()
-            ->with(['course:id,title'])
-            ->orderByDesc('order_date')
-            ->limit(8)
-            ->get();
+        $recentFormOrders = $dashboard->recentFormOrdersQuery()->get();
 
         $courseSchedule = $dashboard->courseScheduleForContext($context);
 

@@ -356,6 +356,7 @@
                                                 <th>Ident</th>
                                                 <th>Szkolenie</th>
                                                 <th>Data</th>
+                                                <th>Rozliczenie</th>
                                                 <th>Formularz</th>
                                                 <th class="text-end">Kwota</th>
                                                 <th></th>
@@ -363,18 +364,37 @@
                                         </thead>
                                         <tbody id="dashboardRecentOrdersBody">
                                             @foreach($recentFormOrders as $order)
+                                                @php
+                                                    $isProcessed = ($order->operational_status['status'] ?? null)
+                                                        === \App\Services\FormOrderOperationalStatusService::STATUS_PROCESSED;
+                                                @endphp
                                                 <tr>
                                                     <td><code>{{ $order->ident }}</code></td>
-                                                    <td class="text-truncate" style="max-width: 220px;" title="{{ $order->course?->title ?? '—' }}">
+                                                    <td class="text-truncate" style="max-width: 180px;" title="{{ $order->course?->title ?? '—' }}">
                                                         {{ $order->course?->title ?? '—' }}
                                                     </td>
-                                                    <td>{{ $order->formatOrderDateLocal('d.m.Y H:i') ?? '—' }}</td>
+                                                    <td class="text-nowrap">{{ $order->formatOrderDateLocal('d.m.Y H:i') ?? '—' }}</td>
+                                                    <td>
+                                                        <span class="d-inline-flex align-items-center gap-1">
+                                                            <span class="badge bg-{{ $order->dashboardSettlementBadgeClass() }}"
+                                                                  data-bs-toggle="tooltip"
+                                                                  title="{{ $order->dashboardSettlementTooltip() }}">
+                                                                {{ $order->paymentModeShortLabel() }}
+                                                            </span>
+                                                            @if($isProcessed)
+                                                                <span class="text-success fw-bold"
+                                                                      data-bs-toggle="tooltip"
+                                                                      title="Przetworzone (FV + uczestnicy)"
+                                                                      aria-label="Przetworzone">✓</span>
+                                                            @endif
+                                                        </span>
+                                                    </td>
                                                     <td>
                                                         <span class="badge bg-{{ $order->orderFormVariantBadgeClass() }}">
                                                             {{ $order->orderFormVariantAdminLabel() }}
                                                         </span>
                                                     </td>
-                                                    <td class="text-end">
+                                                    <td class="text-end text-nowrap">
                                                         @if($order->product_price)
                                                             {{ number_format((float) $order->product_price, 2, ',', ' ') }} zł
                                                         @else
@@ -438,6 +458,12 @@
     @push('scripts')
     <script>
         (function () {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                document.querySelectorAll('#dashboardRecentOrdersContainer [data-bs-toggle="tooltip"]').forEach(function (el) {
+                    bootstrap.Tooltip.getOrCreateInstance(el);
+                });
+            }
+
             window.dashboardCourseScheduleState = {
                 schedule: @json($courseSchedule ?? []),
                 dateKeys: @json($dailyChart['date_keys'] ?? []),
@@ -1239,14 +1265,25 @@
                 const rows = items.map(function (order) {
                     const variantBadge = order.order_form_variant_badge || 'light text-dark border';
                     const variantLabel = order.order_form_variant_label || '—';
+                    const modeBadge = order.payment_mode_badge || 'secondary';
+                    const modeLabel = order.payment_mode_label || '—';
+                    const modeTooltip = order.payment_tooltip || '';
+                    const processedMark = order.is_processed
+                        ? ' <span class="text-success fw-bold" data-bs-toggle="tooltip" title="Przetworzone (FV + uczestnicy)" aria-label="Przetworzone">✓</span>'
+                        : '';
 
                     return '<tr>'
                         + '<td><code>' + escapeHtml(order.ident) + '</code></td>'
-                        + '<td class="text-truncate" style="max-width: 220px;" title="' + escapeHtml(order.course_title || '—') + '">'
+                        + '<td class="text-truncate" style="max-width: 180px;" title="' + escapeHtml(order.course_title || '—') + '">'
                         + escapeHtml(order.course_title || '—') + '</td>'
-                        + '<td>' + escapeHtml(order.order_date || '—') + '</td>'
+                        + '<td class="text-nowrap">' + escapeHtml(order.order_date || '—') + '</td>'
+                        + '<td><span class="d-inline-flex align-items-center gap-1">'
+                        + '<span class="badge bg-' + escapeHtml(modeBadge) + '" data-bs-toggle="tooltip" title="'
+                        + escapeHtml(modeTooltip) + '">' + escapeHtml(modeLabel) + '</span>'
+                        + processedMark
+                        + '</span></td>'
                         + '<td><span class="badge bg-' + escapeHtml(variantBadge) + '">' + escapeHtml(variantLabel) + '</span></td>'
-                        + '<td class="text-end">' + escapeHtml(order.product_price || '—') + '</td>'
+                        + '<td class="text-end text-nowrap">' + escapeHtml(order.product_price || '—') + '</td>'
                         + '<td class="text-end"><a href="' + escapeHtml(order.show_url) + '" class="btn btn-sm btn-link">Szczegóły</a></td>'
                         + '</tr>';
                 }).join('');
@@ -1255,10 +1292,16 @@
                     + '<div class="table-responsive" id="dashboardRecentOrdersTableWrap">'
                     + '<table class="table table-hover table-sm mb-0 align-middle">'
                     + '<thead class="table-light"><tr>'
-                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th>Formularz</th><th class="text-end">Kwota</th><th></th>'
+                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th>Rozliczenie</th><th>Formularz</th><th class="text-end">Kwota</th><th></th>'
                     + '</tr></thead>'
                     + '<tbody id="dashboardRecentOrdersBody">' + rows + '</tbody>'
                     + '</table></div>';
+
+                if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                    recentOrdersContainer.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                        bootstrap.Tooltip.getOrCreateInstance(el);
+                    });
+                }
             }
 
             function renderSections(sections) {

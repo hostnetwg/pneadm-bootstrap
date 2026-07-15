@@ -9,7 +9,7 @@ Panel operacyjny w **adm.pnedu.pl** — domyślna strona po zalogowaniu (`route(
 | Karty „Dziś / Do obsługi / …” | `form_orders` (SQL, scope `includedInDashboardMetrics`) | Polling JSON co ~45 s (pauza gdy karta ukryta) |
 | **Aktywni teraz** | `analytics_events` (lejek) | Osobny polling ~45 s, okno ~30 min |
 | Wykres zamówień | `form_orders.order_date` w zakresie filtra (ten sam scope) | Przy zmianie statystyk + sekcji wykresu |
-| Ostatnie FORM | `form_orders` (8 rekordów, ten sam scope) | Jak wykres |
+| Ostatnie FORM | `form_orders` (**stałe 15** najnowszych po `order_date`, scope `includedInDashboardMetrics` — **nie** zależy od filtra dat wykresu) | Jak wykres |
 | Terminy szkoleń | `courses.start_date` w zakresie filtra | Jak wykres |
 
 Konfiguracja pollingu i „Aktywni teraz”: `config/analytics.php` → `live_visitors_dashboard`.
@@ -76,6 +76,10 @@ Wspólny filtr: `FormOrder::includedInDashboardMetrics()` (`scopeIncludedInDashb
 - **Wykluczone:** anulowane (`cancelled_at IS NOT NULL`) — w tym po „Anuluj zamówienie” (często z legacy `status_completed = 1` bez FV).
 
 Dzięki temu licznik **Dziś (FORM)**, słupek wykresu na bieżący dzień i tabela **Ostatnie zamówienia FORM** pokazują tę samą populację zamówień. Licznik **Do obsługi** nadal używa osobnego scope `needsActiveHandling`.
+
+Tabela **Ostatnie zamówienia FORM**:
+
+- **Rozliczenie** — krótka etykieta (`Odroczona FV` = niebieski / `Online · PayU` / `Online · PayNow`); online: zielony opłacone, żółty w trakcie, czerwony anulowane/błąd; szczegóły w tooltipie. Zielona ikona **✓** na końcu = zamówienie przetworzone (FV + uczestnicy).
 
 ## Polling (wydajność LVE)
 
