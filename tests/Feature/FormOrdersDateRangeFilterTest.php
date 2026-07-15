@@ -49,6 +49,7 @@ class FormOrdersDateRangeFilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->get(route('form-orders.index', [
+            'quick' => 'all',
             'date_from' => '2026-06-10',
             'date_to' => '2026-06-16',
         ]));
@@ -94,6 +95,7 @@ class FormOrdersDateRangeFilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->get(route('form-orders.index', [
+            'quick' => 'all',
             'date_from' => '2026-06-10',
         ]));
 
@@ -138,6 +140,7 @@ class FormOrdersDateRangeFilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->get(route('form-orders.index', [
+            'quick' => 'all',
             'date_from' => '2026-06-20',
             'date_to' => '2026-06-01',
         ]));
