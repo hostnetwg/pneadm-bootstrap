@@ -6,8 +6,8 @@ Panel operacyjny w **adm.pnedu.pl** — domyślna strona po zalogowaniu (`route(
 
 | Sekcja | Źródło danych | Odświeżanie |
 |--------|---------------|-------------|
-| Karty „Dziś / Do obsługi / …” | `form_orders` (SQL, scope `includedInDashboardMetrics`) | Polling JSON co ~15 s |
-| **Aktywni teraz** | `analytics_events` (lejek) | Osobny polling, okno ~30 min |
+| Karty „Dziś / Do obsługi / …” | `form_orders` (SQL, scope `includedInDashboardMetrics`) | Polling JSON co ~45 s (pauza gdy karta ukryta) |
+| **Aktywni teraz** | `analytics_events` (lejek) | Osobny polling ~45 s, okno ~30 min |
 | Wykres zamówień | `form_orders.order_date` w zakresie filtra (ten sam scope) | Przy zmianie statystyk + sekcji wykresu |
 | Ostatnie FORM | `form_orders` (8 rekordów, ten sam scope) | Jak wykres |
 | Terminy szkoleń | `courses.start_date` w zakresie filtra | Jak wykres |
@@ -76,6 +76,12 @@ Wspólny filtr: `FormOrder::includedInDashboardMetrics()` (`scopeIncludedInDashb
 - **Wykluczone:** anulowane (`cancelled_at IS NOT NULL`) — w tym po „Anuluj zamówienie” (często z legacy `status_completed = 1` bez FV).
 
 Dzięki temu licznik **Dziś (FORM)**, słupek wykresu na bieżący dzień i tabela **Ostatnie zamówienia FORM** pokazują tę samą populację zamówień. Licznik **Do obsługi** nadal używa osobnego scope `needsActiveHandling`.
+
+## Polling (wydajność LVE)
+
+- Domyślny interwał: **45 s** (`ANALYTICS_LIVE_VISITORS_POLL_INTERVAL_SECONDS`).
+- Przy ukrytej karcie przeglądarki polling się **nie wykonuje** (pauza na `visibilityState === hidden`).
+- Snapshot liczników cache **20 s**; „Aktywni teraz” cache **15 s** (`ANALYTICS_LIVE_VISITORS_RESPONSE_CACHE_SECONDS`).
 
 ## Pliki
 

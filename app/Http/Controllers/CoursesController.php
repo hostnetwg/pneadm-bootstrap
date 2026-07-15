@@ -166,12 +166,6 @@ class CoursesController extends Controller
 
         // Dla większych zbiorów danych, ograniczamy relacje które są używane tylko do liczenia
         if (! $isAll || $filteredCount < 300) {
-            $eagerLoads['participants'] = function ($query) {
-                $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
-            };
-            $eagerLoads['certificates'] = function ($query) {
-                $query->select('id', 'course_id');
-            };
             $eagerLoads['surveys'] = function ($query) {
                 $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
             };
@@ -190,16 +184,25 @@ class CoursesController extends Controller
         }
 
         $courses = $query->with($eagerLoads)
+            ->withCount([
+                'participants',
+                'certificates',
+                'participants as participants_complete_count' => function ($q) {
+                    $q->whereNotNull('first_name')
+                        ->where('first_name', '!=', '')
+                        ->whereNotNull('last_name')
+                        ->where('last_name', '!=', '')
+                        ->whereNotNull('birth_date')
+                        ->whereNotNull('birth_place')
+                        ->where('birth_place', '!=', '');
+                },
+            ])
             ->orderBy($sortColumn, $sortDirection)
             ->paginate($perPage)
             ->appends($filters + ['sort' => $sortColumn, 'direction' => $sortDirection]);
 
-        // Dla większych zbiorów, ładuj relacje do liczenia osobno (lazy loading)
+        // Dla większych zbiorów, doładuj tylko media/linki (bez pełnej listy participants)
         if ($isAll && $filteredCount >= 300) {
-            $courses->getCollection()->loadCount(['participants', 'certificates']);
-            $courses->getCollection()->load(['participants' => function ($query) {
-                $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
-            }]);
             $courses->getCollection()->load(['surveys' => function ($query) {
                 $query->orderBy('id', 'desc')->limit(1)->select('id', 'course_id');
             }]);

@@ -5,9 +5,12 @@ namespace App\Services\Dashboard;
 use App\Models\FormOrder;
 use App\Support\UtcStorageDate;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardOrdersStatsService
 {
+    private const SNAPSHOT_CACHE_SECONDS = 20;
+
     /**
      * @return array{
      *     as_of: string,
@@ -20,6 +23,26 @@ class DashboardOrdersStatsService
      * }
      */
     public function snapshot(): array
+    {
+        return Cache::remember(
+            'dashboard.orders.stats.snapshot.v1',
+            self::SNAPSHOT_CACHE_SECONDS,
+            fn () => $this->buildSnapshot()
+        );
+    }
+
+    /**
+     * @return array{
+     *     as_of: string,
+     *     form_today: int,
+     *     form_yesterday: int,
+     *     form_handling: int,
+     *     deferred_handling: int,
+     *     online_handling: int,
+     *     latest_form_order_id: int
+     * }
+     */
+    private function buildSnapshot(): array
     {
         $tz = UtcStorageDate::appTimezone();
         $todayLocal = Carbon::today($tz);

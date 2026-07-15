@@ -1412,7 +1412,12 @@
             }
 
             refreshOrdersStats();
-            setInterval(refreshOrdersStats, pollSeconds * 1000);
+            const ordersStatsInterval = setInterval(function () {
+                if (document.visibilityState === 'hidden') {
+                    return;
+                }
+                refreshOrdersStats();
+            }, pollSeconds * 1000);
             document.addEventListener('visibilitychange', function () {
                 if (document.visibilityState === 'visible') {
                     if (typeof window.dashboardUnlockOrderSound === 'function') {
@@ -1421,12 +1426,15 @@
                     refreshOrdersStats();
                 }
             });
+            window.addEventListener('beforeunload', function () {
+                clearInterval(ordersStatsInterval);
+            });
         })();
 
         @if($liveVisitorsEnabled ?? false)
         (function () {
             const pollUrl = @json(route('api.dashboard.live-visitors'));
-            const pollSeconds = {{ (int) ($liveVisitorsPollSeconds ?? 30) }};
+            const pollSeconds = {{ (int) ($liveVisitorsPollSeconds ?? 45) }};
             const countEl = document.getElementById('liveVisitorsCount');
             const bodyEl = document.getElementById('liveVisitorsBody');
             const footerEl = document.getElementById('liveVisitorsFooterText');
@@ -1463,6 +1471,10 @@
                 }
 
                 countdownTimer = setInterval(function () {
+                    if (document.visibilityState === 'hidden') {
+                        return;
+                    }
+
                     if (refreshInFlight) {
                         return;
                     }
@@ -1668,6 +1680,12 @@
             resetCountdown();
             startCountdown();
             refreshLiveVisitors();
+
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                    refreshLiveVisitors();
+                }
+            });
         })();
         @endif
     </script>

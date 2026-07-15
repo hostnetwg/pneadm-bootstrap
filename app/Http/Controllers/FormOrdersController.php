@@ -16,6 +16,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -234,9 +235,11 @@ class FormOrdersController extends Controller
             $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->paginate($perPage);
         }
 
-        // Pobierz informacje o duplikatach dla wyświetlanych zamówień
+        // Pobierz informacje o duplikatach dla wyświetlanych zamówień (cache 60 s — pełny skan jest drogi)
         $duplicateInfo = [];
-        $duplicateGroups = FormOrder::duplicates()->get();
+        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v1', 60, function () {
+            return FormOrder::duplicates()->get();
+        });
         foreach ($duplicateGroups as $group) {
             $orderIds = explode(',', $group->order_ids);
             foreach ($orderIds as $orderId) {
@@ -252,84 +255,88 @@ class FormOrdersController extends Controller
         $totalDuplicateGroupsCount = $duplicateGroups->count();
         $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
 
-        // Policz archiwalne (skrót przycisku) = do obsługi ORAZ minęła data zakończenia szkolenia.
-        $archivalCount = FormOrder::needsHandling()
-            ->whereExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('courses')
-                    ->where('courses.end_date', '<', \Carbon\Carbon::now())
-                    ->where(function ($match) {
-                        $match->whereColumn('courses.id', 'form_orders.product_id')
-                            ->orWhere(function ($legacy) {
-                                $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
-                                    ->whereNotNull('courses.id_old')
-                                    ->where('courses.id_old', '!=', '')
-                                    ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
-                            });
-                    });
-            })
-            ->count();
-
-        // Policz bieżącą kolejkę (aktywne szkolenia) oraz pełny backlog legacy do zamknięcia komendą.
-        $handlingCount = FormOrder::needsActiveHandling()->count();
-        $legacyBacklogCount = FormOrder::needsHandling()->count();
-
-        // Policz operacyjnie przetworzone (wszyscy uczestnicy na szkoleniu, nieanulowane)
-        $processedCount = FormOrder::processed()->count();
-
-        // Policz anulowane (cancelled_at)
-        $cancelledCount = FormOrder::cancelled()->count();
-
-        // Statystyki do wyświetlenia
-        // `order_date` jest zapisywane w bazie jako UTC, ale UI pokazuje dzień wg strefy aplikacji
-        // (np. 00:39/01:00 w lokalnym czasie powinno liczyć się jako "dziś").
-        // Dlatego liczymy granice "wczoraj/dziś" w czasie lokalnym, a dopiero potem porównujemy do UTC.
-        $tz = config('app.timezone', 'Europe/Warsaw');
-
-        $todayLocal = Carbon::today($tz);
-        $yesterdayLocal = Carbon::yesterday($tz);
-
-        $todayStartUtc = $todayLocal->copy()->startOfDay()->utc();
-        $tomorrowStartUtc = $todayLocal->copy()->addDay()->startOfDay()->utc(); // koniec wyłączny
-        $yesterdayStartUtc = $yesterdayLocal->copy()->startOfDay()->utc();
-
-        $stats = [
-            'total' => FormOrder::count(),
-            'handling' => $handlingCount,
-            'handling_backlog' => $legacyBacklogCount,
-            'yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
-                ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
-                ->count(),
-            'today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
-                ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
-                ->count(),
-            'archival' => $archivalCount,
-            'sales_value' => FormOrder::withInvoice()->sum('product_price'),
-            'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
-        ];
-
-        if (Schema::hasColumn((new FormOrder)->getTable(), 'conversion_placement')) {
-            $sidebarPlacement = FormOrder::CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR;
-            $stats['dashboard_sidebar_total'] = FormOrder::where('conversion_placement', $sidebarPlacement)->count();
-            $stats['dashboard_sidebar_invoiced'] = FormOrder::withInvoice()
-                ->where('conversion_placement', $sidebarPlacement)
+        $badgeStats = Cache::remember('form_orders.index.badge_stats.v1', 30, function () {
+            $archivalCount = FormOrder::needsHandling()
+                ->whereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('courses')
+                        ->where('courses.end_date', '<', Carbon::now())
+                        ->where(function ($match) {
+                            $match->whereColumn('courses.id', 'form_orders.product_id')
+                                ->orWhere(function ($legacy) {
+                                    $legacy->where('courses.source_id_old', '=', 'certgen_Publigo')
+                                        ->whereNotNull('courses.id_old')
+                                        ->where('courses.id_old', '!=', '')
+                                        ->whereColumn('courses.id_old', 'form_orders.publigo_product_id');
+                                });
+                        });
+                })
                 ->count();
-            $stats['dashboard_sidebar_sales'] = FormOrder::withInvoice()
-                ->where('conversion_placement', $sidebarPlacement)
-                ->sum('product_price');
-            $stats['other_placement_total'] = FormOrder::where(function ($q) use ($sidebarPlacement) {
-                $q->whereNull('conversion_placement')
-                    ->orWhere('conversion_placement', '')
-                    ->orWhere('conversion_placement', '!=', $sidebarPlacement);
-            })->count();
-            $stats['other_placement_invoiced'] = FormOrder::withInvoice()
-                ->where(function ($q) use ($sidebarPlacement) {
+
+            $handlingCount = FormOrder::needsActiveHandling()->count();
+            $legacyBacklogCount = FormOrder::needsHandling()->count();
+            $processedCount = FormOrder::processed()->count();
+            $cancelledCount = FormOrder::cancelled()->count();
+
+            $tz = config('app.timezone', 'Europe/Warsaw');
+            $todayLocal = Carbon::today($tz);
+            $yesterdayLocal = Carbon::yesterday($tz);
+            $todayStartUtc = $todayLocal->copy()->startOfDay()->utc();
+            $tomorrowStartUtc = $todayLocal->copy()->addDay()->startOfDay()->utc();
+            $yesterdayStartUtc = $yesterdayLocal->copy()->startOfDay()->utc();
+
+            $stats = [
+                'total' => FormOrder::count(),
+                'handling' => $handlingCount,
+                'handling_backlog' => $legacyBacklogCount,
+                'yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
+                    ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
+                    ->count(),
+                'today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
+                    ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
+                    ->count(),
+                'archival' => $archivalCount,
+                'sales_value' => FormOrder::withInvoice()->sum('product_price'),
+                'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
+            ];
+
+            if (Schema::hasColumn((new FormOrder)->getTable(), 'conversion_placement')) {
+                $sidebarPlacement = FormOrder::CONVERSION_PLACEMENT_DASHBOARD_SIDEBAR;
+                $stats['dashboard_sidebar_total'] = FormOrder::where('conversion_placement', $sidebarPlacement)->count();
+                $stats['dashboard_sidebar_invoiced'] = FormOrder::withInvoice()
+                    ->where('conversion_placement', $sidebarPlacement)
+                    ->count();
+                $stats['dashboard_sidebar_sales'] = FormOrder::withInvoice()
+                    ->where('conversion_placement', $sidebarPlacement)
+                    ->sum('product_price');
+                $stats['other_placement_total'] = FormOrder::where(function ($q) use ($sidebarPlacement) {
                     $q->whereNull('conversion_placement')
                         ->orWhere('conversion_placement', '')
                         ->orWhere('conversion_placement', '!=', $sidebarPlacement);
-                })
-                ->count();
-        }
+                })->count();
+                $stats['other_placement_invoiced'] = FormOrder::withInvoice()
+                    ->where(function ($q) use ($sidebarPlacement) {
+                        $q->whereNull('conversion_placement')
+                            ->orWhere('conversion_placement', '')
+                            ->orWhere('conversion_placement', '!=', $sidebarPlacement);
+                    })
+                    ->count();
+            }
+
+            return [
+                'archivalCount' => $archivalCount,
+                'handlingCount' => $handlingCount,
+                'processedCount' => $processedCount,
+                'cancelledCount' => $cancelledCount,
+                'stats' => $stats,
+            ];
+        });
+
+        $archivalCount = $badgeStats['archivalCount'];
+        $handlingCount = $badgeStats['handlingCount'];
+        $processedCount = $badgeStats['processedCount'];
+        $cancelledCount = $badgeStats['cancelledCount'];
+        $stats = $badgeStats['stats'];
 
         return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'dateFromFilter', 'dateToFilter', 'dateRangeError', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'handlingCount', 'processedCount', 'archivalCount', 'cancelledCount'));
     }

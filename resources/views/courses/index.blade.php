@@ -503,24 +503,9 @@
                             </div>
                         </td>
                         <td class="text-center align-middle">
-                            <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants->count() }}</span><br>
-                            @php
-                                // Upewnij się, że uczestnicy są załadowani z potrzebnymi polami
-                                if (!$course->relationLoaded('participants')) {
-                                    $course->load(['participants' => function($query) {
-                                        $query->select('id', 'course_id', 'first_name', 'last_name', 'birth_date', 'birth_place');
-                                    }]);
-                                }
-                                
-                                $completeDataCount = $course->participants->filter(function($participant) {
-                                    return !empty(trim($participant->last_name ?? '')) 
-                                        && !empty(trim($participant->first_name ?? '')) 
-                                        && !is_null($participant->birth_date) 
-                                        && !empty(trim($participant->birth_place ?? ''));
-                                })->count();
-                            @endphp
-                            <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $completeDataCount }}</span><br>
-                            <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates->count() }}</span><br>
+                            <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants_count }}</span><br>
+                            <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $course->participants_complete_count }}</span><br>
+                            <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates_count }}</span><br>
                             @if($course->orders_count > 0)
                                 <a href="{{ route('form-orders.index', ['filter' => 'handling', 'course_id' => $course->id]) }}" 
                                    class="badge bg-danger text-decoration-none" 
@@ -604,8 +589,8 @@
                                     <li><strong>Tytuł:</strong> {!! $course->title !!}</li>
                                     <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
                                     <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
-                                    <li><strong>Uczestnicy:</strong> {{ $course->participants->count() }}</li>
-                                    <li><strong>Zaświadczenia:</strong> {{ $course->certificates->count() }}</li>
+                                    <li><strong>Uczestnicy:</strong> {{ $course->participants_count }}</li>
+                                    <li><strong>Zaświadczenia:</strong> {{ $course->certificates_count }}</li>
                                 </ul>
                             </div>
                             <p class="text-muted mt-3">
