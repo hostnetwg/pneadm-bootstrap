@@ -21,6 +21,7 @@ use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\DashboardOrdersStatsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
+use App\Http\Controllers\GusLookupController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\MarketingCampaignController;
@@ -204,6 +205,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/index-stats', [FormOrdersController::class, 'indexStats'])->name('index-stats');
             Route::get('/courses/search', [FormOrdersController::class, 'searchCourses'])->name('courses.search');
             Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
+            Route::post('/gus-lookup-by-nip', GusLookupController::class)
+                ->middleware('throttle:30,1')
+                ->name('gus-lookup');
             Route::post('/', [FormOrdersController::class, 'store'])->name('store');
             Route::get('/duplicates', [FormOrdersController::class, 'duplicates'])->name('duplicates');
             Route::get('/{id}', [FormOrdersController::class, 'show'])->name('show');

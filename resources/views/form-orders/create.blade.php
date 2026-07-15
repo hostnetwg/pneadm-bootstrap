@@ -254,12 +254,19 @@
                                 <div class="row mt-3">
                                     <div class="col-12">
                                         <label for="buyer_nip" class="form-label">NIP</label>
-                                        <input type="text" class="form-control @error('buyer_nip') is-invalid @enderror" 
-                                               id="buyer_nip" name="buyer_nip" 
-                                               value="{{ old('buyer_nip', $prefill['buyer_nip'] ?? '') }}">
-                                        @error('buyer_nip')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
+                                        <div class="input-group">
+                                            <input type="text" class="form-control @error('buyer_nip') is-invalid @enderror"
+                                                   id="buyer_nip" name="buyer_nip"
+                                                   value="{{ old('buyer_nip', $prefill['buyer_nip'] ?? '') }}"
+                                                   inputmode="numeric" autocomplete="off">
+                                            <button class="btn btn-outline-success" type="button" data-gus-target="buyer">
+                                                Pobierz z GUS
+                                            </button>
+                                            @error('buyer_nip')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="form-text" id="buyer-gus-status" aria-live="polite"></div>
                                     </div>
                                 </div>
                             </div>
@@ -318,12 +325,19 @@
                                 <div class="row mt-3">
                                     <div class="col-12">
                                         <label for="recipient_nip" class="form-label">NIP (opcjonalnie) - proszę podać tylko jeżeli ma znaleźć się na fakturze</label>
-                                        <input type="text" class="form-control @error('recipient_nip') is-invalid @enderror" 
-                                               id="recipient_nip" name="recipient_nip" 
-                                               value="{{ old('recipient_nip', $prefill['recipient_nip'] ?? '') }}">
-                                        @error('recipient_nip')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
+                                        <div class="input-group">
+                                            <input type="text" class="form-control @error('recipient_nip') is-invalid @enderror"
+                                                   id="recipient_nip" name="recipient_nip"
+                                                   value="{{ old('recipient_nip', $prefill['recipient_nip'] ?? '') }}"
+                                                   inputmode="numeric" autocomplete="off">
+                                            <button class="btn btn-outline-success" type="button" data-gus-target="recipient">
+                                                Pobierz z GUS
+                                            </button>
+                                            @error('recipient_nip')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="form-text" id="recipient-gus-status" aria-live="polite"></div>
                                     </div>
                                 </div>
                             </div>
@@ -488,4 +502,5 @@
             }
         });
     </script>
+    @include('form-orders.partials.gus-nip-lookup-script')
 </x-app-layout>

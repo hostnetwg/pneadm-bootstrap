@@ -114,4 +114,13 @@ return [
         'reminder_minutes' => (int) env('GOOGLE_CALENDAR_REMINDER_MINUTES', 60),
     ],
 
+    // GUS BIR (REGON) — ten sam klucz co pnedu (formularz zamówienia „Pobierz z GUS”).
+    'gus_bir' => [
+        'user_key' => env('GUS_BIR_USER_KEY'),
+        'endpoint' => env('GUS_BIR_ENDPOINT', env('GUS_BIR_ENV', 'production') === 'test'
+            ? 'https://wyszukiwarkaregontest.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc'
+            : 'https://wyszukiwarkaregon.stat.gov.pl/wsBIR/UslugaBIRzewnPubl.svc'),
+        'timeout' => (int) env('GUS_BIR_TIMEOUT', 10),
+    ],
+
 ];

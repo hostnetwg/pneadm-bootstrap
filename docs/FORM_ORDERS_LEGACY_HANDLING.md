@@ -7,6 +7,10 @@
 - **Liczniki** (badge przy filtrach + pasek „Wszystkie zamówienia: … | Wartość sprzedaży…”): ładowane **po liście** przez `GET /form-orders/index-stats` (AJAX, bez przeładowania). Zmiana filtrów / wyszukiwanie nadal przeładowuje stronę i najpierw pokazuje listę.
 - Cache: badge stats 30 s, grupy duplikatów 60 s (jak wcześniej).
 
+### Pobierz z GUS (create / edit)
+
+Na `/form-orders/create` i `/form-orders/{id}/edit` przy NIP nabywcy i odbiorcy jest przycisk **Pobierz z GUS** (`POST /form-orders/gus-lookup-by-nip`). Uzupełnia nazwę, kod pocztowy, miasto, adres i NIP (jak formularz zamówienia na pnedu.pl). Wymaga `GUS_BIR_USER_KEY` w `.env` (ten sam klucz co pnedu).
+
 ---
 
 ## Kontekst
