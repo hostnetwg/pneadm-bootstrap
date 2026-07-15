@@ -6,10 +6,10 @@ Panel operacyjny w **adm.pnedu.pl** — domyślna strona po zalogowaniu (`route(
 
 | Sekcja | Źródło danych | Odświeżanie |
 |--------|---------------|-------------|
-| Karty „Dziś / Do obsługi / …” | `form_orders` (SQL) | Polling JSON co ~15 s |
+| Karty „Dziś / Do obsługi / …” | `form_orders` (SQL, scope `includedInDashboardMetrics`) | Polling JSON co ~15 s |
 | **Aktywni teraz** | `analytics_events` (lejek) | Osobny polling, okno ~30 min |
-| Wykres zamówień | `form_orders.order_date` w zakresie filtra | Przy zmianie statystyk + sekcji wykresu |
-| Ostatnie FORM | `form_orders` (8 rekordów) | Jak wykres |
+| Wykres zamówień | `form_orders.order_date` w zakresie filtra (ten sam scope) | Przy zmianie statystyk + sekcji wykresu |
+| Ostatnie FORM | `form_orders` (8 rekordów, ten sam scope) | Jak wykres |
 | Terminy szkoleń | `courses.start_date` w zakresie filtra | Jak wykres |
 
 Konfiguracja pollingu i „Aktywni teraz”: `config/analytics.php` → `live_visitors_dashboard`.
@@ -68,6 +68,15 @@ Serwis: `App\Services\Dashboard\DashboardCourseScheduleService`.
 
 Pod listą **Ostatnie zamówienia FORM** (lewa kolumna): data, godzina, link do kursu, instruktor. Liczba i zakres dat = filtr wykresu. Odświeża się razem z `?sections=1`.
 
+## Metryki FORM (Dziś, wykres, ostatnie zamówienia)
+
+Wspólny filtr: `FormOrder::includedInDashboardMetrics()` (`scopeIncludedInDashboardMetrics`).
+
+- **Liczone:** zamówienia z wystawioną FV **lub** w otwartej kolejce operacyjnej (`withInvoiceOrNeedsHandling`).
+- **Wykluczone:** anulowane (`cancelled_at IS NOT NULL`) — w tym po „Anuluj zamówienie” (często z legacy `status_completed = 1` bez FV).
+
+Dzięki temu licznik **Dziś (FORM)**, słupek wykresu na bieżący dzień i tabela **Ostatnie zamówienia FORM** pokazują tę samą populację zamówień. Licznik **Do obsługi** nadal używa osobnego scope `needsActiveHandling`.
+
 ## Pliki
 
 | Plik | Rola |
@@ -78,6 +87,7 @@ Pod listą **Ostatnie zamówienia FORM** (lewa kolumna): data, godzina, link do 
 | `app/Services/Dashboard/DashboardOrdersDashboardService.php` | Wykres, ostatnie zamówienia, sekcje API |
 | `app/Services/Dashboard/DashboardCourseScheduleService.php` | Terminy szkoleń w zakresie |
 | `app/Services/Analytics/AnalyticsLiveVisitorsService.php` | Aktywni teraz |
+| `app/Models/FormOrder.php` | Scope `includedInDashboardMetrics` |
 | `resources/views/dashboard/orders.blade.php` | Widok + JS (Chart.js, polling, dźwięk) |
 
 ## Testy
@@ -86,4 +96,5 @@ Pod listą **Ostatnie zamówienia FORM** (lewa kolumna): data, godzina, link do 
 sail artisan test --filter=AnalyticsLiveVisitorsDashboardTest
 sail artisan test --filter=DashboardOrdersStatsApiTest
 sail artisan test --filter=DashboardCourseScheduleServiceTest
+sail artisan test --filter=FormOrderDashboardMetricsScopeTest
 ```

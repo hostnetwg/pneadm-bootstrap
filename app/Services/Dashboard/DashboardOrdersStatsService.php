@@ -31,10 +31,12 @@ class DashboardOrdersStatsService
 
         return [
             'as_of' => Carbon::now($tz)->toIso8601String(),
-            'form_today' => FormOrder::where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
+            'form_today' => FormOrder::includedInDashboardMetrics()
+                ->where('order_date', '>=', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
                 ->count(),
-            'form_yesterday' => FormOrder::where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
+            'form_yesterday' => FormOrder::includedInDashboardMetrics()
+                ->where('order_date', '>=', $yesterdayStartUtc->format('Y-m-d H:i:s'))
                 ->where('order_date', '<', $todayStartUtc->format('Y-m-d H:i:s'))
                 ->count(),
             'form_handling' => FormOrder::needsActiveHandling()->count(),

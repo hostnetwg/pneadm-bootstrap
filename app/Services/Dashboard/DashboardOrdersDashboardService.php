@@ -241,6 +241,7 @@ class DashboardOrdersDashboardService
     public function recentOrdersPayload(): array
     {
         return FormOrder::query()
+            ->includedInDashboardMetrics()
             ->with(['course:id,title'])
             ->orderByDesc('order_date')
             ->limit(8)
@@ -287,7 +288,7 @@ class DashboardOrdersDashboardService
         $buckets = $this->initializeChartBuckets($dateFrom, $dateTo, $tz, $granularity);
 
         FormOrder::query()
-            ->withInvoiceOrNeedsHandling()
+            ->includedInDashboardMetrics()
             ->whereBetween('order_date', [$fromUtc, $toUtc])
             ->select(['id', 'order_date', 'payment_mode'])
             ->orderBy('id')

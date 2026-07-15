@@ -415,6 +415,17 @@ class FormOrder extends Model
     }
 
     /**
+     * Metryki dashboardu zamówień FORM (wykres, Dziś/Wczoraj, ostatnie zamówienia):
+     * nieanulowane zamówienia z FV lub w otwartej kolejce operacyjnej.
+     */
+    public function scopeIncludedInDashboardMetrics(Builder $query): Builder
+    {
+        return $query
+            ->whereNull($query->getModel()->getTable().'.cancelled_at')
+            ->withInvoiceOrNeedsHandling();
+    }
+
+    /**
      * Scope - zamówienia operacyjnie przetworzone (wszyscy uczestnicy na szkoleniu, nieanulowane).
      */
     public function scopeProcessed($query)
