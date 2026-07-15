@@ -1,5 +1,14 @@
 # Legacy — operacyjne domknięcie starych zamówień
 
+## Lista `/form-orders` (kolejka dzienna)
+
+- **Domyślny widok** (bez `?quick=`): jak przycisk **Do obsługi (aktywne)** (`needsActiveHandling`).
+- **Wszystkie zamówienia:** `?quick=all` (przycisk „Wszystkie”).
+- **Liczniki** (badge przy filtrach + pasek „Wszystkie zamówienia: … | Wartość sprzedaży…”): ładowane **po liście** przez `GET /form-orders/index-stats` (AJAX, bez przeładowania). Zmiana filtrów / wyszukiwanie nadal przeładowuje stronę i najpierw pokazuje listę.
+- Cache: badge stats 30 s, grupy duplikatów 60 s (jak wcześniej).
+
+---
+
 ## Kontekst
 
 Po migracji z Publigo / importu CSV część zamówień ma **FV**, ale:

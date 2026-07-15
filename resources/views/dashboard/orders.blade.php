@@ -400,7 +400,7 @@
                             <h5 class="mb-0">Szybkie skróty</h5>
                         </div>
                         <div class="list-group list-group-flush">
-                            <a href="{{ route('form-orders.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <a href="{{ route('form-orders.index', ['quick' => 'all']) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <span><i class="bi bi-file-earmark-text me-2"></i>Zamówienia FORM</span>
                                 <i class="bi bi-chevron-right text-muted"></i>
                             </a>

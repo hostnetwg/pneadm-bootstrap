@@ -36,14 +36,11 @@ class FormOrdersController extends Controller
         $courseIdFilter = trim((string) $request->get('course_id', ''));
         // Status przetwarzania — dwa źródła:
         //  - 'quick'  => szybki, NIEZALEŻNY filtr z górnych przycisków (działa samodzielnie).
-        //                Dozwolone: '' | handling | processed | archival | cancelled  (legacy: quick=new → handling)
+        //                Brak parametru → domyślnie handling. Explicit: all | handling | processed | archival | cancelled
+        //                (legacy: quick=new → handling; quick='' → all)
         //  - 'filter' => opcja "Przetwarzanie" w formularzu (łączy się z resztą pól formularza).
         //                Dozwolone: '' | handling | new | processed | cancelled (BEZ archival — archival to osobny checkbox).
-        $quickFilter = $request->get('quick', '');
-        if ($quickFilter === 'new') {
-            $quickFilter = 'handling';
-        }
-        $quickFilter = in_array($quickFilter, ['handling', 'processed', 'archival', 'cancelled'], true) ? $quickFilter : '';
+        $quickFilter = $this->resolveQuickFilter($request);
         $filter = $request->get('filter', '');
         $filter = in_array($filter, ['new', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
 
@@ -252,10 +249,75 @@ class FormOrdersController extends Controller
             }
         }
 
-        $totalDuplicateGroupsCount = $duplicateGroups->count();
-        $urgentDuplicatesCount = $this->countUrgentDuplicateGroups($duplicateGroups);
+        // Liczniki badge / pasek statystyk — dopiero po liście (AJAX /form-orders/index-stats).
+        return view('form-orders.index', compact(
+            'zamowienia',
+            'perPage',
+            'search',
+            'orderIdFilter',
+            'courseIdFilter',
+            'quickFilter',
+            'filter',
+            'archivalOnly',
+            'settlementFilter',
+            'opoStatusFilter',
+            'placementFilter',
+            'dateFromFilter',
+            'dateToFilter',
+            'dateRangeError',
+            'duplicateInfo'
+        ));
+    }
 
-        $badgeStats = Cache::remember('form_orders.index.badge_stats.v1', 30, function () {
+    /**
+     * JSON liczników szybkich filtrów i paska statystyk (ładowane po liście zamówień).
+     */
+    public function indexStats()
+    {
+        $badgeStats = $this->cachedIndexBadgeStats();
+        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v1', 60, function () {
+            return FormOrder::duplicates()->get();
+        });
+
+        return response()->json([
+            'handling_count' => $badgeStats['handlingCount'],
+            'processed_count' => $badgeStats['processedCount'],
+            'archival_count' => $badgeStats['archivalCount'],
+            'cancelled_count' => $badgeStats['cancelledCount'],
+            'total_duplicate_groups' => $duplicateGroups->count(),
+            'urgent_duplicates' => $this->countUrgentDuplicateGroups($duplicateGroups),
+            'stats' => $badgeStats['stats'],
+        ]);
+    }
+
+    /**
+     * Brak ?quick → Do obsługi (aktywne). Explicit ?quick=all (lub '') → wszystkie.
+     */
+    private function resolveQuickFilter(Request $request): string
+    {
+        if (! $request->has('quick')) {
+            return 'handling';
+        }
+
+        $quickFilter = (string) $request->get('quick', '');
+        if ($quickFilter === 'new') {
+            return 'handling';
+        }
+        if ($quickFilter === 'all' || $quickFilter === '') {
+            return '';
+        }
+
+        return in_array($quickFilter, ['handling', 'processed', 'archival', 'cancelled'], true)
+            ? $quickFilter
+            : '';
+    }
+
+    /**
+     * @return array{archivalCount: int, handlingCount: int, processedCount: int, cancelledCount: int, stats: array<string, float|int>}
+     */
+    private function cachedIndexBadgeStats(): array
+    {
+        return Cache::remember('form_orders.index.badge_stats.v1', 30, function () {
             $archivalCount = FormOrder::needsHandling()
                 ->whereExists(function ($sub) {
                     $sub->select(DB::raw(1))
@@ -296,8 +358,8 @@ class FormOrdersController extends Controller
                     ->where('order_date', '<', $tomorrowStartUtc->format('Y-m-d H:i:s'))
                     ->count(),
                 'archival' => $archivalCount,
-                'sales_value' => FormOrder::withInvoice()->sum('product_price'),
-                'avg_price' => FormOrder::withInvoice()->avg('product_price') ?: 0,
+                'sales_value' => (float) FormOrder::withInvoice()->sum('product_price'),
+                'avg_price' => (float) (FormOrder::withInvoice()->avg('product_price') ?: 0),
             ];
 
             if (Schema::hasColumn((new FormOrder)->getTable(), 'conversion_placement')) {
@@ -306,7 +368,7 @@ class FormOrdersController extends Controller
                 $stats['dashboard_sidebar_invoiced'] = FormOrder::withInvoice()
                     ->where('conversion_placement', $sidebarPlacement)
                     ->count();
-                $stats['dashboard_sidebar_sales'] = FormOrder::withInvoice()
+                $stats['dashboard_sidebar_sales'] = (float) FormOrder::withInvoice()
                     ->where('conversion_placement', $sidebarPlacement)
                     ->sum('product_price');
                 $stats['other_placement_total'] = FormOrder::where(function ($q) use ($sidebarPlacement) {
@@ -331,14 +393,6 @@ class FormOrdersController extends Controller
                 'stats' => $stats,
             ];
         });
-
-        $archivalCount = $badgeStats['archivalCount'];
-        $handlingCount = $badgeStats['handlingCount'];
-        $processedCount = $badgeStats['processedCount'];
-        $cancelledCount = $badgeStats['cancelledCount'];
-        $stats = $badgeStats['stats'];
-
-        return view('form-orders.index', compact('zamowienia', 'perPage', 'search', 'orderIdFilter', 'courseIdFilter', 'quickFilter', 'filter', 'archivalOnly', 'settlementFilter', 'opoStatusFilter', 'placementFilter', 'dateFromFilter', 'dateToFilter', 'dateRangeError', 'duplicateInfo', 'urgentDuplicatesCount', 'totalDuplicateGroupsCount', 'stats', 'handlingCount', 'processedCount', 'archivalCount', 'cancelledCount'));
     }
 
     /**

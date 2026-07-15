@@ -61,40 +61,37 @@
                 <div class="d-flex justify-content-between align-items-center">
                     {{-- Szybki, NIEZALEŻNY filtr (czyści pozostałe filtry formularza) --}}
                     <div class="btn-group" role="group">
-                        <a href="{{ route('form-orders.index', ['quick' => '']) }}"
+                        <a href="{{ route('form-orders.index', ['quick' => 'all']) }}"
                            class="btn {{ $quickFilter === '' ? 'btn-primary' : 'btn-outline-primary' }}">
                             <i class="bi bi-list"></i> Wszystkie
                         </a>
                         <a href="{{ route('form-orders.index', ['quick' => 'handling']) }}"
                            class="btn {{ $quickFilter === 'handling' ? 'btn-danger' : 'btn-outline-danger' }}">
                             <i class="bi bi-exclamation-triangle"></i> Do obsługi (aktywne)
-                            <span class="badge bg-danger text-white ms-1">{{ $handlingCount ?? 0 }}</span>
+                            <span class="badge bg-danger text-white ms-1" data-fo-stat="handling_count" aria-busy="true">…</span>
                         </a>
                         <a href="{{ route('form-orders.index', ['quick' => 'processed']) }}"
                            class="btn {{ $quickFilter === 'processed' ? 'btn-info' : 'btn-outline-info' }}">
                             <i class="bi bi-receipt"></i> Przetworzone
-                            <span class="badge bg-info text-dark ms-1">{{ $processedCount ?? 0 }}</span>
+                            <span class="badge bg-info text-dark ms-1" data-fo-stat="processed_count" aria-busy="true">…</span>
                         </a>
                         <a href="{{ route('form-orders.index', ['quick' => 'archival']) }}"
                            class="btn {{ $quickFilter === 'archival' ? 'btn-success' : 'btn-outline-success' }}">
                             <i class="bi bi-archive"></i> Archiwalne
-                            <span class="badge bg-success text-white ms-1">{{ $archivalCount ?? 0 }}</span>
+                            <span class="badge bg-success text-white ms-1" data-fo-stat="archival_count" aria-busy="true">…</span>
                         </a>
                         <a href="{{ route('form-orders.index', ['quick' => 'cancelled']) }}"
                            class="btn {{ $quickFilter === 'cancelled' ? 'btn-secondary' : 'btn-outline-secondary' }}">
                             <i class="bi bi-x-circle"></i> Anulowane
-                            <span class="badge bg-secondary text-white ms-1">{{ $cancelledCount ?? 0 }}</span>
+                            <span class="badge bg-secondary text-white ms-1" data-fo-stat="cancelled_count" aria-busy="true">…</span>
                         </a>
                         <a href="{{ route('form-orders.duplicates') }}?v={{ time() }}" 
-                           class="btn btn-danger @if($urgentDuplicatesCount > 0) btn-pulse @endif"
-                           title="Łącznie {{ $totalDuplicateGroupsCount ?? 0 }} grup (ten sam e-mail uczestnika + ten sam kurs). Liczba w nawiasie to tylko grupy „pilne”: wiele aktywnych zamówień albo faktura i nadal aktywne duplikaty — jak filtr „Wymaga oznaczenia” na stronie duplikatów.">
+                           id="form-orders-duplicates-btn"
+                           class="btn btn-danger"
+                           title="Łącznie grup (ten sam e-mail uczestnika + ten sam kurs). Liczba „pilnych” to grupy wymagające oznaczenia — jak filtr „Wymaga oznaczenia” na stronie duplikatów.">
                             <i class="bi bi-files"></i> DUPLIKATY
-                            @if(($totalDuplicateGroupsCount ?? 0) > 0)
-                                <span class="badge bg-light text-dark ms-1">{{ $totalDuplicateGroupsCount }} grup</span>
-                            @endif
-                            @if(($urgentDuplicatesCount ?? 0) > 0)
-                                <span class="badge bg-white text-danger fw-bold ms-1">pilnych {{ $urgentDuplicatesCount }}</span>
-                            @endif
+                            <span class="badge bg-light text-dark ms-1 d-none" data-fo-stat="dup_groups"></span>
+                            <span class="badge bg-white text-danger fw-bold ms-1 d-none" data-fo-stat="dup_urgent"></span>
                         </a>
                     </div>
                     <div>
@@ -150,9 +147,7 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET" action="{{ route('form-orders.index') }}">
-                        @if(($quickFilter ?? '') !== '')
-                            <input type="hidden" name="quick" value="{{ $quickFilter }}">
-                        @endif
+                        <input type="hidden" name="quick" value="{{ $quickFilter !== '' ? $quickFilter : 'all' }}">
                         {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Przetwarzanie | Rekordów na stronę --}}
                         <div class="row g-3 align-items-end">
                             <div class="col-6 col-md-1">
@@ -275,7 +270,7 @@
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
                                 @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
-                                    <a href="{{ route('form-orders.index', $quickFilter !== '' ? ['quick' => $quickFilter] : []) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ route('form-orders.index', ['quick' => $quickFilter !== '' ? $quickFilter : 'all']) }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
                                 @endif
@@ -285,31 +280,14 @@
                 </div>
             </div>
 
-            {{-- Statystyki --}}
-            <div class="card mb-4">
+            {{-- Statystyki: wartości po AJAX (lista ładuje się pierwsza) --}}
+            <div class="card mb-4" id="form-orders-stats-card" aria-busy="true">
                 <div class="card-body">
-                    <div class="text-center">
-                        <strong>Wszystkie zamówienia:</strong> {{ number_format($stats['total'], 0, ',', ' ') }} | 
-                        <strong>Do obsługi (aktywne):</strong> {{ $stats['handling'] }} |
-                        @if(($stats['handling_backlog'] ?? 0) > ($stats['handling'] ?? 0))
-                            <strong>Backlog legacy:</strong> {{ $stats['handling_backlog'] }} |
-                        @endif 
-                        <strong>Wczoraj:</strong> {{ $stats['yesterday'] }} | 
-                        <strong>Dzisiaj:</strong> {{ $stats['today'] }} | 
-                        <strong>Archiwalne:</strong> {{ $stats['archival'] }} | 
-                        <strong>Wartość sprzedaży:</strong> {{ number_format($stats['sales_value'], 0, ',', ' ') }} zł | 
-                        <strong>Średnia cena:</strong> {{ number_format($stats['avg_price'], 2, ',', ' ') }} zł
-                        @if(isset($stats['dashboard_sidebar_total']))
-                            <br class="d-md-none">
-                            <span class="text-muted">
-                                <strong>Panel (sidebar):</strong> {{ number_format($stats['dashboard_sidebar_total'], 0, ',', ' ') }} zam.
-                                ({{ number_format($stats['dashboard_sidebar_invoiced'], 0, ',', ' ') }} z fakturą,
-                                {{ number_format($stats['dashboard_sidebar_sales'], 0, ',', ' ') }} zł) |
-                                <strong>Inne:</strong> {{ number_format($stats['other_placement_total'], 0, ',', ' ') }} zam.
-                                ({{ number_format($stats['other_placement_invoiced'], 0, ',', ' ') }} z fakturą)
-                            </span>
-                        @endif
+                    <div class="text-center text-muted" id="form-orders-stats-loading">
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Ładowanie podsumowania…
                     </div>
+                    <div class="text-center d-none" id="form-orders-stats-body"></div>
                 </div>
             </div>
 
@@ -938,6 +916,114 @@ nowoczesna-edukacja.pl `;
                 settlementEl.addEventListener('change', syncOpoStatusFilterVisibility);
             }
             syncOpoStatusFilterVisibility();
+
+            // Liczniki badge + pasek statystyk — po liście, bez przeładowania strony
+            (function () {
+                const statsUrl = @json(route('form-orders.index-stats'));
+                const fmtInt = function (n) {
+                    return new Intl.NumberFormat('pl-PL').format(Number(n) || 0);
+                };
+                const fmtMoney = function (n, digits) {
+                    return new Intl.NumberFormat('pl-PL', {
+                        minimumFractionDigits: digits,
+                        maximumFractionDigits: digits
+                    }).format(Number(n) || 0);
+                };
+                const setText = function (key, text) {
+                    document.querySelectorAll('[data-fo-stat="' + key + '"]').forEach(function (el) {
+                        el.textContent = text;
+                        el.removeAttribute('aria-busy');
+                    });
+                };
+
+                fetch(statsUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            throw new Error('stats ' + r.status);
+                        }
+                        return r.json();
+                    })
+                    .then(function (data) {
+                        setText('handling_count', String(data.handling_count ?? 0));
+                        setText('processed_count', String(data.processed_count ?? 0));
+                        setText('archival_count', String(data.archival_count ?? 0));
+                        setText('cancelled_count', String(data.cancelled_count ?? 0));
+
+                        const dupGroups = Number(data.total_duplicate_groups || 0);
+                        const dupUrgent = Number(data.urgent_duplicates || 0);
+                        const dupGroupsEl = document.querySelector('[data-fo-stat="dup_groups"]');
+                        const dupUrgentEl = document.querySelector('[data-fo-stat="dup_urgent"]');
+                        const dupBtn = document.getElementById('form-orders-duplicates-btn');
+                        if (dupGroupsEl) {
+                            if (dupGroups > 0) {
+                                dupGroupsEl.textContent = dupGroups + ' grup';
+                                dupGroupsEl.classList.remove('d-none');
+                            }
+                        }
+                        if (dupUrgentEl) {
+                            if (dupUrgent > 0) {
+                                dupUrgentEl.textContent = 'pilnych ' + dupUrgent;
+                                dupUrgentEl.classList.remove('d-none');
+                                if (dupBtn) {
+                                    dupBtn.classList.add('btn-pulse');
+                                }
+                            }
+                        }
+                        if (dupBtn) {
+                            dupBtn.title = 'Łącznie ' + dupGroups + ' grup (ten sam e-mail uczestnika + ten sam kurs). Liczba „pilnych” to grupy wymagające oznaczenia — jak filtr „Wymaga oznaczenia” na stronie duplikatów.';
+                        }
+
+                        const s = data.stats || {};
+                        let html = '<strong>Wszystkie zamówienia:</strong> ' + fmtInt(s.total) +
+                            ' | <strong>Do obsługi (aktywne):</strong> ' + fmtInt(s.handling);
+                        if ((Number(s.handling_backlog) || 0) > (Number(s.handling) || 0)) {
+                            html += ' | <strong>Backlog legacy:</strong> ' + fmtInt(s.handling_backlog);
+                        }
+                        html += ' | <strong>Wczoraj:</strong> ' + fmtInt(s.yesterday) +
+                            ' | <strong>Dzisiaj:</strong> ' + fmtInt(s.today) +
+                            ' | <strong>Archiwalne:</strong> ' + fmtInt(s.archival) +
+                            ' | <strong>Wartość sprzedaży:</strong> ' + fmtMoney(s.sales_value, 0) + ' zł' +
+                            ' | <strong>Średnia cena:</strong> ' + fmtMoney(s.avg_price, 2) + ' zł';
+
+                        if (Object.prototype.hasOwnProperty.call(s, 'dashboard_sidebar_total')) {
+                            html += '<br class="d-md-none">' +
+                                '<span class="text-muted">' +
+                                '<strong>Panel (sidebar):</strong> ' + fmtInt(s.dashboard_sidebar_total) + ' zam. ' +
+                                '(' + fmtInt(s.dashboard_sidebar_invoiced) + ' z fakturą, ' +
+                                fmtMoney(s.dashboard_sidebar_sales, 0) + ' zł) | ' +
+                                '<strong>Inne:</strong> ' + fmtInt(s.other_placement_total) + ' zam. ' +
+                                '(' + fmtInt(s.other_placement_invoiced) + ' z fakturą)' +
+                                '</span>';
+                        }
+
+                        const loading = document.getElementById('form-orders-stats-loading');
+                        const body = document.getElementById('form-orders-stats-body');
+                        const card = document.getElementById('form-orders-stats-card');
+                        if (loading) {
+                            loading.classList.add('d-none');
+                        }
+                        if (body) {
+                            body.innerHTML = html;
+                            body.classList.remove('d-none');
+                        }
+                        if (card) {
+                            card.removeAttribute('aria-busy');
+                        }
+                    })
+                    .catch(function () {
+                        const loading = document.getElementById('form-orders-stats-loading');
+                        if (loading) {
+                            loading.innerHTML = '<span class="text-danger">Nie udało się wczytać podsumowania.</span>';
+                        }
+                        setText('handling_count', '—');
+                        setText('processed_count', '—');
+                        setText('archival_count', '—');
+                        setText('cancelled_count', '—');
+                    });
+            })();
         });
     </script>
 

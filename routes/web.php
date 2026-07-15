@@ -201,6 +201,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('form-orders.')
         ->group(function () {
             Route::get('/', [FormOrdersController::class, 'index'])->name('index');
+            Route::get('/index-stats', [FormOrdersController::class, 'indexStats'])->name('index-stats');
             Route::get('/courses/search', [FormOrdersController::class, 'searchCourses'])->name('courses.search');
             Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
             Route::post('/', [FormOrdersController::class, 'store'])->name('store');
