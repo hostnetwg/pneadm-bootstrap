@@ -919,7 +919,7 @@ nowoczesna-edukacja.pl `;
 
             // Liczniki badge + pasek statystyk — po liście, bez przeładowania strony
             (function () {
-                const statsUrl = @json(route('form-orders.index-stats'));
+                const statsUrl = @json(url('/form-orders/index-stats'));
                 const fmtInt = function (n) {
                     return new Intl.NumberFormat('pl-PL').format(Number(n) || 0);
                 };
