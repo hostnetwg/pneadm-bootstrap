@@ -1268,7 +1268,8 @@
                     const modeBadge = order.payment_mode_badge || 'secondary';
                     const modeLabel = order.payment_mode_label || '—';
                     const modeTooltip = order.payment_tooltip || '';
-                    const processedMark = order.is_processed
+                    const isProcessed = order.is_processed === true || order.is_processed === 1 || order.is_processed === '1';
+                    const processedMark = isProcessed
                         ? ' <span class="text-success fw-bold" data-bs-toggle="tooltip" title="Przetworzone (FV + uczestnicy)" aria-label="Przetworzone">✓</span>'
                         : '';
 
@@ -1419,6 +1420,9 @@
                                 const snapshotKey = statsSnapshotKey(data);
 
                                 renderHeadlineStats(data);
+                                if (Array.isArray(data.recent_orders)) {
+                                    renderRecentOrders(data.recent_orders);
+                                }
                                 pollCount += 1;
 
                                 if (lastStatsSnapshot === null) {

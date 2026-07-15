@@ -18,6 +18,11 @@ class DashboardOrdersStatsController extends Controller
             return response()->json($dashboard->snapshotWithSections($request));
         }
 
-        return response()->json($stats->snapshot());
+        $payload = $stats->snapshot();
+        // Zawsze dołącz aktualną tabelę „Ostatnie zamówienia” (kolor badge + ✓ przetworzone),
+        // niezależnie od tego, czy zmieniły się liczniki headline.
+        $payload['recent_orders'] = $dashboard->recentOrdersPayload();
+
+        return response()->json($payload);
     }
 }

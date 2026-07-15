@@ -306,7 +306,7 @@ class DashboardOrdersDashboardService
             'payment_mode_label' => $order->paymentModeShortLabel(),
             'payment_mode_badge' => $order->dashboardSettlementBadgeClass(),
             'payment_tooltip' => $order->dashboardSettlementTooltip(),
-            'is_processed' => $isProcessed,
+            'is_processed' => (bool) $isProcessed,
             'show_url' => route('form-orders.show', $order->id),
         ];
     }

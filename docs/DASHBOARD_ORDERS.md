@@ -9,7 +9,7 @@ Panel operacyjny w **adm.pnedu.pl** — domyślna strona po zalogowaniu (`route(
 | Karty „Dziś / Do obsługi / …” | `form_orders` (SQL, scope `includedInDashboardMetrics`) | Polling JSON co ~45 s (pauza gdy karta ukryta) |
 | **Aktywni teraz** | `analytics_events` (lejek) | Osobny polling ~45 s, okno ~30 min |
 | Wykres zamówień | `form_orders.order_date` w zakresie filtra (ten sam scope) | Przy zmianie statystyk + sekcji wykresu |
-| Ostatnie FORM | `form_orders` (**stałe 15** najnowszych po `order_date`, scope `includedInDashboardMetrics` — **nie** zależy od filtra dat wykresu) | Jak wykres |
+| Ostatnie FORM | `form_orders` (**stałe 15** najnowszych po `order_date`, scope `includedInDashboardMetrics` — **nie** zależy od filtra dat wykresu) | Przy **każdym** pollu JSON (~45 s) — kolor badge + ✓ |
 | Terminy szkoleń | `courses.start_date` w zakresie filtra | Jak wykres |
 
 Konfiguracja pollingu i „Aktywni teraz”: `config/analytics.php` → `live_visitors_dashboard`.

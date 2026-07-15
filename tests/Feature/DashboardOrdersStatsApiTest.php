@@ -60,6 +60,7 @@ class DashboardOrdersStatsApiTest extends TestCase
                 'deferred_handling',
                 'online_handling',
                 'latest_form_order_id',
+                'recent_orders',
             ]);
     }
 
