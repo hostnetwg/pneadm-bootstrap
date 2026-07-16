@@ -147,7 +147,9 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET" action="{{ route('form-orders.index') }}">
-                        <input type="hidden" name="quick" value="{{ $quickFilter !== '' ? $quickFilter : 'all' }}">
+                        {{-- Formularz jest niezależny od szybkich buttonów: zawsze szuka w całej bazie (quick=all).
+                             Status przetwarzania bierze się wyłącznie z pola „Przetwarzanie” poniżej. --}}
+                        <input type="hidden" name="quick" value="all">
                         {{-- Wiersz 1: ID zam. | ID szkol. | Rozliczenie | Status bramki | Przetwarzanie | Rekordów na stronę --}}
                         <div class="row g-3 align-items-end">
                             <div class="col-6 col-md-1">
@@ -270,7 +272,7 @@
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
                                 @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
-                                    <a href="{{ route('form-orders.index', ['quick' => $quickFilter !== '' ? $quickFilter : 'all']) }}" class="btn btn-outline-secondary">
+                                    <a href="{{ route('form-orders.index') }}" class="btn btn-outline-secondary" title="Wyczyść formularz i wróć do domyślnej kolejki „Do obsługi (aktywne)”">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
                                 @endif

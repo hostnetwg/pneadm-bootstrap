@@ -34,15 +34,25 @@ class FormOrdersController extends Controller
         $search = $request->get('search', '');
         $orderIdFilter = trim((string) $request->get('order_id', ''));
         $courseIdFilter = trim((string) $request->get('course_id', ''));
-        // Status przetwarzania — dwa źródła:
-        //  - 'quick'  => szybki, NIEZALEŻNY filtr z górnych przycisków (działa samodzielnie).
-        //                Brak parametru → domyślnie handling. Explicit: all | handling | processed | archival | cancelled
+        // Status przetwarzania — dwa NIEZALEŻNE źródła (nie łączymy ich AND):
+        //  - 'quick'  => wyłącznie górne buttony. Brak parametru → domyślnie handling.
+        //                Explicit: all | handling | processed | archival | cancelled
         //                (legacy: quick=new → handling; quick='' → all)
-        //  - 'filter' => opcja "Przetwarzanie" w formularzu (łączy się z resztą pól formularza).
-        //                Dozwolone: '' | handling | new | processed | cancelled (BEZ archival — archival to osobny checkbox).
-        $quickFilter = $this->resolveQuickFilter($request);
+        //  - 'filter' => wyłącznie pole „Przetwarzanie” w formularzu (+ pozostałe pola formularza).
+        //                Formularz zawsze wysyła quick=all, więc nie dziedziczy kolejki z buttonów.
+        //                Dozwolone: '' | handling | new | processed | cancelled | handling_all
         $filter = $request->get('filter', '');
         $filter = in_array($filter, ['new', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
+        $formSearchActive = $this->isFormSearchActive($request, $filter);
+        // Przy aktywnym formularzu ignorujemy szybki filtr (nawet w starych URL z obu parametrami).
+        $quickFilter = $formSearchActive ? '' : $this->resolveQuickFilter($request);
+        if ($formSearchActive && $request->get('quick') !== 'all' && $request->get('quick') !== '') {
+            // UI: po Szukaj pokaż „Szybki filtr: Wszystkie”, nie stary handling z buttona.
+            $quickFilterForUi = '';
+        } else {
+            $quickFilterForUi = $formSearchActive ? '' : $quickFilter;
+        }
+        $quickFilter = $quickFilterForUi;
 
         // Osobny checkbox formularza: "Tylko archiwalne" = minęła data zakończenia szkolenia.
         // Łączy się (AND) z listą "Przetwarzanie" i pozostałymi filtrami — daje więcej kombinacji.
@@ -59,9 +69,12 @@ class FormOrdersController extends Controller
         // Budujemy zapytanie używając modelu Eloquent
         $query = FormOrder::query();
 
-        // Stosujemy filtr przetwarzania niezależnie z przycisków (quick) i z formularza (filter).
-        $this->applyProcessingFilter($query, $quickFilter);
-        $this->applyProcessingFilter($query, $filter);
+        // Albo szybki button, albo pole formularza „Przetwarzanie” — nigdy oba naraz.
+        if ($formSearchActive) {
+            $this->applyProcessingFilter($query, $filter);
+        } else {
+            $this->applyProcessingFilter($query, $quickFilter);
+        }
 
         // Checkbox "Tylko archiwalne" z formularza — dokłada warunek po terminie szkolenia.
         if ($archivalOnly) {
@@ -310,6 +323,24 @@ class FormOrdersController extends Controller
         return in_array($quickFilter, ['handling', 'processed', 'archival', 'cancelled'], true)
             ? $quickFilter
             : '';
+    }
+
+    /**
+     * Czy użytkownik uruchomił wyszukiwanie przez formularz.
+     * Jeśli tak, ignorujemy szybki filtr z buttonów (quick).
+     */
+    private function isFormSearchActive(Request $request, string $filter): bool
+    {
+        return $request->filled('search')
+            || $request->filled('order_id')
+            || $request->filled('course_id')
+            || $request->filled('settlement')
+            || $request->filled('opo_status')
+            || $request->filled('placement')
+            || $filter !== ''
+            || $request->boolean('archival')
+            || $request->filled('date_from')
+            || $request->filled('date_to');
     }
 
     /**
