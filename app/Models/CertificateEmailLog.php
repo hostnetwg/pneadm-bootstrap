@@ -10,9 +10,14 @@ class CertificateEmailLog extends Model
     use HasFactory;
 
     public const TYPE_LIST_LINK = 'list_link';
+
     public const TYPE_SINGLE_CERTIFICATE = 'single_certificate';
+
     public const TYPE_COURSE_ACCESS = 'course_access';
+
     public const TYPE_ACCESS_EXPIRY_REMINDER = 'access_expiry_reminder';
+
+    public const TYPE_LIVE_MEETING_LINK = 'live_meeting_link';
 
     /** Klucz agregowany (nie zapisywany w DB): lista lub pojedyncze zaświadczenie. */
     public const AGGREGATE_CERTIFICATE_LINK = 'certificate_link';
@@ -29,7 +34,9 @@ class CertificateEmailLog extends Model
     }
 
     public const STATUS_QUEUED = 'queued';
+
     public const STATUS_SENT = 'sent';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
@@ -63,4 +70,3 @@ class CertificateEmailLog extends Model
         return $this->belongsTo(Participant::class);
     }
 }
-

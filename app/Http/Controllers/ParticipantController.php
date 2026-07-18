@@ -14,10 +14,12 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
 use App\Models\PneduUser;
+use App\Notifications\ParticipantLiveMeetingLinkNotification;
 use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
 use App\Services\ParticipantLiveAccessService;
+use App\Services\PneduProvisionEmailContextBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -1039,6 +1042,142 @@ class ParticipantController extends Controller
             'error',
             $result['detail'] ?? ($result['warning'] ?? 'Nie udało się zarejestrować uczestnika w ClickMeeting.')
         );
+    }
+
+    /**
+     * Wysyła e-mail z bezpośrednim linkiem do spotkania na żywo (ClickMeeting / live access).
+     */
+    public function sendLiveMeetingLink(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $email = trim((string) ($participant->email ?? ''));
+        if ($email === '' || ! str_contains($email, '@')) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma prawidłowego adresu e-mail.');
+        }
+
+        $participant->loadMissing('liveAccess');
+        $liveAccess = $participant->liveAccess;
+        if ($liveAccess === null || ! $liveAccess->isSuccessful()) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Brak aktywnej rejestracji ClickMeeting dla tego uczestnika. Najpierw użyj przycisku ClickMeeting / CM OK.'
+            );
+        }
+
+        if (trim((string) ($liveAccess->token ?? '')) === '') {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Brak tokenu ClickMeeting — nie można wysłać linku live dla tego uczestnika.'
+            );
+        }
+
+        if ($course->hasEnded()) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Szkolenie zostało zakończone — link do spotkania na żywo nie jest już wysyłany.'
+            );
+        }
+
+        $course->loadMissing(['onlineDetails', 'instructor']);
+        $liveService = app(ParticipantLiveAccessService::class);
+        $liveContext = app(PneduProvisionEmailContextBuilder::class)->build(
+            $course,
+            $liveService->toEmailClickMeetingPayload($liveAccess)
+        );
+
+        if (! $liveContext->showLiveSection || ! $liveContext->joinUrl) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie udało się zbudować linku do spotkania (brak room URL / meeting_link).'
+            );
+        }
+
+        $instructorLine = null;
+        if ($course->instructor) {
+            $name = trim((string) ($course->instructor->full_name ?? ''));
+            $title = trim((string) ($course->instructor->title ?? ''));
+            $display = trim(($title !== '' ? $title.' ' : '').$name);
+            if ($display !== '') {
+                $instructorLine = 'Prowadzący: '.$display;
+            }
+        }
+
+        $scheduleLine = $this->formatCourseScheduleLineForEmail($course);
+        $dashboardUrl = rtrim((string) config('services.pnedu_frontend_url', 'http://localhost:8081'), '/').'/dashboard/szkolenia';
+
+        $createdBy = Auth::id();
+        $log = CertificateEmailLog::create([
+            'course_id' => $course->id,
+            'participant_id' => $participant->id,
+            'type' => CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
+            'status' => CertificateEmailLog::STATUS_QUEUED,
+            'created_by' => $createdBy,
+            'queued_at' => now(),
+            'meta' => [
+                'join_url' => $liveContext->joinUrl,
+                'platform' => $liveContext->platformLabel,
+                'has_token' => filled($liveContext->token),
+            ],
+        ]);
+
+        try {
+            Notification::route('mail', $email)->notify(new ParticipantLiveMeetingLinkNotification(
+                courseTitle: (string) $course->title,
+                participantFirstName: (string) ($participant->first_name ?? ''),
+                instructorLine: $instructorLine,
+                scheduleLine: $scheduleLine,
+                liveAccess: $liveContext,
+                dashboardSzkoleniaUrl: $dashboardUrl,
+            ));
+
+            $log->update([
+                'status' => CertificateEmailLog::STATUS_SENT,
+                'sent_at' => now(),
+                'meta' => array_merge($log->meta ?? [], [
+                    'delivery' => SystemMailDiagnostics::currentConfig(),
+                ]),
+            ]);
+        } catch (\Throwable $e) {
+            $log->update([
+                'status' => CertificateEmailLog::STATUS_FAILED,
+                'failed_at' => now(),
+                'error_message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie udało się wysłać e-maila z linkiem live: '.$e->getMessage()
+            );
+        }
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            'E-mail z linkiem do spotkania na żywo został wysłany na adres '.$email.'.'
+        );
+    }
+
+    private function formatCourseScheduleLineForEmail(Course $course): ?string
+    {
+        if (! $course->start_date) {
+            return null;
+        }
+
+        $tz = (string) config('app.timezone', 'Europe/Warsaw');
+        $start = $course->start_date->copy()->timezone($tz)->format('d.m.Y G:i');
+
+        if ($course->end_date) {
+            $end = $course->end_date->copy()->timezone($tz);
+            if ($course->start_date->copy()->timezone($tz)->isSameDay($end)) {
+                return 'Termin: '.$start.'–'.$end->format('G:i');
+            }
+
+            return 'Termin: '.$start.' – '.$end->format('d.m.Y G:i');
+        }
+
+        return 'Termin: '.$start;
     }
 
     /**

@@ -477,6 +477,27 @@
                                         <span class="small text-muted d-block" title="Token przypisany do e-maila uczestnika">
                                             CM: <code class="user-select-all">{{ e($participant->liveAccess->token) }}</code>
                                         </span>
+                                        @if(! $course->hasEnded())
+                                            <form id="sendLiveMeetingLinkForm{{ $participant->id }}"
+                                                  action="{{ route('participants.send-live-meeting-link', [$course, $participant]) }}"
+                                                  method="POST"
+                                                  class="d-block mt-1">
+                                                @csrf
+                                                <button type="button"
+                                                        class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap"
+                                                        title="Wyślij e-mail z bezpośrednim linkiem do spotkania na żywo"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#formConfirmModal"
+                                                        data-confirm-title="Wyślij link do live"
+                                                        data-confirm-message="Wysłać e-mail z linkiem do spotkania na żywo na adres {{ e($participant->email) }}?"
+                                                        data-confirm-form="#sendLiveMeetingLinkForm{{ $participant->id }}"
+                                                        data-confirm-btn-class="btn-primary"
+                                                        data-confirm-btn-text="Wyślij e-mail"
+                                                        data-confirm-header-class="bg-primary text-white">
+                                                    <i class="bi bi-envelope"></i> Wyślij link do live
+                                                </button>
+                                            </form>
+                                        @endif
                                     @endif
                                 @endif
                                 @php

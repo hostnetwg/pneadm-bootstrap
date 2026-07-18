@@ -64,6 +64,10 @@ Migracje: `2026_04_09_000003_*`, `2026_07_13_210000_create_participant_live_acce
 
 **Token ClickMeeting:** przypisany do **e-maila uczestnika** — blokuje równoległe wejście tą samą parą e-mail+token; po wyjściu ze spotkania można użyć ponownie (zgodnie z testami prod/dev). Nie mylić z trybem „Hasło” / „Dostępny dla wszystkich”, gdzie link można swobodnie udostępniać.
 
+### Panel uczestnika (pnedu)
+
+Na `/dashboard/szkolenia` uczestnik widzi przycisk **Dołącz do spotkania na żywo** (przed startem i w trakcie), z licznikiem czasu oraz opcjonalnym hasłem — szczegóły: `pnedu/docs/DASHBOARD_LIVE_MEETING.md`.
+
 ### Link do spotkania w e-mailu
 
 Builder: `App\Services\PneduProvisionEmailContextBuilder`
@@ -112,6 +116,10 @@ Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_
 Lista: `/courses/{id}/participants` → przycisk **ClickMeeting** (gdy platforma = clickmeeting, jest event_id, szkolenie nie zakończone).
 
 Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
+
+Gdy widoczny jest token (`CM: …`), poniżej pojawia się **Wyślij link do live** — e-mail systemowy z bezpośrednim linkiem do spotkania (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`).
+
+Route: `POST /courses/{course}/participants/{participant}/send-live-meeting-link`
 
 ## Cleanup tokenów po szkoleniu
 

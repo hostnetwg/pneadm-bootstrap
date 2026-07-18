@@ -50,7 +50,7 @@ trait FormatsPneduProvisionLiveAccess
         }
 
         $parts[] = '<p style="margin:0 0 0 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-            .'Wejdź na spotkanie kilka minut przed rozpoczęciem. Przy logowaniu podaj imię, nazwisko i adres e-mail zapisany na szkolenie.'
+            .'Wejdź kilka minut przed rozpoczęciem. Przy dołączaniu podaj imię oraz ten sam adres e-mail, którym jesteś zapisany/a na szkolenie.'
             .'</p>';
 
         return new HtmlString(implode('', $parts));
