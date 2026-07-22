@@ -143,14 +143,17 @@ class GusBirService
         $street = $this->field($record, 'Ulica');
         $building = $this->field($record, 'NrNieruchomosci');
         $unit = $this->field($record, 'NrLokalu');
+        $locality = $this->field($record, 'Miejscowosc');
 
         return [
             'nip' => $nip,
             'regon' => $this->field($record, 'Regon'),
             'name' => $this->field($record, 'Nazwa'),
             'postcode' => $this->field($record, 'KodPocztowy'),
-            'city' => $this->field($record, 'MiejscowoscPoczty') ?: $this->field($record, 'Miejscowosc'),
-            'address' => $this->formatAddress($street, $building, $unit),
+            'city' => $this->field($record, 'MiejscowoscPoczty') ?: $locality,
+            // Bez ulicy (typowe dla małych miejscowości): w polu adresu „miejscowość + nr”,
+            // a w polu miasta zostaje miejscowość poczty / miejscowość.
+            'address' => $this->formatAddress($street, $building, $unit, $locality),
         ];
     }
 
@@ -187,9 +190,14 @@ class GusBirService
         return isset($nodes[0]) ? trim((string) $nodes[0]) : '';
     }
 
-    private function formatAddress(string $street, string $building, string $unit): string
+    private function formatAddress(string $street, string $building, string $unit, string $locality = ''): string
     {
-        $address = trim(implode(' ', array_filter([$street, $building])));
+        // Gdy GUS nie zwraca ulicy, linia adresu to nazwa miejscowości + numer (np. „Węgój 7”).
+        $linePrefix = $street !== '' ? $street : $locality;
+        $address = trim(implode(' ', array_filter(
+            [$linePrefix, $building],
+            static fn (string $part): bool => $part !== ''
+        )));
 
         if ($unit !== '') {
             $address .= '/'.$unit;

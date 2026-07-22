@@ -11,6 +11,11 @@
 
 Na `/form-orders/create` i `/form-orders/{id}/edit` przy NIP nabywcy i odbiorcy jest przycisk **Pobierz z GUS** (`POST /form-orders/gus-lookup-by-nip`). Uzupełnia nazwę, kod pocztowy, miasto, adres i NIP (jak formularz zamówienia na pnedu.pl). Wymaga `GUS_BIR_USER_KEY` w `.env` (ten sam klucz co pnedu).
 
+**Mapowanie adresu (`GusBirService`):**
+- gdy GUS zwraca ulicę → pole **Adres** = `Ulica` + `NrNieruchomosci` (+ `/NrLokalu`);
+- gdy brak ulicy (mała miejscowość) → pole **Adres** = `Miejscowosc` + `NrNieruchomosci` (+ `/NrLokalu`), np. `Węgój 7`;
+- pole **Miasto** = `MiejscowoscPoczty` (albo `Miejscowosc`, gdy poczta pusta).
+
 ---
 
 ## Kontekst
