@@ -90,17 +90,16 @@
                 
                 <div class="row">
                     <div class="col-md-6">
-                        <p class="fw-bold mb-2 text-primary">📊 Status zamówienia:</p>
+                        <p class="fw-bold mb-2 text-primary">📊 Status zamówienia (w analizie):</p>
                         <strong>🥇 Z fakturą:</strong> Przetworzone, faktura wystawiona<br>
                         <strong>🥈 Aktywne:</strong> Bez faktury, nie zakończone<br>
-                        <strong>🥉 Zakończone:</strong> Bez faktury, oznaczone jako duplikat<br>
-                        <small class="text-muted mt-1 d-block">ℹ️ Notatki nie wpływają na priorytet - służą do opisu</small>
+                        <strong>⛔ Poza analizą:</strong> Anulowane albo ukończone bez faktury — <em>nie tworzą grupy duplikatów</em><br>
+                        <small class="text-muted mt-1 d-block">ℹ️ Notatka ze słowem „duplikat” obniża priorytet w rankingu zalecanego</small>
                     </div>
                     <div class="col-md-6">
                         <p class="fw-bold mb-2 text-primary">🔍 Dostępne filtry:</p>
                         <strong>⚠️ Wymaga akcji:</strong> Wymagają uporządkowania<br>
-                        <strong>✅ Gotowe:</strong> Gotowe do wystawienia faktury<br>
-                        <strong>✔️ Przetworzone:</strong> Faktura + duplikaty zakończone<br>
+                        <strong>✅ Gotowe / ✔️ Przetworzone:</strong> Rzadkie po nowej regule (ukończone bez FV wypadają z listy)<br>
                         <strong>🚨 Za dużo faktur:</strong> Błąd - za dużo faktur!<br>
                         <strong>📋 Wszystkie:</strong> Pełna lista
                     </div>
@@ -113,16 +112,15 @@
                         <p class="fw-bold mb-2 text-success">🎯 Priorytet chronologiczny:</p>
                         <strong class="text-primary">PayU + opłacone:</strong> najwyżej w grupie duplikatów<br>
                         <strong>Z fakturą:</strong> ważniejsze niż bez faktury; przy kilku z fakturą — <strong>nowsze &gt; starsze</strong> (wyższe ID)<br>
-                        <strong>Zakończone:</strong> Starsze &gt; Nowsze<br>
                         <strong class="text-success">Aktywne (bez faktury): Nowsze &gt; Starsze ✨</strong><br>
                         <small class="text-muted mt-1 d-block">💡 Klient mógł poprawić dane w kolejnym zgłoszeniu</small>
                     </div>
                     <div class="col-md-6">
                         <p class="fw-bold mb-2 text-primary">🛠️ Dostępne akcje:</p>
-                        <strong>Zakończ:</strong> Oznacz jako duplikat<br>
+                        <strong>Zakończ:</strong> Oznacz jako duplikat → wypada z wykrywania<br>
                         <strong>Notatka:</strong> Dodaj opis (np. "Duplikat #123")<br>
                         <strong>Zachowaj to:</strong> Zachowaj, usuń resztę<br>
-                        <strong>Usuń:</strong> Usuń zamówienie<br>
+                        <strong>Usuń:</strong> Soft-delete zamówienia<br>
                         <strong>Szczegóły:</strong> Pokaż pełne dane
                     </div>
                 </div>
@@ -675,10 +673,10 @@
             
             const descriptions = {
                 'all': '<i class="bi bi-info-circle text-primary"></i> <strong>Pokazuje:</strong> Wszystkie grupy duplikatów bez filtrowania. <strong>Co zrobić:</strong> Przejrzyj i uporządkuj według potrzeb.',
-                'needs-action': '<i class="bi bi-exclamation-triangle text-warning"></i> <strong>Pokazuje:</strong> Grupy dla tego samego uczestnika i szkolenia z więcej niż jednym zamówieniem gotowym do wprowadzenia lub z fakturą + nieoznaczone duplikaty. <strong>Co zrobić:</strong> Użyj przycisków <span class="badge bg-warning text-dark">Zakończ</span> i <span class="badge bg-info">Notatka</span> aby oznaczyć duplikaty - zostaw tylko jedno właściwe zamówienie do wystawienia faktury.',
-                'multiple-invoices': '<i class="bi bi-exclamation-octagon text-danger"></i> <strong>Pokazuje:</strong> Grupy dla tego samego uczestnika i szkolenia z więcej niż jedną wystawioną fakturą - to jest błąd! <strong>Co zrobić:</strong> Anuluj niepotrzebne faktury w systemie księgowym, usuń numery faktur z duplikatów, oznacz jako zakończone (duplikat).',
-                'ready': '<i class="bi bi-check-circle text-success"></i> <strong>Pokazuje:</strong> Grupy dla tego samego uczestnika i szkolenia z jednym zamówieniem gotowym do wprowadzenia + pozostałe zakończone (oznaczone jako duplikat). <strong>Co zrobić:</strong> Nic - są gotowe do wystawienia faktury.',
-                'processed': '<i class="bi bi-check-all text-success"></i> <strong>Pokazuje:</strong> Grupy dla tego samego uczestnika i szkolenia z wystawioną fakturą + wszystkie duplikaty zakończone (oznaczone jako duplikat). <strong>Co zrobić:</strong> Nic - są już w pełni przetworzone.'
+                'needs-action': '<i class="bi bi-exclamation-triangle text-warning"></i> <strong>Pokazuje:</strong> Grupy z więcej niż jednym zamówieniem aktywnym lub z fakturą + aktywnym. <strong>Co zrobić:</strong> Zostaw jedno właściwe; zbędne oznacz <span class="badge bg-warning text-dark">Zakończ</span> (wypadają z wykrywania) albo usuń soft-delete.',
+                'multiple-invoices': '<i class="bi bi-exclamation-octagon text-danger"></i> <strong>Pokazuje:</strong> Grupy z więcej niż jedną wystawioną fakturą - to jest błąd! <strong>Co zrobić:</strong> Anuluj niepotrzebne faktury w systemie księgowym, usuń numery faktur z duplikatów, oznacz zbędne jako zakończone (duplikat).',
+                'ready': '<i class="bi bi-check-circle text-success"></i> <strong>Pokazuje:</strong> Stary wariant „1 aktywne + zakończone”. Po regule wykluczającej ukończone bez FV / anulowane ten filtr zwykle jest pusty — po <span class="badge bg-warning text-dark">Zakończ</span> grupa znika z listy.',
+                'processed': '<i class="bi bi-check-all text-success"></i> <strong>Pokazuje:</strong> Stary wariant „faktura + zakończone duplikaty”. Po nowej regule zwykle pusty — oznaczenie zbędnego jako zakończone usuwa je z analizy duplikatów.'
             };
             
             descriptionElement.innerHTML = descriptions[status] || '';
@@ -1034,9 +1032,9 @@
                         <i class="bi bi-info-circle"></i>
                         <strong>Informacja:</strong> To zamówienie zostało wybrane na podstawie inteligentnych priorytetów:
                         <ul class="mb-0 mt-2">
-                            <li>Faktura > Aktywne > Zakończone bez faktury</li>
-                            <li>Notatki są ignorowane - liczy się tylko status</li>
-                            <li>Aktywne zawsze mają wyższy priorytet niż zakończone</li>
+                            <li>Faktura &gt; Aktywne (ukończone bez FV / anulowane nie wchodzą do analizy)</li>
+                            <li>Notatka ze słowem „duplikat” obniża priorytet zalecanego</li>
+                            <li>PayU opłacone ma najwyższy priorytet w grupie</li>
                         </ul>
                     </div>
                 </div>
@@ -1064,7 +1062,7 @@
                 </div>
                 <div class="modal-body">
                     <p>Czy na pewno chcesz oznaczyć zamówienie <strong id="markCompletedOrderId"></strong> jako zakończone?</p>
-                    <p class="text-muted">To zamówienie zostanie oznaczone jako duplikat i ukryte z głównej listy.</p>
+                    <p class="text-muted">To zamówienie zostanie oznaczone jako duplikat (anulowanie operacyjne) i <strong>wypadnie z wykrywania duplikatów</strong> — żywe zamówienie przestanie świecić jako DUPLIKAT.</p>
                     
                     <div class="mb-3">
                         <label for="duplicateNote" class="form-label">

@@ -5,7 +5,19 @@
 - **Domyślny widok** (bez `?quick=`): jak przycisk **Do obsługi (aktywne)** (`needsActiveHandling`).
 - **Wszystkie zamówienia:** `?quick=all` (przycisk „Wszystkie”).
 - **Liczniki** (badge przy filtrach + pasek „Wszystkie zamówienia: … | Wartość sprzedaży…”): ładowane **po liście** przez `GET /form-orders/index-stats` (AJAX, bez przeładowania). Zmiana filtrów / wyszukiwanie nadal przeładowuje stronę i najpierw pokazuje listę.
-- Cache: badge stats 30 s, grupy duplikatów 60 s (jak wcześniej).
+- Cache: badge stats 30 s, grupy duplikatów 60 s (klucz `form_orders.duplicate_groups.v2`).
+
+### Duplikaty zamówień (`/form-orders/duplicates`)
+
+Wykrywanie na żywo (brak flagi w DB): ten sam e-mail głównego uczestnika + ten sam `courses.id`, przy **>1** zamówieniu.
+
+**Zawsze poza analizą:**
+- anulowane (`cancelled_at` ustawione),
+- ukończone bez faktury (`status_completed=1` i brak `invoice_number`).
+
+Skutek: jedno aktywne / z FV + „martwy” duplikat **nie** tworzy grupy ani badge DUPLIKAT. Akcja **Zakończ** na stronie duplikatów (ustawia completed + `cancelled_reason=duplicate`) usuwa zamówienie z wykrywania. Dwa zamówienia z FV nadal są duplikatem (pilne).
+
+Kod: `FormOrder::scopeDuplicates`, `participatesInDuplicateDetection()`, `FormOrdersController` (cache v2).
 
 ### Pobierz z GUS (create / edit)
 

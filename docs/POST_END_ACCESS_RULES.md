@@ -63,6 +63,8 @@ Dla zakupu przed zakończeniem szkolenia nadal działa standardowa reguła waria
 
 Ponowny zakup tego samego szkolenia przez tego samego uczestnika nie jest obsługiwany automatycznie. System traktuje takie przypadki jako potencjalne duplikaty zamówień i pokazuje je na stronie `form-orders/duplicates`.
 
+**Uwaga (2026-07):** do analizy duplikatów **nie wchodzą** zamówienia anulowane oraz ukończone bez faktury — żeby pojedyncze żywe zamówienie (aktywne lub z FV) nie świeciło jako duplikat obok już domkniętego zbędnego zgłoszenia.
+
 Jeżeli zamówienie wygląda na świadomy ponowny zakup, administrator widzi przy nim komunikat `Możliwy ponowny zakup / przedłużenie dostępu` oraz przycisk `Przedłuż dostęp`. Dopiero ręczne potwierdzenie tej akcji aktualizuje istniejącego uczestnika.
 
 Warunki pokazania akcji `Przedłuż dostęp`:

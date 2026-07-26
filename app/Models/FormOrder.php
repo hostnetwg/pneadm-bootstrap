@@ -457,6 +457,7 @@ class FormOrder extends Model
      *
      * courses.id = COALESCE(dopasowanie po form_orders.product_id, dopasowanie po publigo_product_id = courses.id_old).
      * Zamówienia bez rozpoznanego kursu w ogóle nie wchodzą do analizy duplikatów.
+     * Wyłączone z analizy (zawsze): anulowane (`cancelled_at`) oraz ukończone bez faktury.
      *
      * Zapytanie jest dwupoziomowe (podzapytanie + GROUP BY), żeby uniknąć błędu MySQL ONLY_FULL_GROUP_BY
      * przy skorelowanych podzapytaniach w SELECT.
@@ -483,6 +484,17 @@ class FormOrder extends Model
             ->where('fop.participant_email', '!=', '')
             ->whereRaw($resolvedCourseId.' IS NOT NULL')
             ->whereNull($table.'.deleted_at')
+            ->whereNull($table.'.cancelled_at')
+            ->where(function ($q) use ($table) {
+                $q->where(function ($active) use ($table) {
+                    $active->where($table.'.status_completed', '!=', 1)
+                        ->orWhereNull($table.'.status_completed');
+                })->orWhere(function ($withInvoice) use ($table) {
+                    $withInvoice->whereNotNull($table.'.invoice_number')
+                        ->where($table.'.invoice_number', '!=', '')
+                        ->where($table.'.invoice_number', '!=', '0');
+                });
+            })
             ->selectRaw($table.'.id as form_order_id')
             ->selectRaw('LOWER(TRIM(fop.participant_email)) as participant_email')
             ->selectRaw($resolvedCourseId.' as duplicate_course_key');
@@ -496,6 +508,44 @@ class FormOrder extends Model
             ->selectRaw('GROUP_CONCAT(DISTINCT dup_rows.form_order_id ORDER BY dup_rows.form_order_id) as order_ids')
             ->groupBy('dup_rows.participant_email', 'dup_rows.duplicate_course_key')
             ->havingRaw('COUNT(DISTINCT dup_rows.form_order_id) > 1');
+    }
+
+    /**
+     * Zamówienia brane pod uwagę przy wykrywaniu duplikatów.
+     * Wyłączone: anulowane oraz ukończone bez faktury.
+     */
+    public function scopeWhereParticipatesInDuplicateDetection(Builder $query): Builder
+    {
+        $t = $query->getModel()->getTable();
+
+        return $query
+            ->whereNull($t.'.cancelled_at')
+            ->where(function (Builder $q) use ($t): void {
+                $q->where(function (Builder $active) use ($t): void {
+                    $active->where($t.'.status_completed', '!=', 1)
+                        ->orWhereNull($t.'.status_completed');
+                })->orWhere(function (Builder $withInvoice) use ($t): void {
+                    $withInvoice->whereNotNull($t.'.invoice_number')
+                        ->where($t.'.invoice_number', '!=', '')
+                        ->where($t.'.invoice_number', '!=', '0');
+                });
+            });
+    }
+
+    /**
+     * Czy zamówienie wchodzi do analizy duplikatów (e-mail + kurs).
+     */
+    public function participatesInDuplicateDetection(): bool
+    {
+        if ($this->isCancelled()) {
+            return false;
+        }
+
+        if ($this->is_completed && ! $this->has_invoice) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -576,14 +626,20 @@ class FormOrder extends Model
         $order = self::with('primaryParticipant')->find($orderId);
         $email = $order?->display_participant_email;
         $courseKey = $order?->resolveDuplicateGroupingCourseKey() ?? 0;
-        if (! $order || empty(trim((string) $email)) || $courseKey <= 0) {
+        if (
+            ! $order
+            || empty(trim((string) $email))
+            || $courseKey <= 0
+            || ! $order->participatesInDuplicateDetection()
+        ) {
             return $query->where('id', -1); // Pusty wynik
         }
 
         return $query
             ->where('id', '!=', $orderId)
             ->wherePrimaryParticipantEmailMatches($email)
-            ->whereDuplicateGroupingCourseKey($courseKey);
+            ->whereDuplicateGroupingCourseKey($courseKey)
+            ->whereParticipatesInDuplicateDetection();
     }
 
     /**

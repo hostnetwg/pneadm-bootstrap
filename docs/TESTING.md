@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-07-13
+Data aktualizacji: 2026-07-26
 
 ## Cel
 
@@ -16,7 +16,7 @@ sail test --filter=NazwaTestu        # pojedyncza klasa / metoda
 sail pint                            # formatowanie przed commitem
 ```
 
-**Oczekiwany stan (2026-07-13):** pełny `sail test` → **510 passed**, 0 failed, 3 skipped (rejestracja wyłączona), ewentualne ostrzeżenia „risky” PHPUnit (nie blokują).
+**Oczekiwany stan (2026-07-26):** po zmianie reguły duplikatów dodano `FormOrderDuplicatesDetectionTest` — uruchom `sail test --filter=FormOrderDuplicatesDetectionTest`.
 
 ## Konfiguracja `phpunit.xml`
 

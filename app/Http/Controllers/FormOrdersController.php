@@ -247,7 +247,7 @@ class FormOrdersController extends Controller
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień (cache 60 s — pełny skan jest drogi)
         $duplicateInfo = [];
-        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v1', 60, function () {
+        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v2', 60, function () {
             return FormOrder::duplicates()->get();
         });
         foreach ($duplicateGroups as $group) {
@@ -288,7 +288,7 @@ class FormOrdersController extends Controller
     public function indexStats()
     {
         $badgeStats = $this->cachedIndexBadgeStats();
-        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v1', 60, function () {
+        $duplicateGroups = Cache::remember('form_orders.duplicate_groups.v2', 60, function () {
             return FormOrder::duplicates()->get();
         });
 
@@ -3065,7 +3065,7 @@ class FormOrdersController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Zamówienie #{$id} zostało oznaczone jako zakończone (duplikat).",
+                'message' => "Zamówienie #{$id} zostało oznaczone jako zakończone (duplikat) i nie będzie już wykrywane jako duplikat.",
             ]);
 
         } catch (Exception $e) {
