@@ -5,6 +5,14 @@
         </h2>
     </x-slot>
 
+    <style>
+        .tooltip.courses-lejek-tooltip .tooltip-inner {
+            max-width: 22rem;
+            text-align: left;
+            padding: 0.65rem 0.75rem;
+        }
+    </style>
+
     <div class="py-3">
         <div class="container-fluid px-4">
             @if(session('success'))
@@ -28,13 +36,6 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <a href="{{ route('courses.create') }}" class="btn btn-primary">Dodaj szkolenie</a>
-                <div class="small text-muted">
-                    Kolumna „Lejek”: ostatnie {{ $funnelStatsDays }} dni —
-                    wejścia: max 1×/gość/dzień (bez botów);
-                    opis = strona kursu;
-                    formularz = order-form + deferred-order;
-                    zamówienia z bazy form_orders
-                </div>
                 <div class="d-flex align-items-center gap-3">
                     <!-- Button do generowania PDF -->
                     <a href="{{ route('courses.pdf', request()->query()) }}" class="btn btn-success" target="_blank">
@@ -252,7 +253,32 @@
                         <th style="width: 10%;">Instruktor</th>
                         <th class="text-center" style="width: 3%;" title="Check lista">C</th>
                         <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
-                        <th class="text-center" style="width: 5%;" title="Lejek marketingowy: kampanie (cała historia); poniżej statystyki z ostatnich {{ $funnelStatsDays }} dni (wejścia, formularz, zamówienia)">Lejek</th>
+                        @php
+                            $lejekHeaderTooltip = '<div class="text-start">'
+                                .'<div class="fw-semibold mb-1">Kolumna Lejek</div>'
+                                .'<div class="mb-2">Kampanie marketingowe — cała historia.</div>'
+                                .'<div class="fw-semibold mb-1">Statystyki z ostatnich '.(int) $funnelStatsDays.' dni:</div>'
+                                .'<ul class="mb-0 ps-3">'
+                                .'<li class="mb-1"><strong>Wejścia</strong> — maks. 1 na gościa dziennie (bez botów)</li>'
+                                .'<li class="mb-1"><strong>Opis</strong> — wizyty na stronie kursu</li>'
+                                .'<li class="mb-1"><strong>Formularz</strong> — order-form + deferred-order</li>'
+                                .'<li><strong>Zamówienia</strong> — z bazy form_orders</li>'
+                                .'</ul>'
+                                .'</div>';
+                        @endphp
+                        <th class="text-center" style="width: 5%;">
+                            <span class="d-inline-flex align-items-center gap-1 user-select-none"
+                                  style="cursor: help; text-decoration: underline dotted;"
+                                  tabindex="0"
+                                  data-bs-toggle="tooltip"
+                                  data-bs-placement="left"
+                                  data-bs-html="true"
+                                  data-bs-custom-class="courses-lejek-tooltip"
+                                  title="{{ $lejekHeaderTooltip }}">
+                                Lejek
+                                <i class="bi bi-info-circle text-muted" aria-hidden="true"></i>
+                            </span>
+                        </th>
                         <th class="text-center" style="width: 10%;">Akcje</th>
                     </tr>
                 </thead>
@@ -967,6 +993,10 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+
             // Dla każdego modala załaduj listę nagrań
             @foreach($courses as $course)
             const modal{{ $course->id }} = document.getElementById('videoModal{{ $course->id }}');
