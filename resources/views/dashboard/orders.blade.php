@@ -193,7 +193,7 @@
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
-                                        <h6 class="text-muted mb-1">Odroczna płatność</h6>
+                                        <h6 class="text-muted mb-1">Odroczona płatność</h6>
                                         <h2 class="mb-0 text-success" id="dashboardStatDeferredHandling">{{ number_format($stats['deferred_handling']) }}</h2>
                                         <small class="text-muted">do obsługi · odroczona faktura</small>
                                     </div>
