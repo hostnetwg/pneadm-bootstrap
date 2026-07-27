@@ -107,7 +107,11 @@ networks:
     external: true
 
 volumes:
+  # Pin do istniejącego volume — katalog projektu to `pneadm`, więc Compose
+  # domyślnie tworzyłby `pneadm_pne-mysql-shared`. Bez `external` po zmianie
+  # nazwy katalogu/projektu łatwo podłączyć pusty volume (utrata widoku danych).
   pne-mysql-shared:
-    driver: local
+    external: true
+    name: pneadm_pne-mysql-shared
   sail-redis:
     driver: local

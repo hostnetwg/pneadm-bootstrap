@@ -124,7 +124,8 @@ DB::connection('certgen')->select('SELECT DATABASE()');
 - **MySQL host w Dockerze**: `mysql` (nazwa serwisu) lub `pneadm-mysql` (nazwa kontenera)
 - **MySQL host z hosta**: `127.0.0.1:3307` (port mapowany)
 - **Wspólna sieć**: `pne-network` (external network)
-- **Wspólny volume**: `pne-mysql-shared` (przechowuje dane MySQL)
+- **Wspólny volume**: `pne-mysql-shared` → Docker name **`pneadm_pne-mysql-shared`** (`external: true` w `docker-compose.yml`)
+- **Uwaga:** katalog projektu to `pneadm` (Compose project `pneadm`). Starszy volume `pneadm-bootstrap_pne-mysql-shared` to kopia sprzed zmiany nazwy katalogu — nie podłączaj go „na ślepo”, bo możesz stracić nowsze `pnedu` / analytics z aktualnego volume.
 
 ## 📝 Migracje baz danych - WAŻNA REGUŁA
 
