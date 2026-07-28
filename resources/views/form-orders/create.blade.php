@@ -259,8 +259,8 @@
                                                    id="buyer_nip" name="buyer_nip"
                                                    value="{{ old('buyer_nip', $prefill['buyer_nip'] ?? '') }}"
                                                    inputmode="numeric" autocomplete="off">
-                                            <button class="btn btn-outline-success" type="button" data-gus-target="buyer">
-                                                Pobierz z GUS
+<button class="btn btn-success" type="button" data-gus-target="buyer">
+                                                Wpisz NIP i pobierz dane z GUS
                                             </button>
                                             @error('buyer_nip')
                                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -330,8 +330,8 @@
                                                    id="recipient_nip" name="recipient_nip"
                                                    value="{{ old('recipient_nip', $prefill['recipient_nip'] ?? '') }}"
                                                    inputmode="numeric" autocomplete="off">
-                                            <button class="btn btn-outline-success" type="button" data-gus-target="recipient">
-                                                Pobierz z GUS
+                                            <button class="btn btn-success" type="button" data-gus-target="recipient">
+                                                Wpisz NIP i pobierz dane z GUS
                                             </button>
                                             @error('recipient_nip')
                                                 <div class="invalid-feedback">{{ $message }}</div>
