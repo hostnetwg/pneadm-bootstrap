@@ -55,7 +55,7 @@
                         Kampanie dla szkolenia <strong>#{{ $filteredCourse->id }}</strong>:
                         {!! \Illuminate\Support\Str::limit(strip_tags($filteredCourse->title), 80) !!}
                     </span>
-                    <a href="{{ route('marketing-campaigns.index') }}" class="btn btn-sm btn-outline-secondary">Pokaż wszystkie kampanie</a>
+                    <a href="{{ route('marketing-campaigns.index', request()->except(['course_id', 'page'])) }}" class="btn btn-sm btn-outline-secondary">Pokaż wszystkie kampanie</a>
                 </div>
             @endif
 
@@ -102,9 +102,6 @@
                 </div>
                 <div class="card-body pt-2 pb-3">
                     <form method="GET" action="{{ route('marketing-campaigns.index') }}" class="row g-2 g-lg-3 align-items-end">
-                        @if(request()->filled('course_id'))
-                            <input type="hidden" name="course_id" value="{{ request('course_id') }}">
-                        @endif
                         <div class="col-12">
                             <label class="form-label small text-muted mb-1">Okres aktywności</label>
                             <div class="d-flex flex-wrap gap-1 mb-2">
@@ -158,7 +155,15 @@
                                    value="{{ request('search') }}"
                                    placeholder="Kod, nazwa lub opis…">
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-2 col-md-3">
+                            <label for="course_id" class="form-label">ID szkolenia</label>
+                            <input type="number" class="form-control form-control-sm" id="course_id" name="course_id"
+                                   value="{{ request('course_id') }}"
+                                   min="1" step="1" inputmode="numeric"
+                                   placeholder="np. 531"
+                                   title="Pokaż tylko kampanie przypisane do tego szkolenia">
+                        </div>
+                        <div class="col-lg-2 col-md-6">
                             <label for="source_type_id" class="form-label">Typ źródła</label>
                             <select class="form-select form-select-sm" id="source_type_id" name="source_type_id">
                                 <option value="">Wszystkie typy</option>
