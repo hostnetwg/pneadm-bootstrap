@@ -1,7 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 text-dark">
-            {{ __('Dodaj nowe szkolenie') }}
+            @if(!empty($sourceOffer))
+                {{ __('Dodaj szkolenie z oferty') }}
+            @else
+                {{ __('Dodaj nowe szkolenie') }}
+            @endif
         </h2>
     </x-slot>
 
@@ -11,14 +15,37 @@
             <form action="{{ route('courses.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
 
+                @php
+                    $sourceOffer = $sourceOffer ?? null;
+                    $defaultIsPaid = old('is_paid', $sourceOffer ? '1' : '1');
+                    $defaultCategory = old('category', $sourceOffer->default_course_category ?? 'open');
+                    $defaultInstructorId = old('instructor_id', $sourceOffer->instructor_id ?? '');
+                    $copyImageDefault = old('copy_image_from_offer', $sourceOffer && $sourceOffer->image ? '1' : '0');
+                @endphp
+
+                @if($sourceOffer)
+                    <div class="alert alert-info d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <strong>Tworzenie szkolenia z oferty.</strong>
+                            Pola zostały uzupełnione z oferty „{{ $sourceOffer->title }}”.
+                            Uzupełnij daty rozpoczęcia i zakończenia, wybierz rodzaj szkolenia i zapisz.
+                            Publikacja na pnedu.pl jest domyślnie wyłączona.
+                        </div>
+                        <a href="{{ route('training-offers.show', $sourceOffer) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                            Wróć do oferty
+                        </a>
+                    </div>
+                    <input type="hidden" name="training_offer_id" value="{{ old('training_offer_id', $sourceOffer->id) }}">
+                @endif
+
                 <div class="mb-3">
                     <label for="title" class="form-label">Tytuł kursu</label>
-                    <input type="text" name="title" id="title" class="form-control" required>
+                    <input type="text" name="title" id="title" class="form-control" value="{{ old('title', $sourceOffer->title ?? '') }}" required>
                 </div>
 
                 <div class="mb-3">
                     <label for="description" class="form-label">Zakres szkolenia / Zagadnienia</label>
-                    <textarea name="description" id="description" class="form-control" rows="6"></textarea>
+                    <textarea name="description" id="description" class="form-control" rows="6">{{ old('description', $sourceOffer->scope ?? '') }}</textarea>
                     <div class="form-text">
                         Treść na zaświadczeniu PDF, gdy w szablonie włączona jest opcja „Pokaż zakres szkolenia”.
                         Możesz wpisać listę numerowaną (każdy punkt od nowej linii, np. <code>1. Zagadnienie</code>).
@@ -34,7 +61,7 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label for="offer_summary" class="form-label">Krótkie podsumowanie oferty</label>
-                            <textarea name="offer_summary" class="form-control" id="offer_summary" rows="2" placeholder="Krótki opis oferty (max 500 znaków)"></textarea>
+                            <textarea name="offer_summary" class="form-control" id="offer_summary" rows="2" placeholder="Krótki opis oferty (max 500 znaków)">{{ old('offer_summary', $sourceOffer->summary ?? '') }}</textarea>
                             <div class="form-text">Krótkie podsumowanie wyświetlane w liście szkoleń</div>
                         </div>
                         
@@ -77,7 +104,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <textarea name="offer_description_html" class="form-control" id="offer_description_html" rows="10" placeholder="Wpisz pełny opis oferty z formatowaniem HTML..."></textarea>
+                            <textarea name="offer_description_html" class="form-control" id="offer_description_html" rows="10" placeholder="Wpisz pełny opis oferty z formatowaniem HTML...">{{ old('offer_description_html', $sourceOffer->description_html ?? '') }}</textarea>
                             <div class="form-text">
                                 Możesz używać podstawowych tagów HTML: &lt;strong&gt;, &lt;em&gt;, &lt;h3&gt;, &lt;h4&gt;, &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;, &lt;a&gt;, &lt;p&gt;, &lt;br&gt;
                             </div>
@@ -100,15 +127,15 @@
                     <div class="col-md-2">
                         <label for="is_paid" class="form-label">Płatność</label>
                         <select name="is_paid" class="form-control" id="is_paid" required>
-                            <option value="1">Płatne</option>
-                            <option value="0">Bezpłatne</option>
+                            <option value="1" {{ (string) $defaultIsPaid === '1' ? 'selected' : '' }}>Płatne</option>
+                            <option value="0" {{ (string) $defaultIsPaid === '0' ? 'selected' : '' }}>Bezpłatne</option>
                         </select>
                     </div>                    
                     <div class="col-md-2">
                         <label for="category" class="form-label">Kategoria</label>
                         <select name="category" class="form-control" id="category" required>
-                            <option value="open">Otwarte</option>
-                            <option value="closed">Zamknięte</option>
+                            <option value="open" {{ $defaultCategory === 'open' ? 'selected' : '' }}>Otwarte</option>
+                            <option value="closed" {{ $defaultCategory === 'closed' ? 'selected' : '' }}>Zamknięte</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -243,7 +270,9 @@
                             <select name="instructor_id" id="instructor_id" class="form-control">
                                 <option value="">Brak</option>
                                 @foreach ($instructors as $instructor)
-                                    <option value="{{ $instructor->id }}">{{ $instructor->first_name }} {{ $instructor->last_name }}</option>
+                                    <option value="{{ $instructor->id }}" {{ (string) $defaultInstructorId === (string) $instructor->id ? 'selected' : '' }}>
+                                        {{ $instructor->first_name }} {{ $instructor->last_name }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -252,6 +281,24 @@
                         <div class="mb-3">
                             <label for="image" class="form-label">Obrazek</label>
                             <input type="file" name="image" id="image" class="form-control">
+                            @if($sourceOffer && $sourceOffer->publicImageUrl())
+                                <div class="mt-3 p-3 border rounded bg-light">
+                                    <div class="small text-muted mb-2">Podgląd grafiki z oferty (zostanie skopiowana przy zapisie, jeśli nie wgrasz nowego pliku):</div>
+                                    <img src="{{ $sourceOffer->publicImageUrl() }}" alt="{{ $sourceOffer->title }}" class="img-fluid rounded border" style="max-height: 180px;">
+                                    <div class="form-check mt-3 mb-0">
+                                        <input type="hidden" name="copy_image_from_offer" value="0">
+                                        <input type="checkbox"
+                                               class="form-check-input"
+                                               name="copy_image_from_offer"
+                                               id="copy_image_from_offer"
+                                               value="1"
+                                               {{ (string) $copyImageDefault === '1' ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="copy_image_from_offer">
+                                            Skopiuj grafikę z oferty przy zapisie szkolenia
+                                        </label>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -320,7 +367,7 @@
                 <!-- Pole Notatki -->
                 <div class="mb-3">
                     <label for="notatki" class="form-label">Notatki techniczne</label>
-                    <textarea name="notatki" id="notatki" class="form-control" rows="4" placeholder="Dodatkowe informacje techniczne związane z danym szkoleniem...">{{ old('notatki') }}</textarea>
+                    <textarea name="notatki" id="notatki" class="form-control" rows="4" placeholder="Dodatkowe informacje techniczne związane z danym szkoleniem...">{{ old('notatki', $sourceOffer->internal_notes ?? '') }}</textarea>
                     <div class="form-text">Pole przeznaczone na dodatkowe informacje techniczne związane z danym szkoleniem</div>
                 </div>
 
@@ -331,7 +378,7 @@
 
                 <div class="form-check mb-3">
                     <input type="hidden" name="show_on_pnedu" value="0">
-                    <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu') ? 'checked' : '' }}>
+                    <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu', $sourceOffer ? '0' : '0') == '1' ? 'checked' : '' }}>
                     <label class="form-check-label" for="show_on_pnedu">Pokaż na stronie głównej pnedu.pl</label>
                 </div>
                 <p class="text-muted small mb-3">Po pierwszym zapisie szkolenia link do podglądu strony oferty na pnedu.pl pojawi się na stronie edycji przy tym ustawieniu.</p>

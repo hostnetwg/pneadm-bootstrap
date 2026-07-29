@@ -37,6 +37,7 @@ class Course extends Model
         'type', // online/offline
         'category', // open/closed
         'instructor_id',
+        'training_offer_id',
         'image',
         'is_active',
         'certificate_format',
@@ -147,6 +148,11 @@ class Course extends Model
     public function instructor()
     {
         return $this->belongsTo(Instructor::class, 'instructor_id');
+    }
+
+    public function trainingOffer()
+    {
+        return $this->belongsTo(TrainingOffer::class, 'training_offer_id');
     }
 
     /**

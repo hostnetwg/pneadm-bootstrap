@@ -1,6 +1,6 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-07-13  
+Data utworzenia/aktualizacji: 2026-07-28  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -37,6 +37,39 @@ Po sklonowaniu ostatniego commita:
 - [ ] Worker kolejki `analytics` (opcjonalnie lokalnie): `sail artisan queue:work redis --queue=analytics`.
 
 Szczegóły: `docs/analytics/TRACKING_IMPLEMENTATION_PLAN.md` → sekcja „Lokalna konfiguracja `pne_analytics` na nowym komputerze developerskim”.
+
+## Oferty Szkoleń Bez Terminu — Wdrożone Lokalnie (2026-07-28/29)
+
+Moduł ofert szkoleń bez ustalonego terminu. Szczegóły koncepcji, pól i mapowania: `docs/TRAINING_OFFERS.md`.
+
+Zakres wdrożony lokalnie (do deploy prod):
+
+**pneadm:**
+- tabela `training_offers` w bazie `pneadm` (migracja `2026_07_28_193500`),
+- `courses.training_offer_id` FK z `nullOnDelete` (migracja `2026_07_29_090000`),
+- CRUD ofert w `adm.pnedu.pl` pod `Szkolenia -> Oferty szkoleń`,
+- przycisk „Utwórz szkolenie z oferty" na podglądzie i liście ofert,
+- formularz `courses/create` z prefill z oferty (tytuł, opis, zakres, instruktor, kategoria, notatki),
+- kopiowanie grafiki oferty do `courses/images` przy zapisie szkolenia.
+
+**pnedu:**
+- publiczna lista `/szkolenia-rad-pedagogicznych`,
+- strona szczegółowa `/szkolenia-rad-pedagogicznych/{slug}` (sticky CTA na desktop, dolny pasek na mobile),
+- ogólny formularz zapytania `/szkolenia-rad-pedagogicznych/zapytanie` (bez kontekstu oferty),
+- formularz zapytania na stronie szczegółowej (z kontekstem oferty),
+- oba formularze wysyłają `TrainingOfferInquiryMail`, bez zapisu w bazie,
+- link `Szkolenia → Szkolenia rad pedagogicznych` w menu i stopce,
+- wpisy w dynamicznym sitemap.
+
+**Deploy prod wymaga:**
+1. `pneadm`: `git pull` → `php artisan migrate --force` (2 migracje: `training_offers`, `training_offer_id`)
+2. `pnedu`: `git pull` (brak migracji po stronie pnedu)
+
+Dalsze kroki:
+
+1. Dodać zapis zapytań w bazie i panel obsługi zapytań w `pneadm`, jeśli będzie potrzebny.
+2. Dodać możliwość wyróżniania wybranych ofert na stronie głównej.
+3. Dodać analitykę wejść i zapytań ofertowych.
 
 ## Wdrożone lokalnie (2026-07-13) — do deploy prod adm
 

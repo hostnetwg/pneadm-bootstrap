@@ -44,6 +44,7 @@ use App\Http\Controllers\Settings\PneduPurchasesController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
 use App\Http\Controllers\TrashController;
+use App\Http\Controllers\TrainingOfferController;
 use App\Http\Controllers\UserPreferencesController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
@@ -324,6 +325,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     /**/
 
+    Route::resource('training-offers', TrainingOfferController::class);
+    Route::get('/training-offers/{training_offer}/create-course', [CoursesController::class, 'createFromTrainingOffer'])
+        ->name('training-offers.create-course');
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
     Route::resource('courses/series', \App\Http\Controllers\CourseSeriesController::class)->names([
         'index' => 'courses.series.index',

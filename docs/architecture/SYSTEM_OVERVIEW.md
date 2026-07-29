@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-07-13  
+Data utworzenia/aktualizacji: 2026-07-28  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -14,6 +14,7 @@ użytkownik / klient
     ↓
 pnedu.pl
     ├─ oferta szkoleń
+    ├─ oferty szkoleń bez terminu
     ├─ opis szkolenia
     ├─ formularz zamówienia
     ├─ płatności online
@@ -21,6 +22,7 @@ pnedu.pl
 
 adm.pnedu.pl
     ├─ szkolenia
+    ├─ oferty szkoleń
     ├─ zamówienia
     ├─ kampanie
     ├─ uczestnicy
@@ -45,6 +47,7 @@ Kluczowe obszary:
 
 - strona główna,
 - listy szkoleń,
+- katalog ofert szkoleń bez terminu,
 - szczegóły szkolenia,
 - formularz zamówienia,
 - płatności PayU/Paynow,
@@ -58,6 +61,7 @@ Najważniejsze miejsca w kodzie:
 
 - `routes/web.php`,
 - `app/Http/Controllers/CourseController.php`,
+- `app/Http/Controllers/TrainingOfferController.php`,
 - `app/Http/Controllers/PaymentController.php`,
 - `app/Http/Controllers/CertificateController.php`,
 - `app/Services/MarketingAttributionService.php`,
@@ -65,6 +69,7 @@ Najważniejsze miejsca w kodzie:
 - `app/Services/MarketingCampaignLinkTracker.php`,
 - `app/Services/CoursePageViewTracker.php`,
 - `resources/views/courses/show.blade.php`,
+- `resources/views/training-offers/pedagogical-councils/`,
 - `resources/views/courses/order-form.blade.php`.
 
 ### `adm.pnedu.pl`
@@ -74,6 +79,7 @@ Panel administracyjny i backoffice.
 Kluczowe obszary:
 
 - CRUD szkoleń,
+- CRUD ofert szkoleń bez terminu,
 - zarządzanie wariantami cen,
 - trenerzy,
 - uczestnicy,
@@ -94,6 +100,7 @@ Najważniejsze miejsca w kodzie:
 - `routes/web.php`,
 - `routes/api.php`,
 - `app/Http/Controllers/CoursesController.php`,
+- `app/Http/Controllers/TrainingOfferController.php`,
 - `app/Http/Controllers/FormOrdersController.php`,
 - `app/Http/Controllers/MarketingCampaignController.php`,
 - `app/Http/Controllers/MarketingFunnelController.php`,
@@ -117,6 +124,14 @@ Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION
 `pnedu.pl` korzysta z własnej bazy `pnedu`, ale modele biznesowe czytają i zapisują dane w `pneadm`.
 
 `adm.pnedu.pl` zarządza `pneadm` i ma połączenie do `pnedu` dla administracji użytkownikami portalu.
+
+### Oferty Szkoleń Bez Terminu
+
+Oferty szkoleń bez ustalonego terminu są przechowywane w tabeli `training_offers` w bazie `pneadm`. Panel `adm.pnedu.pl` zarządza ich treścią, statusem aktywności i publikacją. Portal `pnedu.pl` czyta aktywne i opublikowane oferty z połączenia `pneadm` i prezentuje je w katalogu `Szkolenia -> Szkolenia rad pedagogicznych`.
+
+Z panelu administracyjnego można utworzyć szkolenie terminowe (`courses`) na podstawie oferty: formularz `courses/create` jest prefillowany, a `courses.training_offer_id` zapisuje źródło. Grafika oferty jest kopiowana do katalogu grafik szkolenia dopiero przy zapisie.
+
+To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie z terminem, uczestnikami, zamówieniami i certyfikatami. Mapowanie przyszłego kopiowania oferty do `courses` opisuje `docs/TRAINING_OFFERS.md`.
 
 ## Moduły Biznesowe
 

@@ -51,9 +51,9 @@
 
         <!-- Szkolenia -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#courses-collapse"
-                    aria-expanded="{{ request()->routeIs('courses.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#speedometer2"></use>
                 </svg>
@@ -62,9 +62,10 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Lista szkoleń</a></li>
+                    <li><a href="{{ route('training-offers.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('training-offers.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Oferty szkoleń</a></li>
                     <li><a href="{{ route('courses.series.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Serie szkoleń</a></li>
                     <li><a href="{{ route('online-courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('online-courses.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Kursy online (nagrane)</a></li>
                     <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>

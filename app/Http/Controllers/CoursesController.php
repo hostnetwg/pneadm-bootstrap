@@ -11,6 +11,7 @@ use App\Models\CourseSeries;
 use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\PaymentDisplayOption;
+use App\Models\TrainingOffer;
 use App\Services\CourseFormOrderBillingService;
 use App\Services\CourseFunnelStatsService;
 use App\Services\CourseGoogleCalendarSyncService;
@@ -893,7 +894,24 @@ class CoursesController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions'));
+        $sourceOffer = null;
+
+        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer'));
+    }
+
+    /**
+     * Formularz tworzenia szkolenia z prefill z oferty (bez automatycznego zapisu).
+     */
+    public function createFromTrainingOffer(TrainingOffer $trainingOffer)
+    {
+        $instructors = Instructor::all();
+        $paymentDisplayOptions = PaymentDisplayOption::getSettings();
+        $certificateTemplates = CertificateTemplate::where('is_active', true)
+            ->orderBy('name')
+            ->get();
+        $sourceOffer = $trainingOffer->loadMissing('instructor');
+
+        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer'));
     }
 
     public function store(Request $request)
@@ -912,6 +930,8 @@ class CoursesController extends Controller
             'type' => 'required|in:online,offline',
             'category' => 'required|in:open,closed',
             'instructor_id' => 'nullable|exists:instructors,id',
+            'training_offer_id' => 'nullable|exists:training_offers,id',
+            'copy_image_from_offer' => 'nullable|boolean',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'certificate_format' => 'nullable|string|max:255',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
@@ -926,7 +946,9 @@ class CoursesController extends Controller
             'save_action' => 'required|in:close,stay_editing',
         ]);
         $saveAction = $validated['save_action'];
-        unset($validated['save_action'], $validated['image']);
+        $copyImageFromOffer = $request->boolean('copy_image_from_offer');
+        $sourceOfferId = $validated['training_offer_id'] ?? null;
+        unset($validated['save_action'], $validated['image'], $validated['copy_image_from_offer']);
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -968,6 +990,14 @@ class CoursesController extends Controller
                     Log::info("Plik zapisany jako: {$imagePath}");
                 } else {
                     $imageUploadWarning = 'Szkolenie utworzono, ale nie udało się zapisać grafiki na serwerze. Sprawdź uprawnienia katalogu storage/app/public/courses/images i spróbuj ponownie.';
+                }
+            } elseif ($copyImageFromOffer && $sourceOfferId) {
+                $imagePath = $this->copyCourseImageFromTrainingOffer((int) $sourceOfferId, $course);
+                if ($imagePath) {
+                    $course->update(['image' => $imagePath]);
+                    Log::info("Grafika skopiowana z oferty jako: {$imagePath}");
+                } else {
+                    $imageUploadWarning = 'Szkolenie utworzono, ale nie udało się skopiować grafiki z oferty. Możesz wgrać obrazek ręcznie przy edycji.';
                 }
             }
 
@@ -1416,6 +1446,46 @@ class CoursesController extends Controller
 
         if ($course->image && Storage::disk('public')->exists($course->image)) {
             Storage::disk('public')->delete($course->image);
+        }
+
+        return $imagePath;
+    }
+
+    /**
+     * Kopiuje grafikę z oferty szkolenia do katalogu grafik kursu.
+     */
+    private function copyCourseImageFromTrainingOffer(int $trainingOfferId, Course $course): ?string
+    {
+        $offer = TrainingOffer::query()->find($trainingOfferId);
+        if (! $offer || empty($offer->image) || ! Storage::disk('public')->exists($offer->image)) {
+            return null;
+        }
+
+        $directory = storage_path('app/public/courses/images');
+        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+            Log::error('Nie można utworzyć katalogu grafik kursów przy kopiowaniu z oferty', [
+                'course_id' => $course->id,
+                'training_offer_id' => $trainingOfferId,
+                'directory' => $directory,
+            ]);
+
+            return null;
+        }
+
+        $extension = pathinfo($offer->image, PATHINFO_EXTENSION) ?: 'jpg';
+        $randomSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
+        $imageFileName = "course_{$course->id}_{$randomSuffix}.{$extension}";
+        $imagePath = 'courses/images/'.$imageFileName;
+
+        if (! Storage::disk('public')->copy($offer->image, $imagePath)) {
+            Log::error('Nie udało się skopiować grafiki oferty do kursu', [
+                'course_id' => $course->id,
+                'training_offer_id' => $trainingOfferId,
+                'source' => $offer->image,
+                'target' => $imagePath,
+            ]);
+
+            return null;
         }
 
         return $imagePath;
