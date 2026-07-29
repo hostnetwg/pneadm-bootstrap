@@ -36,17 +36,26 @@ class TrainingOfferAdminTest extends TestCase
             'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
             'is_active' => true,
             'show_on_pnedu' => true,
+            'featured_on_homepage' => true,
         ]);
 
         $this->actingAs($user)
             ->get(route('training-offers.index'))
             ->assertOk()
-            ->assertSee('Testowa oferta rady pedagogicznej');
+            ->assertSee('Testowa oferta rady pedagogicznej')
+            ->assertSee('Strona główna');
 
         $this->actingAs($user)
             ->get(route('training-offers.show', $this->offer))
             ->assertOk()
-            ->assertSee('Cena ustalana indywidualnie');
+            ->assertSee('Cena ustalana indywidualnie')
+            ->assertSee('Strona główna');
+
+        $this->actingAs($user)
+            ->get(route('training-offers.edit', $this->offer))
+            ->assertOk()
+            ->assertSee('name="featured_on_homepage"', false)
+            ->assertSee('Wyróżnij na stronie głównej');
     }
 
     public function test_admin_can_open_create_course_form_prefilled_from_offer(): void

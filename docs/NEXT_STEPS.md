@@ -47,6 +47,7 @@ Zakres wdrożony lokalnie (do deploy prod):
 **pneadm:**
 - tabela `training_offers` w bazie `pneadm` (migracja `2026_07_28_193500`),
 - `courses.training_offer_id` FK z `nullOnDelete` (migracja `2026_07_29_090000`),
+- `training_offers.featured_on_homepage` do ręcznego wyróżniania ofert na stronie głównej (migracja `2026_07_29_133000`),
 - CRUD ofert w `adm.pnedu.pl` pod `Szkolenia -> Oferty szkoleń`,
 - przycisk „Utwórz szkolenie z oferty" na podglądzie i liście ofert,
 - formularz `courses/create` z prefill z oferty (tytuł, opis, zakres, instruktor, kategoria, notatki),
@@ -54,6 +55,7 @@ Zakres wdrożony lokalnie (do deploy prod):
 
 **pnedu:**
 - publiczna lista `/szkolenia-rad-pedagogicznych`,
+- sekcja wyróżnionych ofert na stronie głównej (maks. 3 oferty z `featured_on_homepage`),
 - strona szczegółowa `/szkolenia-rad-pedagogicznych/{slug}` (sticky CTA na desktop, dolny pasek na mobile),
 - ogólny formularz zapytania `/szkolenia-rad-pedagogicznych/zapytanie` (bez kontekstu oferty),
 - formularz zapytania na stronie szczegółowej (z kontekstem oferty),
@@ -62,13 +64,13 @@ Zakres wdrożony lokalnie (do deploy prod):
 - wpisy w dynamicznym sitemap.
 
 **Deploy prod wymaga:**
-1. `pneadm`: `git pull` → `php artisan migrate --force` (2 migracje: `training_offers`, `training_offer_id`)
+1. `pneadm`: `git pull` → `php artisan migrate --force` (3 migracje: `training_offers`, `training_offer_id`, `featured_on_homepage`)
 2. `pnedu`: `git pull` (brak migracji po stronie pnedu)
 
 Dalsze kroki:
 
 1. Dodać zapis zapytań w bazie i panel obsługi zapytań w `pneadm`, jeśli będzie potrzebny.
-2. Dodać możliwość wyróżniania wybranych ofert na stronie głównej.
+2. ~~Dodać możliwość wyróżniania wybranych ofert na stronie głównej.~~ **Wdrożone lokalnie** (`featured_on_homepage`).
 3. Dodać analitykę wejść i zapytań ofertowych.
 
 ## Wdrożone lokalnie (2026-07-13) — do deploy prod adm

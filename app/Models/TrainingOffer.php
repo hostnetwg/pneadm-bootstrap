@@ -38,6 +38,7 @@ class TrainingOffer extends Model
         'default_course_category',
         'is_active',
         'show_on_pnedu',
+        'featured_on_homepage',
         'sort_order',
         'meta_title',
         'meta_description',
@@ -48,6 +49,7 @@ class TrainingOffer extends Model
         'price_amount' => 'decimal:2',
         'is_active' => 'boolean',
         'show_on_pnedu' => 'boolean',
+        'featured_on_homepage' => 'boolean',
         'sort_order' => 'integer',
     ];
 

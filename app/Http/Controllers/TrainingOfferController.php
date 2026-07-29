@@ -56,6 +56,7 @@ class TrainingOfferController extends Controller
         $validated = $this->validateOffer($request);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
+        $validated['featured_on_homepage'] = $request->boolean('featured_on_homepage');
         $validated['description_html'] = $this->sanitizeHtml($validated['description_html'] ?? null);
         $validated['price_amount'] = $validated['price_mode'] === TrainingOffer::PRICE_MODE_FIXED
             ? $validated['price_amount']
@@ -102,6 +103,7 @@ class TrainingOfferController extends Controller
         $validated = $this->validateOffer($request, $trainingOffer);
         $validated['is_active'] = $request->boolean('is_active');
         $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
+        $validated['featured_on_homepage'] = $request->boolean('featured_on_homepage');
         $validated['description_html'] = $this->sanitizeHtml($validated['description_html'] ?? null);
         $validated['price_amount'] = $validated['price_mode'] === TrainingOffer::PRICE_MODE_FIXED
             ? $validated['price_amount']
@@ -159,6 +161,7 @@ class TrainingOfferController extends Controller
             'default_course_category' => 'required|in:open,closed',
             'is_active' => 'nullable|boolean',
             'show_on_pnedu' => 'nullable|boolean',
+            'featured_on_homepage' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0|max:999999',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',

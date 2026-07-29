@@ -71,6 +71,9 @@
                                             <span class="badge {{ $offer->show_on_pnedu ? 'bg-primary' : 'bg-light text-dark' }}">
                                                 {{ $offer->show_on_pnedu ? 'Na pnedu' : 'Ukryta' }}
                                             </span>
+                                            @if($offer->featured_on_homepage)
+                                                <span class="badge bg-warning text-dark">Strona główna</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td>{{ $offer->sort_order }}</td>

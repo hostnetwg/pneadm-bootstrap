@@ -104,6 +104,13 @@
                     <div class="form-text">Oferta pojawi się w katalogu „Szkolenia rad pedagogicznych”.</div>
                 </div>
 
+                <input type="hidden" name="featured_on_homepage" value="0">
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="featured_on_homepage" value="1" id="featured_on_homepage" class="form-check-input" {{ old('featured_on_homepage', $offer->featured_on_homepage) ? 'checked' : '' }}>
+                    <label for="featured_on_homepage" class="form-check-label">Wyróżnij na stronie głównej</label>
+                    <div class="form-text">Oferta pojawi się w sekcji szkoleń rad pedagogicznych na stronie głównej pnedu.pl.</div>
+                </div>
+
                 <div class="mb-3">
                     <label for="sort_order" class="form-label">Kolejność</label>
                     <input type="number" min="0" name="sort_order" id="sort_order" class="form-control @error('sort_order') is-invalid @enderror" value="{{ old('sort_order', $offer->sort_order ?? 0) }}">

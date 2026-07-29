@@ -70,6 +70,7 @@ Poza MVP pozostają:
 - `default_course_category` - domyślna kategoria przyszłego kursu: `open` albo `closed`; dla ofert rad pedagogicznych domyślnie `closed`.
 - `is_active` - status administracyjny oferty.
 - `show_on_pnedu` - publikacja w katalogu ofert na `pnedu.pl`.
+- `featured_on_homepage` - wyróżnienie oferty w sekcji szkoleń rad pedagogicznych na stronie głównej `pnedu.pl`.
 - `sort_order` - kolejność na publicznej liście ofert.
 - `meta_title` - tytuł SEO strony szczegółowej.
 - `meta_description` - opis SEO strony szczegółowej.
@@ -136,6 +137,7 @@ pneadm
 pnedu
     -> odczyt aktywnych i opublikowanych ofert z bazy pneadm
     -> lista /szkolenia-rad-pedagogicznych
+    -> wyróżnione oferty featured_on_homepage na stronie głównej
     -> ogólny formularz zapytania GET/POST /szkolenia-rad-pedagogicznych/zapytanie
     -> szczegóły /szkolenia-rad-pedagogicznych/{slug}
     -> formularz POST /szkolenia-rad-pedagogicznych/{slug}/zapytanie
@@ -147,6 +149,6 @@ pnedu
 Kolejne etapy powinny być wdrażane osobno:
 
 1. Zapis zapytań w bazie i lista zapytań w `pneadm`.
-2. Wyróżnianie wybranych ofert na stronie głównej.
+2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone lokalnie** (`featured_on_homepage`).
 3. ~~Tworzenie rekordu `courses` na podstawie oferty.~~ **Wdrożone lokalnie** (prefill + `training_offer_id` + kopiowanie grafiki przy zapisie).
 4. Analityka wejść i zapytań ofertowych.
