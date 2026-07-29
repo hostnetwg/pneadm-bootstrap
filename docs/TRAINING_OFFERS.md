@@ -37,7 +37,7 @@ W pierwszym etapie wdrożenia:
 - każda oferta może mieć stronę szczegółową z adresem opartym o `slug`,
 - strona szczegółowa ma prosty formularz zapytania wysyłający e-mail do adresu systemowego.
 
-Publiczne widoki ofert w MVP używają struktury dopasowanej do szkoleń bez terminu. Nie powinny wyglądać jak archiwalne webinary ani konkretne wydarzenia z kalendarza. Dlatego na liście i stronie szczegółowej nacisk jest położony na temat, odbiorców, cenę, zakres i kontakt w sprawie terminu.
+Publiczne widoki ofert używają struktury dopasowanej do szkoleń bez terminu. Nie powinny wyglądać jak archiwalne webinary ani konkretne wydarzenia z kalendarza. Na liście i stronie szczegółowej nacisk jest położony na temat, odbiorców, cenę, pełny opis oferty i kontakt w sprawie terminu. Pole `scope` (zakres/zagadnienia) jest przeznaczone głównie do zaświadczeń i nie jest wyświetlane publicznie, żeby nie sugerować zawężonego programu.
 
 Uwaga redakcyjna: w publicznym katalogu nie należy używać grafik z datą, QR kodem lub komunikatem „Zapisz się”, jeśli oferta nie ma ustalonego terminu. Takie materiały mogą sugerować archiwalne wydarzenie zamiast aktualnej oferty dla placówki.
 
