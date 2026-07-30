@@ -51,9 +51,9 @@ Formularz zapytania w MVP:
 Poza MVP pozostają:
 
 - zapis zapytań w bazie i panel obsługi w `pneadm`,
-- wyróżnianie wybranych ofert na stronie głównej,
-- automatyczne kopiowanie oferty do `courses`,
 - analityka leadów i zdarzeń na ofertach.
+
+Wyróżnianie na stronie głównej (`featured_on_homepage`) i tworzenie `courses` z oferty — wdrożone (patrz niżej / kontynuacja).
 
 ## Pola Tabeli `training_offers`
 
@@ -86,6 +86,7 @@ Późniejszy przycisk „Utwórz szkolenie z oferty” powinien otwierać formul
 W `adm.pnedu.pl`:
 
 - przycisk „Utwórz szkolenie z oferty” na podglądzie i liście ofert,
+- przycisk „Usuń” na liście i podglądzie z potwierdzeniem w modalu Bootstrap (soft delete),
 - trasa `GET /training-offers/{offer}/create-course`,
 - formularz `courses/create` wypełniony danymi oferty,
 - `courses.training_offer_id` zapisuje źródło oferty,
@@ -137,18 +138,30 @@ pneadm
 pnedu
     -> odczyt aktywnych i opublikowanych ofert z bazy pneadm
     -> lista /szkolenia-rad-pedagogicznych
-    -> wyróżnione oferty featured_on_homepage na stronie głównej
+    -> wyróżnione oferty featured_on_homepage na stronie głównej (karuzela)
+    -> pierwsze 6 ofert w HTML; kolejne dociągane AJAX przy > 
+      GET /fragments/featured-training-offers?offset=&limit=
     -> ogólny formularz zapytania GET/POST /szkolenia-rad-pedagogicznych/zapytanie
     -> szczegóły /szkolenia-rad-pedagogicznych/{slug}
     -> formularz POST /szkolenia-rad-pedagogicznych/{slug}/zapytanie
     -> oba formularze wysyłają e-mail (TrainingOfferInquiryMail), bez zapisu w bazie
 ```
 
+## Karuzela wyróżnionych ofert (pnedu — wdrożone)
+
+Na stronie głównej sekcja „Zamów szkolenie dla rady pedagogicznej”:
+
+- źródło: `TrainingOffer` z `featured_on_homepage` + `publiclyVisible()`, kolejność `sort_order`, `title`;
+- pierwszy HTML: max **6** kart (`FeaturedHomepageTrainingOffers::INITIAL_LIMIT`);
+- przy kliknięciu „następne” karuzela dociąga kolejne **6** (`BATCH_LIMIT`) przez fragment HTML;
+- widoczność: desktop 3 / tablet 2 / mobile 1 kartę;
+- endpoint: `GET /fragments/featured-training-offers` (throttle 60/min), nagłówki `X-Featured-Offers-Total|Count|Offset`.
+
 ## Kontynuacja Po MVP
 
 Kolejne etapy powinny być wdrażane osobno:
 
 1. Zapis zapytań w bazie i lista zapytań w `pneadm`.
-2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone lokalnie** (`featured_on_homepage`).
+2. ~~Wyróżnianie wybranych ofert na stronie głównej.~~ **Wdrożone** (`featured_on_homepage` + lazy karuzela AJAX).
 3. ~~Tworzenie rekordu `courses` na podstawie oferty.~~ **Wdrożone lokalnie** (prefill + `training_offer_id` + kopiowanie grafiki przy zapisie).
 4. Analityka wejść i zapytań ofertowych.

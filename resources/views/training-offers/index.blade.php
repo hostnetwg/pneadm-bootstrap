@@ -82,6 +82,12 @@
                                             <a href="{{ route('training-offers.show', $offer) }}" class="btn btn-outline-secondary">Podgląd</a>
                                             <a href="{{ route('training-offers.create-course', $offer) }}" class="btn btn-outline-success">Utwórz szkolenie</a>
                                             <a href="{{ route('training-offers.edit', $offer) }}" class="btn btn-outline-primary">Edytuj</a>
+                                            <button type="button"
+                                                    class="btn btn-outline-danger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#deleteTrainingOfferModal{{ $offer->id }}">
+                                                <i class="bi bi-trash" aria-hidden="true"></i> Usuń
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -103,4 +109,43 @@
             </div>
         </div>
     </div>
+
+    @foreach($offers as $offer)
+        <div class="modal fade" id="deleteTrainingOfferModal{{ $offer->id }}" tabindex="-1" aria-labelledby="deleteTrainingOfferModalLabel{{ $offer->id }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteTrainingOfferModalLabel{{ $offer->id }}">
+                            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Potwierdzenie usunięcia
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć ofertę <strong>#{{ $offer->id }}</strong>?</p>
+                        <div class="bg-light p-3 rounded">
+                            <ul class="mb-0">
+                                <li><strong>Tytuł:</strong> {{ $offer->title }}</li>
+                                <li><strong>Slug:</strong> <span class="font-monospace">{{ $offer->slug }}</span></li>
+                                <li><strong>Trener:</strong> {{ $offer->instructor?->full_title_name ?? 'Brak' }}</li>
+                            </ul>
+                        </div>
+                        <p class="text-muted mt-3 mb-0">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            Oferta trafi do kosza (soft delete) i zniknie z katalogu publicznego.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <form action="{{ route('training-offers.destroy', $offer) }}" method="POST" class="d-inline">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash" aria-hidden="true"></i> Usuń ofertę
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endforeach
 </x-app-layout>

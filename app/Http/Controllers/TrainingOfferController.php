@@ -142,7 +142,7 @@ class TrainingOfferController extends Controller
 
         return redirect()
             ->route('training-offers.index')
-            ->with('success', 'Oferta szkolenia została usunięta.');
+            ->with('success', 'Oferta szkolenia została usunięta (przeniesiona do kosza).');
     }
 
     private function validateOffer(Request $request, ?TrainingOffer $offer = null): array

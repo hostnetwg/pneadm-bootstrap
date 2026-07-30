@@ -58,6 +58,34 @@ class TrainingOfferAdminTest extends TestCase
             ->assertSee('Wyróżnij na stronie głównej');
     }
 
+    public function test_admin_can_delete_training_offer_from_index(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->offer = TrainingOffer::create([
+            'title' => 'Oferta do usunięcia',
+            'slug' => 'oferta-do-usuniecia-'.Str::lower(Str::random(6)),
+            'summary' => 'Oferta testowa do soft delete.',
+            'price_mode' => TrainingOffer::PRICE_MODE_INDIVIDUAL,
+            'default_course_category' => TrainingOffer::COURSE_CATEGORY_CLOSED,
+            'is_active' => true,
+            'show_on_pnedu' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('training-offers.index'))
+            ->assertOk()
+            ->assertSee('deleteTrainingOfferModal'.$this->offer->id, false)
+            ->assertSee('Usuń');
+
+        $this->actingAs($user)
+            ->delete(route('training-offers.destroy', $this->offer))
+            ->assertRedirect(route('training-offers.index'));
+
+        $this->assertSoftDeleted($this->offer);
+        $this->offer = null;
+    }
+
     public function test_admin_can_open_create_course_form_prefilled_from_offer(): void
     {
         $user = User::factory()->create(['is_active' => true]);

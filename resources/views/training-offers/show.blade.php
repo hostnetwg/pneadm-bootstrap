@@ -9,6 +9,12 @@
                     Utwórz szkolenie z oferty
                 </a>
                 <a href="{{ route('training-offers.edit', $offer) }}" class="btn btn-primary">Edytuj</a>
+                <button type="button"
+                        class="btn btn-outline-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteTrainingOfferModal">
+                    <i class="bi bi-trash" aria-hidden="true"></i> Usuń
+                </button>
                 <a href="{{ route('training-offers.index') }}" class="btn btn-outline-secondary">Lista ofert</a>
             </div>
         </div>
