@@ -311,7 +311,7 @@
                                 <div id="videoIcons{{ $course->id }}" 
                                      class="d-flex justify-content-center gap-1"
                                      data-course-id="{{ $course->id }}"
-                                     data-course-title="{{ strip_tags(html_entity_decode($course->title, ENT_QUOTES | ENT_HTML5, 'UTF-8')) }}"
+                                     data-course-title="{{ $course->plainTitle() }}"
                                      data-course-date="{{ $course->start_date ? $course->start_date->format('d.m.Y') : '' }}"
                                      data-course-time="{{ $course->start_date && $course->start_date->format('H:i') !== '00:00' ? $course->start_date->format('H:i') : '' }}"
                                      data-course-instructor="{{ $course->instructor ? $course->instructor->first_name . ' ' . $course->instructor->last_name : '' }}">
@@ -445,7 +445,7 @@
                                     </div>
                                 @endif
                             @endif
-                            <strong>{!! $course->title !!}</strong>
+                            <strong>{{ $course->plainTitle() }}</strong>
                             @include('courses.partials.index-price-variants', ['course' => $course])
                         </td>
                        {{-- <td>{{ Str::limit($course->description, 50) }}</td> --}}
@@ -612,7 +612,7 @@
                             <div class="bg-light p-3 rounded">
                                 <h6 class="mb-2">Szczegóły szkolenia:</h6>
                                 <ul class="mb-0">
-                                    <li><strong>Tytuł:</strong> {!! $course->title !!}</li>
+                                    <li><strong>Tytuł:</strong> {{ $course->plainTitle() }}</li>
                                     <li><strong>Instruktor:</strong> {{ $course->instructor ? $course->instructor->getFullTitleNameAttribute() : 'Brak instruktora' }}</li>
                                     <li><strong>Data:</strong> {{ $course->start_date ? $course->start_date->format('d.m.Y H:i') : 'Brak daty' }}</li>
                                     <li><strong>Uczestnicy:</strong> {{ $course->participants_count }}</li>
@@ -679,7 +679,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="videoModalLabel{{ $course->id }}">
                         <i class="bi bi-camera-video me-2"></i>
-                        Nagrania - {{ $course->title }}
+                        Nagrania - {{ $course->plainTitle() }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -754,7 +754,7 @@
                     <div class="flex-grow-1">
                         <h5 class="modal-title mb-1" id="videoPlayerModalLabel{{ $course->id }}">
                             <i class="bi bi-display me-2"></i>
-                            Nagrania - {{ strip_tags(html_entity_decode($course->title, ENT_QUOTES | ENT_HTML5, 'UTF-8')) }}
+                            Nagrania - {{ $course->plainTitle() }}
                         </h5>
                         <div class="text-muted small">
                             @if($course->start_date)
@@ -823,7 +823,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="surveyLinkModalLabel{{ $course->id }}">
                         <i class="bi bi-card-checklist me-2"></i>
-                        Ankiety zewnętrzne — {{ $course->title }}
+                        Ankiety zewnętrzne — {{ $course->plainTitle() }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -949,7 +949,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="fileLinkModalLabel{{ $course->id }}">
                         <i class="bi bi-link-45deg me-2"></i>
-                        Materiały do pobrania (pliki) — {{ $course->title }}
+                        Materiały do pobrania (pliki) — {{ $course->plainTitle() }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
