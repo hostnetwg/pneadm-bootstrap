@@ -27,7 +27,7 @@ class CertificateLinkMail extends Mailable
     public function build()
     {
         $participantFirstName = trim((string) $this->participant->first_name) ?: 'Uczestniku';
-        $courseTitle = $this->course->title ?? 'szkolenie';
+        $courseTitle = $this->course->plainTitle();
 
         return $this->withSystemMailSettings()
             ->subject('Link do pobrania zaświadczeń – '.config('app.name'))

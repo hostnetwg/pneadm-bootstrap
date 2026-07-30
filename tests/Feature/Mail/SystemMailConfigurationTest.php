@@ -81,7 +81,7 @@ class SystemMailConfigurationTest extends TestCase
     {
         $mail = new CourseAccessMail(
             participant: new Participant(['first_name' => 'Jan', 'email' => 'jan@example.com']),
-            course: new Course(['title' => 'Szkolenie']),
+            course: new Course(['title' => 'Szkolenie i&nbsp;nagranie']),
             hasPneduAccount: true,
             courseUrl: 'https://pnedu.pl/dashboard',
             certificateUrl: null,
@@ -92,17 +92,22 @@ class SystemMailConfigurationTest extends TestCase
             hasCertificate: false,
         );
 
+        $built = $mail->build();
         $this->assertSystemMailHeaders($mail);
-        $html = $mail->build()->render();
+        $this->assertStringNotContainsString('&nbsp;', $built->subject);
+        $this->assertStringContainsString('Szkolenie i nagranie', $built->subject);
+        $html = $built->render();
         $this->assertNoLegacyDomains($html);
         $this->assertCustomMailIsPolish($html);
         $this->assertStringContainsString('Z poważaniem', $html);
+        $this->assertStringNotContainsString('&nbsp;', $html);
+        $this->assertStringContainsString('Szkolenie i nagranie', $html);
     }
 
     public function test_certificate_link_mails_use_system_mailer(): void
     {
         $participant = new Participant(['first_name' => 'Anna']);
-        $course = new Course(['title' => 'Kurs']);
+        $course = new Course(['title' => 'Kurs i&nbsp;zaświadczenie']);
 
         $listMail = new CertificateLinkMail($participant, $course, 'https://pnedu.pl/certificates/token');
         $this->assertSystemMailHeaders($listMail);
@@ -111,10 +116,14 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertStringContainsString('Pobierz zaświadczenia', $listHtml);
 
         $singleMail = new CertificateSingleLinkMail($participant, $course, 'https://pnedu.pl/certificate/token/1');
+        $builtSingle = $singleMail->build();
         $this->assertSystemMailHeaders($singleMail);
-        $singleHtml = $singleMail->build()->render();
+        $this->assertStringNotContainsString('&nbsp;', $builtSingle->subject);
+        $this->assertStringContainsString('Kurs i zaświadczenie', $builtSingle->subject);
+        $singleHtml = $builtSingle->render();
         $this->assertCustomMailIsPolish($singleHtml);
         $this->assertStringContainsString('Pobierz zaświadczenie', $singleHtml);
+        $this->assertStringNotContainsString('&nbsp;', $singleHtml);
     }
 
     public function test_data_completion_mail_uses_system_mailer_and_brand_in_template(): void

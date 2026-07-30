@@ -33,7 +33,7 @@ class CourseAccessMail extends Mailable
     public function build()
     {
         $participantFirstName = trim((string) $this->participant->first_name) ?: 'Uczestniku';
-        $courseTitle = $this->course->title ?? 'szkolenie';
+        $courseTitle = $this->course->plainTitle();
 
         $courseDateLong = null;
         if ($this->course->start_date) {

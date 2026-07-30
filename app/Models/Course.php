@@ -371,6 +371,21 @@ class Course extends Model
     }
 
     /**
+     * Tytuł szkolenia bez HTML i &nbsp; — do tematów/treści e-maili i UI tekstowego.
+     */
+    public function plainTitle(string $fallback = 'szkolenie'): string
+    {
+        $plain = trim(str_replace(
+            ['&nbsp;', "\xc2\xa0"],
+            ' ',
+            strip_tags(html_entity_decode((string) ($this->title ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+        ));
+        $plain = trim(preg_replace('/\s+/u', ' ', $plain) ?? $plain);
+
+        return $plain !== '' ? $plain : $fallback;
+    }
+
+    /**
      * URL do dodania szkolenia w Google Calendar (link TEMPLATE — bez OAuth).
      */
     public function googleCalendarUrl(): ?string
