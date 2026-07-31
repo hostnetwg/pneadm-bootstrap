@@ -140,6 +140,12 @@
                         </span>
                         @endif
                     @endif
+                    @if(($invoiceSearch ?? '') !== '')
+                        <span class="badge bg-success text-white">
+                            <i class="bi bi-receipt"></i>
+                            Faktura / KSeF{{ !empty($invoiceSearchExact) ? ' (dokładnie)' : ' (fragment)' }}: {{ $invoiceSearch }}
+                        </span>
+                    @endif
                 </div>
             </div>
 
@@ -257,7 +263,7 @@
                                        id="search"
                                        name="search"
                                        value="{{ $search }}"
-                                       placeholder="Imię, email, produkt, faktura, kod kampanii, nazwa kampanii, ID…">
+                                       placeholder="Imię, email, produkt, faktura, KSeF, kod kampanii, nazwa kampanii, ID…">
                             </div>
                             <div class="col-12 col-md-3">
                                 <div class="form-check" title="Pokaż tylko zamówienia, dla których minęła data i godzina zakończenia szkolenia. Łączy się z polem „Przetwarzanie” i resztą filtrów.">
@@ -271,7 +277,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
+                                @if($search || ($invoiceSearch ?? '') !== '' || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index') }}" class="btn btn-outline-secondary" title="Wyczyść formularz i wróć do domyślnej kolejki „Do obsługi (aktywne)”">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -279,6 +285,55 @@
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            {{-- Osobna wyszukiwarka numeru faktury (klasyczny + KSeF) --}}
+            <div class="card mb-3 border-success border-opacity-25">
+                <div class="card-body py-3">
+                    <form method="GET" action="{{ route('form-orders.index') }}" id="formOrdersInvoiceSearchForm" class="row g-2 align-items-end">
+                        <input type="hidden" name="quick" value="all">
+                        <div class="col-12 col-lg-8">
+                            <label for="invoice_search" class="form-label mb-1">
+                                <i class="bi bi-receipt text-success"></i>
+                                Szukaj po numerze faktury
+                                <span class="text-muted fw-normal">(klasyczny lub KSeF)</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="invoice_search"
+                                   name="invoice_search"
+                                   value="{{ $invoiceSearch ?? '' }}"
+                                   placeholder="np. 43/7/2026 lub 7392137630-20260724-…"
+                                   maxlength="128"
+                                   autocomplete="off"
+                                   title="Szuka w invoice_number oraz ksef_number">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       id="invoice_search_exact"
+                                       name="invoice_search_exact"
+                                       value="1"
+                                       @checked($invoiceSearchExact ?? true)>
+                                <label class="form-check-label" for="invoice_search_exact">
+                                    Szukaj dokładnie wpisanego numeru (bez dopasowania fragmentu)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-4 d-flex align-items-end gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-search"></i> Szukaj faktury
+                            </button>
+                            @if(($invoiceSearch ?? '') !== '')
+                                <a href="{{ route('form-orders.index') }}" class="btn btn-outline-secondary" title="Wyczyść wyszukiwanie faktury">
+                                    <i class="bi bi-x-circle"></i> Wyczyść
+                                </a>
+                            @endif
+                        </div>
+                    </form>
+                    <div class="form-text mt-1 mb-0">
+                        Niezależny skrót: szuka wyłącznie w numerze faktury i numerze KSeF w całej bazie (pomija kolejkę „Do obsługi”).
+                    </div>
                 </div>
             </div>
 
@@ -349,6 +404,11 @@
                                                 <span class="badge bg-success ms-2" title="Numer faktury: {{ $zamowienie->invoice_number }}">
                                                     <i class="bi bi-receipt"></i> FAKTURA {{ $zamowienie->invoice_number }}
                                                 </span>
+                                                @if($zamowienie->hasConfirmedKsef())
+                                                    <span class="badge bg-success ms-1" title="Numer KSeF: {{ $zamowienie->ksef_number }}{{ $zamowienie->ksef_sent_at ? ' · '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}">
+                                                        <i class="bi bi-shield-check"></i> KSeF {{ $zamowienie->ksef_number }}
+                                                    </span>
+                                                @endif
                                             @endif
                                         </h5>
                                         @php
@@ -536,6 +596,10 @@
                                                 @method('PUT')
                                                 <input type="hidden" name="per_page" value="{{ $perPage }}">
                                                 <input type="hidden" name="search" value="{{ $search }}">
+                                                <input type="hidden" name="invoice_search" value="{{ $invoiceSearch ?? '' }}">
+                                                @if(!empty($invoiceSearchExact))
+                                                    <input type="hidden" name="invoice_search_exact" value="1">
+                                                @endif
                                                 <input type="hidden" name="order_id" value="{{ $orderIdFilter ?? '' }}">
                                                 <input type="hidden" name="course_id" value="{{ $courseIdFilter ?? '' }}">
                                                 <input type="hidden" name="filter" value="{{ $filter }}">
@@ -552,6 +616,12 @@
                                                                @if($isNew)
                                                                style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);"
                                                                @endif>
+                                                        @if($zamowienie->hasConfirmedKsef())
+                                                            <div class="mt-1 small" title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}">
+                                                                <span class="text-muted">Nr KSeF:</span>
+                                                                <code class="text-success">{{ $zamowienie->ksef_number }}</code>
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label class="form-label small">Status:</label>
@@ -620,6 +690,12 @@
                                                 <div class="text-dark mb-1">
                                                     <span class="fw-semibold">Nr faktury:</span> {{ $zamowienie->invoice_number }}
                                                 </div>
+                                                @if($zamowienie->hasConfirmedKsef())
+                                                    <div class="text-dark mb-1 small">
+                                                        <span class="fw-semibold">Nr KSeF:</span>
+                                                        <code class="text-success">{{ $zamowienie->ksef_number }}</code>
+                                                    </div>
+                                                @endif
                                             @else
                                                 <div class="text-warning mb-1">
                                                     <i class="bi bi-clock"></i> Oczekuje na wystawienie faktury
@@ -918,6 +994,30 @@ nowoczesna-edukacja.pl `;
                 settlementEl.addEventListener('change', syncOpoStatusFilterVisibility);
             }
             syncOpoStatusFilterVisibility();
+
+            // Preferencja trybu dokładnego wyszukiwania faktury (jak accounting/debtors)
+            (function () {
+                var exactEl = document.getElementById('invoice_search_exact');
+                var invoiceInput = document.getElementById('invoice_search');
+                if (!exactEl) {
+                    return;
+                }
+                var storageKey = 'form_orders_invoice_search_exact_v1';
+                var hasActiveInvoiceSearch = invoiceInput && invoiceInput.value.trim() !== '';
+                if (!hasActiveInvoiceSearch) {
+                    try {
+                        var saved = localStorage.getItem(storageKey);
+                        if (saved === 'exact' || saved === 'partial') {
+                            exactEl.checked = saved === 'exact';
+                        }
+                    } catch (e) {}
+                }
+                exactEl.addEventListener('change', function () {
+                    try {
+                        localStorage.setItem(storageKey, exactEl.checked ? 'exact' : 'partial');
+                    } catch (e) {}
+                });
+            })();
 
             // Liczniki badge + pasek statystyk — po liście, bez przeładowania strony
             (function () {

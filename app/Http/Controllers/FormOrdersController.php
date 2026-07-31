@@ -32,6 +32,11 @@ class FormOrdersController extends Controller
         // Liczba rekordów na stronę (domyślnie 50)
         $perPage = $request->get('per_page', 50);
         $search = $request->get('search', '');
+        $invoiceSearch = trim((string) $request->get('invoice_search', ''));
+        // Domyślnie dokładne dopasowanie (jak accounting/debtors), gdy formularz faktury jest używany.
+        $invoiceSearchExact = $invoiceSearch !== ''
+            ? $request->boolean('invoice_search_exact')
+            : true;
         $orderIdFilter = trim((string) $request->get('order_id', ''));
         $courseIdFilter = trim((string) $request->get('course_id', ''));
         // Status przetwarzania — dwa NIEZALEŻNE źródła (nie łączymy ich AND):
@@ -98,6 +103,7 @@ class FormOrdersController extends Controller
                     ->orWhere('orderer_email', 'LIKE', "%{$search}%")
                     ->orWhere('product_name', 'LIKE', "%{$search}%")
                     ->orWhere('invoice_number', 'LIKE', "%{$search}%")
+                    ->orWhere('ksef_number', 'LIKE', "%{$search}%")
                     ->orWhere('notes', 'LIKE', "%{$search}%")
                     ->orWhere('id', 'LIKE', "%{$search}%")
                     ->orWhere('publigo_product_id', 'LIKE', "%{$search}%")
@@ -121,6 +127,19 @@ class FormOrdersController extends Controller
                         $mq->where('name', 'LIKE', "%{$search}%")
                             ->orWhere('campaign_code', 'LIKE', "%{$search}%");
                     });
+            });
+        }
+
+        // Osobna wyszukiwarka numeru faktury (klasyczny + KSeF)
+        if ($invoiceSearch !== '') {
+            $query->where(function ($q) use ($invoiceSearch, $invoiceSearchExact) {
+                if ($invoiceSearchExact) {
+                    $q->where('invoice_number', $invoiceSearch)
+                        ->orWhere('ksef_number', $invoiceSearch);
+                } else {
+                    $q->where('invoice_number', 'LIKE', "%{$invoiceSearch}%")
+                        ->orWhere('ksef_number', 'LIKE', "%{$invoiceSearch}%");
+                }
             });
         }
 
@@ -267,6 +286,8 @@ class FormOrdersController extends Controller
             'zamowienia',
             'perPage',
             'search',
+            'invoiceSearch',
+            'invoiceSearchExact',
             'orderIdFilter',
             'courseIdFilter',
             'quickFilter',
@@ -332,6 +353,7 @@ class FormOrdersController extends Controller
     private function isFormSearchActive(Request $request, string $filter): bool
     {
         return $request->filled('search')
+            || $request->filled('invoice_search')
             || $request->filled('order_id')
             || $request->filled('course_id')
             || $request->filled('settlement')
@@ -991,6 +1013,12 @@ class FormOrdersController extends Controller
                 if ($request->has('search')) {
                     $redirectParams['search'] = $request->input('search');
                 }
+                if ($request->filled('invoice_search')) {
+                    $redirectParams['invoice_search'] = $request->input('invoice_search');
+                    if ($request->boolean('invoice_search_exact')) {
+                        $redirectParams['invoice_search_exact'] = 1;
+                    }
+                }
                 if ($request->has('filter')) {
                     $redirectParams['filter'] = $request->input('filter');
                 }
@@ -1039,6 +1067,12 @@ class FormOrdersController extends Controller
                 }
                 if ($request->has('search')) {
                     $redirectParams['search'] = $request->input('search');
+                }
+                if ($request->filled('invoice_search')) {
+                    $redirectParams['invoice_search'] = $request->input('invoice_search');
+                    if ($request->boolean('invoice_search_exact')) {
+                        $redirectParams['invoice_search_exact'] = 1;
+                    }
                 }
                 if ($request->has('filter')) {
                     $redirectParams['filter'] = $request->input('filter');

@@ -252,13 +252,13 @@ class AccountingController extends Controller
     }
 
     /**
-     * Live lookup danych pod ponaglenie po numerze faktury.
+     * Live lookup danych pod ponaglenie po numerze faktury lub numerze KSeF.
      * Uwaga: dla faktur odroczonych status opłacenia jest weryfikowany w iFirma (poza systemem).
      */
     public function debtorsLookup(Request $request)
     {
         $validated = $request->validate([
-            'q' => ['required', 'string', 'min:2', 'max:100'],
+            'q' => ['required', 'string', 'min:2', 'max:128'],
             'match_mode' => ['nullable', 'string', 'in:exact,partial'],
         ]);
 
@@ -267,16 +267,32 @@ class AccountingController extends Controller
 
         $matchesQuery = FormOrder::query()
             ->with(['primaryParticipant', 'onlinePaymentOrders'])
-            ->whereNotNull('invoice_number')
-            ->where('invoice_number', '!=', '')
-            ->where('invoice_number', '!=', '0');
+            ->where(function ($q) {
+                $q->where(function ($invoice) {
+                    $invoice->whereNotNull('invoice_number')
+                        ->where('invoice_number', '!=', '')
+                        ->where('invoice_number', '!=', '0');
+                })->orWhere(function ($ksef) {
+                    $ksef->whereNotNull('ksef_number')
+                        ->where('ksef_number', '!=', '');
+                });
+            });
 
         if ($matchMode === 'exact') {
-            $matchesQuery->where('invoice_number', $query);
+            $matchesQuery->where(function ($q) use ($query) {
+                $q->where('invoice_number', $query)
+                    ->orWhere('ksef_number', $query);
+            });
         } else {
             $matchesQuery
-                ->where('invoice_number', 'LIKE', '%'.$query.'%')
-                ->orderByRaw('CASE WHEN invoice_number = ? THEN 0 ELSE 1 END', [$query]);
+                ->where(function ($q) use ($query) {
+                    $q->where('invoice_number', 'LIKE', '%'.$query.'%')
+                        ->orWhere('ksef_number', 'LIKE', '%'.$query.'%');
+                })
+                ->orderByRaw(
+                    'CASE WHEN invoice_number = ? OR ksef_number = ? THEN 0 ELSE 1 END',
+                    [$query, $query]
+                );
         }
 
         $matches = $matchesQuery
@@ -316,6 +332,7 @@ class AccountingController extends Controller
             'matches' => $matches->map(fn (FormOrder $order) => [
                 'id' => $order->id,
                 'invoice_number' => $order->invoice_number,
+                'ksef_number' => $order->ksef_number,
                 'order_date' => $order->formatOrderDateLocal('Y-m-d H:i'),
                 'product_name' => $order->product_name,
                 'buyer_name' => $order->buyer_name,
@@ -324,6 +341,7 @@ class AccountingController extends Controller
             'selected' => [
                 'id' => $selected->id,
                 'invoice_number' => $selected->invoice_number,
+                'ksef_number' => $selected->ksef_number,
                 'order_date' => $selected->formatOrderDateLocal('Y-m-d H:i'),
                 'invoice_date' => $this->formatDate($selected->order_date),
                 'product_name' => $selected->product_name,

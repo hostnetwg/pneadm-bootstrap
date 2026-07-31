@@ -670,6 +670,16 @@ class FormOrder extends Model
     }
 
     /**
+     * Faktura przyjęta w KSeF (MF nadał numer) — pole ksef_number jest wypełnione.
+     */
+    public function hasConfirmedKsef(): bool
+    {
+        return $this->ksef_status === 'sent'
+            && is_string($this->ksef_number)
+            && trim($this->ksef_number) !== '';
+    }
+
+    /**
      * Oznaczone jako zamknięte rozliczeniowo bez FV (bezpłatny dostęp).
      */
     public function isInvoiceExempt(): bool

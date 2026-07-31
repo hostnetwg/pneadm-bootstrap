@@ -9,12 +9,12 @@
         <div class="container-fluid px-4">
             <div class="card mb-3">
                 <div class="card-body">
-                    <label for="invoiceLookup" class="form-label fw-semibold mb-2">Numer faktury</label>
+                    <label for="invoiceLookup" class="form-label fw-semibold mb-2">Numer faktury lub KSeF</label>
                     <input
                         id="invoiceLookup"
                         type="text"
                         class="form-control"
-                        placeholder="Wpisz numer faktury (np. FV/12/05/2026)"
+                        placeholder="np. FV/12/05/2026 albo 7392137630-20260724-…"
                         autocomplete="off"
                     >
                     <div class="form-check mt-2">
@@ -24,13 +24,13 @@
                         </label>
                     </div>
                     <div class="form-text mt-2">
-                        Wyszukiwanie działa na żywo, bez przeładowania strony.
+                        Wyszukiwanie działa na żywo, bez przeładowania strony — po numerze faktury lub numerze KSeF.
                     </div>
                 </div>
             </div>
 
             <div id="debtorsStatus" class="alert alert-info mb-3">
-                Wpisz co najmniej 2 znaki numeru faktury.
+                Wpisz co najmniej 2 znaki numeru faktury lub KSeF.
             </div>
 
             <div id="debtorsResults" class="d-none">
@@ -159,6 +159,30 @@
             const money = (value) => {
                 const numeric = Number(value || 0);
                 return `${numeric.toFixed(2)} zł`;
+            };
+
+            const formatPhoneDisplay = (value) => {
+                if (value === null || value === undefined) {
+                    return null;
+                }
+                const raw = String(value).trim();
+                if (raw === '') {
+                    return null;
+                }
+                const digits = raw.replace(/\D+/g, '');
+                if (digits.length === 9) {
+                    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)}`;
+                }
+                if (digits.length === 11 && digits.startsWith('48')) {
+                    return `+48 ${digits.slice(2, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 11)}`;
+                }
+                if (digits.length === 10 && digits.startsWith('0')) {
+                    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 10)}`;
+                }
+                if (digits.length >= 10 && digits.length <= 15) {
+                    return digits.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+                }
+                return raw;
             };
 
             const overdueLabel = (record) => {
@@ -351,7 +375,7 @@
             const renderPayload = (payload) => {
                 if (!payload.selected) {
                     clearResults();
-                    setStatus('Brak dopasowania dla podanego numeru faktury.', 'warning');
+                    setStatus('Brak dopasowania dla podanego numeru faktury / KSeF.', 'warning');
                     return;
                 }
 
@@ -360,13 +384,20 @@
 
                 matchesContainer.innerHTML = payload.matches
                     .map((match) => {
-                        return `<span class="badge text-bg-light border me-2 mb-2">#${escapeHtml(match.id)} | ${escapeHtml(match.invoice_number)} | ${escapeHtml(match.product_name)}</span>`;
+                        const ksefPart = match.ksef_number
+                            ? ` | KSeF: ${escapeHtml(match.ksef_number)}`
+                            : '';
+                        return `<span class="badge text-bg-light border me-2 mb-2">#${escapeHtml(match.id)} | ${escapeHtml(match.invoice_number)}${ksefPart} | ${escapeHtml(match.product_name)}</span>`;
                     })
                     .join('');
 
                 const selected = payload.selected;
+                const ksefLine = selected.ksef_number
+                    ? `<p class="mb-1"><strong>Numer KSeF:</strong> ${escapeHtml(selected.ksef_number)}</p>`
+                    : '';
                 ordererParticipantCard.innerHTML = `
                     <p class="mb-1"><strong>Faktura:</strong> ${escapeHtml(selected.invoice_number)}</p>
+                    ${ksefLine}
                     <p class="mb-1"><strong>Data faktury:</strong> ${escapeHtml(selected.invoice_date)}</p>
                     <p class="mb-1"><strong>Termin płatności:</strong> ${escapeHtml(selected.payment_due_date)} (${escapeHtml(selected.invoice_payment_delay)} dni)</p>
                     <p class="mb-2"><strong>Po terminie:</strong> ${escapeHtml(overdueLabel(selected))}</p>
@@ -375,7 +406,14 @@
                     <hr>
                     <p class="mb-1"><strong>Zamawiający:</strong> ${escapeHtml(selected.orderer.name)}</p>
                     <p class="mb-1"><strong>E-mail:</strong> ${escapeHtml(selected.orderer.email)}</p>
-                    <p class="mb-1"><strong>Telefon:</strong> ${escapeHtml(selected.orderer.phone)}</p>
+                    <p class="mb-1"><strong>Telefon:</strong> ${(() => {
+                        const formatted = formatPhoneDisplay(selected.orderer.phone);
+                        if (!formatted) {
+                            return '—';
+                        }
+                        const telHref = String(selected.orderer.phone || '').replace(/[^\d+]/g, '');
+                        return `<a href="tel:${escapeHtml(telHref || selected.orderer.phone)}" class="text-decoration-none"><strong>${escapeHtml(formatted)}</strong></a>`;
+                    })()}</p>
                     <p class="mb-2"><strong>Adres:</strong> ${escapeHtml(selected.orderer.address)}, ${escapeHtml(selected.orderer.postal_code)} ${escapeHtml(selected.orderer.city)}</p>
                     <hr>
                     <p class="mb-1"><strong>Uczestnik:</strong> ${escapeHtml(selected.participant.name)}</p>
@@ -442,7 +480,7 @@
 
                 if (q.length < 2) {
                     clearResults();
-                    setStatus('Wpisz co najmniej 2 znaki numeru faktury.', 'info');
+                    setStatus('Wpisz co najmniej 2 znaki numeru faktury lub KSeF.', 'info');
                     return;
                 }
 

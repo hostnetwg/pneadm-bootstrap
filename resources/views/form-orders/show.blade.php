@@ -782,6 +782,14 @@ nowoczesna-edukacja.pl </div>
                                                @if($zamowienie->is_new) 
                                                style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);" 
                                                @endif>
+                                        <div id="ksefNumberDisplay"
+                                             class="mt-1 small @if(! $zamowienie->hasConfirmedKsef()) d-none @endif"
+                                             @if($zamowienie->hasConfirmedKsef())
+                                             title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
+                                             @endif>
+                                            <span class="text-muted">Numer KSeF:</span>
+                                            <code class="text-success" id="ksefNumberValue">{{ $zamowienie->hasConfirmedKsef() ? $zamowienie->ksef_number : '' }}</code>
+                                        </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="status_completed" class="form-label small">
@@ -2082,9 +2090,23 @@ nowoczesna-edukacja.pl `;
             `;
         }
 
+        function applyKsefNumberDisplay(ksefNumber) {
+            const wrap = document.getElementById('ksefNumberDisplay');
+            const valueEl = document.getElementById('ksefNumberValue');
+            if (!wrap || !valueEl || !ksefNumber) {
+                return;
+            }
+            valueEl.textContent = ksefNumber;
+            wrap.classList.remove('d-none');
+            wrap.title = 'Przyjęte w KSeF';
+        }
+
         function renderIfirmaKsefResult(data, force, resultDiv) {
             if (data.invoice_number) {
                 applyInvoiceNumberFieldValue(data.invoice_number);
+            }
+            if (data.success && data.ksef_number) {
+                applyKsefNumberDisplay(data.ksef_number);
             }
 
             window.ifirmaResponseData = data;

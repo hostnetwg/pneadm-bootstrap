@@ -22,6 +22,11 @@
         <span class="badge bg-info text-dark" title="Numer faktury: {{ $zamowienie->invoice_number }}">
             <i class="bi bi-receipt"></i> FV {{ $zamowienie->invoice_number }}
         </span>
+        @if($zamowienie->hasConfirmedKsef())
+            <span class="badge bg-success" title="Numer KSeF: {{ $zamowienie->ksef_number }}{{ $zamowienie->ksef_sent_at ? ' · '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}">
+                <i class="bi bi-shield-check"></i> KSeF {{ $zamowienie->ksef_number }}
+            </span>
+        @endif
     @endif
     @if($zamowienie->cancelled_at)
         <span class="badge bg-secondary" title="{{ $zamowienie->cancelled_reason }}">
