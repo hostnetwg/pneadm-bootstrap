@@ -4,16 +4,16 @@ Ten dokument definiuje **obowiązującą** formę współpracy nad projektami `p
 
 > Plik w `pnedu`: `docs/AI_HUMAN_COMMUNICATION.md` (skrót + wskazanie na ten kanon). Zasada jest też w `.cursorrules` obu projektów.
 
-**Ostatnia aktualizacja:** 2026-07-13  
-**Wersja:** 2.1 (współpraca trójstronna + obowiązek aktualizacji docs)
+**Ostatnia aktualizacja:** 2026-07-31  
+**Wersja:** 2.2 (prompt do ChatGPT tylko na wyraźną prośbę)
 
 ---
 
 ## 1. Cel dokumentu
 
-- Ujednolicić sposób pracy: **Waldemar (decyzje)** ↔ **ChatGPT (konsultant)** ↔ **Cursor Agent AI (implementacja)**.
+- Ujednolicić sposób pracy: **Waldemar (decyzje)** ↔ **ChatGPT (konsultant na żądanie)** ↔ **Cursor Agent AI (implementacja)**.
 - Zmniejszyć ryzyko wdrożeń „na ślepo” (UX, logika zamówień, produkcja, PII).
-- Zapewnić powtarzalny format raportów i promptów między narzędziami.
+- Zapewnić powtarzalny format raportów i, tylko gdy Waldemar tego chce, promptów do konsultacji zewnętrznej.
 - Nie zastępuje dokumentacji technicznej (`docs/analytics/`, `NEXT_STEPS.md`, runbooki deploy).
 
 ---
@@ -23,7 +23,7 @@ Ten dokument definiuje **obowiązującą** formę współpracy nad projektami `p
 | Rola | Kto | Odpowiedzialność |
 |------|-----|------------------|
 | **Osoba decyzyjna** | Waldemar Grabowski | Priorytety biznesowe, zakres etapu, kolejność wdrożeń, ryzyka produkcyjne, UX widoczny dla klienta, obsługa klientów, akceptacja deploy |
-| **Konsultant** | ChatGPT | Porządkowanie problemu, ocena ryzyka, rekomendacja kolejności etapów, przygotowanie promptów wdrożeniowych dla Cursor, kontrola jakości decyzji |
+| **Konsultant** | ChatGPT | Porządkowanie problemu, ocena ryzyka, rekomendacja kolejności etapów i kontrola jakości decyzji — tylko gdy Waldemar decyduje o zewnętrznej konsultacji |
 | **Programista** | Cursor Agent AI | Dostęp do kodu i dev; weryfikacja faktów w repo; implementacja; testy; migracje; raport z etapu; **nie** podejmuje decyzji biznesowych zastępczo |
 
 ---
@@ -77,15 +77,15 @@ Po **znaczącym** etapie Cursor przygotowuje raport według poniższej listy. Pu
 7. **Ryzyka techniczne** — dług, edge case, regresje  
 8. **Ryzyka produkcyjne** — deploy, migracje, kolejność, downtime  
 9. **Pytania wymagające decyzji Waldemara** — tylko decyzyjne (nie techniczne „ciekawostki”)  
-10. **Pytania techniczne do ChatGPT** — weryfikacja modelu, progi, architektura  
+10. **Pytania techniczne do ChatGPT** — tylko gdy Waldemar zapowiedział zewnętrzną konsultację albo wyraźnie poprosił o taki materiał  
 11. **Rekomendowany następny krok** — **jeden** krok; bez auto-wdrożenia bez zgody  
 
-### Skrót dla człowieka i prompt do ChatGPT
+### Skrót dla człowieka i opcjonalny prompt do ChatGPT
 
 W praktyce raport 11-punktowy składa się z:
 
 - **Podsumowanie dla Waldemara (proste)** — po polsku, bez żargonu: co zrobiono, co to znaczy, na co uważać.  
-- **Prompt techniczny do ChatGPT** — w bloku kodu Markdown, samowystarczalny (ChatGPT nie zna historii czatu w Cursorze): pliki, kontrakty, testy, ryzyka, czego nie ruszono. **Bez sekretów.**
+- **Prompt techniczny do ChatGPT** — przygotuj wyłącznie wtedy, gdy Waldemar wyraźnie napisze, że chce zrobić zewnętrzną konsultację z ChatGPT i poprosi o prompt. Wtedy prompt ma być w bloku kodu Markdown, samowystarczalny i bez sekretów.
 
 ---
 
@@ -93,7 +93,7 @@ W praktyce raport 11-punktowy składa się z:
 
 | Sytuacja | Format |
 |----------|--------|
-| Wdrożenie etapu, większa zmiana, analiza pod decyzję, commit/PR, deploy | **Pełny raport (11 punktów)** + skrót + prompt ChatGPT |
+| Wdrożenie etapu, większa zmiana, analiza pod decyzję, commit/PR, deploy | **Pełny raport (11 punktów)** + skrót; prompt ChatGPT tylko na wyraźną prośbę Waldemara |
 | Drobna poprawka, jedno pytanie informacyjne, krótkie wyjaśnienie | **Skrót** — 2–4 zdania; pełna struktura nie jest wymagana |
 | Tryb B — brak decyzji | Tylko **pytania** + ewentualnie krótki kontekst; **bez implementacji** |
 | Tryb C — diagnoza | Fakty + rekomendacja; implementacja dopiero po decyzji |
@@ -121,9 +121,9 @@ Cursor traktuje taki prompt jako wejście do trybu A, o ile nie widzi sprzeczno�
 
 1. Krótka informacja o wykonanej akcji (jeśli dotyczy)  
 2. Podsumowanie dla Waldemara (proste)  
-3. Prompt techniczny do ChatGPT (blok kodu)  
-4. Rekomendowany następny krok (jeden)  
-5. Pytania: najpierw do Waldemara (decyzyjne), potem do ChatGPT (techniczne) — **tylko jeśli nie powinny być zadane przed etapem**
+3. Rekomendowany następny krok (jeden)  
+4. Pytania do Waldemara — **tylko jeśli nie powinny być zadane przed etapem**  
+5. Prompt / pytania techniczne do ChatGPT — **tylko jeśli Waldemar wyraźnie poprosił o materiał do zewnętrznej konsultacji**
 
 **Zasady techniczne w każdej implementacji:**
 
@@ -139,7 +139,7 @@ Cursor traktuje taki prompt jako wejście do trybu A, o ile nie widzi sprzeczno�
 ## 10. Prywatność i brak PII
 
 - W analityce: **bez PII**, bez wartości pól formularza, bez pełnych click ID (`fbclid`, `gclid`, …).  
-- W raportach i promptach do ChatGPT: **bez** haseł, tokenów, `.env`, danych klientów.  
+- W raportach i ewentualnych promptach do ChatGPT: **bez** haseł, tokenów, `.env`, danych klientów.  
 - Fail-silent tracking — błąd analityki nie może blokować formularza ani zamówienia.
 
 ---

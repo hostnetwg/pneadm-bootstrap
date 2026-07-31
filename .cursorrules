@@ -220,9 +220,9 @@ Schema::create('online_payment_orders', ...); // Domyślnie baza pneadm
 
 ## 💬 Forma komunikacji Waldemar ↔ ChatGPT ↔ Cursor (OBOWIĄZKOWE)
 
-Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.1).
+Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.2).
 
-**Role:** Waldemar — decyzje biznesowe i prod; ChatGPT — konsultant i prompty wdrożeniowe; Cursor — implementacja, testy, fakty z repo.
+**Role:** Waldemar — decyzje biznesowe i prod; ChatGPT — konsultant tylko na wyraźną prośbę Waldemara; Cursor — implementacja, testy, fakty z repo.
 
 **Zasada główna:** najpierw pytania i decyzje, potem prompt/implementacja. Jeśli brakuje decyzji, ryzyko UX/zamówień lub są dwa warianty — **zatrzymaj się (tryb B)**, nie wdrażaj. Pytania decyzyjne **przed** kodowaniem, nie na końcu zakończonego etapu.
 
@@ -230,10 +230,10 @@ Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.1).
 
 **Dokumentacja po funkcjonalnościach (OBOWIĄZKOWE):** po każdej nowej funkcji / znaczącym etapie aktualizuj `docs/` (moduł, `docs/deploy/`, `TESTING.md`, `NEXT_STEPS.md`, `architecture/SYSTEM_OVERVIEW.md` gdy trzeba) + podsumowanie dla Waldemara. Szczegóły: `AI_HUMAN_COMMUNICATION.md` sekcja 14. Sam commit bez docs = niedokończony etap.
 
-Po **znaczącym** etapie: raport **11 punktów** (kontekst, wdrożone, nie wdrożone, pliki, migracje/komendy, testy, ryzyka tech/prod, pytania→Waldemar, pytania→ChatGPT, następny krok) oraz:
+Po **znaczącym** etapie: raport **11 punktów** (kontekst, wdrożone, nie wdrożone, pliki, migracje/komendy, testy, ryzyka tech/prod, pytania→Waldemar, pytania→ChatGPT tylko gdy poproszono, następny krok) oraz:
 1. Podsumowanie dla Waldemara (proste, po polsku)
-2. Prompt techniczny do ChatGPT (blok kodu Markdown, bez sekretów)
+2. Prompt techniczny do ChatGPT **tylko jeśli Waldemar wyraźnie napisze, że chce zewnętrzną konsultację i poprosi o prompt** (blok kodu Markdown, bez sekretów)
 
-Kolejność odpowiedzi: akcja → podsumowanie człowiek → prompt ChatGPT → następny krok → pytania uzupełniające.
+Kolejność odpowiedzi: akcja → podsumowanie człowiek → następny krok → pytania uzupełniające. Prompt ChatGPT dodawaj tylko na wyraźną prośbę Waldemara o zewnętrzną konsultację.
 
 Przy **drobnych** akcjach pełna struktura nie jest wymagana. Nie commituj bez prośby Waldemara.
