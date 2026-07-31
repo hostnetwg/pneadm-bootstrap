@@ -80,10 +80,15 @@ Dalsze kroki:
 | `participant_live_access` (tokeny CM per uczestnik) | `e7f4389` | `docs/FORM_ORDERS_PNEDU_PROVISION.md`, `docs/deploy/2026-07-participant-live-access-and-tests.md` |
 | KSeF dwufazowy + podgląd etapów po sukcesie | `9ef8045`, `97518ff` | `docs/KSEF_FORM_ORDERS.md` |
 | Pełny `sail test` na zielono (510 passed) | `8963e23` | `docs/TESTING.md` |
+| Windykacja MVP (sprawy, działania, kontakty, VIP, skróty, Poprzednia/Następna) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-07-windykacja-mvp-deploy.md` |
+| `form_orders.ifirma_invoice_id` (wewnętrzny ID iFirma obok FV i KSeF) | lokalnie → do deploy | `docs/KSEF_FORM_ORDERS.md`, `docs/deploy/2026-07-ifirma-invoice-id-deploy.md` |
+| Sync statusu płatności iFirma → Windykacja (odczyt) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-07-ifirma-payment-status-sync-deploy.md` |
 
 **Prod adm — checklist:** `git pull` → `php artisan migrate --force` → `participants:cleanup-live-access --dry-run` → smoke provision + CM z listy uczestników.
 
 **Backlog (uzgodnione, nie wdrożone):** wysyłka maili z linkiem live z listy uczestników (hurt/indywidualnie).
+
+**Windykacja — kolejne etapy:** ~~synchronizacja statusów faktur z iFirma (odczyt)~~ **wdrożone lokalnie**; dalej: import CSV wyciągów bankowych, sugestie dopasowań po FV/KSeF/`form_orders.id`, dyskretne ograniczenia płatności odroczonej w publicznym formularzu dla wysokiego ryzyka.
 
 ## Najbliższe 10 Kroków
 

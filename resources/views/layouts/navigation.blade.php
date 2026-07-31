@@ -375,8 +375,13 @@
                     </li>
                     @endif
                     <li>
+                        <a href="{{ route('accounting.collections.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.collections.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Windykacja
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ route('accounting.debtors.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.debtors.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Dłużnicy
+                            Lookup faktury
                         </a>
                     </li>
                 </ul>

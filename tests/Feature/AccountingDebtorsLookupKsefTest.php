@@ -102,5 +102,38 @@ class AccountingDebtorsLookupKsefTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('selected.id', $match->id);
         $response->assertJsonPath('selected.invoice_number', '43/7/2026');
+        $response->assertJsonPath('selected.active_debt_case', null);
+    }
+
+    public function test_lookup_includes_active_debt_case_when_present(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Kurs z sprawą',
+            'invoice_number' => '349/6/2026',
+            'orderer_email' => 'case@example.test',
+            'product_price' => 300,
+        ]);
+
+        $case = \App\Models\DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => \App\Models\DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('accounting.debtors.lookup', [
+            'q' => '349/6/2026',
+            'match_mode' => 'exact',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('selected.id', $order->id);
+        $response->assertJsonPath('selected.active_debt_case.id', $case->id);
+        $response->assertJsonPath('selected.active_debt_case.status', 'open');
+        $response->assertJsonPath('matches.0.active_debt_case.id', $case->id);
     }
 }

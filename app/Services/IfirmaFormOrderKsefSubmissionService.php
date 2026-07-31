@@ -19,6 +19,11 @@ class IfirmaFormOrderKsefSubmissionService
     ): JsonResponse {
         $invoiceNumber = trim((string) ($invoiceNumber ?: $zamowienie->invoice_number ?: $invoiceId));
 
+        if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== (string) $invoiceId) {
+            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+            $zamowienie->save();
+        }
+
         Log::info('iFirma Invoice With KSeF: Przesyłanie do KSeF', [
             'order_id' => $zamowienie->id,
             'invoice_id' => $invoiceId,

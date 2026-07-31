@@ -3,10 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreRevenueRecordRequest;
+use App\Models\DebtCase;
+use App\Models\DebtCaseAction;
+use App\Models\DebtCaseContact;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Http\Requests\UpdateRevenueRecordRequest;
 use App\Models\RevenueRecord;
+use App\Services\DebtCustomerProfileService;
+use App\Services\IfirmaInvoicePaymentStatusService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -251,6 +256,393 @@ class AccountingController extends Controller
         return view('accounting.debtors.index');
     }
 
+    public function collectionsIndex(Request $request)
+    {
+        $status = (string) $request->get('status', '');
+        $segment = (string) $request->get('segment', '');
+        $search = trim((string) $request->get('search', ''));
+
+        $casesQuery = DebtCase::query()
+            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
+            ->latest('id');
+
+        if ($status !== '' && array_key_exists($status, DebtCase::statusLabels())) {
+            $casesQuery->where('status', $status);
+        }
+
+        if ($segment !== '' && array_key_exists($segment, DebtCase::segmentLabels())) {
+            $casesQuery->where('customer_segment', $segment);
+        }
+
+        if ($search !== '') {
+            $casesQuery->where(function ($query) use ($search) {
+                $query->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('ksef_number', 'like', "%{$search}%")
+                    ->orWhereHas('formOrder', function ($formOrderQuery) use ($search) {
+                        $formOrderQuery->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhere('ksef_number', 'like', "%{$search}%")
+                            ->orWhere('buyer_name', 'like', "%{$search}%")
+                            ->orWhere('recipient_name', 'like', "%{$search}%")
+                            ->orWhere('orderer_email', 'like', "%{$search}%")
+                            ->orWhere('buyer_nip', 'like', "%{$search}%")
+                            ->orWhere('recipient_nip', 'like', "%{$search}%");
+
+                        if (ctype_digit($search)) {
+                            $formOrderQuery->orWhereKey((int) $search);
+                        }
+                    });
+            });
+        }
+
+        $cases = $casesQuery->paginate(25)->withQueryString();
+
+        $stats = [
+            'active' => DebtCase::active()->count(),
+            'vip' => DebtCase::active()
+                ->whereIn('customer_segment', [DebtCase::SEGMENT_VIP, DebtCase::SEGMENT_VIP_OVERDUE])
+                ->count(),
+            'promised' => DebtCase::where('status', DebtCase::STATUS_PROMISED)->count(),
+            'due_today' => DebtCase::active()
+                ->whereNotNull('next_action_at')
+                ->where('next_action_at', '<=', now()->endOfDay())
+                ->count(),
+        ];
+
+        return view('accounting.collections.index', [
+            'cases' => $cases,
+            'stats' => $stats,
+            'status' => $status,
+            'segment' => $segment,
+            'search' => $search,
+            'statusLabels' => DebtCase::statusLabels(),
+            'segmentLabels' => DebtCase::segmentLabels(),
+        ]);
+    }
+
+    public function collectionsStore(Request $request, DebtCustomerProfileService $profileService)
+    {
+        $validated = $request->validate([
+            'form_order_id' => ['required', 'integer', 'exists:form_orders,id'],
+            'summary' => ['nullable', 'string', 'max:2000'],
+            'next_action_at' => ['nullable', 'date'],
+        ]);
+
+        $order = FormOrder::with(['primaryParticipant', 'onlinePaymentOrders'])->findOrFail($validated['form_order_id']);
+        $existing = DebtCase::withTrashed()->where('form_order_id', $order->id)->first();
+        if ($existing !== null && $existing->trashed()) {
+            $existing->restore();
+        }
+        if ($existing !== null) {
+            return redirect()
+                ->route('accounting.collections.show', $existing)
+                ->with('success', 'Sprawa windykacyjna dla tego zamówienia już istnieje.');
+        }
+
+        $profile = $profileService->profileForOrder($order);
+        $delay = (int) ($order->invoice_payment_delay ?: 14);
+        $invoiceDate = $order->order_date?->copy();
+        $dueDate = $invoiceDate?->copy()->addDays($delay);
+
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'created_by' => Auth::id(),
+            'assigned_to_id' => Auth::id(),
+            'status' => DebtCase::STATUS_OPEN,
+            'priority' => $profile['risk_score'] >= 50 ? DebtCase::PRIORITY_HIGH : DebtCase::PRIORITY_NORMAL,
+            'customer_segment' => $profile['customer_segment'],
+            'risk_score' => $profile['risk_score'],
+            'relationship_score' => $profile['relationship_score'],
+            'vip_reason' => $profile['vip_reason'],
+            'invoice_number' => $order->invoice_number,
+            'ksef_number' => $order->ksef_number,
+            'amount_gross' => $order->product_price,
+            'invoice_date' => $invoiceDate?->toDateString(),
+            'due_date' => $dueDate?->toDateString(),
+            'opened_at' => now(),
+            'next_action_at' => $validated['next_action_at'] ?? null,
+            'summary' => $validated['summary'] ?? null,
+        ]);
+
+        $case->actions()->create([
+            'user_id' => Auth::id(),
+            'action_type' => DebtCaseAction::TYPE_CASE_OPENED,
+            'happened_at' => now(),
+            'note' => ! empty($validated['summary'])
+                ? $validated['summary']
+                : 'Utworzono sprawę windykacyjną.',
+        ]);
+
+        return redirect()
+            ->route('accounting.collections.show', $case)
+            ->with('success', 'Utworzono sprawę windykacyjną.');
+    }
+
+    public function collectionsShow(DebtCase $debtCase, DebtCustomerProfileService $profileService)
+    {
+        $debtCase->load([
+            'formOrder.primaryParticipant',
+            'formOrder.onlinePaymentOrders',
+            'actions.user',
+            'contacts.createdBy',
+            'assignedTo',
+            'createdBy',
+        ]);
+
+        $profile = $profileService->profileForOrder($debtCase->formOrder);
+
+        // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
+        $previousCase = DebtCase::query()
+            ->where('id', '>', $debtCase->id)
+            ->orderBy('id')
+            ->first(['id']);
+        $nextCase = DebtCase::query()
+            ->where('id', '<', $debtCase->id)
+            ->orderByDesc('id')
+            ->first(['id']);
+
+        return view('accounting.collections.show', [
+            'case' => $debtCase,
+            'previousCase' => $previousCase,
+            'nextCase' => $nextCase,
+            'profile' => $profile,
+            'relatedOrders' => $profileService->relatedOrders($profile['identity']),
+            'statusLabels' => DebtCase::statusLabels(),
+            'segmentLabels' => DebtCase::segmentLabels(),
+            'actionTypeLabels' => collect(DebtCaseAction::typeLabels())
+                ->except([
+                    DebtCaseAction::TYPE_CASE_OPENED,
+                    DebtCaseAction::TYPE_STATUS_UPDATE,
+                    DebtCaseAction::TYPE_IFIRMA_SYNC,
+                ])
+                ->all(),
+            'contactTypeLabels' => DebtCaseContact::typeLabels(),
+            'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
+        ]);
+    }
+
+    public function collectionsSyncIfirma(
+        DebtCase $debtCase,
+        IfirmaInvoicePaymentStatusService $paymentStatusService
+    ) {
+        $result = $paymentStatusService->syncDebtCase($debtCase, Auth::user());
+
+        if (! ($result['success'] ?? false)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withErrors(['ifirma_sync' => $result['message'] ?? 'Synchronizacja z iFirma nie powiodła się.']);
+        }
+
+        $message = $result['message'];
+        if (($result['status'] ?? null) === IfirmaInvoicePaymentStatusService::STATUS_PAID
+            && $debtCase->fresh()->status !== DebtCase::STATUS_CLOSED) {
+            $message .= ' Możesz ręcznie zamknąć sprawę po weryfikacji.';
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', $message);
+    }
+
+    public function collectionsUpdate(Request $request, DebtCase $debtCase)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:'.implode(',', array_keys(DebtCase::statusLabels()))],
+            'priority' => ['required', 'string', 'in:low,normal,high'],
+            'customer_segment' => ['required', 'string', 'in:'.implode(',', array_keys(DebtCase::segmentLabels()))],
+            'manual_vip' => ['nullable', 'boolean'],
+            'do_not_auto_dun' => ['nullable', 'boolean'],
+            'vip_reason' => ['nullable', 'string', 'max:255'],
+            'next_action_at' => ['nullable', 'date'],
+            'summary' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $wasClosed = $debtCase->status === DebtCase::STATUS_CLOSED;
+        $isClosing = $validated['status'] === DebtCase::STATUS_CLOSED;
+        $manualVip = $request->boolean('manual_vip');
+        $doNotAutoDun = $request->boolean('do_not_auto_dun');
+
+        $changes = $this->describeDebtCaseSettingChanges($debtCase, [
+            'status' => $validated['status'],
+            'priority' => $validated['priority'],
+            'customer_segment' => $validated['customer_segment'],
+            'manual_vip' => $manualVip,
+            'do_not_auto_dun' => $doNotAutoDun,
+            'vip_reason' => $validated['vip_reason'] ?? null,
+            'next_action_at' => $validated['next_action_at'] ?? null,
+            'summary' => $validated['summary'] ?? null,
+        ]);
+
+        $debtCase->fill([
+            'status' => $validated['status'],
+            'priority' => $validated['priority'],
+            'customer_segment' => $validated['customer_segment'],
+            'manual_vip' => $manualVip,
+            'do_not_auto_dun' => $doNotAutoDun,
+            'vip_reason' => $validated['vip_reason'] ?? null,
+            'next_action_at' => $validated['next_action_at'] ?? null,
+            'summary' => $validated['summary'] ?? null,
+            'assigned_to_id' => Auth::id(),
+            'closed_at' => $isClosing ? ($debtCase->closed_at ?? now()) : null,
+        ]);
+
+        if ($wasClosed && ! $isClosing) {
+            $debtCase->closure_reason = null;
+        }
+
+        $debtCase->save();
+
+        if ($changes !== []) {
+            $debtCase->actions()->create([
+                'user_id' => Auth::id(),
+                'action_type' => DebtCaseAction::TYPE_STATUS_UPDATE,
+                'happened_at' => now(),
+                'next_action_at' => $validated['next_action_at'] ?? null,
+                'note' => 'Zmiana ustawień: '.implode('; ', $changes),
+            ]);
+            $debtCase->update([
+                'last_action_at' => now(),
+            ]);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Zapisano ustawienia sprawy.');
+    }
+
+    public function collectionsActionStore(Request $request, DebtCase $debtCase)
+    {
+        $validated = $request->validate([
+            'action_type' => ['required', 'string', 'in:'.implode(',', array_keys(DebtCaseAction::typeLabels()))],
+            'outcome' => ['nullable', 'string', 'max:64'],
+            'happened_at' => ['nullable', 'date'],
+            'promised_payment_at' => ['nullable', 'date'],
+            'next_action_at' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $action = $debtCase->actions()->create([
+            'user_id' => Auth::id(),
+            'action_type' => $validated['action_type'],
+            'outcome' => $validated['outcome'] ?? null,
+            'happened_at' => $validated['happened_at'] ?? now(),
+            'promised_payment_at' => $validated['promised_payment_at'] ?? null,
+            'next_action_at' => $validated['next_action_at'] ?? null,
+            'note' => $validated['note'] ?? null,
+        ]);
+
+        $status = match ($action->action_type) {
+            DebtCaseAction::TYPE_PAYMENT_PROMISE => DebtCase::STATUS_PROMISED,
+            DebtCaseAction::TYPE_DISPUTE => DebtCase::STATUS_DISPUTED,
+            DebtCaseAction::TYPE_PAUSE => DebtCase::STATUS_PAUSED,
+            DebtCaseAction::TYPE_CLOSE => DebtCase::STATUS_CLOSED,
+            default => $debtCase->status === DebtCase::STATUS_OPEN ? DebtCase::STATUS_IN_PROGRESS : $debtCase->status,
+        };
+
+        $debtCase->update([
+            'status' => $status,
+            'assigned_to_id' => Auth::id(),
+            'last_action_at' => $action->happened_at,
+            'next_action_at' => $action->next_action_at,
+            'closed_at' => $status === DebtCase::STATUS_CLOSED ? now() : $debtCase->closed_at,
+            'closure_reason' => $status === DebtCase::STATUS_CLOSED ? ($action->note ?: $debtCase->closure_reason) : $debtCase->closure_reason,
+        ]);
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Dodano działanie do sprawy.');
+    }
+
+    public function collectionsContactStore(Request $request, DebtCase $debtCase)
+    {
+        $validated = $request->validate([
+            'contact_type' => ['required', 'string', 'in:'.implode(',', array_keys(DebtCaseContact::typeLabels()))],
+            'value' => ['required', 'string', 'max:255'],
+            'label' => ['nullable', 'string', 'max:120'],
+            'source' => ['nullable', 'string', 'max:120'],
+            'is_primary' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $debtCase->contacts()->create([
+            'created_by' => Auth::id(),
+            'contact_type' => $validated['contact_type'],
+            'value' => $validated['value'],
+            'label' => $validated['label'] ?? null,
+            'source' => $validated['source'] ?? null,
+            'is_primary' => $request->boolean('is_primary'),
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $debtCase->update([
+            'assigned_to_id' => Auth::id(),
+            'last_action_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Dodano kontakt do sprawy.');
+    }
+
+    /**
+     * @param  array{
+     *     status: string,
+     *     priority: string,
+     *     customer_segment: string,
+     *     manual_vip: bool,
+     *     do_not_auto_dun: bool,
+     *     vip_reason: ?string,
+     *     next_action_at: ?string,
+     *     summary: ?string
+     * }  $incoming
+     * @return list<string>
+     */
+    private function describeDebtCaseSettingChanges(DebtCase $debtCase, array $incoming): array
+    {
+        $changes = [];
+
+        if ($debtCase->status !== $incoming['status']) {
+            $from = DebtCase::statusLabels()[$debtCase->status] ?? $debtCase->status;
+            $to = DebtCase::statusLabels()[$incoming['status']] ?? $incoming['status'];
+            $changes[] = "status {$from} → {$to}";
+        }
+
+        if ($debtCase->priority !== $incoming['priority']) {
+            $changes[] = "priorytet {$debtCase->priority} → {$incoming['priority']}";
+        }
+
+        if ($debtCase->customer_segment !== $incoming['customer_segment']) {
+            $from = DebtCase::segmentLabels()[$debtCase->customer_segment] ?? $debtCase->customer_segment;
+            $to = DebtCase::segmentLabels()[$incoming['customer_segment']] ?? $incoming['customer_segment'];
+            $changes[] = "segment {$from} → {$to}";
+        }
+
+        if ((bool) $debtCase->manual_vip !== $incoming['manual_vip']) {
+            $changes[] = 'VIP ręcznie: '.($incoming['manual_vip'] ? 'włączono' : 'wyłączono');
+        }
+
+        if ((bool) $debtCase->do_not_auto_dun !== $incoming['do_not_auto_dun']) {
+            $changes[] = 'bez auto monitu: '.($incoming['do_not_auto_dun'] ? 'włączono' : 'wyłączono');
+        }
+
+        if ((string) ($debtCase->vip_reason ?? '') !== (string) ($incoming['vip_reason'] ?? '')) {
+            $changes[] = 'powód VIP zmieniony';
+        }
+
+        $oldNext = $debtCase->next_action_at?->timezone(config('app.timezone'))->format('Y-m-d H:i');
+        $newNext = ! empty($incoming['next_action_at'])
+            ? \Illuminate\Support\Carbon::parse($incoming['next_action_at'])->timezone(config('app.timezone'))->format('Y-m-d H:i')
+            : null;
+        if ($oldNext !== $newNext) {
+            $changes[] = 'następny kontakt: '.($oldNext ?: '—').' → '.($newNext ?: '—');
+        }
+
+        if ((string) ($debtCase->summary ?? '') !== (string) ($incoming['summary'] ?? '')) {
+            $changes[] = 'podsumowanie zmienione';
+        }
+
+        return $changes;
+    }
+
     /**
      * Live lookup danych pod ponaglenie po numerze faktury lub numerze KSeF.
      * Uwaga: dla faktur odroczonych status opłacenia jest weryfikowany w iFirma (poza systemem).
@@ -266,7 +658,7 @@ class AccountingController extends Controller
         $matchMode = (string) ($validated['match_mode'] ?? 'partial');
 
         $matchesQuery = FormOrder::query()
-            ->with(['primaryParticipant', 'onlinePaymentOrders'])
+            ->with(['primaryParticipant', 'onlinePaymentOrders', 'activeDebtCases'])
             ->where(function ($q) {
                 $q->where(function ($invoice) {
                     $invoice->whereNotNull('invoice_number')
@@ -337,6 +729,7 @@ class AccountingController extends Controller
                 'product_name' => $order->product_name,
                 'buyer_name' => $order->buyer_name,
                 'recipient_name' => $order->recipient_name,
+                'active_debt_case' => $this->debtCaseSummaryForOrder($order),
             ])->values(),
             'selected' => [
                 'id' => $selected->id,
@@ -353,6 +746,7 @@ class AccountingController extends Controller
                 'payment_mode_label' => $selected->paymentModeLabelWithGateway(),
                 'payment_status_label' => FormOrder::paymentStatusLabel($selected->payment_status),
                 'payment_status_hint' => $this->buildPaymentStatusHint($selected),
+                'active_debt_case' => $this->debtCaseSummaryForOrder($selected),
                 'orderer' => [
                     'name' => $selected->orderer_name,
                     'email' => $selected->orderer_email,
@@ -382,6 +776,27 @@ class AccountingController extends Controller
             ],
             'history' => $historyPayload,
         ]);
+    }
+
+    /**
+     * @return array{id: int, status: string, status_label: string, url: string}|null
+     */
+    private function debtCaseSummaryForOrder(FormOrder $order): ?array
+    {
+        $case = $order->relationLoaded('activeDebtCases')
+            ? $order->activeDebtCases->sortByDesc('id')->first()
+            : $order->activeDebtCases()->orderByDesc('id')->first();
+
+        if ($case === null) {
+            return null;
+        }
+
+        return [
+            'id' => $case->id,
+            'status' => $case->status,
+            'status_label' => $case->statusLabel(),
+            'url' => route('accounting.collections.show', $case),
+        ];
     }
 
     private function buildDebtorHistoryPayload(FormOrder $selected): array

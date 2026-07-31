@@ -161,6 +161,32 @@
                 return `${numeric.toFixed(2)} zł`;
             };
 
+            const collectionsStoreUrl = @json(route('accounting.collections.store'));
+            const formOrdersShowBase = @json(url('/form-orders'));
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            const debtCaseActionsHtml = (item) => {
+                const debtCase = item?.active_debt_case || null;
+                if (debtCase) {
+                    return `
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <span class="badge text-bg-danger">Windykacja #${escapeHtml(debtCase.id)} · ${escapeHtml(debtCase.status_label)}</span>
+                            <a href="${escapeHtml(debtCase.url)}" class="btn btn-sm btn-outline-danger">Otwórz sprawę</a>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <form method="POST" action="${collectionsStoreUrl}" class="d-inline">
+                        <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
+                        <input type="hidden" name="form_order_id" value="${escapeHtml(item.id)}">
+                        <button type="submit" class="btn btn-sm btn-danger">
+                            <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
+                        </button>
+                    </form>
+                `;
+            };
+
             const formatPhoneDisplay = (value) => {
                 if (value === null || value === undefined) {
                     return null;
@@ -396,6 +422,7 @@
                     ? `<p class="mb-1"><strong>Numer KSeF:</strong> ${escapeHtml(selected.ksef_number)}</p>`
                     : '';
                 ordererParticipantCard.innerHTML = `
+                    <p class="mb-1"><strong>Zamówienie:</strong> <a href="${formOrdersShowBase}/${escapeHtml(selected.id)}" class="text-decoration-none">#${escapeHtml(selected.id)}</a></p>
                     <p class="mb-1"><strong>Faktura:</strong> ${escapeHtml(selected.invoice_number)}</p>
                     ${ksefLine}
                     <p class="mb-1"><strong>Data faktury:</strong> ${escapeHtml(selected.invoice_date)}</p>
@@ -403,6 +430,7 @@
                     <p class="mb-2"><strong>Po terminie:</strong> ${escapeHtml(overdueLabel(selected))}</p>
                     <p class="mb-1"><strong>Tryb:</strong> ${escapeHtml(selected.payment_mode_label)}</p>
                     <p class="mb-2"><strong>Status:</strong> ${escapeHtml(selected.payment_status_hint)}</p>
+                    <div class="mb-2">${debtCaseActionsHtml(selected)}</div>
                     <hr>
                     <p class="mb-1"><strong>Zamawiający:</strong> ${escapeHtml(selected.orderer.name)}</p>
                     <p class="mb-1"><strong>E-mail:</strong> ${escapeHtml(selected.orderer.email)}</p>

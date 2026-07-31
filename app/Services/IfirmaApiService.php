@@ -388,6 +388,142 @@ class IfirmaApiService
     }
 
     /**
+     * Lista dokumentów sprzedaży (GET faktury.json).
+     *
+     * @param  array<string, mixed>  $params  dataOd (wymagane), dataDo, status, strona, iloscNaStronie, …
+     * @return array Wynik żądania
+     *
+     * @see https://api.ifirma.pl/lista-faktur/
+     */
+    public function listSalesDocuments(array $params): array
+    {
+        return $this->get('faktury.json', 'faktura', $params);
+    }
+
+    /**
+     * Szuka faktury krajowej po PelnyNumer w zadanym zakresie dat (stronicowanie).
+     *
+     * @return array{status: string, invoice?: array, message?: string}
+     */
+    public function findSalesInvoiceByPelnyNumer(string $pelnyNumer, string $dataOd, ?string $dataDo = null): array
+    {
+        $needle = $this->normalizeInvoiceNumber($pelnyNumer);
+        if ($needle === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Pusty numer faktury.',
+            ];
+        }
+
+        $page = 1;
+        $perPage = 50;
+        $maxPages = 10;
+
+        while ($page <= $maxPages) {
+            $params = [
+                'dataOd' => $dataOd,
+                'strona' => $page,
+                'iloscNaStronie' => $perPage,
+                'typ' => 'prz_faktura_kraj',
+            ];
+            if ($dataDo !== null && $dataDo !== '') {
+                $params['dataDo'] = $dataDo;
+            }
+
+            $result = $this->listSalesDocuments($params);
+            if (($result['status'] ?? null) !== 'success') {
+                return [
+                    'status' => $result['status'] ?? 'error',
+                    'message' => $result['message'] ?? 'Nie udało się pobrać listy faktur z iFirma.',
+                ];
+            }
+
+            $rows = $this->extractSalesDocumentRows($result['data'] ?? null);
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $candidate = $this->normalizeInvoiceNumber((string) ($row['PelnyNumer'] ?? ''));
+                if ($candidate !== '' && $candidate === $needle) {
+                    return [
+                        'status' => 'success',
+                        'invoice' => $row,
+                    ];
+                }
+            }
+
+            if (count($rows) < $perPage) {
+                break;
+            }
+            $page++;
+        }
+
+        return [
+            'status' => 'not_found',
+            'message' => 'Nie znaleziono faktury o podanym numerze w iFirma (w zakresie dat).',
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function extractSalesDocumentRows(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $wynik = $payload['response']['Wynik']
+            ?? $payload['Wynik']
+            ?? null;
+
+        return is_array($wynik) ? array_values(array_filter($wynik, 'is_array')) : [];
+    }
+
+    /**
+     * Normalizuje payload GET fakturakraj/{id} do płaskiej tablicy pól faktury.
+     *
+     * @return array<string, mixed>
+     */
+    public function unwrapInvoicePayload(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        if (isset($payload['response']) && is_array($payload['response'])) {
+            $response = $payload['response'];
+            // Lista / błąd: Kod + Informacja; szczegóły faktury bywają bezpośrednio w response
+            // albo zagnieżdżone — jeśli widać pola faktury, użyj response.
+            if (isset($response['PelnyNumer']) || isset($response['Zaplacono']) || isset($response['Brutto'])) {
+                return $response;
+            }
+            if (isset($response['Wynik']) && is_array($response['Wynik']) && $this->isAssocArray($response['Wynik'])) {
+                return $response['Wynik'];
+            }
+        }
+
+        return $payload;
+    }
+
+    public function normalizeInvoiceNumber(string $number): string
+    {
+        $number = trim($number);
+        $number = str_replace(["\u{00A0}", ' '], '', $number);
+
+        return mb_strtolower($number);
+    }
+
+    private function isAssocArray(array $array): bool
+    {
+        if ($array === []) {
+            return false;
+        }
+
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+
+    /**
      * Wystawia fakturę pro forma
      *
      * @param  array  $invoiceData  Dane faktury (Kontrahent, Pozycje, etc.)

@@ -64,7 +64,8 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Moduł | Filtr / plik |
 |-------|----------------|
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest` |
-| KSeF / iFirma | `--filter=IfirmaFormOrderKsefSubmissionServiceTest` (jeśli istnieje) |
+| KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest` (jeśli istnieje) |
+| Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Pełny suite | `sail test` |
 

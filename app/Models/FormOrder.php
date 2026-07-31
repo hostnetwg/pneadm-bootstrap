@@ -217,6 +217,7 @@ class FormOrder extends Model
 
         // Dane do faktury
         'invoice_number',
+        'ifirma_invoice_id',
         'invoice_notes',
         'invoice_payment_delay',
         'invoice_exempt_at',
@@ -680,6 +681,15 @@ class FormOrder extends Model
     }
 
     /**
+     * Wewnętrzny Identyfikator dokumentu w iFirma (nie mylić z PelnyNumer / KSeF).
+     */
+    public function hasIfirmaInvoiceId(): bool
+    {
+        return is_string($this->ifirma_invoice_id)
+            && trim($this->ifirma_invoice_id) !== '';
+    }
+
+    /**
      * Oznaczone jako zamknięte rozliczeniowo bez FV (bezpłatny dostęp).
      */
     public function isInvoiceExempt(): bool
@@ -1031,6 +1041,16 @@ class FormOrder extends Model
     public function invoiceExemptByUser()
     {
         return $this->belongsTo(User::class, 'invoice_exempt_by');
+    }
+
+    public function debtCases()
+    {
+        return $this->hasMany(DebtCase::class, 'form_order_id');
+    }
+
+    public function activeDebtCases()
+    {
+        return $this->hasMany(DebtCase::class, 'form_order_id')->active();
     }
 
     public function legacyHandledByUser()

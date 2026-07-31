@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-07-28  
+Data utworzenia/aktualizacji: 2026-07-31  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -28,6 +28,7 @@ adm.pnedu.pl
     ├─ uczestnicy
     ├─ certyfikaty
     ├─ faktury / iFirma / KSeF
+    ├─ księgowość / windykacja
     └─ raporty
 
 bazy danych
@@ -87,6 +88,7 @@ Kluczowe obszary:
 - faktury,
 - iFirma,
 - KSeF,
+- windykacja faktur (`accounting.collections.*`; źródło prawdy płatności odroczonych: iFirma),
 - płatności,
 - kampanie marketingowe,
 - źródła marketingowe,

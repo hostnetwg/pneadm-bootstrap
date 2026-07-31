@@ -251,7 +251,7 @@ class FormOrdersController extends Controller
 
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->get();
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -261,7 +261,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor'])->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->paginate($perPage);
         }
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień (cache 60 s — pełny skan jest drogi)
@@ -785,7 +785,7 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant.participant.liveAccess', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser'])->find($id);
+        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant.participant.liveAccess', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser', 'activeDebtCases'])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -2053,6 +2053,9 @@ class FormOrdersController extends Controller
                             \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
                         );
                         $zamowienie->invoice_number = $invoiceNumber;
+                        if (! empty($invoiceId)) {
+                            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        }
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2068,9 +2071,15 @@ class FormOrdersController extends Controller
                                 'model_id' => $zamowienie->id,
                                 'model_name' => "Zamówienie #{$zamowienie->id}",
                                 'old_values' => $oldInvoiceNumber ? ['invoice_number' => $oldInvoiceNumber] : null,
-                                'new_values' => ['invoice_number' => $invoiceNumber],
+                                'new_values' => array_filter([
+                                    'invoice_number' => $invoiceNumber,
+                                    'ifirma_invoice_id' => ! empty($invoiceId) ? (string) $invoiceId : null,
+                                ]),
                             ]
                         );
+                    } elseif (! empty($invoiceId) && empty($zamowienie->ifirma_invoice_id)) {
+                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        $zamowienie->save();
                     }
                 }
 
@@ -2401,6 +2410,9 @@ class FormOrdersController extends Controller
                             \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
                         );
                         $zamowienie->invoice_number = $invoiceNumber;
+                        if (! empty($invoiceId)) {
+                            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        }
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2416,9 +2428,15 @@ class FormOrdersController extends Controller
                                 'model_id' => $zamowienie->id,
                                 'model_name' => "Zamówienie #{$zamowienie->id}",
                                 'old_values' => $oldInvoiceNumber ? ['invoice_number' => $oldInvoiceNumber] : null,
-                                'new_values' => ['invoice_number' => $invoiceNumber],
+                                'new_values' => array_filter([
+                                    'invoice_number' => $invoiceNumber,
+                                    'ifirma_invoice_id' => ! empty($invoiceId) ? (string) $invoiceId : null,
+                                ]),
                             ]
                         );
+                    } elseif (! empty($invoiceId) && empty($zamowienie->ifirma_invoice_id)) {
+                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        $zamowienie->save();
                     }
                 }
 
@@ -2582,6 +2600,11 @@ class FormOrdersController extends Controller
                         'error' => 'Brak identyfikatora faktury iFirma do przesłania do KSeF.',
                         'step' => 'ksef_send',
                     ], 400);
+                }
+
+                if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== $invoiceId) {
+                    $zamowienie->ifirma_invoice_id = $invoiceId;
+                    $zamowienie->save();
                 }
 
                 return app(IfirmaFormOrderKsefSubmissionService::class)->submit(
@@ -2776,6 +2799,7 @@ class FormOrdersController extends Controller
                 \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
             );
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
+            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
             $zamowienie->save();
 
             $resolvedInvoiceNumber = (string) ($invoiceNumber ?: $invoiceId);

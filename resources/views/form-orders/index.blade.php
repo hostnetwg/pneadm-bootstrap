@@ -410,6 +410,19 @@
                                                     </span>
                                                 @endif
                                             @endif
+                                            @if($zamowienie->activeDebtCases->isNotEmpty())
+                                                @php
+                                                    $debtCase = $zamowienie->activeDebtCases->first();
+                                                @endphp
+                                                <a href="{{ route('accounting.collections.show', $debtCase) }}"
+                                                   class="badge bg-danger ms-2 text-decoration-none"
+                                                   title="Aktywna sprawa windykacyjna: {{ $debtCase->statusLabel() }}">
+                                                    <i class="bi bi-exclamation-octagon"></i> Windykacja
+                                                </a>
+                                                @if($debtCase->isVip())
+                                                    <span class="badge bg-warning text-dark ms-1" title="{{ $debtCase->vip_reason ?: 'VIP / ważny klient' }}">VIP</span>
+                                                @endif
+                                            @endif
                                         </h5>
                                         @php
                                             $orderDateFormatted = $zamowienie->formatOrderDateLocal();

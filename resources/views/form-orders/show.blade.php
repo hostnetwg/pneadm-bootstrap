@@ -177,6 +177,19 @@
                                 {{ number_format($zamowienie->product_price, 2) }} PLN
                             </span>
                         @endif
+                        @if($zamowienie->activeDebtCases->isNotEmpty())
+                            @php
+                                $headerDebtCase = $zamowienie->activeDebtCases->first();
+                            @endphp
+                            <a href="{{ route('accounting.collections.show', $headerDebtCase) }}"
+                               class="badge bg-danger ms-2 fs-6 text-decoration-none"
+                               title="Aktywna sprawa windykacyjna: {{ $headerDebtCase->statusLabel() }}">
+                                <i class="bi bi-exclamation-octagon"></i> Windykacja
+                            </a>
+                            @if($headerDebtCase->isVip())
+                                <span class="badge bg-warning text-dark ms-1 fs-6" title="{{ $headerDebtCase->vip_reason ?: 'VIP / ważny klient' }}">VIP</span>
+                            @endif
+                        @endif
                     </h5>
                     @php
                         $submissionTitleShow = \App\Models\FormOrder::submissionSourceLabel($zamowienie->submission_source);
@@ -705,6 +718,39 @@ nowoczesna-edukacja.pl </div>
                                     </p>
                                 @endif
                             </div>
+                            <div class="border-bottom pb-2 mb-3">
+                                <div class="small text-muted fw-semibold mb-2">
+                                    <i class="bi bi-exclamation-octagon"></i> Windykacja
+                                </div>
+                                @if($zamowienie->activeDebtCases->isNotEmpty())
+                                    @php
+                                        $debtCase = $zamowienie->activeDebtCases->first();
+                                    @endphp
+                                    <div class="alert alert-danger py-2 mb-2">
+                                        <div class="fw-semibold">Aktywna sprawa windykacyjna #{{ $debtCase->id }}</div>
+                                        <div class="small">
+                                            Status: {{ $debtCase->statusLabel() }} · Segment: {{ $debtCase->segmentLabel() }}
+                                            @if($debtCase->isVip())
+                                                · <span class="fw-semibold">VIP / delikatna obsługa</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <a href="{{ route('accounting.collections.show', $debtCase) }}" class="btn btn-sm btn-outline-danger">
+                                        Otwórz sprawę windykacyjną
+                                    </a>
+                                @else
+                                    <p class="small text-muted mb-2">
+                                        Brak aktywnej sprawy. Utwórz ją, jeśli faktura wymaga ponaglenia lub ręcznej weryfikacji płatności.
+                                    </p>
+                                    <form method="POST" action="{{ route('accounting.collections.store') }}" class="d-inline">
+                                        @csrf
+                                        <input type="hidden" name="form_order_id" value="{{ $zamowienie->id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
                             @if($zamowienie->orderer_email)
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>
@@ -789,6 +835,12 @@ nowoczesna-edukacja.pl </div>
                                              @endif>
                                             <span class="text-muted">Numer KSeF:</span>
                                             <code class="text-success" id="ksefNumberValue">{{ $zamowienie->hasConfirmedKsef() ? $zamowienie->ksef_number : '' }}</code>
+                                        </div>
+                                        <div id="ifirmaInvoiceIdDisplay"
+                                             class="mt-1 small @if(! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
+                                             title="Wewnętrzny Identyfikator dokumentu w iFirma (nie numer FV)">
+                                            <span class="text-muted">ID iFirma:</span>
+                                            <code class="text-secondary" id="ifirmaInvoiceIdValue">{{ $zamowienie->hasIfirmaInvoiceId() ? $zamowienie->ifirma_invoice_id : '' }}</code>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -1600,6 +1652,9 @@ nowoczesna-edukacja.pl `;
                             `;
                         }
                     }
+                    if (data.invoice_id) {
+                        applyIfirmaInvoiceIdDisplay(data.invoice_id);
+                    }
                     
                 } else {
                     // Błąd
@@ -1891,6 +1946,9 @@ nowoczesna-edukacja.pl `;
                             }, 2000);
                         }
                     }
+                    if (data.invoice_id) {
+                        applyIfirmaInvoiceIdDisplay(data.invoice_id);
+                    }
                 } else {
                     // Błąd
                     resultDiv.innerHTML = `
@@ -2101,9 +2159,22 @@ nowoczesna-edukacja.pl `;
             wrap.title = 'Przyjęte w KSeF';
         }
 
+        function applyIfirmaInvoiceIdDisplay(invoiceId) {
+            const wrap = document.getElementById('ifirmaInvoiceIdDisplay');
+            const valueEl = document.getElementById('ifirmaInvoiceIdValue');
+            if (!wrap || !valueEl || !invoiceId) {
+                return;
+            }
+            valueEl.textContent = invoiceId;
+            wrap.classList.remove('d-none');
+        }
+
         function renderIfirmaKsefResult(data, force, resultDiv) {
             if (data.invoice_number) {
                 applyInvoiceNumberFieldValue(data.invoice_number);
+            }
+            if (data.invoice_id) {
+                applyIfirmaInvoiceIdDisplay(data.invoice_id);
             }
             if (data.success && data.ksef_number) {
                 applyKsefNumberDisplay(data.ksef_number);

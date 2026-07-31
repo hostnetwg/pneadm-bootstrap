@@ -393,3 +393,19 @@ przycisk „Wystaw Fakturę iFirma” **nigdy** nie dołącza Podmiotu3 (tryb
 `recipient_*` przy włączonym `ksef_entity_source='recipient'` — w takim
 przypadku wystawiana jest czysta faktura krajowa (tylko nabywca). Ścieżki
 WithReceiver / WithKsef i kody błędów 400/422 dla nich pozostają bez zmian.
+
+## Identyfikatory faktury na `form_orders`
+
+Obok klasycznego numeru i KSeF zapisujemy wewnętrzny ID dokumentu iFirma:
+
+| Kolumna | Źródło iFirma | Uwagi |
+|---------|---------------|--------|
+| `invoice_number` | `PelnyNumer` | Numer widoczny dla klienta / księgowości |
+| `ksef_number` (+ `ksef_status`, `ksef_sent_at`, …) | NumerKSeF | Po akceptacji w KSeF |
+| `ifirma_invoice_id` | `Identyfikator` / FakturaId | Migracja `2026_07_31_160000_add_ifirma_invoice_id_to_form_orders_table.php`; klucz do API `fakturakraj/{id}` |
+
+Zapis `ifirma_invoice_id` przy wystawianiu FV krajowej, FV z odbiorcą oraz FV+KSeF
+(`FormOrdersController`, `IfirmaFormOrderKsefSubmissionService`). Pro-forma **nie**
+ustawia tego pola (ani `invoice_number`). W UI szczegółów zamówienia: „ID iFirma”
+pod numerem KSeF. Historyczne zamówienia bez ID dostaną je przy kolejnym kontakcie
+z iFirma (wystawienie / faza KSeF) albo przy przyszłym backfillu.

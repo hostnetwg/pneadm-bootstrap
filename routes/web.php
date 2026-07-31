@@ -552,6 +552,15 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/', [AccountingController::class, 'debtorsIndex'])->name('index');
             Route::get('/lookup', [AccountingController::class, 'debtorsLookup'])->name('lookup');
         });
+        Route::prefix('collections')->name('collections.')->group(function () {
+            Route::get('/', [AccountingController::class, 'collectionsIndex'])->name('index');
+            Route::post('/', [AccountingController::class, 'collectionsStore'])->name('store');
+            Route::get('/{debtCase}', [AccountingController::class, 'collectionsShow'])->name('show');
+            Route::put('/{debtCase}', [AccountingController::class, 'collectionsUpdate'])->name('update');
+            Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
+            Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
+            Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
+        });
 
         Route::middleware('super_admin')->prefix('instructor-invoices')->name('instructor-invoices.')->group(function () {
             Route::get('/', [\App\Http\Controllers\InstructorInvoicesController::class, 'index'])->name('index');

@@ -26,6 +26,18 @@ class FormOrderKsefHelpersTest extends TestCase
         $this->assertFalse($order->isKsefAdditionalEntityEnabled());
     }
 
+    public function test_has_ifirma_invoice_id(): void
+    {
+        $order = new FormOrder;
+        $this->assertFalse($order->hasIfirmaInvoiceId());
+
+        $order->ifirma_invoice_id = '   ';
+        $this->assertFalse($order->hasIfirmaInvoiceId());
+
+        $order->ifirma_invoice_id = '12345678';
+        $this->assertTrue($order->hasIfirmaInvoiceId());
+    }
+
     public function test_has_physical_recipient_data_complete(): void
     {
         $order = new FormOrder;
