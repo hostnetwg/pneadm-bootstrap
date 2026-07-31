@@ -403,10 +403,15 @@ class IfirmaApiService
     /**
      * Szuka faktury krajowej po PelnyNumer w zadanym zakresie dat (stronicowanie).
      *
+     * @param  string|null  $invoiceType  np. prz_faktura_kraj; null = bez filtra typu
      * @return array{status: string, invoice?: array, message?: string}
      */
-    public function findSalesInvoiceByPelnyNumer(string $pelnyNumer, string $dataOd, ?string $dataDo = null): array
-    {
+    public function findSalesInvoiceByPelnyNumer(
+        string $pelnyNumer,
+        string $dataOd,
+        ?string $dataDo = null,
+        ?string $invoiceType = 'prz_faktura_kraj'
+    ): array {
         $needle = $this->normalizeInvoiceNumber($pelnyNumer);
         if ($needle === '') {
             return [
@@ -417,17 +422,19 @@ class IfirmaApiService
 
         $page = 1;
         $perPage = 50;
-        $maxPages = 10;
+        $maxPages = 20;
 
         while ($page <= $maxPages) {
             $params = [
                 'dataOd' => $dataOd,
                 'strona' => $page,
                 'iloscNaStronie' => $perPage,
-                'typ' => 'prz_faktura_kraj',
             ];
             if ($dataDo !== null && $dataDo !== '') {
                 $params['dataDo'] = $dataDo;
+            }
+            if ($invoiceType !== null && $invoiceType !== '') {
+                $params['typ'] = $invoiceType;
             }
 
             $result = $this->listSalesDocuments($params);
@@ -495,7 +502,7 @@ class IfirmaApiService
             $response = $payload['response'];
             // Lista / błąd: Kod + Informacja; szczegóły faktury bywają bezpośrednio w response
             // albo zagnieżdżone — jeśli widać pola faktury, użyj response.
-            if (isset($response['PelnyNumer']) || isset($response['Zaplacono']) || isset($response['Brutto'])) {
+            if (isset($response['PelnyNumer']) || isset($response['Zaplacono']) || isset($response['Brutto']) || isset($response['WartoscBrutto'])) {
                 return $response;
             }
             if (isset($response['Wynik']) && is_array($response['Wynik']) && $this->isAssocArray($response['Wynik'])) {

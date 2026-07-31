@@ -358,4 +358,57 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee(route('accounting.collections.show', $newerCase), false);
         $response->assertSee(route('accounting.collections.show', $olderCase), false);
     }
+
+    public function test_collections_show_displays_course_with_link_date_and_instructor(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $instructor = \App\Models\Instructor::create([
+            'first_name' => 'Jan',
+            'last_name' => 'Kowalski',
+            'email' => 'jan.kowalski@example.test',
+            'is_active' => true,
+        ]);
+
+        $start = now()->setTimezone('Europe/Warsaw')->setTime(9, 0);
+        $course = \App\Models\Course::create([
+            'title' => 'Windykacja Testowe Szkolenie',
+            'description' => 'Test',
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(4),
+            'instructor_id' => $instructor->id,
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+        ]);
+
+        $order = FormOrder::create([
+            'product_id' => $course->id,
+            'product_name' => 'Windykacja Testowe Szkolenie',
+            'product_price' => 365,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '88/7/2026',
+        ]);
+
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '88/7/2026',
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+
+        $response->assertOk();
+        $response->assertSee('Szkolenie', false);
+        $response->assertSee('Windykacja Testowe Szkolenie', false);
+        $response->assertSee(route('courses.show', $course->id), false);
+        $response->assertSee('Jan Kowalski', false);
+        $response->assertSee($course->start_date->timezone(config('app.timezone'))->format('d.m.Y'), false);
+    }
 }

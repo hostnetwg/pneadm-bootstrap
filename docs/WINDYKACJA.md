@@ -31,7 +31,8 @@ Pierwszy etap obejmuje:
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
 - ostrzeżenie VIP / lojalny klient,
 - skróty z `/form-orders` i `/form-orders/{id}` do aktywnej sprawy,
-- na karcie sprawy: przyciski **Poprzednia** / **Następna** (kolejność jak na liście — najnowsze pierwsze; Poprzednia = nowsza sprawa, Następna = starsza).
+- na karcie sprawy: przyciski **Poprzednia** / **Następna** (kolejność jak na liście — najnowsze pierwsze; Poprzednia = nowsza sprawa, Następna = starsza),
+- w „Dane sprawy”: szkolenie z linkiem do karty kursu, datą oraz prowadzącym.
 
 ## Kto obsługuje sprawę
 
@@ -65,8 +66,9 @@ Endpoint: `POST /accounting/collections/{debtCase}/sync-ifirma`
 Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
 1. Jeśli `form_orders.ifirma_invoice_id` jest ustawione → `GET fakturakraj/{id}.json`.
-2. W przeciwnym razie → `GET faktury.json` w zakresie dat wokół `order_date` i dopasowanie po `PelnyNumer` (przy znalezieniu uzupełnia `ifirma_invoice_id`).
-3. Status wyliczany z `Zaplacono` / `Brutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
+2. W przeciwnym razie → `GET faktury.json` z zakresem dat obejmującym **miesiąc z numeru FV** (np. `239/6/2026` → czerwiec) oraz `order_date` / datę z sprawy; dopasowanie po `PelnyNumer` (przy znalezieniu uzupełnia `ifirma_invoice_id`).
+3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
+   (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
 5. **Nie** zamyka sprawy automatycznie — przy statusie „Opłacona” UI podpowiada ręczne zamknięcie.
 

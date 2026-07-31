@@ -381,7 +381,9 @@ class AccountingController extends Controller
     {
         $debtCase->load([
             'formOrder.primaryParticipant',
+            'formOrder.primaryParticipant.participant',
             'formOrder.onlinePaymentOrders',
+            'formOrder.course.instructor',
             'actions.user',
             'contacts.createdBy',
             'assignedTo',

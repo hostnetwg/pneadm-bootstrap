@@ -5,7 +5,63 @@
         </h2>
     </x-slot>
 
-    @php($order = $case->formOrder)
+    @php
+        $order = $case->formOrder;
+        $course = $order?->course;
+        $courseTitle = $course
+            ? $course->plainTitle((string) ($order->product_name ?: 'Szkolenie'))
+            : (string) ($order->product_name ?: '—');
+        $courseDateTime = $course?->start_date
+            ? $course->start_date->timezone(config('app.timezone'))->format('d.m.Y H:i')
+            : null;
+        $courseInstructor = trim(($course?->instructor?->first_name ?? '').' '.($course?->instructor?->last_name ?? ''));
+        $ordererName = trim((string) ($order->orderer_name ?? ''));
+        $ordererEmail = trim((string) ($order->orderer_email ?? ''));
+        $participantName = trim((string) ($order->display_participant_name ?? ''));
+        $participantEmail = trim((string) ($order->display_participant_email ?? ''));
+
+        $formatPhone = static function (?string $raw): ?array {
+            $raw = trim((string) $raw);
+            if ($raw === '') {
+                return null;
+            }
+            $digits = preg_replace('/\D+/', '', $raw) ?: '';
+            if ($digits === '') {
+                return ['display' => $raw, 'tel' => preg_replace('/\s+/', '', $raw) ?: $raw];
+            }
+            if (strlen($digits) === 9) {
+                return [
+                    'display' => '+48 '.substr($digits, 0, 3).' '.substr($digits, 3, 3).' '.substr($digits, 6, 3),
+                    'tel' => '+48'.$digits,
+                ];
+            }
+            if (strlen($digits) === 11 && str_starts_with($digits, '48')) {
+                return [
+                    'display' => '+48 '.substr($digits, 2, 3).' '.substr($digits, 5, 3).' '.substr($digits, 8, 3),
+                    'tel' => '+'.$digits,
+                ];
+            }
+            if (strlen($digits) === 10 && str_starts_with($digits, '0')) {
+                $national = substr($digits, 1);
+
+                return [
+                    'display' => '+48 '.substr($national, 0, 3).' '.substr($national, 3, 3).' '.substr($national, 6, 3),
+                    'tel' => '+48'.$national,
+                ];
+            }
+            if (strlen($digits) >= 10 && strlen($digits) <= 15) {
+                return [
+                    'display' => '+'.$digits,
+                    'tel' => '+'.$digits,
+                ];
+            }
+
+            return ['display' => $raw, 'tel' => $digits];
+        };
+
+        $ordererPhoneFmt = $formatPhone($order->orderer_phone ?? null);
+        $participantPhoneFmt = $formatPhone($order->primaryParticipant?->participant?->phone ?? null);
+    @endphp
 
     <div class="py-3">
         <div class="container-fluid px-4">
@@ -80,72 +136,189 @@
             @endif
 
             <div class="row g-3 mb-3">
-                <div class="col-12 col-xl-5">
+                <div class="col-12 col-xl-8">
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Dane sprawy</div>
                         <div class="card-body">
-                            <dl class="row mb-0">
-                                <dt class="col-sm-4">Zamówienie</dt>
-                                <dd class="col-sm-8">#{{ $order->id }}</dd>
-                                <dt class="col-sm-4">Faktura</dt>
-                                <dd class="col-sm-8">{{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</dd>
-                                <dt class="col-sm-4">KSeF</dt>
-                                <dd class="col-sm-8">{{ $case->ksef_number ?: $order->ksef_number ?: '—' }}</dd>
-                                <dt class="col-sm-4">ID iFirma</dt>
-                                <dd class="col-sm-8">
-                                    @if($order->hasIfirmaInvoiceId())
-                                        <code>{{ $order->ifirma_invoice_id }}</code>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </dd>
-                                <dt class="col-sm-4">Status iFirma</dt>
-                                <dd class="col-sm-8">
-                                    @if($case->ifirma_payment_status)
-                                        <span class="badge {{ \App\Services\IfirmaInvoicePaymentStatusService::statusBadgeClass($case->ifirma_payment_status) }}">
-                                            {{ $case->ifirmaPaymentStatusLabel() }}
-                                        </span>
-                                        @if($case->ifirma_synced_at)
-                                            <div class="small text-muted">
-                                                sync {{ $case->ifirma_synced_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
-                                            </div>
-                                        @endif
-                                    @else
-                                        <span class="text-muted">Nie synchronizowano</span>
-                                    @endif
-                                    <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mt-2">
-                                        @csrf
-                                        <button type="submit" class="btn btn-outline-primary btn-sm">
-                                            <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
-                                        </button>
-                                    </form>
-                                    <div class="form-text">Tylko odczyt — nie zamyka sprawy automatycznie.</div>
-                                </dd>
-                                <dt class="col-sm-4">Kwota</dt>
-                                <dd class="col-sm-8">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</dd>
-                                <dt class="col-sm-4">Termin</dt>
-                                <dd class="col-sm-8">{{ $case->due_date?->format('d.m.Y') ?: '—' }}</dd>
-                                <dt class="col-sm-4">Klient</dt>
-                                <dd class="col-sm-8">
-                                    {{ $order->recipient_name ?: $order->buyer_name ?: $order->orderer_name ?: '—' }}
-                                    <div class="small text-muted">{{ $order->orderer_email ?: $order->display_participant_email }}</div>
-                                </dd>
-                                <dt class="col-sm-4">Utworzył</dt>
-                                <dd class="col-sm-8">{{ $case->createdBy?->name ?: '—' }}</dd>
-                                <dt class="col-sm-4">Opiekun</dt>
-                                <dd class="col-sm-8">{{ $case->assignedTo?->name ?: '—' }}</dd>
-                            </dl>
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <dl class="row mb-0 gy-2">
+                                        <dt class="col-sm-4 text-muted">Zamówienie</dt>
+                                        <dd class="col-sm-8 mb-0">#{{ $order->id }}</dd>
+
+                                        <dt class="col-sm-4 text-muted">Szkolenie</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            @if($course)
+                                                <a href="{{ route('courses.show', $course->id) }}" class="fw-semibold text-decoration-none">
+                                                    {{ $courseTitle }}
+                                                </a>
+                                            @else
+                                                <span class="fw-semibold">{{ $courseTitle }}</span>
+                                            @endif
+                                            @if($courseDateTime || $courseInstructor !== '')
+                                                <div class="small text-muted mt-1">
+                                                    @if($courseDateTime)
+                                                        <span><i class="bi bi-calendar3"></i> {{ $courseDateTime }}</span>
+                                                    @endif
+                                                    @if($courseDateTime && $courseInstructor !== '')
+                                                        <span class="mx-1">·</span>
+                                                    @endif
+                                                    @if($courseInstructor !== '')
+                                                        <span><i class="bi bi-person"></i> {{ $courseInstructor }}</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Zamawiający</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            <div class="fw-semibold">{{ $ordererName !== '' ? $ordererName : '—' }}</div>
+                                            @if($ordererEmail !== '')
+                                                <div class="small mt-1">
+                                                    <i class="bi bi-envelope"></i>
+                                                    <a href="mailto:{{ $ordererEmail }}" class="text-decoration-none">{{ $ordererEmail }}</a>
+                                                </div>
+                                            @endif
+                                            @if($ordererPhoneFmt)
+                                                <div class="small mt-1">
+                                                    <i class="bi bi-telephone"></i>
+                                                    <a href="tel:{{ $ordererPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $ordererPhoneFmt['display'] }}</a>
+                                                </div>
+                                            @endif
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Uczestnik</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            <div class="fw-semibold">{{ $participantName !== '' ? $participantName : '—' }}</div>
+                                            @if($participantEmail !== '')
+                                                <div class="small mt-1">
+                                                    <i class="bi bi-envelope"></i>
+                                                    <a href="mailto:{{ $participantEmail }}" class="text-decoration-none">{{ $participantEmail }}</a>
+                                                    @if($ordererEmail !== '' && strcasecmp($ordererEmail, $participantEmail) === 0)
+                                                        <span class="badge text-bg-light border ms-1">jak zamawiający</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                            @if($participantPhoneFmt)
+                                                <div class="small mt-1">
+                                                    <i class="bi bi-telephone"></i>
+                                                    <a href="tel:{{ $participantPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $participantPhoneFmt['display'] }}</a>
+                                                </div>
+                                            @elseif($ordererPhoneFmt && ($participantEmail === '' || strcasecmp($ordererEmail, $participantEmail) === 0))
+                                                <div class="small text-muted mt-1">
+                                                    <i class="bi bi-telephone"></i> ten sam telefon co zamawiający
+                                                </div>
+                                            @endif
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Nabywca</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            @if(filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip))
+                                                <div class="fw-semibold">{{ $order->buyer_name ?: '—' }}</div>
+                                                @if(filled($order->buyer_address))
+                                                    <div class="small">{{ $order->buyer_address }}</div>
+                                                @endif
+                                                @if(filled($order->buyer_postal_code) || filled($order->buyer_city))
+                                                    <div class="small">{{ trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')) }}</div>
+                                                @endif
+                                                @if(filled($order->buyer_nip))
+                                                    <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->buyer_nip) }}</div>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Odbiorca</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            @if(filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip))
+                                                <div class="fw-semibold">{{ $order->recipient_name ?: '—' }}</div>
+                                                @if(filled($order->recipient_address))
+                                                    <div class="small">{{ $order->recipient_address }}</div>
+                                                @endif
+                                                @if(filled($order->recipient_postal_code) || filled($order->recipient_city))
+                                                    <div class="small">{{ trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')) }}</div>
+                                                @endif
+                                                @if(filled($order->recipient_nip))
+                                                    <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->recipient_nip) }}</div>
+                                                @endif
+                                                @if($order->isKsefAdditionalEntityEnabled())
+                                                    <div class="small text-muted mt-1">
+                                                        Podmiot3:
+                                                        {{ \App\Models\FormOrder::ksefAdditionalEntityRoleLabel($order->ksef_additional_entity_role) }}
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </dd>
+                                    </dl>
+                                </div>
+                                <div class="col-md-6">
+                                    <dl class="row mb-0 gy-2">
+                                        <dt class="col-sm-4 text-muted">Faktura</dt>
+                                        <dd class="col-sm-8 mb-0">{{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</dd>
+
+                                        <dt class="col-sm-4 text-muted">KSeF</dt>
+                                        <dd class="col-sm-8 mb-0 text-break">{{ $case->ksef_number ?: $order->ksef_number ?: '—' }}</dd>
+
+                                        <dt class="col-sm-4 text-muted">ID iFirma</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            @if($order->hasIfirmaInvoiceId())
+                                                <code>{{ $order->ifirma_invoice_id }}</code>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Status iFirma</dt>
+                                        <dd class="col-sm-8 mb-0">
+                                            @if($case->ifirma_payment_status)
+                                                <span class="badge {{ \App\Services\IfirmaInvoicePaymentStatusService::statusBadgeClass($case->ifirma_payment_status) }}">
+                                                    {{ $case->ifirmaPaymentStatusLabel() }}
+                                                </span>
+                                                @if($case->ifirma_synced_at)
+                                                    <div class="small text-muted">
+                                                        sync {{ $case->ifirma_synced_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">Nie synchronizowano</span>
+                                            @endif
+                                            <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mt-2">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
+                                                </button>
+                                            </form>
+                                            <div class="form-text mb-0">Tylko odczyt — nie zamyka sprawy automatycznie.</div>
+                                        </dd>
+
+                                        <dt class="col-sm-4 text-muted">Kwota</dt>
+                                        <dd class="col-sm-8 mb-0">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</dd>
+
+                                        <dt class="col-sm-4 text-muted">Termin</dt>
+                                        <dd class="col-sm-8 mb-0">{{ $case->due_date?->format('d.m.Y') ?: '—' }}</dd>
+
+                                        <dt class="col-sm-4 text-muted">Utworzył</dt>
+                                        <dd class="col-sm-8 mb-0">{{ $case->createdBy?->name ?: '—' }}</dd>
+
+                                        <dt class="col-sm-4 text-muted">Opiekun</dt>
+                                        <dd class="col-sm-8 mb-0">{{ $case->assignedTo?->name ?: '—' }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-xl-7">
+                <div class="col-12 col-xl-4">
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Status operacyjny</div>
                         <div class="card-body">
                             <form method="POST" action="{{ route('accounting.collections.update', $case) }}" class="row g-2">
                                 @csrf
                                 @method('PUT')
-                                <div class="col-6 col-lg-3">
+                                <div class="col-6">
                                     <label class="form-label small mb-1" for="status">Status</label>
                                     <select class="form-select form-select-sm" id="status" name="status">
                                         @foreach($statusLabels as $value => $label)
@@ -153,7 +326,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-6 col-lg-3">
+                                <div class="col-6">
                                     <label class="form-label small mb-1" for="priority">Priorytet</label>
                                     <select class="form-select form-select-sm" id="priority" name="priority">
                                         <option value="low" @selected($case->priority === 'low')>Niski</option>
@@ -161,7 +334,7 @@
                                         <option value="high" @selected($case->priority === 'high')>Wysoki</option>
                                     </select>
                                 </div>
-                                <div class="col-12 col-lg-3">
+                                <div class="col-6">
                                     <label class="form-label small mb-1" for="customer_segment">Segment</label>
                                     <select class="form-select form-select-sm" id="customer_segment" name="customer_segment">
                                         @foreach($segmentLabels as $value => $label)
@@ -169,7 +342,7 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-12 col-lg-3">
+                                <div class="col-6">
                                     <label class="form-label small mb-1" for="next_action_at">Następny kontakt</label>
                                     <input type="datetime-local" class="form-control form-control-sm" id="next_action_at" name="next_action_at"
                                            value="{{ $case->next_action_at?->timezone(config('app.timezone'))->format('Y-m-d\TH:i') }}">
@@ -178,22 +351,22 @@
                                     <label class="form-label small mb-1" for="summary">Podsumowanie</label>
                                     <textarea class="form-control form-control-sm" id="summary" name="summary" rows="2">{{ $case->summary }}</textarea>
                                 </div>
-                                <div class="col-12 col-lg-5">
+                                <div class="col-12">
                                     <label class="form-label small mb-1" for="vip_reason">Powód VIP / delikatnej obsługi</label>
                                     <input type="text" class="form-control form-control-sm" id="vip_reason" name="vip_reason" value="{{ $case->vip_reason }}">
                                 </div>
-                                <div class="col-12 col-lg-5 d-flex align-items-end gap-3 flex-wrap">
-                                    <div class="form-check">
+                                <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+                                    <div class="form-check mb-0">
                                         <input class="form-check-input" type="checkbox" id="manual_vip" name="manual_vip" value="1" @checked($case->manual_vip)>
                                         <label class="form-check-label" for="manual_vip">VIP ręcznie</label>
                                     </div>
-                                    <div class="form-check">
+                                    <div class="form-check mb-0">
                                         <input class="form-check-input" type="checkbox" id="do_not_auto_dun" name="do_not_auto_dun" value="1" @checked($case->do_not_auto_dun)>
                                         <label class="form-check-label" for="do_not_auto_dun">Bez automatycznego monitu</label>
                                     </div>
                                 </div>
-                                <div class="col-12 col-lg-2 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="bi bi-save"></i> Zapisz
                                     </button>
                                 </div>

@@ -57,7 +57,11 @@ class IfirmaInvoicePaymentStatusService
             ];
         }
 
-        $snapshot = $this->fetchPaymentSnapshotForOrder($order);
+        $snapshot = $this->fetchPaymentSnapshotForOrder(
+            $order,
+            $case->invoice_number ?: null,
+            $case->invoice_date
+        );
         if (! ($snapshot['success'] ?? false)) {
             return [
                 'success' => false,
@@ -146,8 +150,11 @@ class IfirmaInvoicePaymentStatusService
      *     source?: string
      * }
      */
-    public function fetchPaymentSnapshotForOrder(FormOrder $order): array
-    {
+    public function fetchPaymentSnapshotForOrder(
+        FormOrder $order,
+        ?string $invoiceNumberOverride = null,
+        mixed $invoiceDateHint = null
+    ): array {
         $invoiceId = trim((string) ($order->ifirma_invoice_id ?? ''));
         if ($invoiceId !== '') {
             $result = $this->api->getInvoice($invoiceId);
@@ -165,7 +172,7 @@ class IfirmaInvoicePaymentStatusService
             ]);
         }
 
-        $invoiceNumber = trim((string) ($order->invoice_number ?? ''));
+        $invoiceNumber = trim((string) ($invoiceNumberOverride ?: $order->invoice_number ?? ''));
         if ($invoiceNumber === '' || $invoiceNumber === '0') {
             return [
                 'success' => false,
@@ -173,12 +180,21 @@ class IfirmaInvoicePaymentStatusService
             ];
         }
 
-        [$dataOd, $dataDo] = $this->resolveSearchDateRange($order);
+        [$dataOd, $dataDo] = $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint);
+
         $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo);
+        if (($found['status'] ?? null) === 'not_found') {
+            // Ponów bez filtra typu — na liście bywają inne rodzaje dokumentów sprzedaży.
+            $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo, null);
+        }
+
         if (($found['status'] ?? null) !== 'success' || empty($found['invoice']) || ! is_array($found['invoice'])) {
+            $rangeHint = "{$dataOd} – {$dataDo}";
+
             return [
                 'success' => false,
-                'message' => $found['message'] ?? 'Nie znaleziono faktury w iFirma po numerze.',
+                'message' => ($found['message'] ?? 'Nie znaleziono faktury w iFirma po numerze.')
+                    ." Zakres wyszukiwania: {$rangeHint}.",
             ];
         }
 
@@ -207,8 +223,21 @@ class IfirmaInvoicePaymentStatusService
      */
     public function snapshotFromInvoiceRow(array $row, string $source, ?string $invoiceId = null): array
     {
-        $paid = $this->toFloatOrNull($row['Zaplacono'] ?? null);
-        $gross = $this->toFloatOrNull($row['Brutto'] ?? $row['Razem'] ?? null);
+        $paid = $this->toFloatOrNull(
+            $row['Zaplacono']
+                ?? $row['ZaplaconoNaDokumencie']
+                ?? null
+        );
+        $gross = $this->toFloatOrNull(
+            $row['Brutto']
+                ?? $row['WartoscBrutto']
+                ?? $row['Razem']
+                ?? null
+        );
+        if ($gross === null) {
+            $gross = $this->sumPozycjeBrutto($row['Pozycje'] ?? null);
+        }
+
         $dueRaw = $row['TerminPlatnosci'] ?? null;
         $dueDate = null;
         if (is_string($dueRaw) && trim($dueRaw) !== '') {
@@ -243,6 +272,37 @@ class IfirmaInvoicePaymentStatusService
         ];
     }
 
+    /**
+     * Suma brutto z pozycji faktury (GET fakturakraj/{id} nie zawsze ma Brutto, ma WartoscBrutto / Pozycje).
+     */
+    public function sumPozycjeBrutto(mixed $pozycje): ?float
+    {
+        if (! is_array($pozycje) || $pozycje === []) {
+            return null;
+        }
+
+        $sum = 0.0;
+        $any = false;
+        foreach ($pozycje as $pozycja) {
+            if (! is_array($pozycja)) {
+                continue;
+            }
+            $value = $this->toFloatOrNull(
+                $pozycja['WartoscBrutto']
+                    ?? $pozycja['Brutto']
+                    ?? $pozycja['CenaBrutto']
+                    ?? null
+            );
+            if ($value === null) {
+                continue;
+            }
+            $sum += $value;
+            $any = true;
+        }
+
+        return $any ? round($sum, 2) : null;
+    }
+
     public function deriveStatus(?float $paid, ?float $gross, ?string $dueDate): string
     {
         $paid = $paid ?? 0.0;
@@ -252,11 +312,15 @@ class IfirmaInvoicePaymentStatusService
         }
 
         if ($paid > self::AMOUNT_EPSILON) {
-            return self::STATUS_PARTIAL;
+            // Częściowa wpłata — nawet bez Brutto (np. tylko Zaplacono > 0).
+            if ($gross === null || $paid + self::AMOUNT_EPSILON < $gross) {
+                return self::STATUS_PARTIAL;
+            }
         }
 
-        if ($gross === null && $paid <= self::AMOUNT_EPSILON) {
-            // Lista iFirma czasem bez Brutto — bez kwoty nie da się odróżnić pełnej płatności
+        // Brak Brutto na szczegółach faktury nie powinien dawać „Nieznany”,
+        // gdy znamy TerminPlatnosci / brak wpłaty — to typowy payload GET fakturakraj/{id}.
+        if ($gross === null && $paid <= self::AMOUNT_EPSILON && $dueDate === null) {
             return self::STATUS_UNKNOWN;
         }
 
@@ -304,18 +368,103 @@ class IfirmaInvoicePaymentStatusService
     }
 
     /**
+     * Zakres dat do GET faktury.json.
+     * Preferuje miesiąc z numeru FV (np. 239/6/2026 → czerwiec), potem datę z sprawy / zamówienia.
+     * Dzięki temu sync działa także gdy order_date jest w innym miesiącu niż wystawienie FV.
+     *
      * @return array{0: string, 1: string}
      */
-    private function resolveSearchDateRange(FormOrder $order): array
+    public function resolveSearchDateRange(
+        FormOrder $order,
+        ?string $invoiceNumber = null,
+        mixed $invoiceDateHint = null
+    ): array {
+        $points = [];
+
+        $fromNumber = $this->parseIssueMonthFromInvoiceNumber(
+            $invoiceNumber ?: (string) ($order->invoice_number ?? '')
+        );
+        if ($fromNumber !== null) {
+            $points[] = $fromNumber->copy()->startOfMonth();
+            $points[] = $fromNumber->copy()->endOfMonth();
+        }
+
+        $hint = $this->toCarbonDate($invoiceDateHint);
+        if ($hint !== null) {
+            $points[] = $hint->copy()->startOfMonth();
+            $points[] = $hint->copy()->endOfMonth();
+        }
+
+        if ($order->order_date) {
+            $points[] = $order->order_date->copy()->startOfDay();
+        }
+        if ($order->created_at) {
+            $points[] = $order->created_at->copy()->startOfDay();
+        }
+
+        if ($points === []) {
+            $points[] = now()->startOfDay();
+        }
+
+        /** @var Carbon $min */
+        $min = $points[0];
+        /** @var Carbon $max */
+        $max = $points[0];
+        foreach ($points as $point) {
+            if ($point->lt($min)) {
+                $min = $point;
+            }
+            if ($point->gt($max)) {
+                $max = $point;
+            }
+        }
+
+        return [
+            $min->copy()->subDays(14)->toDateString(),
+            $max->copy()->addDays(45)->toDateString(),
+        ];
+    }
+
+    /**
+     * Parsuje miesiąc wystawienia z numeru iFirma: {nr}/{miesiąc}/{rok}.
+     * Przykłady: 239/6/2026, 12/06/2025.
+     */
+    public function parseIssueMonthFromInvoiceNumber(?string $invoiceNumber): ?Carbon
     {
-        $anchor = $order->order_date?->copy()
-            ?? $order->created_at?->copy()
-            ?? now();
+        if ($invoiceNumber === null) {
+            return null;
+        }
 
-        $dataOd = $anchor->copy()->subDays(7)->toDateString();
-        $dataDo = $anchor->copy()->addDays(90)->toDateString();
+        $invoiceNumber = trim($invoiceNumber);
+        if ($invoiceNumber === '' || ! preg_match('/^(\d+)\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})\b/u', $invoiceNumber, $matches)) {
+            return null;
+        }
 
-        return [$dataOd, $dataDo];
+        $month = (int) $matches[2];
+        $year = (int) $matches[3];
+        if ($month < 1 || $month > 12 || $year < 2000 || $year > 2100) {
+            return null;
+        }
+
+        return Carbon::create($year, $month, 1)->startOfDay();
+    }
+
+    private function toCarbonDate(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::parse($value)->startOfDay();
+        }
+        try {
+            return Carbon::parse((string) $value)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function toFloatOrNull(mixed $value): ?float
