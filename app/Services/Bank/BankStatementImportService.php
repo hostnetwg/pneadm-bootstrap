@@ -381,6 +381,75 @@ class BankStatementImportService
         return $this->acceptMatch($match, $userId);
     }
 
+    /**
+     * Ręczne powiązanie wpływu z zamówieniem (bez aktywnej sprawy) + akceptacja.
+     * acceptMatch utworzy lub przywróci sprawę windykacyjną.
+     */
+    public function manuallyLinkTransactionToFormOrder(
+        BankTransaction $transaction,
+        FormOrder $order,
+        ?int $userId = null
+    ): BankTransactionMatch {
+        if (! $transaction->is_incoming) {
+            throw new InvalidArgumentException('Można powiązać tylko wpływy (przelewy przychodzące).');
+        }
+
+        if ($transaction->matches()
+            ->whereIn('status', [
+                BankTransactionMatch::STATUS_ACCEPTED,
+                BankTransactionMatch::STATUS_IGNORED,
+            ])
+            ->exists()) {
+            throw new InvalidArgumentException('Ten przelew jest już zaakceptowany albo zignorowany.');
+        }
+
+        $activeCase = DebtCase::query()
+            ->where('form_order_id', $order->id)
+            ->where('status', '!=', DebtCase::STATUS_CLOSED)
+            ->latest('id')
+            ->first();
+
+        if ($activeCase) {
+            return $this->manuallyLinkTransactionToDebtCase($transaction, $activeCase, $userId);
+        }
+
+        $userId = $userId ?? Auth::id();
+        $amountMatches = abs(
+            round((float) $transaction->amount, 2)
+            - round((float) ($order->product_price ?? 0), 2)
+        ) <= 0.01;
+
+        $reasons = [
+            'manual_case_link',
+            $amountMatches ? 'amount_match' : 'amount_mismatch',
+        ];
+
+        $match = BankTransactionMatch::query()
+            ->where('bank_transaction_id', $transaction->id)
+            ->where('form_order_id', $order->id)
+            ->whereNull('debt_case_id')
+            ->first();
+
+        if ($match) {
+            $match->forceFill([
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $reasons,
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ])->save();
+        } else {
+            $match = BankTransactionMatch::create([
+                'bank_transaction_id' => $transaction->id,
+                'form_order_id' => $order->id,
+                'debt_case_id' => null,
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $reasons,
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ]);
+        }
+
+        return $this->acceptMatch($match, $userId);
+    }
+
     public function ignoreMatch(BankTransactionMatch $match): BankTransactionMatch
     {
         $match->update(['status' => BankTransactionMatch::STATUS_IGNORED]);

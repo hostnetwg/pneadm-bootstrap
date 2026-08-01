@@ -6,6 +6,7 @@ use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
+use App\Models\FormOrder;
 use App\Models\User;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\DebtCaseAutoCloseService;
@@ -357,41 +358,58 @@ class BankStatementImportController extends Controller
         $query = trim($validated['q']);
         $digits = preg_replace('/\D+/', '', $query) ?: '';
 
+        $applyOrderSearch = function ($formOrderQuery) use ($query, $digits) {
+            $formOrderQuery->where(function ($inner) use ($query, $digits) {
+                $inner->where('invoice_number', 'like', "%{$query}%")
+                    ->orWhere('ksef_number', 'like', "%{$query}%")
+                    ->orWhere('buyer_name', 'like', "%{$query}%")
+                    ->orWhere('recipient_name', 'like', "%{$query}%")
+                    ->orWhere('orderer_name', 'like', "%{$query}%")
+                    ->orWhere('orderer_email', 'like', "%{$query}%")
+                    ->orWhere('buyer_nip', 'like', "%{$query}%")
+                    ->orWhere('recipient_nip', 'like', "%{$query}%")
+                    ->orWhere('product_name', 'like', "%{$query}%");
+
+                if (ctype_digit($query)) {
+                    $inner->orWhereKey((int) $query);
+                }
+
+                if (strlen($digits) >= 7) {
+                    $inner->orWhereRaw(
+                        "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                        ['%'.$digits.'%']
+                    )->orWhereRaw(
+                        "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                        ['%'.$digits.'%']
+                    );
+                }
+            });
+        };
+
         $cases = DebtCase::query()
             ->active()
             ->with(['formOrder'])
-            ->where(function ($outer) use ($query, $digits) {
+            ->where(function ($outer) use ($query, $applyOrderSearch) {
                 $outer->where('invoice_number', 'like', "%{$query}%")
                     ->orWhere('ksef_number', 'like', "%{$query}%")
-                    ->orWhereHas('formOrder', function ($formOrderQuery) use ($query, $digits) {
-                        $formOrderQuery->where('invoice_number', 'like', "%{$query}%")
-                            ->orWhere('ksef_number', 'like', "%{$query}%")
-                            ->orWhere('buyer_name', 'like', "%{$query}%")
-                            ->orWhere('recipient_name', 'like', "%{$query}%")
-                            ->orWhere('orderer_name', 'like', "%{$query}%")
-                            ->orWhere('orderer_email', 'like', "%{$query}%")
-                            ->orWhere('buyer_nip', 'like', "%{$query}%")
-                            ->orWhere('recipient_nip', 'like', "%{$query}%");
-
-                        if (ctype_digit($query)) {
-                            $formOrderQuery->orWhereKey((int) $query);
-                        }
-
-                        if (strlen($digits) >= 7) {
-                            $formOrderQuery->orWhereRaw(
-                                "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
-                                ['%'.$digits.'%']
-                            )->orWhereRaw(
-                                "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
-                                ['%'.$digits.'%']
-                            );
-                        }
-                    });
+                    ->orWhereHas('formOrder', $applyOrderSearch);
 
                 if (ctype_digit($query)) {
                     $outer->orWhereKey((int) $query);
                 }
             })
+            ->latest('id')
+            ->limit(12)
+            ->get();
+
+        $caseOrderIds = $cases->pluck('form_order_id')->filter()->all();
+
+        $orders = FormOrder::query()
+            ->whereDoesntHave('activeDebtCases')
+            ->where(function ($outer) use ($applyOrderSearch) {
+                $applyOrderSearch($outer);
+            })
+            ->when($caseOrderIds !== [], fn ($q) => $q->whereNotIn('id', $caseOrderIds))
             ->latest('id')
             ->limit(12)
             ->get();
@@ -402,6 +420,7 @@ class BankStatementImportController extends Controller
                 $amount = (float) ($case->amount_gross ?? $order?->product_price ?? 0);
 
                 return [
+                    'type' => 'case',
                     'id' => $case->id,
                     'status' => $case->status,
                     'status_label' => $case->statusLabel(),
@@ -414,7 +433,25 @@ class BankStatementImportController extends Controller
                         : null,
                     'buyer_name' => $order?->buyer_name,
                     'recipient_name' => $order?->recipient_name,
+                    'product_name' => $order?->product_name,
                     'url' => route('accounting.collections.show', $case),
+                ];
+            })->values(),
+            'orders' => $orders->map(function (FormOrder $order) {
+                return [
+                    'type' => 'order',
+                    'id' => $order->id,
+                    'invoice_number' => $order->invoice_number ?: null,
+                    'ksef_number' => $order->ksef_number ?: null,
+                    'amount_gross' => (float) ($order->product_price ?? 0),
+                    'order_id' => $order->id,
+                    'order_date' => $order->order_date
+                        ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
+                        : null,
+                    'buyer_name' => $order->buyer_name,
+                    'recipient_name' => $order->recipient_name,
+                    'product_name' => $order->product_name,
+                    'url' => route('form-orders.show', $order->id),
                 ];
             })->values(),
         ]);
@@ -433,27 +470,45 @@ class BankStatementImportController extends Controller
         }
 
         $validated = $request->validate([
-            'debt_case_id' => ['required', 'integer', 'exists:debt_cases,id'],
+            'debt_case_id' => ['nullable', 'integer', 'exists:debt_cases,id'],
+            'form_order_id' => ['nullable', 'integer', 'exists:form_orders,id'],
             'register_ifirma_payment' => ['nullable', 'boolean'],
         ]);
 
-        $debtCase = DebtCase::query()->findOrFail($validated['debt_case_id']);
+        if (empty($validated['debt_case_id']) && empty($validated['form_order_id'])) {
+            return back()->withErrors(['match' => 'Wybierz sprawę albo zamówienie do powiązania.']);
+        }
 
         try {
-            $accepted = $importService->manuallyLinkTransactionToDebtCase(
-                $transaction,
-                $debtCase,
-                $request->user()?->id
-            );
+            if (! empty($validated['debt_case_id'])) {
+                $debtCase = DebtCase::query()->findOrFail($validated['debt_case_id']);
+                $accepted = $importService->manuallyLinkTransactionToDebtCase(
+                    $transaction,
+                    $debtCase,
+                    $request->user()?->id
+                );
+                $message = sprintf(
+                    'Ręcznie powiązano przelew #%d ze sprawą #%d.',
+                    $transaction->id,
+                    $debtCase->id
+                );
+            } else {
+                $order = FormOrder::query()->findOrFail($validated['form_order_id']);
+                $accepted = $importService->manuallyLinkTransactionToFormOrder(
+                    $transaction,
+                    $order,
+                    $request->user()?->id
+                );
+                $message = sprintf(
+                    'Ręcznie powiązano przelew #%d z zamówieniem #%d (sprawa #%d).',
+                    $transaction->id,
+                    $order->id,
+                    $accepted->debt_case_id
+                );
+            }
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['match' => $e->getMessage()]);
         }
-
-        $message = sprintf(
-            'Ręcznie powiązano przelew #%d ze sprawą #%d.',
-            $transaction->id,
-            $debtCase->id
-        );
 
         if ($request->boolean('register_ifirma_payment')) {
             try {

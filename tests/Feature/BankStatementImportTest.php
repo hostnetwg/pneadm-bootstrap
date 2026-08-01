@@ -538,7 +538,7 @@ class BankStatementImportTest extends TestCase
             'filter' => 'unlinked',
         ]));
         $show->assertOk();
-        $show->assertSee('Powiąż ręcznie ze sprawą windykacyjną', false);
+        $show->assertSee('Powiąż ręcznie ze sprawą lub zamówieniem', false);
 
         $link = $this->actingAs($user)->post(
             route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),
@@ -557,6 +557,76 @@ class BankStatementImportTest extends TestCase
         $this->assertContains('manual_case_link', $match->match_reasons);
         $this->assertDatabaseHas('debt_case_actions', [
             'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
+        ]);
+    }
+
+    public function test_manual_link_from_bank_import_to_order_without_active_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie bez sprawy',
+            'product_price' => 420,
+            'order_date' => now()->subDays(15),
+            'invoice_number' => '902/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Firma Testowa Bez Sprawy Sp. z o.o.',
+            'buyer_nip' => '5251112223',
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_order_only.csv',
+            'file_hash' => str_repeat('2', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 420,
+            'currency' => 'PLN',
+            'description' => 'FIRMA TESTOWA BEZ SPRAWY PRZELEW',
+            'account_label' => 'Firma Testowa',
+            'fingerprint' => str_repeat('3', 64),
+            'is_incoming' => true,
+        ]);
+
+        $lookup = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => 'Bez Sprawy',
+        ]));
+        $lookup->assertOk();
+        $lookup->assertJsonPath('cases', []);
+        $lookup->assertJsonPath('orders.0.id', $order->id);
+
+        $link = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),
+            [
+                'form_order_id' => $order->id,
+                'filter' => 'unlinked',
+            ]
+        );
+        $link->assertRedirect();
+        $link->assertSessionHas('success');
+
+        $match = BankTransactionMatch::first();
+        $this->assertNotNull($match);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $match->status);
+        $this->assertSame($order->id, $match->form_order_id);
+        $this->assertNotNull($match->debt_case_id);
+        $this->assertDatabaseHas('debt_cases', [
+            'id' => $match->debt_case_id,
+            'form_order_id' => $order->id,
+        ]);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $match->debt_case_id,
             'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
         ]);
     }

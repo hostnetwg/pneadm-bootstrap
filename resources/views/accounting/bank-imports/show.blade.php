@@ -429,10 +429,11 @@
                     </div>
 
                     <div class="border-top pt-3 mt-3 d-none" id="bankTxManualLinkPanel">
-                        <h6 class="fw-semibold mb-2">Powiąż ręcznie ze sprawą windykacyjną</h6>
+                        <h6 class="fw-semibold mb-2">Powiąż ręcznie ze sprawą lub zamówieniem</h6>
                         <p class="small text-muted mb-2">
                             Szukaj po FV, KSeF, ID sprawy/zamówienia, NIP, nazwie nabywcy/odbiorcy lub e-mailu.
-                            Wyniki tylko dla <strong>niezamkniętych</strong> spraw.
+                            Najpierw pokazujemy <strong>niezamknięte sprawy</strong>, potem zamówienia <strong>bez aktywnej sprawy</strong>
+                            (np. gdy wpłatę oznaczono wcześniej tylko w iFirma).
                         </p>
                         <div class="input-group input-group-sm mb-2" style="max-width: 36rem;">
                             <input type="text"
@@ -442,7 +443,7 @@
                                    maxlength="128"
                                    autocomplete="off">
                             <button type="button" class="btn btn-outline-primary" id="bankTxManualLookupBtn">
-                                <i class="bi bi-search"></i> Szukaj spraw
+                                <i class="bi bi-search"></i> Szukaj
                             </button>
                         </div>
                         <div class="form-text mb-2" id="bankTxManualLookupStatus"></div>
@@ -492,6 +493,7 @@
                 <form method="POST" action="" id="bankImportManualLinkConfirmForm">
                     @csrf
                     <input type="hidden" name="debt_case_id" value="" id="bankImportManualLinkCaseId">
+                    <input type="hidden" name="form_order_id" value="" id="bankImportManualLinkOrderId">
                     <input type="hidden" name="register_ifirma_payment" value="0" id="bankImportManualLinkRegisterIfirma">
                     <input type="hidden" name="filter" value="{{ $filter }}">
                     <input type="hidden" name="preview" value="" id="bankImportManualLinkPreview">
@@ -1032,50 +1034,73 @@
                 return Math.abs(Number(a) - Number(b)) <= 0.01;
             }
 
-            function renderManualLookupResults(cases, txAmount) {
+            function renderManualLookupResults(payload, txAmount) {
                 var root = document.getElementById('bankTxManualLookupResults');
                 if (!root) return;
-                if (!cases.length) {
-                    root.innerHTML = '<div class="small text-muted">Brak niezamkniętych spraw dla tego zapytania.</div>';
+
+                var cases = payload.cases || [];
+                var orders = payload.orders || [];
+                if (!cases.length && !orders.length) {
+                    root.innerHTML = '<div class="small text-muted">Brak spraw ani zamówień dla tego zapytania.</div>';
                     return;
                 }
 
-                var rows = cases.map(function (c) {
-                    var amountMatches = amountsClose(txAmount, c.amount_gross || 0);
-                    var summary = 'Sprawa #' + c.id
-                        + (c.invoice_number ? ' · FV ' + c.invoice_number : '')
-                        + (c.order_id ? ' · zam. #' + c.order_id : '')
-                        + ' · ' + Number(c.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
+                function rowHtml(item, kind) {
+                    var amountMatches = amountsClose(txAmount, item.amount_gross || 0);
+                    var summary = kind === 'case'
+                        ? ('Sprawa #' + item.id
+                            + (item.invoice_number ? ' · FV ' + item.invoice_number : '')
+                            + (item.order_id ? ' · zam. #' + item.order_id : '')
+                            + ' · ' + Number(item.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł')
+                        : ('Zamówienie #' + item.id
+                            + (item.invoice_number ? ' · FV ' + item.invoice_number : '')
+                            + ' · ' + Number(item.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł'
+                            + ' · bez aktywnej sprawy');
                     var meta = [
-                        c.status_label || '',
-                        c.buyer_name || '',
-                        c.recipient_name || '',
-                        c.order_date ? ('zam. ' + c.order_date) : ''
+                        kind === 'case' ? (item.status_label || '') : 'Utworzy sprawę przy powiązaniu',
+                        item.product_name || '',
+                        item.buyer_name || '',
+                        item.recipient_name || '',
+                        item.order_date ? ('zam. ' + item.order_date) : ''
                     ].filter(Boolean).join(' · ');
+
+                    var linkAttrs = kind === 'case'
+                        ? (' data-case-id="' + esc(String(item.id)) + '" data-order-id=""')
+                        : (' data-case-id="" data-order-id="' + esc(String(item.id)) + '"');
 
                     return '<div class="border rounded p-2 mb-2">'
                         + '<div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">'
                         + '<div class="small">'
                         + '<div class="fw-semibold">' + esc(summary) + '</div>'
                         + '<div class="text-muted">' + esc(meta) + '</div>'
-                        + (!amountMatches ? '<div class="text-warning">Kwota sprawy różni się od przelewu</div>' : '')
+                        + (!amountMatches ? '<div class="text-warning">Kwota różni się od przelewu</div>' : '')
                         + '</div>'
                         + '<div class="d-flex flex-column flex-sm-row gap-1">'
-                        + '<a class="btn btn-sm btn-outline-secondary" href="' + esc(c.url) + '" target="_blank" rel="noopener">Sprawa</a>'
+                        + '<a class="btn btn-sm btn-outline-secondary" href="' + esc(item.url) + '" target="_blank" rel="noopener">'
+                        + (kind === 'case' ? 'Sprawa' : 'Zamówienie') + '</a>'
                         + '<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
-                        + ' data-case-id="' + esc(String(c.id)) + '"'
+                        + linkAttrs
                         + ' data-register-ifirma="0"'
                         + ' data-summary="' + esc(summary) + '">Powiąż lokalnie</button>'
                         + (amountMatches
                             ? '<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
-                              + ' data-case-id="' + esc(String(c.id)) + '"'
+                              + linkAttrs
                               + ' data-register-ifirma="1"'
                               + ' data-summary="' + esc(summary) + '">+ wpłata iFirma</button>'
                             : '')
                         + '</div></div></div>';
-                }).join('');
+                }
 
-                root.innerHTML = rows;
+                var html = '';
+                if (cases.length) {
+                    html += '<div class="small text-muted mb-1">Sprawy niezamknięte</div>';
+                    html += cases.map(function (c) { return rowHtml(c, 'case'); }).join('');
+                }
+                if (orders.length) {
+                    html += '<div class="small text-muted mb-1' + (cases.length ? ' mt-2' : '') + '">Zamówienia bez aktywnej sprawy</div>';
+                    html += orders.map(function (o) { return rowHtml(o, 'order'); }).join('');
+                }
+                root.innerHTML = html;
             }
 
             async function runManualCaseLookup() {
@@ -1098,14 +1123,13 @@
                         throw new Error(payload.message || 'Błąd wyszukiwania');
                     }
                     var txAmount = parseFloat(currentPreviewBtn.getAttribute('data-tx-amount') || '0');
-                    renderManualLookupResults(payload.cases || [], txAmount);
+                    renderManualLookupResults(payload, txAmount);
+                    var total = (payload.cases || []).length + (payload.orders || []).length;
                     if (status) {
-                        status.textContent = (payload.cases || []).length
-                            ? ('Znaleziono: ' + payload.cases.length)
-                            : 'Brak wyników';
+                        status.textContent = total ? ('Znaleziono: ' + total) : 'Brak wyników';
                     }
                 } catch (e) {
-                    if (status) status.textContent = e.message || 'Nie udało się wyszukać spraw.';
+                    if (status) status.textContent = e.message || 'Nie udało się wyszukać.';
                 }
             }
 
@@ -1301,6 +1325,7 @@
             var manualConfirmModalEl = document.getElementById('bankImportManualLinkConfirmModal');
             var manualConfirmForm = document.getElementById('bankImportManualLinkConfirmForm');
             var manualCaseIdInput = document.getElementById('bankImportManualLinkCaseId');
+            var manualOrderIdInput = document.getElementById('bankImportManualLinkOrderId');
             var manualRegisterInput = document.getElementById('bankImportManualLinkRegisterIfirma');
             var manualPreviewInput = document.getElementById('bankImportManualLinkPreview');
             var manualSummaryEl = document.getElementById('bankImportManualLinkSummary');
@@ -1317,6 +1342,7 @@
                 var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
                 manualConfirmForm.setAttribute('action', currentPreviewBtn.getAttribute('data-link-url') || '');
                 if (manualCaseIdInput) manualCaseIdInput.value = btn.getAttribute('data-case-id') || '';
+                if (manualOrderIdInput) manualOrderIdInput.value = btn.getAttribute('data-order-id') || '';
                 if (manualRegisterInput) manualRegisterInput.value = registerIfirma ? '1' : '0';
                 if (manualPreviewInput) {
                     var buttons = previewButtons();
@@ -1328,7 +1354,7 @@
                     manualSummaryEl.textContent = 'Powiązać przelew #'
                         + (currentPreviewBtn.getAttribute('data-tx-id') || '')
                         + ' z: '
-                        + (btn.getAttribute('data-summary') || 'sprawą');
+                        + (btn.getAttribute('data-summary') || 'wybranym rekordem');
                 }
                 if (manualIfirmaInfo) manualIfirmaInfo.classList.toggle('d-none', !registerIfirma);
                 if (manualSubmitBtn) {
