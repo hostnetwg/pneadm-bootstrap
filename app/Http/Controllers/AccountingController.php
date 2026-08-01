@@ -258,7 +258,11 @@ class AccountingController extends Controller
 
     public function collectionsIndex(Request $request)
     {
-        $status = (string) $request->get('status', '');
+        // Brak parametru status → domyślnie kolejka robocza (niezamknięte).
+        // Jawne status= (puste) → wszystkie sprawy, w tym zamknięte.
+        $status = $request->has('status')
+            ? (string) $request->get('status', '')
+            : 'active';
         $segment = (string) $request->get('segment', '');
         $search = trim((string) $request->get('search', ''));
 
@@ -266,7 +270,9 @@ class AccountingController extends Controller
             ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
             ->latest('id');
 
-        if ($status !== '' && array_key_exists($status, DebtCase::statusLabels())) {
+        if ($status === 'active') {
+            $casesQuery->active();
+        } elseif ($status !== '' && array_key_exists($status, DebtCase::statusLabels())) {
             $casesQuery->where('status', $status);
         }
 

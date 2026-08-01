@@ -23,6 +23,7 @@ Identyfikatory faktury na `form_orders` (używane przy synchronizacji statusu z 
 Pierwszy etap obejmuje:
 
 - dashboard spraw windykacyjnych pod `accounting.collections.*`,
+  - domyślny filtr listy: **Niezamknięte** (`status=active` / `DebtCase::active()`); kafelek „Aktywne sprawy” ustawia ten filtr; opcja „Wszystkie” pokazuje też zamknięte,
 - tworzenie sprawy z `form_orders.id`,
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,

@@ -27,12 +27,14 @@
 
             <div class="row g-3 mb-3">
                 <div class="col-6 col-xl-3">
-                    <div class="card h-100">
+                    <a href="{{ route('accounting.collections.index', ['status' => 'active']) }}"
+                       class="card h-100 text-decoration-none text-dark{{ $status === 'active' ? ' border-primary' : '' }}">
                         <div class="card-body">
                             <div class="small text-muted">Aktywne sprawy</div>
                             <div class="fs-4 fw-semibold">{{ $stats['active'] }}</div>
+                            <div class="small text-primary mt-1">Pokaż niezamknięte</div>
                         </div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-6 col-xl-3">
                     <div class="card h-100 border-warning">
@@ -74,7 +76,8 @@
                                 <div class="col-6">
                                     <label for="status" class="form-label small mb-1">Status</label>
                                     <select id="status" name="status" class="form-select form-select-sm">
-                                        <option value="">Wszystkie</option>
+                                        <option value="active" @selected($status === 'active')>Niezamknięte</option>
+                                        <option value="" @selected($status === '')>Wszystkie</option>
                                         @foreach($statusLabels as $value => $label)
                                             <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
                                         @endforeach
@@ -93,7 +96,7 @@
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="bi bi-search"></i> Filtruj
                                     </button>
-                                    @if($search !== '' || $status !== '' || $segment !== '')
+                                    @if($search !== '' || $status !== 'active' || $segment !== '')
                                         <a href="{{ route('accounting.collections.index') }}" class="btn btn-outline-secondary btn-sm">Wyczyść</a>
                                     @endif
                                 </div>

@@ -46,6 +46,62 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee('id="createInvoiceLookup"', false);
         $response->assertSee('Utwórz sprawę', false);
         $response->assertSee('createInvoiceLookupBtn', false);
+        $response->assertSee('Niezamknięte', false);
+        $response->assertSee('Pokaż niezamknięte', false);
+    }
+
+    public function test_collections_index_defaults_to_active_and_hides_closed(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $openOrder = FormOrder::create([
+            'product_name' => 'Otwarta',
+            'product_price' => 100,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '100/8/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $openOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '100/8/2026',
+            'opened_at' => now(),
+        ]);
+
+        $closedOrder = FormOrder::create([
+            'product_name' => 'Zamknięta',
+            'product_price' => 200,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '200/8/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $closedOrder->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'invoice_number' => '200/8/2026',
+            'opened_at' => now()->subDays(8),
+            'closed_at' => now()->subDay(),
+        ]);
+
+        $default = $this->actingAs($user)->get(route('accounting.collections.index'));
+        $default->assertOk();
+        $default->assertSee('100/8/2026');
+        $default->assertDontSee('200/8/2026');
+
+        $activeCard = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'active',
+        ]));
+        $activeCard->assertOk();
+        $activeCard->assertSee('100/8/2026');
+        $activeCard->assertDontSee('200/8/2026');
+
+        $all = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => '',
+        ]));
+        $all->assertOk();
+        $all->assertSee('100/8/2026');
+        $all->assertSee('200/8/2026');
     }
 
     public function test_user_can_create_debt_case_from_form_order(): void
