@@ -185,10 +185,20 @@ class BankStatementImportController extends Controller
         );
 
         if ($request->boolean('register_ifirma_payment')) {
-            $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
-                $accepted,
-                $request->user()
-            );
+            try {
+                $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                    $accepted,
+                    $request->user()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+
+                return $this->redirectAfterReview(
+                    $request,
+                    $bankImport,
+                    $message.' Akceptacja lokalna OK.'
+                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+            }
 
             if ($paymentResult['success']) {
                 return $this->redirectAfterReview(
@@ -198,16 +208,11 @@ class BankStatementImportController extends Controller
                 );
             }
 
-            return redirect()
-                ->route('accounting.bank-imports.show', array_filter([
-                    'bankImport' => $bankImport,
-                    'filter' => $request->input('filter') ?: null,
-                    'preview' => $request->input('preview') !== null && $request->input('preview') !== ''
-                        ? (int) $request->input('preview')
-                        : null,
-                ]))
-                ->with('success', $message.' Akceptacja lokalna OK.')
-                ->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                $message.' Akceptacja lokalna OK.'
+            )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
         }
 
         if ($request->boolean('ifirma_already_paid')) {

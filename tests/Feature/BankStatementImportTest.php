@@ -211,6 +211,70 @@ class BankStatementImportTest extends TestCase
         ]);
     }
 
+    public function test_accept_reuses_existing_closed_debt_case_instead_of_duplicate(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie CSV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '320/7/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_nip' => '5250001009',
+        ]);
+
+        $existing = DebtCase::create([
+            'form_order_id' => $order->id,
+            'created_by' => $user->id,
+            'assigned_to_id' => $user->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'priority' => DebtCase::PRIORITY_NORMAL,
+            'customer_segment' => DebtCase::SEGMENT_STANDARD,
+            'risk_score' => 0,
+            'relationship_score' => 0,
+            'invoice_number' => $order->invoice_number,
+            'amount_gross' => $order->product_price,
+            'opened_at' => now()->subDays(5),
+            'closed_at' => now()->subDay(),
+        ]);
+
+        $fixture = file_get_contents(base_path('tests/fixtures/bank/mbank_sample.csv'));
+        $this->assertNotFalse($fixture);
+        $file = UploadedFile::fake()->createWithContent('lista_operacji_test.csv', $fixture);
+
+        $this->actingAs($user)->post(route('accounting.bank-imports.store'), [
+            'csv_file' => $file,
+        ])->assertRedirect();
+
+        $import = BankStatementImport::first();
+        $match = BankTransactionMatch::query()
+            ->where('form_order_id', $order->id)
+            ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+            ->first();
+        $this->assertNotNull($match);
+
+        $accept = $this->actingAs($user)->post(
+            route('accounting.bank-imports.matches.accept', [$import, $match])
+        );
+        $accept->assertRedirect();
+        $accept->assertSessionHasNoErrors();
+
+        $match->refresh();
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $match->status);
+        $this->assertSame($existing->id, $match->debt_case_id);
+        $this->assertSame(1, DebtCase::withTrashed()->where('form_order_id', $order->id)->count());
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $existing->id,
+            'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
+        ]);
+    }
+
     public function test_accept_as_already_paid_in_ifirma_is_local_only(): void
     {
         $user = User::factory()->create([

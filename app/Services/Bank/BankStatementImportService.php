@@ -244,11 +244,16 @@ class BankStatementImportService
             $formOrder = $match->formOrder;
 
             if (! $debtCase && $formOrder) {
-                $debtCase = DebtCase::query()
+                // form_order_id jest UNIQUE — używaj istniejącej sprawy (także closed / soft-deleted),
+                // zamiast tworzyć drugą i wywalać Integrity constraint → 500.
+                $debtCase = DebtCase::withTrashed()
                     ->where('form_order_id', $formOrder->id)
-                    ->where('status', '!=', DebtCase::STATUS_CLOSED)
                     ->latest('id')
                     ->first();
+
+                if ($debtCase?->trashed()) {
+                    $debtCase->restore();
+                }
 
                 if (! $debtCase) {
                     $debtCase = $this->createDebtCaseFromOrder($formOrder, $userId);
