@@ -568,10 +568,33 @@ class BankStatementImportTest extends TestCase
             'is_active' => 1,
         ]);
 
+        $instructor = \App\Models\Instructor::create([
+            'first_name' => 'Anna',
+            'last_name' => 'Nowak',
+            'email' => 'anna.nowak@example.test',
+            'is_active' => true,
+        ]);
+
+        $courseStart = now()->setTimezone('Europe/Warsaw')->addDays(5)->setTime(10, 0);
+        $course = \App\Models\Course::create([
+            'title' => 'Szkolenie bez sprawy',
+            'description' => 'Test',
+            'start_date' => $courseStart,
+            'end_date' => $courseStart->copy()->addHours(4),
+            'instructor_id' => $instructor->id,
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+        ]);
+
+        $orderDate = now()->subDays(15);
         $order = FormOrder::create([
+            'product_id' => $course->id,
             'product_name' => 'Szkolenie bez sprawy',
             'product_price' => 420,
-            'order_date' => now()->subDays(15),
+            'order_date' => $orderDate,
             'invoice_number' => '902/8/2026',
             'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
             'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
@@ -605,6 +628,8 @@ class BankStatementImportTest extends TestCase
         $lookup->assertOk();
         $lookup->assertJsonPath('cases', []);
         $lookup->assertJsonPath('orders.0.id', $order->id);
+        $lookup->assertJsonPath('orders.0.order_date', $orderDate->format('Y-m-d'));
+        $lookup->assertJsonPath('orders.0.course_date', $courseStart->format('Y-m-d'));
 
         $link = $this->actingAs($user)->post(
             route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),

@@ -386,9 +386,20 @@ class BankStatementImportController extends Controller
             });
         };
 
+        $formatCourseDate = function (?FormOrder $order): ?string {
+            $start = $order?->course?->start_date;
+            if (! $start) {
+                return null;
+            }
+
+            return \Illuminate\Support\Carbon::parse($start)
+                ->timezone(config('app.timezone', 'Europe/Warsaw'))
+                ->format('Y-m-d');
+        };
+
         $cases = DebtCase::query()
             ->active()
-            ->with(['formOrder'])
+            ->with(['formOrder.course'])
             ->where(function ($outer) use ($query, $applyOrderSearch) {
                 $outer->where('invoice_number', 'like', "%{$query}%")
                     ->orWhere('ksef_number', 'like', "%{$query}%")
@@ -405,6 +416,7 @@ class BankStatementImportController extends Controller
         $caseOrderIds = $cases->pluck('form_order_id')->filter()->all();
 
         $orders = FormOrder::query()
+            ->with(['course'])
             ->whereDoesntHave('activeDebtCases')
             ->where(function ($outer) use ($applyOrderSearch) {
                 $applyOrderSearch($outer);
@@ -415,7 +427,7 @@ class BankStatementImportController extends Controller
             ->get();
 
         return response()->json([
-            'cases' => $cases->map(function (DebtCase $case) {
+            'cases' => $cases->map(function (DebtCase $case) use ($formatCourseDate) {
                 $order = $case->formOrder;
                 $amount = (float) ($case->amount_gross ?? $order?->product_price ?? 0);
 
@@ -431,13 +443,14 @@ class BankStatementImportController extends Controller
                     'order_date' => $order?->order_date
                         ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
                         : null,
+                    'course_date' => $formatCourseDate($order),
                     'buyer_name' => $order?->buyer_name,
                     'recipient_name' => $order?->recipient_name,
                     'product_name' => $order?->product_name,
                     'url' => route('accounting.collections.show', $case),
                 ];
             })->values(),
-            'orders' => $orders->map(function (FormOrder $order) {
+            'orders' => $orders->map(function (FormOrder $order) use ($formatCourseDate) {
                 return [
                     'type' => 'order',
                     'id' => $order->id,
@@ -448,6 +461,7 @@ class BankStatementImportController extends Controller
                     'order_date' => $order->order_date
                         ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
                         : null,
+                    'course_date' => $formatCourseDate($order),
                     'buyer_name' => $order->buyer_name,
                     'recipient_name' => $order->recipient_name,
                     'product_name' => $order->product_name,

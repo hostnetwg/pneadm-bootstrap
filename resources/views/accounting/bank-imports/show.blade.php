@@ -1047,6 +1047,10 @@
 
                 function rowHtml(item, kind) {
                     var amountMatches = amountsClose(txAmount, item.amount_gross || 0);
+                    var dateBits = [
+                        item.order_date ? ('zam. ' + item.order_date) : '',
+                        item.course_date ? ('szkol. ' + item.course_date) : ''
+                    ].filter(Boolean).join(' · ');
                     var summary = kind === 'case'
                         ? ('Sprawa #' + item.id
                             + (item.invoice_number ? ' · FV ' + item.invoice_number : '')
@@ -1058,10 +1062,10 @@
                             + ' · bez aktywnej sprawy');
                     var meta = [
                         kind === 'case' ? (item.status_label || '') : 'Utworzy sprawę przy powiązaniu',
+                        dateBits,
                         item.product_name || '',
                         item.buyer_name || '',
-                        item.recipient_name || '',
-                        item.order_date ? ('zam. ' + item.order_date) : ''
+                        item.recipient_name || ''
                     ].filter(Boolean).join(' · ');
 
                     var linkAttrs = kind === 'case'
