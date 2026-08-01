@@ -51,6 +51,31 @@ class PaymentTitleExtractorTest extends TestCase
         $this->assertContains('5250001009', $result['nips']);
     }
 
+    public function test_extracts_order_number_variants_from_bank_title(): void
+    {
+        $extractor = new PaymentTitleExtractor;
+
+        $cases = [
+            'KULESZA EWELINA zamówienie nr 7431 PRZELEW' => 7431,
+            'zapłata za zamowienie nr. 8123' => 8123,
+            'zam. nr 9001 za szkolenie' => 9001,
+            'nr zamówienia 5510' => 5510,
+            'order no 1205' => 1205,
+            'order #88' => 88,
+            'Potwierdzenie: zapłata za #4587' => 4587,
+            'tytuł # 4587 szkolenie' => 4587,
+        ];
+
+        foreach ($cases as $title => $expected) {
+            $result = $extractor->extract($title);
+            $this->assertContains(
+                $expected,
+                $result['order_ids'],
+                "Failed for title: {$title}"
+            );
+        }
+    }
+
     public function test_extracts_ksef_and_normalizes_extra_hyphen(): void
     {
         $extractor = new PaymentTitleExtractor;

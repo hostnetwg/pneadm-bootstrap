@@ -696,6 +696,31 @@ class BankStatementImportTest extends TestCase
         $byCity->assertJsonPath('orders.0.id', $order->id);
     }
 
+    public function test_lookup_cases_finds_order_by_numeric_id(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po ID',
+            'product_price' => 365,
+            'order_date' => now()->subDays(3),
+            'invoice_number' => '304/6/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Ewelina Kulesza',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => (string) $order->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('orders.0.id', $order->id);
+    }
+
     public function test_lookup_order_preview_returns_order_payload(): void
     {
         $user = User::factory()->create([

@@ -404,10 +404,21 @@ class BankStatementImportController extends Controller
     public function lookupDebtCases(Request $request)
     {
         $validated = $request->validate([
-            'q' => ['required', 'string', 'min:2', 'max:128'],
+            'q' => ['required', 'string', 'min:1', 'max:128'],
         ]);
 
         $query = trim($validated['q']);
+        if ($query === '') {
+            throw ValidationException::withMessages([
+                'q' => 'Podaj frazę wyszukiwania.',
+            ]);
+        }
+        if (! ctype_digit($query) && mb_strlen($query) < 2) {
+            throw ValidationException::withMessages([
+                'q' => 'Wpisz co najmniej 2 znaki (albo samo ID zamówienia/sprawy).',
+            ]);
+        }
+
         $digits = preg_replace('/\D+/', '', $query) ?: '';
 
         $applyOrderSearch = function ($formOrderQuery) use ($query, $digits) {
@@ -429,7 +440,7 @@ class BankStatementImportController extends Controller
                     ->orWhere('recipient_postal_code', 'like', "%{$query}%");
 
                 if (ctype_digit($query)) {
-                    $inner->orWhereKey((int) $query);
+                    $inner->orWhere('id', (int) $query);
                 }
 
                 if (strlen($digits) >= 7) {
@@ -464,7 +475,8 @@ class BankStatementImportController extends Controller
                     ->orWhereHas('formOrder', $applyOrderSearch);
 
                 if (ctype_digit($query)) {
-                    $outer->orWhereKey((int) $query);
+                    $outer->orWhere('id', (int) $query)
+                        ->orWhere('form_order_id', (int) $query);
                 }
             })
             ->latest('id')

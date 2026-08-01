@@ -1313,8 +1313,12 @@
                 var input = document.getElementById('bankTxManualLookupInput');
                 var status = document.getElementById('bankTxManualLookupStatus');
                 var q = (input && input.value ? input.value : '').trim();
-                if (q.length < 2) {
-                    if (status) status.textContent = 'Wpisz co najmniej 2 znaki.';
+                if (q.length < 1) {
+                    if (status) status.textContent = 'Wpisz frazę wyszukiwania.';
+                    return;
+                }
+                if (q.length < 2 && !/^\d+$/.test(q)) {
+                    if (status) status.textContent = 'Wpisz co najmniej 2 znaki (albo samo ID).';
                     return;
                 }
                 if (!currentPreviewBtn) return;

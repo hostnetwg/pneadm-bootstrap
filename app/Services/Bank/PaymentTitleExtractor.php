@@ -98,9 +98,15 @@ class PaymentTitleExtractor
 
         $patterns = [
             '/#\s*ID\s*[:\s]*(\d{1,10})\b/iu',
+            '/#\s*(\d{1,10})\b/u',
             '/\bzam[oó]wienie\s+ID\s*[:\s]*(\d{1,10})\b/iu',
             '/\border\s+ID\s*[:\s]*(\d{1,10})\b/iu',
             '/\bID\s*zam[oó]wienia\s*[:\s]*(\d{1,10})\b/iu',
+            // Typowe w tytułach przelewów: "zamówienie nr 7431", "zam. nr 7431", "nr zamówienia 7431"
+            '/\bzam[oó]wieni[ea]\s*(?:nr\.?|numer|#|:)\s*(\d{1,10})\b/iu',
+            '/\bzam\.?\s*(?:nr\.?|numer|#|:)\s*(\d{1,10})\b/iu',
+            '/\bnr\.?\s*zam[oó]wieni[ea]\s*[:#]?\s*(\d{1,10})\b/iu',
+            '/\border\s*(?:nr\.?|no\.?|number|#|:)\s*(\d{1,10})\b/iu',
         ];
 
         foreach ($patterns as $pattern) {

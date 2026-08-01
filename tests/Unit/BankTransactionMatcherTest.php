@@ -79,6 +79,34 @@ class BankTransactionMatcherTest extends TestCase
         $this->assertSame(BankTransactionMatch::CONFIDENCE_MEDIUM, $suggestions[0]['confidence']);
     }
 
+    public function test_matches_order_number_phrase_from_transfer_title(): void
+    {
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie nr zamówienia',
+            'product_price' => 365,
+            'order_date' => now()->subDays(2),
+            'invoice_number' => '304/6/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $tx = new BankTransaction([
+            'operation_date' => '2026-07-01',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'KULESZA EWELINA zamówienie nr '.$order->id.' PRZELEW ZEWNĘTRZNY PRZYCHODZĄCY',
+            'is_incoming' => true,
+            'fingerprint' => 'test-fp-order-nr',
+        ]);
+
+        $suggestions = (new BankTransactionMatcher)->suggest($tx);
+
+        $this->assertNotEmpty($suggestions);
+        $this->assertSame($order->id, $suggestions[0]['form_order_id']);
+        $this->assertContains('order_id:'.$order->id, $suggestions[0]['match_reasons']);
+    }
+
     public function test_medium_confidence_on_buyer_name_without_nip_case_insensitive(): void
     {
         $order = FormOrder::create([
