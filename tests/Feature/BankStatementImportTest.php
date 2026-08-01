@@ -655,4 +655,56 @@ class BankStatementImportTest extends TestCase
             'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
         ]);
     }
+
+    public function test_lookup_order_preview_returns_order_payload(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $instructor = \App\Models\Instructor::create([
+            'first_name' => 'Ewa',
+            'last_name' => 'Test',
+            'email' => 'ewa.test@example.test',
+            'is_active' => true,
+        ]);
+
+        $courseStart = now()->setTimezone('Europe/Warsaw')->addDays(3)->setTime(11, 0);
+        $course = \App\Models\Course::create([
+            'title' => 'Podgląd zamówienia',
+            'description' => 'Test',
+            'start_date' => $courseStart,
+            'end_date' => $courseStart->copy()->addHours(3),
+            'instructor_id' => $instructor->id,
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+        ]);
+
+        $order = FormOrder::create([
+            'product_id' => $course->id,
+            'product_name' => 'Podgląd zamówienia',
+            'product_price' => 510,
+            'order_date' => now()->subDays(7),
+            'invoice_number' => '111/8/2026',
+            'buyer_name' => 'Nabywca Podgląd Sp. z o.o.',
+            'buyer_nip' => '5259998887',
+            'buyer_city' => 'Warszawa',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-order-preview', [
+            'form_order_id' => $order->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('order.id', $order->id);
+        $response->assertJsonPath('order.invoice', '111/8/2026');
+        $response->assertJsonPath('order.buyer_name', 'Nabywca Podgląd Sp. z o.o.');
+        $response->assertJsonPath('order.buyer_nip', '5259998887');
+        $response->assertJsonPath('order.course_id', $course->id);
+        $this->assertStringContainsString($courseStart->format('d.m.Y'), $response->json('order.product'));
+    }
 }

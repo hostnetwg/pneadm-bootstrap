@@ -471,6 +471,21 @@ class BankStatementImportController extends Controller
         ]);
     }
 
+    public function lookupOrderPreview(Request $request)
+    {
+        $validated = $request->validate([
+            'form_order_id' => ['required', 'integer', 'exists:form_orders,id'],
+        ]);
+
+        $order = FormOrder::query()
+            ->with(['course.instructor'])
+            ->findOrFail($validated['form_order_id']);
+
+        return response()->json([
+            'order' => $this->formatOrderPreviewPayload($order),
+        ]);
+    }
+
     public function linkTransactionToCase(
         Request $request,
         BankStatementImport $bankImport,
@@ -607,6 +622,66 @@ class BankStatementImportController extends Controller
         if (! $match->transaction || (int) $match->transaction->bank_statement_import_id !== (int) $import->id) {
             abort(404);
         }
+    }
+
+    /**
+     * Payload prawej kolumny „Zamówienie / sugestia” w modalu importu wyciągu.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatOrderPreviewPayload(FormOrder $order): array
+    {
+        $order->loadMissing(['course.instructor']);
+
+        $course = $order->course;
+        $courseTitle = $course
+            ? $course->plainTitle((string) ($order->product_name ?: 'Szkolenie'))
+            : (string) ($order->product_name ?: '—');
+        $courseDate = $course?->start_date
+            ? $course->start_date->timezone(config('app.timezone'))->format('d.m.Y H:i')
+            : null;
+        $courseInstructor = trim(
+            ($course?->instructor?->first_name ?? '').' '.($course?->instructor?->last_name ?? '')
+        );
+        $productLabel = $courseTitle;
+        if ($courseDate) {
+            $productLabel .= ' ('.$courseDate.')';
+        }
+        if ($courseInstructor !== '') {
+            $productLabel .= ' — '.$courseInstructor;
+        }
+
+        return [
+            'id' => $order->id,
+            'url' => route('form-orders.show', $order->id),
+            'invoice' => $order->invoice_number ?: '—',
+            'ksef' => $order->ksef_number ?: '—',
+            'amount' => $order->product_price !== null
+                ? number_format((float) $order->product_price, 2, ',', ' ').' PLN'
+                : '—',
+            'product' => $productLabel !== '' ? $productLabel : '—',
+            'course_id' => $course?->id,
+            'course_url' => $course?->id ? route('courses.show', $course->id) : null,
+            'buyer_name' => $order->buyer_name ?: '—',
+            'buyer_nip' => $order->buyer_nip ?: 'brak NIP',
+            'buyer_address' => trim(implode(', ', array_filter([
+                $order->buyer_address,
+                trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')),
+            ]))) ?: '—',
+            'recipient_name' => $order->recipient_name ?: '—',
+            'recipient_nip' => $order->recipient_nip ?: 'brak NIP',
+            'recipient_address' => trim(implode(', ', array_filter([
+                $order->recipient_address,
+                trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')),
+            ]))) ?: '—',
+            'participant_name' => trim((string) ($order->display_participant_name ?? '')) ?: '—',
+            'participant_email' => trim((string) ($order->display_participant_email ?? '')) ?: '',
+            'orderer_name' => trim((string) ($order->orderer_name ?? '')) ?: '—',
+            'orderer_email' => trim((string) ($order->orderer_email ?? '')) ?: '',
+            'order_date' => $order->order_date
+                ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
+                : '—',
+        ];
     }
 
     private function countByConfidence(BankStatementImport $import, string $confidence): int

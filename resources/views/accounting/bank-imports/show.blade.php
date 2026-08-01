@@ -400,7 +400,15 @@
                         </div>
                         <div class="col-lg-6">
                             <div class="border rounded h-100 p-3">
-                                <h6 class="fw-semibold mb-3">Zamówienie / sugestia</h6>
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <h6 class="fw-semibold mb-0">Zamówienie / sugestia</h6>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary d-none"
+                                            id="bankTxPreviewClearOrderBtn"
+                                            title="Przywróć oryginalną sugestię przelewu">
+                                        Wyczyść
+                                    </button>
+                                </div>
                                 <div id="bankTxPreviewNoOrder" class="small text-muted d-none">Brak powiązanego zamówienia w sugestii.</div>
                                 <div id="bankTxPreviewOrderBlock">
                                     <div class="mb-2" id="bankTxPreviewMatchMeta"></div>
@@ -608,6 +616,17 @@
         #bankImportAcceptWarnModal,
         #bankImportAcceptIfirmaModal {
             z-index: 1065;
+        }
+        .bank-manual-peek-btn.is-active {
+            color: #fff;
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .bank-manual-peek-btn.is-active:hover,
+        .bank-manual-peek-btn.is-active:focus {
+            color: #fff;
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
         }
     </style>
     <script>
@@ -1014,6 +1033,9 @@
 
             var currentPreviewBtn = null;
             var lookupCasesUrl = @json(route('accounting.bank-imports.lookup-cases'));
+            var lookupOrderPreviewUrl = @json(route('accounting.bank-imports.lookup-order-preview'));
+            var originalOrderSnapshot = null;
+            var peekedOrderId = null;
             var previewButtons = function () {
                 return Array.prototype.slice.call(document.querySelectorAll('.bank-tx-preview-btn'));
             };
@@ -1027,7 +1049,116 @@
                     var status = document.getElementById('bankTxManualLookupStatus');
                     if (results) results.innerHTML = '';
                     if (status) status.textContent = '';
+                    clearPeekState(true);
                 }
+            }
+
+            function setClearPeekBtnVisible(visible) {
+                var btn = document.getElementById('bankTxPreviewClearOrderBtn');
+                if (btn) btn.classList.toggle('d-none', !visible);
+            }
+
+            function setActivePeekEye(orderId) {
+                document.querySelectorAll('.bank-manual-peek-btn').forEach(function (btn) {
+                    var active = orderId && String(btn.getAttribute('data-peek-order-id')) === String(orderId);
+                    btn.classList.toggle('is-active', !!active);
+                    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+            }
+
+            function clearPeekState(restoreOriginal) {
+                peekedOrderId = null;
+                setActivePeekEye(null);
+                setClearPeekBtnVisible(false);
+                if (restoreOriginal && originalOrderSnapshot) {
+                    renderOrderPanelFromSnapshot(originalOrderSnapshot, false);
+                }
+            }
+
+            function renderOrderPanelFromSnapshot(snapshot, isPeek) {
+                var noOrder = document.getElementById('bankTxPreviewNoOrder');
+                var orderBlock = document.getElementById('bankTxPreviewOrderBlock');
+                var matchMeta = document.getElementById('bankTxPreviewMatchMeta');
+                var reasonsEl = document.getElementById('bankTxPreviewReasons');
+                var linksEl = document.getElementById('bankTxPreviewLinks');
+                var txId = snapshot && snapshot.txId ? snapshot.txId : '';
+                var order = snapshot ? snapshot.order : null;
+                var match = snapshot ? snapshot.match : null;
+
+                clearMatchHighlights(modalEl);
+                resetIfirmaStatusPanel();
+
+                if (!order) {
+                    noOrder.classList.remove('d-none');
+                    orderBlock.classList.add('d-none');
+                    document.getElementById('bankTxPreviewModalLabel').textContent =
+                        'Podgląd przelewu #' + (txId || '');
+                    matchMeta.innerHTML = '';
+                    reasonsEl.innerHTML = '';
+                    linksEl.innerHTML = '';
+                    setClearPeekBtnVisible(!!isPeek);
+                    return;
+                }
+
+                noOrder.classList.add('d-none');
+                orderBlock.classList.remove('d-none');
+                fillDl(document.getElementById('bankTxPreviewOrder'), order);
+
+                if (isPeek) {
+                    document.getElementById('bankTxPreviewModalLabel').textContent =
+                        'Podgląd przelewu #' + (txId || '') + ' · kandydat zam. #' + order.id;
+                    matchMeta.innerHTML = '<span class="badge text-bg-primary">Podgląd kandydata</span>';
+                    reasonsEl.innerHTML = '';
+                    var peekLinks = [];
+                    if (order.url) {
+                        peekLinks.push('<a class="btn btn-sm btn-outline-primary" href="' + esc(order.url) + '" target="_blank" rel="noopener">Otwórz zamówienie</a>');
+                    }
+                    linksEl.innerHTML = peekLinks.join(' ');
+                    setClearPeekBtnVisible(true);
+                    return;
+                }
+
+                document.getElementById('bankTxPreviewModalLabel').textContent =
+                    'Podgląd: przelew #' + (txId || '') + ' ↔ zam. #' + order.id;
+
+                if (match) {
+                    matchMeta.innerHTML =
+                        '<span class="badge ' + esc(match.confidence_class) + ' me-1">' + esc(match.confidence) + '</span>' +
+                        '<span class="badge text-bg-light border">' + esc(match.status) + '</span>';
+                } else {
+                    matchMeta.innerHTML = '';
+                }
+
+                if (match && match.reasons && match.reasons.length) {
+                    reasonsEl.innerHTML =
+                        '<div class="text-muted mb-1">Podstawa dopasowania:</div><ul class="mb-0 ps-3">' +
+                        match.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') +
+                        '</ul>';
+                } else {
+                    reasonsEl.innerHTML = '';
+                }
+
+                var links = [];
+                if (order.url) {
+                    links.push('<a class="btn btn-sm btn-outline-primary" href="' + esc(order.url) + '" target="_blank" rel="noopener">Otwórz zamówienie</a>');
+                }
+                if (match && match.debt_case_url) {
+                    links.push('<a class="btn btn-sm btn-outline-secondary" href="' + esc(match.debt_case_url) + '" target="_blank" rel="noopener">Otwórz sprawę #' + esc(match.debt_case_id) + '</a>');
+                }
+                var ifirmaStatusUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-ifirma-status-url') || '') : '';
+                if (ifirmaStatusUrl && currentPreviewBtn && currentPreviewBtn.getAttribute('data-can-act') === 'match') {
+                    links.push('<button type="button" class="btn btn-sm btn-outline-success" id="bankTxPreviewIfirmaStatusBtn">Sprawdź status z iFirma</button>');
+                }
+                linksEl.innerHTML = links.join(' ');
+                var ifirmaStatusBtn = document.getElementById('bankTxPreviewIfirmaStatusBtn');
+                if (ifirmaStatusBtn) {
+                    ifirmaStatusBtn.addEventListener('click', function () {
+                        checkIfirmaStatus(ifirmaStatusUrl, ifirmaStatusBtn);
+                    });
+                }
+
+                applyMatchHighlights(modalEl, match ? match.reason_codes : [], snapshot.txData || {});
+                setClearPeekBtnVisible(false);
             }
 
             function amountsClose(a, b) {
@@ -1071,6 +1202,17 @@
                         ? (' data-case-id="' + esc(String(item.id)) + '" data-order-id=""')
                         : (' data-case-id="" data-order-id="' + esc(String(item.id)) + '"');
 
+                    var peekOrderId = kind === 'case' ? item.order_id : item.id;
+                    var eyeHtml = peekOrderId
+                        ? ('<button type="button" class="btn btn-sm btn-outline-secondary bank-manual-peek-btn'
+                            + (peekedOrderId && String(peekedOrderId) === String(peekOrderId) ? ' is-active' : '')
+                            + '" data-peek-order-id="' + esc(String(peekOrderId)) + '"'
+                            + ' title="Podgląd zamówienia w prawej kolumnie"'
+                            + ' aria-label="Podgląd zamówienia #' + esc(String(peekOrderId)) + '"'
+                            + ' aria-pressed="' + (peekedOrderId && String(peekedOrderId) === String(peekOrderId) ? 'true' : 'false') + '">'
+                            + '<i class="bi bi-eye"></i></button>')
+                        : '';
+
                     return '<div class="border rounded p-2 mb-2">'
                         + '<div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">'
                         + '<div class="small">'
@@ -1079,6 +1221,7 @@
                         + (!amountMatches ? '<div class="text-warning">Kwota różni się od przelewu</div>' : '')
                         + '</div>'
                         + '<div class="d-flex flex-column flex-sm-row gap-1">'
+                        + eyeHtml
                         + '<a class="btn btn-sm btn-outline-secondary" href="' + esc(item.url) + '" target="_blank" rel="noopener">'
                         + (kind === 'case' ? 'Sprawa' : 'Zamówienie') + '</a>'
                         + '<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
@@ -1104,6 +1247,38 @@
                     html += orders.map(function (o) { return rowHtml(o, 'order'); }).join('');
                 }
                 root.innerHTML = html;
+            }
+
+            async function peekOrderInRightColumn(orderId, eyeBtn) {
+                if (!orderId) return;
+                if (eyeBtn) {
+                    eyeBtn.disabled = true;
+                }
+                try {
+                    var response = await fetch(
+                        lookupOrderPreviewUrl + '?form_order_id=' + encodeURIComponent(orderId),
+                        { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }
+                    );
+                    var payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.message || 'Nie udało się wczytać zamówienia');
+                    }
+                    peekedOrderId = orderId;
+                    setActivePeekEye(orderId);
+                    renderOrderPanelFromSnapshot({
+                        order: payload.order,
+                        match: null,
+                        txId: originalOrderSnapshot && originalOrderSnapshot.txId
+                            ? originalOrderSnapshot.txId
+                            : (currentPreviewBtn ? currentPreviewBtn.getAttribute('data-tx-id') : ''),
+                        txData: originalOrderSnapshot ? originalOrderSnapshot.txData : {}
+                    }, true);
+                } catch (e) {
+                    var status = document.getElementById('bankTxManualLookupStatus');
+                    if (status) status.textContent = e.message || 'Nie udało się wczytać podglądu.';
+                } finally {
+                    if (eyeBtn) eyeBtn.disabled = false;
+                }
             }
 
             async function runManualCaseLookup() {
@@ -1214,77 +1389,24 @@
                     preview = {};
                 }
 
+                originalOrderSnapshot = {
+                    order: preview.order || null,
+                    match: preview.match || null,
+                    txId: preview.tx && preview.tx.id ? preview.tx.id : (btn.getAttribute('data-tx-id') || ''),
+                    txData: preview.tx || {}
+                };
+                peekedOrderId = null;
+                setActivePeekEye(null);
+
                 clearMatchHighlights(modalEl);
                 fillDl(document.getElementById('bankTxPreviewTransfer'), preview.tx || {});
 
-                var noOrder = document.getElementById('bankTxPreviewNoOrder');
-                var orderBlock = document.getElementById('bankTxPreviewOrderBlock');
-                var matchMeta = document.getElementById('bankTxPreviewMatchMeta');
-                var reasonsEl = document.getElementById('bankTxPreviewReasons');
-                var linksEl = document.getElementById('bankTxPreviewLinks');
                 var lookupResults = document.getElementById('bankTxManualLookupResults');
                 var lookupStatus = document.getElementById('bankTxManualLookupStatus');
                 if (lookupResults) lookupResults.innerHTML = '';
                 if (lookupStatus) lookupStatus.textContent = '';
-                resetIfirmaStatusPanel();
 
-                if (!preview.order) {
-                    noOrder.classList.remove('d-none');
-                    orderBlock.classList.add('d-none');
-                    document.getElementById('bankTxPreviewModalLabel').textContent =
-                        'Podgląd przelewu #' + (preview.tx && preview.tx.id ? preview.tx.id : '');
-                    matchMeta.innerHTML = '';
-                    reasonsEl.innerHTML = '';
-                    linksEl.innerHTML = '';
-                    syncActionForms(btn);
-                    return;
-                }
-
-                noOrder.classList.add('d-none');
-                orderBlock.classList.remove('d-none');
-                fillDl(document.getElementById('bankTxPreviewOrder'), preview.order);
-
-                document.getElementById('bankTxPreviewModalLabel').textContent =
-                    'Podgląd: przelew #' + (preview.tx && preview.tx.id ? preview.tx.id : '') +
-                    ' ↔ zam. #' + preview.order.id;
-
-                if (preview.match) {
-                    matchMeta.innerHTML =
-                        '<span class="badge ' + esc(preview.match.confidence_class) + ' me-1">' + esc(preview.match.confidence) + '</span>' +
-                        '<span class="badge text-bg-light border">' + esc(preview.match.status) + '</span>';
-                } else {
-                    matchMeta.innerHTML = '';
-                }
-
-                if (preview.match && preview.match.reasons && preview.match.reasons.length) {
-                    reasonsEl.innerHTML =
-                        '<div class="text-muted mb-1">Podstawa dopasowania:</div><ul class="mb-0 ps-3">' +
-                        preview.match.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') +
-                        '</ul>';
-                } else {
-                    reasonsEl.innerHTML = '';
-                }
-
-                var links = [];
-                if (preview.order.url) {
-                    links.push('<a class="btn btn-sm btn-outline-primary" href="' + esc(preview.order.url) + '" target="_blank" rel="noopener">Otwórz zamówienie</a>');
-                }
-                if (preview.match && preview.match.debt_case_url) {
-                    links.push('<a class="btn btn-sm btn-outline-secondary" href="' + esc(preview.match.debt_case_url) + '" target="_blank" rel="noopener">Otwórz sprawę #' + esc(preview.match.debt_case_id) + '</a>');
-                }
-                var ifirmaStatusUrl = btn.getAttribute('data-ifirma-status-url') || '';
-                if (ifirmaStatusUrl && btn.getAttribute('data-can-act') === 'match') {
-                    links.push('<button type="button" class="btn btn-sm btn-outline-success" id="bankTxPreviewIfirmaStatusBtn">Sprawdź status z iFirma</button>');
-                }
-                linksEl.innerHTML = links.join(' ');
-                var ifirmaStatusBtn = document.getElementById('bankTxPreviewIfirmaStatusBtn');
-                if (ifirmaStatusBtn) {
-                    ifirmaStatusBtn.addEventListener('click', function () {
-                        checkIfirmaStatus(ifirmaStatusUrl, ifirmaStatusBtn);
-                    });
-                }
-
-                applyMatchHighlights(modalEl, preview.match ? preview.match.reason_codes : [], preview.tx || {});
+                renderOrderPanelFromSnapshot(originalOrderSnapshot, false);
                 syncActionForms(btn);
             }
 
@@ -1339,6 +1461,13 @@
                 : null;
 
             document.getElementById('bankTxManualLookupResults')?.addEventListener('click', function (event) {
+                var peekBtn = event.target.closest('.bank-manual-peek-btn');
+                if (peekBtn) {
+                    event.preventDefault();
+                    peekOrderInRightColumn(peekBtn.getAttribute('data-peek-order-id'), peekBtn);
+                    return;
+                }
+
                 var btn = event.target.closest('.bank-manual-link-btn');
                 if (!btn || !currentPreviewBtn || !manualConfirmForm || !manualConfirmModal) return;
 
@@ -1366,6 +1495,13 @@
                 }
                 manualConfirmModal.show();
             });
+
+            var clearPeekBtn = document.getElementById('bankTxPreviewClearOrderBtn');
+            if (clearPeekBtn) {
+                clearPeekBtn.addEventListener('click', function () {
+                    clearPeekState(true);
+                });
+            }
 
             var autoPreviewId = new URLSearchParams(window.location.search).get('preview');
             if (autoPreviewId) {

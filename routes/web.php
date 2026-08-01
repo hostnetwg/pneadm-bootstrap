@@ -567,6 +567,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/', [BankStatementImportController::class, 'index'])->name('index');
             Route::post('/', [BankStatementImportController::class, 'store'])->name('store');
             Route::get('/lookup-cases', [BankStatementImportController::class, 'lookupDebtCases'])->name('lookup-cases');
+            Route::get('/lookup-order-preview', [BankStatementImportController::class, 'lookupOrderPreview'])->name('lookup-order-preview');
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
             Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');
