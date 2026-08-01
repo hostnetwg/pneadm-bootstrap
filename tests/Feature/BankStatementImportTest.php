@@ -656,6 +656,46 @@ class BankStatementImportTest extends TestCase
         ]);
     }
 
+    public function test_lookup_cases_matches_recipient_address_case_insensitively(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie Bobowo',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '117/7/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Gmina Bobowo',
+            'recipient_name' => 'Publiczna Szkoła Podstawowa w Bobowie',
+            'recipient_address' => 'ul. Gimnazjalna 20',
+            'recipient_postal_code' => '83-212',
+            'recipient_city' => 'Bobowo',
+        ]);
+
+        $byStreet = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => 'ul. GIMNAZJALNA 20',
+        ]));
+        $byStreet->assertOk();
+        $byStreet->assertJsonPath('orders.0.id', $order->id);
+
+        $byFragment = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => 'GIMNAZJALNA',
+        ]));
+        $byFragment->assertOk();
+        $byFragment->assertJsonPath('orders.0.id', $order->id);
+
+        $byCity = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => 'bobowo',
+        ]));
+        $byCity->assertOk();
+        $byCity->assertJsonPath('orders.0.id', $order->id);
+    }
+
     public function test_lookup_order_preview_returns_order_payload(): void
     {
         $user = User::factory()->create([

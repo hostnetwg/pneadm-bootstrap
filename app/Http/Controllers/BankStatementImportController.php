@@ -420,7 +420,13 @@ class BankStatementImportController extends Controller
                     ->orWhere('orderer_email', 'like', "%{$query}%")
                     ->orWhere('buyer_nip', 'like', "%{$query}%")
                     ->orWhere('recipient_nip', 'like', "%{$query}%")
-                    ->orWhere('product_name', 'like', "%{$query}%");
+                    ->orWhere('product_name', 'like', "%{$query}%")
+                    ->orWhere('buyer_address', 'like', "%{$query}%")
+                    ->orWhere('buyer_city', 'like', "%{$query}%")
+                    ->orWhere('buyer_postal_code', 'like', "%{$query}%")
+                    ->orWhere('recipient_address', 'like', "%{$query}%")
+                    ->orWhere('recipient_city', 'like', "%{$query}%")
+                    ->orWhere('recipient_postal_code', 'like', "%{$query}%");
 
                 if (ctype_digit($query)) {
                     $inner->orWhereKey((int) $query);
