@@ -561,6 +561,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
             Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
+            Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');
         });
         Route::prefix('bank-imports')->name('bank-imports.')->group(function () {
             Route::get('/', [BankStatementImportController::class, 'index'])->name('index');

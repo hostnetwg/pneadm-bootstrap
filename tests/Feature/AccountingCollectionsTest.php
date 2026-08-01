@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\BankStatementImport;
+use App\Models\BankTransaction;
+use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
@@ -374,6 +377,78 @@ class AccountingCollectionsTest extends TestCase
         $show->assertOk();
         $show->assertSee('Odśwież status z iFirma', false);
         $show->assertSee('Opłacona', false);
+    }
+
+    public function test_user_can_manually_link_unlinked_bank_transfer_from_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie ręczne',
+            'product_price' => 365,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '77/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '77/8/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('a', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'SPECJALNY OSRODEK KURZETNIK PRZELEW ZA SZKOLENIE',
+            'account_label' => 'Specjalny Ośrodek w Kurzętniku',
+            'counterparty_account' => '00112233445566778899001122',
+            'fingerprint' => str_repeat('b', 64),
+            'is_incoming' => true,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', [
+            'debtCase' => $case,
+            'bank_search' => 'KURZETNIK',
+            'bank_amount' => '365.00',
+        ]));
+        $show->assertOk();
+        $show->assertSee('Powiąż lokalnie', false);
+        $show->assertSee('SPECJALNY OSRODEK KURZETNIK', false);
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.bank-transactions.link', [$case, $transaction]));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+
+        $match = BankTransactionMatch::first();
+        $this->assertNotNull($match);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $match->status);
+        $this->assertSame($transaction->id, $match->bank_transaction_id);
+        $this->assertSame($case->id, $match->debt_case_id);
+        $this->assertContains('manual_case_link', $match->match_reasons);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
+            'user_id' => $user->id,
+        ]);
+        $this->assertNotSame(DebtCase::STATUS_CLOSED, $case->fresh()->status);
     }
 
     public function test_collections_show_has_previous_and_next_case_links(): void

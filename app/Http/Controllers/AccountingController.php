@@ -3,14 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreRevenueRecordRequest;
+use App\Http\Requests\UpdateRevenueRecordRequest;
+use App\Models\BankTransaction;
+use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\DebtCaseContact;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
-use App\Http\Requests\UpdateRevenueRecordRequest;
 use App\Models\RevenueRecord;
+use App\Services\Bank\BankStatementImportService;
+use App\Services\DebtCaseAutoCloseService;
 use App\Services\DebtCustomerProfileService;
+use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -383,7 +388,7 @@ class AccountingController extends Controller
             ->with('success', 'Utworzono sprawę windykacyjną.');
     }
 
-    public function collectionsShow(DebtCase $debtCase, DebtCustomerProfileService $profileService)
+    public function collectionsShow(Request $request, DebtCase $debtCase, DebtCustomerProfileService $profileService)
     {
         $debtCase->load([
             'formOrder.primaryParticipant',
@@ -402,6 +407,12 @@ class AccountingController extends Controller
         ]);
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
+        $bankTransferSearch = trim((string) $request->query('bank_search', ''));
+        $bankTransferAmount = $this->resolveBankTransferSearchAmount($request, $debtCase);
+        $bankTransferCandidates = $this->unlinkedBankTransferCandidates(
+            $bankTransferSearch,
+            $bankTransferAmount
+        );
 
         // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
         $previousCase = DebtCase::query()
@@ -432,7 +443,177 @@ class AccountingController extends Controller
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
             'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
             'bankPayments' => $debtCase->bankTransactionMatches,
+            'bankTransferSearch' => $bankTransferSearch,
+            'bankTransferAmount' => $bankTransferAmount,
+            'bankTransferCandidates' => $bankTransferCandidates,
         ]);
+    }
+
+    public function collectionsBankTransactionLink(
+        Request $request,
+        DebtCase $debtCase,
+        BankTransaction $transaction,
+        BankStatementImportService $importService,
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
+    ) {
+        $validated = $request->validate([
+            'register_ifirma_payment' => ['nullable', 'boolean'],
+        ]);
+
+        $debtCase->loadMissing('formOrder');
+
+        if (! $this->canManuallyLinkBankTransaction($transaction)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withErrors(['bank_transaction' => 'Ten przelew jest już zaakceptowany albo zignorowany.']);
+        }
+
+        $amountMatches = $this->amountsMatch(
+            (float) $transaction->amount,
+            (float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0)
+        );
+
+        $match = BankTransactionMatch::query()
+            ->where('bank_transaction_id', $transaction->id)
+            ->where('debt_case_id', $debtCase->id)
+            ->first();
+
+        if ($match) {
+            $match->forceFill([
+                'form_order_id' => $debtCase->form_order_id,
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $this->manualBankMatchReasons($amountMatches),
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ])->save();
+        } else {
+            $match = BankTransactionMatch::create([
+                'bank_transaction_id' => $transaction->id,
+                'debt_case_id' => $debtCase->id,
+                'form_order_id' => $debtCase->form_order_id,
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $this->manualBankMatchReasons($amountMatches),
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ]);
+        }
+
+        $accepted = $importService->acceptMatch($match, Auth::id());
+
+        $message = sprintf(
+            'Ręcznie powiązano przelew #%d ze sprawą #%d.',
+            $transaction->id,
+            $debtCase->id
+        );
+
+        if ($validated['register_ifirma_payment'] ?? false) {
+            try {
+                $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                    $accepted,
+                    $request->user()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+
+                return redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->with('success', $message.' Akceptacja lokalna OK.')
+                    ->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+            }
+
+            if ($paymentResult['success']) {
+                $message .= ' '.$paymentResult['message'];
+                if ($autoClose->closeIfFullyPaid($accepted->debtCase, $request->user(), $paymentResult['status'] ?? null)) {
+                    $message .= ' Sprawę zamknięto automatycznie.';
+                }
+
+                return redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->with('success', $message);
+            }
+
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('success', $message.' Akceptacja lokalna OK.')
+                ->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).');
+    }
+
+    private function resolveBankTransferSearchAmount(Request $request, DebtCase $case): ?float
+    {
+        if ($request->has('bank_amount')) {
+            $raw = trim(str_replace(',', '.', (string) $request->query('bank_amount')));
+
+            return is_numeric($raw) && (float) $raw > 0 ? round((float) $raw, 2) : null;
+        }
+
+        $amount = (float) ($case->amount_gross ?? $case->formOrder?->product_price ?? 0);
+
+        return $amount > 0 ? round($amount, 2) : null;
+    }
+
+    private function unlinkedBankTransferCandidates(string $search, ?float $amount)
+    {
+        if ($search === '' && $amount === null) {
+            return collect();
+        }
+
+        return BankTransaction::query()
+            ->with('import')
+            ->where('is_incoming', true)
+            ->whereDoesntHave('matches', function ($query) {
+                $query->whereIn('status', [
+                    BankTransactionMatch::STATUS_ACCEPTED,
+                    BankTransactionMatch::STATUS_IGNORED,
+                ]);
+            })
+            ->when($amount !== null, function ($query) use ($amount) {
+                $query->whereBetween('amount', [$amount - 0.01, $amount + 0.01]);
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('description', 'like', "%{$search}%")
+                        ->orWhere('account_label', 'like', "%{$search}%")
+                        ->orWhere('counterparty_account', 'like', "%{$search}%");
+                });
+            })
+            ->latest('operation_date')
+            ->latest('id')
+            ->limit(12)
+            ->get();
+    }
+
+    private function canManuallyLinkBankTransaction(BankTransaction $transaction): bool
+    {
+        if (! $transaction->is_incoming) {
+            return false;
+        }
+
+        return ! $transaction->matches()
+            ->whereIn('status', [
+                BankTransactionMatch::STATUS_ACCEPTED,
+                BankTransactionMatch::STATUS_IGNORED,
+            ])
+            ->exists();
+    }
+
+    private function amountsMatch(float $a, float $b): bool
+    {
+        return abs(round($a, 2) - round($b, 2)) <= 0.01;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function manualBankMatchReasons(bool $amountMatches): array
+    {
+        return [
+            'manual_case_link',
+            $amountMatches ? 'amount_match' : 'amount_mismatch',
+        ];
     }
 
     public function collectionsSyncIfirma(

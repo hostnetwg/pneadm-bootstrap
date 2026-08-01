@@ -72,6 +72,13 @@
                 </div>
             @endif
 
+            @if(session('warning'))
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    {{ session('warning') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger">
                     <div class="fw-semibold mb-1">Nie udało się zapisać danych:</div>
@@ -456,6 +463,117 @@
                             <span>Wpłaty z wyciągu</span>
                             <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
                         </div>
+                        <div class="card-body border-bottom">
+                            <form method="GET" action="{{ route('accounting.collections.show', $case) }}" class="row g-2 align-items-end">
+                                <div class="col-12 col-lg-5">
+                                    <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
+                                    <input type="text"
+                                           id="bank_search"
+                                           name="bank_search"
+                                           class="form-control form-control-sm"
+                                           value="{{ $bankTransferSearch ?? '' }}"
+                                           placeholder="Nadawca, opis, NIP, konto">
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <label for="bank_amount" class="form-label small mb-1">Kwota</label>
+                                    <input type="number"
+                                           step="0.01"
+                                           min="0"
+                                           id="bank_amount"
+                                           name="bank_amount"
+                                           class="form-control form-control-sm"
+                                           value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
+                                </div>
+                                <div class="col-6 col-lg-4 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-search"></i> Szukaj przelewu
+                                    </button>
+                                    <a href="{{ route('accounting.collections.show', $case) }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-text">
+                                        Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
+                                        Domyślnie filtrujemy po kwocie sprawy.
+                                    </div>
+                                </div>
+                            </form>
+
+                            <div class="mt-3">
+                                @if(($bankTransferCandidates ?? collect())->isEmpty())
+                                    <div class="text-muted small">Brak kandydatów dla podanych kryteriów.</div>
+                                @else
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th class="text-end">Kwota</th>
+                                                    <th>Nadawca / opis</th>
+                                                    <th>Import</th>
+                                                    <th class="text-end">Akcja</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($bankTransferCandidates as $candidate)
+                                                    @php
+                                                        $caseAmount = (float) ($case->amount_gross ?? $order->product_price ?? 0);
+                                                        $candidateAmountMatches = abs((float) $candidate->amount - $caseAmount) <= 0.01;
+                                                        $candidateSummary = sprintf(
+                                                            '#%d · %s · %s %s',
+                                                            $candidate->id,
+                                                            $candidate->operation_date?->format('Y-m-d') ?? '—',
+                                                            number_format((float) $candidate->amount, 2, ',', ' '),
+                                                            $candidate->currency
+                                                        );
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="small">{{ $candidate->operation_date?->format('Y-m-d') ?? '—' }}</td>
+                                                        <td class="text-end fw-semibold text-nowrap">
+                                                            {{ number_format((float) $candidate->amount, 2, ',', ' ') }} {{ $candidate->currency }}
+                                                            @if(! $candidateAmountMatches)
+                                                                <div class="small text-warning">inna kwota</div>
+                                                            @endif
+                                                        </td>
+                                                        <td class="small text-break" style="max-width: 34rem;">
+                                                            <div class="fw-semibold">{{ $candidate->account_label ?: '—' }}</div>
+                                                            <div>{{ \Illuminate\Support\Str::limit($candidate->description, 220) }}</div>
+                                                        </td>
+                                                        <td class="small">
+                                                            <a href="{{ route('accounting.bank-imports.show', $candidate->bank_statement_import_id) }}" class="text-decoration-none">
+                                                                Import #{{ $candidate->bank_statement_import_id }}
+                                                            </a>
+                                                            <div class="text-muted">{{ $candidate->import?->original_filename }}</div>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-flex flex-column flex-md-row gap-1 justify-content-end">
+                                                                <button type="button"
+                                                                        class="btn btn-outline-primary btn-sm bank-link-confirm-btn"
+                                                                        data-action="{{ route('accounting.collections.bank-transactions.link', [$case, $candidate]) }}"
+                                                                        data-register-ifirma="0"
+                                                                        data-summary="{{ $candidateSummary }}"
+                                                                        data-description="{{ \Illuminate\Support\Str::limit($candidate->description, 180) }}">
+                                                                    Powiąż lokalnie
+                                                                </button>
+                                                                @if($candidateAmountMatches)
+                                                                    <button type="button"
+                                                                            class="btn btn-success btn-sm bank-link-confirm-btn"
+                                                                            data-action="{{ route('accounting.collections.bank-transactions.link', [$case, $candidate]) }}"
+                                                                            data-register-ifirma="1"
+                                                                            data-summary="{{ $candidateSummary }}"
+                                                                            data-description="{{ \Illuminate\Support\Str::limit($candidate->description, 180) }}">
+                                                                        + wpłata iFirma
+                                                                    </button>
+                                                                @endif
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
                         <div class="card-body p-0">
                             @if(($bankPayments ?? collect())->isEmpty())
                                 <div class="p-3 text-muted small">Brak zaakceptowanych wpłat z wyciągu bankowego dla tej sprawy.</div>
@@ -591,4 +709,70 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="bankTransactionLinkConfirmModal" tabindex="-1" aria-labelledby="bankTransactionLinkConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankTransactionLinkConfirmForm">
+                    @csrf
+                    <input type="hidden" name="register_ifirma_payment" value="0" id="bankTransactionLinkRegisterIfirma">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bankTransactionLinkConfirmModalLabel">Potwierdź powiązanie przelewu</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            Powiązać wybrany przelew ze sprawą
+                            <strong>#{{ $case->id }}</strong>
+                            (FV {{ $case->invoice_number ?: $order->invoice_number ?: '—' }})?
+                        </p>
+                        <div class="border rounded p-2 bg-light small">
+                            <div class="fw-semibold" id="bankTransactionLinkSummary">—</div>
+                            <div class="text-muted text-break" id="bankTransactionLinkDescription">—</div>
+                        </div>
+                        <div class="alert alert-info small mt-3 mb-0 d-none" id="bankTransactionLinkIfirmaInfo">
+                            Po lokalnym powiązaniu system spróbuje zarejestrować wpłatę w iFirma i odświeżyć status sprawy.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-primary" id="bankTransactionLinkSubmit">Powiąż lokalnie</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modalEl = document.getElementById('bankTransactionLinkConfirmModal');
+            var form = document.getElementById('bankTransactionLinkConfirmForm');
+            var registerInput = document.getElementById('bankTransactionLinkRegisterIfirma');
+            var summaryEl = document.getElementById('bankTransactionLinkSummary');
+            var descriptionEl = document.getElementById('bankTransactionLinkDescription');
+            var infoEl = document.getElementById('bankTransactionLinkIfirmaInfo');
+            var submitBtn = document.getElementById('bankTransactionLinkSubmit');
+
+            if (!modalEl || !form || !registerInput || !summaryEl || !descriptionEl || !infoEl || !submitBtn || !window.bootstrap) {
+                return;
+            }
+
+            var modal = new window.bootstrap.Modal(modalEl);
+            document.querySelectorAll('.bank-link-confirm-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
+
+                    form.setAttribute('action', btn.getAttribute('data-action') || '');
+                    registerInput.value = registerIfirma ? '1' : '0';
+                    summaryEl.textContent = btn.getAttribute('data-summary') || '—';
+                    descriptionEl.textContent = btn.getAttribute('data-description') || '—';
+                    infoEl.classList.toggle('d-none', !registerIfirma);
+                    submitBtn.textContent = registerIfirma ? 'Powiąż + wpłata iFirma' : 'Powiąż lokalnie';
+                    submitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
+
+                    modal.show();
+                });
+            });
+        });
+    </script>
 </x-app-layout>

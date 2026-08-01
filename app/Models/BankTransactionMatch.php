@@ -138,6 +138,7 @@ class BankTransactionMatch extends Model
                 'amount_mismatch' => 'Kwota przelewu różni się od kwoty FV/zamówienia',
                 'existing_debt_case' => 'Istnieje aktywna sprawa windykacyjna dla tego zamówienia',
                 'multiple_candidates' => 'Więcej niż jeden kandydat — zweryfikuj ręcznie',
+                'manual_case_link' => 'Ręczne powiązanie przelewu ze sprawą windykacyjną',
                 'manual_ignore' => 'Ręcznie zignorowane',
                 'party_name_mismatch' => 'Nadawca z wyciągu nie pasuje do nabywcy/odbiorcy zamówienia — możliwy błędny numer FV w tytule',
                 default => $reason,
