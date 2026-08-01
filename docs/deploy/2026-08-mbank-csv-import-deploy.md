@@ -38,6 +38,11 @@ Deploy: wypchnąć kod (bez nowej migracji) + `php artisan optimize:clear`.
 4. Na karcie sprawy: sekcja „Wpłaty z wyciągu” + wpis historii `bank_match`.
 5. Przy zgodnej kwocie: modal — lokalnie albo + wpłata iFirma; przy różnicy kwot — tylko lokalnie (ostrzeżenie).
 6. Akceptacja na zamówieniu z już zamkniętą sprawą nie może dać 500 — wiąże do istniejącej.
+7. Po **Akceptuj + wpłata w iFirma** (status `oplacone`) lub **Zaakceptuj jako opłacone w iFirma** — sprawa powinna zostać **zamknięta automatycznie** (wpis `close` w historii), chyba że była `disputed`.
+
+## Auto-zamknięcie po Accept (2026-08)
+
+Serwis: `DebtCaseAutoCloseService`. Bez migracji. Deploy kodu + `php artisan optimize:clear`.
 
 ## Storage
 

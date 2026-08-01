@@ -333,6 +333,15 @@ class BankStatementImportTest extends TestCase
             'debt_case_id' => $match->debt_case_id,
             'note' => 'Zaakceptowano wpłatę z wyciągu mBank: 365,00 PLN z dnia 2026-07-31 (FV 320/7/2026). Transakcja #'.$match->bank_transaction_id.'. iFirma przed akceptacją wskazywała fakturę jako opłaconą — nie rejestrowano nowej wpłaty w iFirma.',
         ]);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $match->debt_case_id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
+            'note' => \App\Services\DebtCaseAutoCloseService::CLOSURE_REASON,
+        ]);
+        $this->assertSame(DebtCase::STATUS_CLOSED, DebtCase::find($match->debt_case_id)?->status);
+        $accept->assertSessionHas('success', function (string $value): bool {
+            return str_contains($value, 'Sprawę zamknięto automatycznie');
+        });
     }
 
     public function test_accept_with_ifirma_registration_flag_calls_payment_api(): void
@@ -415,6 +424,61 @@ class BankStatementImportTest extends TestCase
         $this->assertDatabaseHas('debt_case_actions', [
             'debt_case_id' => $match->debt_case_id,
             'action_type' => DebtCaseAction::TYPE_IFIRMA_SYNC,
+        ]);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $match->debt_case_id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
+        ]);
+        $this->assertSame(DebtCase::STATUS_CLOSED, DebtCase::find($match->debt_case_id)?->status);
+        $accept->assertSessionHas('success', function (string $value): bool {
+            return str_contains($value, 'Sprawę zamknięto automatycznie');
+        });
+    }
+
+    public function test_plain_local_accept_does_not_auto_close(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie CSV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '320/7/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_nip' => '5250001009',
+        ]);
+
+        $fixture = file_get_contents(base_path('tests/fixtures/bank/mbank_sample.csv'));
+        $this->assertNotFalse($fixture);
+        $file = UploadedFile::fake()->createWithContent('lista_operacji_test.csv', $fixture);
+
+        $this->actingAs($user)->post(route('accounting.bank-imports.store'), [
+            'csv_file' => $file,
+        ])->assertRedirect();
+
+        $import = BankStatementImport::first();
+        $match = BankTransactionMatch::query()
+            ->where('form_order_id', $order->id)
+            ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+            ->first();
+        $this->assertNotNull($match);
+
+        $this->actingAs($user)->post(
+            route('accounting.bank-imports.matches.accept', [$import, $match])
+        )->assertRedirect();
+
+        $match->refresh();
+        $case = DebtCase::find($match->debt_case_id);
+        $this->assertNotNull($case);
+        $this->assertNotSame(DebtCase::STATUS_CLOSED, $case->status);
+        $this->assertDatabaseMissing('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
         ]);
     }
 }

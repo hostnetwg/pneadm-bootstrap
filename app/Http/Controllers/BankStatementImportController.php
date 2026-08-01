@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\BankTransactionMatch;
+use App\Models\User;
 use App\Services\Bank\BankStatementImportService;
+use App\Services\DebtCaseAutoCloseService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
 use Illuminate\Http\Request;
@@ -165,7 +167,8 @@ class BankStatementImportController extends Controller
         BankStatementImport $bankImport,
         BankTransactionMatch $match,
         BankStatementImportService $importService,
-        IfirmaInvoicePaymentRegistrationService $paymentRegistration
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
     ) {
         $this->assertMatchBelongsToImport($bankImport, $match);
 
@@ -201,11 +204,15 @@ class BankStatementImportController extends Controller
             }
 
             if ($paymentResult['success']) {
-                return $this->redirectAfterReview(
-                    $request,
-                    $bankImport,
-                    $message.' '.$paymentResult['message']
+                $message .= ' '.$paymentResult['message'];
+                $message .= $this->appendAutoCloseMessage(
+                    $autoClose,
+                    $accepted,
+                    $request->user(),
+                    $paymentResult['status'] ?? null
                 );
+
+                return $this->redirectAfterReview($request, $bankImport, $message);
             }
 
             return $this->redirectAfterReview(
@@ -216,11 +223,15 @@ class BankStatementImportController extends Controller
         }
 
         if ($request->boolean('ifirma_already_paid')) {
-            return $this->redirectAfterReview(
-                $request,
-                $bankImport,
-                $message.' iFirma wskazywała fakturę jako opłaconą — powiązano tylko lokalnie, bez rejestracji nowej wpłaty.'
+            $message .= ' iFirma wskazywała fakturę jako opłaconą — powiązano tylko lokalnie, bez rejestracji nowej wpłaty.';
+            $message .= $this->appendAutoCloseMessage(
+                $autoClose,
+                $accepted,
+                $request->user(),
+                IfirmaInvoicePaymentStatusService::STATUS_PAID
             );
+
+            return $this->redirectAfterReview($request, $bankImport, $message);
         }
 
         return $this->redirectAfterReview(
@@ -334,6 +345,24 @@ class BankStatementImportController extends Controller
         $importService->ignoreTransaction($transaction);
 
         return $this->redirectAfterReview($request, $bankImport, 'Transakcja oznaczona jako ignorowana.');
+    }
+
+    private function appendAutoCloseMessage(
+        DebtCaseAutoCloseService $autoClose,
+        BankTransactionMatch $accepted,
+        ?User $user,
+        ?string $ifirmaStatus
+    ): string {
+        $case = $accepted->debtCase ?: $accepted->fresh(['debtCase'])?->debtCase;
+        if (! $case) {
+            return '';
+        }
+
+        if (! $autoClose->closeIfFullyPaid($case, $user, $ifirmaStatus)) {
+            return '';
+        }
+
+        return ' Sprawę zamknięto automatycznie.';
     }
 
     private function redirectAfterReview(Request $request, BankStatementImport $import, string $message)

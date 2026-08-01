@@ -70,7 +70,8 @@ Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
    (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
-5. **Nie** zamyka sprawy automatycznie — przy statusie „Opłacona” UI podpowiada ręczne zamknięcie.
+5. Na karcie sprawy **„Odśwież status z iFirma”** nadal **nie** zamyka sprawy automatycznie — tylko cache + podpowiedź UI.
+6. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
 
 Testy: `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=AccountingCollectionsTest`.
 
@@ -82,11 +83,11 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 
 ## Kolejne Etapy
 
-- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania sprawy,
+- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania na samym syncu karty,
 - ~~import CSV wyciągów bankowych~~ — **wdrożone (MVP mBank)**: `Księgowość → Import wyciągu` (`accounting.bank-imports.*`); tabele `bank_statement_imports` / `bank_transactions` / `bank_transaction_matches`; parser `MbankStatementParser`; sugestie FV / KSeF / `#ID` / NIP / **imię+nazwisko nabywcy (tylko FV bez NIP) + kwota** → Medium; ręczna akceptacja → lokalny link + `debt_case_actions.bank_match`; przy zgodnej kwocie opcjonalnie **rejestracja wpłaty w iFirma** + sync statusu,
 - dopracowanie sugestii dopasowań (fuzzy nazwa, bulk),
 - ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
-- automatyczne zamykanie spraw po matchu — świadomie poza MVP.
+- ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone (wąski zakres)**: po akceptacji z wyciągu, gdy iFirma potwierdza pełną opłatę (`oplacone`); nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka.
 
 ## Import wyciągu mBank (MVP)
 
@@ -102,6 +103,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - Ostrzeżenie przed akceptacją przy `amount_mismatch` (modal Bootstrap): jedno powiązanie przelewu z FV, odrzucenie innych sugestii, znikanie z kolejki — ryzyko przy jednym przelewie za kilka faktur; **bez** rejestracji w iFirma.
 - Przy **zgodnej kwocie**: modal wyboru — **Akceptuj + wpłata w iFirma** (POST `faktury/wplaty/...` + odświeżenie statusu na sprawie) albo **Tylko lokalnie**.
 - W podglądzie sugestii: **Sprawdź status z iFirma** (bez tworzenia sprawy, jeśli jeszcze jej nie ma). Gdy iFirma zwraca `Opłacona`, operator może wybrać **Zaakceptuj jako opłacone w iFirma** — lokalny `bank_match`, bez rejestracji kolejnej wpłaty.
+- **Auto-zamknięcie sprawy** (`DebtCaseAutoCloseService`): po **Akceptuj + wpłata w iFirma** gdy sync = `oplacone`, oraz po **Zaakceptuj jako opłacone w iFirma** (`ifirma_already_paid`). Pomija `disputed` i już `closed`. Powód: „Zamknięto automatycznie — FV opłacona w iFirma po akceptacji przelewu z wyciągu.”
 - Ikona oka przy wierszu → modal Bootstrap z porównaniem **przelew z wyciągu** ↔ **zamówienie/sugestia** (FV z opisu, KSeF z tytułu, nabywca, NIP, e-mail, podstawa dopasowania).
 - Pliku produkcyjnego z PII **nie** commitować; fixture testowa: `tests/fixtures/bank/mbank_sample.csv`.
 
