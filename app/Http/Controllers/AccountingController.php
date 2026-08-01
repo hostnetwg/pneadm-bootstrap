@@ -467,43 +467,17 @@ class AccountingController extends Controller
             'register_ifirma_payment' => ['nullable', 'boolean'],
         ]);
 
-        $debtCase->loadMissing('formOrder');
-
-        if (! $this->canManuallyLinkBankTransaction($transaction)) {
+        try {
+            $accepted = $importService->manuallyLinkTransactionToDebtCase(
+                $transaction,
+                $debtCase,
+                Auth::id()
+            );
+        } catch (\InvalidArgumentException $e) {
             return redirect()
                 ->route('accounting.collections.show', $debtCase)
-                ->withErrors(['bank_transaction' => 'Ten przelew jest już zaakceptowany albo zignorowany.']);
+                ->withErrors(['bank_transaction' => $e->getMessage()]);
         }
-
-        $amountMatches = $this->amountsMatch(
-            (float) $transaction->amount,
-            (float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0)
-        );
-
-        $match = BankTransactionMatch::query()
-            ->where('bank_transaction_id', $transaction->id)
-            ->where('debt_case_id', $debtCase->id)
-            ->first();
-
-        if ($match) {
-            $match->forceFill([
-                'form_order_id' => $debtCase->form_order_id,
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
-                'match_reasons' => $this->manualBankMatchReasons($amountMatches),
-                'status' => BankTransactionMatch::STATUS_SUGGESTED,
-            ])->save();
-        } else {
-            $match = BankTransactionMatch::create([
-                'bank_transaction_id' => $transaction->id,
-                'debt_case_id' => $debtCase->id,
-                'form_order_id' => $debtCase->form_order_id,
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
-                'match_reasons' => $this->manualBankMatchReasons($amountMatches),
-                'status' => BankTransactionMatch::STATUS_SUGGESTED,
-            ]);
-        }
-
-        $accepted = $importService->acceptMatch($match, Auth::id());
 
         $message = sprintf(
             'Ręcznie powiązano przelew #%d ze sprawą #%d.',
@@ -593,36 +567,6 @@ class AccountingController extends Controller
             ->latest('id')
             ->limit(12)
             ->get();
-    }
-
-    private function canManuallyLinkBankTransaction(BankTransaction $transaction): bool
-    {
-        if (! $transaction->is_incoming) {
-            return false;
-        }
-
-        return ! $transaction->matches()
-            ->whereIn('status', [
-                BankTransactionMatch::STATUS_ACCEPTED,
-                BankTransactionMatch::STATUS_IGNORED,
-            ])
-            ->exists();
-    }
-
-    private function amountsMatch(float $a, float $b): bool
-    {
-        return abs(round($a, 2) - round($b, 2)) <= 0.01;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function manualBankMatchReasons(bool $amountMatches): array
-    {
-        return [
-            'manual_case_link',
-            $amountMatches ? 'amount_match' : 'amount_mismatch',
-        ];
     }
 
     public function collectionsSyncIfirma(

@@ -252,6 +252,8 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#bankTxPreviewModal"
                                                     data-tx-id="{{ $tx->id }}"
+                                                    data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
+                                                    data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
                                                     data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) }}"
                                                     @if($suggestBest)
                                                         data-can-act="match"
@@ -425,6 +427,27 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="border-top pt-3 mt-3 d-none" id="bankTxManualLinkPanel">
+                        <h6 class="fw-semibold mb-2">Powiąż ręcznie ze sprawą windykacyjną</h6>
+                        <p class="small text-muted mb-2">
+                            Szukaj po FV, KSeF, ID sprawy/zamówienia, NIP, nazwie nabywcy/odbiorcy lub e-mailu.
+                            Wyniki tylko dla <strong>niezamkniętych</strong> spraw.
+                        </p>
+                        <div class="input-group input-group-sm mb-2" style="max-width: 36rem;">
+                            <input type="text"
+                                   id="bankTxManualLookupInput"
+                                   class="form-control"
+                                   placeholder="np. Kurzętnik, 343/7/2026, NIP…"
+                                   maxlength="128"
+                                   autocomplete="off">
+                            <button type="button" class="btn btn-outline-primary" id="bankTxManualLookupBtn">
+                                <i class="bi bi-search"></i> Szukaj spraw
+                            </button>
+                        </div>
+                        <div class="form-text mb-2" id="bankTxManualLookupStatus"></div>
+                        <div id="bankTxManualLookupResults"></div>
+                    </div>
                 </div>
                 <div class="modal-footer flex-wrap gap-2 justify-content-between">
                     <div class="d-flex flex-wrap gap-2">
@@ -459,6 +482,34 @@
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankImportManualLinkConfirmModal" tabindex="-1" aria-labelledby="bankImportManualLinkConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankImportManualLinkConfirmForm">
+                    @csrf
+                    <input type="hidden" name="debt_case_id" value="" id="bankImportManualLinkCaseId">
+                    <input type="hidden" name="register_ifirma_payment" value="0" id="bankImportManualLinkRegisterIfirma">
+                    <input type="hidden" name="filter" value="{{ $filter }}">
+                    <input type="hidden" name="preview" value="" id="bankImportManualLinkPreview">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bankImportManualLinkConfirmModalLabel">Potwierdź ręczne powiązanie</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2" id="bankImportManualLinkSummary">—</p>
+                        <div class="alert alert-info small mb-0 d-none" id="bankImportManualLinkIfirmaInfo">
+                            Po lokalnym powiązaniu system spróbuje zarejestrować wpłatę w iFirma i odświeżyć status sprawy.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-primary" id="bankImportManualLinkSubmit">Powiąż lokalnie</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -960,9 +1011,103 @@
             if (!modalEl) return;
 
             var currentPreviewBtn = null;
+            var lookupCasesUrl = @json(route('accounting.bank-imports.lookup-cases'));
             var previewButtons = function () {
                 return Array.prototype.slice.call(document.querySelectorAll('.bank-tx-preview-btn'));
             };
+
+            function setManualLinkPanelVisible(visible) {
+                var panel = document.getElementById('bankTxManualLinkPanel');
+                if (!panel) return;
+                panel.classList.toggle('d-none', !visible);
+                if (!visible) {
+                    var results = document.getElementById('bankTxManualLookupResults');
+                    var status = document.getElementById('bankTxManualLookupStatus');
+                    if (results) results.innerHTML = '';
+                    if (status) status.textContent = '';
+                }
+            }
+
+            function amountsClose(a, b) {
+                return Math.abs(Number(a) - Number(b)) <= 0.01;
+            }
+
+            function renderManualLookupResults(cases, txAmount) {
+                var root = document.getElementById('bankTxManualLookupResults');
+                if (!root) return;
+                if (!cases.length) {
+                    root.innerHTML = '<div class="small text-muted">Brak niezamkniętych spraw dla tego zapytania.</div>';
+                    return;
+                }
+
+                var rows = cases.map(function (c) {
+                    var amountMatches = amountsClose(txAmount, c.amount_gross || 0);
+                    var summary = 'Sprawa #' + c.id
+                        + (c.invoice_number ? ' · FV ' + c.invoice_number : '')
+                        + (c.order_id ? ' · zam. #' + c.order_id : '')
+                        + ' · ' + Number(c.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł';
+                    var meta = [
+                        c.status_label || '',
+                        c.buyer_name || '',
+                        c.recipient_name || '',
+                        c.order_date ? ('zam. ' + c.order_date) : ''
+                    ].filter(Boolean).join(' · ');
+
+                    return '<div class="border rounded p-2 mb-2">'
+                        + '<div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">'
+                        + '<div class="small">'
+                        + '<div class="fw-semibold">' + esc(summary) + '</div>'
+                        + '<div class="text-muted">' + esc(meta) + '</div>'
+                        + (!amountMatches ? '<div class="text-warning">Kwota sprawy różni się od przelewu</div>' : '')
+                        + '</div>'
+                        + '<div class="d-flex flex-column flex-sm-row gap-1">'
+                        + '<a class="btn btn-sm btn-outline-secondary" href="' + esc(c.url) + '" target="_blank" rel="noopener">Sprawa</a>'
+                        + '<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
+                        + ' data-case-id="' + esc(String(c.id)) + '"'
+                        + ' data-register-ifirma="0"'
+                        + ' data-summary="' + esc(summary) + '">Powiąż lokalnie</button>'
+                        + (amountMatches
+                            ? '<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
+                              + ' data-case-id="' + esc(String(c.id)) + '"'
+                              + ' data-register-ifirma="1"'
+                              + ' data-summary="' + esc(summary) + '">+ wpłata iFirma</button>'
+                            : '')
+                        + '</div></div></div>';
+                }).join('');
+
+                root.innerHTML = rows;
+            }
+
+            async function runManualCaseLookup() {
+                var input = document.getElementById('bankTxManualLookupInput');
+                var status = document.getElementById('bankTxManualLookupStatus');
+                var q = (input && input.value ? input.value : '').trim();
+                if (q.length < 2) {
+                    if (status) status.textContent = 'Wpisz co najmniej 2 znaki.';
+                    return;
+                }
+                if (!currentPreviewBtn) return;
+
+                if (status) status.textContent = 'Szukam…';
+                try {
+                    var response = await fetch(lookupCasesUrl + '?q=' + encodeURIComponent(q), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    var payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.message || 'Błąd wyszukiwania');
+                    }
+                    var txAmount = parseFloat(currentPreviewBtn.getAttribute('data-tx-amount') || '0');
+                    renderManualLookupResults(payload.cases || [], txAmount);
+                    if (status) {
+                        status.textContent = (payload.cases || []).length
+                            ? ('Znaleziono: ' + payload.cases.length)
+                            : 'Brak wyników';
+                    }
+                } catch (e) {
+                    if (status) status.textContent = e.message || 'Nie udało się wyszukać spraw.';
+                }
+            }
 
             function setFormPreviewTargets(nextTxId) {
                 ['bankTxPreviewAcceptForm', 'bankTxPreviewRejectForm', 'bankTxPreviewIgnoreForm'].forEach(function (id) {
@@ -1002,6 +1147,7 @@
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj';
+                    setManualLinkPanelVisible(true);
                 } else if (canAct === 'ignore-tx') {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');
@@ -1012,6 +1158,7 @@
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj transakcję';
+                    setManualLinkPanelVisible(true);
                 } else {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');
@@ -1020,6 +1167,7 @@
                     acceptForm.removeAttribute('data-accept-confirmed');
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
+                    setManualLinkPanelVisible(false);
                 }
 
                 var prevBtn = document.getElementById('bankTxPreviewPrevBtn');
@@ -1047,6 +1195,10 @@
                 var matchMeta = document.getElementById('bankTxPreviewMatchMeta');
                 var reasonsEl = document.getElementById('bankTxPreviewReasons');
                 var linksEl = document.getElementById('bankTxPreviewLinks');
+                var lookupResults = document.getElementById('bankTxManualLookupResults');
+                var lookupStatus = document.getElementById('bankTxManualLookupStatus');
+                if (lookupResults) lookupResults.innerHTML = '';
+                if (lookupStatus) lookupStatus.textContent = '';
                 resetIfirmaStatusPanel();
 
                 if (!preview.order) {
@@ -1130,6 +1282,60 @@
                 var buttons = previewButtons();
                 var idx = buttons.indexOf(currentPreviewBtn);
                 if (idx >= 0 && idx < buttons.length - 1) loadPreviewFromButton(buttons[idx + 1]);
+            });
+
+            var lookupBtn = document.getElementById('bankTxManualLookupBtn');
+            var lookupInput = document.getElementById('bankTxManualLookupInput');
+            if (lookupBtn) {
+                lookupBtn.addEventListener('click', runManualCaseLookup);
+            }
+            if (lookupInput) {
+                lookupInput.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        runManualCaseLookup();
+                    }
+                });
+            }
+
+            var manualConfirmModalEl = document.getElementById('bankImportManualLinkConfirmModal');
+            var manualConfirmForm = document.getElementById('bankImportManualLinkConfirmForm');
+            var manualCaseIdInput = document.getElementById('bankImportManualLinkCaseId');
+            var manualRegisterInput = document.getElementById('bankImportManualLinkRegisterIfirma');
+            var manualPreviewInput = document.getElementById('bankImportManualLinkPreview');
+            var manualSummaryEl = document.getElementById('bankImportManualLinkSummary');
+            var manualIfirmaInfo = document.getElementById('bankImportManualLinkIfirmaInfo');
+            var manualSubmitBtn = document.getElementById('bankImportManualLinkSubmit');
+            var manualConfirmModal = manualConfirmModalEl && window.bootstrap
+                ? new window.bootstrap.Modal(manualConfirmModalEl)
+                : null;
+
+            document.getElementById('bankTxManualLookupResults')?.addEventListener('click', function (event) {
+                var btn = event.target.closest('.bank-manual-link-btn');
+                if (!btn || !currentPreviewBtn || !manualConfirmForm || !manualConfirmModal) return;
+
+                var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
+                manualConfirmForm.setAttribute('action', currentPreviewBtn.getAttribute('data-link-url') || '');
+                if (manualCaseIdInput) manualCaseIdInput.value = btn.getAttribute('data-case-id') || '';
+                if (manualRegisterInput) manualRegisterInput.value = registerIfirma ? '1' : '0';
+                if (manualPreviewInput) {
+                    var buttons = previewButtons();
+                    var idx = buttons.indexOf(currentPreviewBtn);
+                    var nextBtn = idx >= 0 && idx < buttons.length - 1 ? buttons[idx + 1] : null;
+                    manualPreviewInput.value = nextBtn ? (nextBtn.getAttribute('data-tx-id') || '') : '';
+                }
+                if (manualSummaryEl) {
+                    manualSummaryEl.textContent = 'Powiązać przelew #'
+                        + (currentPreviewBtn.getAttribute('data-tx-id') || '')
+                        + ' z: '
+                        + (btn.getAttribute('data-summary') || 'sprawą');
+                }
+                if (manualIfirmaInfo) manualIfirmaInfo.classList.toggle('d-none', !registerIfirma);
+                if (manualSubmitBtn) {
+                    manualSubmitBtn.textContent = registerIfirma ? 'Powiąż + wpłata iFirma' : 'Powiąż lokalnie';
+                    manualSubmitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
+                }
+                manualConfirmModal.show();
             });
 
             var autoPreviewId = new URLSearchParams(window.location.search).get('preview');

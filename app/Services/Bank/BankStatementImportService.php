@@ -74,6 +74,7 @@ class BankStatementImportService
         foreach ($parsed['rows'] as $row) {
             if (isset($existingFingerprints[$row['fingerprint']])) {
                 $duplicates++;
+
                 continue;
             }
 
@@ -229,8 +230,7 @@ class BankStatementImportService
         BankTransactionMatch $match,
         ?int $userId = null,
         bool $acceptedViaIfirmaPaid = false
-    ): BankTransactionMatch
-    {
+    ): BankTransactionMatch {
         if ($match->status === BankTransactionMatch::STATUS_ACCEPTED) {
             return $match;
         }
@@ -319,6 +319,66 @@ class BankStatementImportService
         $match->update(['status' => BankTransactionMatch::STATUS_REJECTED]);
 
         return $match->fresh();
+    }
+
+    /**
+     * Ręczne powiązanie wpływu ze sprawą windykacyjną + natychmiastowa akceptacja.
+     */
+    public function manuallyLinkTransactionToDebtCase(
+        BankTransaction $transaction,
+        DebtCase $debtCase,
+        ?int $userId = null
+    ): BankTransactionMatch {
+        if (! $transaction->is_incoming) {
+            throw new InvalidArgumentException('Można powiązać tylko wpływy (przelewy przychodzące).');
+        }
+
+        if ($transaction->matches()
+            ->whereIn('status', [
+                BankTransactionMatch::STATUS_ACCEPTED,
+                BankTransactionMatch::STATUS_IGNORED,
+            ])
+            ->exists()) {
+            throw new InvalidArgumentException('Ten przelew jest już zaakceptowany albo zignorowany.');
+        }
+
+        $debtCase->loadMissing('formOrder');
+        $userId = $userId ?? Auth::id();
+
+        $amountMatches = abs(
+            round((float) $transaction->amount, 2)
+            - round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2)
+        ) <= 0.01;
+
+        $reasons = [
+            'manual_case_link',
+            $amountMatches ? 'amount_match' : 'amount_mismatch',
+        ];
+
+        $match = BankTransactionMatch::query()
+            ->where('bank_transaction_id', $transaction->id)
+            ->where('debt_case_id', $debtCase->id)
+            ->first();
+
+        if ($match) {
+            $match->forceFill([
+                'form_order_id' => $debtCase->form_order_id,
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $reasons,
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ])->save();
+        } else {
+            $match = BankTransactionMatch::create([
+                'bank_transaction_id' => $transaction->id,
+                'debt_case_id' => $debtCase->id,
+                'form_order_id' => $debtCase->form_order_id,
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => $reasons,
+                'status' => BankTransactionMatch::STATUS_SUGGESTED,
+            ]);
+        }
+
+        return $this->acceptMatch($match, $userId);
     }
 
     public function ignoreMatch(BankTransactionMatch $match): BankTransactionMatch

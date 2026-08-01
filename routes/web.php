@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AccountingController;
-use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Admin\PneduUsersController;
 use App\Http\Controllers\Admin\StatisticsController;
@@ -12,6 +11,7 @@ use App\Http\Controllers\Analytics\AnalyticsOrderFormFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsRevenueController;
 use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsSettingsController;
+use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\CoursePriceVariantController;
@@ -44,8 +44,8 @@ use App\Http\Controllers\SendyController;
 use App\Http\Controllers\Settings\PneduPurchasesController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
-use App\Http\Controllers\TrashController;
 use App\Http\Controllers\TrainingOfferController;
+use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserPreferencesController;
 use App\Http\Controllers\WebhookPubligoController;
 use App\Http\Controllers\ZamowieniaController;
@@ -566,6 +566,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::prefix('bank-imports')->name('bank-imports.')->group(function () {
             Route::get('/', [BankStatementImportController::class, 'index'])->name('index');
             Route::post('/', [BankStatementImportController::class, 'store'])->name('store');
+            Route::get('/lookup-cases', [BankStatementImportController::class, 'lookupDebtCases'])->name('lookup-cases');
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
             Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');
@@ -573,6 +574,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{bankImport}/matches/{match}/reject', [BankStatementImportController::class, 'reject'])->name('matches.reject');
             Route::post('/{bankImport}/matches/{match}/ignore', [BankStatementImportController::class, 'ignoreMatch'])->name('matches.ignore');
             Route::post('/{bankImport}/transactions/{transaction}/ignore', [BankStatementImportController::class, 'ignoreTransaction'])->name('transactions.ignore');
+            Route::post('/{bankImport}/transactions/{transaction}/link-case', [BankStatementImportController::class, 'linkTransactionToCase'])->name('transactions.link-case');
         });
 
         Route::middleware('super_admin')->prefix('instructor-invoices')->name('instructor-invoices.')->group(function () {

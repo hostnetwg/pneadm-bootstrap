@@ -40,6 +40,7 @@ Deploy: wypchnąć kod (bez nowej migracji) + `php artisan optimize:clear`.
 6. Akceptacja na zamówieniu z już zamkniętą sprawą nie może dać 500 — wiąże do istniejącej.
 7. Po **Akceptuj + wpłata w iFirma** (status `oplacone`) lub **Zaakceptuj jako opłacone w iFirma** — sprawa powinna zostać **zamknięta automatycznie** (wpis `close` w historii), chyba że była `disputed`.
 8. Na karcie sprawy sprawdź wyszukiwarkę **Wpłaty z wyciągu**: znajdź niepowiązany wpływ po kwocie/frazie z opisu i powiąż lokalnie albo z rejestracją wpłaty iFirma.
+9. W modalu przelewu bez sugestii: **Powiąż ręcznie ze sprawą** — wyszukaj niezamkniętą sprawę i powiąż.
 
 ## Auto-zamknięcie po Accept (2026-08)
 

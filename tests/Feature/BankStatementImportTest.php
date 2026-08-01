@@ -481,4 +481,83 @@ class BankStatementImportTest extends TestCase
             'action_type' => DebtCaseAction::TYPE_CLOSE,
         ]);
     }
+
+    public function test_manual_link_from_bank_import_lookup_and_accept(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie ręczne od przelewu',
+            'product_price' => 365,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '901/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Spółdzielnia Socjalna Razem dla Gminy Kurzętnik',
+            'buyer_nip' => '7410001111',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '901/8/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_manual.csv',
+            'file_hash' => str_repeat('f', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'SPOLDZIELNIA SOCJALNA RAZEM DLA GMINY KURZETNIK SZKOLENIE',
+            'account_label' => 'Kurzętnik',
+            'fingerprint' => str_repeat('1', 64),
+            'is_incoming' => true,
+        ]);
+
+        $lookup = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => 'Kurzętnik',
+        ]));
+        $lookup->assertOk();
+        $lookup->assertJsonPath('cases.0.id', $case->id);
+
+        $show = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'unlinked',
+        ]));
+        $show->assertOk();
+        $show->assertSee('Powiąż ręcznie ze sprawą windykacyjną', false);
+
+        $link = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),
+            [
+                'debt_case_id' => $case->id,
+                'filter' => 'unlinked',
+            ]
+        );
+        $link->assertRedirect();
+        $link->assertSessionHas('success');
+
+        $match = BankTransactionMatch::first();
+        $this->assertNotNull($match);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $match->status);
+        $this->assertSame($case->id, $match->debt_case_id);
+        $this->assertContains('manual_case_link', $match->match_reasons);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_BANK_MATCH,
+        ]);
+    }
 }

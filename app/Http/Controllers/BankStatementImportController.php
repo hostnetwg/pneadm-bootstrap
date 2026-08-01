@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BankStatementImport;
 use App\Models\BankTransaction;
 use App\Models\BankTransactionMatch;
+use App\Models\DebtCase;
 use App\Models\User;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\DebtCaseAutoCloseService;
@@ -345,6 +346,155 @@ class BankStatementImportController extends Controller
         $importService->ignoreTransaction($transaction);
 
         return $this->redirectAfterReview($request, $bankImport, 'Transakcja oznaczona jako ignorowana.');
+    }
+
+    public function lookupDebtCases(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:128'],
+        ]);
+
+        $query = trim($validated['q']);
+        $digits = preg_replace('/\D+/', '', $query) ?: '';
+
+        $cases = DebtCase::query()
+            ->active()
+            ->with(['formOrder'])
+            ->where(function ($outer) use ($query, $digits) {
+                $outer->where('invoice_number', 'like', "%{$query}%")
+                    ->orWhere('ksef_number', 'like', "%{$query}%")
+                    ->orWhereHas('formOrder', function ($formOrderQuery) use ($query, $digits) {
+                        $formOrderQuery->where('invoice_number', 'like', "%{$query}%")
+                            ->orWhere('ksef_number', 'like', "%{$query}%")
+                            ->orWhere('buyer_name', 'like', "%{$query}%")
+                            ->orWhere('recipient_name', 'like', "%{$query}%")
+                            ->orWhere('orderer_name', 'like', "%{$query}%")
+                            ->orWhere('orderer_email', 'like', "%{$query}%")
+                            ->orWhere('buyer_nip', 'like', "%{$query}%")
+                            ->orWhere('recipient_nip', 'like', "%{$query}%");
+
+                        if (ctype_digit($query)) {
+                            $formOrderQuery->orWhereKey((int) $query);
+                        }
+
+                        if (strlen($digits) >= 7) {
+                            $formOrderQuery->orWhereRaw(
+                                "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                                ['%'.$digits.'%']
+                            )->orWhereRaw(
+                                "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                                ['%'.$digits.'%']
+                            );
+                        }
+                    });
+
+                if (ctype_digit($query)) {
+                    $outer->orWhereKey((int) $query);
+                }
+            })
+            ->latest('id')
+            ->limit(12)
+            ->get();
+
+        return response()->json([
+            'cases' => $cases->map(function (DebtCase $case) {
+                $order = $case->formOrder;
+                $amount = (float) ($case->amount_gross ?? $order?->product_price ?? 0);
+
+                return [
+                    'id' => $case->id,
+                    'status' => $case->status,
+                    'status_label' => $case->statusLabel(),
+                    'invoice_number' => $case->invoice_number ?: ($order?->invoice_number ?: null),
+                    'ksef_number' => $case->ksef_number ?: ($order?->ksef_number ?: null),
+                    'amount_gross' => $amount,
+                    'order_id' => $order?->id,
+                    'order_date' => $order?->order_date
+                        ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
+                        : null,
+                    'buyer_name' => $order?->buyer_name,
+                    'recipient_name' => $order?->recipient_name,
+                    'url' => route('accounting.collections.show', $case),
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function linkTransactionToCase(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransaction $transaction,
+        BankStatementImportService $importService,
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
+    ) {
+        if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'debt_case_id' => ['required', 'integer', 'exists:debt_cases,id'],
+            'register_ifirma_payment' => ['nullable', 'boolean'],
+        ]);
+
+        $debtCase = DebtCase::query()->findOrFail($validated['debt_case_id']);
+
+        try {
+            $accepted = $importService->manuallyLinkTransactionToDebtCase(
+                $transaction,
+                $debtCase,
+                $request->user()?->id
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['match' => $e->getMessage()]);
+        }
+
+        $message = sprintf(
+            'Ręcznie powiązano przelew #%d ze sprawą #%d.',
+            $transaction->id,
+            $debtCase->id
+        );
+
+        if ($request->boolean('register_ifirma_payment')) {
+            try {
+                $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                    $accepted,
+                    $request->user()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+
+                return $this->redirectAfterReview(
+                    $request,
+                    $bankImport,
+                    $message.' Akceptacja lokalna OK.'
+                )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+            }
+
+            if ($paymentResult['success']) {
+                $message .= ' '.$paymentResult['message'];
+                $message .= $this->appendAutoCloseMessage(
+                    $autoClose,
+                    $accepted,
+                    $request->user(),
+                    $paymentResult['status'] ?? null
+                );
+
+                return $this->redirectAfterReview($request, $bankImport, $message);
+            }
+
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                $message.' Akceptacja lokalna OK.'
+            )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+        }
+
+        return $this->redirectAfterReview(
+            $request,
+            $bankImport,
+            $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).'
+        );
     }
 
     private function appendAutoCloseMessage(
