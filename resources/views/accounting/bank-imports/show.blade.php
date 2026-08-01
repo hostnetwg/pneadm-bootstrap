@@ -444,6 +444,7 @@
                             Wielkość liter nie ma znaczenia.
                             Najpierw pokazujemy <strong>niezamknięte sprawy</strong>, potem zamówienia <strong>bez aktywnej sprawy</strong>
                             (np. gdy wpłatę oznaczono wcześniej tylko w iFirma).
+                            Kliknij <strong>oko</strong>, żeby zobaczyć dane w prawej kolumnie i dopiero stamtąd powiązać.
                         </p>
                         <div class="input-group input-group-sm mb-2" style="max-width: 36rem;">
                             <input type="text"
@@ -1039,6 +1040,7 @@
             var csrfToken = @json(csrf_token());
             var originalOrderSnapshot = null;
             var peekedOrderId = null;
+            var peekedLinkContext = null;
             var previewButtons = function () {
                 return Array.prototype.slice.call(document.querySelectorAll('.bank-tx-preview-btn'));
             };
@@ -1071,6 +1073,7 @@
 
             function clearPeekState(restoreOriginal) {
                 peekedOrderId = null;
+                peekedLinkContext = null;
                 setActivePeekEye(null);
                 setClearPeekBtnVisible(false);
                 if (restoreOriginal && originalOrderSnapshot) {
@@ -1113,8 +1116,25 @@
                     matchMeta.innerHTML = '<span class="badge text-bg-primary">Podgląd kandydata</span>';
                     reasonsEl.innerHTML = '';
                     var peekLinks = [];
-                    if (order.url) {
-                        peekLinks.push('<a class="btn btn-sm btn-outline-primary" href="' + esc(order.url) + '" target="_blank" rel="noopener">Otwórz zamówienie</a>');
+                    var ctx = peekedLinkContext || {};
+                    var openLabel = ctx.kind === 'case' ? 'Sprawa' : 'Zamówienie';
+                    var openUrl = ctx.itemUrl || order.url || '';
+                    if (openUrl) {
+                        peekLinks.push('<a class="btn btn-sm btn-outline-secondary" href="' + esc(openUrl) + '" target="_blank" rel="noopener">'
+                            + esc(openLabel) + '</a>');
+                    }
+                    var linkAttrs = ' data-case-id="' + esc(String(ctx.caseId || '')) + '"'
+                        + ' data-order-id="' + esc(String(ctx.orderId || '')) + '"'
+                        + ' data-summary="' + esc(String(ctx.summary || ('zam. #' + order.id))) + '"';
+                    peekLinks.push('<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
+                        + linkAttrs
+                        + ' data-register-ifirma="0">Powiąż lokalnie</button>');
+                    if (ctx.amountMatches) {
+                        peekLinks.push('<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
+                            + linkAttrs
+                            + ' data-register-ifirma="1">+ wpłata iFirma</button>');
+                    } else {
+                        reasonsEl.innerHTML = '<div class="text-warning">Kwota różni się od przelewu — dostępne tylko powiązanie lokalne.</div>';
                     }
                     linksEl.innerHTML = peekLinks.join(' ');
                     setClearPeekBtnVisible(true);
@@ -1210,42 +1230,30 @@
                         item.recipient_name || ''
                     ].filter(Boolean).join(' · ');
 
-                    var linkAttrs = kind === 'case'
-                        ? (' data-case-id="' + esc(String(item.id)) + '" data-order-id=""')
-                        : (' data-case-id="" data-order-id="' + esc(String(item.id)) + '"');
-
                     var peekOrderId = kind === 'case' ? item.order_id : item.id;
                     var eyeHtml = peekOrderId
-                        ? ('<button type="button" class="btn btn-sm btn-outline-secondary bank-manual-peek-btn'
+                        ? ('<button type="button" class="btn btn-sm btn-outline-secondary bank-manual-peek-btn flex-shrink-0'
                             + (peekedOrderId && String(peekedOrderId) === String(peekOrderId) ? ' is-active' : '')
                             + '" data-peek-order-id="' + esc(String(peekOrderId)) + '"'
-                            + ' title="Podgląd zamówienia w prawej kolumnie"'
+                            + ' data-kind="' + esc(kind) + '"'
+                            + ' data-case-id="' + esc(kind === 'case' ? String(item.id) : '') + '"'
+                            + ' data-order-id="' + esc(kind === 'order' ? String(item.id) : '') + '"'
+                            + ' data-item-url="' + esc(item.url || '') + '"'
+                            + ' data-summary="' + esc(summary) + '"'
+                            + ' data-amount-matches="' + (amountMatches ? '1' : '0') + '"'
+                            + ' title="Podgląd w prawej kolumnie — potem powiąż"'
                             + ' aria-label="Podgląd zamówienia #' + esc(String(peekOrderId)) + '"'
                             + ' aria-pressed="' + (peekedOrderId && String(peekedOrderId) === String(peekOrderId) ? 'true' : 'false') + '">'
                             + '<i class="bi bi-eye"></i></button>')
-                        : '';
+                        : '<span class="text-muted small flex-shrink-0" title="Brak zamówienia do podglądu">—</span>';
 
                     return '<div class="border rounded p-2 mb-2">'
-                        + '<div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">'
-                        + '<div class="small">'
+                        + '<div class="d-flex gap-2 align-items-start">'
+                        + eyeHtml
+                        + '<div class="small flex-grow-1">'
                         + '<div class="fw-semibold">' + esc(summary) + '</div>'
                         + '<div class="text-muted">' + esc(meta) + '</div>'
                         + (!amountMatches ? '<div class="text-warning">Kwota różni się od przelewu</div>' : '')
-                        + '</div>'
-                        + '<div class="d-flex flex-column flex-sm-row gap-1">'
-                        + eyeHtml
-                        + '<a class="btn btn-sm btn-outline-secondary" href="' + esc(item.url) + '" target="_blank" rel="noopener">'
-                        + (kind === 'case' ? 'Sprawa' : 'Zamówienie') + '</a>'
-                        + '<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
-                        + linkAttrs
-                        + ' data-register-ifirma="0"'
-                        + ' data-summary="' + esc(summary) + '">Powiąż lokalnie</button>'
-                        + (amountMatches
-                            ? '<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
-                              + linkAttrs
-                              + ' data-register-ifirma="1"'
-                              + ' data-summary="' + esc(summary) + '">+ wpłata iFirma</button>'
-                            : '')
                         + '</div></div></div>';
                 }
 
@@ -1276,6 +1284,14 @@
                         throw new Error(payload.message || 'Nie udało się wczytać zamówienia');
                     }
                     peekedOrderId = orderId;
+                    peekedLinkContext = {
+                        kind: eyeBtn ? (eyeBtn.getAttribute('data-kind') || 'order') : 'order',
+                        caseId: eyeBtn ? (eyeBtn.getAttribute('data-case-id') || '') : '',
+                        orderId: eyeBtn ? (eyeBtn.getAttribute('data-order-id') || '') : '',
+                        itemUrl: eyeBtn ? (eyeBtn.getAttribute('data-item-url') || '') : '',
+                        summary: eyeBtn ? (eyeBtn.getAttribute('data-summary') || '') : '',
+                        amountMatches: eyeBtn ? eyeBtn.getAttribute('data-amount-matches') === '1' : false
+                    };
                     setActivePeekEye(orderId);
                     renderOrderPanelFromSnapshot({
                         order: payload.order,
@@ -1408,6 +1424,7 @@
                     txData: preview.tx || {}
                 };
                 peekedOrderId = null;
+                peekedLinkContext = null;
                 setActivePeekEye(null);
 
                 clearMatchHighlights(modalEl);
@@ -1472,15 +1489,7 @@
                 ? new window.bootstrap.Modal(manualConfirmModalEl)
                 : null;
 
-            document.getElementById('bankTxManualLookupResults')?.addEventListener('click', function (event) {
-                var peekBtn = event.target.closest('.bank-manual-peek-btn');
-                if (peekBtn) {
-                    event.preventDefault();
-                    peekOrderInRightColumn(peekBtn.getAttribute('data-peek-order-id'), peekBtn);
-                    return;
-                }
-
-                var btn = event.target.closest('.bank-manual-link-btn');
+            function openManualLinkConfirm(btn) {
                 if (!btn || !currentPreviewBtn || !manualConfirmForm || !manualConfirmModal) return;
 
                 var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
@@ -1506,6 +1515,22 @@
                     manualSubmitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
                 }
                 manualConfirmModal.show();
+            }
+
+            document.getElementById('bankTxManualLookupResults')?.addEventListener('click', function (event) {
+                var peekBtn = event.target.closest('.bank-manual-peek-btn');
+                if (peekBtn) {
+                    event.preventDefault();
+                    peekOrderInRightColumn(peekBtn.getAttribute('data-peek-order-id'), peekBtn);
+                }
+            });
+
+            document.getElementById('bankTxPreviewLinks')?.addEventListener('click', function (event) {
+                var btn = event.target.closest('.bank-manual-link-btn');
+                if (btn) {
+                    event.preventDefault();
+                    openManualLinkConfirm(btn);
+                }
             });
 
             var clearPeekBtn = document.getElementById('bankTxPreviewClearOrderBtn');
