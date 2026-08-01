@@ -1047,22 +1047,21 @@
 
                 function rowHtml(item, kind) {
                     var amountMatches = amountsClose(txAmount, item.amount_gross || 0);
-                    var dateBits = [
-                        item.order_date ? ('zam. ' + item.order_date) : '',
-                        item.course_date ? ('szkol. ' + item.course_date) : ''
-                    ].filter(Boolean).join(' · ');
+                    var courseDateBit = item.course_date ? ('szkol. ' + item.course_date) : '';
                     var summary = kind === 'case'
                         ? ('Sprawa #' + item.id
                             + (item.invoice_number ? ' · FV ' + item.invoice_number : '')
                             + (item.order_id ? ' · zam. #' + item.order_id : '')
+                            + (item.order_date ? ' · zam. ' + item.order_date : '')
                             + ' · ' + Number(item.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł')
                         : ('Zamówienie #' + item.id
+                            + (item.order_date ? ' · ' + item.order_date : '')
                             + (item.invoice_number ? ' · FV ' + item.invoice_number : '')
                             + ' · ' + Number(item.amount_gross || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł'
                             + ' · bez aktywnej sprawy');
                     var meta = [
                         kind === 'case' ? (item.status_label || '') : 'Utworzy sprawę przy powiązaniu',
-                        dateBits,
+                        courseDateBit,
                         item.product_name || '',
                         item.buyer_name || '',
                         item.recipient_name || ''
