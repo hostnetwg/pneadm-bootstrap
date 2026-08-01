@@ -82,8 +82,27 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 
 ## Kolejne Etapy
 
-- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania sprawy i **bez** rejestracji wpłat,
-- import CSV wyciągów bankowych,
-- sugestie dopasowania po numerze faktury, KSeF, `form_orders.id`, NIP, nazwie i kwocie,
-- ręczna akceptacja dopasowań,
-- ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora.
+- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania sprawy,
+- ~~import CSV wyciągów bankowych~~ — **wdrożone (MVP mBank)**: `Księgowość → Import wyciągu` (`accounting.bank-imports.*`); tabele `bank_statement_imports` / `bank_transactions` / `bank_transaction_matches`; parser `MbankStatementParser`; sugestie FV / KSeF / `#ID` / NIP / **imię+nazwisko nabywcy (tylko FV bez NIP) + kwota** → Medium; ręczna akceptacja → lokalny link + `debt_case_actions.bank_match`; przy zgodnej kwocie opcjonalnie **rejestracja wpłaty w iFirma** + sync statusu,
+- dopracowanie sugestii dopasowań (fuzzy nazwa, bulk),
+- ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
+- automatyczne zamykanie spraw po matchu — świadomie poza MVP.
+
+## Import wyciągu mBank (MVP)
+
+- Menu: `Księgowość → Import wyciągu`.
+- Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.
+- Tylko wpływy (`amount > 0`) idą do UI dopasowań; wydatki mogą być zapisane, ale nie są przeglądane w MVP.
+- Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, `Ignorowane`, `Wszystkie wpływy`.
+- Deduplikacja: `bank_transactions.fingerprint` (data + kwota + opis znormalizowany).
+- Wydajność: lookup FV/KSeF/NIP/spraw ładowany raz do pamięci + bulk insert; limit czasu requestu podniesiony do 600 s (duże CSV ~5k wierszy).
+- Konflikty: jeśli w tytule jest **inny KSeF** niż na zamówieniu → max **Low** (`ksef_mismatch`); jeśli nadawca z wyciągu nie pasuje do nabywcy/odbiorcy → obniżenie High→Medium (`party_name_mismatch`) — typowy błędny numer FV w tytule.
+- **Priorytet KSeF:** gdy w tytule jest nr KSeF i istnieje zamówienie z tym numerem → tylko ta sugestia (FV z tytułu może być błędna). Jeśli FV z tytułu ≠ FV na zamówieniu → **Medium** przy zgodnej kwocie (`invoice_number_mismatch`). Gdy KSeF z tytułu **nie ma** w DB → fallback na numer FV (jak wcześniej).
+- Akceptacja: wymaga istniejącej sprawy **lub** `form_order_id` (wtedy tworzy sprawę jak w `collectionsStore`); wpis historii typu `bank_match`; sekcja „Wpłaty z wyciągu” na karcie sprawy.
+- Ostrzeżenie przed akceptacją przy `amount_mismatch` (modal Bootstrap): jedno powiązanie przelewu z FV, odrzucenie innych sugestii, znikanie z kolejki — ryzyko przy jednym przelewie za kilka faktur; **bez** rejestracji w iFirma.
+- Przy **zgodnej kwocie**: modal wyboru — **Akceptuj + wpłata w iFirma** (POST `faktury/wplaty/...` + odświeżenie statusu na sprawie) albo **Tylko lokalnie**.
+- W podglądzie sugestii: **Sprawdź status z iFirma** (bez tworzenia sprawy, jeśli jeszcze jej nie ma). Gdy iFirma zwraca `Opłacona`, operator może wybrać **Zaakceptuj jako opłacone w iFirma** — lokalny `bank_match`, bez rejestracji kolejnej wpłaty.
+- Ikona oka przy wierszu → modal Bootstrap z porównaniem **przelew z wyciągu** ↔ **zamówienie/sugestia** (FV z opisu, KSeF z tytułu, nabywca, NIP, e-mail, podstawa dopasowania).
+- Pliku produkcyjnego z PII **nie** commitować; fixture testowa: `tests/fixtures/bank/mbank_sample.csv`.
+
+Testy: `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest`, `--filter=BankStatementImportTest`.

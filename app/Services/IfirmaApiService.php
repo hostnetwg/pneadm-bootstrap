@@ -379,12 +379,58 @@ class IfirmaApiService
     /**
      * Pobiera szczegóły faktury
      *
-     * @param  int  $invoiceId  ID faktury
+     * @param  int|string  $invoiceId  ID faktury
      * @return array Wynik żądania
      */
     public function getInvoice(int|string $invoiceId): array
     {
         return $this->get('fakturakraj/'.$invoiceId.'.json', 'faktura');
+    }
+
+    /**
+     * Rejestruje wpłatę do faktury (POST faktury/wplaty/{typ}/{numer_lub_id}.json).
+     *
+     * @see https://api.ifirma.pl/rejestrowanie-wplat-do-faktur/
+     *
+     * @param  string  $invoiceRef  Identyfikator faktury albo numer ze / zamienionym na _
+     * @param  float  $amount  Kwota wpłaty (PLN dla faktury krajowej)
+     * @param  string|null  $paymentDate  Data wpłaty Y-m-d (opcjonalnie; wymagane m.in. dla walut / metody kasowej)
+     * @param  string  $invoiceType  Typ dokumentu, domyślnie prz_faktura_kraj
+     * @return array Wynik żądania (status success|error)
+     */
+    public function registerInvoicePayment(
+        string $invoiceRef,
+        float $amount,
+        ?string $paymentDate = null,
+        string $invoiceType = 'prz_faktura_kraj'
+    ): array {
+        $invoiceRef = trim($invoiceRef);
+        $invoiceType = trim($invoiceType) !== '' ? trim($invoiceType) : 'prz_faktura_kraj';
+
+        if ($invoiceRef === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Brak numeru/identyfikatora faktury do rejestracji wpłaty.',
+            ];
+        }
+
+        if ($amount < 0) {
+            return [
+                'status' => 'error',
+                'message' => 'Kwota wpłaty nie może być ujemna.',
+            ];
+        }
+
+        $payload = [
+            'Kwota' => round($amount, 2),
+        ];
+        if ($paymentDate !== null && trim($paymentDate) !== '') {
+            $payload['Data'] = trim($paymentDate);
+        }
+
+        $endpoint = 'faktury/wplaty/'.$invoiceType.'/'.$invoiceRef.'.json';
+
+        return $this->post($endpoint, $payload, 'faktura');
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountingController;
+use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Admin\PneduUsersController;
 use App\Http\Controllers\Admin\StatisticsController;
@@ -560,6 +561,17 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
             Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
+        });
+        Route::prefix('bank-imports')->name('bank-imports.')->group(function () {
+            Route::get('/', [BankStatementImportController::class, 'index'])->name('index');
+            Route::post('/', [BankStatementImportController::class, 'store'])->name('store');
+            Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
+            Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
+            Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');
+            Route::post('/{bankImport}/matches/{match}/accept', [BankStatementImportController::class, 'accept'])->name('matches.accept');
+            Route::post('/{bankImport}/matches/{match}/reject', [BankStatementImportController::class, 'reject'])->name('matches.reject');
+            Route::post('/{bankImport}/matches/{match}/ignore', [BankStatementImportController::class, 'ignoreMatch'])->name('matches.ignore');
+            Route::post('/{bankImport}/transactions/{transaction}/ignore', [BankStatementImportController::class, 'ignoreTransaction'])->name('transactions.ignore');
         });
 
         Route::middleware('super_admin')->prefix('instructor-invoices')->name('instructor-invoices.')->group(function () {

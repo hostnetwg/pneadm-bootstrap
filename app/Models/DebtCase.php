@@ -105,6 +105,11 @@ class DebtCase extends Model
         return $this->hasMany(DebtCaseContact::class);
     }
 
+    public function bankTransactionMatches(): HasMany
+    {
+        return $this->hasMany(BankTransactionMatch::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->whereNotIn('status', [self::STATUS_CLOSED]);

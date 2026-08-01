@@ -449,6 +449,57 @@
                 </div>
             </div>
 
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                            <span>Wpłaty z wyciągu</span>
+                            <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
+                        </div>
+                        <div class="card-body p-0">
+                            @if(($bankPayments ?? collect())->isEmpty())
+                                <div class="p-3 text-muted small">Brak zaakceptowanych wpłat z wyciągu bankowego dla tej sprawy.</div>
+                            @else
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Data operacji</th>
+                                                <th class="text-end">Kwota</th>
+                                                <th>Opis</th>
+                                                <th>Zaakceptował</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($bankPayments as $payment)
+                                                @php $tx = $payment->transaction; @endphp
+                                                <tr>
+                                                    <td class="small">{{ $tx?->operation_date?->format('Y-m-d') ?? '—' }}</td>
+                                                    <td class="text-end fw-semibold text-nowrap">
+                                                        {{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency : '—' }}
+                                                    </td>
+                                                    <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
+                                                    <td class="small">
+                                                        {{ $payment->acceptedBy?->name ?? '—' }}
+                                                        <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        @if($tx)
+                                                            <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', $tx->bank_statement_import_id) }}">Import</a>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3">
                 <div class="col-12 col-xl-6">
                     <div class="card">

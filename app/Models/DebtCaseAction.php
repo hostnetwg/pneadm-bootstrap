@@ -22,6 +22,8 @@ class DebtCaseAction extends Model
 
     public const TYPE_IFIRMA_SYNC = 'ifirma_sync';
 
+    public const TYPE_IFIRMA_PAYMENT = 'ifirma_payment';
+
     public const TYPE_NO_CONTACT = 'no_contact';
 
     public const TYPE_PAYMENT_PROMISE = 'payment_promise';
@@ -35,6 +37,8 @@ class DebtCaseAction extends Model
     public const TYPE_STATUS_UPDATE = 'status_update';
 
     public const TYPE_CASE_OPENED = 'case_opened';
+
+    public const TYPE_BANK_MATCH = 'bank_match';
 
     protected $fillable = [
         'debt_case_id',
@@ -78,6 +82,7 @@ class DebtCaseAction extends Model
             self::TYPE_PHONE => 'Telefon',
             self::TYPE_IFIRMA_REMINDER => 'iFirma',
             self::TYPE_IFIRMA_SYNC => 'Synchronizacja iFirma',
+            self::TYPE_IFIRMA_PAYMENT => 'Wpłata w iFirma',
             self::TYPE_NO_CONTACT => 'Brak kontaktu',
             self::TYPE_PAYMENT_PROMISE => 'Obietnica płatności',
             self::TYPE_DISPUTE => 'Sporne',
@@ -85,6 +90,7 @@ class DebtCaseAction extends Model
             self::TYPE_CLOSE => 'Zamknięcie',
             self::TYPE_STATUS_UPDATE => 'Zmiana ustawień',
             self::TYPE_CASE_OPENED => 'Otwarcie sprawy',
+            self::TYPE_BANK_MATCH => 'Wpłata z wyciągu',
         ];
     }
 }

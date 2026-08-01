@@ -83,12 +83,13 @@ Dalsze kroki:
 | Windykacja MVP (sprawy, działania, kontakty, VIP, skróty, Poprzednia/Następna) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-07-windykacja-mvp-deploy.md` |
 | `form_orders.ifirma_invoice_id` (wewnętrzny ID iFirma obok FV i KSeF) | lokalnie → do deploy | `docs/KSEF_FORM_ORDERS.md`, `docs/deploy/2026-07-ifirma-invoice-id-deploy.md` |
 | Sync statusu płatności iFirma → Windykacja (odczyt) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-07-ifirma-payment-status-sync-deploy.md` |
+| Import CSV mBank → Windykacja (MVP, lokalna akceptacja) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-08-mbank-csv-import-deploy.md` |
 
 **Prod adm — checklist:** `git pull` → `php artisan migrate --force` → `participants:cleanup-live-access --dry-run` → smoke provision + CM z listy uczestników.
 
 **Backlog (uzgodnione, nie wdrożone):** wysyłka maili z linkiem live z listy uczestników (hurt/indywidualnie).
 
-**Windykacja — kolejne etapy:** ~~synchronizacja statusów faktur z iFirma (odczyt)~~ **wdrożone lokalnie**; dalej: import CSV wyciągów bankowych, sugestie dopasowań po FV/KSeF/`form_orders.id`, dyskretne ograniczenia płatności odroczonej w publicznym formularzu dla wysokiego ryzyka.
+**Windykacja — kolejne etapy:** ~~synchronizacja statusów faktur z iFirma (odczyt)~~ **wdrożone lokalnie**; ~~import CSV mBank + ręczne dopasowania~~ **wdrożone lokalnie**; ~~opcjonalna rejestracja wpłat w iFirma po potwierdzeniu~~ **wdrożone lokalnie** (modal przy akceptacji, zgodna kwota); dalej: dopracowanie sugestii (nazwa/bulk), dyskretne ograniczenia płatności odroczonej w publicznym formularzu dla wysokiego ryzyka.
 
 ## Najbliższe 10 Kroków
 

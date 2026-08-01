@@ -89,6 +89,7 @@ Kluczowe obszary:
 - iFirma,
 - KSeF,
 - windykacja faktur (`accounting.collections.*`; źródło prawdy płatności odroczonych: iFirma),
+- import CSV wyciągu mBank i ręczne dopasowania do spraw (`accounting.bank-imports.*`; lokalnie + opcjonalna rejestracja wpłaty w iFirma przy zgodnej kwocie),
 - płatności,
 - kampanie marketingowe,
 - źródła marketingowe,

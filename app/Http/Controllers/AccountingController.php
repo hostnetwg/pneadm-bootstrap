@@ -388,6 +388,11 @@ class AccountingController extends Controller
             'contacts.createdBy',
             'assignedTo',
             'createdBy',
+            'bankTransactionMatches' => function ($q) {
+                $q->where('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED)
+                    ->with(['transaction', 'acceptedBy'])
+                    ->latest('accepted_at');
+            },
         ]);
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
@@ -415,10 +420,12 @@ class AccountingController extends Controller
                     DebtCaseAction::TYPE_CASE_OPENED,
                     DebtCaseAction::TYPE_STATUS_UPDATE,
                     DebtCaseAction::TYPE_IFIRMA_SYNC,
+                    DebtCaseAction::TYPE_BANK_MATCH,
                 ])
                 ->all(),
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
             'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
+            'bankPayments' => $debtCase->bankTransactionMatches,
         ]);
     }
 

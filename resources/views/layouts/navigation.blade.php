@@ -380,6 +380,11 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{{ route('accounting.bank-imports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.bank-imports.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Import wyciągu
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ route('accounting.debtors.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.debtors.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             Lookup faktury
                         </a>

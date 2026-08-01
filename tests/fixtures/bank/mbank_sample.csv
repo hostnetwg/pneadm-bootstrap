@@ -1,0 +1,20 @@
+mBank S.A. Bankowość Detaliczna;
+		www.mBank.pl;
+
+#Klient;
+FIRMA TESTOWA SP. Z O.O.;
+
+Lista operacji;
+
+#Za okres:;
+01.01.2026;31.07.2026;
+
+#Waluta;#Wpływy;#Wydatki;
+PLN;1 095,00;50,00;
+
+#Data operacji;#Opis operacji;#Rachunek;#Kategoria;#Kwota;
+2026-07-31;"SZKOLA TESTOWA UL. TESTOWA 1 00-001 WARSZAWA, F-ra 320/7/2026 z 29.07.2026                                                                         PRZELEW ZEWNETRZNY PRZYCHODZACY                                                   70109019550000000120234687  ";"Konto firmowe 2511 ... 2577";"Wplywy - inne";365,00 PLN;;
+2026-07-30;"PRZEDSZKOLE DEMO UL. DEMO 2 30-001 KRAKOW, faktura nr 308/7/2026  PRZELEW WEWNETRZNY PRZYCHODZACY                                                   61907200022003033000830002  ";"Konto firmowe 2511 ... 2577";"Wplywy - inne";365,00 PLN;;
+2026-07-29;"GMINA PRZYKLAD ul. Glowna 3, 332/7/2026  PRZELEW ZEWNETRZNY PRZYCHODZACY                                                   10908200050000248220000060  ";"Konto firmowe 2511 ... 2577";"Wplywy - inne";365,00 PLN;;
+2026-07-28;"FIRMA ABC NIP 5250001009, zaplata za szkolenie #ID 4242  PRZELEW ZEWNETRZNY PRZYCHODZACY                                                   82105014451000009093991942  ";"Konto firmowe 2511 ... 2577";"Wplywy - inne";500,00 PLN;;
+2026-07-27;"WYDATEK BIUROWY  PRZELEW WYCHODZACY                                                   11111111111111111111111111  ";"Konto firmowe 2511 ... 2577";"Wydatki";-50,00 PLN;;
