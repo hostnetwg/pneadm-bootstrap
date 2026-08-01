@@ -465,6 +465,7 @@
                         </div>
                         <div class="card-body border-bottom">
                             <form method="GET" action="{{ route('accounting.collections.show', $case) }}" class="row g-2 align-items-end">
+                                <input type="hidden" name="bank_filter" value="1">
                                 <div class="col-12 col-lg-5">
                                     <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
                                     <input type="text"
@@ -491,9 +492,23 @@
                                     <a href="{{ route('accounting.collections.show', $case) }}" class="btn btn-outline-secondary btn-sm">Reset</a>
                                 </div>
                                 <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               value="1"
+                                               id="bank_after_order"
+                                               name="bank_after_order"
+                                               @checked($bankAfterOrderDate ?? true)>
+                                        <label class="form-check-label small" for="bank_after_order">
+                                            Tylko przelewy z datą operacji ≥ data zamówienia
+                                            @if($order?->order_date)
+                                                ({{ $order->order_date->format('Y-m-d') }})
+                                            @endif
+                                        </label>
+                                    </div>
                                     <div class="form-text">
                                         Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
-                                        Domyślnie filtrujemy po kwocie sprawy.
+                                        Domyślnie filtrujemy po kwocie sprawy i dacie zamówienia.
                                     </div>
                                 </div>
                             </form>

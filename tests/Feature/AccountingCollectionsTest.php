@@ -451,6 +451,76 @@ class AccountingCollectionsTest extends TestCase
         $this->assertNotSame(DebtCase::STATUS_CLOSED, $case->fresh()->status);
     }
 
+    public function test_bank_transfer_search_defaults_to_after_order_date(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie filtr daty',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '88/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '88/8/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('c', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(20)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW PRZED ZAMOWIENIEM ALPHA',
+            'account_label' => 'Przed',
+            'fingerprint' => str_repeat('d', 64),
+            'is_incoming' => true,
+        ]);
+        BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW PO ZAMOWIENIU BETA',
+            'account_label' => 'Po',
+            'fingerprint' => str_repeat('e', 64),
+            'is_incoming' => true,
+        ]);
+
+        $default = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $default->assertOk();
+        $default->assertSee('bank_after_order', false);
+        $default->assertSee('PRZELEW PO ZAMOWIENIU BETA', false);
+        $default->assertDontSee('PRZELEW PRZED ZAMOWIENIEM ALPHA', false);
+
+        $withoutDateFilter = $this->actingAs($user)->get(route('accounting.collections.show', [
+            'debtCase' => $case,
+            'bank_filter' => '1',
+            'bank_amount' => '365.00',
+        ]));
+        $withoutDateFilter->assertOk();
+        $withoutDateFilter->assertSee('PRZELEW PO ZAMOWIENIU BETA', false);
+        $withoutDateFilter->assertSee('PRZELEW PRZED ZAMOWIENIEM ALPHA', false);
+    }
+
     public function test_collections_show_has_previous_and_next_case_links(): void
     {
         $user = User::factory()->create([

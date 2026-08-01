@@ -102,34 +102,42 @@ class BankTransactionMatch extends Model
 
             if (str_starts_with($reason, 'invoice_number:')) {
                 $labels[] = 'Numer FV z tytułu przelewu: '.substr($reason, strlen('invoice_number:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'debt_case_invoice_number:')) {
                 $labels[] = 'Numer FV z tytułu = FV na sprawie: '.substr($reason, strlen('debt_case_invoice_number:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'ksef_number:')) {
                 $labels[] = 'Numer KSeF z tytułu przelewu: '.substr($reason, strlen('ksef_number:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'order_id:')) {
                 $labels[] = 'ID zamówienia z tytułu przelewu (#ID / zamówienie ID): '.substr($reason, strlen('order_id:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'nip:')) {
                 $labels[] = 'NIP z tytułu przelewu: '.substr($reason, strlen('nip:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'buyer_name:')) {
                 $labels[] = 'Imię i nazwisko nabywcy (bez NIP) w tytule przelewu: '.substr($reason, strlen('buyer_name:'));
+
                 continue;
             }
             if (str_starts_with($reason, 'ksef_mismatch:')) {
                 $labels[] = 'Konflikt KSeF: w tytule przelewu jest inny numer niż na zamówieniu ('.substr($reason, strlen('ksef_mismatch:')).')';
+
                 continue;
             }
             if (str_starts_with($reason, 'invoice_number_mismatch:')) {
                 $labels[] = 'Numer FV z tytułu przelewu ('.substr($reason, strlen('invoice_number_mismatch:')).') różni się od FV na zamówieniu dopasowanym po KSeF — możliwy błąd przy wpisywaniu numeru FV';
+
                 continue;
             }
 

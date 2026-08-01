@@ -409,9 +409,14 @@ class AccountingController extends Controller
         $profile = $profileService->profileForOrder($debtCase->formOrder);
         $bankTransferSearch = trim((string) $request->query('bank_search', ''));
         $bankTransferAmount = $this->resolveBankTransferSearchAmount($request, $debtCase);
+        // Domyślnie włączone; po wysłaniu formularza (bank_filter=1) respektuj checkbox.
+        $bankAfterOrderDate = $request->has('bank_filter')
+            ? $request->boolean('bank_after_order')
+            : true;
         $bankTransferCandidates = $this->unlinkedBankTransferCandidates(
             $bankTransferSearch,
-            $bankTransferAmount
+            $bankTransferAmount,
+            $bankAfterOrderDate ? $debtCase->formOrder?->order_date?->toDateString() : null
         );
 
         // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
@@ -445,6 +450,7 @@ class AccountingController extends Controller
             'bankPayments' => $debtCase->bankTransactionMatches,
             'bankTransferSearch' => $bankTransferSearch,
             'bankTransferAmount' => $bankTransferAmount,
+            'bankAfterOrderDate' => $bankAfterOrderDate,
             'bankTransferCandidates' => $bankTransferCandidates,
         ]);
     }
@@ -555,7 +561,7 @@ class AccountingController extends Controller
         return $amount > 0 ? round($amount, 2) : null;
     }
 
-    private function unlinkedBankTransferCandidates(string $search, ?float $amount)
+    private function unlinkedBankTransferCandidates(string $search, ?float $amount, ?string $notBeforeDate = null)
     {
         if ($search === '' && $amount === null) {
             return collect();
@@ -572,6 +578,9 @@ class AccountingController extends Controller
             })
             ->when($amount !== null, function ($query) use ($amount) {
                 $query->whereBetween('amount', [$amount - 0.01, $amount + 0.01]);
+            })
+            ->when($notBeforeDate !== null && $notBeforeDate !== '', function ($query) use ($notBeforeDate) {
+                $query->whereDate('operation_date', '>=', $notBeforeDate);
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
