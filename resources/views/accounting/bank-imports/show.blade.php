@@ -267,6 +267,7 @@
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
                                                     @else
                                                         data-can-act="0"
+                                                        data-register-ifirma-url="{{ route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $accepted]) }}"
                                                     @endif
                                                     title="Podgląd przelewu i zamówienia"
                                                     aria-label="Podgląd przelewu i zamówienia">
@@ -1034,6 +1035,7 @@
             var currentPreviewBtn = null;
             var lookupCasesUrl = @json(route('accounting.bank-imports.lookup-cases'));
             var lookupOrderPreviewUrl = @json(route('accounting.bank-imports.lookup-order-preview'));
+            var csrfToken = @json(csrf_token());
             var originalOrderSnapshot = null;
             var peekedOrderId = null;
             var previewButtons = function () {
@@ -1148,6 +1150,15 @@
                 var ifirmaStatusUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-ifirma-status-url') || '') : '';
                 if (ifirmaStatusUrl && currentPreviewBtn && currentPreviewBtn.getAttribute('data-can-act') === 'match') {
                     links.push('<button type="button" class="btn btn-sm btn-outline-success" id="bankTxPreviewIfirmaStatusBtn">Sprawdź status z iFirma</button>');
+                }
+                var registerIfirmaUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-register-ifirma-url') || '') : '';
+                if (registerIfirmaUrl) {
+                    links.push('<form method="POST" action="' + esc(registerIfirmaUrl) + '" class="d-inline">'
+                        + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
+                        + '<input type="hidden" name="filter" value="{{ $filter }}">'
+                        + '<input type="hidden" name="preview" value="' + esc(txId || '') + '">'
+                        + '<button type="submit" class="btn btn-sm btn-outline-success">Zarejestruj wpłatę iFirma</button>'
+                        + '</form>');
                 }
                 linksEl.innerHTML = links.join(' ');
                 var ifirmaStatusBtn = document.getElementById('bankTxPreviewIfirmaStatusBtn');

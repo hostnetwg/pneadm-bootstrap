@@ -243,6 +243,58 @@ class BankStatementImportController extends Controller
         );
     }
 
+    public function registerIfirmaPayment(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransactionMatch $match,
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
+    ) {
+        $this->assertMatchBelongsToImport($bankImport, $match);
+
+        $match = $match->fresh(['debtCase', 'transaction']) ?? $match;
+        if ($match->status !== BankTransactionMatch::STATUS_ACCEPTED) {
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                'Wpłatę w iFirma można rejestrować tylko dla zaakceptowanego dopasowania.'
+            )->with('warning', 'Najpierw zaakceptuj dopasowanie lokalnie.');
+        }
+
+        try {
+            $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                $match,
+                $request->user()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                'Dopasowanie jest zaakceptowane lokalnie.'
+            )->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+        }
+
+        if ($paymentResult['success']) {
+            $message = $paymentResult['message'];
+            $message .= $this->appendAutoCloseMessage(
+                $autoClose,
+                $match,
+                $request->user(),
+                $paymentResult['status'] ?? null
+            );
+
+            return $this->redirectAfterReview($request, $bankImport, $message);
+        }
+
+        return $this->redirectAfterReview(
+            $request,
+            $bankImport,
+            'Dopasowanie jest zaakceptowane lokalnie.'
+        )->with('warning', 'Wpłata w iFirma nie przeszła: '.$paymentResult['message']);
+    }
+
     public function ifirmaStatus(
         Request $request,
         BankStatementImport $bankImport,

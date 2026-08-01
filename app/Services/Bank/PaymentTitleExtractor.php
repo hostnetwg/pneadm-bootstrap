@@ -134,6 +134,25 @@ class PaymentTitleExtractor
             }
         }
 
+        // Bare KSeF number from bank transfer descriptions, often without "KSeF" label.
+        if (preg_match_all('/\b(\d{10}-\d{8}-[0-9A-F]{4,12}(?:-[0-9A-F]{2,12}){1,3})\b/iu', $text, $matches)) {
+            foreach ($matches[1] as $match) {
+                $normalized = $this->normalizeKsefNumber($match);
+                if ($normalized !== null) {
+                    $found[] = $normalized;
+                }
+            }
+        }
+
+        if (preg_match_all('/\b(\d{10}-IZ\d{6}-[0-9A-F]{4,12}(?:-[0-9A-F]{2,12}){1,3})\b/iu', $text, $matches)) {
+            foreach ($matches[1] as $match) {
+                $normalized = $this->normalizeKsefNumber($match);
+                if ($normalized !== null) {
+                    $found[] = $normalized;
+                }
+            }
+        }
+
         return $found;
     }
 

@@ -41,6 +41,7 @@ class IfirmaInvoicePaymentStatusService
      *     gross_amount?: float|null,
      *     invoice_id?: string|null,
      *     invoice_number?: string|null,
+     *     issue_date?: string|null,
      *     due_date?: string|null,
      *     source?: string,
      *     changed?: bool
@@ -131,6 +132,7 @@ class IfirmaInvoicePaymentStatusService
             'gross_amount' => $gross,
             'invoice_id' => $snapshot['invoice_id'] ?? null,
             'invoice_number' => $snapshot['invoice_number'] ?? null,
+            'issue_date' => $snapshot['issue_date'] ?? null,
             'due_date' => $snapshot['due_date'] ?? null,
             'source' => $snapshot['source'] ?? null,
             'changed' => $changed,
@@ -146,6 +148,7 @@ class IfirmaInvoicePaymentStatusService
      *     gross_amount?: float|null,
      *     invoice_id?: string|null,
      *     invoice_number?: string|null,
+     *     issue_date?: string|null,
      *     due_date?: string|null,
      *     source?: string
      * }
@@ -217,6 +220,7 @@ class IfirmaInvoicePaymentStatusService
      *     gross_amount: float|null,
      *     invoice_id: string|null,
      *     invoice_number: string|null,
+     *     issue_date: string|null,
      *     due_date: string|null,
      *     source: string
      * }
@@ -248,6 +252,16 @@ class IfirmaInvoicePaymentStatusService
             }
         }
 
+        $issueRaw = $row['DataWystawienia'] ?? $row['DataWystawieniaFaktury'] ?? null;
+        $issueDate = null;
+        if (is_string($issueRaw) && trim($issueRaw) !== '') {
+            try {
+                $issueDate = Carbon::parse($issueRaw)->toDateString();
+            } catch (\Throwable) {
+                $issueDate = null;
+            }
+        }
+
         $invoiceNumber = isset($row['PelnyNumer']) ? trim((string) $row['PelnyNumer']) : null;
         if ($invoiceNumber === '') {
             $invoiceNumber = null;
@@ -267,6 +281,7 @@ class IfirmaInvoicePaymentStatusService
             'gross_amount' => $gross,
             'invoice_id' => $invoiceId,
             'invoice_number' => $invoiceNumber,
+            'issue_date' => $issueDate,
             'due_date' => $dueDate,
             'source' => $source,
         ];

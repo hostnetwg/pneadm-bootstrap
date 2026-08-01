@@ -571,6 +571,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
             Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');
+            Route::post('/{bankImport}/matches/{match}/register-ifirma-payment', [BankStatementImportController::class, 'registerIfirmaPayment'])->name('matches.register-ifirma-payment');
             Route::post('/{bankImport}/matches/{match}/accept', [BankStatementImportController::class, 'accept'])->name('matches.accept');
             Route::post('/{bankImport}/matches/{match}/reject', [BankStatementImportController::class, 'reject'])->name('matches.reject');
             Route::post('/{bankImport}/matches/{match}/ignore', [BankStatementImportController::class, 'ignoreMatch'])->name('matches.ignore');

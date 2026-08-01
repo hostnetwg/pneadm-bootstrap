@@ -169,4 +169,88 @@ class IfirmaInvoicePaymentRegistrationServiceTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('zgodnej kwocie', $result['message']);
     }
+
+    public function test_register_omits_payment_date_when_transfer_predates_domestic_invoice(): void
+    {
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '322/7/2026',
+            'ifirma_invoice_id' => '999003',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '322/7/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+        $import = \App\Models\BankStatementImport::create([
+            'original_filename' => 'test.csv',
+            'stored_path' => 'bank/test3.csv',
+            'file_hash' => hash('sha256', 'test-fp-reg-3'),
+            'status' => 'completed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-07-20',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'Przelew przed FV',
+            'is_incoming' => true,
+            'fingerprint' => 'fp-reg-3',
+        ]);
+        $match = BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+            'match_reasons' => ['manual_case_link', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+        ]);
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('getInvoice')
+            ->twice()
+            ->with('999003')
+            ->andReturn(
+                [
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '322/7/2026',
+                        'DataWystawienia' => '2026-07-23',
+                        'Zaplacono' => 0,
+                        'Brutto' => 365,
+                        'FakturaId' => 999003,
+                    ],
+                ],
+                [
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '322/7/2026',
+                        'DataWystawienia' => '2026-07-23',
+                        'Zaplacono' => 365,
+                        'Brutto' => 365,
+                        'FakturaId' => 999003,
+                    ],
+                ]
+            );
+        $api->shouldReceive('registerInvoicePayment')
+            ->once()
+            ->with('999003', 365.0, null, 'prz_faktura_kraj')
+            ->andReturn(['status' => 'success', 'data' => ['response' => ['Kod' => 0]]]);
+        $api->shouldReceive('unwrapInvoicePayload')
+            ->andReturnUsing(fn ($data) => is_array($data) ? $data : []);
+
+        $statusService = new IfirmaInvoicePaymentStatusService($api);
+        $service = new IfirmaInvoicePaymentRegistrationService($api, $statusService);
+
+        $result = $service->registerFromAcceptedBankMatch($match);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(IfirmaInvoicePaymentStatusService::STATUS_PAID, $result['status'] ?? null);
+    }
 }

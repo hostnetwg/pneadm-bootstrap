@@ -68,4 +68,15 @@ class PaymentTitleExtractorTest extends TestCase
             $extractor->normalizeKsefNumber('7392137630-20260715-00FEFF400000-86')
         );
     }
+
+    public function test_extracts_bare_ksef_from_bank_description(): void
+    {
+        $extractor = new PaymentTitleExtractor;
+        $result = $extractor->extract(
+            'SZKOŁA PODSTAWOWA Z O.INT. NR 216 UL.WOLNA 36/38 04-908 WARSZAWA;PL, '
+            .'7392137630-20260708-4A4C66000005-EA, SP216 SZKOŁA PODSTAWOWA Z O.INT. NR 216'
+        );
+
+        $this->assertContains('7392137630-20260708-4A4C66000005-EA', $result['ksef_numbers']);
+    }
 }

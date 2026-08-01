@@ -707,4 +707,207 @@ class BankStatementImportTest extends TestCase
         $response->assertJsonPath('order.course_id', $course->id);
         $this->assertStringContainsString($courseStart->format('d.m.Y'), $response->json('order.product'));
     }
+
+    public function test_manual_link_from_bank_import_to_order_registers_ifirma_payment_and_closes_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie opłacone ręcznie',
+            'product_price' => 365,
+            'order_date' => now()->subDays(2),
+            'invoice_number' => '115/7/2026',
+            'ifirma_invoice_id' => '777115',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Klient Ręczny Sp. z o.o.',
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_manual_ifirma.csv',
+            'file_hash' => str_repeat('7', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-07-23',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW WEWNĘTRZNY PRZYCHODZĄCY',
+            'account_label' => 'Firma Testowa',
+            'fingerprint' => str_repeat('8', 64),
+            'is_incoming' => true,
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->twice()
+                ->with('777115')
+                ->andReturn(
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '115/7/2026',
+                            'Zaplacono' => 0,
+                            'Brutto' => 365,
+                            'FakturaId' => 777115,
+                        ],
+                    ],
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '115/7/2026',
+                            'Zaplacono' => 365,
+                            'Brutto' => 365,
+                            'FakturaId' => 777115,
+                        ],
+                    ]
+                );
+            $mock->shouldReceive('unwrapInvoicePayload')->andReturnUsing(fn ($d) => is_array($d) ? $d : []);
+            $mock->shouldReceive('registerInvoicePayment')
+                ->once()
+                ->with('777115', 365.0, '2026-07-23', 'prz_faktura_kraj')
+                ->andReturn(['status' => 'success', 'data' => ['response' => ['Kod' => 0]]]);
+        });
+
+        $response = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),
+            [
+                'form_order_id' => $order->id,
+                'register_ifirma_payment' => '1',
+                'filter' => 'unlinked',
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', function (string $value): bool {
+            return str_contains($value, 'Zarejestrowano wpłatę w iFirma')
+                && str_contains($value, 'Sprawę zamknięto automatycznie');
+        });
+
+        $match = BankTransactionMatch::first();
+        $this->assertNotNull($match);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $match->status);
+        $this->assertSame($order->id, $match->form_order_id);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $match->debt_case_id,
+            'action_type' => DebtCaseAction::TYPE_IFIRMA_PAYMENT,
+        ]);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $match->debt_case_id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
+        ]);
+        $this->assertSame(DebtCase::STATUS_CLOSED, DebtCase::find($match->debt_case_id)?->status);
+    }
+
+    public function test_accepted_bank_match_can_retry_ifirma_payment_registration(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie retry iFirma',
+            'product_price' => 365,
+            'order_date' => now()->subDays(2),
+            'invoice_number' => '116/7/2026',
+            'ifirma_invoice_id' => '777116',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_retry_ifirma.csv',
+            'file_hash' => str_repeat('9', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $transaction = \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-07-23',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW BEZ FV',
+            'fingerprint' => str_repeat('a', 64),
+            'is_incoming' => true,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '116/7/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+        $match = BankTransactionMatch::create([
+            'bank_transaction_id' => $transaction->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+            'match_reasons' => ['manual_case_link', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->twice()
+                ->with('777116')
+                ->andReturn(
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '116/7/2026',
+                            'Zaplacono' => 0,
+                            'Brutto' => 365,
+                            'FakturaId' => 777116,
+                        ],
+                    ],
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '116/7/2026',
+                            'Zaplacono' => 365,
+                            'Brutto' => 365,
+                            'FakturaId' => 777116,
+                        ],
+                    ]
+                );
+            $mock->shouldReceive('unwrapInvoicePayload')->andReturnUsing(fn ($d) => is_array($d) ? $d : []);
+            $mock->shouldReceive('registerInvoicePayment')
+                ->once()
+                ->with('777116', 365.0, '2026-07-23', 'prz_faktura_kraj')
+                ->andReturn(['status' => 'success', 'data' => ['response' => ['Kod' => 0]]]);
+        });
+
+        $response = $this->actingAs($user)->post(
+            route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $match]),
+            [
+                'filter' => 'accepted',
+                'preview' => $transaction->id,
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', function (string $value): bool {
+            return str_contains($value, 'Zarejestrowano wpłatę w iFirma')
+                && str_contains($value, 'Sprawę zamknięto automatycznie');
+        });
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_IFIRMA_PAYMENT,
+        ]);
+        $this->assertSame(DebtCase::STATUS_CLOSED, $case->fresh()->status);
+    }
 }

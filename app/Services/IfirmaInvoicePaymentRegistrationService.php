@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
+use App\Models\FormOrder;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -28,6 +29,7 @@ class IfirmaInvoicePaymentRegistrationService
      */
     public function registerFromAcceptedBankMatch(BankTransactionMatch $match, ?User $user = null): array
     {
+        $match = $match->fresh(['transaction', 'formOrder', 'debtCase.formOrder']) ?? $match;
         $match->loadMissing(['transaction', 'formOrder', 'debtCase.formOrder']);
 
         if ($match->status !== BankTransactionMatch::STATUS_ACCEPTED) {
@@ -76,6 +78,7 @@ class IfirmaInvoicePaymentRegistrationService
         ?string $paymentDate = null,
         ?User $user = null
     ): array {
+        $case = $case->fresh(['formOrder']) ?? $case;
         $case->loadMissing('formOrder');
         $order = $case->formOrder;
         if ($order === null) {
@@ -84,6 +87,8 @@ class IfirmaInvoicePaymentRegistrationService
                 'message' => 'Sprawa nie ma powiązanego zamówienia.',
             ];
         }
+
+        $this->refreshCaseInvoiceDataFromOrder($case, $order);
 
         $snapshot = $this->statusService->fetchPaymentSnapshotForOrder(
             $order,
@@ -142,7 +147,8 @@ class IfirmaInvoicePaymentRegistrationService
         }
 
         $invoiceType = 'prz_faktura_kraj';
-        $apiResult = $this->api->registerInvoicePayment($invoiceRef, $amount, $paymentDate, $invoiceType);
+        $apiPaymentDate = $this->paymentDateAllowedForInvoice($paymentDate, $snapshot, $invoiceType);
+        $apiResult = $this->api->registerInvoicePayment($invoiceRef, $amount, $apiPaymentDate, $invoiceType);
 
         if (($apiResult['status'] ?? null) !== 'success') {
             $message = $apiResult['message'] ?? 'Nie udało się zarejestrować wpłaty w iFirma.';
@@ -209,6 +215,52 @@ class IfirmaInvoicePaymentRegistrationService
     public function amountsMatch(float $a, float $b): bool
     {
         return abs($a - $b) <= self::AMOUNT_EPSILON;
+    }
+
+    private function refreshCaseInvoiceDataFromOrder(DebtCase $case, FormOrder $order): void
+    {
+        $dirty = false;
+
+        foreach (['invoice_number', 'ksef_number'] as $field) {
+            $value = trim((string) ($order->{$field} ?? ''));
+            if ($value !== '' && (string) ($case->{$field} ?? '') !== $value) {
+                $case->{$field} = $value;
+                $dirty = true;
+            }
+        }
+
+        if ($order->product_price !== null) {
+            $amount = round((float) $order->product_price, 2);
+            $caseAmount = $case->amount_gross !== null ? round((float) $case->amount_gross, 2) : null;
+            if ($caseAmount === null || abs($caseAmount - $amount) > self::AMOUNT_EPSILON) {
+                $case->amount_gross = $amount;
+                $dirty = true;
+            }
+        }
+
+        if ($dirty) {
+            $case->save();
+        }
+    }
+
+    /**
+     * iFirma dla zwykłej faktury krajowej przyjmuje wpłatę z samą kwotą.
+     * Gdy przelew był przed wystawieniem FV, wysłanie tej daty może zostać odrzucone.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function paymentDateAllowedForInvoice(?string $paymentDate, array $snapshot, string $invoiceType): ?string
+    {
+        if ($paymentDate === null || trim($paymentDate) === '') {
+            return null;
+        }
+
+        $issueDate = trim((string) ($snapshot['issue_date'] ?? ''));
+        if ($invoiceType === 'prz_faktura_kraj' && $issueDate !== '' && $paymentDate < $issueDate) {
+            return null;
+        }
+
+        return $paymentDate;
     }
 
     /**
