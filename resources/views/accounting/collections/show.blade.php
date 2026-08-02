@@ -589,8 +589,18 @@
                                                 @endif
                                             </label>
                                         </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   value="1"
+                                                   id="bank_search_exact"
+                                                   name="bank_search_exact">
+                                            <label class="form-check-label small" for="bank_search_exact">
+                                                Szukaj dokładnie wpisanego numeru (bez dopasowania fragmentu)
+                                            </label>
+                                        </div>
                                         <div class="form-text" id="bankTransferSearchStatus">
-                                            Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
+                                            Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie).
                                         </div>
                                     </div>
                                 </form>
@@ -996,6 +1006,7 @@
             var amountInput = document.getElementById('bank_amount');
             var afterOrderInput = document.getElementById('bank_after_order');
             var unlinkedOnlyInput = document.getElementById('bank_unlinked_only');
+            var exactSearchInput = document.getElementById('bank_search_exact');
             var searchStatus = document.getElementById('bankTransferSearchStatus');
             var searchResults = document.getElementById('bankTransferSearchResults');
             var searchResetBtn = document.getElementById('bankTransferSearchResetBtn');
@@ -1005,7 +1016,7 @@
             var bankPaymentsHeader = document.getElementById('caseBankPaymentsHeader');
             var bankPaymentsCollapseEl = document.getElementById('caseBankPaymentsCollapse');
             var bankPaymentsImportLink = document.getElementById('caseBankPaymentsImportLink');
-            var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.';
+            var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie).';
 
             function setBankPaymentsExpanded(expanded) {
                 if (!bankPaymentsHeader || !bankPaymentsCollapseEl) {
@@ -1135,6 +1146,11 @@
                 } else {
                     params.set('bank_unlinked_only', '0');
                 }
+                if (exactSearchInput && exactSearchInput.checked) {
+                    params.set('bank_search_exact', '1');
+                } else {
+                    params.set('bank_search_exact', '0');
+                }
 
                 try {
                     var response = await fetch(searchUrl + '?' + params.toString(), {
@@ -1164,6 +1180,9 @@
                 }
                 setBankPaymentsExpanded(true);
                 searchInput.value = value;
+                if (exactSearchInput) {
+                    exactSearchInput.checked = true;
+                }
                 searchInput.focus();
                 runBankTransferSearch();
             }
@@ -1198,6 +1217,7 @@
                     if (amountInput) amountInput.value = defaultAmount || '';
                     if (afterOrderInput) afterOrderInput.checked = true;
                     if (unlinkedOnlyInput) unlinkedOnlyInput.checked = true;
+                    if (exactSearchInput) exactSearchInput.checked = false;
                     if (searchResults) {
                         searchResults.innerHTML = '<div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>';
                     }

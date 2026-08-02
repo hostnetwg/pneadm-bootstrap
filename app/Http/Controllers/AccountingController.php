@@ -452,6 +452,7 @@ class AccountingController extends Controller
             'bank_amount' => ['nullable', 'numeric', 'min:0'],
             'bank_after_order' => ['nullable', 'boolean'],
             'bank_unlinked_only' => ['nullable', 'boolean'],
+            'bank_search_exact' => ['nullable', 'boolean'],
         ]);
 
         $search = trim($validated['bank_search']);
@@ -465,12 +466,13 @@ class AccountingController extends Controller
 
         $afterOrder = $request->boolean('bank_after_order', true);
         $unlinkedOnly = $request->boolean('bank_unlinked_only', true);
+        $exactSearch = $request->boolean('bank_search_exact', false);
         $notBefore = $afterOrder
             ? $debtCase->formOrder?->order_date?->toDateString()
             : null;
 
         $caseAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
-        $candidates = $this->bankTransferCandidates($search, $amount, $notBefore, $unlinkedOnly);
+        $candidates = $this->bankTransferCandidates($search, $amount, $notBefore, $unlinkedOnly, $exactSearch);
 
         return response()->json([
             'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount) {
@@ -591,7 +593,8 @@ class AccountingController extends Controller
         string $search,
         ?float $amount,
         ?string $notBeforeDate = null,
-        bool $unlinkedOnly = true
+        bool $unlinkedOnly = true,
+        bool $exactSearch = false
     ) {
         $search = trim($search);
         if ($search === '') {
@@ -615,15 +618,40 @@ class AccountingController extends Controller
             ->when($notBeforeDate !== null && $notBeforeDate !== '', function ($query) use ($notBeforeDate) {
                 $query->whereDate('operation_date', '>=', $notBeforeDate);
             })
-            ->where(function ($inner) use ($search) {
-                $inner->where('description', 'like', "%{$search}%")
-                    ->orWhere('account_label', 'like', "%{$search}%")
-                    ->orWhere('counterparty_account', 'like', "%{$search}%");
+            ->where(function ($inner) use ($search, $exactSearch) {
+                $this->applyBankTransferTextSearch($inner, $search, $exactSearch);
             })
             ->latest('operation_date')
             ->latest('id')
             ->limit(12)
             ->get();
+    }
+
+    /**
+     * Partial: LIKE %fraza%. Exact: token w tekście (nie fragment dłuższej liczby, np. 63 ≠ 263).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>|\Illuminate\Database\Query\Builder  $query
+     */
+    private function applyBankTransferTextSearch($query, string $search, bool $exactSearch): void
+    {
+        if (! $exactSearch) {
+            $query->where('description', 'like', "%{$search}%")
+                ->orWhere('account_label', 'like', "%{$search}%")
+                ->orWhere('counterparty_account', 'like', "%{$search}%");
+
+            return;
+        }
+
+        $pattern = '(^|[^0-9A-Za-z])'.$this->escapeMysqlRegexpLiteral($search).'([^0-9A-Za-z]|$)';
+
+        $query->whereRaw('description REGEXP ?', [$pattern])
+            ->orWhereRaw('account_label REGEXP ?', [$pattern])
+            ->orWhereRaw('counterparty_account REGEXP ?', [$pattern]);
+    }
+
+    private function escapeMysqlRegexpLiteral(string $value): string
+    {
+        return preg_replace('/([\\\\.^$*+?()\\[\\]{}|])/', '\\\\$1', $value) ?? $value;
     }
 
     public function collectionsSyncIfirma(

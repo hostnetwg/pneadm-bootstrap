@@ -774,6 +774,87 @@ class AccountingCollectionsTest extends TestCase
         $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $linkedPayload['link_status']);
     }
 
+    public function test_bank_transfer_exact_search_does_not_match_invoice_number_fragment(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie exact FV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(40),
+            'invoice_number' => '63/6/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '63/6/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('k', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $wrongInvoice = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'OPLATA ZA FAKTURA VAT 263/6/2026 SZKOLENIE',
+            'account_label' => 'Inna szkola',
+            'fingerprint' => str_repeat('l', 64),
+            'is_incoming' => true,
+        ]);
+        $exactInvoice = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'OPLATA ZA FAKTURA VAT 63/6/2026 SZKOLENIE',
+            'account_label' => 'Wlasciwa szkola',
+            'fingerprint' => str_repeat('m', 64),
+            'is_incoming' => true,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('bank_search_exact', false);
+        $show->assertSee('Szukaj dokładnie wpisanego numeru (bez dopasowania fragmentu)', false);
+
+        $partial = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '63/6/2026',
+            'bank_search_exact' => '0',
+            'bank_after_order' => '0',
+        ]));
+        $partial->assertOk();
+        $partialIds = collect($partial->json('candidates'))->pluck('id');
+        $this->assertTrue($partialIds->contains($wrongInvoice->id));
+        $this->assertTrue($partialIds->contains($exactInvoice->id));
+
+        $exact = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '63/6/2026',
+            'bank_search_exact' => '1',
+            'bank_after_order' => '0',
+        ]));
+        $exact->assertOk();
+        $exact->assertJsonCount(1, 'candidates');
+        $exact->assertJsonPath('candidates.0.id', $exactInvoice->id);
+    }
+
     public function test_collections_show_has_previous_and_next_case_links(): void
     {
         $user = User::factory()->create([
