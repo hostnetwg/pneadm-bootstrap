@@ -500,6 +500,7 @@ class AccountingCollectionsTest extends TestCase
         $show->assertSee('Szukaj przelewu', false);
         $show->assertSee('bank_unlinked_only', false);
         $show->assertSee('case-fill-bank-search', false);
+        $show->assertSee('bankTransferSearchClearBtn', false);
         $show->assertDontSee('SPECJALNY OSRODEK KURZETNIK', false);
 
         $search = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [

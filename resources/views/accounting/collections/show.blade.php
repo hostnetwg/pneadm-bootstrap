@@ -527,14 +527,25 @@
                                 <form id="bankTransferSearchForm" class="row g-2 align-items-end">
                                     <div class="col-12 col-lg-5">
                                         <label for="bank_search" class="form-label small mb-1">Szukaj przelewu</label>
-                                        <input type="text"
-                                               id="bank_search"
-                                               name="bank_search"
-                                               class="form-control form-control-sm"
-                                               value=""
-                                               placeholder="Nadawca, opis, NIP, FV, KSeF, konto"
-                                               maxlength="128"
-                                               autocomplete="off">
+                                        <div class="input-group input-group-sm">
+                                            <input type="text"
+                                                   id="bank_search"
+                                                   name="bank_search"
+                                                   class="form-control"
+                                                   value=""
+                                                   placeholder="Nadawca, opis, NIP, FV, KSeF, konto"
+                                                   maxlength="128"
+                                                   autocomplete="off">
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary"
+                                                    id="bankTransferSearchClearBtn"
+                                                    title="Wyczyść pole wyszukiwania"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-title="Wyczyść pole wyszukiwania"
+                                                    aria-label="Wyczyść pole wyszukiwania">
+                                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
                                         <label for="bank_amount" class="form-label small mb-1">Kwota</label>
@@ -988,6 +999,7 @@
             var searchStatus = document.getElementById('bankTransferSearchStatus');
             var searchResults = document.getElementById('bankTransferSearchResults');
             var searchResetBtn = document.getElementById('bankTransferSearchResetBtn');
+            var searchClearBtn = document.getElementById('bankTransferSearchClearBtn');
             var searchUrl = @json(route('accounting.collections.bank-transactions.search', $case));
             var defaultAmount = amountInput ? amountInput.value : '';
             var bankPaymentsHeader = document.getElementById('caseBankPaymentsHeader');
@@ -1166,6 +1178,18 @@
                 searchForm.addEventListener('submit', function (event) {
                     event.preventDefault();
                     runBankTransferSearch();
+                });
+            }
+            if (searchClearBtn) {
+                searchClearBtn.addEventListener('click', function () {
+                    if (searchInput) {
+                        searchInput.value = '';
+                        searchInput.focus();
+                    }
+                    if (searchResults) {
+                        searchResults.innerHTML = '<div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>';
+                    }
+                    setSearchStatus(defaultSearchHint);
                 });
             }
             if (searchResetBtn) {
