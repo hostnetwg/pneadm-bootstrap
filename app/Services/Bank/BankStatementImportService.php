@@ -24,6 +24,7 @@ class BankStatementImportService
         private readonly MbankStatementParser $parser = new MbankStatementParser,
         private readonly BankTransactionMatcher $matcher = new BankTransactionMatcher,
         private readonly DebtCustomerProfileService $profileService = new DebtCustomerProfileService,
+        private readonly PayNowGatewayPayoutDetector $payNowGatewayPayoutDetector = new PayNowGatewayPayoutDetector,
     ) {}
 
     public function importUploadedFile(UploadedFile $file, ?int $userId = null): BankStatementImport
@@ -457,23 +458,115 @@ class BankStatementImportService
         return $match->fresh();
     }
 
-    public function ignoreTransaction(BankTransaction $transaction): void
+    public function ignoreTransaction(BankTransaction $transaction, array $reasons = [BankTransactionMatch::REASON_MANUAL_IGNORE]): void
     {
         $transaction->matches()
             ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
             ->update(['status' => BankTransactionMatch::STATUS_IGNORED]);
 
-        if ($transaction->matches()->count() === 0) {
+        $hasIgnored = $transaction->matches()
+            ->where('status', BankTransactionMatch::STATUS_IGNORED)
+            ->exists();
+
+        if (! $hasIgnored) {
             $transaction->matches()->create([
                 'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
-                'match_reasons' => ['manual_ignore'],
+                'match_reasons' => array_values($reasons),
                 'status' => BankTransactionMatch::STATUS_IGNORED,
             ]);
         }
     }
 
-    private function createDebtCaseFromOrder(FormOrder $order, ?int $userId): DebtCase
+    /**
+     * Ignoruje wyłącznie wpływy rozpoznane jako wypłaty rozliczeniowe PayNow (mElements).
+     * Nie opiera się na braku FV/KSeF. Pomija już zaakceptowane i już ignorowane.
+     *
+     * @return array{candidates: int, ignored: int, skipped_accepted: int, skipped_already_ignored: int}
+     */
+    public function ignorePayNowGatewayPayouts(BankStatementImport $import): array
     {
+        $transactions = $import->transactions()
+            ->where('is_incoming', true)
+            ->with('matches')
+            ->orderBy('id')
+            ->get();
+
+        $candidates = 0;
+        $ignored = 0;
+        $skippedAccepted = 0;
+        $skippedAlreadyIgnored = 0;
+
+        foreach ($transactions as $transaction) {
+            if (! $this->payNowGatewayPayoutDetector->isPayNowGatewayPayout($transaction)) {
+                continue;
+            }
+
+            $candidates++;
+
+            if ($transaction->matches->contains(
+                fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_ACCEPTED
+            )) {
+                $skippedAccepted++;
+
+                continue;
+            }
+
+            if ($transaction->matches->contains(
+                fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_IGNORED
+            )) {
+                $skippedAlreadyIgnored++;
+
+                continue;
+            }
+
+                $this->ignoreTransaction($transaction, [BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW]);
+                $ignored++;
+            }
+
+            return [
+                'candidates' => $candidates,
+                'ignored' => $ignored,
+                'skipped_accepted' => $skippedAccepted,
+                'skipped_already_ignored' => $skippedAlreadyIgnored,
+            ];
+        }
+
+        public function countIgnorablePayNowGatewayPayouts(BankStatementImport $import): int
+        {
+            return $import->transactions()
+                ->where('is_incoming', true)
+                ->whereDoesntHave('matches', function ($query) {
+                    $query->whereIn('status', [
+                        BankTransactionMatch::STATUS_ACCEPTED,
+                        BankTransactionMatch::STATUS_IGNORED,
+                    ]);
+                })
+                ->get()
+                ->filter(fn (BankTransaction $transaction) => $this->payNowGatewayPayoutDetector->isPayNowGatewayPayout($transaction))
+                ->count();
+        }
+
+        public function countPayNowGatewayPayouts(BankStatementImport $import): int
+        {
+            return $this->payNowGatewayPayoutsQuery($import)->count();
+        }
+
+        /**
+         * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>|\Illuminate\Database\Eloquent\Relations\Relation  $base
+         * @return \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>
+         */
+        public function payNowGatewayPayoutsQuery(BankStatementImport $import)
+        {
+            return $import->transactions()
+                ->where('is_incoming', true)
+                ->whereHas('matches', function ($query) {
+                    $query->where('status', BankTransactionMatch::STATUS_IGNORED)
+                        ->whereJsonContains('match_reasons', BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW);
+                });
+        }
+
+        private function createDebtCaseFromOrder(FormOrder $order, ?int $userId): DebtCase
+        {
         $profile = $this->profileService->profileForOrder($order);
         $delay = (int) ($order->invoice_payment_delay ?: 14);
         $invoiceDate = $order->order_date?->copy();

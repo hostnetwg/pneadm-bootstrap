@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\BankStatementImport;
+use App\Models\BankTransaction;
 use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
@@ -974,5 +975,81 @@ class BankStatementImportTest extends TestCase
             'action_type' => DebtCaseAction::TYPE_IFIRMA_PAYMENT,
         ]);
         $this->assertSame(DebtCase::STATUS_CLOSED, $case->fresh()->status);
+    }
+
+    public function test_user_can_bulk_ignore_paynow_gateway_payouts_without_touching_school_transfers(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('p', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $payNow = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(3)->toDateString(),
+            'amount' => 1500.55,
+            'currency' => 'PLN',
+            'description' => 'MELEMENTS SPÓŁKA AKCYJNA, /OPF/X///// WYPŁATA ŚRODKÓW NR PON-MWB-BZ7-RAU ZA DZIEŃ 28.04.2026',
+            'account_label' => 'MELEMENTS SPÓŁKA AKCYJNA',
+            'fingerprint' => str_repeat('q', 64),
+            'is_incoming' => true,
+        ]);
+        $schoolWithoutInvoice = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'SZKOLA PODSTAWOWA NR 1 W KURZETNIKU UL MICKIEWICZA 7 ZA SZKOLENIE',
+            'account_label' => 'Szkoła Podstawowa nr 1',
+            'fingerprint' => str_repeat('r', 64),
+            'is_incoming' => true,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.bank-imports.show', $import));
+        $show->assertOk();
+        $show->assertSee('Ignoruj wypłaty PayNow', false);
+        $show->assertSee('bankImportIgnorePayNowModal', false);
+
+        $response = $this->actingAs($user)->post(route('accounting.bank-imports.ignore-paynow-payouts', $import));
+        $response->assertRedirect(route('accounting.bank-imports.show', ['bankImport' => $import, 'filter' => 'paynow']));
+        $response->assertSessionHas('success');
+
+        $this->assertTrue(
+            $payNow->fresh()->matches()->where('status', BankTransactionMatch::STATUS_IGNORED)->exists()
+        );
+        $this->assertSame(
+            [BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW],
+            $payNow->fresh()->matches()->where('status', BankTransactionMatch::STATUS_IGNORED)->first()->match_reasons
+        );
+        $this->assertFalse(
+            $schoolWithoutInvoice->fresh()->matches()->where('status', BankTransactionMatch::STATUS_IGNORED)->exists()
+        );
+
+        $payNowTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'paynow',
+        ]));
+        $payNowTab->assertOk();
+        $payNowTab->assertSee('PayNow (1)', false);
+        $payNowTab->assertSee('MELEMENTS', false);
+        $payNowTab->assertDontSee('SZKOLA PODSTAWOWA NR 1', false);
+
+        $ignoredTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'ignored',
+        ]));
+        $ignoredTab->assertOk();
+        $ignoredTab->assertSee('Ignorowane (0)', false);
+        $ignoredTab->assertDontSee('MELEMENTS', false);
     }
 }

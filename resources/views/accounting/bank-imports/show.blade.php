@@ -47,6 +47,16 @@
                             @csrf
                             <button type="submit" class="btn btn-sm btn-outline-primary">Przelicz sugestie</button>
                         </form>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#bankImportIgnorePayNowModal"
+                                @disabled(($payNowIgnorableCount ?? 0) < 1)>
+                            Ignoruj wypłaty PayNow
+                            @if(($payNowIgnorableCount ?? 0) > 0)
+                                ({{ $payNowIgnorableCount }})
+                            @endif
+                        </button>
                         <span class="small text-muted align-self-center">Po zmianie reguł dopasowania (np. nazwisko nabywcy). Zaakceptowane pozostają bez zmian.</span>
                     </div>
                     <p class="small text-muted mb-0 mt-2">
@@ -105,9 +115,20 @@
                             'label' => 'Zaakceptowane ('.$counts['accepted'].')',
                             'title' => null,
                         ],
+                        'paynow' => [
+                            'label' => 'PayNow ('.$counts['paynow'].')',
+                            'title' => '<div class="text-start"><strong>PayNow</strong><ul class="mb-0 ps-3 mt-1">'
+                                .'<li>wypłaty rozliczeniowe bramki PayNow (mElements / WYPŁATA ŚRODKÓW NR PON-…)</li>'
+                                .'<li>oznaczone przyciskiem „Ignoruj wypłaty PayNow”</li>'
+                                .'<li>nie obejmuje przelewów klientów bez FV/KSeF</li>'
+                                .'</ul></div>',
+                        ],
                         'ignored' => [
                             'label' => 'Ignorowane ('.$counts['ignored'].')',
-                            'title' => null,
+                            'title' => '<div class="text-start"><strong>Ignorowane</strong><ul class="mb-0 ps-3 mt-1">'
+                                .'<li>ręcznie zignorowane wpływy spoza PayNow</li>'
+                                .'<li>wypłaty PayNow są w osobnej zakładce</li>'
+                                .'</ul></div>',
                         ],
                         'all' => [
                             'label' => 'Wszystkie wpływy',
@@ -368,6 +389,38 @@
                 @if($transactions->hasPages())
                     <div class="card-footer">{{ $transactions->links() }}</div>
                 @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankImportIgnorePayNowModal" tabindex="-1" aria-labelledby="bankImportIgnorePayNowModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bankImportIgnorePayNowModalLabel">Ignoruj wypłaty PayNow</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">
+                        Oznacz jako ignorowane <strong>{{ (int) ($payNowIgnorableCount ?? 0) }}</strong>
+                        {{ (int) ($payNowIgnorableCount ?? 0) === 1 ? 'wpływ' : 'wpływów' }}
+                        rozpoznanych jako <strong>rozliczeniowa wypłata bramki PayNow</strong>
+                        (mElements / „WYPŁATA ŚRODKÓW NR PON-…”).
+                    </p>
+                    <div class="alert alert-warning py-2 small mb-0">
+                        Ta akcja <strong>nie</strong> dotyczy przelewów klientów bez numeru FV/KSeF —
+                        takie pozycje zostają w kolejce (powiązanie po nazwie szkoły, adresie itd.).
+                        Zaakceptowane powiązania nie są ruszane. Po potwierdzeniu pozycje trafią do zakładki <strong>PayNow</strong>
+                        (nie do ogólnego „Ignorowane”).
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <form method="POST" action="{{ route('accounting.bank-imports.ignore-paynow-payouts', $import) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-secondary">Ignoruj wypłaty PayNow</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

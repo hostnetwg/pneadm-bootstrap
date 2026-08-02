@@ -21,6 +21,10 @@ class BankTransactionMatch extends Model
 
     public const STATUS_IGNORED = 'ignored';
 
+    public const REASON_GATEWAY_PAYOUT_PAYNOW = 'gateway_payout_paynow';
+
+    public const REASON_MANUAL_IGNORE = 'manual_ignore';
+
     protected $fillable = [
         'bank_transaction_id',
         'form_order_id',
@@ -147,7 +151,8 @@ class BankTransactionMatch extends Model
                 'existing_debt_case' => 'Istnieje aktywna sprawa windykacyjna dla tego zamówienia',
                 'multiple_candidates' => 'Więcej niż jeden kandydat — zweryfikuj ręcznie',
                 'manual_case_link' => 'Ręczne powiązanie przelewu ze sprawą windykacyjną',
-                'manual_ignore' => 'Ręcznie zignorowane',
+                self::REASON_GATEWAY_PAYOUT_PAYNOW => 'Wypłata rozliczeniowa bramki PayNow (mElements) — poza windykacją FV',
+                self::REASON_MANUAL_IGNORE => 'Ręcznie zignorowane',
                 'party_name_mismatch' => 'Nadawca z wyciągu nie pasuje do nabywcy/odbiorcy zamówienia — możliwy błędny numer FV w tytule',
                 default => $reason,
             };

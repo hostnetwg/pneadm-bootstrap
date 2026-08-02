@@ -78,7 +78,7 @@ class BankStatementImportController extends Controller
             ));
     }
 
-    public function show(Request $request, BankStatementImport $bankImport)
+    public function show(Request $request, BankStatementImport $bankImport, BankStatementImportService $importService)
     {
         $filter = $request->string('filter')->toString() ?: 'unmatched';
 
@@ -121,9 +121,18 @@ class BankStatementImportController extends Controller
             $transactionsQuery->whereHas('matches', function ($q) {
                 $q->where('status', BankTransactionMatch::STATUS_ACCEPTED);
             });
+        } elseif ($filter === 'paynow') {
+            $transactionsQuery->whereHas('matches', function ($q) {
+                $q->where('status', BankTransactionMatch::STATUS_IGNORED)
+                    ->whereJsonContains('match_reasons', BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW);
+            });
         } elseif ($filter === 'ignored') {
             $transactionsQuery->whereHas('matches', function ($q) {
-                $q->where('status', BankTransactionMatch::STATUS_IGNORED);
+                $q->where('status', BankTransactionMatch::STATUS_IGNORED)
+                    ->where(function ($reasons) {
+                        $reasons->whereNull('match_reasons')
+                            ->orWhereJsonDoesntContain('match_reasons', BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW);
+                    });
             });
         }
 
@@ -151,8 +160,16 @@ class BankStatementImportController extends Controller
             'accepted' => $bankImport->transactions()
                 ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_ACCEPTED))
                 ->count(),
+            'paynow' => $importService->countPayNowGatewayPayouts($bankImport),
             'ignored' => $bankImport->transactions()
-                ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_IGNORED))
+                ->where('is_incoming', true)
+                ->whereHas('matches', function ($q) {
+                    $q->where('status', BankTransactionMatch::STATUS_IGNORED)
+                        ->where(function ($reasons) {
+                            $reasons->whereNull('match_reasons')
+                                ->orWhereJsonDoesntContain('match_reasons', BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW);
+                        });
+                })
                 ->count(),
         ];
 
@@ -161,7 +178,35 @@ class BankStatementImportController extends Controller
             'transactions' => $transactions,
             'filter' => $filter,
             'counts' => $counts,
+            'payNowIgnorableCount' => $importService->countIgnorablePayNowGatewayPayouts($bankImport),
         ]);
+    }
+
+    public function ignorePayNowGatewayPayouts(
+        BankStatementImport $bankImport,
+        BankStatementImportService $importService
+    ) {
+        $result = $importService->ignorePayNowGatewayPayouts($bankImport);
+
+        if ($result['ignored'] === 0 && $result['candidates'] === 0) {
+            return redirect()
+                ->route('accounting.bank-imports.show', $bankImport)
+                ->with('warning', 'Nie znaleziono wypłat rozliczeniowych PayNow (mElements / WYPŁATA ŚRODKÓW NR PON-…) do zignorowania.');
+        }
+
+        $parts = [
+            sprintf('Zignorowano wypłat PayNow: %d.', $result['ignored']),
+        ];
+        if ($result['skipped_already_ignored'] > 0) {
+            $parts[] = sprintf('Już ignorowane: %d.', $result['skipped_already_ignored']);
+        }
+        if ($result['skipped_accepted'] > 0) {
+            $parts[] = sprintf('Pominięto zaakceptowane: %d.', $result['skipped_accepted']);
+        }
+
+        return redirect()
+            ->route('accounting.bank-imports.show', ['bankImport' => $bankImport, 'filter' => 'paynow'])
+            ->with('success', implode(' ', $parts));
     }
 
     public function accept(

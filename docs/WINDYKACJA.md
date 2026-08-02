@@ -108,7 +108,8 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - Menu: `Księgowość → Import wyciągu`.
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.
 - Tylko wpływy (`amount > 0`) idą do UI dopasowań; wydatki mogą być zapisane, ale nie są przeglądane w MVP.
-- Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, `Ignorowane`, `Wszystkie wpływy`.
+- Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, `PayNow`, `Ignorowane`, `Wszystkie wpływy`.
+- Przycisk **Ignoruj wypłaty PayNow** (modal Bootstrap): masowo oznacza wpływy rozpoznane pozytywnie jako rozliczenie bramki (`MELEMENTS` albo `WYPŁATA ŚRODKÓW` + `PON-…`). Trafiają do zakładki **PayNow** (powód `gateway_payout_paynow`), **nie** do ogólnego „Ignorowane”. **Nie** używa braku FV/KSeF — przelewy klientów bez numeru zostają w kolejce. Zaakceptowane nie są ruszane.
 - Deduplikacja: `bank_transactions.fingerprint` (data + kwota + opis znormalizowany).
 - Wydajność: lookup FV/KSeF/NIP/spraw ładowany raz do pamięci + bulk insert; limit czasu requestu podniesiony do 600 s (duże CSV ~5k wierszy).
 - Konflikty: jeśli w tytule jest **inny KSeF** niż na zamówieniu → max **Low** (`ksef_mismatch`); jeśli nadawca z wyciągu nie pasuje do nabywcy/odbiorcy → obniżenie High→Medium (`party_name_mismatch`) — typowy błędny numer FV w tytule.
