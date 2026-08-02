@@ -33,7 +33,7 @@ Pierwszy etap obejmuje:
 - ostrzeżenie VIP / lojalny klient,
 - skróty z `/form-orders` i `/form-orders/{id}` do aktywnej sprawy,
 - na karcie sprawy: przyciski **Poprzednia** / **Następna** (kolejność jak na liście — najnowsze pierwsze; Poprzednia = nowsza sprawa, Następna = starsza) oraz checkbox **tylko niezamknięte** (domyślnie zaznaczony; stan w `localStorage`),
-- w „Dane sprawy”: szkolenie z linkiem do karty kursu, datą oraz prowadzącym.
+- w „Dane sprawy”: szkolenie z linkiem do karty kursu, datą oraz prowadzącym; przy terminie płatności czerwone „X dni po terminie” tylko gdy status iFirma = `przeterminowane`; przy `oplacone` — szary napis tylko gdy znamy datę wpłaty z zaakceptowanego przelewu i była po terminie (bez daty wpłaty nie pokazujemy „po terminie”),
 
 ## Kto obsługuje sprawę
 

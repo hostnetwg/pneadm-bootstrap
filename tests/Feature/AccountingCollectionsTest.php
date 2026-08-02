@@ -855,6 +855,98 @@ class AccountingCollectionsTest extends TestCase
         $exact->assertJsonPath('candidates.0.id', $exactInvoice->id);
     }
 
+    public function test_collections_show_overdue_label_depends_on_ifirma_status_and_payment_date(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $makeCase = function (array $caseAttrs, array $orderAttrs = []) {
+            $order = FormOrder::create(array_merge([
+                'product_name' => 'Termin test',
+                'product_price' => 365,
+                'order_date' => now()->subDays(40),
+                'invoice_number' => 'due-'.uniqid(),
+                'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+                'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            ], $orderAttrs));
+
+            return DebtCase::create(array_merge([
+                'form_order_id' => $order->id,
+                'status' => DebtCase::STATUS_OPEN,
+                'invoice_number' => $order->invoice_number,
+                'amount_gross' => 365,
+                'due_date' => now()->subDays(10)->toDateString(),
+                'opened_at' => now(),
+            ], $caseAttrs));
+        };
+
+        $overdueCase = $makeCase([
+            'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE,
+        ]);
+        $overdueShow = $this->actingAs($user)->get(route('accounting.collections.show', $overdueCase));
+        $overdueShow->assertOk();
+        $overdueShow->assertSee('text-danger">(10 dni po terminie)', false);
+
+        $paidWithoutPaymentDate = $makeCase([
+            'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID,
+            'status' => DebtCase::STATUS_CLOSED,
+            'closed_at' => now(),
+        ]);
+        $paidNoDateShow = $this->actingAs($user)->get(route('accounting.collections.show', $paidWithoutPaymentDate));
+        $paidNoDateShow->assertOk();
+        $paidNoDateShow->assertDontSee('po terminie', false);
+
+        $paidLate = $makeCase([
+            'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID,
+            'status' => DebtCase::STATUS_CLOSED,
+            'closed_at' => now(),
+            'due_date' => now()->subDays(20)->toDateString(),
+        ]);
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('n', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(5)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'WPLATA PO TERMINIE',
+            'account_label' => 'Klient',
+            'fingerprint' => str_repeat('o', 64),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'debt_case_id' => $paidLate->id,
+            'form_order_id' => $paidLate->form_order_id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['manual_case_link'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $paidLateShow = $this->actingAs($user)->get(route('accounting.collections.show', $paidLate));
+        $paidLateShow->assertOk();
+        $paidLateShow->assertSee('text-muted fw-normal">(15 dni po terminie)', false);
+        $paidLateShow->assertDontSee('text-danger">(15 dni po terminie)', false);
+
+        $unpaidPastDue = $makeCase([
+            'ifirma_payment_status' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_UNPAID,
+        ]);
+        $unpaidShow = $this->actingAs($user)->get(route('accounting.collections.show', $unpaidPastDue));
+        $unpaidShow->assertOk();
+        $unpaidShow->assertDontSee('po terminie', false);
+    }
+
     public function test_collections_show_has_previous_and_next_case_links(): void
     {
         $user = User::factory()->create([

@@ -181,8 +181,22 @@
                                 $hasBuyer = filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip);
                                 $hasRecipient = filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip);
                                 $dueDate = $case->due_date?->copy()->startOfDay();
+                                $ifirmaStatus = $case->ifirma_payment_status;
+                                $paymentDate = null;
+                                foreach ($bankPayments ?? [] as $bankPayment) {
+                                    $operationDate = $bankPayment->transaction?->operation_date;
+                                    if ($operationDate === null) {
+                                        continue;
+                                    }
+                                    $candidatePaymentDate = $operationDate->copy()->startOfDay();
+                                    if ($paymentDate === null || $candidatePaymentDate->gt($paymentDate)) {
+                                        $paymentDate = $candidatePaymentDate;
+                                    }
+                                }
+
                                 $dueOverdueDays = null;
                                 $dueDaysLabel = null;
+                                $dueDaysIsDanger = false;
                                 if ($dueDate) {
                                     $today = now()->timezone(config('app.timezone'))->startOfDay();
                                     $dayWord = static function (int $n): string {
@@ -198,14 +212,30 @@
                                         return 'dni';
                                     };
 
-                                    if ($dueDate->lt($today)) {
-                                        $dueOverdueDays = (int) $dueDate->diffInDays($today);
-                                        $dueDaysLabel = $dueOverdueDays.' '.$dayWord($dueOverdueDays).' po terminie';
-                                    } elseif ($dueDate->equalTo($today)) {
-                                        $dueDaysLabel = 'termin dziś';
+                                    if ($ifirmaStatus === \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID) {
+                                        // Opłacona: „X dni po terminie” tylko gdy znamy datę wpłaty i była po terminie (szary).
+                                        if ($paymentDate !== null && $paymentDate->gt($dueDate)) {
+                                            $dueOverdueDays = (int) $dueDate->diffInDays($paymentDate);
+                                            $dueDaysLabel = $dueOverdueDays.' '.$dayWord($dueOverdueDays).' po terminie';
+                                            $dueDaysIsDanger = false;
+                                        }
+                                    } elseif ($ifirmaStatus === \App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE) {
+                                        // Czerwone przeterminowanie tylko gdy iFirma mówi „przeterminowana”.
+                                        if ($dueDate->lt($today)) {
+                                            $dueOverdueDays = (int) $dueDate->diffInDays($today);
+                                            $dueDaysLabel = $dueOverdueDays.' '.$dayWord($dueOverdueDays).' po terminie';
+                                            $dueDaysIsDanger = true;
+                                        } elseif ($dueDate->equalTo($today)) {
+                                            $dueDaysLabel = 'termin dziś';
+                                        }
                                     } else {
-                                        $n = (int) $today->diffInDays($dueDate);
-                                        $dueDaysLabel = 'za '.$n.' '.$dayWord($n);
+                                        // Pozostałe statusy / brak sync: bez czerwonego „po terminie”; zostaw „dziś” / „za X”.
+                                        if ($dueDate->equalTo($today)) {
+                                            $dueDaysLabel = 'termin dziś';
+                                        } elseif ($dueDate->gt($today)) {
+                                            $n = (int) $today->diffInDays($dueDate);
+                                            $dueDaysLabel = 'za '.$n.' '.$dayWord($n);
+                                        }
                                     }
                                 }
                             @endphp
@@ -279,8 +309,8 @@
                                             @if($dueDaysLabel)
                                                 <span @class([
                                                     'ms-1',
-                                                    'text-danger' => $dueOverdueDays !== null,
-                                                    'text-muted fw-normal' => $dueOverdueDays === null,
+                                                    'text-danger' => $dueDaysIsDanger,
+                                                    'text-muted fw-normal' => ! $dueDaysIsDanger,
                                                 ])>({{ $dueDaysLabel }})</span>
                                             @endif
                                         </div>
