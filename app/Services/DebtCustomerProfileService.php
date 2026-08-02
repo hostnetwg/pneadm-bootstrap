@@ -6,7 +6,6 @@ use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class DebtCustomerProfileService
 {
@@ -20,7 +19,13 @@ class DebtCustomerProfileService
      *     related_orders_total: float,
      *     online_paid_count: int,
      *     open_debt_cases_count: int,
-     *     identity: array{recipient_nip: ?string, buyer_nip: ?string, emails: array<int, string>}
+     *     identity: array{
+     *         strategy: string,
+     *         recipient_nip: ?string,
+     *         buyer_nip: ?string,
+     *         recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *         orderer_email: ?string
+     *     }
      * }
      */
     public function profileForOrder(FormOrder $order): array
@@ -66,37 +71,24 @@ class DebtCustomerProfileService
     }
 
     /**
-     * @param  array{recipient_nip: ?string, buyer_nip: ?string, emails: array<int, string>}  $identity
+     * @param  array{
+     *     strategy: string,
+     *     recipient_nip: ?string,
+     *     buyer_nip: ?string,
+     *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *     orderer_email: ?string
+     * }  $identity
      * @return Collection<int, FormOrder>
      */
     public function relatedOrders(array $identity): Collection
     {
-        $recipientNip = $identity['recipient_nip'];
-        $buyerNip = $identity['buyer_nip'];
-        $emails = $identity['emails'];
-
-        if ($recipientNip === null && $buyerNip === null && $emails === []) {
+        if ($identity['strategy'] === 'none') {
             return collect();
         }
 
         return FormOrder::query()
             ->with(['primaryParticipant', 'onlinePaymentOrders'])
-            ->where(function ($query) use ($recipientNip, $buyerNip, $emails) {
-                if ($recipientNip !== null) {
-                    $query->orWhereRaw($this->normalizedDigitsSql('recipient_nip').' = ?', [$recipientNip]);
-                }
-
-                if ($buyerNip !== null) {
-                    $query->orWhereRaw($this->normalizedDigitsSql('buyer_nip').' = ?', [$buyerNip]);
-                }
-
-                if ($emails !== []) {
-                    $query->orWhereIn(DB::raw('LOWER(TRIM(orderer_email))'), $emails)
-                        ->orWhereHas('primaryParticipant', function ($participantQuery) use ($emails) {
-                            $participantQuery->whereIn(DB::raw('LOWER(TRIM(participant_email))'), $emails);
-                        });
-                }
-            })
+            ->where(fn ($query) => $this->applyIdentityScope($query, $identity))
             ->orderByDesc('id')
             ->limit(250)
             ->get()
@@ -105,18 +97,180 @@ class DebtCustomerProfileService
     }
 
     /**
-     * @return array{recipient_nip: ?string, buyer_nip: ?string, emails: array<int, string>}
+     * @return array{
+     *     strategy: string,
+     *     recipient_nip: ?string,
+     *     buyer_nip: ?string,
+     *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *     orderer_email: ?string
+     * }
      */
     public function identityForOrder(FormOrder $order): array
     {
+        $recipientNip = $this->digits($order->recipient_nip);
+        $buyerNip = $this->digits($order->buyer_nip);
+        $recipientProfile = $this->recipientProfile($order);
+        $ordererEmail = $this->email($order->orderer_email);
+
+        if ($recipientNip !== null) {
+            $strategy = 'recipient_nip';
+        } elseif ($recipientProfile !== null) {
+            $strategy = 'recipient_profile';
+        } elseif ($buyerNip !== null) {
+            $strategy = 'buyer_nip';
+        } elseif ($ordererEmail !== null) {
+            $strategy = 'orderer_email';
+        } else {
+            $strategy = 'none';
+        }
+
         return [
-            'recipient_nip' => $this->digits($order->recipient_nip),
-            'buyer_nip' => $this->digits($order->buyer_nip),
-            'emails' => collect([
-                strtolower(trim((string) ($order->orderer_email ?? ''))),
-                strtolower(trim((string) ($order->display_participant_email ?? ''))),
-            ])->filter()->unique()->values()->all(),
+            'strategy' => $strategy,
+            'recipient_nip' => $recipientNip,
+            'buyer_nip' => $buyerNip,
+            'recipient_profile' => $recipientProfile,
+            'orderer_email' => $ordererEmail,
         ];
+    }
+
+    public function strategyLabel(string $strategy): string
+    {
+        return match ($strategy) {
+            'recipient_nip' => 'NIP odbiorcy',
+            'recipient_profile' => 'Dane odbiorcy (+ e-mail zamawiającego)',
+            'buyer_nip' => 'NIP nabywcy',
+            'orderer_email' => 'E-mail zamawiającego',
+            default => 'Brak klucza identyfikacji',
+        };
+    }
+
+    /**
+     * @param  array{
+     *     strategy: string,
+     *     recipient_nip: ?string,
+     *     buyer_nip: ?string,
+     *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *     orderer_email: ?string
+     * }  $identity
+     * @return list<array{key: string, label: string, value: string, strength: string}>
+     */
+    public function linkReasonsForRelatedOrder(FormOrder $related, array $identity): array
+    {
+        $reasons = [];
+
+        if ($identity['strategy'] === 'recipient_nip' && $identity['recipient_nip'] !== null) {
+            $relatedRecipientNip = $this->digits($related->recipient_nip);
+            if ($relatedRecipientNip !== null && $relatedRecipientNip === $identity['recipient_nip']) {
+                $reasons[] = [
+                    'key' => 'recipient_nip',
+                    'label' => 'NIP odbiorcy',
+                    'value' => $relatedRecipientNip,
+                    'strength' => 'high',
+                ];
+            }
+
+            return $reasons;
+        }
+
+        if ($identity['strategy'] === 'recipient_profile' && $identity['recipient_profile'] !== null) {
+            $relatedProfile = $this->recipientProfile($related);
+            if ($relatedProfile !== null && $relatedProfile === $identity['recipient_profile']) {
+                $reasons[] = [
+                    'key' => 'recipient_profile',
+                    'label' => 'Dane odbiorcy',
+                    'value' => trim($relatedProfile['name'].', '.$relatedProfile['postal_code'].' '.$relatedProfile['city']),
+                    'strength' => 'high',
+                ];
+            }
+
+            $relatedOrdererEmail = $this->email($related->orderer_email);
+            if ($identity['orderer_email'] !== null && $relatedOrdererEmail === $identity['orderer_email']) {
+                $reasons[] = [
+                    'key' => 'orderer_email',
+                    'label' => 'E-mail zamawiającego',
+                    'value' => $relatedOrdererEmail,
+                    'strength' => 'medium',
+                ];
+            }
+
+            return $reasons;
+        }
+
+        if ($identity['strategy'] === 'buyer_nip' && $identity['buyer_nip'] !== null) {
+            $relatedBuyerNip = $this->digits($related->buyer_nip);
+            if ($relatedBuyerNip !== null && $relatedBuyerNip === $identity['buyer_nip']) {
+                $reasons[] = [
+                    'key' => 'buyer_nip',
+                    'label' => 'NIP nabywcy',
+                    'value' => $relatedBuyerNip,
+                    'strength' => 'high',
+                ];
+            }
+
+            return $reasons;
+        }
+
+        if ($identity['strategy'] === 'orderer_email' && $identity['orderer_email'] !== null) {
+            $relatedOrdererEmail = $this->email($related->orderer_email);
+            if ($relatedOrdererEmail === $identity['orderer_email']) {
+                $reasons[] = [
+                    'key' => 'orderer_email',
+                    'label' => 'E-mail zamawiającego',
+                    'value' => $relatedOrdererEmail,
+                    'strength' => 'high',
+                ];
+            }
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<FormOrder>  $query
+     * @param  array{
+     *     strategy: string,
+     *     recipient_nip: ?string,
+     *     buyer_nip: ?string,
+     *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *     orderer_email: ?string
+     * }  $identity
+     */
+    private function applyIdentityScope($query, array $identity): void
+    {
+        if ($identity['strategy'] === 'recipient_nip' && $identity['recipient_nip'] !== null) {
+            $query->whereRaw($this->normalizedDigitsSql('recipient_nip').' = ?', [$identity['recipient_nip']]);
+
+            return;
+        }
+
+        if ($identity['strategy'] === 'recipient_profile' && $identity['recipient_profile'] !== null) {
+            $profile = $identity['recipient_profile'];
+            $query->where(function ($inner) use ($profile, $identity) {
+                $inner->where(function ($recipient) use ($profile) {
+                    $recipient
+                        ->whereRaw($this->normalizedTextSql('recipient_name').' = ?', [$profile['name']])
+                        ->whereRaw($this->normalizedAddressSql('recipient_address').' = ?', [$profile['address']])
+                        ->whereRaw($this->normalizedTextSql('recipient_postal_code').' = ?', [$profile['postal_code']])
+                        ->whereRaw($this->normalizedTextSql('recipient_city').' = ?', [$profile['city']]);
+                });
+
+                if ($identity['orderer_email'] !== null) {
+                    $inner->orWhereRaw('LOWER(TRIM(orderer_email)) = ?', [$identity['orderer_email']]);
+                }
+            });
+
+            return;
+        }
+
+        if ($identity['strategy'] === 'buyer_nip' && $identity['buyer_nip'] !== null) {
+            $query->whereRaw($this->normalizedDigitsSql('buyer_nip').' = ?', [$identity['buyer_nip']]);
+
+            return;
+        }
+
+        if ($identity['strategy'] === 'orderer_email' && $identity['orderer_email'] !== null) {
+            $query->whereRaw('LOWER(TRIM(orderer_email)) = ?', [$identity['orderer_email']]);
+        }
     }
 
     private function relationshipScore(int $ordersCount, float $ordersTotal, int $onlinePaidCount): int
@@ -182,8 +336,58 @@ class DebtCustomerProfileService
         return $digits !== '' ? $digits : null;
     }
 
+    /**
+     * @return array{name: string, address: string, postal_code: string, city: string}|null
+     */
+    private function recipientProfile(FormOrder $order): ?array
+    {
+        $profile = [
+            'name' => $this->normalizeText($order->recipient_name),
+            'address' => $this->normalizeAddress($order->recipient_address),
+            'postal_code' => $this->normalizeText($order->recipient_postal_code),
+            'city' => $this->normalizeText($order->recipient_city),
+        ];
+
+        return in_array('', $profile, true) ? null : $profile;
+    }
+
+    private function email(?string $value): ?string
+    {
+        $email = strtolower(trim((string) $value));
+
+        return $email !== '' ? $email : null;
+    }
+
+    private function normalizeText(?string $value): string
+    {
+        $value = mb_strtolower(trim((string) $value));
+        $value = str_replace(['.', ',', ';', ':'], ' ', $value);
+        $value = preg_replace('/\s+/', ' ', $value) ?: '';
+
+        return trim($value);
+    }
+
+    private function normalizeAddress(?string $value): string
+    {
+        $value = $this->normalizeText($value);
+        $value = preg_replace('/\b(ulica|ul)\b/u', 'ul', $value) ?: $value;
+        $value = preg_replace('/\s+/', ' ', $value) ?: '';
+
+        return trim($value);
+    }
+
     private function normalizedDigitsSql(string $column): string
     {
         return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE({$column}, ''), '-', ''), ' ', ''), '.', ''), '/', ''), '_', '')";
+    }
+
+    private function normalizedTextSql(string $column): string
+    {
+        return "TRIM(REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE({$column}, '')), '.', ' '), ',', ' '), ';', ' '), ':', ' '), '[[:space:]]+', ' '))";
+    }
+
+    private function normalizedAddressSql(string $column): string
+    {
+        return "TRIM(REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(COALESCE({$column}, '')), '.', ' '), ',', ' '), ';', ' '), ':', ' '), 'ulica', 'ul'), '[[:space:]]+', ' '))";
     }
 }

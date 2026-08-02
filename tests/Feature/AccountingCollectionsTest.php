@@ -7,6 +7,7 @@ use App\Models\BankTransaction;
 use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
+use App\Models\DebtCaseContact;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use App\Models\User;
@@ -187,6 +188,45 @@ class AccountingCollectionsTest extends TestCase
         ]);
     }
 
+    public function test_user_can_delete_debt_case_contact(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie kontakt',
+            'product_price' => 300,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '55/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+        $contact = DebtCaseContact::create([
+            'debt_case_id' => $case->id,
+            'created_by' => $user->id,
+            'contact_type' => DebtCaseContact::TYPE_EMAIL,
+            'value' => 'kontakt@example.test',
+            'source' => 'ręcznie',
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('case-contact-delete-btn', false);
+        $show->assertSee('kontakt@example.test', false);
+
+        $response = $this->actingAs($user)->delete(route('accounting.collections.contacts.destroy', [$case, $contact]));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+        $this->assertDatabaseMissing('debt_case_contacts', ['id' => $contact->id]);
+        $this->assertSame($user->id, $case->fresh()->assigned_to_id);
+    }
+
     public function test_collections_filter_finds_case_by_linked_form_order_invoice_number(): void
     {
         $user = User::factory()->create([
@@ -320,6 +360,38 @@ class AccountingCollectionsTest extends TestCase
         $this->assertTrue($case->isVip());
         $this->assertNotNull($case->vip_reason);
         $this->assertGreaterThanOrEqual(60, $case->relationship_score);
+    }
+
+    public function test_collections_show_uses_current_profile_for_vip_alert_reason(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po zmianie reguł VIP',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '77/8/2026',
+            'buyer_nip' => '9999999999',
+            'recipient_nip' => '1111111111',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'customer_segment' => DebtCase::SEGMENT_VIP,
+            'relationship_score' => 80,
+            'vip_reason' => '13 powiązanych zamówień, łączna wartość 4 152,00 zł',
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+
+        $response->assertOk();
+        $response->assertDontSee('VIP / lojalny klient', false);
+        $response->assertDontSee('Powód: 13 powiązanych zamówień', false);
+        $response->assertSee('Łącznie: 1 zamówień', false);
     }
 
     public function test_user_can_sync_ifirma_payment_status_on_debt_case(): void
@@ -586,6 +658,7 @@ class AccountingCollectionsTest extends TestCase
         $show->assertSee('Brak wyników — wykonaj wyszukiwanie.', false);
         $show->assertDontSee('WPLYW BEZ WYSZUKIWANIA XYZ', false);
         $show->assertSee('id="caseBankPaymentsCollapse"', false);
+        $show->assertSee('id="caseBankPaymentsHeader"', false);
         $show->assertSee('aria-expanded="false"', false);
         $show->assertSee('class="collapse"', false);
 

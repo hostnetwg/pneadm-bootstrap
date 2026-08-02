@@ -69,23 +69,23 @@
                 <div class="card">
                     <div class="card-header fw-semibold">Historia zamówień powiązanych</div>
                     <div class="card-body border-bottom">
-                        <div class="small fw-semibold mb-2">Bierz pod uwagę powiązanie po:</div>
+                        <div class="small fw-semibold mb-2">Pokaż powiązania po (ta sama reguła co w sprawach VIP):</div>
                         <div class="d-flex flex-wrap gap-3" id="historyLinkFilters">
                             <div class="form-check">
                                 <input class="form-check-input history-link-filter" type="checkbox" id="filterRecipientNip" value="recipient_nip" checked>
                                 <label class="form-check-label" for="filterRecipientNip">NIP odbiorcy</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input history-link-filter" type="checkbox" id="filterBuyerNip" value="buyer_nip">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterRecipientProfile" value="recipient_profile" checked>
+                                <label class="form-check-label" for="filterRecipientProfile">Dane odbiorcy</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input history-link-filter" type="checkbox" id="filterBuyerNip" value="buyer_nip" checked>
                                 <label class="form-check-label" for="filterBuyerNip">NIP nabywcy</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input history-link-filter" type="checkbox" id="filterOrdererEmail" value="orderer_email" checked>
                                 <label class="form-check-label" for="filterOrdererEmail">E-mail zamawiającego</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input history-link-filter" type="checkbox" id="filterParticipantEmail" value="participant_email" checked>
-                                <label class="form-check-label" for="filterParticipantEmail">E-mail uczestnika</label>
                             </div>
                         </div>
                         <div class="small text-muted mt-2" id="historyFilterInfo"></div>
@@ -132,16 +132,19 @@
             const historyRows = document.getElementById('historyRows');
             const historyFilterInfo = document.getElementById('historyFilterInfo');
             const linkFilterInputs = Array.from(document.querySelectorAll('.history-link-filter'));
-            const linkFilterStorageKey = 'accounting_debtors_link_filters_v2';
+            const linkFilterStorageKey = 'accounting_debtors_link_filters_v3';
             const invoiceMatchModeStorageKey = 'accounting_debtors_invoice_match_mode_v2';
 
             let debounceTimer = null;
             let activeRequest = null;
             let latestHistoryOrders = [];
             let latestHistoryIdentity = {
+                strategy: 'none',
+                strategy_label: 'Brak klucza identyfikacji',
                 recipient_nip: null,
                 buyer_nip: null,
-                emails: [],
+                orderer_email: null,
+                recipient_profile: null,
             };
 
             const escapeHtml = (value) => {
@@ -314,6 +317,36 @@
                 const onlinePendingCount = visibleOrders.filter((order) => ['pending', 'created'].includes(order.latest_gateway_status)).length;
                 const onlineFailedCount = visibleOrders.filter((order) => ['failed', 'cancelled'].includes(order.latest_gateway_status)).length;
 
+                const identityKeyLines = (() => {
+                    const strategy = latestHistoryIdentity.strategy || 'none';
+                    const lines = [
+                        `Strategia: <strong>${escapeHtml(latestHistoryIdentity.strategy_label || strategy)}</strong>`,
+                    ];
+
+                    if (strategy === 'recipient_nip') {
+                        lines.push(`NIP odbiorcy: <strong>${escapeHtml(latestHistoryIdentity.recipient_nip)}</strong>`);
+                    } else if (strategy === 'recipient_profile') {
+                        const profile = latestHistoryIdentity.recipient_profile || {};
+                        lines.push(`Odbiorca: <strong>${escapeHtml(profile.name)}</strong>`);
+                        lines.push(`Adres: <strong>${escapeHtml([profile.address, profile.postal_code, profile.city].filter(Boolean).join(', '))}</strong>`);
+                        if (latestHistoryIdentity.orderer_email) {
+                            lines.push(`E-mail zamawiającego: <strong>${escapeHtml(latestHistoryIdentity.orderer_email)}</strong>`);
+                        }
+                    } else if (strategy === 'buyer_nip') {
+                        lines.push(`NIP nabywcy: <strong>${escapeHtml(latestHistoryIdentity.buyer_nip)}</strong>`);
+                    } else if (strategy === 'orderer_email') {
+                        lines.push(`E-mail zamawiającego: <strong>${escapeHtml(latestHistoryIdentity.orderer_email)}</strong>`);
+                    }
+
+                    return lines.join('<br>');
+                })();
+
+                const buyerNipWarning = (latestHistoryIdentity.strategy === 'buyer_nip')
+                    ? `<div class="alert alert-warning mt-3 mb-0 py-2 small">
+                        Powiązanie po <strong>NIP nabywcy</strong> (brak NIP/danych odbiorcy) — sprawdź, czy to nie organ prowadzący dla wielu szkół.
+                       </div>`
+                    : '';
+
                 historyStats.innerHTML = `
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
@@ -330,12 +363,8 @@
                         </div>
                         <div class="col-12 col-md-4">
                             <div class="border rounded p-2 h-100">
-                                <div class="small text-muted">Klucz identyfikacji</div>
-                                <div class="small">
-                                    Odbiorca NIP: <strong>${escapeHtml(latestHistoryIdentity.recipient_nip)}</strong><br>
-                                    Nabywca NIP: <strong>${escapeHtml(latestHistoryIdentity.buyer_nip)}</strong><br>
-                                    E-maile: <strong>${escapeHtml((latestHistoryIdentity.emails || []).join(', '))}</strong>
-                                </div>
+                                <div class="small text-muted">Klucz identyfikacji klienta</div>
+                                <div class="small">${identityKeyLines}</div>
                             </div>
                         </div>
                     </div>
@@ -346,9 +375,7 @@
                         <span class="badge text-bg-warning me-1 mb-1">Online oczekujące: ${escapeHtml(onlinePendingCount)}</span>
                         <span class="badge text-bg-danger me-1 mb-1">Online nieudane/anulowane: ${escapeHtml(onlineFailedCount)}</span>
                     </div>
-                    <div class="alert alert-warning mt-3 mb-0 py-2 small">
-                        Powiązanie po <strong>NIP nabywcy</strong> traktuj pomocniczo (np. gmina może być nabywcą dla wielu szkół).
-                    </div>
+                    ${buyerNipWarning}
                 `;
 
                 if (visibleOrders.length === 0) {
@@ -460,9 +487,12 @@
 
                 latestHistoryOrders = payload.history.orders || [];
                 latestHistoryIdentity = payload.history.identity || {
+                    strategy: 'none',
+                    strategy_label: 'Brak klucza identyfikacji',
                     recipient_nip: null,
                     buyer_nip: null,
-                    emails: [],
+                    orderer_email: null,
+                    recipient_profile: null,
                 };
                 renderHistoryRows();
             };

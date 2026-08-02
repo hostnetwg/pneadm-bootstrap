@@ -20,7 +20,6 @@ use App\Services\IfirmaInvoicePaymentStatusService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AccountingController extends Controller
@@ -766,6 +765,24 @@ class AccountingController extends Controller
             ->with('success', 'Dodano kontakt do sprawy.');
     }
 
+    public function collectionsContactDestroy(DebtCase $debtCase, DebtCaseContact $contact)
+    {
+        if ((int) $contact->debt_case_id !== (int) $debtCase->id) {
+            abort(404);
+        }
+
+        $contact->delete();
+
+        $debtCase->update([
+            'assigned_to_id' => Auth::id(),
+            'last_action_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Usunięto kontakt ze sprawy.');
+    }
+
     /**
      * @param  array{
      *     status: string,
@@ -830,7 +847,7 @@ class AccountingController extends Controller
      * Live lookup danych pod ponaglenie po numerze faktury lub numerze KSeF.
      * Uwaga: dla faktur odroczonych status opłacenia jest weryfikowany w iFirma (poza systemem).
      */
-    public function debtorsLookup(Request $request)
+    public function debtorsLookup(Request $request, DebtCustomerProfileService $profileService)
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:2', 'max:128'],
@@ -891,17 +908,23 @@ class AccountingController extends Controller
                         'online_failed_or_cancelled_orders' => 0,
                     ],
                     'identity' => [
+                        'strategy' => 'none',
+                        'strategy_label' => $profileService->strategyLabel('none'),
                         'recipient_nip' => null,
                         'buyer_nip' => null,
-                        'emails' => [],
+                        'orderer_email' => null,
+                        'recipient_profile' => null,
                     ],
-                    'sources' => [],
+                    'sources' => [
+                        'strategy' => 'none',
+                        'related_orders' => 0,
+                    ],
                 ],
             ]);
         }
 
         $selected = $matches->first();
-        $historyPayload = $this->buildDebtorHistoryPayload($selected);
+        $historyPayload = $this->buildDebtorHistoryPayload($selected, $profileService);
 
         return response()->json([
             'matches' => $matches->map(fn (FormOrder $order) => [
@@ -982,58 +1005,10 @@ class AccountingController extends Controller
         ];
     }
 
-    private function buildDebtorHistoryPayload(FormOrder $selected): array
+    private function buildDebtorHistoryPayload(FormOrder $selected, DebtCustomerProfileService $profileService): array
     {
-        $recipientNip = preg_replace('/\D+/', '', (string) ($selected->recipient_nip ?? '')) ?: null;
-        $buyerNip = preg_replace('/\D+/', '', (string) ($selected->buyer_nip ?? '')) ?: null;
-        $emails = collect([
-            strtolower(trim((string) ($selected->orderer_email ?? ''))),
-            strtolower(trim((string) ($selected->display_participant_email ?? ''))),
-        ])->filter()->unique()->values();
-
-        $ordersByRecipientNip = collect();
-        $ordersByBuyerNip = collect();
-        $ordersByEmails = collect();
-
-        if ($recipientNip !== null) {
-            $ordersByRecipientNip = FormOrder::query()
-                ->with(['primaryParticipant', 'onlinePaymentOrders'])
-                ->whereRaw($this->normalizedDigitsSql('recipient_nip').' = ?', [$recipientNip])
-                ->orderByDesc('id')
-                ->limit(200)
-                ->get();
-        }
-
-        if ($buyerNip !== null) {
-            $ordersByBuyerNip = FormOrder::query()
-                ->with(['primaryParticipant', 'onlinePaymentOrders'])
-                ->whereRaw($this->normalizedDigitsSql('buyer_nip').' = ?', [$buyerNip])
-                ->orderByDesc('id')
-                ->limit(200)
-                ->get();
-        }
-
-        if ($emails->isNotEmpty()) {
-            $emailValues = $emails->all();
-            $ordersByEmails = FormOrder::query()
-                ->with(['primaryParticipant', 'onlinePaymentOrders'])
-                ->where(function ($query) use ($emailValues) {
-                    $query->whereIn(DB::raw('LOWER(TRIM(orderer_email))'), $emailValues)
-                        ->orWhereHas('primaryParticipant', function ($participantQuery) use ($emailValues) {
-                            $participantQuery->whereIn(DB::raw('LOWER(TRIM(participant_email))'), $emailValues);
-                        });
-                })
-                ->orderByDesc('id')
-                ->limit(200)
-                ->get();
-        }
-
-        $allOrders = $ordersByRecipientNip
-            ->concat($ordersByBuyerNip)
-            ->concat($ordersByEmails)
-            ->unique('id')
-            ->sortByDesc('id')
-            ->values();
+        $identity = $profileService->identityForOrder($selected);
+        $allOrders = $profileService->relatedOrders($identity);
 
         $stats = [
             'total_orders' => $allOrders->count(),
@@ -1047,18 +1022,20 @@ class AccountingController extends Controller
 
         return [
             'identity' => [
-                'recipient_nip' => $recipientNip,
-                'buyer_nip' => $buyerNip,
-                'emails' => $emails->all(),
+                'strategy' => $identity['strategy'],
+                'strategy_label' => $profileService->strategyLabel($identity['strategy']),
+                'recipient_nip' => $identity['recipient_nip'],
+                'buyer_nip' => $identity['buyer_nip'],
+                'orderer_email' => $identity['orderer_email'],
+                'recipient_profile' => $identity['recipient_profile'],
             ],
             'sources' => [
-                'recipient_nip_matches' => $ordersByRecipientNip->count(),
-                'buyer_nip_matches' => $ordersByBuyerNip->count(),
-                'email_matches' => $ordersByEmails->count(),
+                'strategy' => $identity['strategy'],
+                'related_orders' => $allOrders->count(),
             ],
             'stats' => $stats,
-            'orders' => $allOrders->map(function (FormOrder $order) use ($recipientNip, $buyerNip, $emails) {
-                $linkReasons = $this->resolveLinkReasons($order, $recipientNip, $buyerNip, $emails->all());
+            'orders' => $allOrders->map(function (FormOrder $order) use ($identity, $profileService) {
+                $linkReasons = $profileService->linkReasonsForRelatedOrder($order, $identity);
 
                 return [
                     'id' => $order->id,
@@ -1088,11 +1065,6 @@ class AccountingController extends Controller
                 ];
             })->values(),
         ];
-    }
-
-    private function normalizedDigitsSql(string $column): string
-    {
-        return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE({$column}, ''), '-', ''), ' ', ''), '.', ''), '/', ''), '_', '')";
     }
 
     private function latestGatewayStatus(FormOrder $order): ?string
@@ -1172,53 +1144,5 @@ class AccountingController extends Controller
         }
 
         return $value->format('Y-m-d');
-    }
-
-    private function resolveLinkReasons(FormOrder $order, ?string $selectedRecipientNip, ?string $selectedBuyerNip, array $selectedEmails): array
-    {
-        $reasons = [];
-
-        $orderRecipientNip = preg_replace('/\D+/', '', (string) ($order->recipient_nip ?? '')) ?: null;
-        $orderBuyerNip = preg_replace('/\D+/', '', (string) ($order->buyer_nip ?? '')) ?: null;
-        $ordererEmail = strtolower(trim((string) ($order->orderer_email ?? ''))) ?: null;
-        $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? ''))) ?: null;
-
-        if (! empty($orderRecipientNip) && $selectedRecipientNip !== null && $orderRecipientNip === $selectedRecipientNip) {
-            $reasons[] = [
-                'key' => 'recipient_nip',
-                'label' => 'NIP odbiorcy',
-                'value' => $orderRecipientNip,
-                'strength' => 'high',
-            ];
-        }
-
-        if (! empty($participantEmail) && in_array($participantEmail, $selectedEmails, true)) {
-            $reasons[] = [
-                'key' => 'participant_email',
-                'label' => 'E-mail uczestnika',
-                'value' => $participantEmail,
-                'strength' => 'high',
-            ];
-        }
-
-        if (! empty($ordererEmail) && in_array($ordererEmail, $selectedEmails, true)) {
-            $reasons[] = [
-                'key' => 'orderer_email',
-                'label' => 'E-mail zamawiającego',
-                'value' => $ordererEmail,
-                'strength' => 'high',
-            ];
-        }
-
-        if (! empty($orderBuyerNip) && $selectedBuyerNip !== null && $orderBuyerNip === $selectedBuyerNip) {
-            $reasons[] = [
-                'key' => 'buyer_nip',
-                'label' => 'NIP nabywcy',
-                'value' => $orderBuyerNip,
-                'strength' => 'low',
-            ];
-        }
-
-        return $reasons;
     }
 }

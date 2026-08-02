@@ -19,6 +19,14 @@
         $ordererEmail = trim((string) ($order->orderer_email ?? ''));
         $participantName = trim((string) ($order->display_participant_name ?? ''));
         $participantEmail = trim((string) ($order->display_participant_email ?? ''));
+        $profileIsVip = in_array($profile['customer_segment'] ?? null, [
+            \App\Models\DebtCase::SEGMENT_VIP,
+            \App\Models\DebtCase::SEGMENT_VIP_OVERDUE,
+        ], true);
+        $showVipAlert = (bool) $case->manual_vip || $profileIsVip;
+        $vipAlertReason = $case->manual_vip && filled($case->vip_reason)
+            ? $case->vip_reason
+            : ($profile['vip_reason'] ?? null);
 
         $formatPhone = static function (?string $raw): ?array {
             $raw = trim((string) $raw);
@@ -128,7 +136,7 @@
                 </div>
             </div>
 
-            @if($case->isVip())
+            @if($showVipAlert)
                 <div class="alert alert-warning">
                     <div class="fw-semibold">
                         <i class="bi bi-star-fill"></i> VIP / lojalny klient — zalecany kontakt osobisty.
@@ -136,183 +144,271 @@
                     <div>
                         Ten kontrahent ma wysoką relację z PNE. Zanim wyślesz formalny monit, rozważ telefon lub personalny e-mail z prośbą o pomoc w identyfikacji wpłaty.
                     </div>
-                    @if($case->vip_reason)
-                        <div class="small mt-1">Powód: {{ $case->vip_reason }}</div>
+                    @if($vipAlertReason)
+                        <div class="small mt-1">Powód: {{ $vipAlertReason }}</div>
                     @endif
                 </div>
             @endif
 
             <div class="row g-3 mb-3">
                 <div class="col-12 col-xl-8">
-                    <div class="card h-100">
-                        <div class="card-header fw-semibold">Dane sprawy</div>
-                        <div class="card-body">
-                            <div class="row g-4">
-                                <div class="col-md-6">
-                                    <dl class="row mb-0 gy-2">
-                                        <dt class="col-sm-4 text-muted">Zamówienie</dt>
-                                        <dd class="col-sm-8 mb-0">#{{ $order->id }}</dd>
+                    <div class="card h-100 case-details-card">
+                        <div class="card-header py-2 fw-semibold d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <span>Dane sprawy</span>
+                            <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mb-0">
+                                @csrf
+                                <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-2">
+                                    <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
+                                </button>
+                            </form>
+                        </div>
+                        <div class="card-body p-3">
+                            @php
+                                $invoiceNo = $case->invoice_number ?: $order->invoice_number ?: null;
+                                $ksefNo = $case->ksef_number ?: $order->ksef_number ?: null;
+                                $amountGross = (float) ($case->amount_gross ?? $order->product_price ?? 0);
+                                $hasBuyer = filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip);
+                                $hasRecipient = filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip);
+                                $dueDate = $case->due_date?->copy()->startOfDay();
+                                $dueOverdueDays = null;
+                                $dueDaysLabel = null;
+                                if ($dueDate) {
+                                    $today = now()->timezone(config('app.timezone'))->startOfDay();
+                                    $dayWord = static function (int $n): string {
+                                        $mod10 = $n % 10;
+                                        $mod100 = $n % 100;
+                                        if ($n === 1) {
+                                            return 'dzień';
+                                        }
+                                        if ($mod10 >= 2 && $mod10 <= 4 && ! ($mod100 >= 12 && $mod100 <= 14)) {
+                                            return 'dni';
+                                        }
 
-                                        <dt class="col-sm-4 text-muted">Szkolenie</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            @if($course)
-                                                <a href="{{ route('courses.show', $course->id) }}" class="fw-semibold text-decoration-none">
-                                                    {{ $courseTitle }}
-                                                </a>
-                                            @else
-                                                <span class="fw-semibold">{{ $courseTitle }}</span>
-                                            @endif
-                                            @if($courseDateTime || $courseInstructor !== '')
-                                                <div class="small text-muted mt-1">
-                                                    @if($courseDateTime)
-                                                        <span><i class="bi bi-calendar3"></i> {{ $courseDateTime }}</span>
-                                                    @endif
-                                                    @if($courseDateTime && $courseInstructor !== '')
-                                                        <span class="mx-1">·</span>
-                                                    @endif
-                                                    @if($courseInstructor !== '')
-                                                        <span><i class="bi bi-person"></i> {{ $courseInstructor }}</span>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                        </dd>
+                                        return 'dni';
+                                    };
 
-                                        <dt class="col-sm-4 text-muted">Zamawiający</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            <div class="fw-semibold">{{ $ordererName !== '' ? $ordererName : '—' }}</div>
-                                            @if($ordererEmail !== '')
-                                                <div class="small mt-1">
-                                                    <i class="bi bi-envelope"></i>
-                                                    <a href="mailto:{{ $ordererEmail }}" class="text-decoration-none">{{ $ordererEmail }}</a>
-                                                </div>
-                                            @endif
-                                            @if($ordererPhoneFmt)
-                                                <div class="small mt-1">
-                                                    <i class="bi bi-telephone"></i>
-                                                    <a href="tel:{{ $ordererPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $ordererPhoneFmt['display'] }}</a>
-                                                </div>
-                                            @endif
-                                        </dd>
+                                    if ($dueDate->lt($today)) {
+                                        $dueOverdueDays = (int) $dueDate->diffInDays($today);
+                                        $dueDaysLabel = $dueOverdueDays.' '.$dayWord($dueOverdueDays).' po terminie';
+                                    } elseif ($dueDate->equalTo($today)) {
+                                        $dueDaysLabel = 'termin dziś';
+                                    } else {
+                                        $n = (int) $today->diffInDays($dueDate);
+                                        $dueDaysLabel = 'za '.$n.' '.$dayWord($n);
+                                    }
+                                }
+                            @endphp
 
-                                        <dt class="col-sm-4 text-muted">Uczestnik</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            <div class="fw-semibold">{{ $participantName !== '' ? $participantName : '—' }}</div>
-                                            @if($participantEmail !== '')
-                                                <div class="small mt-1">
-                                                    <i class="bi bi-envelope"></i>
-                                                    <a href="mailto:{{ $participantEmail }}" class="text-decoration-none">{{ $participantEmail }}</a>
-                                                    @if($ordererEmail !== '' && strcasecmp($ordererEmail, $participantEmail) === 0)
-                                                        <span class="badge text-bg-light border ms-1">jak zamawiający</span>
-                                                    @endif
+                            {{-- Kluczowe dane: zamówienie / FV + status iFirma --}}
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-8 col-xl-9">
+                                    <div class="border rounded-2 h-100 p-2 d-flex flex-column">
+                                        <div class="d-flex flex-wrap gap-3 gap-xl-4 align-items-start">
+                                            <div>
+                                                <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Zamówienie</div>
+                                                <div class="fw-semibold lh-sm">
+                                                    <a href="{{ route('form-orders.show', $order->id) }}" class="text-decoration-none">#{{ $order->id }}</a>
                                                 </div>
+                                            </div>
+                                            <div>
+                                                <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Faktura</div>
+                                                @if($invoiceNo)
+                                                    <button type="button"
+                                                            class="btn btn-link text-decoration-none text-body fw-semibold lh-sm text-nowrap p-0 border-0 case-copy-value"
+                                                            data-copy-text="{{ $invoiceNo }}"
+                                                            title="Kliknij, aby skopiować"
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-title="Kliknij, aby skopiować">{{ $invoiceNo }}</button>
+                                                @else
+                                                    <div class="fw-semibold lh-sm text-nowrap">—</div>
+                                                @endif
+                                            </div>
+                                            <div class="flex-grow-1" style="min-width: 12rem;">
+                                                <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">KSeF</div>
+                                                @if($ksefNo)
+                                                    <button type="button"
+                                                            class="btn btn-link text-decoration-none text-body fw-semibold text-nowrap lh-sm p-0 border-0 case-copy-value"
+                                                            data-copy-text="{{ $ksefNo }}"
+                                                            title="Kliknij, aby skopiować"
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-title="Kliknij, aby skopiować">{{ $ksefNo }}</button>
+                                                @else
+                                                    <div class="fw-semibold text-nowrap lh-sm">—</div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="mt-auto pt-2 fw-semibold lh-sm">
+                                            <span class="text-muted fw-normal">Kwota:</span>
+                                            {{ number_format($amountGross, 2, ',', ' ') }} zł
+                                            <span class="mx-2 text-muted fw-normal">·</span>
+                                            <span class="text-muted fw-normal text-uppercase">Termin:</span>
+                                            {{ $case->due_date?->format('d.m.Y') ?: '—' }}
+                                            @if($dueDaysLabel)
+                                                <span @class([
+                                                    'ms-1',
+                                                    'text-danger' => $dueOverdueDays !== null,
+                                                    'text-muted fw-normal' => $dueOverdueDays === null,
+                                                ])>({{ $dueDaysLabel }})</span>
                                             @endif
-                                            @if($participantPhoneFmt)
-                                                <div class="small mt-1">
-                                                    <i class="bi bi-telephone"></i>
-                                                    <a href="tel:{{ $participantPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $participantPhoneFmt['display'] }}</a>
-                                                </div>
-                                            @elseif($ordererPhoneFmt && ($participantEmail === '' || strcasecmp($ordererEmail, $participantEmail) === 0))
-                                                <div class="small text-muted mt-1">
-                                                    <i class="bi bi-telephone"></i> ten sam telefon co zamawiający
-                                                </div>
-                                            @endif
-                                        </dd>
-
-                                        <dt class="col-sm-4 text-muted">Nabywca</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            @if(filled($order->buyer_name) || filled($order->buyer_address) || filled($order->buyer_city) || filled($order->buyer_nip))
-                                                <div class="fw-semibold">{{ $order->buyer_name ?: '—' }}</div>
-                                                @if(filled($order->buyer_address))
-                                                    <div class="small">{{ $order->buyer_address }}</div>
-                                                @endif
-                                                @if(filled($order->buyer_postal_code) || filled($order->buyer_city))
-                                                    <div class="small">{{ trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')) }}</div>
-                                                @endif
-                                                @if(filled($order->buyer_nip))
-                                                    <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->buyer_nip) }}</div>
-                                                @endif
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </dd>
-
-                                        <dt class="col-sm-4 text-muted">Odbiorca</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            @if(filled($order->recipient_name) || filled($order->recipient_address) || filled($order->recipient_city) || filled($order->recipient_nip))
-                                                <div class="fw-semibold">{{ $order->recipient_name ?: '—' }}</div>
-                                                @if(filled($order->recipient_address))
-                                                    <div class="small">{{ $order->recipient_address }}</div>
-                                                @endif
-                                                @if(filled($order->recipient_postal_code) || filled($order->recipient_city))
-                                                    <div class="small">{{ trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')) }}</div>
-                                                @endif
-                                                @if(filled($order->recipient_nip))
-                                                    <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->recipient_nip) }}</div>
-                                                @endif
-                                                @if($order->isKsefAdditionalEntityEnabled())
-                                                    <div class="small text-muted mt-1">
-                                                        Podmiot3:
-                                                        {{ \App\Models\FormOrder::ksefAdditionalEntityRoleLabel($order->ksef_additional_entity_role) }}
-                                                    </div>
-                                                @endif
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </dd>
-                                    </dl>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <dl class="row mb-0 gy-2">
-                                        <dt class="col-sm-4 text-muted">Faktura</dt>
-                                        <dd class="col-sm-8 mb-0">{{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</dd>
-
-                                        <dt class="col-sm-4 text-muted">KSeF</dt>
-                                        <dd class="col-sm-8 mb-0 text-break">{{ $case->ksef_number ?: $order->ksef_number ?: '—' }}</dd>
-
-                                        <dt class="col-sm-4 text-muted">ID iFirma</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            @if($order->hasIfirmaInvoiceId())
-                                                <code>{{ $order->ifirma_invoice_id }}</code>
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </dd>
-
-                                        <dt class="col-sm-4 text-muted">Status iFirma</dt>
-                                        <dd class="col-sm-8 mb-0">
-                                            @if($case->ifirma_payment_status)
+                                <div class="col-md-4 col-xl-3">
+                                    <div class="border rounded-2 h-100 p-2 text-center">
+                                        <div class="text-muted small text-uppercase mb-1 fw-bold" style="letter-spacing: .03em;">Status iFirma</div>
+                                        @if($order->hasIfirmaInvoiceId())
+                                            <div class="lh-sm mb-1">
+                                                <code class="user-select-all"
+                                                      data-bs-toggle="tooltip"
+                                                      data-bs-title="ID iFirma"
+                                                      title="ID iFirma">ID: {{ $order->ifirma_invoice_id }}</code>
+                                            </div>
+                                        @endif
+                                        @if($case->ifirma_payment_status)
+                                            <div>
                                                 <span class="badge {{ \App\Services\IfirmaInvoicePaymentStatusService::statusBadgeClass($case->ifirma_payment_status) }}">
                                                     {{ $case->ifirmaPaymentStatusLabel() }}
                                                 </span>
-                                                @if($case->ifirma_synced_at)
-                                                    <div class="small text-muted">
-                                                        sync {{ $case->ifirma_synced_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
-                                                    </div>
-                                                @endif
-                                            @else
-                                                <span class="text-muted">Nie synchronizowano</span>
+                                            </div>
+                                            @if($case->ifirma_synced_at)
+                                                <div class="small text-muted mt-1">
+                                                    sync {{ $case->ifirma_synced_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                                                </div>
                                             @endif
-                                            <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mt-2">
-                                                @csrf
-                                                <button type="submit" class="btn btn-outline-primary btn-sm">
-                                                    <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
-                                                </button>
-                                            </form>
-                                            <div class="form-text mb-0">Tylko odczyt — nie zamyka sprawy automatycznie.</div>
-                                        </dd>
+                                        @else
+                                            <div class="small text-muted">Nie synchronizowano</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
 
-                                        <dt class="col-sm-4 text-muted">Kwota</dt>
-                                        <dd class="col-sm-8 mb-0">{{ number_format((float) ($case->amount_gross ?? $order->product_price ?? 0), 2, ',', ' ') }} zł</dd>
+                            {{-- Szkolenie --}}
+                            <div class="mb-3">
+                                <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-1">
+                                    <div class="small text-uppercase fw-bold" style="letter-spacing: .03em;">Szkolenie</div>
+                                    @if($courseDateTime || $courseInstructor !== '')
+                                        <div class="small text-muted text-end ms-auto">
+                                            @if($courseDateTime)
+                                                <span><i class="bi bi-calendar3"></i> {{ $courseDateTime }}</span>
+                                            @endif
+                                            @if($courseDateTime && $courseInstructor !== '')
+                                                <span class="mx-1">·</span>
+                                            @endif
+                                            @if($courseInstructor !== '')
+                                                <span><i class="bi bi-person"></i> {{ $courseInstructor }}</span>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                                @if($course)
+                                    <a href="{{ route('courses.show', $course->id) }}" class="fw-semibold text-decoration-none">
+                                        {{ $courseTitle }}
+                                    </a>
+                                @else
+                                    <span class="fw-semibold">{{ $courseTitle }}</span>
+                                @endif
+                            </div>
 
-                                        <dt class="col-sm-4 text-muted">Termin</dt>
-                                        <dd class="col-sm-8 mb-0">{{ $case->due_date?->format('d.m.Y') ?: '—' }}</dd>
+                            {{-- Kontakty i strony FV --}}
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <div class="border rounded-2 h-100 p-2 bg-body-tertiary bg-opacity-25">
+                                        <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Zamawiający</div>
+                                        <div class="fw-semibold">{{ $ordererName !== '' ? $ordererName : '—' }}</div>
+                                        @if($ordererEmail !== '')
+                                            <div class="small text-truncate">
+                                                <i class="bi bi-envelope"></i>
+                                                <a href="mailto:{{ $ordererEmail }}" class="text-decoration-none">{{ $ordererEmail }}</a>
+                                            </div>
+                                        @endif
+                                        @if($ordererPhoneFmt)
+                                            <div class="small">
+                                                <i class="bi bi-telephone"></i>
+                                                <a href="tel:{{ $ordererPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $ordererPhoneFmt['display'] }}</a>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded-2 h-100 p-2 bg-body-tertiary bg-opacity-25">
+                                        <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Uczestnik</div>
+                                        <div class="fw-semibold">{{ $participantName !== '' ? $participantName : '—' }}</div>
+                                        @if($participantEmail !== '')
+                                            <div class="small text-truncate">
+                                                <i class="bi bi-envelope"></i>
+                                                <a href="mailto:{{ $participantEmail }}" class="text-decoration-none">{{ $participantEmail }}</a>
+                                                @if($ordererEmail !== '' && strcasecmp($ordererEmail, $participantEmail) === 0)
+                                                    <span class="badge text-bg-light border ms-1">jak zamawiający</span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        @if($participantPhoneFmt)
+                                            <div class="small">
+                                                <i class="bi bi-telephone"></i>
+                                                <a href="tel:{{ $participantPhoneFmt['tel'] }}" class="text-decoration-none text-nowrap">{{ $participantPhoneFmt['display'] }}</a>
+                                            </div>
+                                        @elseif($ordererPhoneFmt && ($participantEmail === '' || strcasecmp($ordererEmail, $participantEmail) === 0))
+                                            <div class="small text-muted">
+                                                <i class="bi bi-telephone"></i> ten sam telefon co zamawiający
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded-2 h-100 p-2">
+                                        <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Nabywca</div>
+                                        @if($hasBuyer)
+                                            <div class="fw-semibold">{{ $order->buyer_name ?: '—' }}</div>
+                                            @if(filled($order->buyer_address))
+                                                <div class="small">{{ $order->buyer_address }}</div>
+                                            @endif
+                                            @if(filled($order->buyer_postal_code) || filled($order->buyer_city))
+                                                <div class="small">{{ trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')) }}</div>
+                                            @endif
+                                            @if(filled($order->buyer_nip))
+                                                <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->buyer_nip) }}</div>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded-2 h-100 p-2">
+                                        <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Odbiorca</div>
+                                        @if($hasRecipient)
+                                            <div class="fw-semibold">{{ $order->recipient_name ?: '—' }}</div>
+                                            @if(filled($order->recipient_address))
+                                                <div class="small">{{ $order->recipient_address }}</div>
+                                            @endif
+                                            @if(filled($order->recipient_postal_code) || filled($order->recipient_city))
+                                                <div class="small">{{ trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')) }}</div>
+                                            @endif
+                                            @if(filled($order->recipient_nip))
+                                                <div class="small">NIP: {{ preg_replace('/[^0-9]/', '', (string) $order->recipient_nip) }}</div>
+                                            @endif
+                                            @if($order->isKsefAdditionalEntityEnabled())
+                                                <div class="small text-muted">
+                                                    Podmiot3:
+                                                    {{ \App\Models\FormOrder::ksefAdditionalEntityRoleLabel($order->ksef_additional_entity_role) }}
+                                                </div>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
 
-                                        <dt class="col-sm-4 text-muted">Utworzył</dt>
-                                        <dd class="col-sm-8 mb-0">{{ $case->createdBy?->name ?: '—' }}</dd>
-
-                                        <dt class="col-sm-4 text-muted">Opiekun</dt>
-                                        <dd class="col-sm-8 mb-0">{{ $case->assignedTo?->name ?: '—' }}</dd>
-                                    </dl>
+                            {{-- Opiekunowie --}}
+                            <div class="d-flex flex-wrap justify-content-between gap-2 small pt-2 border-top">
+                                <div>
+                                    <span class="text-muted">Utworzył:</span>
+                                    {{ $case->createdBy?->name ?: '—' }}
+                                </div>
+                                <div class="ms-auto text-end">
+                                    <span class="text-muted">Opiekun:</span>
+                                    {{ $case->assignedTo?->name ?: '—' }}
                                 </div>
                             </div>
                         </div>
@@ -386,21 +482,23 @@
             <div class="row g-3 mb-3">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header fw-semibold d-flex justify-content-between align-items-center gap-2 py-2">
-                            <button type="button"
-                                    class="btn btn-link text-decoration-none text-body fw-semibold p-0 d-inline-flex align-items-center gap-2 border-0"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#caseBankPaymentsCollapse"
-                                    aria-expanded="false"
-                                    aria-controls="caseBankPaymentsCollapse"
-                                    id="caseBankPaymentsToggle">
+                        <div class="card-header fw-semibold d-flex justify-content-between align-items-center gap-2 py-2"
+                             id="caseBankPaymentsHeader"
+                             role="button"
+                             tabindex="0"
+                             aria-expanded="false"
+                             aria-controls="caseBankPaymentsCollapse"
+                             style="cursor: pointer;">
+                            <div class="d-inline-flex align-items-center gap-2 user-select-none">
                                 <i class="bi bi-chevron-right case-bank-payments-chevron" aria-hidden="true"></i>
                                 <span>Wpłaty z wyciągu</span>
                                 @if(($bankPayments ?? collect())->isNotEmpty())
                                     <span class="badge text-bg-secondary">{{ $bankPayments->count() }}</span>
                                 @endif
-                            </button>
-                            <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
+                            </div>
+                            <a href="{{ route('accounting.bank-imports.index') }}"
+                               class="btn btn-sm btn-outline-secondary"
+                               id="caseBankPaymentsImportLink">Import wyciągu</a>
                         </div>
                         <div id="caseBankPaymentsCollapse" class="collapse">
                             <div class="card-body border-bottom">
@@ -609,19 +707,28 @@
                         <div class="card-header fw-semibold">Kontakty</div>
                         <div class="card-body">
                             @forelse($case->contacts as $contact)
-                                <div class="border-bottom pb-2 mb-2">
-                                    <span class="badge text-bg-light border">{{ $contact->typeLabel() }}</span>
-                                    <span class="fw-semibold">{{ $contact->value }}</span>
-                                    @if($contact->source)
-                                        <span class="small text-muted">Źródło: {{ $contact->source }}</span>
-                                    @endif
-                                    @if($contact->notes)
-                                        <div class="small">{{ $contact->notes }}</div>
-                                    @endif
-                                    <div class="small text-muted">
-                                        <i class="bi bi-person"></i>
-                                        {{ $contact->createdBy?->name ?: 'System / brak użytkownika' }}
+                                <div class="border-bottom pb-2 mb-2 d-flex justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <span class="badge text-bg-light border">{{ $contact->typeLabel() }}</span>
+                                        <span class="fw-semibold">{{ $contact->value }}</span>
+                                        @if($contact->source)
+                                            <span class="small text-muted">Źródło: {{ $contact->source }}</span>
+                                        @endif
+                                        @if($contact->notes)
+                                            <div class="small">{{ $contact->notes }}</div>
+                                        @endif
+                                        <div class="small text-muted">
+                                            <i class="bi bi-person"></i>
+                                            {{ $contact->createdBy?->name ?: 'System / brak użytkownika' }}
+                                        </div>
                                     </div>
+                                    <button type="button"
+                                            class="btn btn-outline-danger btn-sm flex-shrink-0 case-contact-delete-btn"
+                                            data-action="{{ route('accounting.collections.contacts.destroy', [$case, $contact]) }}"
+                                            data-summary="{{ $contact->typeLabel() }}: {{ $contact->value }}"
+                                            title="Usuń kontakt">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             @empty
                                 <div class="text-muted">Brak dodatkowych kontaktów.</div>
@@ -658,7 +765,7 @@
                             </table>
                         </div>
                         <div class="card-footer small text-muted">
-                            Powiązania po NIP/e-mailu. Łącznie: {{ $profile['related_orders_count'] }} zamówień,
+                            Powiązania według reguły klienta (odbiorca → nabywca → e-mail zamawiającego). Łącznie: {{ $profile['related_orders_count'] }} zamówień,
                             {{ number_format((float) $profile['related_orders_total'], 2, ',', ' ') }} zł.
                         </div>
                     </div>
@@ -700,17 +807,136 @@
         </div>
     </div>
 
+    <div class="modal fade" id="caseContactDeleteModal" tabindex="-1" aria-labelledby="caseContactDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="caseContactDeleteForm">
+                    @csrf
+                    @method('DELETE')
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="caseContactDeleteModalLabel">Usuń kontakt</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Czy na pewno usunąć ten kontakt ze sprawy?</p>
+                        <div class="border rounded p-2 bg-light small fw-semibold" id="caseContactDeleteSummary">—</div>
+                        <div class="alert alert-warning small mt-3 mb-0">
+                            Tej operacji nie da się cofnąć.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-danger">Usuń kontakt</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <style>
-        #caseBankPaymentsToggle .case-bank-payments-chevron {
+        #caseBankPaymentsHeader .case-bank-payments-chevron {
+            display: inline-block;
             transition: transform 0.15s ease-in-out;
+            pointer-events: none;
         }
-        #caseBankPaymentsToggle[aria-expanded="true"] .case-bank-payments-chevron {
+        #caseBankPaymentsHeader[aria-expanded="true"] .case-bank-payments-chevron {
             transform: rotate(90deg);
+        }
+        .case-copy-value {
+            cursor: copy;
+        }
+        .case-copy-value:hover {
+            color: var(--bs-primary) !important;
         }
     </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            if (window.bootstrap && window.bootstrap.Tooltip) {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                    window.bootstrap.Tooltip.getOrCreateInstance(el);
+                });
+            }
+
+            function fallbackCopyText(text) {
+                var textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.setAttribute('readonly', '');
+                textArea.style.position = 'fixed';
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                var ok = false;
+                try {
+                    ok = document.execCommand('copy');
+                } catch (e) {
+                    ok = false;
+                }
+                document.body.removeChild(textArea);
+                return ok;
+            }
+
+            function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text);
+                }
+                return fallbackCopyText(text)
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('Nie udało się skopiować'));
+            }
+
+            function flashCopied(el) {
+                var tip = window.bootstrap && window.bootstrap.Tooltip
+                    ? window.bootstrap.Tooltip.getOrCreateInstance(el)
+                    : null;
+                var original = el.getAttribute('data-bs-title') || el.getAttribute('title') || 'Kliknij, aby skopiować';
+                el.setAttribute('data-bs-title', 'Skopiowano');
+                el.setAttribute('title', 'Skopiowano');
+                if (tip) {
+                    tip.setContent({ '.tooltip-inner': 'Skopiowano' });
+                    tip.show();
+                }
+                el.classList.add('text-success');
+                setTimeout(function () {
+                    el.setAttribute('data-bs-title', original);
+                    el.setAttribute('title', original);
+                    el.classList.remove('text-success');
+                    if (tip) {
+                        tip.setContent({ '.tooltip-inner': original });
+                        tip.hide();
+                    }
+                }, 1200);
+            }
+
+            document.querySelectorAll('.case-copy-value').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    var text = (el.getAttribute('data-copy-text') || '').trim();
+                    if (!text) return;
+                    copyText(text).then(function () {
+                        flashCopied(el);
+                    }).catch(function () {
+                        // cichy fallback — bez native alert
+                    });
+                });
+            });
+
+            var contactDeleteModalEl = document.getElementById('caseContactDeleteModal');
+            var contactDeleteForm = document.getElementById('caseContactDeleteForm');
+            var contactDeleteSummary = document.getElementById('caseContactDeleteSummary');
+            if (contactDeleteModalEl && contactDeleteForm && contactDeleteSummary && window.bootstrap) {
+                var contactDeleteModal = window.bootstrap.Modal.getOrCreateInstance(contactDeleteModalEl);
+                document.querySelectorAll('.case-contact-delete-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        contactDeleteForm.setAttribute('action', btn.getAttribute('data-action') || '');
+                        contactDeleteSummary.textContent = btn.getAttribute('data-summary') || '—';
+                        contactDeleteModal.show();
+                    });
+                });
+            }
+
             var modalEl = document.getElementById('bankTransactionLinkConfirmModal');
             var form = document.getElementById('bankTransactionLinkConfirmForm');
             var registerInput = document.getElementById('bankTransactionLinkRegisterIfirma');
@@ -727,6 +953,44 @@
             var searchResetBtn = document.getElementById('bankTransferSearchResetBtn');
             var searchUrl = @json(route('accounting.collections.bank-transactions.search', $case));
             var defaultAmount = amountInput ? amountInput.value : '';
+            var bankPaymentsHeader = document.getElementById('caseBankPaymentsHeader');
+            var bankPaymentsCollapseEl = document.getElementById('caseBankPaymentsCollapse');
+            var bankPaymentsImportLink = document.getElementById('caseBankPaymentsImportLink');
+
+            if (bankPaymentsHeader && bankPaymentsCollapseEl) {
+                function setBankPaymentsExpanded(expanded) {
+                    bankPaymentsCollapseEl.classList.toggle('show', expanded);
+                    bankPaymentsHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                }
+
+                function toggleBankPayments() {
+                    setBankPaymentsExpanded(!bankPaymentsCollapseEl.classList.contains('show'));
+                }
+
+                bankPaymentsHeader.addEventListener('click', function (event) {
+                    if (event.target.closest('#caseBankPaymentsImportLink')) {
+                        return;
+                    }
+                    event.preventDefault();
+                    toggleBankPayments();
+                });
+                bankPaymentsHeader.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                    }
+                    if (event.target.closest('#caseBankPaymentsImportLink')) {
+                        return;
+                    }
+                    event.preventDefault();
+                    toggleBankPayments();
+                });
+
+                if (bankPaymentsImportLink) {
+                    bankPaymentsImportLink.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                    });
+                }
+            }
 
             function esc(value) {
                 return String(value ?? '')

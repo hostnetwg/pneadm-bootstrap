@@ -219,7 +219,15 @@
                                         <span class="badge {{ $case->isVip() ? 'text-bg-warning' : 'text-bg-light border' }}">
                                             {{ $case->segmentLabel() }}
                                         </span>
-                                        <div class="small text-muted">R: {{ $case->risk_score }} / L: {{ $case->relationship_score }}</div>
+                                        <div class="small text-muted"
+                                             role="button"
+                                             tabindex="0"
+                                             data-bs-toggle="tooltip"
+                                             data-bs-placement="top"
+                                             data-bs-title="R = ryzyko (zaległości / przeterminowanie). L = lojalność / relacja (liczba i wartość powiązanych zamówień oraz opłaty online). Im wyższe L (≥60), tym VIP."
+                                             title="R = ryzyko (zaległości / przeterminowanie). L = lojalność / relacja (liczba i wartość powiązanych zamówień oraz opłaty online). Im wyższe L (≥60), tym VIP.">
+                                            R: {{ $case->risk_score }} / L: {{ $case->relationship_score }}
+                                        </div>
                                     </td>
                                     <td>
                                         <div>{{ $case->assignedTo?->name ?: '—' }}</div>
@@ -439,6 +447,12 @@
                 }
                 useOrderId(button.getAttribute('data-order-id'));
             });
+
+            if (window.bootstrap?.Tooltip) {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                    window.bootstrap.Tooltip.getOrCreateInstance(el);
+                });
+            }
         })();
     </script>
 </x-app-layout>

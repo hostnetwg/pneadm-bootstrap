@@ -560,6 +560,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::put('/{debtCase}', [AccountingController::class, 'collectionsUpdate'])->name('update');
             Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
             Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
+            Route::delete('/{debtCase}/contacts/{contact}', [AccountingController::class, 'collectionsContactDestroy'])->name('contacts.destroy');
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
             Route::get('/{debtCase}/bank-transactions/search', [AccountingController::class, 'collectionsBankTransactionSearch'])->name('bank-transactions.search');
             Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');

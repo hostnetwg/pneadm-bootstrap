@@ -28,7 +28,7 @@ Pierwszy etap obejmuje:
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,
-- alternatywne kontakty,
+- alternatywne kontakty (dodawanie i usuwanie z karty sprawy),
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
 - ostrzeżenie VIP / lojalny klient,
 - skróty z `/form-orders` i `/form-orders/{id}` do aktywnej sprawy,
@@ -60,6 +60,17 @@ Serwis `DebtCustomerProfileService` liczy osobno:
 
 - `risk_score` — aktywne zaległości i przeterminowanie,
 - `relationship_score` — liczba i wartość historycznych zamówień oraz opłacone płatności online.
+
+Powiązane zamówienia i VIP są liczone według jednej reguły „kto jest klientem”:
+
+1. Jeśli zamówienie ma `recipient_nip`, klientem jest **odbiorca** i powiązujemy tylko po NIP odbiorcy. NIP nabywcy, nazwa/adres i e-maile są wtedy ignorowane, żeby organ prowadzący nie robił VIP-a wszystkim szkołom.
+2. Jeśli odbiorca nie ma NIP, ale ma komplet: nazwa + adres + kod + miasto, klientem nadal jest **odbiorca**. Powiązanie idzie po znormalizowanym komplecie danych odbiorcy (`ul.`/`ulica`, wielkość liter, podstawowa interpunkcja/spacje) oraz pomocniczo po e-mailu zamawiającego.
+3. Jeśli nie ma odbiorcy, ale jest `buyer_nip`, klientem jest **nabywca** i powiązujemy po NIP nabywcy.
+4. Jeśli nie ma odbiorcy ani NIP nabywcy, klientem jest osoba/firma bez NIP i powiązujemy po `orderer_email`.
+
+E-mail uczestnika nie bierze udziału w tej regule, bo uczestnik szkolenia często nie jest klientem decyzyjnym. Istniejące sprawy można przeliczyć komendą `sail artisan debt-cases:recalculate-profiles` (dry-run) oraz `sail artisan debt-cases:recalculate-profiles --apply` po akceptacji wyniku. Komenda nie zmienia `manual_vip`.
+
+Ta sama reguła buduje historię powiązanych zamówień na `/accounting/debtors` (`accounting.debtors.lookup` → `DebtCustomerProfileService::relatedOrders`), na karcie sprawy oraz przy liczeniu VIP. Filtry checkboxów na debtors tylko zawężają widok po typie `link_reasons` zwróconym dla aktywnej strategii — nie łączą już OR-em NIP nabywcy / e-maili uczestnika z NIP odbiorcy.
 
 ## Synchronizacja statusu płatności z iFirma (odczyt)
 

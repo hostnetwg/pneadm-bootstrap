@@ -136,4 +136,63 @@ class AccountingDebtorsLookupKsefTest extends TestCase
         $response->assertJsonPath('selected.active_debt_case.status', 'open');
         $response->assertJsonPath('matches.0.active_debt_case.id', $case->id);
     }
+
+    public function test_lookup_history_uses_recipient_nip_strategy_like_collections(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $selected = FormOrder::create([
+            'product_name' => 'Kurs szkoła A',
+            'invoice_number' => '100/8/2026',
+            'product_price' => 400,
+            'buyer_nip' => '9999999999',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'sekretariat@school-a.test',
+        ]);
+        $sameSchool = FormOrder::create([
+            'product_name' => 'Kurs szkoła A #2',
+            'invoice_number' => '101/8/2026',
+            'product_price' => 350,
+            'buyer_nip' => '8888888888',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'inna@school-a.test',
+        ]);
+        $sameOrganOnly = FormOrder::create([
+            'product_name' => 'Kurs inna szkoła organu',
+            'invoice_number' => '102/8/2026',
+            'product_price' => 500,
+            'buyer_nip' => '9999999999',
+            'recipient_nip' => '2222222222',
+            'orderer_email' => 'inna@school-b.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Kurs tylko e-mail',
+            'invoice_number' => '103/8/2026',
+            'product_price' => 200,
+            'buyer_nip' => '7777777777',
+            'recipient_nip' => '3333333333',
+            'orderer_email' => 'sekretariat@school-a.test',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('accounting.debtors.lookup', [
+            'q' => '100/8/2026',
+            'match_mode' => 'exact',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('history.identity.strategy', 'recipient_nip');
+        $response->assertJsonPath('history.identity.recipient_nip', '1111111111');
+        $response->assertJsonPath('history.sources.related_orders', 2);
+
+        $historyIds = collect($response->json('history.orders'))->pluck('id');
+        $this->assertTrue($historyIds->contains($selected->id));
+        $this->assertTrue($historyIds->contains($sameSchool->id));
+        $this->assertFalse($historyIds->contains($sameOrganOnly->id));
+
+        $selectedRow = collect($response->json('history.orders'))->firstWhere('id', $selected->id);
+        $this->assertSame(['recipient_nip'], collect($selectedRow['link_reasons'])->pluck('key')->all());
+    }
 }
