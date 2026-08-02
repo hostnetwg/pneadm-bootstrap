@@ -451,6 +451,7 @@ class AccountingController extends Controller
             'bank_search' => ['required', 'string', 'min:2', 'max:128'],
             'bank_amount' => ['nullable', 'numeric', 'min:0'],
             'bank_after_order' => ['nullable', 'boolean'],
+            'bank_unlinked_only' => ['nullable', 'boolean'],
         ]);
 
         $search = trim($validated['bank_search']);
@@ -463,16 +464,30 @@ class AccountingController extends Controller
         }
 
         $afterOrder = $request->boolean('bank_after_order', true);
+        $unlinkedOnly = $request->boolean('bank_unlinked_only', true);
         $notBefore = $afterOrder
             ? $debtCase->formOrder?->order_date?->toDateString()
             : null;
 
         $caseAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
-        $candidates = $this->unlinkedBankTransferCandidates($search, $amount, $notBefore);
+        $candidates = $this->bankTransferCandidates($search, $amount, $notBefore, $unlinkedOnly);
 
         return response()->json([
             'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount) {
                 $amountMatches = abs((float) $candidate->amount - $caseAmount) <= 0.01;
+                $blockingMatch = $candidate->relationLoaded('matches')
+                    ? $candidate->matches->first(fn (BankTransactionMatch $match) => in_array($match->status, [
+                        BankTransactionMatch::STATUS_ACCEPTED,
+                        BankTransactionMatch::STATUS_IGNORED,
+                    ], true))
+                    : $candidate->matches()
+                        ->whereIn('status', [
+                            BankTransactionMatch::STATUS_ACCEPTED,
+                            BankTransactionMatch::STATUS_IGNORED,
+                        ])
+                        ->orderByDesc('id')
+                        ->first();
+                $isLinkable = $blockingMatch === null;
                 $summary = sprintf(
                     '#%d · %s · %s %s',
                     $candidate->id,
@@ -497,6 +512,9 @@ class AccountingController extends Controller
                     'import_filename' => $candidate->import?->original_filename,
                     'link_url' => route('accounting.collections.bank-transactions.link', [$debtCase, $candidate]),
                     'summary' => $summary,
+                    'is_linkable' => $isLinkable,
+                    'link_status' => $blockingMatch?->status,
+                    'link_status_label' => $blockingMatch?->statusLabel(),
                 ];
             })->values(),
         ]);
@@ -569,21 +587,27 @@ class AccountingController extends Controller
             ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).');
     }
 
-    private function unlinkedBankTransferCandidates(string $search, ?float $amount, ?string $notBeforeDate = null)
-    {
+    private function bankTransferCandidates(
+        string $search,
+        ?float $amount,
+        ?string $notBeforeDate = null,
+        bool $unlinkedOnly = true
+    ) {
         $search = trim($search);
         if ($search === '') {
             return collect();
         }
 
         return BankTransaction::query()
-            ->with('import')
+            ->with(['import', 'matches'])
             ->where('is_incoming', true)
-            ->whereDoesntHave('matches', function ($query) {
-                $query->whereIn('status', [
-                    BankTransactionMatch::STATUS_ACCEPTED,
-                    BankTransactionMatch::STATUS_IGNORED,
-                ]);
+            ->when($unlinkedOnly, function ($query) {
+                $query->whereDoesntHave('matches', function ($matchQuery) {
+                    $matchQuery->whereIn('status', [
+                        BankTransactionMatch::STATUS_ACCEPTED,
+                        BankTransactionMatch::STATUS_IGNORED,
+                    ]);
+                });
             })
             ->when($amount !== null, function ($query) use ($amount) {
                 $query->whereBetween('amount', [$amount - 0.01, $amount + 0.01]);

@@ -213,12 +213,23 @@
                                             <div>
                                                 <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">Faktura</div>
                                                 @if($invoiceNo)
-                                                    <button type="button"
-                                                            class="btn btn-link text-decoration-none text-body fw-semibold lh-sm text-nowrap p-0 border-0 case-copy-value"
-                                                            data-copy-text="{{ $invoiceNo }}"
-                                                            title="Kliknij, aby skopiować"
-                                                            data-bs-toggle="tooltip"
-                                                            data-bs-title="Kliknij, aby skopiować">{{ $invoiceNo }}</button>
+                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                        <button type="button"
+                                                                class="btn btn-link text-decoration-none text-body fw-semibold lh-sm text-nowrap p-0 border-0 case-copy-value"
+                                                                data-copy-text="{{ $invoiceNo }}"
+                                                                title="Kliknij, aby skopiować"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-title="Kliknij, aby skopiować">{{ $invoiceNo }}</button>
+                                                        <button type="button"
+                                                                class="btn btn-link btn-sm p-0 text-muted case-fill-bank-search"
+                                                                data-bank-search-text="{{ $invoiceNo }}"
+                                                                title="Wstaw do wyszukiwarki przelewów"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-title="Wstaw do wyszukiwarki przelewów"
+                                                                aria-label="Wstaw numer faktury do wyszukiwarki przelewów">
+                                                            <i class="bi bi-search" aria-hidden="true"></i>
+                                                        </button>
+                                                    </div>
                                                 @else
                                                     <div class="fw-semibold lh-sm text-nowrap">—</div>
                                                 @endif
@@ -226,12 +237,23 @@
                                             <div class="flex-grow-1" style="min-width: 12rem;">
                                                 <div class="text-muted small text-uppercase mb-1" style="letter-spacing: .03em;">KSeF</div>
                                                 @if($ksefNo)
-                                                    <button type="button"
-                                                            class="btn btn-link text-decoration-none text-body fw-semibold text-nowrap lh-sm p-0 border-0 case-copy-value"
-                                                            data-copy-text="{{ $ksefNo }}"
-                                                            title="Kliknij, aby skopiować"
-                                                            data-bs-toggle="tooltip"
-                                                            data-bs-title="Kliknij, aby skopiować">{{ $ksefNo }}</button>
+                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                        <button type="button"
+                                                                class="btn btn-link text-decoration-none text-body fw-semibold text-nowrap lh-sm p-0 border-0 case-copy-value"
+                                                                data-copy-text="{{ $ksefNo }}"
+                                                                title="Kliknij, aby skopiować"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-title="Kliknij, aby skopiować">{{ $ksefNo }}</button>
+                                                        <button type="button"
+                                                                class="btn btn-link btn-sm p-0 text-muted case-fill-bank-search"
+                                                                data-bank-search-text="{{ $ksefNo }}"
+                                                                title="Wstaw do wyszukiwarki przelewów"
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-title="Wstaw do wyszukiwarki przelewów"
+                                                                aria-label="Wstaw numer KSeF do wyszukiwarki przelewów">
+                                                            <i class="bi bi-search" aria-hidden="true"></i>
+                                                        </button>
+                                                    </div>
                                                 @else
                                                     <div class="fw-semibold text-nowrap lh-sm">—</div>
                                                 @endif
@@ -504,13 +526,13 @@
                             <div class="card-body border-bottom">
                                 <form id="bankTransferSearchForm" class="row g-2 align-items-end">
                                     <div class="col-12 col-lg-5">
-                                        <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
+                                        <label for="bank_search" class="form-label small mb-1">Szukaj przelewu</label>
                                         <input type="text"
                                                id="bank_search"
                                                name="bank_search"
                                                class="form-control form-control-sm"
                                                value=""
-                                               placeholder="Nadawca, opis, NIP, konto"
+                                               placeholder="Nadawca, opis, NIP, FV, KSeF, konto"
                                                maxlength="128"
                                                autocomplete="off">
                                     </div>
@@ -535,6 +557,17 @@
                                             <input class="form-check-input"
                                                    type="checkbox"
                                                    value="1"
+                                                   id="bank_unlinked_only"
+                                                   name="bank_unlinked_only"
+                                                   checked>
+                                            <label class="form-check-label small" for="bank_unlinked_only">
+                                                Szukaj tylko w nieprzypisanych
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   value="1"
                                                    id="bank_after_order"
                                                    name="bank_after_order"
                                                    @checked($bankAfterOrderDate ?? true)>
@@ -546,7 +579,7 @@
                                             </label>
                                         </div>
                                         <div class="form-text" id="bankTransferSearchStatus">
-                                            Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
+                                            Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
                                         </div>
                                     </div>
                                 </form>
@@ -848,6 +881,9 @@
         .case-copy-value:hover {
             color: var(--bs-primary) !important;
         }
+        .case-fill-bank-search:hover {
+            color: var(--bs-primary) !important;
+        }
     </style>
 
     <script>
@@ -948,6 +984,7 @@
             var searchInput = document.getElementById('bank_search');
             var amountInput = document.getElementById('bank_amount');
             var afterOrderInput = document.getElementById('bank_after_order');
+            var unlinkedOnlyInput = document.getElementById('bank_unlinked_only');
             var searchStatus = document.getElementById('bankTransferSearchStatus');
             var searchResults = document.getElementById('bankTransferSearchResults');
             var searchResetBtn = document.getElementById('bankTransferSearchResetBtn');
@@ -956,13 +993,17 @@
             var bankPaymentsHeader = document.getElementById('caseBankPaymentsHeader');
             var bankPaymentsCollapseEl = document.getElementById('caseBankPaymentsCollapse');
             var bankPaymentsImportLink = document.getElementById('caseBankPaymentsImportLink');
+            var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.';
+
+            function setBankPaymentsExpanded(expanded) {
+                if (!bankPaymentsHeader || !bankPaymentsCollapseEl) {
+                    return;
+                }
+                bankPaymentsCollapseEl.classList.toggle('show', expanded);
+                bankPaymentsHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            }
 
             if (bankPaymentsHeader && bankPaymentsCollapseEl) {
-                function setBankPaymentsExpanded(expanded) {
-                    bankPaymentsCollapseEl.classList.toggle('show', expanded);
-                    bankPaymentsHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-                }
-
                 function toggleBankPayments() {
                     setBankPaymentsExpanded(!bankPaymentsCollapseEl.classList.contains('show'));
                 }
@@ -1013,6 +1054,28 @@
                 }
 
                 var rows = candidates.map(function (c) {
+                    var actionsHtml;
+                    if (c.is_linkable === false) {
+                        actionsHtml = '<span class="badge text-bg-secondary">'
+                            + esc(c.link_status_label || 'Przypisany')
+                            + '</span>';
+                    } else {
+                        actionsHtml = '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
+                            + '<button type="button" class="btn btn-outline-primary btn-sm bank-link-confirm-btn"'
+                            + ' data-action="' + esc(c.link_url) + '"'
+                            + ' data-register-ifirma="0"'
+                            + ' data-summary="' + esc(c.summary) + '"'
+                            + ' data-description="' + esc(c.description_confirm) + '">Powiąż lokalnie</button>'
+                            + (c.amount_matches
+                                ? '<button type="button" class="btn btn-success btn-sm bank-link-confirm-btn"'
+                                  + ' data-action="' + esc(c.link_url) + '"'
+                                  + ' data-register-ifirma="1"'
+                                  + ' data-summary="' + esc(c.summary) + '"'
+                                  + ' data-description="' + esc(c.description_confirm) + '">+ wpłata iFirma</button>'
+                                : '')
+                            + '</div>';
+                    }
+
                     return '<tr>'
                         + '<td class="small">' + esc(c.operation_date || '—') + '</td>'
                         + '<td class="text-end fw-semibold text-nowrap">'
@@ -1027,21 +1090,7 @@
                         + '<a href="' + esc(c.import_url) + '" class="text-decoration-none">Import #' + esc(c.import_id) + '</a>'
                         + '<div class="text-muted">' + esc(c.import_filename || '') + '</div>'
                         + '</td>'
-                        + '<td class="text-end">'
-                        + '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
-                        + '<button type="button" class="btn btn-outline-primary btn-sm bank-link-confirm-btn"'
-                        + ' data-action="' + esc(c.link_url) + '"'
-                        + ' data-register-ifirma="0"'
-                        + ' data-summary="' + esc(c.summary) + '"'
-                        + ' data-description="' + esc(c.description_confirm) + '">Powiąż lokalnie</button>'
-                        + (c.amount_matches
-                            ? '<button type="button" class="btn btn-success btn-sm bank-link-confirm-btn"'
-                              + ' data-action="' + esc(c.link_url) + '"'
-                              + ' data-register-ifirma="1"'
-                              + ' data-summary="' + esc(c.summary) + '"'
-                              + ' data-description="' + esc(c.description_confirm) + '">+ wpłata iFirma</button>'
-                            : '')
-                        + '</div></td></tr>';
+                        + '<td class="text-end">' + actionsHtml + '</td></tr>';
                 }).join('');
 
                 searchResults.innerHTML =
@@ -1069,6 +1118,11 @@
                 } else {
                     params.set('bank_after_order', '0');
                 }
+                if (unlinkedOnlyInput && unlinkedOnlyInput.checked) {
+                    params.set('bank_unlinked_only', '1');
+                } else {
+                    params.set('bank_unlinked_only', '0');
+                }
 
                 try {
                     var response = await fetch(searchUrl + '?' + params.toString(), {
@@ -1091,6 +1145,23 @@
                 }
             }
 
+            function fillBankSearchFromCaseValue(text) {
+                var value = String(text || '').trim();
+                if (!value || !searchInput) {
+                    return;
+                }
+                setBankPaymentsExpanded(true);
+                searchInput.value = value;
+                searchInput.focus();
+                runBankTransferSearch();
+            }
+
+            document.querySelectorAll('.case-fill-bank-search').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    fillBankSearchFromCaseValue(el.getAttribute('data-bank-search-text') || '');
+                });
+            });
+
             if (searchForm) {
                 searchForm.addEventListener('submit', function (event) {
                     event.preventDefault();
@@ -1102,10 +1173,11 @@
                     if (searchInput) searchInput.value = '';
                     if (amountInput) amountInput.value = defaultAmount || '';
                     if (afterOrderInput) afterOrderInput.checked = true;
+                    if (unlinkedOnlyInput) unlinkedOnlyInput.checked = true;
                     if (searchResults) {
                         searchResults.innerHTML = '<div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>';
                     }
-                    setSearchStatus('Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.');
+                    setSearchStatus(defaultSearchHint);
                 });
             }
 

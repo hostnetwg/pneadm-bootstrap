@@ -497,7 +497,9 @@ class AccountingCollectionsTest extends TestCase
 
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
-        $show->assertSee('Szukaj niepowiązanego przelewu', false);
+        $show->assertSee('Szukaj przelewu', false);
+        $show->assertSee('bank_unlinked_only', false);
+        $show->assertSee('case-fill-bank-search', false);
         $show->assertDontSee('SPECJALNY OSRODEK KURZETNIK', false);
 
         $search = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
@@ -667,6 +669,108 @@ class AccountingCollectionsTest extends TestCase
             'bank_search' => 'X',
         ]));
         $tooShort->assertStatus(422);
+    }
+
+    public function test_bank_transfer_search_can_include_already_linked_transfers(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie linked search',
+            'product_price' => 250,
+            'order_date' => now()->subDays(8),
+            'invoice_number' => '77/8/2026',
+            'ksef_number' => '7392137630-20260802-ABCDEF000077-11',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '77/8/2026',
+            'ksef_number' => '7392137630-20260802-ABCDEF000077-11',
+            'amount_gross' => 250,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('h', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $linked = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 250,
+            'currency' => 'PLN',
+            'description' => 'FV 77/8/2026 JUZ PRZYPISANY',
+            'account_label' => 'Linked',
+            'fingerprint' => str_repeat('i', 64),
+            'is_incoming' => true,
+        ]);
+        $free = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 250,
+            'currency' => 'PLN',
+            'description' => 'FV 77/8/2026 WOLNY WPLYW',
+            'account_label' => 'Free',
+            'fingerprint' => str_repeat('j', 64),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $linked->id,
+            'debt_case_id' => $case->id,
+            'form_order_id' => $order->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['manual_case_link'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('data-bank-search-text="77/8/2026"', false);
+        $show->assertSee('data-bank-search-text="7392137630-20260802-ABCDEF000077-11"', false);
+        $show->assertSee('Szukaj tylko w nieprzypisanych', false);
+
+        $unlinkedOnly = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '77/8/2026',
+            'bank_unlinked_only' => '1',
+            'bank_after_order' => '0',
+        ]));
+        $unlinkedOnly->assertOk();
+        $unlinkedOnly->assertJsonCount(1, 'candidates');
+        $unlinkedOnly->assertJsonPath('candidates.0.id', $free->id);
+        $unlinkedOnly->assertJsonPath('candidates.0.is_linkable', true);
+
+        $allTransfers = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '77/8/2026',
+            'bank_unlinked_only' => '0',
+            'bank_after_order' => '0',
+        ]));
+        $allTransfers->assertOk();
+        $allTransfers->assertJsonCount(2, 'candidates');
+
+        $ids = collect($allTransfers->json('candidates'))->pluck('id');
+        $this->assertTrue($ids->contains($linked->id));
+        $this->assertTrue($ids->contains($free->id));
+
+        $linkedPayload = collect($allTransfers->json('candidates'))->firstWhere('id', $linked->id);
+        $this->assertFalse($linkedPayload['is_linkable']);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $linkedPayload['link_status']);
     }
 
     public function test_collections_show_has_previous_and_next_case_links(): void
