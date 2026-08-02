@@ -697,6 +697,48 @@ class BankStatementImportTest extends TestCase
         $byCity->assertJsonPath('orders.0.id', $order->id);
     }
 
+    public function test_lookup_cases_exact_invoice_does_not_match_fragment(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $exact = FormOrder::create([
+            'product_name' => 'Exact FV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '63/6/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $fragment = FormOrder::create([
+            'product_name' => 'Fragment FV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(9),
+            'invoice_number' => '263/6/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $partial = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '63/6/2026',
+            'exact' => '0',
+        ]));
+        $partial->assertOk();
+        $partialIds = collect($partial->json('orders'))->pluck('id');
+        $this->assertTrue($partialIds->contains($exact->id));
+        $this->assertTrue($partialIds->contains($fragment->id));
+
+        $exactLookup = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '63/6/2026',
+            'exact' => '1',
+        ]));
+        $exactLookup->assertOk();
+        $exactLookup->assertJsonCount(1, 'orders');
+        $exactLookup->assertJsonPath('orders.0.id', $exact->id);
+    }
+
     public function test_lookup_cases_finds_order_by_numeric_id(): void
     {
         $user = User::factory()->create([

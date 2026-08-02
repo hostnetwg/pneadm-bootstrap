@@ -510,6 +510,15 @@
                                 <i class="bi bi-search"></i> Szukaj
                             </button>
                         </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   value="1"
+                                   id="bankTxManualLookupExact">
+                            <label class="form-check-label small" for="bankTxManualLookupExact">
+                                Szukaj dokładnie wpisanego numeru (bez dopasowania fragmentu)
+                            </label>
+                        </div>
                         <div class="form-text mb-2" id="bankTxManualLookupStatus"></div>
                         <div id="bankTxManualLookupResults"></div>
                     </div>
@@ -1364,6 +1373,7 @@
 
             async function runManualCaseLookup() {
                 var input = document.getElementById('bankTxManualLookupInput');
+                var exactInput = document.getElementById('bankTxManualLookupExact');
                 var status = document.getElementById('bankTxManualLookupStatus');
                 var q = (input && input.value ? input.value : '').trim();
                 if (q.length < 1) {
@@ -1378,7 +1388,10 @@
 
                 if (status) status.textContent = 'Szukam…';
                 try {
-                    var response = await fetch(lookupCasesUrl + '?q=' + encodeURIComponent(q), {
+                    var params = new URLSearchParams();
+                    params.set('q', q);
+                    params.set('exact', (exactInput && exactInput.checked) ? '1' : '0');
+                    var response = await fetch(lookupCasesUrl + '?' + params.toString(), {
                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                     });
                     var payload = await response.json();
@@ -1395,6 +1408,31 @@
                     if (status) status.textContent = e.message || 'Nie udało się wyszukać.';
                 }
             }
+
+            (function initManualLookupExactPreference() {
+                var exactInput = document.getElementById('bankTxManualLookupExact');
+                if (!exactInput) {
+                    return;
+                }
+                var storageKey = 'accounting_bank_imports_lookup_exact_v1';
+                try {
+                    var raw = localStorage.getItem(storageKey);
+                    if (raw === '1') {
+                        exactInput.checked = true;
+                    } else if (raw === '0') {
+                        exactInput.checked = false;
+                    }
+                } catch (e) {
+                    // keep default unchecked
+                }
+                exactInput.addEventListener('change', function () {
+                    try {
+                        localStorage.setItem(storageKey, exactInput.checked ? '1' : '0');
+                    } catch (e) {
+                        // ignore
+                    }
+                });
+            })();
 
             function setFormPreviewTargets(nextTxId) {
                 ['bankTxPreviewAcceptForm', 'bankTxPreviewRejectForm', 'bankTxPreviewIgnoreForm'].forEach(function (id) {

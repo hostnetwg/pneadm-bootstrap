@@ -450,9 +450,11 @@ class BankStatementImportController extends Controller
     {
         $validated = $request->validate([
             'q' => ['required', 'string', 'min:1', 'max:128'],
+            'exact' => ['nullable', 'boolean'],
         ]);
 
         $query = trim($validated['q']);
+        $exact = $request->boolean('exact', false);
         if ($query === '') {
             throw ValidationException::withMessages([
                 'q' => 'Podaj frazę wyszukiwania.',
@@ -466,16 +468,20 @@ class BankStatementImportController extends Controller
 
         $digits = preg_replace('/\D+/', '', $query) ?: '';
 
-        $applyOrderSearch = function ($formOrderQuery) use ($query, $digits) {
-            $formOrderQuery->where(function ($inner) use ($query, $digits) {
-                $inner->where('invoice_number', 'like', "%{$query}%")
-                    ->orWhere('ksef_number', 'like', "%{$query}%")
-                    ->orWhere('buyer_name', 'like', "%{$query}%")
+        $applyOrderSearch = function ($formOrderQuery) use ($query, $digits, $exact) {
+            $formOrderQuery->where(function ($inner) use ($query, $digits, $exact) {
+                if ($exact) {
+                    $inner->where('invoice_number', $query)
+                        ->orWhere('ksef_number', $query);
+                } else {
+                    $inner->where('invoice_number', 'like', "%{$query}%")
+                        ->orWhere('ksef_number', 'like', "%{$query}%");
+                }
+
+                $inner->orWhere('buyer_name', 'like', "%{$query}%")
                     ->orWhere('recipient_name', 'like', "%{$query}%")
                     ->orWhere('orderer_name', 'like', "%{$query}%")
                     ->orWhere('orderer_email', 'like', "%{$query}%")
-                    ->orWhere('buyer_nip', 'like', "%{$query}%")
-                    ->orWhere('recipient_nip', 'like', "%{$query}%")
                     ->orWhere('product_name', 'like', "%{$query}%")
                     ->orWhere('buyer_address', 'like', "%{$query}%")
                     ->orWhere('buyer_city', 'like', "%{$query}%")
@@ -484,18 +490,36 @@ class BankStatementImportController extends Controller
                     ->orWhere('recipient_city', 'like', "%{$query}%")
                     ->orWhere('recipient_postal_code', 'like', "%{$query}%");
 
+                if ($exact) {
+                    $inner->orWhere('buyer_nip', $query)
+                        ->orWhere('recipient_nip', $query);
+                } else {
+                    $inner->orWhere('buyer_nip', 'like', "%{$query}%")
+                        ->orWhere('recipient_nip', 'like', "%{$query}%");
+                }
+
                 if (ctype_digit($query)) {
                     $inner->orWhere('id', (int) $query);
                 }
 
                 if (strlen($digits) >= 7) {
-                    $inner->orWhereRaw(
-                        "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
-                        ['%'.$digits.'%']
-                    )->orWhereRaw(
-                        "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
-                        ['%'.$digits.'%']
-                    );
+                    if ($exact) {
+                        $inner->orWhereRaw(
+                            "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') = ?",
+                            [$digits]
+                        )->orWhereRaw(
+                            "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') = ?",
+                            [$digits]
+                        );
+                    } else {
+                        $inner->orWhereRaw(
+                            "REPLACE(REPLACE(REPLACE(COALESCE(buyer_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                            ['%'.$digits.'%']
+                        )->orWhereRaw(
+                            "REPLACE(REPLACE(REPLACE(COALESCE(recipient_nip,''), '-', ''), ' ', ''), 'PL', '') LIKE ?",
+                            ['%'.$digits.'%']
+                        );
+                    }
                 }
             });
         };
@@ -514,10 +538,16 @@ class BankStatementImportController extends Controller
         $cases = DebtCase::query()
             ->active()
             ->with(['formOrder.course'])
-            ->where(function ($outer) use ($query, $applyOrderSearch) {
-                $outer->where('invoice_number', 'like', "%{$query}%")
-                    ->orWhere('ksef_number', 'like', "%{$query}%")
-                    ->orWhereHas('formOrder', $applyOrderSearch);
+            ->where(function ($outer) use ($query, $applyOrderSearch, $exact) {
+                if ($exact) {
+                    $outer->where('invoice_number', $query)
+                        ->orWhere('ksef_number', $query);
+                } else {
+                    $outer->where('invoice_number', 'like', "%{$query}%")
+                        ->orWhere('ksef_number', 'like', "%{$query}%");
+                }
+
+                $outer->orWhereHas('formOrder', $applyOrderSearch);
 
                 if (ctype_digit($query)) {
                     $outer->orWhere('id', (int) $query)
