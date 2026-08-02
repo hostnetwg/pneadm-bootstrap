@@ -585,6 +585,9 @@ class AccountingCollectionsTest extends TestCase
         $show->assertOk();
         $show->assertSee('Brak wyników — wykonaj wyszukiwanie.', false);
         $show->assertDontSee('WPLYW BEZ WYSZUKIWANIA XYZ', false);
+        $show->assertSee('id="caseBankPaymentsCollapse"', false);
+        $show->assertSee('aria-expanded="false"', false);
+        $show->assertSee('class="collapse"', false);
 
         $tooShort = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
             'debtCase' => $case,

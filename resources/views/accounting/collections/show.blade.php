@@ -384,6 +384,125 @@
             </div>
 
             <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header fw-semibold d-flex justify-content-between align-items-center gap-2 py-2">
+                            <button type="button"
+                                    class="btn btn-link text-decoration-none text-body fw-semibold p-0 d-inline-flex align-items-center gap-2 border-0"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#caseBankPaymentsCollapse"
+                                    aria-expanded="false"
+                                    aria-controls="caseBankPaymentsCollapse"
+                                    id="caseBankPaymentsToggle">
+                                <i class="bi bi-chevron-right case-bank-payments-chevron" aria-hidden="true"></i>
+                                <span>Wpłaty z wyciągu</span>
+                                @if(($bankPayments ?? collect())->isNotEmpty())
+                                    <span class="badge text-bg-secondary">{{ $bankPayments->count() }}</span>
+                                @endif
+                            </button>
+                            <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
+                        </div>
+                        <div id="caseBankPaymentsCollapse" class="collapse">
+                            <div class="card-body border-bottom">
+                                <form id="bankTransferSearchForm" class="row g-2 align-items-end">
+                                    <div class="col-12 col-lg-5">
+                                        <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
+                                        <input type="text"
+                                               id="bank_search"
+                                               name="bank_search"
+                                               class="form-control form-control-sm"
+                                               value=""
+                                               placeholder="Nadawca, opis, NIP, konto"
+                                               maxlength="128"
+                                               autocomplete="off">
+                                    </div>
+                                    <div class="col-6 col-lg-3">
+                                        <label for="bank_amount" class="form-label small mb-1">Kwota</label>
+                                        <input type="number"
+                                               step="0.01"
+                                               min="0"
+                                               id="bank_amount"
+                                               name="bank_amount"
+                                               class="form-control form-control-sm"
+                                               value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
+                                    </div>
+                                    <div class="col-6 col-lg-4 d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">
+                                            <i class="bi bi-search"></i> Szukaj przelewu
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="bankTransferSearchResetBtn">Reset</button>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   value="1"
+                                                   id="bank_after_order"
+                                                   name="bank_after_order"
+                                                   @checked($bankAfterOrderDate ?? true)>
+                                            <label class="form-check-label small" for="bank_after_order">
+                                                Tylko przelewy z datą operacji ≥ data zamówienia
+                                                @if($order?->order_date)
+                                                    ({{ $order->order_date->format('Y-m-d') }})
+                                                @endif
+                                            </label>
+                                        </div>
+                                        <div class="form-text" id="bankTransferSearchStatus">
+                                            Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <div class="mt-3" id="bankTransferSearchResults">
+                                    <div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                @if(($bankPayments ?? collect())->isEmpty())
+                                    <div class="p-3 text-muted small">Brak zaakceptowanych wpłat z wyciągu bankowego dla tej sprawy.</div>
+                                @else
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Data operacji</th>
+                                                    <th class="text-end">Kwota</th>
+                                                    <th>Opis</th>
+                                                    <th>Zaakceptował</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($bankPayments as $payment)
+                                                    @php $tx = $payment->transaction; @endphp
+                                                    <tr>
+                                                        <td class="small">{{ $tx?->operation_date?->format('Y-m-d') ?? '—' }}</td>
+                                                        <td class="text-end fw-semibold text-nowrap">
+                                                            {{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency : '—' }}
+                                                        </td>
+                                                        <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
+                                                        <td class="small">
+                                                            {{ $payment->acceptedBy?->name ?? '—' }}
+                                                            <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            @if($tx)
+                                                                <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', $tx->bank_statement_import_id) }}">Import</a>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
                 <div class="col-12 col-xl-6">
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Dodaj działanie</div>
@@ -451,111 +570,6 @@
                                     </button>
                                 </div>
                             </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
-                            <span>Wpłaty z wyciągu</span>
-                            <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
-                        </div>
-                        <div class="card-body border-bottom">
-                            <form id="bankTransferSearchForm" class="row g-2 align-items-end">
-                                <div class="col-12 col-lg-5">
-                                    <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
-                                    <input type="text"
-                                           id="bank_search"
-                                           name="bank_search"
-                                           class="form-control form-control-sm"
-                                           value=""
-                                           placeholder="Nadawca, opis, NIP, konto"
-                                           maxlength="128"
-                                           autocomplete="off">
-                                </div>
-                                <div class="col-6 col-lg-3">
-                                    <label for="bank_amount" class="form-label small mb-1">Kwota</label>
-                                    <input type="number"
-                                           step="0.01"
-                                           min="0"
-                                           id="bank_amount"
-                                           name="bank_amount"
-                                           class="form-control form-control-sm"
-                                           value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
-                                </div>
-                                <div class="col-6 col-lg-4 d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">
-                                        <i class="bi bi-search"></i> Szukaj przelewu
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="bankTransferSearchResetBtn">Reset</button>
-                                </div>
-                                <div class="col-12">
-                                    <div class="form-check">
-                                        <input class="form-check-input"
-                                               type="checkbox"
-                                               value="1"
-                                               id="bank_after_order"
-                                               name="bank_after_order"
-                                               @checked($bankAfterOrderDate ?? true)>
-                                        <label class="form-check-label small" for="bank_after_order">
-                                            Tylko przelewy z datą operacji ≥ data zamówienia
-                                            @if($order?->order_date)
-                                                ({{ $order->order_date->format('Y-m-d') }})
-                                            @endif
-                                        </label>
-                                    </div>
-                                    <div class="form-text" id="bankTransferSearchStatus">
-                                        Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
-                                    </div>
-                                </div>
-                            </form>
-
-                            <div class="mt-3" id="bankTransferSearchResults">
-                                <div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>
-                            </div>
-                        </div>
-                        <div class="card-body p-0">
-                            @if(($bankPayments ?? collect())->isEmpty())
-                                <div class="p-3 text-muted small">Brak zaakceptowanych wpłat z wyciągu bankowego dla tej sprawy.</div>
-                            @else
-                                <div class="table-responsive">
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Data operacji</th>
-                                                <th class="text-end">Kwota</th>
-                                                <th>Opis</th>
-                                                <th>Zaakceptował</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($bankPayments as $payment)
-                                                @php $tx = $payment->transaction; @endphp
-                                                <tr>
-                                                    <td class="small">{{ $tx?->operation_date?->format('Y-m-d') ?? '—' }}</td>
-                                                    <td class="text-end fw-semibold text-nowrap">
-                                                        {{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency : '—' }}
-                                                    </td>
-                                                    <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
-                                                    <td class="small">
-                                                        {{ $payment->acceptedBy?->name ?? '—' }}
-                                                        <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
-                                                    </td>
-                                                    <td class="text-end">
-                                                        @if($tx)
-                                                            <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', $tx->bank_statement_import_id) }}">Import</a>
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @endif
                         </div>
                     </div>
                 </div>
@@ -685,6 +699,15 @@
             </div>
         </div>
     </div>
+
+    <style>
+        #caseBankPaymentsToggle .case-bank-payments-chevron {
+            transition: transform 0.15s ease-in-out;
+        }
+        #caseBankPaymentsToggle[aria-expanded="true"] .case-bank-payments-chevron {
+            transform: rotate(90deg);
+        }
+    </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
