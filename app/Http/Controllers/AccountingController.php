@@ -411,19 +411,33 @@ class AccountingController extends Controller
         $bankTransferAmount = $defaultBankAmount > 0 ? round($defaultBankAmount, 2) : null;
 
         // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
-        $previousCase = DebtCase::query()
+        $previousCaseAll = DebtCase::query()
             ->where('id', '>', $debtCase->id)
             ->orderBy('id')
             ->first(['id']);
-        $nextCase = DebtCase::query()
+        $nextCaseAll = DebtCase::query()
+            ->where('id', '<', $debtCase->id)
+            ->orderByDesc('id')
+            ->first(['id']);
+        $previousCaseActive = DebtCase::query()
+            ->active()
+            ->where('id', '>', $debtCase->id)
+            ->orderBy('id')
+            ->first(['id']);
+        $nextCaseActive = DebtCase::query()
+            ->active()
             ->where('id', '<', $debtCase->id)
             ->orderByDesc('id')
             ->first(['id']);
 
         return view('accounting.collections.show', [
             'case' => $debtCase,
-            'previousCase' => $previousCase,
-            'nextCase' => $nextCase,
+            'previousCase' => $previousCaseActive,
+            'nextCase' => $nextCaseActive,
+            'previousCaseAll' => $previousCaseAll,
+            'nextCaseAll' => $nextCaseAll,
+            'previousCaseActive' => $previousCaseActive,
+            'nextCaseActive' => $nextCaseActive,
             'profile' => $profile,
             'relatedOrders' => $profileService->relatedOrders($profile['identity']),
             'statusLabels' => DebtCase::statusLabels(),

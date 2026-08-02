@@ -110,29 +110,40 @@
                         Lookup faktury
                     </a>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                    @if($previousCase)
-                        <a href="{{ route('accounting.collections.show', $previousCase) }}"
-                           class="btn btn-outline-dark btn-sm"
-                           title="Nowsza sprawa #{{ $previousCase->id }}">
-                            <i class="bi bi-chevron-left"></i> Poprzednia
-                        </a>
-                    @else
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
-                            <i class="bi bi-chevron-left"></i> Poprzednia
-                        </button>
-                    @endif
-                    @if($nextCase)
-                        <a href="{{ route('accounting.collections.show', $nextCase) }}"
-                           class="btn btn-outline-dark btn-sm"
-                           title="Starsza sprawa #{{ $nextCase->id }}">
-                            Następna <i class="bi bi-chevron-right"></i>
-                        </a>
-                    @else
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
-                            Następna <i class="bi bi-chevron-right"></i>
-                        </button>
-                    @endif
+                <div class="d-flex flex-wrap gap-2 align-items-center"
+                     id="caseNavControls"
+                     data-prev-active-url="{{ $previousCaseActive ? route('accounting.collections.show', $previousCaseActive) : '' }}"
+                     data-next-active-url="{{ $nextCaseActive ? route('accounting.collections.show', $nextCaseActive) : '' }}"
+                     data-prev-all-url="{{ $previousCaseAll ? route('accounting.collections.show', $previousCaseAll) : '' }}"
+                     data-next-all-url="{{ $nextCaseAll ? route('accounting.collections.show', $nextCaseAll) : '' }}"
+                     data-prev-active-id="{{ $previousCaseActive?->id ?? '' }}"
+                     data-next-active-id="{{ $nextCaseActive?->id ?? '' }}"
+                     data-prev-all-id="{{ $previousCaseAll?->id ?? '' }}"
+                     data-next-all-id="{{ $nextCaseAll?->id ?? '' }}">
+                    <div class="form-check mb-0 me-1">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               value="1"
+                               id="case_nav_active_only"
+                               checked>
+                        <label class="form-check-label small" for="case_nav_active_only">
+                            tylko niezamknięte
+                        </label>
+                    </div>
+                    <a href="{{ $previousCaseActive ? route('accounting.collections.show', $previousCaseActive) : '#' }}"
+                       id="caseNavPrev"
+                       class="btn btn-outline-dark btn-sm{{ $previousCaseActive ? '' : ' disabled' }}"
+                       @if(! $previousCaseActive) aria-disabled="true" tabindex="-1" @endif
+                       title="{{ $previousCaseActive ? 'Nowsza sprawa #'.$previousCaseActive->id : 'Brak nowszej sprawy' }}">
+                        <i class="bi bi-chevron-left"></i> Poprzednia
+                    </a>
+                    <a href="{{ $nextCaseActive ? route('accounting.collections.show', $nextCaseActive) : '#' }}"
+                       id="caseNavNext"
+                       class="btn btn-outline-dark btn-sm{{ $nextCaseActive ? '' : ' disabled' }}"
+                       @if(! $nextCaseActive) aria-disabled="true" tabindex="-1" @endif
+                       title="{{ $nextCaseActive ? 'Starsza sprawa #'.$nextCaseActive->id : 'Brak starszej sprawy' }}">
+                        Następna <i class="bi bi-chevron-right"></i>
+                    </a>
                 </div>
             </div>
 
@@ -915,6 +926,99 @@
                 });
             }
 
+            var caseNavControls = document.getElementById('caseNavControls');
+            var caseNavActiveOnly = document.getElementById('case_nav_active_only');
+            var caseNavPrev = document.getElementById('caseNavPrev');
+            var caseNavNext = document.getElementById('caseNavNext');
+            var caseNavActiveOnlyStorageKey = 'accounting_collections_nav_active_only_v1';
+
+            function applyCaseNavButton(btn, url, id, directionLabel) {
+                if (!btn) {
+                    return;
+                }
+                if (url) {
+                    btn.href = url;
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('aria-disabled');
+                    btn.removeAttribute('tabindex');
+                    btn.title = directionLabel + ' sprawa #' + id;
+                } else {
+                    btn.href = '#';
+                    btn.classList.add('disabled');
+                    btn.setAttribute('aria-disabled', 'true');
+                    btn.setAttribute('tabindex', '-1');
+                    btn.title = 'Brak ' + (directionLabel === 'Nowsza' ? 'nowszej' : 'starszej') + ' sprawy';
+                }
+            }
+
+            function syncCaseNavLinks() {
+                if (!caseNavControls || !caseNavActiveOnly) {
+                    return;
+                }
+                var activeOnly = caseNavActiveOnly.checked;
+                var prevUrl = activeOnly
+                    ? (caseNavControls.getAttribute('data-prev-active-url') || '')
+                    : (caseNavControls.getAttribute('data-prev-all-url') || '');
+                var nextUrl = activeOnly
+                    ? (caseNavControls.getAttribute('data-next-active-url') || '')
+                    : (caseNavControls.getAttribute('data-next-all-url') || '');
+                var prevId = activeOnly
+                    ? (caseNavControls.getAttribute('data-prev-active-id') || '')
+                    : (caseNavControls.getAttribute('data-prev-all-id') || '');
+                var nextId = activeOnly
+                    ? (caseNavControls.getAttribute('data-next-active-id') || '')
+                    : (caseNavControls.getAttribute('data-next-all-id') || '');
+
+                applyCaseNavButton(caseNavPrev, prevUrl, prevId, 'Nowsza');
+                applyCaseNavButton(caseNavNext, nextUrl, nextId, 'Starsza');
+            }
+
+            function saveCaseNavActiveOnly() {
+                if (!caseNavActiveOnly) {
+                    return;
+                }
+                try {
+                    localStorage.setItem(caseNavActiveOnlyStorageKey, caseNavActiveOnly.checked ? '1' : '0');
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            function restoreCaseNavActiveOnly() {
+                if (!caseNavActiveOnly) {
+                    return;
+                }
+                try {
+                    var raw = localStorage.getItem(caseNavActiveOnlyStorageKey);
+                    if (raw === '0') {
+                        caseNavActiveOnly.checked = false;
+                    } else if (raw === '1') {
+                        caseNavActiveOnly.checked = true;
+                    }
+                } catch (e) {
+                    // keep default checked
+                }
+                syncCaseNavLinks();
+            }
+
+            if (caseNavActiveOnly) {
+                restoreCaseNavActiveOnly();
+                caseNavActiveOnly.addEventListener('change', function () {
+                    saveCaseNavActiveOnly();
+                    syncCaseNavLinks();
+                });
+            }
+            [caseNavPrev, caseNavNext].forEach(function (btn) {
+                if (!btn) {
+                    return;
+                }
+                btn.addEventListener('click', function (event) {
+                    if (btn.classList.contains('disabled')) {
+                        event.preventDefault();
+                    }
+                });
+            });
+
             function fallbackCopyText(text) {
                 var textArea = document.createElement('textarea');
                 textArea.value = text;
@@ -1017,6 +1121,51 @@
             var bankPaymentsCollapseEl = document.getElementById('caseBankPaymentsCollapse');
             var bankPaymentsImportLink = document.getElementById('caseBankPaymentsImportLink');
             var defaultSearchHint = 'Wpisz frazę i kliknij „Szukaj przelewu”. Domyślnie wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania. Przy numerze FV/KSeF zaznacz dokładne dopasowanie (lupka przy FV/KSeF robi to automatycznie).';
+            var bankFiltersStorageKey = 'accounting_collections_bank_filters_v1';
+
+            function saveBankFilters() {
+                try {
+                    localStorage.setItem(bankFiltersStorageKey, JSON.stringify({
+                        unlinked_only: !!(unlinkedOnlyInput && unlinkedOnlyInput.checked),
+                        after_order: !!(afterOrderInput && afterOrderInput.checked),
+                        search_exact: !!(exactSearchInput && exactSearchInput.checked),
+                    }));
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            function restoreBankFilters() {
+                try {
+                    var raw = localStorage.getItem(bankFiltersStorageKey);
+                    if (!raw) {
+                        return;
+                    }
+                    var data = JSON.parse(raw);
+                    if (!data || typeof data !== 'object') {
+                        return;
+                    }
+                    if (unlinkedOnlyInput && typeof data.unlinked_only === 'boolean') {
+                        unlinkedOnlyInput.checked = data.unlinked_only;
+                    }
+                    if (afterOrderInput && typeof data.after_order === 'boolean') {
+                        afterOrderInput.checked = data.after_order;
+                    }
+                    if (exactSearchInput && typeof data.search_exact === 'boolean') {
+                        exactSearchInput.checked = data.search_exact;
+                    }
+                } catch (e) {
+                    // keep HTML defaults
+                }
+            }
+
+            restoreBankFilters();
+            [unlinkedOnlyInput, afterOrderInput, exactSearchInput].forEach(function (input) {
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('change', saveBankFilters);
+            });
 
             function setBankPaymentsExpanded(expanded) {
                 if (!bankPaymentsHeader || !bankPaymentsCollapseEl) {
@@ -1182,6 +1331,7 @@
                 searchInput.value = value;
                 if (exactSearchInput) {
                     exactSearchInput.checked = true;
+                    saveBankFilters();
                 }
                 searchInput.focus();
                 runBankTransferSearch();
@@ -1218,6 +1368,7 @@
                     if (afterOrderInput) afterOrderInput.checked = true;
                     if (unlinkedOnlyInput) unlinkedOnlyInput.checked = true;
                     if (exactSearchInput) exactSearchInput.checked = false;
+                    saveBankFilters();
                     if (searchResults) {
                         searchResults.innerHTML = '<div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>';
                     }

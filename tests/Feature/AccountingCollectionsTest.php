@@ -890,8 +890,67 @@ class AccountingCollectionsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Poprzednia', false);
         $response->assertSee('Następna', false);
+        $response->assertSee('case_nav_active_only', false);
+        $response->assertSee('tylko niezamknięte', false);
         $response->assertSee(route('accounting.collections.show', $newerCase), false);
         $response->assertSee(route('accounting.collections.show', $olderCase), false);
+        $response->assertSee('data-prev-active-url="'.route('accounting.collections.show', $newerCase).'"', false);
+        $response->assertSee('data-next-active-url="'.route('accounting.collections.show', $olderCase).'"', false);
+    }
+
+    public function test_collections_show_nav_skips_closed_cases_in_active_urls(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $oldest = FormOrder::create([
+            'product_name' => 'Najstarsza open',
+            'product_price' => 100,
+            'order_date' => now()->subDays(50),
+            'invoice_number' => '10/nav/2026',
+        ]);
+        $closed = FormOrder::create([
+            'product_name' => 'Zamknięta pomiędzy',
+            'product_price' => 150,
+            'order_date' => now()->subDays(40),
+            'invoice_number' => '11/nav/2026',
+        ]);
+        $current = FormOrder::create([
+            'product_name' => 'Bieżąca open',
+            'product_price' => 200,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '12/nav/2026',
+        ]);
+        $newestClosed = FormOrder::create([
+            'product_name' => 'Nowsza zamknięta',
+            'product_price' => 250,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '13/nav/2026',
+        ]);
+        $newestOpen = FormOrder::create([
+            'product_name' => 'Najnowsza open',
+            'product_price' => 300,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '14/nav/2026',
+        ]);
+
+        $oldestCase = DebtCase::create(['form_order_id' => $oldest->id, 'status' => DebtCase::STATUS_OPEN, 'opened_at' => now()]);
+        $closedBetween = DebtCase::create(['form_order_id' => $closed->id, 'status' => DebtCase::STATUS_CLOSED, 'opened_at' => now(), 'closed_at' => now()]);
+        $currentCase = DebtCase::create(['form_order_id' => $current->id, 'status' => DebtCase::STATUS_OPEN, 'opened_at' => now()]);
+        $newerClosed = DebtCase::create(['form_order_id' => $newestClosed->id, 'status' => DebtCase::STATUS_CLOSED, 'opened_at' => now(), 'closed_at' => now()]);
+        $newestOpenCase = DebtCase::create(['form_order_id' => $newestOpen->id, 'status' => DebtCase::STATUS_IN_PROGRESS, 'opened_at' => now()]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.show', $currentCase));
+
+        $response->assertOk();
+        $response->assertSee('data-prev-active-url="'.route('accounting.collections.show', $newestOpenCase).'"', false);
+        $response->assertSee('data-next-active-url="'.route('accounting.collections.show', $oldestCase).'"', false);
+        $response->assertSee('data-prev-all-url="'.route('accounting.collections.show', $newerClosed).'"', false);
+        $response->assertSee('data-next-all-url="'.route('accounting.collections.show', $closedBetween).'"', false);
+        $response->assertSee('accounting_collections_nav_active_only_v1', false);
+        $response->assertSee('accounting_collections_bank_filters_v1', false);
     }
 
     public function test_collections_show_displays_course_with_link_date_and_instructor(): void
