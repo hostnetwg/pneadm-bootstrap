@@ -108,49 +108,56 @@
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Utwórz sprawę</div>
                         <div class="card-body">
-                            <div class="mb-3 pb-3 border-bottom">
-                                <label for="createInvoiceLookup" class="form-label small mb-1">
-                                    <i class="bi bi-receipt"></i>
-                                    Znajdź ID zamówienia po numerze faktury / KSeF
-                                </label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text"
-                                           id="createInvoiceLookup"
-                                           class="form-control"
-                                           placeholder="np. 349/6/2026 lub 7392137630-20260724-…"
-                                           autocomplete="off"
-                                           maxlength="128">
-                                    <button type="button" class="btn btn-outline-success" id="createInvoiceLookupBtn">
-                                        <i class="bi bi-search"></i> Szukaj
-                                    </button>
-                                </div>
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" id="createInvoiceLookupExact" checked>
-                                    <label class="form-check-label small" for="createInvoiceLookupExact">
-                                        Szukaj dokładnie wpisanego numeru
+                            <div class="row g-3 align-items-start">
+                                <div class="col-12 col-md-6">
+                                    <label for="createInvoiceLookup" class="form-label small mb-1">
+                                        <i class="bi bi-receipt"></i>
+                                        Znajdź ID zamówienia po numerze faktury / KSeF
                                     </label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text"
+                                               id="createInvoiceLookup"
+                                               class="form-control"
+                                               placeholder="np. 349/6/2026 lub 7392137630-20260724-…"
+                                               autocomplete="off"
+                                               maxlength="128">
+                                        <button type="button" class="btn btn-outline-success" id="createInvoiceLookupBtn">
+                                            <i class="bi bi-search"></i> Szukaj
+                                        </button>
+                                    </div>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="createInvoiceLookupExact" checked>
+                                        <label class="form-check-label small" for="createInvoiceLookupExact">
+                                            Szukaj dokładnie wpisanego numeru
+                                        </label>
+                                    </div>
+                                    <div id="createInvoiceLookupStatus" class="form-text mt-1 mb-0">
+                                        Wpisz numer z iFirma, potem wstaw ID zamówienia obok.
+                                    </div>
                                 </div>
-                                <div id="createInvoiceLookupStatus" class="form-text mt-1 mb-0">
-                                    Wpisz numer z iFirma, potem wstaw ID zamówienia poniżej.
-                                </div>
-                                <div id="createInvoiceLookupResults" class="mt-2 d-none"></div>
-                            </div>
 
-                            <form method="POST" action="{{ route('accounting.collections.store') }}" id="createDebtCaseForm">
-                                @csrf
-                                <label for="form_order_id" class="form-label small mb-1">ID zamówienia `form_orders`</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="number" min="1" id="form_order_id" name="form_order_id" class="form-control" required>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="bi bi-plus-circle"></i> Dodaj
-                                    </button>
+                                <div class="col-12 col-md-6">
+                                    <form method="POST" action="{{ route('accounting.collections.store') }}" id="createDebtCaseForm">
+                                        @csrf
+                                        <label for="form_order_id" class="form-label small mb-1">ID zamówienia `form_orders`</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" min="1" id="form_order_id" name="form_order_id" class="form-control" required>
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="bi bi-plus-circle"></i> Dodaj
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            Status płatności potwierdzasz w iFirma; tutaj rejestrujemy działania i kontekst.
+                                        </div>
+                                    </form>
+                                    <div class="mt-2">
+                                        <a href="{{ route('accounting.debtors.index') }}" class="small">Pełny lookup faktury / historii klienta</a>
+                                    </div>
                                 </div>
-                                <div class="form-text">
-                                    Status płatności potwierdzasz w iFirma; tutaj rejestrujemy działania i kontekst.
+
+                                <div class="col-12">
+                                    <div id="createInvoiceLookupResults" class="d-none"></div>
                                 </div>
-                            </form>
-                            <div class="mt-2">
-                                <a href="{{ route('accounting.debtors.index') }}" class="small">Pełny lookup faktury / historii klienta</a>
                             </div>
                         </div>
                     </div>
