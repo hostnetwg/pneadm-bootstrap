@@ -21,6 +21,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AccountingController extends Controller
 {
@@ -407,17 +408,8 @@ class AccountingController extends Controller
         ]);
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
-        $bankTransferSearch = trim((string) $request->query('bank_search', ''));
-        $bankTransferAmount = $this->resolveBankTransferSearchAmount($request, $debtCase);
-        // Domyślnie włączone; po wysłaniu formularza (bank_filter=1) respektuj checkbox.
-        $bankAfterOrderDate = $request->has('bank_filter')
-            ? $request->boolean('bank_after_order')
-            : true;
-        $bankTransferCandidates = $this->unlinkedBankTransferCandidates(
-            $bankTransferSearch,
-            $bankTransferAmount,
-            $bankAfterOrderDate ? $debtCase->formOrder?->order_date?->toDateString() : null
-        );
+        $defaultBankAmount = (float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0);
+        $bankTransferAmount = $defaultBankAmount > 0 ? round($defaultBankAmount, 2) : null;
 
         // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
         $previousCase = DebtCase::query()
@@ -448,10 +440,66 @@ class AccountingController extends Controller
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
             'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
             'bankPayments' => $debtCase->bankTransactionMatches,
-            'bankTransferSearch' => $bankTransferSearch,
+            'bankTransferSearch' => '',
             'bankTransferAmount' => $bankTransferAmount,
-            'bankAfterOrderDate' => $bankAfterOrderDate,
-            'bankTransferCandidates' => $bankTransferCandidates,
+            'bankAfterOrderDate' => true,
+        ]);
+    }
+
+    public function collectionsBankTransactionSearch(Request $request, DebtCase $debtCase)
+    {
+        $validated = $request->validate([
+            'bank_search' => ['required', 'string', 'min:2', 'max:128'],
+            'bank_amount' => ['nullable', 'numeric', 'min:0'],
+            'bank_after_order' => ['nullable', 'boolean'],
+        ]);
+
+        $search = trim($validated['bank_search']);
+        $amount = null;
+        if (array_key_exists('bank_amount', $validated) && $validated['bank_amount'] !== null && $validated['bank_amount'] !== '') {
+            $amount = round((float) $validated['bank_amount'], 2);
+            if ($amount <= 0) {
+                $amount = null;
+            }
+        }
+
+        $afterOrder = $request->boolean('bank_after_order', true);
+        $notBefore = $afterOrder
+            ? $debtCase->formOrder?->order_date?->toDateString()
+            : null;
+
+        $caseAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
+        $candidates = $this->unlinkedBankTransferCandidates($search, $amount, $notBefore);
+
+        return response()->json([
+            'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount) {
+                $amountMatches = abs((float) $candidate->amount - $caseAmount) <= 0.01;
+                $summary = sprintf(
+                    '#%d · %s · %s %s',
+                    $candidate->id,
+                    $candidate->operation_date?->format('Y-m-d') ?? '—',
+                    number_format((float) $candidate->amount, 2, ',', ' '),
+                    $candidate->currency
+                );
+
+                return [
+                    'id' => $candidate->id,
+                    'operation_date' => $candidate->operation_date?->format('Y-m-d'),
+                    'amount' => (float) $candidate->amount,
+                    'amount_formatted' => number_format((float) $candidate->amount, 2, ',', ' '),
+                    'currency' => $candidate->currency,
+                    'amount_matches' => $amountMatches,
+                    'account_label' => $candidate->account_label,
+                    'description' => $candidate->description,
+                    'description_short' => Str::limit((string) $candidate->description, 220),
+                    'description_confirm' => Str::limit((string) $candidate->description, 180),
+                    'import_id' => $candidate->bank_statement_import_id,
+                    'import_url' => route('accounting.bank-imports.show', $candidate->bank_statement_import_id),
+                    'import_filename' => $candidate->import?->original_filename,
+                    'link_url' => route('accounting.collections.bank-transactions.link', [$debtCase, $candidate]),
+                    'summary' => $summary,
+                ];
+            })->values(),
         ]);
     }
 
@@ -522,22 +570,10 @@ class AccountingController extends Controller
             ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).');
     }
 
-    private function resolveBankTransferSearchAmount(Request $request, DebtCase $case): ?float
-    {
-        if ($request->has('bank_amount')) {
-            $raw = trim(str_replace(',', '.', (string) $request->query('bank_amount')));
-
-            return is_numeric($raw) && (float) $raw > 0 ? round((float) $raw, 2) : null;
-        }
-
-        $amount = (float) ($case->amount_gross ?? $case->formOrder?->product_price ?? 0);
-
-        return $amount > 0 ? round($amount, 2) : null;
-    }
-
     private function unlinkedBankTransferCandidates(string $search, ?float $amount, ?string $notBeforeDate = null)
     {
-        if ($search === '' && $amount === null) {
+        $search = trim($search);
+        if ($search === '') {
             return collect();
         }
 
@@ -556,12 +592,10 @@ class AccountingController extends Controller
             ->when($notBeforeDate !== null && $notBeforeDate !== '', function ($query) use ($notBeforeDate) {
                 $query->whereDate('operation_date', '>=', $notBeforeDate);
             })
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($inner) use ($search) {
-                    $inner->where('description', 'like', "%{$search}%")
-                        ->orWhere('account_label', 'like', "%{$search}%")
-                        ->orWhere('counterparty_account', 'like', "%{$search}%");
-                });
+            ->where(function ($inner) use ($search) {
+                $inner->where('description', 'like', "%{$search}%")
+                    ->orWhere('account_label', 'like', "%{$search}%")
+                    ->orWhere('counterparty_account', 'like', "%{$search}%");
             })
             ->latest('operation_date')
             ->latest('id')

@@ -423,14 +423,19 @@ class AccountingCollectionsTest extends TestCase
             'is_incoming' => true,
         ]);
 
-        $show = $this->actingAs($user)->get(route('accounting.collections.show', [
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('Szukaj niepowiązanego przelewu', false);
+        $show->assertDontSee('SPECJALNY OSRODEK KURZETNIK', false);
+
+        $search = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
             'debtCase' => $case,
             'bank_search' => 'KURZETNIK',
             'bank_amount' => '365.00',
         ]));
-        $show->assertOk();
-        $show->assertSee('Powiąż lokalnie', false);
-        $show->assertSee('SPECJALNY OSRODEK KURZETNIK', false);
+        $search->assertOk();
+        $search->assertJsonPath('candidates.0.id', $transaction->id);
+        $search->assertJsonFragment(['description_short' => 'SPECJALNY OSRODEK KURZETNIK PRZELEW ZA SZKOLENIE']);
 
         $response = $this->actingAs($user)->post(route('accounting.collections.bank-transactions.link', [$case, $transaction]));
 
@@ -505,20 +510,87 @@ class AccountingCollectionsTest extends TestCase
             'is_incoming' => true,
         ]);
 
-        $default = $this->actingAs($user)->get(route('accounting.collections.show', $case));
-        $default->assertOk();
-        $default->assertSee('bank_after_order', false);
-        $default->assertSee('PRZELEW PO ZAMOWIENIU BETA', false);
-        $default->assertDontSee('PRZELEW PRZED ZAMOWIENIEM ALPHA', false);
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('bank_after_order', false);
+        $show->assertDontSee('PRZELEW PO ZAMOWIENIU BETA', false);
+        $show->assertDontSee('PRZELEW PRZED ZAMOWIENIEM ALPHA', false);
 
-        $withoutDateFilter = $this->actingAs($user)->get(route('accounting.collections.show', [
+        $withDateFilter = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
             'debtCase' => $case,
-            'bank_filter' => '1',
+            'bank_search' => 'PRZELEW',
             'bank_amount' => '365.00',
+            'bank_after_order' => '1',
+        ]));
+        $withDateFilter->assertOk();
+        $withDateFilter->assertJsonCount(1, 'candidates');
+        $withDateFilter->assertJsonFragment(['description_short' => 'PRZELEW PO ZAMOWIENIU BETA']);
+
+        $withoutDateFilter = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => 'PRZELEW',
+            'bank_amount' => '365.00',
+            'bank_after_order' => '0',
         ]));
         $withoutDateFilter->assertOk();
-        $withoutDateFilter->assertSee('PRZELEW PO ZAMOWIENIU BETA', false);
-        $withoutDateFilter->assertSee('PRZELEW PRZED ZAMOWIENIEM ALPHA', false);
+        $withoutDateFilter->assertJsonCount(2, 'candidates');
+        $withoutDateFilter->assertJsonFragment(['description_short' => 'PRZELEW PO ZAMOWIENIU BETA']);
+        $withoutDateFilter->assertJsonFragment(['description_short' => 'PRZELEW PRZED ZAMOWIENIEM ALPHA']);
+    }
+
+    public function test_bank_transfer_search_requires_query_and_does_not_run_on_show(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie bez auto-search',
+            'product_price' => 200,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '99/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '99/8/2026',
+            'amount_gross' => 200,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('f', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 200,
+            'currency' => 'PLN',
+            'description' => 'WPLYW BEZ WYSZUKIWANIA XYZ',
+            'account_label' => 'Test',
+            'fingerprint' => str_repeat('g', 64),
+            'is_incoming' => true,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('Brak wyników — wykonaj wyszukiwanie.', false);
+        $show->assertDontSee('WPLYW BEZ WYSZUKIWANIA XYZ', false);
+
+        $tooShort = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => 'X',
+        ]));
+        $tooShort->assertStatus(422);
     }
 
     public function test_collections_show_has_previous_and_next_case_links(): void

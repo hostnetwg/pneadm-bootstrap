@@ -464,16 +464,17 @@
                             <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Import wyciągu</a>
                         </div>
                         <div class="card-body border-bottom">
-                            <form method="GET" action="{{ route('accounting.collections.show', $case) }}" class="row g-2 align-items-end">
-                                <input type="hidden" name="bank_filter" value="1">
+                            <form id="bankTransferSearchForm" class="row g-2 align-items-end">
                                 <div class="col-12 col-lg-5">
                                     <label for="bank_search" class="form-label small mb-1">Szukaj niepowiązanego przelewu</label>
                                     <input type="text"
                                            id="bank_search"
                                            name="bank_search"
                                            class="form-control form-control-sm"
-                                           value="{{ $bankTransferSearch ?? '' }}"
-                                           placeholder="Nadawca, opis, NIP, konto">
+                                           value=""
+                                           placeholder="Nadawca, opis, NIP, konto"
+                                           maxlength="128"
+                                           autocomplete="off">
                                 </div>
                                 <div class="col-6 col-lg-3">
                                     <label for="bank_amount" class="form-label small mb-1">Kwota</label>
@@ -486,10 +487,10 @@
                                            value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
                                 </div>
                                 <div class="col-6 col-lg-4 d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm">
+                                    <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">
                                         <i class="bi bi-search"></i> Szukaj przelewu
                                     </button>
-                                    <a href="{{ route('accounting.collections.show', $case) }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="bankTransferSearchResetBtn">Reset</button>
                                 </div>
                                 <div class="col-12">
                                     <div class="form-check">
@@ -506,87 +507,14 @@
                                             @endif
                                         </label>
                                     </div>
-                                    <div class="form-text">
-                                        Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
-                                        Domyślnie filtrujemy po kwocie sprawy i dacie zamówienia.
+                                    <div class="form-text" id="bankTransferSearchStatus">
+                                        Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.
                                     </div>
                                 </div>
                             </form>
 
-                            <div class="mt-3">
-                                @if(($bankTransferCandidates ?? collect())->isEmpty())
-                                    <div class="text-muted small">Brak kandydatów dla podanych kryteriów.</div>
-                                @else
-                                    <div class="table-responsive">
-                                        <table class="table table-sm align-middle mb-0">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Data</th>
-                                                    <th class="text-end">Kwota</th>
-                                                    <th>Nadawca / opis</th>
-                                                    <th>Import</th>
-                                                    <th class="text-end">Akcja</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($bankTransferCandidates as $candidate)
-                                                    @php
-                                                        $caseAmount = (float) ($case->amount_gross ?? $order->product_price ?? 0);
-                                                        $candidateAmountMatches = abs((float) $candidate->amount - $caseAmount) <= 0.01;
-                                                        $candidateSummary = sprintf(
-                                                            '#%d · %s · %s %s',
-                                                            $candidate->id,
-                                                            $candidate->operation_date?->format('Y-m-d') ?? '—',
-                                                            number_format((float) $candidate->amount, 2, ',', ' '),
-                                                            $candidate->currency
-                                                        );
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="small">{{ $candidate->operation_date?->format('Y-m-d') ?? '—' }}</td>
-                                                        <td class="text-end fw-semibold text-nowrap">
-                                                            {{ number_format((float) $candidate->amount, 2, ',', ' ') }} {{ $candidate->currency }}
-                                                            @if(! $candidateAmountMatches)
-                                                                <div class="small text-warning">inna kwota</div>
-                                                            @endif
-                                                        </td>
-                                                        <td class="small text-break" style="max-width: 34rem;">
-                                                            <div class="fw-semibold">{{ $candidate->account_label ?: '—' }}</div>
-                                                            <div>{{ \Illuminate\Support\Str::limit($candidate->description, 220) }}</div>
-                                                        </td>
-                                                        <td class="small">
-                                                            <a href="{{ route('accounting.bank-imports.show', $candidate->bank_statement_import_id) }}" class="text-decoration-none">
-                                                                Import #{{ $candidate->bank_statement_import_id }}
-                                                            </a>
-                                                            <div class="text-muted">{{ $candidate->import?->original_filename }}</div>
-                                                        </td>
-                                                        <td class="text-end">
-                                                            <div class="d-flex flex-column flex-md-row gap-1 justify-content-end">
-                                                                <button type="button"
-                                                                        class="btn btn-outline-primary btn-sm bank-link-confirm-btn"
-                                                                        data-action="{{ route('accounting.collections.bank-transactions.link', [$case, $candidate]) }}"
-                                                                        data-register-ifirma="0"
-                                                                        data-summary="{{ $candidateSummary }}"
-                                                                        data-description="{{ \Illuminate\Support\Str::limit($candidate->description, 180) }}">
-                                                                    Powiąż lokalnie
-                                                                </button>
-                                                                @if($candidateAmountMatches)
-                                                                    <button type="button"
-                                                                            class="btn btn-success btn-sm bank-link-confirm-btn"
-                                                                            data-action="{{ route('accounting.collections.bank-transactions.link', [$case, $candidate]) }}"
-                                                                            data-register-ifirma="1"
-                                                                            data-summary="{{ $candidateSummary }}"
-                                                                            data-description="{{ \Illuminate\Support\Str::limit($candidate->description, 180) }}">
-                                                                        + wpłata iFirma
-                                                                    </button>
-                                                                @endif
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                @endif
+                            <div class="mt-3" id="bankTransferSearchResults">
+                                <div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -767,26 +695,151 @@
             var descriptionEl = document.getElementById('bankTransactionLinkDescription');
             var infoEl = document.getElementById('bankTransactionLinkIfirmaInfo');
             var submitBtn = document.getElementById('bankTransactionLinkSubmit');
+            var searchForm = document.getElementById('bankTransferSearchForm');
+            var searchInput = document.getElementById('bank_search');
+            var amountInput = document.getElementById('bank_amount');
+            var afterOrderInput = document.getElementById('bank_after_order');
+            var searchStatus = document.getElementById('bankTransferSearchStatus');
+            var searchResults = document.getElementById('bankTransferSearchResults');
+            var searchResetBtn = document.getElementById('bankTransferSearchResetBtn');
+            var searchUrl = @json(route('accounting.collections.bank-transactions.search', $case));
+            var defaultAmount = amountInput ? amountInput.value : '';
+
+            function esc(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function setSearchStatus(message) {
+                if (searchStatus) searchStatus.textContent = message;
+            }
+
+            function renderCandidates(candidates) {
+                if (!searchResults) return;
+                if (!candidates.length) {
+                    searchResults.innerHTML = '<div class="text-muted small">Brak kandydatów dla podanych kryteriów.</div>';
+                    return;
+                }
+
+                var rows = candidates.map(function (c) {
+                    return '<tr>'
+                        + '<td class="small">' + esc(c.operation_date || '—') + '</td>'
+                        + '<td class="text-end fw-semibold text-nowrap">'
+                        + esc(c.amount_formatted) + ' ' + esc(c.currency)
+                        + (!c.amount_matches ? '<div class="small text-warning">inna kwota</div>' : '')
+                        + '</td>'
+                        + '<td class="small text-break" style="max-width: 34rem;">'
+                        + '<div class="fw-semibold">' + esc(c.account_label || '—') + '</div>'
+                        + '<div>' + esc(c.description_short || '—') + '</div>'
+                        + '</td>'
+                        + '<td class="small">'
+                        + '<a href="' + esc(c.import_url) + '" class="text-decoration-none">Import #' + esc(c.import_id) + '</a>'
+                        + '<div class="text-muted">' + esc(c.import_filename || '') + '</div>'
+                        + '</td>'
+                        + '<td class="text-end">'
+                        + '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
+                        + '<button type="button" class="btn btn-outline-primary btn-sm bank-link-confirm-btn"'
+                        + ' data-action="' + esc(c.link_url) + '"'
+                        + ' data-register-ifirma="0"'
+                        + ' data-summary="' + esc(c.summary) + '"'
+                        + ' data-description="' + esc(c.description_confirm) + '">Powiąż lokalnie</button>'
+                        + (c.amount_matches
+                            ? '<button type="button" class="btn btn-success btn-sm bank-link-confirm-btn"'
+                              + ' data-action="' + esc(c.link_url) + '"'
+                              + ' data-register-ifirma="1"'
+                              + ' data-summary="' + esc(c.summary) + '"'
+                              + ' data-description="' + esc(c.description_confirm) + '">+ wpłata iFirma</button>'
+                            : '')
+                        + '</div></td></tr>';
+                }).join('');
+
+                searchResults.innerHTML =
+                    '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+                    + '<thead class="table-light"><tr>'
+                    + '<th>Data</th><th class="text-end">Kwota</th><th>Nadawca / opis</th><th>Import</th><th class="text-end">Akcja</th>'
+                    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+            }
+
+            async function runBankTransferSearch() {
+                var q = (searchInput && searchInput.value ? searchInput.value : '').trim();
+                if (q.length < 2) {
+                    setSearchStatus('Wpisz co najmniej 2 znaki w pole wyszukiwania.');
+                    return;
+                }
+
+                setSearchStatus('Szukam…');
+                var params = new URLSearchParams();
+                params.set('bank_search', q);
+                if (amountInput && amountInput.value.trim() !== '') {
+                    params.set('bank_amount', amountInput.value.trim());
+                }
+                if (afterOrderInput && afterOrderInput.checked) {
+                    params.set('bank_after_order', '1');
+                } else {
+                    params.set('bank_after_order', '0');
+                }
+
+                try {
+                    var response = await fetch(searchUrl + '?' + params.toString(), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    var payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.message || 'Błąd wyszukiwania');
+                    }
+                    var candidates = payload.candidates || [];
+                    renderCandidates(candidates);
+                    setSearchStatus(candidates.length
+                        ? ('Znaleziono: ' + candidates.length)
+                        : 'Brak kandydatów dla podanych kryteriów.');
+                } catch (e) {
+                    if (searchResults) {
+                        searchResults.innerHTML = '<div class="text-danger small">Nie udało się wyszukać przelewów.</div>';
+                    }
+                    setSearchStatus(e.message || 'Nie udało się wyszukać.');
+                }
+            }
+
+            if (searchForm) {
+                searchForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    runBankTransferSearch();
+                });
+            }
+            if (searchResetBtn) {
+                searchResetBtn.addEventListener('click', function () {
+                    if (searchInput) searchInput.value = '';
+                    if (amountInput) amountInput.value = defaultAmount || '';
+                    if (afterOrderInput) afterOrderInput.checked = true;
+                    if (searchResults) {
+                        searchResults.innerHTML = '<div class="text-muted small">Brak wyników — wykonaj wyszukiwanie.</div>';
+                    }
+                    setSearchStatus('Wpisz frazę i kliknij „Szukaj przelewu”. Wyniki obejmują tylko wpływy bez zaakceptowanego/ignorowanego powiązania.');
+                });
+            }
 
             if (!modalEl || !form || !registerInput || !summaryEl || !descriptionEl || !infoEl || !submitBtn || !window.bootstrap) {
                 return;
             }
 
             var modal = new window.bootstrap.Modal(modalEl);
-            document.querySelectorAll('.bank-link-confirm-btn').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
+            document.addEventListener('click', function (event) {
+                var btn = event.target.closest('.bank-link-confirm-btn');
+                if (!btn) return;
 
-                    form.setAttribute('action', btn.getAttribute('data-action') || '');
-                    registerInput.value = registerIfirma ? '1' : '0';
-                    summaryEl.textContent = btn.getAttribute('data-summary') || '—';
-                    descriptionEl.textContent = btn.getAttribute('data-description') || '—';
-                    infoEl.classList.toggle('d-none', !registerIfirma);
-                    submitBtn.textContent = registerIfirma ? 'Powiąż + wpłata iFirma' : 'Powiąż lokalnie';
-                    submitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
-
-                    modal.show();
-                });
+                var registerIfirma = btn.getAttribute('data-register-ifirma') === '1';
+                form.setAttribute('action', btn.getAttribute('data-action') || '');
+                registerInput.value = registerIfirma ? '1' : '0';
+                summaryEl.textContent = btn.getAttribute('data-summary') || '—';
+                descriptionEl.textContent = btn.getAttribute('data-description') || '—';
+                infoEl.classList.toggle('d-none', !registerIfirma);
+                submitBtn.textContent = registerIfirma ? 'Powiąż + wpłata iFirma' : 'Powiąż lokalnie';
+                submitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
+                modal.show();
             });
         });
     </script>
