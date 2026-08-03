@@ -264,10 +264,11 @@ class AccountingController extends Controller
     public function collectionsIndex(Request $request)
     {
         // Brak parametru status → domyślnie kolejka robocza (niezamknięte).
-        // Jawne status= (puste) → wszystkie sprawy, w tym zamknięte.
-        $status = $request->has('status')
+        // status=all (lub puste status=) → wszystkie sprawy, w tym zamknięte.
+        $rawStatus = $request->has('status')
             ? (string) $request->get('status', '')
             : 'active';
+        $status = $rawStatus === '' ? 'all' : $rawStatus;
         $segment = (string) $request->get('segment', '');
         $search = trim((string) $request->get('search', ''));
 
@@ -277,7 +278,7 @@ class AccountingController extends Controller
 
         if ($status === 'active') {
             $casesQuery->active();
-        } elseif ($status !== '' && array_key_exists($status, DebtCase::statusLabels())) {
+        } elseif ($status !== 'all' && array_key_exists($status, DebtCase::statusLabels())) {
             $casesQuery->where('status', $status);
         }
 
@@ -310,7 +311,11 @@ class AccountingController extends Controller
             });
         }
 
-        $cases = $casesQuery->paginate(25)->withQueryString();
+        $cases = $casesQuery->paginate(25)->appends([
+            'search' => $search,
+            'status' => $status,
+            'segment' => $segment,
+        ]);
 
         $stats = [
             'active' => DebtCase::active()->count(),

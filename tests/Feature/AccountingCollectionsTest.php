@@ -101,7 +101,7 @@ class AccountingCollectionsTest extends TestCase
         $activeCard->assertDontSee('200/8/2026');
 
         $all = $this->actingAs($user)->get(route('accounting.collections.index', [
-            'status' => '',
+            'status' => 'all',
         ]));
         $all->assertOk();
         $all->assertSee('100/8/2026');

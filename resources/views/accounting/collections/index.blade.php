@@ -77,7 +77,7 @@
                                     <label for="status" class="form-label small mb-1">Status</label>
                                     <select id="status" name="status" class="form-select form-select-sm">
                                         <option value="active" @selected($status === 'active')>Niezamknięte</option>
-                                        <option value="" @selected($status === '')>Wszystkie</option>
+                                        <option value="all" @selected($status === 'all')>Wszystkie</option>
                                         @foreach($statusLabels as $value => $label)
                                             <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
                                         @endforeach
