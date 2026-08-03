@@ -299,9 +299,14 @@ class AccountingController extends Controller
                             ->orWhere('recipient_nip', 'like', "%{$search}%");
 
                         if (ctype_digit($search)) {
-                            $formOrderQuery->orWhereKey((int) $search);
+                            $formOrderQuery->orWhere('id', (int) $search);
                         }
                     });
+
+                if (ctype_digit($search)) {
+                    $query->orWhere('id', (int) $search)
+                        ->orWhere('form_order_id', (int) $search);
+                }
             });
         }
 

@@ -269,6 +269,48 @@ class AccountingCollectionsTest extends TestCase
         $response->assertDontSee('350/6/2026');
     }
 
+    public function test_collections_filter_finds_case_by_form_order_id(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $matchingOrder = FormOrder::create([
+            'product_name' => 'Szkolenie ID search',
+            'product_price' => 365,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '111/8/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $matchingOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $otherOrder = FormOrder::create([
+            'product_name' => 'Szkolenie inne',
+            'product_price' => 500,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '222/8/2026',
+        ]);
+        DebtCase::create([
+            'form_order_id' => $otherOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'search' => (string) $matchingOrder->id,
+            'status' => 'active',
+            'segment' => '',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('111/8/2026');
+        $response->assertDontSee('222/8/2026');
+    }
+
     public function test_settings_update_records_admin_user_in_history(): void
     {
         $user = User::factory()->create([
