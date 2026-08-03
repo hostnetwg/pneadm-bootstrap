@@ -191,6 +191,10 @@ Tracking płatności powinien zapisywać wyłącznie identyfikatory i statusy:
 
 Nie zapisywać danych karty, danych płatnika ani szczegółów bramki zawierających dane osobowe.
 
+Status płatności zamówienia formularza (`form_orders.payment_status`) jest synchronizowany z próbami bramkowymi w `online_payment_orders`.
+Dla zamówień `payment_mode = online_gateway` obowiązuje reguła: jeśli dowolna powiązana próba ma `online_payment_orders.status = paid`, zamówienie formularza pozostaje `paid`.
+Spóźnione webhooki `cancelled` / `failed` ze starszych prób nie mogą degradować opłaconego zamówienia, bo faktury, dostęp PNEDU i obsługa operacyjna korzystają z `form_orders.payment_status`.
+
 ### Faktury, KSeF I iFirma
 
 Tracking powinien zapisywać tylko neutralne metadane:
