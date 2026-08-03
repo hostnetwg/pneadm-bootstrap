@@ -506,6 +506,15 @@
                                    placeholder="np. Kurzętnik, 343/7/2026, NIP…"
                                    maxlength="128"
                                    autocomplete="off">
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    id="bankTxManualLookupClearBtn"
+                                    title="Wyczyść pole wyszukiwania"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-title="Wyczyść pole wyszukiwania"
+                                    aria-label="Wyczyść pole wyszukiwania">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>
+                            </button>
                             <button type="button" class="btn btn-outline-primary" id="bankTxManualLookupBtn">
                                 <i class="bi bi-search"></i> Szukaj
                             </button>
@@ -1559,6 +1568,7 @@
 
             var lookupBtn = document.getElementById('bankTxManualLookupBtn');
             var lookupInput = document.getElementById('bankTxManualLookupInput');
+            var lookupClearBtn = document.getElementById('bankTxManualLookupClearBtn');
             if (lookupBtn) {
                 lookupBtn.addEventListener('click', runManualCaseLookup);
             }
@@ -1567,6 +1577,22 @@
                     if (event.key === 'Enter') {
                         event.preventDefault();
                         runManualCaseLookup();
+                    }
+                });
+            }
+            if (lookupClearBtn) {
+                lookupClearBtn.addEventListener('click', function () {
+                    if (lookupInput) {
+                        lookupInput.value = '';
+                        lookupInput.focus();
+                    }
+                    var results = document.getElementById('bankTxManualLookupResults');
+                    if (results) {
+                        results.innerHTML = '';
+                    }
+                    var status = document.getElementById('bankTxManualLookupStatus');
+                    if (status) {
+                        status.textContent = '';
                     }
                 });
             }
