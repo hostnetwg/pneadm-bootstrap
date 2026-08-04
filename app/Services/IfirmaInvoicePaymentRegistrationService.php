@@ -202,6 +202,119 @@ class IfirmaInvoicePaymentRegistrationService
         ];
     }
 
+    /**
+     * Best-effort usunięcie wpłaty w iFirma (API oficjalnie dokumentuje tylko rejestrację).
+     *
+     * @return array{success: bool, message: string, attempted: bool, synced?: bool, status?: string|null}
+     */
+    public function attemptRemovePaymentForDebtCase(
+        DebtCase $case,
+        float $amount,
+        ?string $paymentDate = null,
+        ?User $user = null
+    ): array {
+        $case = $case->fresh(['formOrder']) ?? $case;
+        $case->loadMissing('formOrder');
+        $order = $case->formOrder;
+        if ($order === null) {
+            return [
+                'success' => false,
+                'attempted' => false,
+                'message' => 'Brak zamówienia — pominięto próbę usunięcia wpłaty w iFirma.',
+            ];
+        }
+
+        $this->refreshCaseInvoiceDataFromOrder($case, $order);
+
+        $snapshot = $this->statusService->fetchPaymentSnapshotForOrder(
+            $order,
+            $case->invoice_number ?: null,
+            $case->invoice_date
+        );
+
+        if (! ($snapshot['success'] ?? false)) {
+            return [
+                'success' => false,
+                'attempted' => true,
+                'message' => $snapshot['message'] ?? 'Nie udało się odnaleźć faktury w iFirma przed usunięciem wpłaty.',
+            ];
+        }
+
+        $invoiceId = trim((string) ($snapshot['invoice_id'] ?? ''));
+        $invoiceNumber = trim((string) ($snapshot['invoice_number'] ?? $order->invoice_number ?? ''));
+        $invoiceRef = $invoiceId !== '' ? $invoiceId : $this->invoiceNumberToApiPath($invoiceNumber);
+
+        if ($invoiceRef === '') {
+            return [
+                'success' => false,
+                'attempted' => false,
+                'message' => 'Brak identyfikatora faktury w iFirma — nie wykonano usunięcia wpłaty.',
+            ];
+        }
+
+        $paid = (float) ($snapshot['paid_amount'] ?? 0);
+        if ($paid <= self::AMOUNT_EPSILON) {
+            $sync = $this->statusService->syncDebtCase($case->fresh(['formOrder']), $user);
+
+            return [
+                'success' => true,
+                'attempted' => false,
+                'message' => 'W iFirma nie widać wpłaty do usunięcia (Zaplacono ≈ 0). Odświeżono status lokalnie.',
+                'synced' => (bool) ($sync['success'] ?? false),
+                'status' => $sync['status'] ?? $snapshot['status'] ?? null,
+            ];
+        }
+
+        $apiPaymentDate = $this->paymentDateAllowedForInvoice($paymentDate, $snapshot, 'prz_faktura_kraj');
+        $apiResult = $this->api->deleteInvoicePayment($invoiceRef, $amount, $apiPaymentDate, 'prz_faktura_kraj');
+
+        if (($apiResult['status'] ?? null) !== 'success') {
+            Log::warning('iFirma delete payment failed or unsupported', [
+                'debt_case_id' => $case->id,
+                'form_order_id' => $order->id,
+                'invoice_ref' => $invoiceRef,
+                'amount' => $amount,
+                'api_result' => $apiResult,
+            ]);
+
+            $sync = $this->statusService->syncDebtCase($case->fresh(['formOrder']), $user);
+
+            return [
+                'success' => false,
+                'attempted' => true,
+                'message' => ($apiResult['message'] ?? 'iFirma nie przyjęła usunięcia wpłaty.')
+                    .' Oficjalne API dokumentuje tylko dodawanie wpłat — usuń wpłatę ręcznie w panelu iFirma (FV '
+                    .($invoiceNumber !== '' ? $invoiceNumber : $invoiceRef).').',
+                'synced' => (bool) ($sync['success'] ?? false),
+                'status' => $sync['status'] ?? null,
+            ];
+        }
+
+        $case->actions()->create([
+            'user_id' => $user?->id,
+            'action_type' => DebtCaseAction::TYPE_IFIRMA_PAYMENT,
+            'channel' => 'ifirma',
+            'happened_at' => now(),
+            'note' => sprintf(
+                'Usunięto wpłatę w iFirma: %s PLN%s (ref. %s).',
+                number_format($amount, 2, ',', ' '),
+                $paymentDate ? ' z dnia '.$paymentDate : '',
+                $invoiceRef
+            ),
+        ]);
+
+        $sync = $this->statusService->syncDebtCase($case->fresh(['formOrder']), $user);
+
+        return [
+            'success' => true,
+            'attempted' => true,
+            'message' => 'Usunięto wpłatę w iFirma. Status lokalny: '
+                .(isset($sync['status_label']) ? (string) $sync['status_label'] : (string) ($sync['status'] ?? '—')).'.',
+            'synced' => (bool) ($sync['success'] ?? false),
+            'status' => $sync['status'] ?? null,
+        ];
+    }
+
     public function invoiceNumberToApiPath(string $invoiceNumber): string
     {
         $number = trim($invoiceNumber);

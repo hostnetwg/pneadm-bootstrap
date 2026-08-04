@@ -287,7 +287,8 @@
                                                         data-can-act="ignore-tx"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
                                                     @else
-                                                        data-can-act="0"
+                                                        data-can-act="accepted"
+                                                        data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $accepted]) }}"
                                                         data-register-ifirma-url="{{ route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $accepted]) }}"
                                                     @endif
                                                     title="Podgląd przelewu i zamówienia"
@@ -373,6 +374,15 @@
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary">Ignoruj transakcję</button>
                                                     </form>
+                                                @else
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#bankImportUnlinkModal"
+                                                            data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $accepted]) }}"
+                                                            data-unlink-summary="{{ number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency.' · '.($tx->operation_date?->format('Y-m-d') ?? '—') }}{{ $accepted->debt_case_id ? ' · sprawa #'.$accepted->debt_case_id : '' }}">
+                                                        Cofnij przypisanie
+                                                    </button>
                                                 @endif
                                             </div>
                                         </td>
@@ -562,9 +572,48 @@
                             <input type="hidden" name="preview" value="">
                             <button type="submit" class="btn btn-outline-secondary" id="bankTxPreviewIgnoreBtn">Ignoruj</button>
                         </form>
+                        <button type="button"
+                                class="btn btn-outline-danger d-none"
+                                id="bankTxPreviewUnlinkBtn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#bankImportUnlinkModal"
+                                data-unlink-url=""
+                                data-unlink-summary="">
+                            Cofnij przypisanie
+                        </button>
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankImportUnlinkModal" tabindex="-1" aria-labelledby="bankImportUnlinkModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankImportUnlinkForm">
+                    @csrf
+                    <input type="hidden" name="filter" value="{{ $filter }}">
+                    <div class="modal-header text-bg-danger">
+                        <h5 class="modal-title" id="bankImportUnlinkModalLabel">Cofnij przypisanie przelewu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Odpiąć zaakceptowane powiązanie przelewu ze sprawą / fakturą?</p>
+                        <div class="border rounded p-2 bg-light small mb-3" id="bankImportUnlinkSummary">—</div>
+                        <div class="alert alert-warning small mb-0">
+                            <ul class="mb-0 ps-3">
+                                <li>Przelew wróci do kolejki nieprzypisanych wpływów.</li>
+                                <li>Jeśli sprawa jest zamknięta — zostanie <strong>otwarta ponownie</strong>.</li>
+                                <li>System <strong>spróbuje usunąć wpłatę w iFirma</strong>. Gdy API nie pozwoli, popraw status ręcznie w panelu iFirma.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">Cofnij przypisanie</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1458,12 +1507,17 @@
                 var rejectForm = document.getElementById('bankTxPreviewRejectForm');
                 var ignoreForm = document.getElementById('bankTxPreviewIgnoreForm');
                 var ignoreBtn = document.getElementById('bankTxPreviewIgnoreBtn');
+                var unlinkBtn = document.getElementById('bankTxPreviewUnlinkBtn');
                 var buttons = previewButtons();
                 var idx = buttons.indexOf(btn);
                 var nextBtn = idx >= 0 && idx < buttons.length - 1 ? buttons[idx + 1] : null;
                 var nextTxId = nextBtn ? (nextBtn.getAttribute('data-tx-id') || '') : '';
 
                 setFormPreviewTargets(nextTxId);
+
+                if (unlinkBtn) {
+                    unlinkBtn.classList.add('d-none');
+                }
 
                 if (canAct === 'match') {
                     acceptForm.classList.remove('d-none');
@@ -1493,6 +1547,27 @@
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj transakcję';
                     setManualLinkPanelVisible(true);
+                } else if (canAct === 'accepted') {
+                    acceptForm.classList.add('d-none');
+                    rejectForm.classList.add('d-none');
+                    ignoreForm.classList.add('d-none');
+                    acceptForm.removeAttribute('data-amount-mismatch');
+                    acceptForm.removeAttribute('data-accept-confirmed');
+                    setRegisterIfirma(acceptForm, false);
+                    setIfirmaAlreadyPaid(acceptForm, false);
+                    setManualLinkPanelVisible(false);
+                    if (unlinkBtn) {
+                        unlinkBtn.classList.remove('d-none');
+                        unlinkBtn.setAttribute('data-unlink-url', btn.getAttribute('data-unlink-url') || '');
+                        var preview = {};
+                        try { preview = JSON.parse(btn.getAttribute('data-preview') || '{}'); } catch (e) {}
+                        var summary = ((preview.tx && preview.tx.amount) ? preview.tx.amount : '')
+                            + ((preview.tx && preview.tx.date) ? ' · ' + preview.tx.date : '');
+                        if (preview.match && preview.match.debt_case_id) {
+                            summary += ' · sprawa #' + preview.match.debt_case_id;
+                        }
+                        unlinkBtn.setAttribute('data-unlink-summary', summary || ('przelew #' + (btn.getAttribute('data-tx-id') || '')));
+                    }
                 } else {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');
@@ -1658,6 +1733,20 @@
             if (clearPeekBtn) {
                 clearPeekBtn.addEventListener('click', function () {
                     clearPeekState(true);
+                });
+            }
+
+            var unlinkModalEl = document.getElementById('bankImportUnlinkModal');
+            var unlinkForm = document.getElementById('bankImportUnlinkForm');
+            var unlinkSummary = document.getElementById('bankImportUnlinkSummary');
+            if (unlinkModalEl && unlinkForm) {
+                unlinkModalEl.addEventListener('show.bs.modal', function (event) {
+                    var btn = event.relatedTarget;
+                    if (!btn) return;
+                    unlinkForm.setAttribute('action', btn.getAttribute('data-unlink-url') || '');
+                    if (unlinkSummary) {
+                        unlinkSummary.textContent = btn.getAttribute('data-unlink-summary') || '—';
+                    }
                 });
             }
 

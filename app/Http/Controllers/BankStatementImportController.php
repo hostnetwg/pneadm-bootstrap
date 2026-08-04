@@ -9,6 +9,7 @@ use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\User;
 use App\Services\Bank\BankStatementImportService;
+use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
@@ -417,6 +418,37 @@ class BankStatementImportController extends Controller
         $importService->rejectMatch($match);
 
         return $this->redirectAfterReview($request, $bankImport, 'Odrzucono sugestię dopasowania.');
+    }
+
+    public function unlink(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransactionMatch $match,
+        BankTransactionUnlinkService $unlinkService
+    ) {
+        $this->assertMatchBelongsToImport($bankImport, $match);
+
+        try {
+            $result = $unlinkService->unlinkAcceptedMatch($match, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return $this->redirectAfterReview($request, $bankImport, $e->getMessage())
+                ->with('warning', $e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                'Nie udało się cofnąć przypisania: '.$e->getMessage()
+            )->with('warning', $e->getMessage());
+        }
+
+        $redirect = $this->redirectAfterReview($request, $bankImport, $result['message']);
+        if (! empty($result['warning'])) {
+            $redirect->with('warning', $result['warning']);
+        }
+
+        return $redirect;
     }
 
     public function ignoreMatch(

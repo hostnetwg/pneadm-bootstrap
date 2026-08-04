@@ -434,6 +434,130 @@ class IfirmaApiService
     }
 
     /**
+     * Best-effort usunięcie wpłaty z faktury.
+     *
+     * Oficjalna dokumentacja iFirma opisuje tylko POST rejestracji wpłat.
+     * Próbujemy DELETE na tym samym zasobie — gdy API odrzuci, caller musi
+     * poinformować operatora o ręcznej korekcie w panelu iFirma.
+     *
+     * @return array Wynik żądania (status success|error|exception)
+     */
+    public function deleteInvoicePayment(
+        string $invoiceRef,
+        float $amount,
+        ?string $paymentDate = null,
+        string $invoiceType = 'prz_faktura_kraj'
+    ): array {
+        $invoiceRef = trim($invoiceRef);
+        $invoiceType = trim($invoiceType) !== '' ? trim($invoiceType) : 'prz_faktura_kraj';
+
+        if ($invoiceRef === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Brak numeru/identyfikatora faktury do usunięcia wpłaty.',
+            ];
+        }
+
+        $payload = [
+            'Kwota' => round($amount, 2),
+        ];
+        if ($paymentDate !== null && trim($paymentDate) !== '') {
+            $payload['Data'] = trim($paymentDate);
+        }
+
+        $endpoint = 'faktury/wplaty/'.$invoiceType.'/'.$invoiceRef.'.json';
+
+        return $this->delete($endpoint, $payload, 'faktura');
+    }
+
+    /**
+     * Wykonuje żądanie DELETE do API iFirma (HMAC jak przy POST).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{status: string, status_code?: int, message?: string, data?: mixed, raw_response?: string}
+     */
+    public function delete(string $endpoint, array $data = [], string $keyName = 'faktura'): array
+    {
+        try {
+            if (! str_ends_with($endpoint, '.json')) {
+                $endpoint .= '.json';
+            }
+            $fullUrl = $this->baseUrl.$this->apiEndpoint.'/'.$endpoint;
+            $requestContent = $data === []
+                ? ''
+                : json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            if ($requestContent === false) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Nie udało się zakodować JSON dla DELETE iFirma.',
+                ];
+            }
+            $requestContent = str_replace(["\r\n", "\r"], "\n", $requestContent);
+            $authHeader = $this->generateAuthHeader($fullUrl, $keyName, $requestContent);
+
+            Log::info('iFirma API Request (DELETE)', [
+                'url' => $fullUrl,
+                'key_name' => $keyName,
+                'endpoint' => $endpoint,
+            ]);
+
+            $pending = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authentication' => $authHeader,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ]);
+
+            $response = $requestContent === ''
+                ? $pending->delete($fullUrl)
+                : $pending->withBody($requestContent, 'application/json')->delete($fullUrl);
+
+            $statusCode = $response->status();
+            $body = $response->body();
+            $jsonData = $response->successful() ? $response->json() : null;
+
+            $hasErrorInResponse = false;
+            $errorMessage = null;
+            if ($jsonData !== null && isset($jsonData['response'])) {
+                $apiResponse = $jsonData['response'];
+                if (isset($apiResponse['Kod']) && $apiResponse['Kod'] != 0 && $apiResponse['Kod'] != 200) {
+                    $hasErrorInResponse = true;
+                    $errorMessage = $apiResponse['Informacja'] ?? 'Błąd API iFirma';
+                }
+            }
+
+            if ($response->successful() && ! $hasErrorInResponse) {
+                return [
+                    'status' => 'success',
+                    'status_code' => $statusCode,
+                    'data' => $jsonData,
+                    'raw_response' => $body,
+                ];
+            }
+
+            return [
+                'status' => 'error',
+                'status_code' => $hasErrorInResponse ? ($jsonData['response']['Kod'] ?? $statusCode) : $statusCode,
+                'message' => $hasErrorInResponse
+                    ? $errorMessage
+                    : ($this->parseErrorMessage($body) ?: 'iFirma odrzuciła usunięcie wpłaty (HTTP '.$statusCode.').'),
+                'raw_response' => $body,
+            ];
+        } catch (Exception $e) {
+            Log::error('iFirma API DELETE Exception', [
+                'message' => $e->getMessage(),
+                'endpoint' => $endpoint,
+            ]);
+
+            return [
+                'status' => 'exception',
+                'message' => $e->getMessage(),
+                'error_type' => get_class($e),
+            ];
+        }
+    }
+
+    /**
      * Lista dokumentów sprzedaży (GET faktury.json).
      *
      * @param  array<string, mixed>  $params  dataOd (wymagane), dataDo, status, strona, iloscNaStronie, …

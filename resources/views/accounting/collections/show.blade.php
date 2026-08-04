@@ -678,7 +678,15 @@
                                                             {{ $payment->acceptedBy?->name ?? '—' }}
                                                             <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
                                                         </td>
-                                                        <td class="text-end">
+                                                        <td class="text-end text-nowrap">
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-danger"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#bankPaymentUnlinkModal"
+                                                                    data-unlink-url="{{ route('accounting.collections.bank-matches.unlink', [$case, $payment]) }}"
+                                                                    data-unlink-summary="{{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency.' · '.($tx->operation_date?->format('Y-m-d') ?? '—') : 'przelew #'.$payment->id }}">
+                                                                Cofnij
+                                                            </button>
                                                             @if($tx)
                                                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', $tx->bank_statement_import_id) }}">Import</a>
                                                             @endif
@@ -865,6 +873,38 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankPaymentUnlinkModal" tabindex="-1" aria-labelledby="bankPaymentUnlinkModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankPaymentUnlinkForm">
+                    @csrf
+                    <div class="modal-header text-bg-danger">
+                        <h5 class="modal-title" id="bankPaymentUnlinkModalLabel">Cofnij przypisanie przelewu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            Odpiąć przelew od sprawy <strong>#{{ $case->id }}</strong>
+                            (FV {{ $case->invoice_number ?: $order->invoice_number ?: '—' }})?
+                        </p>
+                        <div class="border rounded p-2 bg-light small mb-3" id="bankPaymentUnlinkSummary">—</div>
+                        <div class="alert alert-warning small mb-0">
+                            <ul class="mb-0 ps-3">
+                                <li>Przelew wróci do kolejki nieprzypisanych wpływów.</li>
+                                <li>Jeśli sprawa jest zamknięta — zostanie <strong>otwarta ponownie</strong>.</li>
+                                <li>System <strong>spróbuje usunąć wpłatę w iFirma</strong>. Oficjalne API iFirma dokumentuje tylko dodawanie wpłat — gdy usunięcie się nie uda, popraw status ręcznie w panelu iFirma.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">Cofnij przypisanie</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1113,6 +1153,20 @@
                     });
                 });
             });
+
+            var unlinkModalEl = document.getElementById('bankPaymentUnlinkModal');
+            var unlinkForm = document.getElementById('bankPaymentUnlinkForm');
+            var unlinkSummary = document.getElementById('bankPaymentUnlinkSummary');
+            if (unlinkModalEl && unlinkForm) {
+                unlinkModalEl.addEventListener('show.bs.modal', function (event) {
+                    var btn = event.relatedTarget;
+                    if (!btn) return;
+                    unlinkForm.setAttribute('action', btn.getAttribute('data-unlink-url') || '');
+                    if (unlinkSummary) {
+                        unlinkSummary.textContent = btn.getAttribute('data-unlink-summary') || '—';
+                    }
+                });
+            }
 
             var contactDeleteModalEl = document.getElementById('caseContactDeleteModal');
             var contactDeleteForm = document.getElementById('caseContactDeleteForm');

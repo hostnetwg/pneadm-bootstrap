@@ -13,6 +13,7 @@ use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Models\RevenueRecord;
 use App\Services\Bank\BankStatementImportService;
+use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
 use App\Services\DebtCustomerProfileService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
@@ -458,6 +459,7 @@ class AccountingController extends Controller
                     DebtCaseAction::TYPE_STATUS_UPDATE,
                     DebtCaseAction::TYPE_IFIRMA_SYNC,
                     DebtCaseAction::TYPE_BANK_MATCH,
+                    DebtCaseAction::TYPE_BANK_UNMATCH,
                 ])
                 ->all(),
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
@@ -611,6 +613,41 @@ class AccountingController extends Controller
         return redirect()
             ->route('accounting.collections.show', $debtCase)
             ->with('success', $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).');
+    }
+
+    public function collectionsBankTransactionUnlink(
+        Request $request,
+        DebtCase $debtCase,
+        BankTransactionMatch $match,
+        BankTransactionUnlinkService $unlinkService
+    ) {
+        if ((int) $match->debt_case_id !== (int) $debtCase->id) {
+            abort(404);
+        }
+
+        try {
+            $result = $unlinkService->unlinkAcceptedMatch($match, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withErrors(['bank_transaction' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withErrors(['bank_transaction' => 'Nie udało się cofnąć przypisania: '.$e->getMessage()]);
+        }
+
+        $redirect = redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', $result['message']);
+
+        if (! empty($result['warning'])) {
+            $redirect->with('warning', $result['warning']);
+        }
+
+        return $redirect;
     }
 
     private function bankTransferCandidates(
