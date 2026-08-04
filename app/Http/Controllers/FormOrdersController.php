@@ -15,8 +15,8 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -1743,6 +1743,18 @@ class FormOrdersController extends Controller
                 'error' => 'Wystąpił błąd podczas przetwarzania: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * HTML panelu statusu operacyjnego (show) — do odświeżenia AJAX po wystawieniu FV bez przeładowania strony.
+     */
+    public function operationalStatusPartial(int $id)
+    {
+        $zamowienie = FormOrder::query()->findOrFail($id);
+
+        return view('form-orders.partials.operational-status-panel', [
+            'zamowienie' => $zamowienie,
+        ]);
     }
 
     /**

@@ -22,6 +22,10 @@ Rollback kolumn (np. na stagingu): `sail artisan migrate:rollback --step=1` (prz
 
 Pełny opis flow (participants → ClickMeeting → e-mail, tokeny, linki live): **[FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md)**.
 
+## Status operacyjny na karcie zamówienia
+
+Po wystawieniu FV przez iFirma (AJAX) panel **Status operacyjny** na `/form-orders/{id}` odświeża się bez przeładowania strony (`GET form-orders/{id}/operational-status`). Dzięki temu znika m.in. ostrzeżenie „Uczestnik dodany…, ale faktura nie została wystawiona.” zaraz po pojawieniu się numeru FV w polu.
+
 ## Stare skrypty zewnętrzne
 
 Jeśli masz PHP/SQL poza tymi repozytoriami, które jeszcze odwołują się do `form_orders.participant_*`, zaktualizuj je do **`form_order_participants`**.

@@ -227,4 +227,37 @@ class FormOrderOperationalStatusTest extends TestCase
         $this->assertNotNull($order->cancelled_at);
         $this->assertSame('rezygnacja', $order->cancelled_reason);
     }
+
+    public function test_operational_status_partial_updates_after_invoice(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $courseId = $this->createCourse();
+        $order = $this->createOrderWithParticipant($courseId);
+
+        $participant = Participant::create([
+            'course_id' => $courseId,
+            'first_name' => 'Jan',
+            'last_name' => 'Kowalski',
+            'email' => 'jan@example.test',
+            'order' => 1,
+        ]);
+
+        FormOrderParticipant::where('form_order_id', $order->id)->update(['participant_id' => $participant->id]);
+
+        $before = $this->actingAs($user)->get(route('form-orders.operational-status', $order->id));
+        $before->assertOk();
+        $before->assertSee('Uczestnik dodany do szkolenia, ale faktura nie została wystawiona.', false);
+        $before->assertSee('Do wystawienia FV', false);
+
+        $order->update(['invoice_number' => 'FV/99/2026']);
+
+        $after = $this->actingAs($user)->get(route('form-orders.operational-status', $order->id));
+        $after->assertOk();
+        $after->assertDontSee('Uczestnik dodany do szkolenia, ale faktura nie została wystawiona.', false);
+        $after->assertSee('Przetworzone', false);
+    }
 }

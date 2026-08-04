@@ -230,6 +230,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/invoice-exempt/clear', [FormOrdersController::class, 'clearInvoiceExempt'])->name('invoice-exempt.clear');
             Route::post('/{id}/pnedu/extend-access', [FormOrdersController::class, 'extendPneduAccess'])->name('pnedu.extend-access');
             Route::post('/{id}/pnedu/reset', [FormOrdersController::class, 'resetPneduStatus'])->name('pnedu.reset');
+            Route::get('/{id}/operational-status', [FormOrdersController::class, 'operationalStatusPartial'])->name('operational-status');
             Route::get('/{id}/ifirma/check-invoice', [FormOrdersController::class, 'checkInvoiceStatus'])->name('ifirma.check-invoice');
             Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');
             Route::post('/{id}/ifirma/invoice', [FormOrdersController::class, 'createIfirmaInvoice'])->name('ifirma.invoice');

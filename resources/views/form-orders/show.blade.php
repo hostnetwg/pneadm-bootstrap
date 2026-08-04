@@ -679,44 +679,10 @@ nowoczesna-edukacja.pl </div>
                             </h6>
                         </div>
                         <div class="card-body py-2">
-                            <div class="border-bottom pb-2 mb-3">
-                                <div class="small text-muted fw-semibold mb-2">
-                                    <i class="bi bi-clipboard-check"></i> Status operacyjny
-                                </div>
-                                @include('form-orders.partials.operational-status', [
+                            <div class="border-bottom pb-2 mb-3" id="operationalStatusPanel">
+                                @include('form-orders.partials.operational-status-panel', [
                                     'zamowienie' => $zamowienie,
-                                    'hide_invoice_badge' => true,
                                 ])
-                                <div class="d-flex flex-wrap gap-2 mt-2">
-                                    @if($zamowienie->cancelled_at)
-                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#restoreOrderModal">
-                                            <i class="bi bi-arrow-counterclockwise"></i> Przywróć zamówienie
-                                        </button>
-                                    @else
-                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
-                                            <i class="bi bi-x-circle"></i> Anuluj zamówienie
-                                        </button>
-                                        @if($zamowienie->isInvoiceExempt())
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#clearInvoiceExemptModal">
-                                                <i class="bi bi-receipt-cutoff"></i> Cofnij „bez FV”
-                                            </button>
-                                        @elseif(!$zamowienie->has_invoice)
-                                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#invoiceExemptModal">
-                                                <i class="bi bi-gift"></i> Bezpłatny dostęp — bez FV
-                                            </button>
-                                        @endif
-                                    @endif
-                                </div>
-                                @if($zamowienie->isInvoiceExempt())
-                                    <p class="small text-muted mb-0 mt-2">
-                                        <i class="bi bi-info-circle"></i>
-                                        Oznaczone jako bez faktury
-                                        {{ $zamowienie->invoice_exempt_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
-                                        @if($zamowienie->invoice_exempt_reason)
-                                            — {{ $zamowienie->invoice_exempt_reason }}
-                                        @endif
-                                    </p>
-                                @endif
                             </div>
                             <div class="border-bottom pb-2 mb-3">
                                 <div class="small text-muted fw-semibold mb-2">
@@ -1616,30 +1582,7 @@ nowoczesna-edukacja.pl `;
                     // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
                     // Tylko dla Faktury krajowej (nie PRO-FORMA) - Faktura zapisuje się w invoice_number
                     if (data.invoice_number) {
-                        const invoiceNumberInput = document.getElementById('invoice_number');
-                        if (invoiceNumberInput) {
-                            invoiceNumberInput.value = data.invoice_number;
-                            
-                            // Zmień czerwone podświetlenie na zielone (trwale)
-                            // Usuń klasy czerwone
-                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
-                            // Usuń czerwone style inline
-                            invoiceNumberInput.style.borderWidth = '';
-                            invoiceNumberInput.style.boxShadow = '';
-                            
-                            // Dodaj klasy zielone (Bootstrap)
-                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
-                            // Dodaj zielony box-shadow
-                            invoiceNumberInput.style.borderWidth = '2px';
-                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
-                            
-                            // Dodatkowy wizualny efekt - podświetlenie tła na zielono na moment
-                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
-                            invoiceNumberInput.style.backgroundColor = '#d4edda';
-                            setTimeout(() => {
-                                invoiceNumberInput.style.backgroundColor = '';
-                            }, 2000);
-                        }
+                        applyInvoiceNumberFieldValue(data.invoice_number);
                         
                         // Zmień alert "ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!" na zielony komunikat
                         const orderStatusAlert = document.getElementById('orderStatusAlert');
@@ -1926,25 +1869,7 @@ nowoczesna-edukacja.pl `;
                     
                     // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
                     if (data.invoice_number) {
-                        const invoiceNumberInput = document.getElementById('invoice_number');
-                        if (invoiceNumberInput) {
-                            invoiceNumberInput.value = data.invoice_number;
-                            
-                            // Zmień podświetlenie na zielone
-                            invoiceNumberInput.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
-                            invoiceNumberInput.style.borderWidth = '';
-                            invoiceNumberInput.style.boxShadow = '';
-                            invoiceNumberInput.classList.add('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
-                            invoiceNumberInput.style.borderWidth = '2px';
-                            invoiceNumberInput.style.boxShadow = '0 0 0 0.2rem rgba(25, 135, 84, 0.25)';
-                            
-                            // Wizualny efekt - podświetlenie tła na zielono na moment
-                            invoiceNumberInput.style.transition = 'background-color 0.3s, border-color 0.3s, box-shadow 0.3s';
-                            invoiceNumberInput.style.backgroundColor = '#d4edda';
-                            setTimeout(() => {
-                                invoiceNumberInput.style.backgroundColor = '';
-                            }, 2000);
-                        }
+                        applyInvoiceNumberFieldValue(data.invoice_number);
                     }
                     if (data.invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.invoice_id);
@@ -2101,6 +2026,33 @@ nowoczesna-edukacja.pl `;
             createIfirmaInvoiceWithKsef(orderId, true);
         }
 
+        function refreshOperationalStatusPanel() {
+            const panel = document.getElementById('operationalStatusPanel');
+            if (!panel) {
+                return;
+            }
+            const orderId = {{ (int) $zamowienie->id }};
+            fetch(`/form-orders/${orderId}/operational-status`, {
+                headers: {
+                    'Accept': 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error('Nie udało się odświeżyć statusu operacyjnego');
+                    }
+                    return response.text();
+                })
+                .then((html) => {
+                    panel.innerHTML = html;
+                })
+                .catch((error) => {
+                    console.error(error);
+                });
+        }
+
         function applyInvoiceNumberFieldValue(invoiceNumber) {
             if (!invoiceNumber) {
                 return;
@@ -2121,6 +2073,8 @@ nowoczesna-edukacja.pl `;
             setTimeout(() => {
                 invoiceNumberInput.style.backgroundColor = '';
             }, 2000);
+
+            refreshOperationalStatusPanel();
         }
 
         function renderIfirmaKsefProgress(stages) {
