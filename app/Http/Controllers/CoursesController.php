@@ -268,7 +268,8 @@ class CoursesController extends Controller
         $funnelStatsDays = $funnelStatsService->defaultStatsDays();
         $funnelStats = [];
         if (! empty($courseIdsOnPage)) {
-            $funnelStats = $funnelStatsService->statsForCourses($courseIdsOnPage);
+            // 🛒/FV na liście szkoleń = cała historia; widoki i CR nadal z ostatnich N dni
+            $funnelStats = $funnelStatsService->statsForCourses($courseIdsOnPage, ordersAllTime: true);
             $campaignCounts = $funnelStatsService->campaignCountsForCourses($courseIdsOnPage);
             $courses->getCollection()->transform(function ($course) use ($funnelStats, $campaignCounts) {
                 $course->funnel_stats = array_merge($funnelStats[$course->id] ?? [

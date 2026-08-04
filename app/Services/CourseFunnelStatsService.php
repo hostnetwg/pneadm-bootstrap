@@ -18,17 +18,20 @@ class CourseFunnelStatsService
 
     /**
      * @param  array<int>  $courseIds
+     * @param  bool  $ordersAllTime  true = 🛒/FV z całej historii szkolenia (lista /courses);
+     *                               CR nadal z zamówień w okresie widoków (unikamy CR > 100%).
      * @return array<int, array{
      *     views_course_show: int,
      *     views_order_form: int,
      *     orders_submitted: int,
      *     orders_invoiced: int,
+     *     orders_all_time: bool,
      *     cr_show_to_order: float|null,
      *     cr_form_to_order: float|null,
      *     cr_show_to_invoiced: float|null
      * }>
      */
-    public function statsForCourses(array $courseIds, ?Carbon $from = null, ?Carbon $to = null): array
+    public function statsForCourses(array $courseIds, ?Carbon $from = null, ?Carbon $to = null, bool $ordersAllTime = false): array
     {
         if ($courseIds === []) {
             return [];
@@ -45,14 +48,19 @@ class CourseFunnelStatsService
             ->get()
             ->keyBy('course_id');
 
-        $orderStats = $this->orderCountsForCourses($courseIds, $from, $to);
+        $periodOrderStats = $this->orderCountsForCourses($courseIds, $from, $to);
+        $displayOrderStats = $ordersAllTime
+            ? $this->orderCountsForCourses($courseIds)
+            : $periodOrderStats;
 
         $result = [];
         foreach ($courseIds as $courseId) {
             $viewsShow = (int) ($viewStats->get($courseId)?->views_course_show ?? 0);
             $viewsForm = (int) ($viewStats->get($courseId)?->views_order_form ?? 0);
-            $submitted = (int) ($orderStats[$courseId]['submitted'] ?? 0);
-            $invoiced = (int) ($orderStats[$courseId]['invoiced'] ?? 0);
+            $submitted = (int) ($displayOrderStats[$courseId]['submitted'] ?? 0);
+            $invoiced = (int) ($displayOrderStats[$courseId]['invoiced'] ?? 0);
+            $periodSubmitted = (int) ($periodOrderStats[$courseId]['submitted'] ?? 0);
+            $periodInvoiced = (int) ($periodOrderStats[$courseId]['invoiced'] ?? 0);
 
             $result[$courseId] = [
                 'views_course_show' => $viewsShow,
@@ -61,9 +69,11 @@ class CourseFunnelStatsService
                 'orders_invoiced' => $invoiced,
                 // Zachowane dla kompatybilności widoków / starych odwołań
                 'orders_paid' => $invoiced,
-                'cr_show_to_order' => $this->conversionRate($submitted, $viewsShow),
-                'cr_form_to_order' => $this->conversionRate($submitted, $viewsForm),
-                'cr_show_to_invoiced' => $this->conversionRate($invoiced, $viewsShow),
+                'orders_all_time' => $ordersAllTime,
+                // CR zawsze w tym samym oknie co widoki (okres), nawet gdy 🛒/FV = cała historia
+                'cr_show_to_order' => $this->conversionRate($periodSubmitted, $viewsShow),
+                'cr_form_to_order' => $this->conversionRate($periodSubmitted, $viewsForm),
+                'cr_show_to_invoiced' => $this->conversionRate($periodInvoiced, $viewsShow),
             ];
         }
 
@@ -97,19 +107,21 @@ class CourseFunnelStatsService
     }
 
     /**
-     * Zamówienia w liczniku 🛒 — bez soft delete; bez zamkniętych ręcznie bez faktury
-     * (status_completed = 1 i brak invoice_number), spójnie z badge „niewprowadzone” w panelu.
+     * Zamówienia w liczniku 🛒 — bez soft delete; wyklucza anulowane (`cancelled_at`).
+     * Bez `$from`/`$to` = cała historia (lista /courses).
      *
      * @return array<int, array{submitted: int, invoiced: int}>
      */
-    public function orderCountsForCourses(array $courseIds, Carbon $from, Carbon $to): array
+    public function orderCountsForCourses(array $courseIds, ?Carbon $from = null, ?Carbon $to = null): array
     {
+        if ($courseIds === []) {
+            return [];
+        }
+
         $invoicePresent = $this->invoicePresentSql('fo.invoice_number');
         $operationalSubmitted = $this->operationalSubmittedOrderSql('fo.invoice_number', 'fo.status_completed');
 
-        [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
-
-        $rows = DB::table('form_orders as fo')
+        $query = DB::table('form_orders as fo')
             ->join('courses as c', function ($join) {
                 $join->on('fo.product_id', '=', 'c.id')
                     ->orOn(function ($q) {
@@ -119,8 +131,14 @@ class CourseFunnelStatsService
                     });
             })
             ->whereNull('fo.deleted_at')
-            ->whereIn('c.id', $courseIds)
-            ->whereBetween('fo.order_date', [$fromUtc, $toUtc])
+            ->whereIn('c.id', $courseIds);
+
+        if ($from !== null && $to !== null) {
+            [$fromUtc, $toUtc] = UtcStorageDate::utcRangeForLocalDays($from, $to);
+            $query->whereBetween('fo.order_date', [$fromUtc, $toUtc]);
+        }
+
+        $rows = $query
             ->groupBy('c.id')
             ->selectRaw('c.id as course_id')
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$operationalSubmitted} THEN fo.id END) as submitted")
@@ -128,6 +146,9 @@ class CourseFunnelStatsService
             ->get();
 
         $map = [];
+        foreach ($courseIds as $courseId) {
+            $map[$courseId] = ['submitted' => 0, 'invoiced' => 0];
+        }
         foreach ($rows as $row) {
             $map[(int) $row->course_id] = [
                 'submitted' => (int) $row->submitted,

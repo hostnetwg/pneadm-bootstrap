@@ -257,12 +257,14 @@
                             $lejekHeaderTooltip = '<div class="text-start">'
                                 .'<div class="fw-semibold mb-1">Kolumna Lejek</div>'
                                 .'<div class="mb-2">Kampanie marketingowe — cała historia.</div>'
-                                .'<div class="fw-semibold mb-1">Statystyki z ostatnich '.(int) $funnelStatsDays.' dni:</div>'
+                                .'<div class="fw-semibold mb-1">Zamówienia (🛒 / FV) — cała historia szkolenia</div>'
+                                .'<div class="mb-2 small">Nieanulowane <code>form_orders</code> (spójnie z kolejką obsługi).</div>'
+                                .'<div class="fw-semibold mb-1">Wejścia i konwersja — ostatnie '.(int) $funnelStatsDays.' dni:</div>'
                                 .'<ul class="mb-0 ps-3">'
                                 .'<li class="mb-1"><strong>Wejścia</strong> — maks. 1 na gościa dziennie (bez botów)</li>'
                                 .'<li class="mb-1"><strong>Opis</strong> — wizyty na stronie kursu</li>'
                                 .'<li class="mb-1"><strong>Formularz</strong> — order-form + deferred-order</li>'
-                                .'<li><strong>Zamówienia</strong> — z bazy form_orders</li>'
+                                .'<li><strong>% CR</strong> — z zamówień w tym samym okresie co wejścia</li>'
                                 .'</ul>'
                                 .'</div>';
                         @endphp
@@ -554,24 +556,24 @@
                                 </a>
                             </div>
                             @if($fs)
-                                <div title="Wejścia na opis szkolenia (pnedu.pl, unikalne/dzień)">
+                                <div title="Wejścia na opis szkolenia (pnedu.pl, unikalne/dzień, ostatnie {{ (int) $funnelStatsDays }} dni)">
                                     <i class="bi bi-eye text-muted"></i> {{ number_format($fs['views_course_show'], 0, ',', ' ') }}
                                 </div>
-                                <div title="Wejścia na formularz (order-form + deferred-order, unikalne/dzień)">
+                                <div title="Wejścia na formularz (order-form + deferred-order, unikalne/dzień, ostatnie {{ (int) $funnelStatsDays }} dni)">
                                     <i class="bi bi-ui-checks text-muted"></i> {{ number_format($fs['views_order_form'], 0, ',', ' ') }}
                                 </div>
-                                <div title="Złożone zamówienia (bez ręcznie zakończonych bez faktury)">
+                                <div title="Złożone zamówienia — cała historia (bez anulowanych)">
                                     <i class="bi bi-cart text-muted"></i> {{ number_format($fs['orders_submitted'], 0, ',', ' ') }}
                                 </div>
-                                <div title="Wystawiona faktura (invoice_number)">
+                                <div title="Wystawiona faktura (invoice_number) — cała historia">
                                     <i class="bi bi-receipt text-muted"></i> {{ number_format($fs['orders_invoiced'] ?? $fs['orders_paid'] ?? 0, 0, ',', ' ') }}
                                 </div>
                                 @if(($fs['cr_show_to_invoiced'] ?? null) !== null)
-                                    <div class="text-success fw-semibold" title="Konwersja: opis → faktura">
+                                    <div class="text-success fw-semibold" title="Konwersja: opis → faktura (ostatnie {{ (int) $funnelStatsDays }} dni)">
                                         {{ number_format($fs['cr_show_to_invoiced'], 1, ',', ' ') }}%
                                     </div>
                                 @elseif($fs['cr_show_to_order'] !== null)
-                                    <div class="text-primary fw-semibold" title="Konwersja: opis → zamówienie">
+                                    <div class="text-primary fw-semibold" title="Konwersja: opis → zamówienie (ostatnie {{ (int) $funnelStatsDays }} dni)">
                                         {{ number_format($fs['cr_show_to_order'], 1, ',', ' ') }}%
                                     </div>
                                 @endif

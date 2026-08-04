@@ -126,12 +126,14 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 |------|---------|-----------|
 | Wejście na opis | `views_course_show` | GET `/courses/{id}`, max 1×/gość/kurs/dzień, bez botów |
 | Wejście na formularz | `views_order_form` | GET `order-form` + `deferred-order`, ten sam licznik |
-| Złożone | `orders_submitted` | Rekord w `form_orders` w okresie; **bez** `status_completed = 1` przy braku faktury |
+| Złożone | `orders_submitted` | Rekord w `form_orders`; **bez** `cancelled_at` (anulowane) |
 | Z fakturą | `orders_invoiced` | `invoice_number` wypełnione (jak `FormOrder::scopeWithInvoice()`) |
 
-**Wykluczone z 🛒:** zamówienie oznaczone jako zakończone (`status_completed = 1`) i jednocześnie bez numeru faktury — np. rezygnacja zamknięta w panelu (spójnie z badge „niewprowadzone” = 0).
+**Okna czasowe (ważne):**
+- **`/courses` (kolumna Lejek):** 🛒 i FV = **cała historia** szkolenia; wejścia i % CR = ostatnie `MARKETING_FUNNEL_STATS_DAYS` (domyślnie 30). Dzięki temu 🛒 jest zbliżone do „przetworzone + do obsługi”, a CR nie miesza okien (CR liczone z zamówień w tym samym okresie co widoki).
+- **`Marketing → Lejek konwersji`:** wszystkie etapy w wybranym okresie.
 
-Serwis: `App\Services\CourseFunnelStatsService`.  
+Serwis: `App\Services\CourseFunnelStatsService` (`statsForCourses(..., ordersAllTime: true)` na liście szkoleń).  
 UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
 **Opt-out zespołu (pnedu + adm):** przełączniki na **Ustawienia → Analityka** (`/settings/analityka`) lub linki `?pne_skip_funnel=1&token=…` / `?pne_skip_analytics=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` obu projektów). Lejek OFF wyłącza zliczanie wejść w `course_page_stats_daily` i eventy GA `course_view` / `order_form_view`. GA/GTM OFF pomija ładowanie GA4 i GTM na pnedu.pl. **Wyłączenie trwa do ręcznego ON** — cookie ma techniczny TTL (`MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, domyślnie 365 dni), ale jest **odnawiane przy każdej wizycie** na pnedu.pl i w panelu adm, więc nie wygasa samo po roku.

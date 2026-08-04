@@ -23,4 +23,13 @@ class CourseFunnelStatsServiceTest extends TestCase
 
         $this->assertSame("(invoice_number IS NOT NULL AND invoice_number != '' AND invoice_number != '0')", $sql);
     }
+
+    public function test_stats_for_courses_empty_ids_returns_empty(): void
+    {
+        $service = new CourseFunnelStatsService;
+
+        $this->assertSame([], $service->statsForCourses([]));
+        $this->assertSame([], $service->statsForCourses([], ordersAllTime: true));
+        $this->assertSame([], $service->orderCountsForCourses([]));
+    }
 }

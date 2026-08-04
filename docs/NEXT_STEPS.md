@@ -1,7 +1,14 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-07-28  
+Data utworzenia/aktualizacji: 2026-08-04  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-04) — lejek na `/courses`
+
+- Decyzja: 🛒 / FV w kolumnie Lejek na liście szkoleń = **cała historia** zamówień szkolenia (wariant B).
+- Wejścia i % CR nadal z ostatnich `MARKETING_FUNNEL_STATS_DAYS` dni.
+- Kod: `CourseFunnelStatsService::statsForCourses(..., ordersAllTime: true)` z `CoursesController`.
+- Docs: `MARKETING.md` sekcja 4.
 
 ## Cel Dokumentu
 
