@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\Dashboard\DashboardCourseScheduleService;
 use Illuminate\Support\Facades\Schema;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class DashboardCourseScheduleServiceTest extends TestCase
@@ -22,5 +23,15 @@ class DashboardCourseScheduleServiceTest extends TestCase
             'Europe/Warsaw',
             'day',
         ));
+    }
+
+    public function test_normalize_course_title_replaces_nbsp_with_regular_spaces(): void
+    {
+        $service = app(DashboardCourseScheduleService::class);
+        $method = new ReflectionMethod(DashboardCourseScheduleService::class, 'normalizeCourseTitle');
+
+        $this->assertSame('A B C', $method->invoke($service, 'A&nbsp;B&nbsp;C'));
+        $this->assertSame('A B', $method->invoke($service, "A\u{00A0}B"));
+        $this->assertSame('Szkolenie test', $method->invoke($service, '<b>Szkolenie&nbsp;test</b>'));
     }
 }

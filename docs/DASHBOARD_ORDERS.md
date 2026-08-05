@@ -62,7 +62,7 @@ Wzorowane na wykresie w **Analityka → Rozliczenia** (`/analytics/revenue`):
 - **Oś X (agregacja dzienna):** dwie linie — data (`7 lip`) i dzień tygodnia (`poniedziałek`). Tooltip: pełna data z dniem w nawiasie, np. `7 lip 2026 (poniedziałek)`.
 - Przy zakresie **> 90 dni** wykres jest miesięczny — markery wg miesiąca startu, bez dnia tygodnia na osi.
 
-Serwis: `App\Services\Dashboard\DashboardCourseScheduleService`.
+Serwis: `App\Services\Dashboard\DashboardCourseScheduleService` (tytuły: `&nbsp;` / NBSP → zwykła spacja).
 
 ## Tabela „Terminy szkoleń w zakresie”
 

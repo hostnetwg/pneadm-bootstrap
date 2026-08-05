@@ -46,7 +46,7 @@ class DashboardCourseScheduleService
 
                     return [
                         'course_id' => (int) $course->id,
-                        'title' => (string) $course->title,
+                        'title' => $this->normalizeCourseTitle((string) $course->title),
                         'start_date' => $start->toDateString(),
                         'start_time' => $start->format('H:i'),
                         'schedule_key' => $scheduleKey,
@@ -58,6 +58,16 @@ class DashboardCourseScheduleService
         } catch (Throwable) {
             return [];
         }
+    }
+
+    /**
+     * Tytuły w bazie bywają z HTML / &nbsp; — na dashboardzie pokazujemy zwykłe spacje.
+     */
+    private function normalizeCourseTitle(string $title): string
+    {
+        $plain = html_entity_decode(strip_tags($title), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return str_replace(["\u{00A0}", '&nbsp;'], ' ', $plain);
     }
 
     private function formatInstructorLabel(Course $course): ?string
