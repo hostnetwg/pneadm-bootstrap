@@ -8,7 +8,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Testy mapowania KSeF Podmiot3 → iFirma OdbiorcaNaFakturze.
+ * Testy mapowania KSeF Podmiot3 → iFirma PodmiotyDodatkowe (wpis).
  *
  * Zakres ETAP 2 (role obsługiwane):
  *   - odbiorca          → ODBIORCA
@@ -84,7 +84,7 @@ class IfirmaAdditionalEntityMapperTest extends TestCase
 
         $payload = $this->mapper->build($order);
 
-        $this->assertSame(true, $payload['UzywajDanychOdbiorcyNaFakturach']);
+        $this->assertSame(true, $payload['CzyDomyslny']);
         $this->assertSame('ACME Sp. z o.o.', $payload['Nazwa']);
         $this->assertSame('00-001', $payload['KodPocztowy']);
         $this->assertSame('Warszawa', $payload['Miejscowosc']);

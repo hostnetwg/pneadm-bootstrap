@@ -1885,21 +1885,8 @@ class FormOrdersController extends Controller
                 $uwagi = "pnedu.pl #{$zamowienie->id}";
             }
 
-            // Przygotowanie danych kontrahenta (FAKTURA KRAJOWA) — ETAP 3.
-            // Przycisk „Wystaw Fakturę iFirma”: zawsze faktura BEZ Podmiotu3 (`podmiot3_mode=ignore`),
-            // nawet gdy w zamówieniu są metadane KSeF / niekompletne recipient_* — mapper nie jest wołany.
-            try {
-                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
-                    ->buildForInvoice($zamowienie, [
-                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_IGNORE,
-                    ]);
-            } catch (\InvalidArgumentException $e) {
-                return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-            } catch (\App\Services\IfirmaKontrahentException $e) {
-                return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
-            } catch (\RuntimeException $e) {
-                return response()->json(['success' => false, 'error' => $e->getMessage()], 422);
-            }
+            // Przygotowanie danych kontrahenta (FAKTURA KRAJOWA) — tylko nabywca, bez Podmiotu3.
+            $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)->buildForInvoice($zamowienie);
 
             // Sprawdzenie, czy konto jest na RYCZAŁCIE
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
@@ -2259,15 +2246,13 @@ class FormOrdersController extends Controller
             // Pozwala m.in. dodać linię „UCZESTNIK: …” / „UCZESTNICY: …” do faktury.
             $uwagi = $this->ifirmaCustomRemarksFromRequest($request, $zamowienie);
 
-            // Wspólny builder (ETAP 3) — `podmiot3_mode=invoice_with_receiver`:
-            // przy KSeF źródle `recipient` pełny mapper (role, NIP, fail-fast);
-            // przy `none` — legacy `OdbiorcaNaFakturze` z recipient_* jeśli nazwa+kod+miasto
-            // kompletne, w przeciwnym razie faktura tylko z nabywcą (bez 400).
+            // Kontrahent (nabywca) + PodmiotyDodatkowe (Podmiot3) — od 2026-08-04 iFirma wymaga
+            // root `PodmiotyDodatkowe`, nie `Kontrahent.OdbiorcaNaFakturze`.
             try {
-                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
-                    ->buildForInvoice($zamowienie, [
-                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
-                    ]);
+                [$kontrahent, $podmiotyDodatkowe] = $this->buildIfirmaKontrahentAndPodmiotyDodatkowe(
+                    $zamowienie,
+                    \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER
+                );
             } catch (\InvalidArgumentException $e) {
                 return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
             } catch (\App\Services\IfirmaKontrahentException $e) {
@@ -2303,7 +2288,7 @@ class FormOrdersController extends Controller
             $pozycja['Jednostka'] = 'sztuk';
             $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
 
-            // Przygotowanie danych faktury krajowej z odbiorcą w Kontrahencie
+            // Przygotowanie danych faktury krajowej z Podmiotem3 w PodmiotyDodatkowe
             $invoiceData = [
                 'Zaplacono' => 0.00,
                 'ZaplaconoNaDokumencie' => 0.00,
@@ -2320,6 +2305,8 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
             ];
+
+            $this->attachIfirmaPodmiotyDodatkoweToInvoiceData($invoiceData, $podmiotyDodatkowe);
 
             $this->applyIfirmaPaymentSettlementToInvoiceData($invoiceData, $zamowienie);
 
@@ -2339,7 +2326,7 @@ class FormOrdersController extends Controller
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
-                'odbiorca_na_fakturze' => $kontrahent['OdbiorcaNaFakturze'] ?? null,
+                'podmioty_dodatkowe' => $podmiotyDodatkowe,
                 'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
                 'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
@@ -2658,15 +2645,12 @@ class FormOrdersController extends Controller
             // Pozwala m.in. dodać linię "UCZESTNIK: ..." / "UCZESTNICY: ..." do faktury.
             $uwagi = $this->ifirmaCustomRemarksFromRequest($request, $zamowienie);
 
-            // Wspólny builder (ETAP 3) — ten sam tryb co „Wystaw Fakturę iFirma z Odbiorcą”
-            // (`podmiot3_mode=invoice_with_receiver`): KSeF metadane → mapper; `none` + kompletne
-            // recipient_* → legacy OdbiorcaNaFakturze; inaczej tylko nabywca. Różnica względem
-            // fioletowego przycisku: po udanym wystawieniu faktury następuje sendInvoiceToKsef.
+            // Ten sam tryb Podmiotu3 co fioletowy przycisk — root `PodmiotyDodatkowe` (od 2026-08-04).
             try {
-                $kontrahent = (new \App\Services\IfirmaKontrahentBuilder)
-                    ->buildForInvoice($zamowienie, [
-                        'podmiot3_mode' => \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
-                    ]);
+                [$kontrahent, $podmiotyDodatkowe] = $this->buildIfirmaKontrahentAndPodmiotyDodatkowe(
+                    $zamowienie,
+                    \App\Services\IfirmaKontrahentBuilder::PODMIOT3_MODE_INVOICE_WITH_RECEIVER
+                );
             } catch (\InvalidArgumentException $e) {
                 return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
             } catch (\App\Services\IfirmaKontrahentException $e) {
@@ -2702,7 +2686,7 @@ class FormOrdersController extends Controller
             $pozycja['Jednostka'] = 'sztuk';
             $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
 
-            // Przygotowanie danych faktury krajowej z odbiorcą w Kontrahencie
+            // Przygotowanie danych faktury krajowej z Podmiotem3 w PodmiotyDodatkowe
             $invoiceData = [
                 'Zaplacono' => 0.00,
                 'ZaplaconoNaDokumencie' => 0.00,
@@ -2719,6 +2703,8 @@ class FormOrdersController extends Controller
                 'Pozycje' => [$pozycja],
                 'Kontrahent' => $kontrahent,
             ];
+
+            $this->attachIfirmaPodmiotyDodatkoweToInvoiceData($invoiceData, $podmiotyDodatkowe);
 
             $this->applyIfirmaPaymentSettlementToInvoiceData($invoiceData, $zamowienie);
 
@@ -2738,7 +2724,7 @@ class FormOrdersController extends Controller
                 'order_id' => $zamowienie->id,
                 'invoice_data' => $invoiceData,
                 'kontrahent' => $kontrahent,
-                'odbiorca_na_fakturze' => $kontrahent['OdbiorcaNaFakturze'] ?? null,
+                'podmioty_dodatkowe' => $podmiotyDodatkowe,
                 'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
@@ -3280,6 +3266,36 @@ class FormOrdersController extends Controller
             ->value('id');
 
         return $byOld !== null ? (int) $byOld : $asInt;
+    }
+
+    /**
+     * Buduje Kontrahent (nabywca) oraz tablicę PodmiotyDodatkowe dla faktury krajowej iFirma.
+     *
+     * @return array{0: array<string,mixed>, 1: list<array<string,mixed>>}
+     *
+     * @throws \InvalidArgumentException
+     * @throws \App\Services\IfirmaKontrahentException
+     * @throws \RuntimeException
+     */
+    private function buildIfirmaKontrahentAndPodmiotyDodatkowe(FormOrder $zamowienie, string $podmiot3Mode): array
+    {
+        $builder = new \App\Services\IfirmaKontrahentBuilder;
+
+        return [
+            $builder->buildForInvoice($zamowienie),
+            $builder->buildPodmiotyDodatkowe($zamowienie, ['podmiot3_mode' => $podmiot3Mode]),
+        ];
+    }
+
+    /**
+     * @param  list<array<string,mixed>>  $podmiotyDodatkowe
+     * @param  array<string,mixed>  $invoiceData
+     */
+    private function attachIfirmaPodmiotyDodatkoweToInvoiceData(array &$invoiceData, array $podmiotyDodatkowe): void
+    {
+        if ($podmiotyDodatkowe !== []) {
+            $invoiceData['PodmiotyDodatkowe'] = $podmiotyDodatkowe;
+        }
     }
 
     /**

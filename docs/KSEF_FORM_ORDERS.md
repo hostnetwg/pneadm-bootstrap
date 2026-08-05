@@ -158,20 +158,31 @@ Dodatkowo kontroler zwraca **HTTP 400**, gdy
 
 Źródło prawdy: [`https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/`](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/).
 
-Struktura zwracana przez `IfirmaAdditionalEntityMapper::build($order)`:
+**Od 2026-08-04** iFirma nie używa już `Kontrahent.OdbiorcaNaFakturze` / `DaneOdbiorcy`.
+Podmiot3 trafia na fakturę w root **`PodmiotyDodatkowe`** (tablica wpisów). Pole
+`UzywajDanychOdbiorcyNaFakturach` zastąpiono przez **`CzyDomyslny`**
+([historia zmian API](https://api.ifirma.pl/)).
+
+Struktura jednego wpisu zwracanego przez `IfirmaAdditionalEntityMapper::build($order)`
+i doklejanego przez `IfirmaKontrahentBuilder::buildPodmiotyDodatkowe()`:
 
 ```php
-[
-    'UzywajDanychOdbiorcyNaFakturach' => true,
-    'Nazwa'        => $order->recipient_name,
-    'KodPocztowy'  => $order->recipient_postal_code,
-    'Miejscowosc'  => $order->recipient_city,
-    'Ulica'        => $order->recipient_address, // pominięte gdy puste
-    'NIP'          => <patrz niżej>,             // pominięte gdy brak
-    'Kraj'         => 'Polska',
-    'Rola'         => <wynik FormOrder::ksefRoleIfirmaCode($role)>,
-]
+// root payloadu faktury (fakturakraj.json):
+'PodmiotyDodatkowe' => [
+    [
+        'CzyDomyslny' => true,
+        'Nazwa'        => $order->recipient_name,
+        'KodPocztowy'  => $order->recipient_postal_code,
+        'Miejscowosc'  => $order->recipient_city,
+        'Ulica'        => $order->recipient_address, // pominięte gdy puste
+        'NIP'          => <patrz niżej>,             // pominięte gdy brak
+        'Kraj'         => 'Polska',
+        'Rola'         => <wynik FormOrder::ksefRoleIfirmaCode($role)>,
+    ],
+],
 ```
+
+`Kontrahent` zawiera **wyłącznie nabywcę** — bez zagnieżdżonego odbiorcy.
 
 Reguły dla pola `NIP` (po usunięciu znaków nie-cyfrowych):
 
@@ -249,8 +260,8 @@ Podmiotu3 tam, gdzie endpoint iFirma to jawnie wspiera.
 
 ### Mapa przycisków → endpointów iFirma → zachowania Podmiotu3
 
-| Przycisk                                    | Metoda kontrolera                   | Endpoint iFirma                       | `OdbiorcaNaFakturze` | Wysyłka do KSeF |
-| ------------------------------------------- | ----------------------------------- | ------------------------------------- | -------------------- | --------------- |
+| Przycisk                                    | Metoda kontrolera                   | Endpoint iFirma                       | `PodmiotyDodatkowe` | Wysyłka do KSeF |
+| ------------------------------------------- | ----------------------------------- | ------------------------------------- | ------------------- | --------------- |
 | Wystaw PRO-FORMA iFirma                     | `createIfirmaProForma`              | `fakturaproformakraj.json`            | ❌ nigdy             | ❌ nigdy        |
 | Wystaw Fakturę iFirma                       | `createIfirmaInvoice`               | `fakturakraj.json`                    | ❌ nigdy             | ❌ nigdy        |
 | Wystaw Fakturę iFirma z Odbiorcą            | `createIfirmaInvoiceWithReceiver`   | `fakturakraj.json`                    | ✅ jeśli KSeF `recipient` **lub** kompletne `recipient_*` | ❌ nigdy        |
@@ -258,7 +269,7 @@ Podmiotu3 tam, gdzie endpoint iFirma to jawnie wspiera.
 
 Tryb `podmiot3_mode=invoice_with_receiver` (fioletowy i czerwony): **brak** gate 400
 przy `ksef_entity_source = 'none'`; przy `none` i niekompletnych `recipient_*`
-wystawiana jest faktura tylko z nabywcą (bez `OdbiorcaNaFakturze`). Tryb
+wystawiana jest faktura tylko z nabywcą (bez `PodmiotyDodatkowe`). Tryb
 `required` zostaje w builderze na potrzeby testów / ewentualnej przyszłej ścieżki
 z twardym wymogiem Podmiotu3 — obecnie kontroler `form_orders` go nie używa.
 
@@ -276,24 +287,15 @@ Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
 Wszystkie cztery metody kontrolera budują `Kontrahent` przez jedno miejsce:
 
-- `buildForInvoice(FormOrder $order, ['podmiot3_mode' => string]): array`
-  - Format „Polska / PrefiksUE='PL' / OsobaFizyczna=false / Email”.
+- `buildForInvoice(FormOrder $order): array` — tylko nabywca (`Kontrahent`).
+- `buildPodmiotyDodatkowe(FormOrder $order, ['podmiot3_mode' => string]): array`
+  - zwraca listę wpisów do root `PodmiotyDodatkowe` (zwykle 0 lub 1);
   - `podmiot3_mode`:
-    - **`ignore`** (przycisk „Wystaw Fakturę iFirma”) — **nigdy** nie woła
-      mappera; zawsze faktura bez `OdbiorcaNaFakturze`, nawet przy
-      `ksef_entity_source='recipient'` i niekompletnych `recipient_*`
-      (brak 422 z fail-fastu Podmiotu3).
-    - **`auto`** (domyślny, zarezerwowany na ewentualne przyszłe użycie) —
-      dokleja `OdbiorcaNaFakturze` gdy `isKsefAdditionalEntityEnabled()`;
-      mapper fail-fast → **HTTP 422**.
-    - **`required`** (czerwony „prześlij do KSeF”) — jeśli Podmiot3 wyłączony →
-      `IfirmaKontrahentException` → **HTTP 400**; w przeciwnym razie jak `auto`.
-    - **`invoice_with_receiver`** (fioletowy „z Odbiorcą”) — przy
-      `ksef_entity_source='recipient'` pełny `IfirmaAdditionalEntityMapper::build()`
-      (role, identyfikator, fail-fast); przy `none` — `buildLegacyRecipientPhysicalOnly()`
-      (tylko `recipient_*`, rola `ODBIORCA`, bez czytania `ksef_additional_entity_*`);
-      jeśli `recipient_*` niekompletne, faktura **bez** `OdbiorcaNaFakturze`.
-  - Nieznany `podmiot3_mode` → `InvalidArgumentException` (kontroler → **HTTP 500**).
+    - **`ignore`** (przycisk „Wystaw Fakturę iFirma”) — pusta tablica.
+    - **`auto`** — wpis gdy `isKsefAdditionalEntityEnabled()` (mapper, fail-fast 422).
+    - **`required`** — gate 400 gdy Podmiot3 wyłączony; w przeciwnym razie jak `auto`.
+    - **`invoice_with_receiver`** (fioletowy i czerwony KSeF) — przy `recipient` pełny
+      mapper; przy `none` legacy z `recipient_*` (rola `ODBIORCA`) lub pusta tablica.
 - `buildForProForma(FormOrder $order): array`
   - Format pro-forma (`Kraj='PL'`, tylko niepuste pola).
   - **Nigdy** nie dokleja `OdbiorcaNaFakturze`.

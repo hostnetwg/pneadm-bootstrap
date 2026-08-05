@@ -579,7 +579,7 @@ nowoczesna-edukacja.pl </div>
                             <div class="small text-muted mt-1">
                                 <i class="bi bi-info-circle"></i>
                                 Endpoint <code>fakturaproformakraj.json</code>, bez wysyłki do KSeF.
-                                <strong>Nie wysyła</strong> bloku <code>OdbiorcaNaFakturze</code> (Podmiot3) — publiczna dokumentacja iFirma
+                                <strong>Nie wysyła</strong> bloku <code>PodmiotyDodatkowe</code> (Podmiot3) — publiczna dokumentacja iFirma
                                 nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF.
                             </div>
                         </div>
@@ -602,7 +602,7 @@ nowoczesna-edukacja.pl </div>
                             <div class="small text-muted mt-1">
                                 <i class="bi bi-info-circle"></i>
                                 Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
-                                Ta ścieżka <strong>nigdy</strong> nie dołącza bloku <code>OdbiorcaNaFakturze</code>
+                                Ta ścieżka <strong>nigdy</strong> nie dołącza <code>PodmiotyDodatkowe</code>
                                 (Podmiot3), niezależnie od metadanych KSeF w zamówieniu.
                                 Do faktury z Podmiotem3 użyj „Wystaw Fakturę iFirma z Odbiorcą” (bez KSeF)
                                 lub czerwonego przycisku (z KSeF).

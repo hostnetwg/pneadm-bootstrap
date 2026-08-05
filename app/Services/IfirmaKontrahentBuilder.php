@@ -6,39 +6,14 @@ use App\Models\FormOrder;
 use InvalidArgumentException;
 
 /**
- * Wspólny builder obiektu Kontrahent w payloadzie iFirma dla wszystkich czterech
- * ścieżek wystawiania dokumentu z widoku szczegółów zamówienia:
+ * Wspólny builder obiektów iFirma dla wystawiania dokumentu z widoku szczegółów zamówienia:
  *
- *  - PRO-FORMA                 (endpoint: fakturaproformakraj.json)
- *  - Faktura iFirma            (endpoint: fakturakraj.json)
- *  - Faktura iFirma z Odbiorcą (endpoint: fakturakraj.json + Kontrahent.OdbiorcaNaFakturze)
- *  - Faktura iFirma + KSeF     (endpoint: fakturakraj.json + sendInvoiceToKsef; ten sam tryb Podmiotu3 co „z Odbiorcą”)
+ *  - `buildForInvoice()` — obiekt `Kontrahent` (nabywca) dla `fakturakraj.json`
+ *  - `buildPodmiotyDodatkowe()` — tablica wpisów Podmiot3 dla root `PodmiotyDodatkowe`
+ *  - `buildForProForma()` — uproszczony `Kontrahent` dla `fakturaproformakraj.json`
  *
- * Zamiast trzech niemal identycznych bloków w kontrolerze (~40 linii każdy) mamy
- * jedno miejsce, które wie, jak budować obiekt Kontrahent dla faktury krajowej
- * oraz uproszczony wariant dla faktury pro forma.
- *
- * Kluczowe decyzje (ETAP 3, patrz docs/KSEF_FORM_ORDERS.md):
- *  - buildForInvoice() ⇒ pełny format Kontrahent (Kraj='Polska', PrefiksUE='PL',
- *    OsobaFizyczna=false, Email); `OdbiorcaNaFakturze` zależy od `podmiot3_mode`
- *    (`ignore` / `auto` / `required` / `invoice_with_receiver`) — patrz stałe `PODMIOT3_MODE_*`.
- *  - buildForProForma() ⇒ wariant „pro-forma” (Kraj='PL', tylko niepuste pola).
- *    NIGDY nie dokleja OdbiorcaNaFakturze, bo publiczna dokumentacja iFirma
- *    (https://api.ifirma.pl/wystawianie-faktury-proforma/) nie wymienia tego
- *    pola w obiekcie Kontrahent dla pro formy, a zasada projektu to „nie zgaduj
- *    obsługi endpointu pro formy”. Pro forma też nie podlega KSeF, więc
- *    Podmiot3 nie ma tu uzasadnienia biznesowego.
- *
- * Tryby Podmiotu3 dla `buildForInvoice()` — parametr `podmiot3_mode`:
- *  - `ignore`   — nigdy nie woła mappera; zawsze faktura bez `OdbiorcaNaFakturze`
- *                 (przycisk „Wystaw Fakturę iFirma”).
- *  - `auto`     — domyślny; dokleja `OdbiorcaNaFakturze` tylko gdy
- *                 `isKsefAdditionalEntityEnabled()` (mapper, fail-fast 422).
- *  - `required` — gate 400 gdy Podmiot3 wyłączony; w przeciwnym razie jak `auto`
- *                 (nieużywane przez `form_orders`; testy / ewentualna twarda ścieżka).
- *  - `invoice_with_receiver` — przycisk „z Odbiorcą” i czerwony KSeF: przy aktywnych metadanych KSeF
- *                 (`recipient`) pełny mapper; przy `none` — tylko `recipient_*`
- *                 jako ODBIORCA, jeśli kompletne; inaczej faktura tylko z nabywcą.
+ * Od 2026-08-04 iFirma wymaga Podmiotu3 w `PodmiotyDodatkowe` na poziomie dokumentu
+ * (nie w `Kontrahent.OdbiorcaNaFakturze`). Patrz docs/KSEF_FORM_ORDERS.md.
  */
 class IfirmaKontrahentBuilder
 {
@@ -59,44 +34,12 @@ class IfirmaKontrahentBuilder
     }
 
     /**
-     * Zbuduj obiekt Kontrahent dla faktury krajowej (fakturakraj.json).
+     * Zbuduj obiekt Kontrahent (nabywca) dla faktury krajowej — bez Podmiotu3.
      *
-     * Opcje:
-     *  - podmiot3_mode (string, domyślnie `self::PODMIOT3_MODE_AUTO`):
-     *      `ignore`   — bez `OdbiorcaNaFakturze`, mapper nie jest wołany.
-     *      `auto`     — dokleja `OdbiorcaNaFakturze` gdy Podmiot3 aktywny (mapper, fail-fast).
-     *      `required` — jak `auto`, ale jeśli Podmiot3 wyłączony → IfirmaKontrahentException (gate).
-     *      `invoice_with_receiver` — przy włączonym KSeF jak `auto`; przy `none` legacy
-     *                 z `recipient_*` (rola ODBIORCA) lub brak bloku, jeśli dane niekompletne.
-     *
-     * Wyjątki:
-     *  - IfirmaKontrahentException        ⇒ gate `required` zawiódł (kontroler → HTTP 400),
-     *  - RuntimeException (z mappera)     ⇒ nieobsługiwana konfiguracja Podmiotu3 (kontroler → HTTP 422),
-     *  - InvalidArgumentException         ⇒ nieznany `podmiot3_mode`.
-     *
-     * @param  array{podmiot3_mode?: string}  $options
      * @return array<string,mixed>
-     *
-     * @throws IfirmaKontrahentException
-     * @throws InvalidArgumentException
-     * @throws RuntimeException
      */
-    public function buildForInvoice(FormOrder $order, array $options = []): array
+    public function buildForInvoice(FormOrder $order): array
     {
-        $mode = $options['podmiot3_mode'] ?? self::PODMIOT3_MODE_AUTO;
-        if (! is_string($mode) || ! in_array($mode, [
-            self::PODMIOT3_MODE_IGNORE,
-            self::PODMIOT3_MODE_AUTO,
-            self::PODMIOT3_MODE_REQUIRED,
-            self::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
-        ], true)) {
-            throw new InvalidArgumentException(
-                'IfirmaKontrahentBuilder: nieznany podmiot3_mode '.json_encode($mode, JSON_UNESCAPED_UNICODE).'. '
-                .'Dozwolone: "'.self::PODMIOT3_MODE_IGNORE.'", "'.self::PODMIOT3_MODE_AUTO.'", "'
-                .self::PODMIOT3_MODE_REQUIRED.'", "'.self::PODMIOT3_MODE_INVOICE_WITH_RECEIVER.'".'
-            );
-        }
-
         $kontrahent = [
             'Nazwa' => (string) $order->buyer_name,
             'NIP' => null,
@@ -129,53 +72,66 @@ class IfirmaKontrahentBuilder
             $kontrahent['Email'] = $email;
         }
 
+        return $kontrahent;
+    }
+
+    /**
+     * Zbuduj tablicę `PodmiotyDodatkowe` dla faktury krajowej (0 lub 1 wpis).
+     *
+     * Opcje:
+     *  - podmiot3_mode (string, domyślnie `self::PODMIOT3_MODE_AUTO`):
+     *      `ignore`   — pusta tablica, mapper nie jest wołany.
+     *      `auto`     — wpis gdy Podmiot3 aktywny (mapper, fail-fast).
+     *      `required` — gate 400 gdy Podmiot3 wyłączony; w przeciwnym razie jak `auto`.
+     *      `invoice_with_receiver` — przy `recipient` pełny mapper; przy `none` legacy
+     *                 z `recipient_*` (rola ODBIORCA) lub pusta tablica.
+     *
+     * @param  array{podmiot3_mode?: string}  $options
+     * @return list<array<string,mixed>>
+     *
+     * @throws IfirmaKontrahentException
+     * @throws InvalidArgumentException
+     * @throws \RuntimeException
+     */
+    public function buildPodmiotyDodatkowe(FormOrder $order, array $options = []): array
+    {
+        $mode = $this->resolvePodmiot3Mode($options);
+
         if ($mode === self::PODMIOT3_MODE_REQUIRED && ! $order->isKsefAdditionalEntityEnabled()) {
             throw new IfirmaKontrahentException(
-                'KSeF Podmiot3: ta ścieżka wystawia fakturę z blokiem OdbiorcaNaFakturze, '
+                'KSeF Podmiot3: ta ścieżka wystawia fakturę z Podmiotem3 (PodmiotyDodatkowe), '
                 .'ale ksef_entity_source jest ustawione na "none". Ustaw źródło Podmiotu3 na "recipient" '
                 .'w sekcji „KSeF – Podmiot3” zamówienia albo użyj zwykłej ścieżki wystawienia faktury bez odbiorcy.'
             );
         }
 
         if ($mode === self::PODMIOT3_MODE_IGNORE) {
-            return $kontrahent;
+            return [];
         }
 
         if ($mode === self::PODMIOT3_MODE_INVOICE_WITH_RECEIVER) {
             if ($order->isKsefAdditionalEntityEnabled()) {
-                $odbiorca = $this->additionalEntityMapper->build($order);
-                if ($odbiorca !== null) {
-                    $kontrahent['OdbiorcaNaFakturze'] = $odbiorca;
-                }
-            } else {
-                $odbiorca = $this->additionalEntityMapper->buildLegacyRecipientPhysicalOnly($order);
-                if ($odbiorca !== null) {
-                    $kontrahent['OdbiorcaNaFakturze'] = $odbiorca;
-                }
+                $podmiot = $this->additionalEntityMapper->build($order);
+
+                return $podmiot !== null ? [$podmiot] : [];
             }
 
-            return $kontrahent;
+            $podmiot = $this->additionalEntityMapper->buildLegacyRecipientPhysicalOnly($order);
+
+            return $podmiot !== null ? [$podmiot] : [];
         }
 
         if ($order->isKsefAdditionalEntityEnabled()) {
-            $odbiorca = $this->additionalEntityMapper->build($order);
-            if ($odbiorca !== null) {
-                $kontrahent['OdbiorcaNaFakturze'] = $odbiorca;
-            }
+            $podmiot = $this->additionalEntityMapper->build($order);
+
+            return $podmiot !== null ? [$podmiot] : [];
         }
 
-        return $kontrahent;
+        return [];
     }
 
     /**
      * Zbuduj obiekt Kontrahent dla faktury pro forma (fakturaproformakraj.json).
-     *
-     * Uproszczony format (zgodny z dotychczasowym zachowaniem pro formy w projekcie):
-     *  - Kraj='PL' (nie 'Polska'),
-     *  - brak pól PrefiksUE / OsobaFizyczna / Email jako stałych kluczy,
-     *  - puste pola Ulica / KodPocztowy / Miejscowosc / NIP są pomijane.
-     *
-     * OdbiorcaNaFakturze NIE jest dołączany — patrz class-level PHPDoc.
      *
      * @return array<string,mixed>
      */
@@ -210,8 +166,27 @@ class IfirmaKontrahentBuilder
     }
 
     /**
-     * Znormalizuj NIP nabywcy (tylko cyfry). Zwraca null dla pustego wejścia.
+     * @param  array{podmiot3_mode?: string}  $options
      */
+    private function resolvePodmiot3Mode(array $options): string
+    {
+        $mode = $options['podmiot3_mode'] ?? self::PODMIOT3_MODE_AUTO;
+        if (! is_string($mode) || ! in_array($mode, [
+            self::PODMIOT3_MODE_IGNORE,
+            self::PODMIOT3_MODE_AUTO,
+            self::PODMIOT3_MODE_REQUIRED,
+            self::PODMIOT3_MODE_INVOICE_WITH_RECEIVER,
+        ], true)) {
+            throw new InvalidArgumentException(
+                'IfirmaKontrahentBuilder: nieznany podmiot3_mode '.json_encode($mode, JSON_UNESCAPED_UNICODE).'. '
+                .'Dozwolone: "'.self::PODMIOT3_MODE_IGNORE.'", "'.self::PODMIOT3_MODE_AUTO.'", "'
+                .self::PODMIOT3_MODE_REQUIRED.'", "'.self::PODMIOT3_MODE_INVOICE_WITH_RECEIVER.'".'
+            );
+        }
+
+        return $mode;
+    }
+
     private function normalizeNip(string $raw): ?string
     {
         if (trim($raw) === '') {
@@ -223,10 +198,6 @@ class IfirmaKontrahentBuilder
         return $normalized !== '' ? $normalized : null;
     }
 
-    /**
-     * Rozwiąż pole Email kontrahenta — preferuj orderer_email, fallback na
-     * display_participant_email. Walidacja FILTER_VALIDATE_EMAIL.
-     */
     private function resolveEmail(FormOrder $order): ?string
     {
         $candidate = null;

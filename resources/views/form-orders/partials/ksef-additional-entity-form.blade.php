@@ -88,7 +88,7 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
                 <div class="form-text">
-                    <code>none</code> = faktura bez <code>OdbiorcaNaFakturze</code>; <code>recipient</code> = Podmiot3 budowany z danych ODBIORCA powyżej.
+                    <code>none</code> = faktura bez <code>PodmiotyDodatkowe</code>; <code>recipient</code> = Podmiot3 budowany z danych ODBIORCA powyżej.
                 </div>
             </div>
 

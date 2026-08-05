@@ -6,8 +6,13 @@ use App\Models\FormOrder;
 use RuntimeException;
 
 /**
- * Mapowanie metadanych KSeF Podmiot3 na fragment payloadu iFirma (blok
- * Kontrahent.OdbiorcaNaFakturze — patrz https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/).
+ * Mapowanie metadanych KSeF Podmiot3 na wpis w tablicy iFirma `PodmiotyDodatkowe`
+ * (patrz https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/).
+ *
+ * Od 2026-08-04 iFirma nie używa już `Kontrahent.OdbiorcaNaFakturze` /
+ * `DaneOdbiorcy` — podmiot dodatkowy trafia na fakturę wyłącznie przez
+ * root `PodmiotyDodatkowe` z polem `CzyDomyslny` (wcześniej
+ * `UzywajDanychOdbiorcyNaFakturach` w starym formacie).
  *
  * Obsługiwane role (ETAP 2):
  *  - `odbiorca`         → iFirma `ODBIORCA`              (KSeF rola 1, ETAP 1)
@@ -21,18 +26,13 @@ use RuntimeException;
  *  - niekompletne dane `recipient_*`            ⇒ RuntimeException,
  *  - rola wymagająca NIP (JST, grupa VAT) + pusty NIP ⇒ RuntimeException.
  *
- * Uwaga nazewnicza: kolumny `recipient_*` są historycznie nazwane, ale
- * semantycznie trzymają dane Podmiotu3 niezależnie od wybranej roli. Nie
- * zmieniamy nazw kolumn, żeby nie rozjechać kontraktu z publicznym formularzem
- * pnedu.pl (wariant C w dokumentacji KSEF_FORM_ORDERS.md).
- *
  * Legacy: `buildLegacyRecipientPhysicalOnly()` — zwykły odbiorca (rola ODBIORCA)
  * wyłącznie z `recipient_*`, gdy KSeF jest wyłączony (`ksef_entity_source=none`).
  */
 class IfirmaAdditionalEntityMapper
 {
     /**
-     * Zbuduj fragment OdbiorcaNaFakturze dla bloku Kontrahent w payloadzie iFirma.
+     * Zbuduj jeden wpis do tablicy `PodmiotyDodatkowe` w payloadzie faktury iFirma.
      *
      * Zwraca:
      *  - null                — gdy Podmiot3 nieaktywny (source = 'none'),
@@ -41,7 +41,6 @@ class IfirmaAdditionalEntityMapper
      * @return array<string,mixed>|null
      *
      * @throws RuntimeException gdy konfiguracja Podmiotu3 nie jest obsługiwana
-     *                          (nieznana rola / id_type / brak danych / brak NIP dla JST/grupy VAT).
      */
     public function build(FormOrder $order): ?array
     {
@@ -80,8 +79,8 @@ class IfirmaAdditionalEntityMapper
             );
         }
 
-        $odbiorca = [
-            'UzywajDanychOdbiorcyNaFakturach' => true,
+        $podmiot = [
+            'CzyDomyslny' => true,
             'Nazwa' => $recipientName,
             'KodPocztowy' => $recipientPostalCode,
             'Miejscowosc' => $recipientCity,
@@ -89,7 +88,7 @@ class IfirmaAdditionalEntityMapper
 
         $recipientAddress = trim((string) $order->recipient_address);
         if ($recipientAddress !== '') {
-            $odbiorca['Ulica'] = $recipientAddress;
+            $podmiot['Ulica'] = $recipientAddress;
         }
 
         if ($idType === FormOrder::KSEF_ID_TYPE_IDWEW) {
@@ -106,7 +105,7 @@ class IfirmaAdditionalEntityMapper
                 );
             }
 
-            $odbiorca['IdentyfikatorWewnetrznyZNip'] = $idwew;
+            $podmiot['IdentyfikatorWewnetrznyZNip'] = $idwew;
         } else {
             $nip = $this->resolveNip($order);
 
@@ -119,14 +118,14 @@ class IfirmaAdditionalEntityMapper
             }
 
             if ($nip !== null) {
-                $odbiorca['NIP'] = $nip;
+                $podmiot['NIP'] = $nip;
             }
         }
 
-        $odbiorca['Kraj'] = 'Polska';
-        $odbiorca['Rola'] = $this->mapRoleToIfirma($role);
+        $podmiot['Kraj'] = 'Polska';
+        $podmiot['Rola'] = $this->mapRoleToIfirma($role);
 
-        return $odbiorca;
+        return $podmiot;
     }
 
     /**
@@ -151,7 +150,7 @@ class IfirmaAdditionalEntityMapper
     }
 
     /**
-     * Zbuduj `OdbiorcaNaFakturze` wyłącznie z kolumn `recipient_*` (rola ODBIORCA w iFirma),
+     * Zbuduj wpis `PodmiotyDodatkowe` wyłącznie z kolumn `recipient_*` (rola ODBIORCA),
      * bez udziału metadanych KSeF (`ksef_*`).
      *
      * @return array<string,mixed>|null
@@ -166,8 +165,8 @@ class IfirmaAdditionalEntityMapper
         $recipientPostalCode = trim((string) $order->recipient_postal_code);
         $recipientCity = trim((string) $order->recipient_city);
 
-        $odbiorca = [
-            'UzywajDanychOdbiorcyNaFakturach' => true,
+        $podmiot = [
+            'CzyDomyslny' => true,
             'Nazwa' => $recipientName,
             'KodPocztowy' => $recipientPostalCode,
             'Miejscowosc' => $recipientCity,
@@ -177,27 +176,22 @@ class IfirmaAdditionalEntityMapper
 
         $recipientAddress = trim((string) $order->recipient_address);
         if ($recipientAddress !== '') {
-            $odbiorca['Ulica'] = $recipientAddress;
+            $podmiot['Ulica'] = $recipientAddress;
         }
 
         $recipientNip = trim((string) $order->recipient_nip);
         if ($recipientNip !== '') {
             $normalized = preg_replace('/[^0-9]/', '', $recipientNip);
             if ($normalized !== '') {
-                $odbiorca['NIP'] = $normalized;
+                $podmiot['NIP'] = $normalized;
             }
         }
 
-        return $odbiorca;
+        return $podmiot;
     }
 
     /**
      * Rozwiąż wartość pola NIP w payloadzie iFirma.
-     *
-     * - id_type = 'NIP' + identifier niepusty ⇒ identifier (znormalizowany do cyfr),
-     * - id_type = 'NIP' + identifier pusty    ⇒ recipient_nip (znormalizowany),
-     * - id_type pusty/NULL                    ⇒ recipient_nip (znormalizowany),
-     * - inne id_type                          ⇒ wyjątek już wcześniej (build()).
      */
     private function resolveNip(FormOrder $order): ?string
     {
@@ -222,9 +216,6 @@ class IfirmaAdditionalEntityMapper
 
     /**
      * Mapowanie kanonicznego kodu roli na wartość oczekiwaną przez iFirma.
-     *
-     * Walidacja obsługiwanych wartości odbywa się w build() — tu używamy helpera
-     * z modelu, a ewentualny default => wyjątek jest zabezpieczeniem przed desynchronizacją.
      */
     private function mapRoleToIfirma(?string $canonicalRole): string
     {

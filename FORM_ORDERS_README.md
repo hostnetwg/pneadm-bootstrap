@@ -161,15 +161,17 @@ Można to robić **stopniowo** - stary system może działać równolegle.
 ## iFirma - faktura z odbiorcą
 
 Wystawianie faktury z odbiorcą (przycisk „Wystaw Fakturę iFirma z Odbiorcą”) używa
-struktury `Kontrahent.OdbiorcaNaFakturze`, a nie pola root `DodatkowyPodmiot`.
+root `PodmiotyDodatkowe` w payloadzie `fakturakraj.json` (od zmiany API iFirma 2026-08-04).
 
-Wymagane minimum dla odbiorcy:
-- `UzywajDanychOdbiorcyNaFakturach`
+Wymagane minimum dla wpisu odbiorcy:
+- `CzyDomyslny`
 - `Nazwa`
 - `KodPocztowy`
 - `Miejscowosc`
+- `Rola` (np. `ODBIORCA`)
 
-Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()`.
+Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()` +
+`IfirmaKontrahentBuilder::buildPodmiotyDodatkowe()`.
 
 ## iFirma - integracja z KSeF (Krajowy System e-Faktur)
 
