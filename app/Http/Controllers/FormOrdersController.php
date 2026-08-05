@@ -1792,6 +1792,57 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Pobiera z iFirma NumerKSeF (i potwierdza ifirma_invoice_id) po zapisanym ID dokumentu.
+     * Użyteczne po ręcznej wysyłce do KSeF z panelu iFirma (fioletowy przycisk bez auto-KSeF).
+     */
+    public function syncIfirmaKsefMetadata($id)
+    {
+        try {
+            $zamowienie = FormOrder::find($id);
+
+            if (! $zamowienie) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Zamówienie nie zostało znalezione.',
+                ], 404);
+            }
+
+            $result = app(\App\Services\IfirmaFormOrderKsefSyncService::class)
+                ->syncFromIfirmaInvoiceId($zamowienie);
+
+            if (! ($result['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['message'] ?? 'Nie udało się zsynchronizować KSeF z iFirma.',
+                    'ifirma_invoice_id' => $result['ifirma_invoice_id'] ?? $zamowienie->ifirma_invoice_id,
+                    'ksef_number' => $result['ksef_number'] ?? $zamowienie->ksef_number,
+                    'invoice_number' => $result['invoice_number'] ?? null,
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $result['message'] ?? 'Zsynchronizowano KSeF z iFirma.',
+                'ksef_number' => $result['ksef_number'] ?? null,
+                'ifirma_invoice_id' => $result['ifirma_invoice_id'] ?? null,
+                'invoice_number' => $result['invoice_number'] ?? null,
+                'ksef_status' => $result['ksef_status'] ?? null,
+                'changed' => $result['changed'] ?? false,
+            ]);
+        } catch (Exception $e) {
+            Log::error('iFirma KSeF sync failed', [
+                'order_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Wystąpił błąd podczas synchronizacji KSeF: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Wystawia fakturę krajową (nie pro-forma) w iFirma.pl na podstawie zamówienia
      */
     public function createIfirmaInvoice(Request $request, $id)

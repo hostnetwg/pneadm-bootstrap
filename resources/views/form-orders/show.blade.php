@@ -795,12 +795,23 @@ nowoczesna-edukacja.pl </div>
                                                style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);" 
                                                @endif>
                                         <div id="ksefNumberDisplay"
-                                             class="mt-1 small @if(! $zamowienie->hasConfirmedKsef()) d-none @endif"
+                                             class="mt-1 small @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
                                              @if($zamowienie->hasConfirmedKsef())
                                              title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
+                                             @elseif($zamowienie->hasIfirmaInvoiceId())
+                                             title="Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce"
                                              @endif>
                                             <span class="text-muted">Numer KSeF:</span>
-                                            <code class="text-success" id="ksefNumberValue">{{ $zamowienie->hasConfirmedKsef() ? $zamowienie->ksef_number : '' }}</code>
+                                            <code class="text-success" id="ksefNumberValue">@if($zamowienie->hasConfirmedKsef()){{ $zamowienie->ksef_number }}@else<span class="text-muted">—</span>@endif</code>
+                                            @if($zamowienie->hasIfirmaInvoiceId())
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
+                                                        id="syncIfirmaKsefBtn"
+                                                        title="Pobierz numer KSeF z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
+                                                        aria-label="Synchronizuj numer KSeF z iFirma">
+                                                    <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
+                                                </button>
+                                            @endif
                                         </div>
                                         <div id="ifirmaInvoiceIdDisplay"
                                              class="mt-1 small @if(! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
@@ -2122,6 +2133,81 @@ nowoczesna-edukacja.pl `;
             valueEl.textContent = invoiceId;
             wrap.classList.remove('d-none');
         }
+
+        async function syncIfirmaKsefFromPanel(orderId) {
+            const btn = document.getElementById('syncIfirmaKsefBtn');
+            const icon = document.getElementById('syncIfirmaKsefIcon');
+            const resultDiv = document.getElementById('ifirmaResult');
+            if (!btn) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            btn.disabled = true;
+            if (icon) {
+                icon.classList.add('spinner-border', 'spinner-border-sm');
+                icon.classList.remove('bi-arrow-repeat');
+            }
+
+            try {
+                const response = await fetch(`/form-orders/${orderId}/ifirma/sync-ksef`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.ksef_number) {
+                        applyKsefNumberDisplay(data.ksef_number);
+                    }
+                    if (data.ifirma_invoice_id) {
+                        applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
+                    }
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                            <div class="alert alert-success alert-dismissible fade show py-2 small mb-0" role="alert">
+                                <i class="bi bi-check-circle"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
+                                ${data.ksef_number ? `<br><span class="text-muted">Numer KSeF:</span> <code>${data.ksef_number}</code>` : ''}
+                                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                            </div>`;
+                    }
+                    refreshOperationalStatusPanel();
+                } else if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning alert-dismissible fade show py-2 small mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> ${data.error || 'Synchronizacja KSeF nie powiodła się.'}
+                            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                        </div>`;
+                }
+            } catch (error) {
+                if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show py-2 small mb-0" role="alert">
+                            <i class="bi bi-x-circle"></i> Błąd połączenia: ${error.message}
+                            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                        </div>`;
+                }
+            } finally {
+                btn.disabled = false;
+                if (icon) {
+                    icon.classList.remove('spinner-border', 'spinner-border-sm');
+                    icon.classList.add('bi-arrow-repeat');
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const syncKsefBtn = document.getElementById('syncIfirmaKsefBtn');
+            if (syncKsefBtn) {
+                syncKsefBtn.addEventListener('click', function () {
+                    syncIfirmaKsefFromPanel({{ $zamowienie->id }});
+                });
+            }
+        });
 
         function renderIfirmaKsefResult(data, force, resultDiv) {
             if (data.invoice_number) {

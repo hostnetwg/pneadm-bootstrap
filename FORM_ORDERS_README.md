@@ -173,6 +173,13 @@ Wymagane minimum dla wpisu odbiorcy:
 Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()` +
 `IfirmaKontrahentBuilder::buildPodmiotyDodatkowe()`.
 
+## iFirma - synchronizacja KSeF po ręcznej wysyłce
+
+Gdy faktura została wystawiona **fioletowym** przyciskiem (bez auto-KSeF), a do KSeF wysłano ją ręcznie w panelu iFirma,
+na szczegółach zamówienia przy polu **Numer KSeF** jest ikona odświeżenia. Wywołuje
+`POST /form-orders/{id}/ifirma/sync-ksef` — pobiera `NumerKSeF` z iFirma po zapisanym **`ifirma_invoice_id`**
+(nie po numerze FV). Serwis: `IfirmaFormOrderKsefSyncService`.
+
 ## iFirma - integracja z KSeF (Krajowy System e-Faktur)
 
 ### Funkcjonalność

@@ -283,6 +283,13 @@ formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
 faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
+**Synchronizacja KSeF po ręcznej wysyłce (2026-08):** ikona odświeżenia przy polu
+Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`. Pobiera `NumerKSeF`
+z iFirma po **`ifirma_invoice_id`** (nie po `invoice_number`). Serwis:
+`App\Services\IfirmaFormOrderKsefSyncService`. Po korekcie anulującej i nowym
+dokumencie w iFirma trzeba najpierw wystawić fakturę ponownie z panelu (nowe ID),
+potem zsynchronizować KSeF.
+
 ### Wspólny builder — `App\Services\IfirmaKontrahentBuilder`
 
 Wszystkie cztery metody kontrolera budują `Kontrahent` przez jedno miejsce:
