@@ -26,6 +26,10 @@ Pełny opis flow (participants → ClickMeeting → e-mail, tokeny, linki live):
 
 Po wystawieniu FV przez iFirma (AJAX) panel **Status operacyjny** na `/form-orders/{id}` odświeża się bez przeładowania strony (`GET form-orders/{id}/operational-status`). Dzięki temu znika m.in. ostrzeżenie „Uczestnik dodany…, ale faktura nie została wystawiona.” zaraz po pojawieniu się numeru FV w polu.
 
+## Wyszukiwarka FV / KSeF na liście
+
+Osobny formularz na `/form-orders` (`invoice_search`) szuka w `invoice_number` i `ksef_number` wśród **wszystkich** zamówień — bez kolejki „Do obsługi” i bez filtra „Przetwarzanie” (nawet gdy w URL jest `filter=handling` / `quick=handling`).
+
 ## Stare skrypty zewnętrzne
 
 Jeśli masz PHP/SQL poza tymi repozytoriami, które jeszcze odwołują się do `form_orders.participant_*`, zaktualizuj je do **`form_order_participants`**.

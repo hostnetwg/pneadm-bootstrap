@@ -48,7 +48,12 @@ class FormOrdersController extends Controller
         //                Dozwolone: '' | handling | new | processed | cancelled | handling_all
         $filter = $request->get('filter', '');
         $filter = in_array($filter, ['new', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
-        $formSearchActive = $this->isFormSearchActive($request, $filter);
+        $invoiceSearchActive = $invoiceSearch !== '';
+        // Wyszukiwarka FV/KSeF zawsze w całej bazie — bez kolejki „Do obsługi” / innych filtrów przetwarzania.
+        if ($invoiceSearchActive) {
+            $filter = '';
+        }
+        $formSearchActive = $this->isFormSearchActive($request, $filter) || $invoiceSearchActive;
         // Przy aktywnym formularzu ignorujemy szybki filtr (nawet w starych URL z obu parametrami).
         $quickFilter = $formSearchActive ? '' : $this->resolveQuickFilter($request);
         if ($formSearchActive && $request->get('quick') !== 'all' && $request->get('quick') !== '') {
@@ -61,7 +66,8 @@ class FormOrdersController extends Controller
 
         // Osobny checkbox formularza: "Tylko archiwalne" = minęła data zakończenia szkolenia.
         // Łączy się (AND) z listą "Przetwarzanie" i pozostałymi filtrami — daje więcej kombinacji.
-        $archivalOnly = $request->boolean('archival');
+        // Przy wyszukiwaniu FV/KSeF wyłączamy też „tylko archiwalne”, żeby nie ucinać trafień.
+        $archivalOnly = $invoiceSearchActive ? false : $request->boolean('archival');
 
         $orderIdForExact = (ctype_digit($orderIdFilter) && $orderIdFilter !== '' && (int) $orderIdFilter > 0)
             ? (int) $orderIdFilter
@@ -75,7 +81,10 @@ class FormOrdersController extends Controller
         $query = FormOrder::query();
 
         // Albo szybki button, albo pole formularza „Przetwarzanie” — nigdy oba naraz.
-        if ($formSearchActive) {
+        // invoice_search: bez filtra przetwarzania (cała baza).
+        if ($invoiceSearchActive) {
+            // brak scope processing
+        } elseif ($formSearchActive) {
             $this->applyProcessingFilter($query, $filter);
         } else {
             $this->applyProcessingFilter($query, $quickFilter);

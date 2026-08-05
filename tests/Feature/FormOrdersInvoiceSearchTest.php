@@ -148,6 +148,42 @@ class FormOrdersInvoiceSearchTest extends TestCase
         $response->assertSee($full);
     }
 
+    public function test_invoice_search_finds_processed_order_even_with_hostile_handling_filter(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $processed = FormOrder::create([
+            'product_name' => 'Kurs przetworzony FV',
+            'invoice_number' => '80/8/2026',
+            'orderer_email' => 'processed-fv@example.test',
+            'status_completed' => 1,
+        ]);
+
+        FormOrder::create([
+            'product_name' => 'Kurs bez FV w kolejce',
+            'invoice_number' => null,
+            'orderer_email' => 'handling@example.test',
+            'status_completed' => 0,
+        ]);
+
+        // Celowo: filter=handling + brak quick=all — wyszukiwarka FV i tak musi znaleźć przetworzone.
+        $response = $this->actingAs($user)->get(route('form-orders.index', [
+            'invoice_search' => '80/8/2026',
+            'invoice_search_exact' => 1,
+            'filter' => 'handling',
+            'quick' => 'handling',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee((string) $processed->id);
+        $response->assertSee('80/8/2026');
+        $response->assertSee('Kurs przetworzony FV');
+        $response->assertDontSee('Kurs bez FV w kolejce');
+    }
+
     public function test_general_search_also_matches_ksef_number(): void
     {
         $user = User::factory()->create([

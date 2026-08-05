@@ -332,7 +332,8 @@
                         </div>
                     </form>
                     <div class="form-text mt-1 mb-0">
-                        Niezależny skrót: szuka wyłącznie w numerze faktury i numerze KSeF w całej bazie (pomija kolejkę „Do obsługi”).
+                        Niezależny skrót: szuka w numerze faktury i numerze KSeF wśród <strong>wszystkich</strong> zamówień
+                        (także przetworzonych) — pomija kolejkę „Do obsługi” i filtr „Przetwarzanie”.
                     </div>
                 </div>
             </div>
