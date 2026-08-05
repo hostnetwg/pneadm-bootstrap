@@ -1828,6 +1828,7 @@ class FormOrdersController extends Controller
                 'invoice_number' => $result['invoice_number'] ?? null,
                 'ksef_status' => $result['ksef_status'] ?? null,
                 'changed' => $result['changed'] ?? false,
+                'ksef_cleared' => $result['ksef_cleared'] ?? false,
             ]);
         } catch (Exception $e) {
             Log::error('iFirma KSeF sync failed', [

@@ -2116,7 +2116,12 @@ nowoczesna-edukacja.pl `;
         function applyKsefNumberDisplay(ksefNumber) {
             const wrap = document.getElementById('ksefNumberDisplay');
             const valueEl = document.getElementById('ksefNumberValue');
-            if (!wrap || !valueEl || !ksefNumber) {
+            if (!wrap || !valueEl) {
+                return;
+            }
+            if (!ksefNumber) {
+                valueEl.innerHTML = '<span class="text-muted">—</span>';
+                wrap.title = 'Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce';
                 return;
             }
             valueEl.textContent = ksefNumber;
@@ -2161,16 +2166,16 @@ nowoczesna-edukacja.pl `;
                 const data = await response.json();
 
                 if (data.success) {
-                    if (data.ksef_number) {
-                        applyKsefNumberDisplay(data.ksef_number);
-                    }
+                    applyKsefNumberDisplay(data.ksef_number || null);
                     if (data.ifirma_invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
                     }
                     if (resultDiv) {
+                        const alertClass = data.ksef_cleared ? 'alert-info' : 'alert-success';
+                        const iconClass = data.ksef_cleared ? 'bi-info-circle' : 'bi-check-circle';
                         resultDiv.innerHTML = `
-                            <div class="alert alert-success alert-dismissible fade show py-2 small mb-0" role="alert">
-                                <i class="bi bi-check-circle"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
+                            <div class="alert ${alertClass} alert-dismissible fade show py-2 small mb-0" role="alert">
+                                <i class="bi ${iconClass}"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
                                 ${data.ksef_number ? `<br><span class="text-muted">Numer KSeF:</span> <code>${data.ksef_number}</code>` : ''}
                                 <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
                             </div>`;

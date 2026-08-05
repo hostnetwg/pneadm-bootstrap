@@ -77,14 +77,18 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertSame('99887766', $result['ifirma_invoice_id']);
     }
 
-    public function test_returns_error_when_ksef_not_yet_assigned(): void
+    public function test_clears_ksef_when_ifirma_has_no_number(): void
     {
-        $order = new FormOrder;
+        $order = Mockery::mock(FormOrder::class)->makePartial();
         $order->forceFill([
             'id' => 2,
             'ifirma_invoice_id' => '111',
-            'ksef_number' => null,
+            'ksef_number' => '7392137630-20260805-OLD00000001-99',
+            'ksef_status' => 'sent',
+            'ksef_sent_at' => now(),
+            'ksef_error' => null,
         ]);
+        $order->shouldReceive('save')->once()->andReturnTrue();
 
         $api = Mockery::mock(IfirmaApiService::class);
         $api->shouldReceive('getInvoice')->once()->andReturn(['status' => 'success', 'data' => []]);
@@ -97,7 +101,37 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $service = new IfirmaFormOrderKsefSyncService($api);
         $result = $service->syncFromIfirmaInvoiceId($order);
 
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('nie ma jeszcze nadanego numeru KSeF', $result['message']);
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['ksef_cleared'] ?? false);
+        $this->assertNull($result['ksef_number']);
+        $this->assertNull($order->ksef_number);
+        $this->assertNull($order->ksef_status);
+        $this->assertStringContainsString('wyczyszczono', $result['message']);
+    }
+
+    public function test_no_change_when_ifirma_has_no_ksef_and_order_already_empty(): void
+    {
+        $order = new FormOrder;
+        $order->forceFill([
+            'id' => 3,
+            'ifirma_invoice_id' => '222',
+            'ksef_number' => null,
+            'ksef_status' => null,
+        ]);
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('getInvoice')->once()->andReturn(['status' => 'success', 'data' => []]);
+        $api->shouldReceive('unwrapInvoicePayload')->once()->andReturn([
+            'Identyfikator' => '222',
+            'PelnyNumer' => '46/8/2026',
+        ]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->once()->andReturn(null);
+
+        $service = new IfirmaFormOrderKsefSyncService($api);
+        $result = $service->syncFromIfirmaInvoiceId($order);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['changed'] ?? true);
+        $this->assertNull($result['ksef_number']);
     }
 }

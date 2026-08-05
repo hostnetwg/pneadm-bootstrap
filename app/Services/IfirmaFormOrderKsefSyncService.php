@@ -84,24 +84,50 @@ class IfirmaFormOrderKsefSyncService
             }
             $order->ksef_error = null;
         } else {
-            Log::info('iFirma KSeF sync: brak NumerKSeF w dokumencie', [
+            Log::info('iFirma KSeF sync: brak NumerKSeF w dokumencie — czyszczenie pola w zamówieniu', [
                 'form_order_id' => $order->id,
                 'ifirma_invoice_id' => $invoiceId,
                 'pelny_numer' => $pelnyNumer,
+                'previous_ksef_number' => $previousKsef !== '' ? $previousKsef : null,
             ]);
 
-            return [
-                'success' => false,
-                'message' => 'Dokument iFirma (ID '.$invoiceId.') nie ma jeszcze nadanego numeru KSeF. '
-                    .'Wyślij fakturę do KSeF w panelu iFirma i spróbuj ponownie za chwilę.',
-                'ifirma_invoice_id' => $resolvedId !== '' ? $resolvedId : $invoiceId,
-                'invoice_number' => $pelnyNumer,
-                'ksef_number' => $previousKsef !== '' ? $previousKsef : null,
-            ];
+            if ($previousKsef !== '') {
+                $order->ksef_number = null;
+                $changed = true;
+            }
+            if ($order->ksef_status !== null) {
+                $order->ksef_status = null;
+                $changed = true;
+            }
+            if ($order->ksef_sent_at !== null) {
+                $order->ksef_sent_at = null;
+                $changed = true;
+            }
+            if ($order->ksef_error !== null) {
+                $order->ksef_error = null;
+                $changed = true;
+            }
         }
 
         if ($changed) {
             $order->save();
+        }
+
+        if ($ksefNumber === null || $ksefNumber === '') {
+            $message = $changed
+                ? 'W iFirma brak numeru KSeF dla tego dokumentu — wyczyszczono zapisany numer KSeF w zamówieniu.'
+                : 'W iFirma brak numeru KSeF dla tego dokumentu. Zamówienie nie miało zapisanego numeru KSeF.';
+
+            return [
+                'success' => true,
+                'message' => $message,
+                'ksef_number' => null,
+                'ifirma_invoice_id' => $order->ifirma_invoice_id,
+                'invoice_number' => $pelnyNumer,
+                'ksef_status' => null,
+                'changed' => $changed,
+                'ksef_cleared' => $changed && $previousKsef !== '',
+            ];
         }
 
         $message = $changed
