@@ -23,7 +23,8 @@ Identyfikatory faktury na `form_orders` (używane przy synchronizacji statusu z 
 Pierwszy etap obejmuje:
 
 - dashboard spraw windykacyjnych pod `accounting.collections.*`,
-  - w menu Księgowość jedna pozycja **Windykacja**; **Import wyciągu** i **Lookup faktury** są przyciskami u góry listy spraw (trasy bez osobnych pozycji w menu),
+  - w menu Księgowość jedna pozycja **Windykacja**; **Import wyciągu**, **Lookup faktury** i **Ustawienia** są przyciskami u góry listy spraw (trasy bez osobnych pozycji w menu),
+  - ustawienia ogólne: `/accounting/collections/settings` (`debt_collection_settings`) — m.in. telefon kontaktowy do stopki e-maili windykacyjnych,
   - domyślny filtr listy: **Niezamknięte** (`status=active` / `DebtCase::active()`); kafelek „Aktywne sprawy” ustawia ten filtr; opcja „Wszystkie” to `status=all` (puste `status=` też działa wstecznie); paginacja zachowuje `search` / `status` / `segment` przez `appends()`,
   - wyszukiwarka listy: FV/KSeF/nazwa/NIP/e-mail oraz numeryczne ID sprawy / zamówienia (`form_orders.id`),
   - kolumna Status na liście: kolorowe badge (`DebtCase::statusBadgeClass()` — Nowa niebieski, W toku cyan, Obietnica żółty, Sporne czerwony, Wstrzymane szary, Zamknięte zielony),
@@ -31,6 +32,7 @@ Pierwszy etap obejmuje:
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,
+- **wysyłka e-maila z karty sprawy**: przycisk „Wyślij przypomnienie” → modal (jak linki do prowadzącego) z szablonami przypomnienie/ponaglenie, edycją treści, wyborem odbiorcy (zamawiający / uczestnik / kontakty), wysyłką właściwą i testową, opcjonalnym PDF z iFirma + upload PDF; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady; SMS później,
 - alternatywne kontakty (dodawanie i usuwanie z karty sprawy),
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
 - ostrzeżenie VIP / lojalny klient,
@@ -110,7 +112,9 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - ~~ręczne powiązanie od strony przelewu~~ — **wdrożone**: w modalu podglądu importu wyszukiwarka niezamkniętych spraw + powiązanie lokalne / + iFirma,
 - dopracowanie sugestii dopasowań (fuzzy nazwa, bulk),
 - ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
-- ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone (wąski zakres)**: po akceptacji z wyciągu, gdy iFirma potwierdza pełną opłatę (`oplacone`); nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka.
+- ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone (wąski zakres)**: po akceptacji z wyciągu, gdy iFirma potwierdza pełną opłatę (`oplacone`); nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka,
+- magazyn PDF FV na sprawie (pobranie przy utworzeniu + checkbox „załącz FV ze sprawy” przy wysyłce),
+- SMS do dłużnika (ten sam flow co e-mail, inny kanał).
 
 ## Import wyciągu mBank (MVP)
 

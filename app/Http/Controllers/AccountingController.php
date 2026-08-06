@@ -9,6 +9,7 @@ use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\DebtCaseContact;
+use App\Models\DebtCollectionSetting;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Models\RevenueRecord;
@@ -16,6 +17,8 @@ use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
 use App\Services\DebtCustomerProfileService;
+use App\Services\DebtReminderMailService;
+use App\Services\DebtReminderTemplateService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
 use Carbon\CarbonInterface;
@@ -341,6 +344,35 @@ class AccountingController extends Controller
         ]);
     }
 
+    public function collectionsSettingsEdit()
+    {
+        return view('accounting.collections.settings', [
+            'settings' => DebtCollectionSetting::getSettings(),
+        ]);
+    }
+
+    public function collectionsSettingsUpdate(Request $request)
+    {
+        $validated = $request->validate([
+            'contact_phone' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $settings = DebtCollectionSetting::query()->firstOrCreate(
+            ['id' => DebtCollectionSetting::SINGLETON_ID]
+        );
+
+        $phone = trim((string) ($validated['contact_phone'] ?? ''));
+        $settings->contact_phone = $phone !== '' ? $phone : null;
+        $settings->updated_by = Auth::id();
+        $settings->save();
+
+        DebtCollectionSetting::forgetSettingsCache();
+
+        return redirect()
+            ->route('accounting.collections.settings.edit')
+            ->with('success', 'Zapisano ustawienia windykacji.');
+    }
+
     public function collectionsStore(Request $request, DebtCustomerProfileService $profileService)
     {
         $validated = $request->validate([
@@ -460,6 +492,12 @@ class AccountingController extends Controller
             return $relatedOrder;
         });
 
+        $reminderTemplates = app(DebtReminderTemplateService::class);
+        $reminderTemplatePayloads = [];
+        foreach (array_keys($reminderTemplates->templateLabels()) as $templateKey) {
+            $reminderTemplatePayloads[$templateKey] = $reminderTemplates->build($debtCase, $templateKey);
+        }
+
         return view('accounting.collections.show', [
             'case' => $debtCase,
             'previousCase' => $previousCaseActive,
@@ -488,7 +526,73 @@ class AccountingController extends Controller
             'bankTransferSearch' => '',
             'bankTransferAmount' => $bankTransferAmount,
             'bankAfterOrderDate' => true,
+            'reminderTemplateLabels' => $reminderTemplates->templateLabels(),
+            'reminderTemplatePayloads' => $reminderTemplatePayloads,
+            'reminderRecipientOptions' => $reminderTemplates->recipientOptions($debtCase),
+            'reminderCanAttachIfirmaPdf' => $reminderTemplates->canAttachIfirmaPdf($debtCase),
+            'reminderDefaultTestEmail' => Auth::user()?->email ?: 'waldemar.grabowski@hostnet.pl',
         ]);
+    }
+
+    public function collectionsSendReminder(
+        Request $request,
+        DebtCase $debtCase,
+        DebtReminderMailService $mailService,
+        DebtReminderTemplateService $templates,
+    ) {
+        $debtCase->load(['formOrder.primaryParticipant', 'contacts']);
+
+        $rules = [
+            'template' => ['required', 'string', 'in:'.implode(',', array_keys($templates->templateLabels()))],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:20000'],
+            'send_target' => ['required', 'string', 'in:recipient,test'],
+            'recipient_email' => ['nullable', 'email', 'max:255'],
+            'test_email' => ['nullable', 'email', 'max:255'],
+            'attach_ifirma_pdf' => ['nullable', 'boolean'],
+            'attachment' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
+        ];
+
+        if ($request->input('send_target') === 'test') {
+            $rules['test_email'] = ['required', 'email', 'max:255'];
+        } else {
+            $rules['recipient_email'] = ['required', 'email', 'max:255'];
+        }
+
+        $validated = $request->validate($rules);
+        $isTest = $validated['send_target'] === 'test';
+        $toEmail = trim($isTest
+            ? (string) $validated['test_email']
+            : (string) $validated['recipient_email']);
+
+        $attachIfirma = $request->boolean('attach_ifirma_pdf');
+        if ($attachIfirma && ! $templates->canAttachIfirmaPdf($debtCase)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withInput()
+                ->with('error', 'Brak danych do pobrania PDF faktury z iFirma dla tej sprawy.');
+        }
+
+        $result = $mailService->send(
+            case: $debtCase,
+            toEmail: $toEmail,
+            subject: $validated['subject'],
+            body: $validated['body'],
+            isTest: $isTest,
+            attachIfirmaPdf: $attachIfirma,
+            uploadedFile: $request->file('attachment'),
+        );
+
+        if (! $result['ok']) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withInput($request->except('attachment'))
+                ->with('error', $result['message']);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', $result['message']);
     }
 
     public function collectionsBankTransactionSearch(Request $request, DebtCase $debtCase)

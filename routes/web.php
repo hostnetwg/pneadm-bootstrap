@@ -558,12 +558,15 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::prefix('collections')->name('collections.')->group(function () {
             Route::get('/', [AccountingController::class, 'collectionsIndex'])->name('index');
             Route::post('/', [AccountingController::class, 'collectionsStore'])->name('store');
+            Route::get('/settings', [AccountingController::class, 'collectionsSettingsEdit'])->name('settings.edit');
+            Route::post('/settings', [AccountingController::class, 'collectionsSettingsUpdate'])->name('settings.update');
             Route::get('/{debtCase}', [AccountingController::class, 'collectionsShow'])->name('show');
             Route::put('/{debtCase}', [AccountingController::class, 'collectionsUpdate'])->name('update');
             Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
             Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
             Route::delete('/{debtCase}/contacts/{contact}', [AccountingController::class, 'collectionsContactDestroy'])->name('contacts.destroy');
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
+            Route::post('/{debtCase}/send-reminder', [AccountingController::class, 'collectionsSendReminder'])->name('send-reminder');
             Route::get('/{debtCase}/bank-transactions/search', [AccountingController::class, 'collectionsBankTransactionSearch'])->name('bank-transactions.search');
             Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');
             Route::post('/{debtCase}/bank-matches/{match}/unlink', [AccountingController::class, 'collectionsBankTransactionUnlink'])->name('bank-matches.unlink');

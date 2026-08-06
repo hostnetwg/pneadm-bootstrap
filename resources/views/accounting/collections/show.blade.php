@@ -1,8 +1,16 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">
-            Windykacja: sprawa #{{ $case->id }}
-        </h2>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
+                Windykacja: sprawa #{{ $case->id }}
+            </h2>
+            <button type="button"
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#debtReminderModal">
+                <i class="bi bi-envelope"></i> Wyślij przypomnienie
+            </button>
+        </div>
     </x-slot>
 
     @php
@@ -948,6 +956,158 @@
         </div>
     </div>
 
+    <div class="modal fade" id="debtReminderModal" tabindex="-1" aria-labelledby="debtReminderModalLabel" aria-hidden="true"
+         data-templates='@json($reminderTemplatePayloads ?? [])'
+         data-recipients='@json($reminderRecipientOptions ?? [])'>
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="debtReminderModalLabel">
+                        <i class="bi bi-envelope me-2"></i>Wyślij przypomnienie / ponaglenie
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    @if($showVipAlert || $case->do_not_auto_dun)
+                        <div class="alert alert-warning small">
+                            @if($showVipAlert)
+                                <div class="fw-semibold mb-1">VIP / lojalny klient — rozważ kontakt osobisty przed formalnym monitem.</div>
+                            @endif
+                            @if($case->do_not_auto_dun)
+                                <div>Sprawa ma włączone „Bez automatycznego monitu” — ręczna wysyłka jest nadal możliwa.</div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <form id="formDebtReminder"
+                          method="POST"
+                          action="{{ route('accounting.collections.send-reminder', $case) }}"
+                          enctype="multipart/form-data">
+                        @csrf
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderTemplate">Szablon</label>
+                            <select class="form-select" id="debtReminderTemplate" name="template">
+                                @foreach(($reminderTemplateLabels ?? []) as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('template', \App\Services\DebtReminderTemplateService::TEMPLATE_REMINDER) === $value)>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderSubject">Temat</label>
+                            <input type="text"
+                                   class="form-control @error('subject') is-invalid @enderror"
+                                   id="debtReminderSubject"
+                                   name="subject"
+                                   value="{{ old('subject') }}"
+                                   maxlength="255"
+                                   required>
+                            @error('subject')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderBody">Treść wiadomości (możesz edytować przed wysłaniem)</label>
+                            <textarea class="form-control font-monospace @error('body') is-invalid @enderror"
+                                      id="debtReminderBody"
+                                      name="body"
+                                      rows="14"
+                                      spellcheck="true"
+                                      required>{{ old('body') }}</textarea>
+                            @error('body')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="debtReminderRecipientKey">Odbiorca (wybór z listy)</label>
+                            <select class="form-select" id="debtReminderRecipientKey">
+                                <option value="">— wybierz —</option>
+                                @foreach(($reminderRecipientOptions ?? []) as $option)
+                                    <option value="{{ $option['key'] }}"
+                                            data-email="{{ $option['email'] }}"
+                                            @selected(old('recipient_email') === $option['email'])>
+                                        {{ $option['label'] }} ({{ $option['email'] }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if(empty($reminderRecipientOptions))
+                                <div class="form-text text-warning">Brak gotowych adresów — wpisz e-mail ręcznie poniżej.</div>
+                            @endif
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold" for="debtReminderRecipientEmail">E-mail odbiorcy</label>
+                                <input type="email"
+                                       class="form-control @error('recipient_email') is-invalid @enderror"
+                                       id="debtReminderRecipientEmail"
+                                       name="recipient_email"
+                                       value="{{ old('recipient_email') }}"
+                                       autocomplete="email"
+                                       placeholder="adres@przykład.pl">
+                                @error('recipient_email')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold" for="debtReminderTestEmail">E-mail testowy</label>
+                                <input type="email"
+                                       class="form-control @error('test_email') is-invalid @enderror"
+                                       id="debtReminderTestEmail"
+                                       name="test_email"
+                                       value="{{ old('test_email', $reminderDefaultTestEmail ?? '') }}"
+                                       autocomplete="email"
+                                       placeholder="adres@przykład.pl">
+                                @error('test_email')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            @if($reminderCanAttachIfirmaPdf ?? false)
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           value="1"
+                                           id="debtReminderAttachIfirma"
+                                           name="attach_ifirma_pdf"
+                                           @checked(old('attach_ifirma_pdf'))>
+                                    <label class="form-check-label" for="debtReminderAttachIfirma">
+                                        Załącz PDF faktury z iFirma
+                                    </label>
+                                </div>
+                            @else
+                                <div class="form-text text-muted mb-2">Brak ID/numeru FV — nie można pobrać PDF z iFirma.</div>
+                            @endif
+                            <label class="form-label fw-bold" for="debtReminderAttachment">Dodatkowy załącznik (PDF)</label>
+                            <input type="file"
+                                   class="form-control @error('attachment') is-invalid @enderror"
+                                   id="debtReminderAttachment"
+                                   name="attachment"
+                                   accept="application/pdf,.pdf">
+                            @error('attachment')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Opcjonalnie, max 5 MB.</div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" name="send_target" value="recipient" class="btn btn-primary">
+                                <i class="bi bi-envelope me-1"></i>Wyślij e-mail do dłużnika
+                            </button>
+                            <button type="submit" name="send_target" value="test" class="btn btn-outline-primary">
+                                <i class="bi bi-flask me-1"></i>Wyślij e-mail testowy
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="bankPaymentUnlinkModal" tabindex="-1" aria-labelledby="bankPaymentUnlinkModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -1066,6 +1226,73 @@
                     window.bootstrap.Tooltip.getOrCreateInstance(el);
                 });
             }
+
+            (function initDebtReminderModal() {
+                var modalEl = document.getElementById('debtReminderModal');
+                if (!modalEl) {
+                    return;
+                }
+
+                var templates = {};
+                var recipients = [];
+                try {
+                    templates = JSON.parse(modalEl.getAttribute('data-templates') || '{}');
+                } catch (e) {
+                    templates = {};
+                }
+                try {
+                    recipients = JSON.parse(modalEl.getAttribute('data-recipients') || '[]');
+                } catch (e) {
+                    recipients = [];
+                }
+
+                var templateSelect = document.getElementById('debtReminderTemplate');
+                var subjectInput = document.getElementById('debtReminderSubject');
+                var bodyInput = document.getElementById('debtReminderBody');
+                var recipientKey = document.getElementById('debtReminderRecipientKey');
+                var recipientEmail = document.getElementById('debtReminderRecipientEmail');
+                var keepEditedContent = {{ old('subject') || old('body') ? 'true' : 'false' }};
+
+                function applyTemplate(force) {
+                    if (!templateSelect || !subjectInput || !bodyInput) {
+                        return;
+                    }
+                    var key = templateSelect.value;
+                    var payload = templates[key];
+                    if (!payload) {
+                        return;
+                    }
+                    if (force || !subjectInput.value) {
+                        subjectInput.value = payload.subject || '';
+                    }
+                    if (force || !bodyInput.value) {
+                        bodyInput.value = payload.body || '';
+                    }
+                }
+
+                if (templateSelect) {
+                    templateSelect.addEventListener('change', function () {
+                        applyTemplate(true);
+                    });
+                }
+
+                if (recipientKey && recipientEmail) {
+                    recipientKey.addEventListener('change', function () {
+                        var option = recipientKey.options[recipientKey.selectedIndex];
+                        if (option && option.dataset.email) {
+                            recipientEmail.value = option.dataset.email;
+                        }
+                    });
+                }
+
+                applyTemplate(!keepEditedContent);
+
+                @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'test_email', 'attachment', 'send_target']))
+                    if (window.bootstrap && window.bootstrap.Modal) {
+                        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    }
+                @endif
+            })();
 
             var caseNavControls = document.getElementById('caseNavControls');
             var caseNavActiveOnly = document.getElementById('case_nav_active_only');

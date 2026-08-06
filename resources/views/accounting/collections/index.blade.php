@@ -11,6 +11,9 @@
                 <a href="{{ route('accounting.debtors.index') }}" class="btn btn-outline-success btn-sm">
                     <i class="bi bi-search"></i> Lookup faktury
                 </a>
+                <a href="{{ route('accounting.collections.settings.edit') }}" class="btn btn-outline-dark btn-sm">
+                    <i class="bi bi-gear"></i> Ustawienia
+                </a>
             </div>
         </div>
     </x-slot>

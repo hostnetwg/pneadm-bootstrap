@@ -1207,6 +1207,83 @@ class IfirmaApiService
     }
 
     /**
+     * Pobiera PDF faktury krajowej z iFirma (GET fakturakraj/{id}.pdf).
+     *
+     * @param  string|int  $invoiceIdOrNumber  ID iFirma lub numer FV (ukośniki → podkreślenia)
+     * @return array{status: string, content?: string, status_code?: int, message?: string}
+     */
+    public function downloadInvoicePdf(string|int $invoiceIdOrNumber): array
+    {
+        $raw = trim((string) $invoiceIdOrNumber);
+        if ($raw === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Brak identyfikatora faktury',
+            ];
+        }
+
+        $lookup = ctype_digit($raw) ? $raw : str_replace('/', '_', $raw);
+        $endpoint = 'fakturakraj/'.$lookup.'.pdf';
+
+        try {
+            $fullUrl = $this->baseUrl.$this->apiEndpoint.'/'.$endpoint;
+            $authHeader = $this->generateAuthHeader($fullUrl, 'faktura', '');
+
+            Log::info('iFirma API Request (GET PDF)', [
+                'url' => $fullUrl,
+                'endpoint' => $endpoint,
+            ]);
+
+            $response = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authentication' => $authHeader,
+                    'Accept' => 'application/pdf',
+                    'Content-Type' => 'application/pdf; charset=UTF-8',
+                ])
+                ->get($fullUrl);
+
+            $statusCode = $response->status();
+            $body = $response->body();
+
+            if ($response->successful() && $body !== '' && str_starts_with($body, '%PDF')) {
+                Log::info('iFirma API Response (PDF Success)', [
+                    'status' => $statusCode,
+                    'endpoint' => $endpoint,
+                    'bytes' => strlen($body),
+                ]);
+
+                return [
+                    'status' => 'success',
+                    'status_code' => $statusCode,
+                    'content' => $body,
+                ];
+            }
+
+            Log::error('iFirma API Response (PDF Error)', [
+                'status' => $statusCode,
+                'endpoint' => $endpoint,
+                'response_preview' => substr($body, 0, 500),
+            ]);
+
+            return [
+                'status' => 'error',
+                'status_code' => $statusCode,
+                'message' => $this->parseErrorMessage($body) ?: 'Nie udało się pobrać PDF faktury',
+            ];
+        } catch (Exception $e) {
+            Log::error('iFirma API PDF Exception', [
+                'message' => $e->getMessage(),
+                'endpoint' => $endpoint,
+            ]);
+
+            return [
+                'status' => 'exception',
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Parsuje komunikat błędu z odpowiedzi API
      *
      * @param  string  $response  Raw response body
