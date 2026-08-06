@@ -370,18 +370,8 @@
                     </li>
                     @endif
                     <li>
-                        <a href="{{ route('accounting.collections.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.collections.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                        <a href="{{ route('accounting.collections.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.collections.*', 'accounting.bank-imports.*', 'accounting.debtors.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             Windykacja
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('accounting.bank-imports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.bank-imports.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Import wyciągu
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('accounting.debtors.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.debtors.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Lookup faktury
                         </a>
                     </li>
                 </ul>

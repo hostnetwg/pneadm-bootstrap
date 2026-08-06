@@ -436,6 +436,47 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee('Łącznie: 1 zamówień', false);
     }
 
+    public function test_collections_show_explains_related_order_link_reasons(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie bieżące',
+            'product_price' => 400,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '101/8/2026',
+            'buyer_nip' => '9999999999',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'sekretariat@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Szkolenie powiązane',
+            'product_price' => 500,
+            'order_date' => now()->subDays(40),
+            'invoice_number' => '50/7/2026',
+            'buyer_nip' => '8888888888',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'inna@example.test',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+
+        $response->assertOk();
+        $response->assertSee('Historia powiązanych zamówień', false);
+        $response->assertSee('Identyfikacja:', false);
+        $response->assertSee('NIP odbiorcy: 1111111111', false);
+        $response->assertSee('ta sprawa', false);
+        $response->assertSee('Szkolenie powiązane', false);
+    }
+
     public function test_user_can_sync_ifirma_payment_status_on_debt_case(): void
     {
         $user = User::factory()->create([

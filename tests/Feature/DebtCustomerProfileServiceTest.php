@@ -141,6 +141,58 @@ class DebtCustomerProfileServiceTest extends TestCase
         $this->assertLessThan(60, $profile['relationship_score']);
     }
 
+    public function test_link_reasons_for_recipient_nip_strategy(): void
+    {
+        $current = $this->order([
+            'buyer_nip' => '9999999999',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'sekretariat@example.test',
+        ]);
+        $sameSchool = $this->order([
+            'buyer_nip' => '8888888888',
+            'recipient_nip' => '1111111111',
+            'orderer_email' => 'inna@example.test',
+        ]);
+
+        $identity = $this->service()->identityForOrder($current);
+        $reasons = $this->service()->linkReasonsForRelatedOrder($sameSchool, $identity);
+
+        $this->assertSame('recipient_nip', $identity['strategy']);
+        $this->assertSame('NIP odbiorcy: 1111111111', $this->service()->identitySummary($identity));
+        $this->assertCount(1, $reasons);
+        $this->assertSame('recipient_nip', $reasons[0]['key']);
+        $this->assertSame('NIP odbiorcy', $reasons[0]['label']);
+        $this->assertSame('1111111111', $reasons[0]['value']);
+        $this->assertSame('high', $reasons[0]['strength']);
+    }
+
+    public function test_link_reasons_for_recipient_profile_may_include_orderer_email(): void
+    {
+        $current = $this->order([
+            'recipient_name' => 'Szkoła Podstawowa nr 1',
+            'recipient_address' => 'ul. Mickiewicza 7',
+            'recipient_postal_code' => '12-345',
+            'recipient_city' => 'Kurzętnik',
+            'orderer_email' => 'sekretariat@sp1.example.test',
+        ]);
+        $sameProfileAndEmail = $this->order([
+            'recipient_name' => 'Szkoła Podstawowa nr 1',
+            'recipient_address' => 'ul. Mickiewicza 7',
+            'recipient_postal_code' => '12-345',
+            'recipient_city' => 'Kurzętnik',
+            'orderer_email' => 'sekretariat@sp1.example.test',
+        ]);
+
+        $identity = $this->service()->identityForOrder($current);
+        $reasons = $this->service()->linkReasonsForRelatedOrder($sameProfileAndEmail, $identity);
+        $keys = array_column($reasons, 'key');
+
+        $this->assertSame('recipient_profile', $identity['strategy']);
+        $this->assertStringContainsString('Dane odbiorcy', $this->service()->identitySummary($identity));
+        $this->assertContains('recipient_profile', $keys);
+        $this->assertContains('orderer_email', $keys);
+    }
+
     private function service(): DebtCustomerProfileService
     {
         return app(DebtCustomerProfileService::class);

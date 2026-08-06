@@ -841,6 +841,9 @@
 
                     <div class="card">
                         <div class="card-header fw-semibold">Historia powiązanych zamówień</div>
+                        <div class="px-3 pt-2 small text-muted border-bottom">
+                            Identyfikacja: <span class="text-body">{{ $customerIdentitySummary ?? '—' }}</span>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead class="table-light">
@@ -848,20 +851,50 @@
                                         <th>ID</th>
                                         <th>Faktura</th>
                                         <th>Szkolenie</th>
+                                        <th>Powiązanie</th>
                                         <th class="text-end">Kwota</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @forelse($relatedOrders as $relatedOrder)
-                                        <tr>
-                                            <td><a href="{{ route('form-orders.show', $relatedOrder->id) }}">#{{ $relatedOrder->id }}</a></td>
+                                        @php
+                                            $linkReasons = $relatedOrder->link_reasons ?? [];
+                                            $isCurrentOrder = (int) $relatedOrder->id === (int) ($order->id ?? 0);
+                                        @endphp
+                                        <tr @class(['table-primary' => $isCurrentOrder])>
+                                            <td>
+                                                <a href="{{ route('form-orders.show', $relatedOrder->id) }}">#{{ $relatedOrder->id }}</a>
+                                                @if($isCurrentOrder)
+                                                    <span class="badge text-bg-dark ms-1">ta sprawa</span>
+                                                @endif
+                                            </td>
                                             <td>{{ $relatedOrder->invoice_number ?: '—' }}</td>
                                             <td>{{ $relatedOrder->product_name ?: '—' }}</td>
+                                            <td>
+                                                @forelse($linkReasons as $reason)
+                                                    @php
+                                                        $badgeClass = match ($reason['strength'] ?? '') {
+                                                            'high' => 'text-bg-primary',
+                                                            'medium' => 'text-bg-warning',
+                                                            default => 'text-bg-light border',
+                                                        };
+                                                    @endphp
+                                                    <span class="badge {{ $badgeClass }} me-1 mb-1"
+                                                          @if(! empty($reason['value']))
+                                                              data-bs-toggle="tooltip"
+                                                              data-bs-title="{{ $reason['value'] }}"
+                                                          @endif>
+                                                        {{ $reason['label'] }}
+                                                    </span>
+                                                @empty
+                                                    <span class="text-muted">—</span>
+                                                @endforelse
+                                            </td>
                                             <td class="text-end">{{ number_format((float) ($relatedOrder->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="4" class="text-muted text-center py-3">Brak powiązanych zamówień.</td>
+                                            <td colspan="5" class="text-muted text-center py-3">Brak powiązanych zamówień.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

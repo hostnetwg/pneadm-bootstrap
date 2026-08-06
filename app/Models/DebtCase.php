@@ -126,6 +126,19 @@ class DebtCase extends Model
         return self::statusLabels()[$this->status] ?? (string) $this->status;
     }
 
+    public function statusBadgeClass(): string
+    {
+        return match ($this->status) {
+            self::STATUS_OPEN => 'text-bg-primary',
+            self::STATUS_IN_PROGRESS => 'text-bg-info',
+            self::STATUS_PROMISED => 'text-bg-warning',
+            self::STATUS_DISPUTED => 'text-bg-danger',
+            self::STATUS_PAUSED => 'text-bg-secondary',
+            self::STATUS_CLOSED => 'text-bg-success',
+            default => 'text-bg-light border',
+        };
+    }
+
     public function ifirmaPaymentStatusLabel(): string
     {
         return \App\Services\IfirmaInvoicePaymentStatusService::statusLabels()[$this->ifirma_payment_status]

@@ -1,8 +1,18 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">
-            Windykacja
-        </h2>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
+                Windykacja
+            </h2>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-bank"></i> Import wyciągu
+                </a>
+                <a href="{{ route('accounting.debtors.index') }}" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-search"></i> Lookup faktury
+                </a>
+            </div>
+        </div>
     </x-slot>
 
     <div class="py-3">
@@ -214,7 +224,7 @@
                                         <div>{{ $order->recipient_name ?: $order->buyer_name ?: $order->orderer_name ?: '—' }}</div>
                                         <div class="small text-muted">{{ $order->orderer_email ?: $order->display_participant_email }}</div>
                                     </td>
-                                    <td><span class="badge text-bg-secondary">{{ $case->statusLabel() }}</span></td>
+                                    <td><span class="badge {{ $case->statusBadgeClass() }}">{{ $case->statusLabel() }}</span></td>
                                     <td>
                                         <span class="badge {{ $case->isVip() ? 'text-bg-warning' : 'text-bg-light border' }}">
                                             {{ $case->segmentLabel() }}

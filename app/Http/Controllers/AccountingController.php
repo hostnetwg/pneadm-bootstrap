@@ -441,6 +441,16 @@ class AccountingController extends Controller
             ->orderByDesc('id')
             ->first(['id']);
 
+        $identity = $profile['identity'];
+        $relatedOrders = $profileService->relatedOrders($identity)->map(function (FormOrder $relatedOrder) use ($profileService, $identity) {
+            $relatedOrder->setAttribute(
+                'link_reasons',
+                $profileService->linkReasonsForRelatedOrder($relatedOrder, $identity)
+            );
+
+            return $relatedOrder;
+        });
+
         return view('accounting.collections.show', [
             'case' => $debtCase,
             'previousCase' => $previousCaseActive,
@@ -450,7 +460,8 @@ class AccountingController extends Controller
             'previousCaseActive' => $previousCaseActive,
             'nextCaseActive' => $nextCaseActive,
             'profile' => $profile,
-            'relatedOrders' => $profileService->relatedOrders($profile['identity']),
+            'customerIdentitySummary' => $profileService->identitySummary($identity),
+            'relatedOrders' => $relatedOrders,
             'statusLabels' => DebtCase::statusLabels(),
             'segmentLabels' => DebtCase::segmentLabels(),
             'actionTypeLabels' => collect(DebtCaseAction::typeLabels())

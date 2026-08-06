@@ -152,6 +152,38 @@ class DebtCustomerProfileService
      *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
      *     orderer_email: ?string
      * }  $identity
+     */
+    public function identitySummary(array $identity): string
+    {
+        $label = $this->strategyLabel($identity['strategy']);
+
+        $value = match ($identity['strategy']) {
+            'recipient_nip' => $identity['recipient_nip'] ?? '',
+            'buyer_nip' => $identity['buyer_nip'] ?? '',
+            'orderer_email' => $identity['orderer_email'] ?? '',
+            'recipient_profile' => $identity['recipient_profile']
+                ? trim(
+                    ($identity['recipient_profile']['name'] ?? '').', '
+                    .($identity['recipient_profile']['postal_code'] ?? '').' '
+                    .($identity['recipient_profile']['city'] ?? '')
+                )
+                : '',
+            default => '',
+        };
+
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
+
+        return $value !== '' ? $label.': '.$value : $label;
+    }
+
+    /**
+     * @param  array{
+     *     strategy: string,
+     *     recipient_nip: ?string,
+     *     buyer_nip: ?string,
+     *     recipient_profile: ?array{name: string, address: string, postal_code: string, city: string},
+     *     orderer_email: ?string
+     * }  $identity
      * @return list<array{key: string, label: string, value: string, strength: string}>
      */
     public function linkReasonsForRelatedOrder(FormOrder $related, array $identity): array

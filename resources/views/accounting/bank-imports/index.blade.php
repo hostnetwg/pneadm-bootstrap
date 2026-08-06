@@ -1,6 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">Import wyciągu mBank</h2>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">Import wyciągu mBank</h2>
+            <a href="{{ route('accounting.collections.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Wróć do windykacji
+            </a>
+        </div>
     </x-slot>
 
     <div class="py-3">

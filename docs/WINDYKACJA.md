@@ -23,8 +23,10 @@ Identyfikatory faktury na `form_orders` (używane przy synchronizacji statusu z 
 Pierwszy etap obejmuje:
 
 - dashboard spraw windykacyjnych pod `accounting.collections.*`,
+  - w menu Księgowość jedna pozycja **Windykacja**; **Import wyciągu** i **Lookup faktury** są przyciskami u góry listy spraw (trasy bez osobnych pozycji w menu),
   - domyślny filtr listy: **Niezamknięte** (`status=active` / `DebtCase::active()`); kafelek „Aktywne sprawy” ustawia ten filtr; opcja „Wszystkie” to `status=all` (puste `status=` też działa wstecznie); paginacja zachowuje `search` / `status` / `segment` przez `appends()`,
   - wyszukiwarka listy: FV/KSeF/nazwa/NIP/e-mail oraz numeryczne ID sprawy / zamówienia (`form_orders.id`),
+  - kolumna Status na liście: kolorowe badge (`DebtCase::statusBadgeClass()` — Nowa niebieski, W toku cyan, Obietnica żółty, Sporne czerwony, Wstrzymane szary, Zamknięte zielony),
 - tworzenie sprawy z `form_orders.id`,
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
@@ -72,6 +74,11 @@ Powiązane zamówienia i VIP są liczone według jednej reguły „kto jest klie
 E-mail uczestnika nie bierze udziału w tej regule, bo uczestnik szkolenia często nie jest klientem decyzyjnym. Istniejące sprawy można przeliczyć komendą `sail artisan debt-cases:recalculate-profiles` (dry-run) oraz `sail artisan debt-cases:recalculate-profiles --apply` po akceptacji wyniku. Komenda nie zmienia `manual_vip`.
 
 Ta sama reguła buduje historię powiązanych zamówień na `/accounting/debtors` (`accounting.debtors.lookup` → `DebtCustomerProfileService::relatedOrders`), na karcie sprawy oraz przy liczeniu VIP. Filtry checkboxów na debtors tylko zawężają widok po typie `link_reasons` zwróconym dla aktywnej strategii — nie łączą już OR-em NIP nabywcy / e-maili uczestnika z NIP odbiorcy.
+
+Na karcie sprawy (`/accounting/collections/{id}`) sekcja **Historia powiązanych zamówień** pokazuje:
+- linię **Identyfikacja:** ze strategią i wartością (`DebtCustomerProfileService::identitySummary`),
+- kolumnę **Powiązanie** z badge’ami powodów (`linkReasonsForRelatedOrder`; tooltip z wartością NIP/e-mail/danych),
+- wyróżnienie wiersza zamówienia bieżącej sprawy (`ta sprawa`).
 
 ## Synchronizacja statusu płatności z iFirma (odczyt)
 
