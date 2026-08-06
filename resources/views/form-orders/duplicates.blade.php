@@ -317,7 +317,7 @@
                                                         </div>
                                                         <div class="col-6">
                                                             <strong>Szkolenie:</strong><br>
-                                                            {{ $order->product_name }}<br>
+                                                            {{ $order->display_product_name }}<br>
                                                             <small class="text-muted">
                                                                 ID kursu: {{ $order->product_id ?? '—' }}
                                                                 @if($order->publigo_product_id)

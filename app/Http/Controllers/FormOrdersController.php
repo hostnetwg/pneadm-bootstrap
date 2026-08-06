@@ -3492,6 +3492,8 @@ class FormOrdersController extends Controller
      */
     private function ifirmaNazwaPelnaFromRequest(Request $request, string $productName): string
     {
+        $productName = FormOrder::plainProductName($productName, '');
+
         if (! $request->boolean('prefix_szkolenie_in_product_name')) {
             return $productName;
         }

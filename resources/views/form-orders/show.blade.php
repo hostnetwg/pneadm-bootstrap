@@ -167,10 +167,10 @@
                             <a href="{{ route('courses.show', $zamowienie->course->id) }}"
                                class="link-light link-underline-opacity-25 link-underline-opacity-100-hover"
                                title="Przejdź do szczegółów szkolenia">
-                                {{ $zamowienie->product_name ?? '—' }}
+                                {{ $zamowienie->display_product_name }}
                             </a>
                         @else
-                            {{ $zamowienie->product_name ?? '—' }}
+                            {{ $zamowienie->display_product_name }}
                         @endif
                         @if($zamowienie->product_price)
                             <span class="badge bg-success ms-2 fs-6">
@@ -3178,7 +3178,7 @@ nowoczesna-edukacja.pl `;
                         <ul class="mb-0">
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
-                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->display_product_name }}</li>
                             @if($zamowienie->publigo_sent_at)
                                 <li><strong>Data wysłania do Publigo:</strong> {{ $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
                             @endif
@@ -3219,7 +3219,7 @@ nowoczesna-edukacja.pl `;
                         <ul class="mb-0">
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
-                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->display_product_name }}</li>
                             @if($zamowienie->pnedu_provisioned_at)
                                 <li><strong>Data przyznania dostępu PNEDU:</strong> {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
                             @endif
@@ -3377,7 +3377,7 @@ nowoczesna-edukacja.pl `;
                         <ul class="mb-0">
                             <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
                             <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
-                            <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                            <li><strong>Szkolenie:</strong> {{ $zamowienie->display_product_name }}</li>
                             @php
                                 $orderDateFormatted = $zamowienie->formatOrderDateLocal() ?? '—';
                             @endphp

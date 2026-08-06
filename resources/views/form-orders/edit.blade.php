@@ -130,7 +130,7 @@
                                         <label for="product_name" class="form-label">Nazwa szkolenia (z bazy kursów, aktualizowana automatycznie)</label>
                                         <input type="text" class="form-control"
                                                id="product_name" name="product_name"
-                                               value="{{ old('product_name', $zamowienie->product_name) }}" readonly>
+                                               value="{{ old('product_name', $zamowienie->display_product_name) }}" readonly>
                                     </div>
                                 </div>
                                 @if($zamowienie->publigo_product_id)

@@ -469,10 +469,10 @@
                                             <a href="{{ route('courses.show', $zamowienie->course->id) }}"
                                                class="link-primary link-underline-opacity-25 link-underline-opacity-100-hover"
                                                title="Przejdź do szczegółów szkolenia">
-                                                {{ $zamowienie->product_name ?? '—' }}
+                                                {{ $zamowienie->display_product_name }}
                                             </a>
                                         @else
-                                            {{ $zamowienie->product_name ?? '—' }}
+                                            {{ $zamowienie->display_product_name }}
                                         @endif
                                     </div>
                                     @php
@@ -795,7 +795,7 @@
                                             <ul class="mb-0">
                                                 <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
                                                 <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
-                                                <li><strong>Szkolenie:</strong> {{ $zamowienie->product_name }}</li>
+                                                <li><strong>Szkolenie:</strong> {{ $zamowienie->display_product_name }}</li>
                                                 @php
                                                     $orderDateFormatted = $zamowienie->formatOrderDateLocal();
                                                 @endphp

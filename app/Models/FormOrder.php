@@ -865,6 +865,23 @@ class FormOrder extends Model
     }
 
     /**
+     * Nazwa szkolenia bez HTML i &nbsp; — do UI tekstowego i pozycji faktury iFirma.
+     */
+    public function getDisplayProductNameAttribute(): string
+    {
+        return self::plainProductName($this->product_name);
+    }
+
+    public static function plainProductName(?string $value, string $fallback = '—'): string
+    {
+        if ($value === null || trim($value) === '') {
+            return $fallback;
+        }
+
+        return (new Course(['title' => $value]))->plainTitle($fallback);
+    }
+
+    /**
      * Accessor - liczba uczestników (z nowej tabeli)
      */
     public function getParticipantsCountAttribute(): int
