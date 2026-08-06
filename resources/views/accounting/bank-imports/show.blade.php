@@ -503,7 +503,8 @@
                     <div class="border-top pt-3 mt-3 d-none" id="bankTxManualLinkPanel">
                         <h6 class="fw-semibold mb-2">Powiąż ręcznie ze sprawą lub zamówieniem</h6>
                         <p class="small text-muted mb-2">
-                            Szukaj po FV, KSeF, ID sprawy/zamówienia, NIP, nazwie, adresie/mieście nabywcy lub odbiorcy albo e-mailu.
+                            Szukaj po FV, KSeF, ID sprawy/zamówienia, NIP, nazwie, adresie/mieście nabywcy lub odbiorcy, e-mailu
+                            albo notatkach zamówienia (w tym numerze anulowanej FV).
                             Wielkość liter nie ma znaczenia.
                             Najpierw pokazujemy <strong>niezamknięte sprawy</strong>, potem zamówienia <strong>bez aktywnej sprawy</strong>
                             (np. gdy wpłatę oznaczono wcześniej tylko w iFirma).

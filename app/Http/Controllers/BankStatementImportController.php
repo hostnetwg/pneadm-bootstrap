@@ -553,6 +553,16 @@ class BankStatementImportController extends Controller
                         );
                     }
                 }
+
+                $titleExtractor = new \App\Services\Bank\PaymentTitleExtractor;
+                if ($exact && $titleExtractor->looksLikeInvoiceNumber($query)) {
+                    $notesPattern = $titleExtractor->invoiceNumberSqlBoundaryPattern($query);
+                    $inner->orWhereRaw('notes REGEXP ?', [$notesPattern])
+                        ->orWhereRaw('invoice_notes REGEXP ?', [$notesPattern]);
+                } else {
+                    $inner->orWhere('notes', 'like', "%{$query}%")
+                        ->orWhere('invoice_notes', 'like', "%{$query}%");
+                }
             });
         };
 

@@ -134,6 +134,11 @@ class BankTransactionMatch extends Model
 
                 continue;
             }
+            if (str_starts_with($reason, 'invoice_number_in_notes:')) {
+                $labels[] = 'Numer FV z tytułu przelewu występuje w notatkach zamówienia (np. anulowana FV): '.substr($reason, strlen('invoice_number_in_notes:'));
+
+                continue;
+            }
             if (str_starts_with($reason, 'ksef_mismatch:')) {
                 $labels[] = 'Konflikt KSeF: w tytule przelewu jest inny numer niż na zamówieniu ('.substr($reason, strlen('ksef_mismatch:')).')';
 

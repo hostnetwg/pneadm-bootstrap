@@ -60,6 +60,50 @@ class PaymentTitleExtractor
         return $number;
     }
 
+    public function looksLikeInvoiceNumber(string $value): bool
+    {
+        $normalized = preg_replace('/\s+/', '', trim($value)) ?? '';
+
+        return (bool) preg_match('/^\d{1,6}\/\d{1,2}\/\d{4}$/', $normalized);
+    }
+
+    /**
+     * Wzorzec MySQL REGEXP: numer FV jako osobny token (bez dopasowania 63/6/2026 w 263/6/2026).
+     */
+    public function invoiceNumberSqlBoundaryPattern(string $invoiceNumber): string
+    {
+        $normalized = preg_quote($this->normalizeInvoiceNumber($invoiceNumber), '/');
+
+        return '(^|[^0-9/])'.$normalized.'([^0-9/]|$)';
+    }
+
+    /**
+     * Numery FV występujące w notatkach zamówienia (poza aktualnym numerem FV).
+     *
+     * @return list<string>
+     */
+    public function extractHistoricalInvoiceNumbersFromNotes(?string $notes, ?string $invoiceNotes, ?string $currentInvoiceNumber = null): array
+    {
+        $combined = trim(trim((string) $notes)."\n".trim((string) $invoiceNotes));
+        if ($combined === '') {
+            return [];
+        }
+
+        $current = $currentInvoiceNumber !== null && trim($currentInvoiceNumber) !== ''
+            ? $this->normalizeInvoiceNumber($currentInvoiceNumber)
+            : null;
+
+        $found = [];
+        foreach ($this->extract($combined)['invoice_numbers'] as $number) {
+            if ($current !== null && $number === $current) {
+                continue;
+            }
+            $found[] = $number;
+        }
+
+        return array_values(array_unique($found));
+    }
+
     /**
      * @return list<string>
      */

@@ -292,4 +292,38 @@ class BankTransactionMatcherTest extends TestCase
             collect($suggestions[0]['match_reasons'])->contains(fn ($r) => str_starts_with((string) $r, 'invoice_number_mismatch:'))
         );
     }
+
+    public function test_suggests_order_when_transfer_uses_cancelled_invoice_number_from_notes(): void
+    {
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po anulowanej FV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '140/7/2026',
+            'notes' => 'Anulowano FV 138/7/2026, wystawiono poprawną',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Szkoła Podstawowa w Parchowie',
+        ]);
+
+        $tx = new BankTransaction([
+            'operation_date' => '2026-07-22',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'SZKOLA PODSTAWOWA W PARCHOWIE 138/7/2026 PRZELEW',
+            'is_incoming' => true,
+            'fingerprint' => 'test-fp-cancelled-in-notes',
+        ]);
+
+        $suggestions = (new BankTransactionMatcher)->suggest($tx);
+
+        $this->assertNotEmpty($suggestions);
+        $this->assertSame($order->id, $suggestions[0]['form_order_id']);
+        $this->assertSame(BankTransactionMatch::CONFIDENCE_HIGH, $suggestions[0]['confidence']);
+        $this->assertTrue(
+            collect($suggestions[0]['match_reasons'])->contains(fn ($r) => str_starts_with((string) $r, 'invoice_number_in_notes:'))
+        );
+        $this->assertContains('amount_match', $suggestions[0]['match_reasons']);
+    }
 }

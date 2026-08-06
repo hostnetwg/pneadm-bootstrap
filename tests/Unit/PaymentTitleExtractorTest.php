@@ -104,4 +104,28 @@ class PaymentTitleExtractorTest extends TestCase
 
         $this->assertContains('7392137630-20260708-4A4C66000005-EA', $result['ksef_numbers']);
     }
+
+    public function test_extracts_historical_invoice_numbers_from_notes_excluding_current(): void
+    {
+        $extractor = new PaymentTitleExtractor;
+
+        $found = $extractor->extractHistoricalInvoiceNumbersFromNotes(
+            'Anulowano FV 138/7/2026, wystawiono nową',
+            null,
+            '140/7/2026'
+        );
+
+        $this->assertSame(['138/7/2026'], $found);
+    }
+
+    public function test_invoice_number_sql_boundary_pattern_avoids_fragment_match(): void
+    {
+        $extractor = new PaymentTitleExtractor;
+
+        $this->assertTrue($extractor->looksLikeInvoiceNumber('138/7/2026'));
+        $this->assertSame(
+            '(^|[^0-9/])138\/7\/2026([^0-9/]|$)',
+            $extractor->invoiceNumberSqlBoundaryPattern('138/7/2026')
+        );
+    }
 }

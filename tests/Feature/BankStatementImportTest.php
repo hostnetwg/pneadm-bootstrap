@@ -764,6 +764,63 @@ class BankStatementImportTest extends TestCase
         $response->assertJsonPath('orders.0.id', $order->id);
     }
 
+    public function test_lookup_cases_finds_order_by_cancelled_invoice_number_in_notes(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po anulowanej FV',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '140/7/2026',
+            'notes' => 'Anulowano FV 138/7/2026, wystawiono poprawną 140/7/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Szkoła Podstawowa w Parchowie',
+        ]);
+
+        $byNotes = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '138/7/2026',
+        ]));
+        $byNotes->assertOk();
+        $byNotes->assertJsonPath('orders.0.id', $order->id);
+
+        $exact = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '138/7/2026',
+            'exact' => '1',
+        ]));
+        $exact->assertOk();
+        $exact->assertJsonPath('orders.0.id', $order->id);
+    }
+
+    public function test_lookup_cases_finds_order_by_cancelled_invoice_number_in_invoice_notes(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie po anulowanej FV w uwagach',
+            'product_price' => 365,
+            'order_date' => now()->subDays(8),
+            'invoice_number' => '150/7/2026',
+            'invoice_notes' => 'Anulowano poprzednią FV 138/7/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '138/7/2026',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('orders.0.id', $order->id);
+    }
+
     public function test_lookup_order_preview_returns_order_payload(): void
     {
         $user = User::factory()->create([

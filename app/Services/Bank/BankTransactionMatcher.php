@@ -21,6 +21,9 @@ class BankTransactionMatcher
     /** @var array<string, list<FormOrder>>|null */
     private ?array $ordersByKsef = null;
 
+    /** @var array<string, list<FormOrder>>|null */
+    private ?array $ordersByInvoiceInNotes = null;
+
     /** @var array<int, FormOrder>|null */
     private ?array $ordersById = null;
 
@@ -46,6 +49,7 @@ class BankTransactionMatcher
     {
         $this->ordersByInvoice = [];
         $this->casesByInvoice = [];
+        $this->ordersByInvoiceInNotes = [];
         $this->ordersByKsef = [];
         $this->ordersById = [];
         $this->ordersByNip = [];
@@ -62,6 +66,8 @@ class BankTransactionMatcher
                 'buyer_name',
                 'recipient_nip',
                 'recipient_name',
+                'notes',
+                'invoice_notes',
             ])
             ->whereNotNull('invoice_number')
             ->where('invoice_number', '!=', '')
@@ -92,6 +98,14 @@ class BankTransactionMatcher
                     $recipientNip = preg_replace('/\D+/', '', (string) ($order->recipient_nip ?? '')) ?: '';
                     if (strlen($recipientNip) === 10 && $recipientNip !== $buyerNip) {
                         $this->ordersByNip[$recipientNip][] = $order;
+                    }
+
+                    foreach ($this->titleExtractor->extractHistoricalInvoiceNumbersFromNotes(
+                        is_string($order->notes) ? $order->notes : null,
+                        is_string($order->invoice_notes) ? $order->invoice_notes : null,
+                        is_string($order->invoice_number) ? $order->invoice_number : null
+                    ) as $historicalInvoice) {
+                        $this->ordersByInvoiceInNotes[$historicalInvoice][] = $order;
                     }
                 }
             });
@@ -162,6 +176,40 @@ class BankTransactionMatcher
                 } else {
                     $reasons[] = 'amount_mismatch';
                     $score = 40;
+                }
+
+                $debtCase = $this->activeDebtCaseForOrder($order);
+                if ($debtCase) {
+                    $reasons[] = 'existing_debt_case';
+                    $score += 5;
+                }
+
+                $candidates[$key] = $this->mergeCandidate($candidates[$key] ?? null, [
+                    'form_order_id' => $order->id,
+                    'debt_case_id' => $debtCase?->id,
+                    'confidence' => $confidence,
+                    'match_reasons' => $reasons,
+                    'score' => $score,
+                ]);
+            }
+
+            foreach ($this->findOrdersByInvoiceInNotes($invoiceNumber) as $order) {
+                $key = 'order:'.$order->id;
+                if (isset($candidates[$key])) {
+                    continue;
+                }
+
+                $reasons = ['invoice_number_in_notes:'.$invoiceNumber];
+                $confidence = BankTransactionMatch::CONFIDENCE_MEDIUM;
+                $score = 48;
+
+                if ($this->amountsMatch($amount, (float) $order->product_price)) {
+                    $confidence = BankTransactionMatch::CONFIDENCE_HIGH;
+                    $score = 98;
+                    $reasons[] = 'amount_match';
+                } else {
+                    $reasons[] = 'amount_mismatch';
+                    $score = 38;
                 }
 
                 $debtCase = $this->activeDebtCaseForOrder($order);
@@ -632,6 +680,31 @@ class BankTransactionMatcher
             ->where('invoice_number', '!=', '')
             ->where('invoice_number', '!=', '0')
             ->whereRaw("REPLACE(invoice_number, ' ', '') = ?", [$normalized])
+            ->limit(10)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, FormOrder>
+     */
+    private function findOrdersByInvoiceInNotes(string $invoiceNumber): Collection
+    {
+        $normalized = $this->titleExtractor->normalizeInvoiceNumber($invoiceNumber);
+        $pattern = $this->titleExtractor->invoiceNumberSqlBoundaryPattern($invoiceNumber);
+
+        if ($this->cachesWarmed) {
+            return collect($this->ordersByInvoiceInNotes[$normalized] ?? [])->take(10);
+        }
+
+        return FormOrder::query()
+            ->whereNotNull('invoice_number')
+            ->where('invoice_number', '!=', '')
+            ->where('invoice_number', '!=', '0')
+            ->whereRaw("REPLACE(COALESCE(invoice_number, ''), ' ', '') != ?", [$normalized])
+            ->where(function ($q) use ($pattern) {
+                $q->whereRaw('notes REGEXP ?', [$pattern])
+                    ->orWhereRaw('invoice_notes REGEXP ?', [$pattern]);
+            })
             ->limit(10)
             ->get();
     }
