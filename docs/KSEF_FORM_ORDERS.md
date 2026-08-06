@@ -294,6 +294,11 @@ daty FV i tak są odświeżane, jeśli są w payloadzie. Po korekcie anulującej
 dokumencie w iFirma trzeba najpierw wystawić fakturę ponownie z panelu (nowe ID),
 potem zsynchronizować KSeF.
 
+**Daty FV przy wystawianiu (2026-08):** po `fakturakraj.json` panel robi `GET` faktury
+(jak przy sync KSeF) i zapisuje `invoice_issue_date` / `invoice_due_date` od razu
+wraz z numerem FV i ID iFirma; JSON odpowiedzi zawiera te daty, a UI odświeża blok dat
+bez przeładowania strony.
+
 ### Wspólny builder — `App\Services\IfirmaKontrahentBuilder`
 
 Wszystkie cztery metody kontrolera budują `Kontrahent` przez jedno miejsce:

@@ -6,12 +6,14 @@ use App\Models\CertificateTemplate;
 use App\Models\Course;
 use App\Models\CourseLocation;
 use App\Models\CourseOnlineDetails;
+use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
 use App\Models\Instructor;
 use App\Models\Participant;
 use App\Models\ParticipantEmail;
 use App\Models\User;
+use App\Services\DebtCaseInvoicePdfService;
 use Illuminate\Http\Request;
 
 class TrashController extends Controller
@@ -101,6 +103,11 @@ class TrashController extends Controller
                 'display_fields' => ['name', 'slug', 'description'],
                 'label' => 'Szablony certyfikatów',
             ],
+            'debt_cases' => [
+                'model' => DebtCase::class,
+                'display_fields' => ['id', 'form_order_id', 'invoice_number', 'status'],
+                'label' => 'Sprawy windykacyjne',
+            ],
         ];
 
         // Pobieranie danych dla wybranej tabeli lub wszystkich
@@ -183,6 +190,13 @@ class TrashController extends Controller
             }
 
             $record = $modelClass::onlyTrashed()->findOrFail($id);
+
+            if ($table === 'debt_cases' && $record instanceof DebtCase) {
+                if ($record->hasInvoicePdf()) {
+                    app(DebtCaseInvoicePdfService::class)->delete($record);
+                }
+            }
+
             $record->forceDelete();
 
             return redirect()->back()->with('success', 'Rekord został trwale usunięty!');
@@ -205,6 +219,16 @@ class TrashController extends Controller
             }
 
             $count = $modelClass::onlyTrashed()->count();
+
+            if ($table === 'debt_cases') {
+                $pdfService = app(DebtCaseInvoicePdfService::class);
+                $modelClass::onlyTrashed()->get()->each(function (DebtCase $case) use ($pdfService) {
+                    if ($case->hasInvoicePdf()) {
+                        $pdfService->delete($case);
+                    }
+                });
+            }
+
             $modelClass::onlyTrashed()->forceDelete();
 
             return redirect()->back()->with('success', "Kosz dla tabeli '{$table}' został opróżniony. Usunięto {$count} rekordów.");
@@ -232,9 +256,18 @@ class TrashController extends Controller
                 'course_locations' => CourseLocation::class,
                 'course_online_details' => CourseOnlineDetails::class,
                 'certificate_templates' => CertificateTemplate::class,
+                'debt_cases' => DebtCase::class,
             ];
 
             foreach ($tables as $tableName => $modelClass) {
+                if ($tableName === 'debt_cases') {
+                    $pdfService = app(DebtCaseInvoicePdfService::class);
+                    $modelClass::onlyTrashed()->get()->each(function (DebtCase $case) use ($pdfService) {
+                        if ($case->hasInvoicePdf()) {
+                            $pdfService->delete($case);
+                        }
+                    });
+                }
                 $count = $modelClass::onlyTrashed()->count();
                 $modelClass::onlyTrashed()->forceDelete();
                 $totalDeleted += $count;
@@ -263,6 +296,7 @@ class TrashController extends Controller
             'course_locations' => CourseLocation::class,
             'course_online_details' => CourseOnlineDetails::class,
             'certificate_templates' => CertificateTemplate::class,
+            'debt_cases' => DebtCase::class,
         ];
 
         return $modelMap[$table] ?? null;

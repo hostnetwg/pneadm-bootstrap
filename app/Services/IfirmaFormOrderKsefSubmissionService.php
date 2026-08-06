@@ -190,6 +190,8 @@ class IfirmaFormOrderKsefSubmissionService
             'invoice_id' => $invoiceId,
             'invoice_number' => $invoiceNumber,
             'invoice_created' => true,
+            'invoice_issue_date' => $zamowienie->invoice_issue_date?->toDateString(),
+            'invoice_due_date' => $zamowienie->invoice_due_date?->toDateString(),
             'ksef_number' => $ksefNumber,
             'ksef_sent_at' => $zamowienie->ksef_sent_at?->toDateTimeString(),
             'email_sent' => $emailsSent !== [],

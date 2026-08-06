@@ -2118,7 +2118,7 @@ class FormOrdersController extends Controller
                         if (! empty($invoiceId)) {
                             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
                         }
-                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2137,13 +2137,24 @@ class FormOrdersController extends Controller
                                 'new_values' => array_filter([
                                     'invoice_number' => $invoiceNumber,
                                     'ifirma_invoice_id' => ! empty($invoiceId) ? (string) $invoiceId : null,
+                                    'invoice_issue_date' => $zamowienie->invoice_issue_date?->toDateString(),
+                                    'invoice_due_date' => $zamowienie->invoice_due_date?->toDateString(),
                                 ]),
                             ]
                         );
-                    } elseif (! empty($invoiceId) && empty($zamowienie->ifirma_invoice_id)) {
-                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    } elseif (! empty($invoiceId)) {
+                        if (empty($zamowienie->ifirma_invoice_id)) {
+                            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        }
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                         $zamowienie->save();
                     }
+                } elseif (! empty($invoiceId)) {
+                    if (empty($zamowienie->ifirma_invoice_id)) {
+                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    }
+                    $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
+                    $zamowienie->save();
                 }
 
                 // Wysyłka e-mailem (jeśli zaznaczono checkbox)
@@ -2214,7 +2225,7 @@ class FormOrdersController extends Controller
                     $message .= ' (Błędy wysyłki: '.count($emailErrors).')';
                 }
 
-                return response()->json([
+                return response()->json(array_merge([
                     'success' => true,
                     'message' => $message,
                     'invoice_number' => $invoiceNumber,
@@ -2224,7 +2235,7 @@ class FormOrdersController extends Controller
                     'emails_sent' => $emailsSent,
                     'email_errors' => $emailErrors,
                     'created_at' => now()->format('d.m.Y H:i'),
-                ]);
+                ], $this->invoiceDocumentDatesJsonPayload($zamowienie)));
             } else {
                 return response()->json([
                     'success' => false,
@@ -2476,7 +2487,7 @@ class FormOrdersController extends Controller
                         if (! empty($invoiceId)) {
                             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
                         }
-                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2495,13 +2506,24 @@ class FormOrdersController extends Controller
                                 'new_values' => array_filter([
                                     'invoice_number' => $invoiceNumber,
                                     'ifirma_invoice_id' => ! empty($invoiceId) ? (string) $invoiceId : null,
+                                    'invoice_issue_date' => $zamowienie->invoice_issue_date?->toDateString(),
+                                    'invoice_due_date' => $zamowienie->invoice_due_date?->toDateString(),
                                 ]),
                             ]
                         );
-                    } elseif (! empty($invoiceId) && empty($zamowienie->ifirma_invoice_id)) {
-                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    } elseif (! empty($invoiceId)) {
+                        if (empty($zamowienie->ifirma_invoice_id)) {
+                            $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                        }
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                         $zamowienie->save();
                     }
+                } elseif (! empty($invoiceId)) {
+                    if (empty($zamowienie->ifirma_invoice_id)) {
+                        $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    }
+                    $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
+                    $zamowienie->save();
                 }
 
                 // Wysyłka e-mailem (jeśli zaznaczono checkbox)
@@ -2572,7 +2594,7 @@ class FormOrdersController extends Controller
                     $message .= ' (Błędy wysyłki: '.count($emailErrors).')';
                 }
 
-                return response()->json([
+                return response()->json(array_merge([
                     'success' => true,
                     'message' => $message,
                     'invoice_number' => $invoiceNumber,
@@ -2582,7 +2604,7 @@ class FormOrdersController extends Controller
                     'emails_sent' => $emailsSent,
                     'email_errors' => $emailErrors,
                     'created_at' => now()->format('d.m.Y H:i'),
-                ]);
+                ], $this->invoiceDocumentDatesJsonPayload($zamowienie)));
             } else {
                 return response()->json([
                     'success' => false,
@@ -2839,6 +2861,7 @@ class FormOrdersController extends Controller
 
             // Pobierz pełny numer faktury
             $invoiceNumber = null;
+            $fullInvoiceData = null;
             try {
                 $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
                 if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
@@ -2863,13 +2886,13 @@ class FormOrdersController extends Controller
             );
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
-            $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
+            $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
             $zamowienie->save();
 
             $resolvedInvoiceNumber = (string) ($invoiceNumber ?: $invoiceId);
 
             if ($phase === 'create') {
-                return response()->json([
+                return response()->json(array_merge([
                     'success' => true,
                     'phase' => 'create',
                     'step' => 'invoice_created',
@@ -2878,7 +2901,7 @@ class FormOrdersController extends Controller
                     'invoice_number' => $resolvedInvoiceNumber,
                     'invoice_created' => true,
                     'ifirma_response' => $result['data'] ?? null,
-                ]);
+                ], $this->invoiceDocumentDatesJsonPayload($zamowienie)));
             }
 
             return app(IfirmaFormOrderKsefSubmissionService::class)->submit(
@@ -3373,15 +3396,45 @@ class FormOrdersController extends Controller
     }
 
     /**
-     * Zapisuje na zamówieniu daty FV z payloadu wysłanego/odebranego z iFirma.
+     * Zapisuje na zamówieniu daty FV.
+     * Preferuje pola z GET faktury iFirma (jak sync KSeF); fallback: payload wysłany przy wystawieniu.
      *
-     * @param  array<string, mixed>  $invoiceData
+     * @param  array<string, mixed>  $outboundInvoiceData
+     * @param  array<string, mixed>|null  $fetchedInvoiceData surowa odpowiedź getInvoice / data
      */
-    private function applyInvoiceDocumentDatesFromPayload(FormOrder $zamowienie, array $invoiceData): void
+    private function applyInvoiceDocumentDatesFromPayload(
+        FormOrder $zamowienie,
+        array $outboundInvoiceData,
+        ?array $fetchedInvoiceData = null
+    ): void {
+        $fetched = [];
+        if ($fetchedInvoiceData !== null && $fetchedInvoiceData !== []) {
+            $fetched = app(\App\Services\IfirmaApiService::class)->unwrapInvoicePayload($fetchedInvoiceData);
+        }
+
+        $issue = $fetched['DataWystawienia']
+            ?? $fetched['DataWystawieniaFaktury']
+            ?? $outboundInvoiceData['DataWystawienia']
+            ?? null;
+        $due = $fetched['TerminPlatnosci']
+            ?? $outboundInvoiceData['TerminPlatnosci']
+            ?? null;
+
+        $zamowienie->applyInvoiceDocumentDates(
+            $issue !== null && $issue !== '' ? (string) $issue : null,
+            $due !== null && $due !== '' ? (string) $due : null
+        );
+    }
+
+    /**
+     * @return array{invoice_issue_date: ?string, invoice_due_date: ?string}
+     */
+    private function invoiceDocumentDatesJsonPayload(FormOrder $zamowienie): array
     {
-        $issue = isset($invoiceData['DataWystawienia']) ? (string) $invoiceData['DataWystawienia'] : null;
-        $due = isset($invoiceData['TerminPlatnosci']) ? (string) $invoiceData['TerminPlatnosci'] : null;
-        $zamowienie->applyInvoiceDocumentDates($issue, $due);
+        return [
+            'invoice_issue_date' => $zamowienie->invoice_issue_date?->toDateString(),
+            'invoice_due_date' => $zamowienie->invoice_due_date?->toDateString(),
+        ];
     }
 
     /**

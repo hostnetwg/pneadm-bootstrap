@@ -31,7 +31,7 @@ Pierwszy etap obejmuje:
 - tworzenie sprawy z `form_orders.id`,
   - **wymagana wystawiona FV** (`invoice_number` lub `ifirma_invoice_id`) — bez FV backend blokuje; na `/form-orders/{id}` przycisk jest nieaktywny,
   - **modal Bootstrap** przed utworzeniem (zamówienie, form-orders, lookup / lista windykacji — nie natychmiastowy POST),
-  - **Usuń błędną sprawę** (soft delete) na karcie sprawy, gdy brak zaakceptowanego przelewu z wyciągu; ponowne utworzenie przywraca soft-deleted (`withTrashed` + restore),
+  - **Usuń błędną sprawę** (soft delete) na karcie sprawy, gdy brak zaakceptowanego przelewu z wyciągu; ponowne utworzenie przywraca soft-deleted (`withTrashed` + restore); soft-deleted sprawy są też w `/trash` (filtr „Sprawy windykacyjne”) — przywrócenie lub trwałe usunięcie (cascade akcji/kontaktów; PDF kasowany z dysku),
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,

@@ -1632,6 +1632,7 @@ nowoczesna-edukacja.pl `;
                     if (data.invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.invoice_id);
                     }
+                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
                     
                 } else {
                     // Błąd
@@ -1908,6 +1909,7 @@ nowoczesna-edukacja.pl `;
                     if (data.invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.invoice_id);
                     }
+                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
                 } else {
                     // Błąd
                     resultDiv.innerHTML = `
@@ -2283,6 +2285,7 @@ nowoczesna-edukacja.pl `;
             if (data.invoice_id) {
                 applyIfirmaInvoiceIdDisplay(data.invoice_id);
             }
+            applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
             if (data.success && data.ksef_number) {
                 applyKsefNumberDisplay(data.ksef_number);
             }
@@ -2429,6 +2432,10 @@ nowoczesna-edukacja.pl `;
                 }
 
                 applyInvoiceNumberFieldValue(createData.invoice_number);
+                if (createData.invoice_id) {
+                    applyIfirmaInvoiceIdDisplay(createData.invoice_id);
+                }
+                applyInvoiceDatesDisplay(createData.invoice_issue_date, createData.invoice_due_date);
 
                 resultDiv.innerHTML = renderIfirmaKsefProgress([
                     { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
