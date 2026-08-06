@@ -53,16 +53,76 @@
                         <table class="table table-sm table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Plik</th>
-                                    <th>Okres</th>
-                                    <th>Wpływy</th>
-                                    <th>Sugestie</th>
-                                    <th>Duplikaty</th>
-                                    <th>Status</th>
-                                    <th>Kto</th>
-                                    <th>Kiedy</th>
-                                    <th></th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Unikalny numer rekordu importu w bazie (bank_statement_imports.id).">
+                                        ID
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Oryginalna nazwa wgranego pliku CSV z mBank (lista_operacji_*.csv). Kopia pliku jest też zapisana na serwerze.">
+                                        Plik
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Zakres dat operacji odczytany z wyciągu (period_from → period_to). Pokazuje, jaki okres obejmuje ten import.">
+                                        Okres
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Liczba nowo zapisanych wpływów (kwota &gt; 0) względem wszystkich wierszy z tego pliku: wpływy / wszystkie wiersze. Nie obejmuje operacji pominiętych jako duplikaty.">
+                                        Wpływy
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Ile wpływów z tego importu ma obecnie co najmniej jedną automatyczną sugestię dopasowania (status suggested). Ustawiane przy imporcie i aktualizowane po „Przelicz sugestie”. Nie oznacza jeszcze zaakceptowania.">
+                                        Sugestie
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Ile wierszy z pliku pominięto, bo taka sama operacja (data + kwota + znormalizowany opis) była już w bazie. Nie tworzymy drugiego przelewu — wcześniejsza akceptacja/ignorowanie zostaje.">
+                                        Duplikaty
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Status przetwarzania importu: „Sparsowany” = plik wczytany do bazy i gotowy do ręcznego przeglądu; „Przejrzany” = oznaczony jako przejrzany (jeśli używane).">
+                                        Status
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Użytkownik panelu, który wgrał ten plik CSV.">
+                                        Kto
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Data i godzina utworzenia rekordu importu (kiedy plik został wgrany).">
+                                        Kiedy
+                                    </th>
+                                    <th scope="col"
+                                        class="text-nowrap"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Wejście do podglądu transakcji tego importu — kolejka dopasowań, akceptacja, ignorowanie, ręczne powiązanie.">
+                                        <span class="visually-hidden">Akcje</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -104,4 +164,15 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!window.bootstrap || !bootstrap.Tooltip) {
+                return;
+            }
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+        });
+    </script>
 </x-app-layout>

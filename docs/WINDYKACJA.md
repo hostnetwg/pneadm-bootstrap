@@ -108,6 +108,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 ## Import wyciągu mBank (MVP)
 
 - Menu: `Księgowość → Import wyciągu`.
+- Lista importów: nagłówki kolumn mają tooltipy Bootstrap (ID, plik, okres, wpływy/wszystkie, sugestie, duplikaty, status, kto, kiedy, akcje).
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.
 - Tylko wpływy (`amount > 0`) idą do UI dopasowań; wydatki mogą być zapisane, ale nie są przeglądane w MVP.
 - Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, `PayNow`, `Ignorowane`, `Wszystkie wpływy`.
