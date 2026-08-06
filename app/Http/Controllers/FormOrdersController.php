@@ -1835,6 +1835,8 @@ class FormOrdersController extends Controller
                 'ksef_number' => $result['ksef_number'] ?? null,
                 'ifirma_invoice_id' => $result['ifirma_invoice_id'] ?? null,
                 'invoice_number' => $result['invoice_number'] ?? null,
+                'invoice_issue_date' => $result['invoice_issue_date'] ?? null,
+                'invoice_due_date' => $result['invoice_due_date'] ?? null,
                 'ksef_status' => $result['ksef_status'] ?? null,
                 'changed' => $result['changed'] ?? false,
                 'ksef_cleared' => $result['ksef_cleared'] ?? false,

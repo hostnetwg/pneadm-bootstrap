@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\DebtCase;
 use App\Models\FormOrder;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Pobiera z iFirma aktualny NumerKSeF (i potwierdza ifirma_invoice_id) dla zamówienia
  * po wewnętrznym Identyfikatorze dokumentu — np. po ręcznej wysyłce do KSeF z panelu iFirma.
+ * Przy tej samej odpowiedzi nadpisuje też daty FV (wystawienie / termin płatności).
  */
 class IfirmaFormOrderKsefSyncService
 {
@@ -22,6 +25,8 @@ class IfirmaFormOrderKsefSyncService
      *     ksef_number?: string|null,
      *     ifirma_invoice_id?: string|null,
      *     invoice_number?: string|null,
+     *     invoice_issue_date?: string|null,
+     *     invoice_due_date?: string|null,
      *     ksef_status?: string|null,
      *     changed?: bool
      * }
@@ -60,12 +65,28 @@ class IfirmaFormOrderKsefSyncService
             $pelnyNumer = null;
         }
 
+        $issueDate = $this->parseDateString(
+            $payload['DataWystawienia'] ?? $payload['DataWystawieniaFaktury'] ?? null
+        );
+        $dueDate = $this->parseDateString($payload['TerminPlatnosci'] ?? null);
+
         $previousKsef = trim((string) ($order->ksef_number ?? ''));
         $previousId = trim((string) ($order->ifirma_invoice_id ?? ''));
+        $previousIssue = $order->invoice_issue_date?->toDateString();
+        $previousDue = $order->invoice_due_date?->toDateString();
         $changed = false;
 
         if ($resolvedId !== '' && $previousId !== $resolvedId) {
             $order->ifirma_invoice_id = $resolvedId;
+            $changed = true;
+        }
+
+        if ($issueDate !== null && $previousIssue !== $issueDate) {
+            $order->invoice_issue_date = $issueDate;
+            $changed = true;
+        }
+        if ($dueDate !== null && $previousDue !== $dueDate) {
+            $order->invoice_due_date = $dueDate;
             $changed = true;
         }
 
@@ -113,12 +134,19 @@ class IfirmaFormOrderKsefSyncService
             $order->save();
         }
 
+        $this->syncDebtCaseInvoiceDates($order, $issueDate, $dueDate);
+
+        $datesPayload = [
+            'invoice_issue_date' => $order->invoice_issue_date?->toDateString(),
+            'invoice_due_date' => $order->invoice_due_date?->toDateString(),
+        ];
+
         if ($ksefNumber === null || $ksefNumber === '') {
             $message = $changed
                 ? 'W iFirma brak numeru KSeF dla tego dokumentu — wyczyszczono zapisany numer KSeF w zamówieniu.'
                 : 'W iFirma brak numeru KSeF dla tego dokumentu. Zamówienie nie miało zapisanego numeru KSeF.';
 
-            return [
+            return array_merge([
                 'success' => true,
                 'message' => $message,
                 'ksef_number' => null,
@@ -127,14 +155,14 @@ class IfirmaFormOrderKsefSyncService
                 'ksef_status' => null,
                 'changed' => $changed,
                 'ksef_cleared' => $changed && $previousKsef !== '',
-            ];
+            ], $datesPayload);
         }
 
         $message = $changed
-            ? 'Zaktualizowano dane KSeF z iFirma.'
-            : 'Dane KSeF w zamówieniu są już zgodne z iFirma.';
+            ? 'Zaktualizowano dane KSeF i daty FV z iFirma.'
+            : 'Dane KSeF i daty FV w zamówieniu są już zgodne z iFirma.';
 
-        return [
+        return array_merge([
             'success' => true,
             'message' => $message,
             'ksef_number' => $order->ksef_number,
@@ -142,7 +170,7 @@ class IfirmaFormOrderKsefSyncService
             'invoice_number' => $pelnyNumer,
             'ksef_status' => $order->ksef_status,
             'changed' => $changed,
-        ];
+        ], $datesPayload);
     }
 
     /**
@@ -156,5 +184,53 @@ class IfirmaFormOrderKsefSyncService
         }
 
         return $requestedId;
+    }
+
+    private function parseDateString(mixed $raw): ?string
+    {
+        if (! is_string($raw) && ! is_numeric($raw)) {
+            return null;
+        }
+
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function syncDebtCaseInvoiceDates(FormOrder $order, ?string $issueDate, ?string $dueDate): void
+    {
+        if ($issueDate === null && $dueDate === null) {
+            return;
+        }
+
+        if (! $order->exists || $order->id === null) {
+            return;
+        }
+
+        $cases = DebtCase::query()
+            ->where('form_order_id', $order->id)
+            ->get();
+
+        foreach ($cases as $case) {
+            $caseDirty = false;
+            if ($issueDate !== null && $case->invoice_date?->toDateString() !== $issueDate) {
+                $case->invoice_date = $issueDate;
+                $caseDirty = true;
+            }
+            if ($dueDate !== null && $case->due_date?->toDateString() !== $dueDate) {
+                $case->due_date = $dueDate;
+                $caseDirty = true;
+            }
+            if ($caseDirty) {
+                $case->save();
+            }
+        }
     }
 }

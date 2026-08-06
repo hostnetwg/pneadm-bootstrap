@@ -807,8 +807,8 @@ nowoczesna-edukacja.pl </div>
                                                 <button type="button"
                                                         class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
                                                         id="syncIfirmaKsefBtn"
-                                                        title="Pobierz numer KSeF z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
-                                                        aria-label="Synchronizuj numer KSeF z iFirma">
+                                                        title="Pobierz numer KSeF i daty FV z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
+                                                        aria-label="Synchronizuj numer KSeF i daty FV z iFirma">
                                                     <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
                                                 </button>
                                             @endif
@@ -818,13 +818,6 @@ nowoczesna-edukacja.pl </div>
                                              title="Wewnętrzny Identyfikator dokumentu w iFirma (nie numer FV)">
                                             <span class="text-muted">ID iFirma:</span>
                                             <code class="text-secondary" id="ifirmaInvoiceIdValue">{{ $zamowienie->hasIfirmaInvoiceId() ? $zamowienie->ifirma_invoice_id : '' }}</code>
-                                        </div>
-                                        <div class="mt-1 small">
-                                            <span class="text-muted">Data wystawienia FV:</span>
-                                            <strong>{{ $zamowienie->invoice_issue_date?->format('d.m.Y') ?: '—' }}</strong>
-                                            <span class="mx-1 text-muted">·</span>
-                                            <span class="text-muted">Termin płatności:</span>
-                                            <strong>{{ $zamowienie->invoice_due_date?->format('d.m.Y') ?: '—' }}</strong>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -837,6 +830,15 @@ nowoczesna-edukacja.pl </div>
                                             <label class="form-check-label small text-muted" for="status_completed">
                                                 Zakończone — pole historyczne; do anulowania użyj „Anuluj zamówienie”
                                             </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-2">
+                                        <div class="small border rounded px-2 py-1 bg-light">
+                                            <span class="text-muted">Data wystawienia FV:</span>
+                                            <strong id="invoiceIssueDateValue">{{ $zamowienie->invoice_issue_date?->format('d.m.Y') ?: '—' }}</strong>
+                                            <span class="mx-1 text-muted">·</span>
+                                            <span class="text-muted">Termin płatności:</span>
+                                            <strong id="invoiceDueDateValue">{{ $zamowienie->invoice_due_date?->format('d.m.Y') ?: '—' }}</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -2146,6 +2148,28 @@ nowoczesna-edukacja.pl `;
             wrap.classList.remove('d-none');
         }
 
+        function formatInvoiceDateDisplay(isoDate) {
+            if (!isoDate || typeof isoDate !== 'string') {
+                return '—';
+            }
+            const parts = isoDate.split('-');
+            if (parts.length !== 3) {
+                return isoDate;
+            }
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+
+        function applyInvoiceDatesDisplay(issueDate, dueDate) {
+            const issueEl = document.getElementById('invoiceIssueDateValue');
+            const dueEl = document.getElementById('invoiceDueDateValue');
+            if (issueEl && issueDate !== undefined) {
+                issueEl.textContent = formatInvoiceDateDisplay(issueDate);
+            }
+            if (dueEl && dueDate !== undefined) {
+                dueEl.textContent = formatInvoiceDateDisplay(dueDate);
+            }
+        }
+
         async function syncIfirmaKsefFromPanel(orderId) {
             const btn = document.getElementById('syncIfirmaKsefBtn');
             const icon = document.getElementById('syncIfirmaKsefIcon');
@@ -2177,13 +2201,18 @@ nowoczesna-edukacja.pl `;
                     if (data.ifirma_invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
                     }
+                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
                     if (resultDiv) {
                         const alertClass = data.ksef_cleared ? 'alert-info' : 'alert-success';
                         const iconClass = data.ksef_cleared ? 'bi-info-circle' : 'bi-check-circle';
+                        const datesLine = (data.invoice_issue_date || data.invoice_due_date)
+                            ? `<br><span class="text-muted">Data FV:</span> ${formatInvoiceDateDisplay(data.invoice_issue_date)} · <span class="text-muted">Termin:</span> ${formatInvoiceDateDisplay(data.invoice_due_date)}`
+                            : '';
                         resultDiv.innerHTML = `
                             <div class="alert ${alertClass} alert-dismissible fade show py-2 small mb-0" role="alert">
                                 <i class="bi ${iconClass}"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
                                 ${data.ksef_number ? `<br><span class="text-muted">Numer KSeF:</span> <code>${data.ksef_number}</code>` : ''}
+                                ${datesLine}
                                 <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
                             </div>`;
                     }

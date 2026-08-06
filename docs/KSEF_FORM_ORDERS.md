@@ -285,10 +285,12 @@ Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
 **Synchronizacja KSeF po ręcznej wysyłce (2026-08):** ikona odświeżenia przy polu
 Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`. Pobiera `NumerKSeF`
-z iFirma po **`ifirma_invoice_id`** (nie po `invoice_number`). Serwis:
+z iFirma po **`ifirma_invoice_id`** (nie po `invoice_number`) oraz **nadpisuje daty FV**
+(`DataWystawienia` → `invoice_issue_date`, `TerminPlatnosci` → `invoice_due_date`;
+także na powiązanych sprawach windykacyjnych). Serwis:
 `App\Services\IfirmaFormOrderKsefSyncService`. Gdy dokument w iFirma **nie ma**
-`NumerKSeF`, synchronizacja **czyści** zapisany numer KSeF (oraz status/datę) w zamówieniu.
-Po korekcie anulującej i nowym
+`NumerKSeF`, synchronizacja **czyści** zapisany numer KSeF (oraz status/datę KSeF) w zamówieniu;
+daty FV i tak są odświeżane, jeśli są w payloadzie. Po korekcie anulującej i nowym
 dokumencie w iFirma trzeba najpierw wystawić fakturę ponownie z panelu (nowe ID),
 potem zsynchronizować KSeF.
 

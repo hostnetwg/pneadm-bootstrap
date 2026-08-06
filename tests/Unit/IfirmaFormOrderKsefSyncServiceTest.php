@@ -41,6 +41,8 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
             'ksef_status' => null,
             'ksef_sent_at' => null,
             'ksef_error' => null,
+            'invoice_issue_date' => null,
+            'invoice_due_date' => null,
         ]);
         $order->shouldReceive('save')->once()->andReturnTrue();
 
@@ -55,6 +57,8 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
                         'Identyfikator' => '99887766',
                         'PelnyNumer' => '73/8/2026',
                         'NumerKSeF' => '7392137630-20260805-ABCDEF000001-11',
+                        'DataWystawienia' => '2026-08-05',
+                        'TerminPlatnosci' => '2026-08-20',
                     ],
                 ],
             ]);
@@ -64,6 +68,8 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
                 'Identyfikator' => '99887766',
                 'PelnyNumer' => '73/8/2026',
                 'NumerKSeF' => '7392137630-20260805-ABCDEF000001-11',
+                'DataWystawienia' => '2026-08-05',
+                'TerminPlatnosci' => '2026-08-20',
             ]);
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
             ->once()
@@ -75,6 +81,47 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame('7392137630-20260805-ABCDEF000001-11', $result['ksef_number']);
         $this->assertSame('99887766', $result['ifirma_invoice_id']);
+        $this->assertSame('2026-08-05', $result['invoice_issue_date']);
+        $this->assertSame('2026-08-20', $result['invoice_due_date']);
+        $this->assertSame('2026-08-05', $order->invoice_issue_date?->toDateString() ?? (string) $order->invoice_issue_date);
+        $this->assertSame('2026-08-20', $order->invoice_due_date?->toDateString() ?? (string) $order->invoice_due_date);
+    }
+
+    public function test_updates_invoice_dates_even_when_ksef_unchanged(): void
+    {
+        $order = Mockery::mock(FormOrder::class)->makePartial();
+        $order->forceFill([
+            'id' => 8207,
+            'ifirma_invoice_id' => '555',
+            'ksef_number' => '7392137630-20260805-ABCDEF000001-11',
+            'ksef_status' => 'sent',
+            'ksef_sent_at' => now(),
+            'ksef_error' => null,
+            'invoice_issue_date' => '2026-07-01',
+            'invoice_due_date' => '2026-07-01',
+        ]);
+        $order->shouldReceive('save')->once()->andReturnTrue();
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('getInvoice')->once()->andReturn(['status' => 'success', 'data' => []]);
+        $api->shouldReceive('unwrapInvoicePayload')->once()->andReturn([
+            'Identyfikator' => '555',
+            'PelnyNumer' => '12/8/2026',
+            'NumerKSeF' => '7392137630-20260805-ABCDEF000001-11',
+            'DataWystawienia' => '2026-08-06',
+            'TerminPlatnosci' => '2026-08-06',
+        ]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
+            ->once()
+            ->andReturn('7392137630-20260805-ABCDEF000001-11');
+
+        $service = new IfirmaFormOrderKsefSyncService($api);
+        $result = $service->syncFromIfirmaInvoiceId($order);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['changed']);
+        $this->assertSame('2026-08-06', $result['invoice_issue_date']);
+        $this->assertSame('2026-08-06', $result['invoice_due_date']);
     }
 
     public function test_clears_ksef_when_ifirma_has_no_number(): void
