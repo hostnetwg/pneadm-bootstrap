@@ -794,25 +794,6 @@ nowoczesna-edukacja.pl </div>
                                                @if($zamowienie->is_new) 
                                                style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);" 
                                                @endif>
-                                        <div id="ksefNumberDisplay"
-                                             class="mt-1 small @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
-                                             @if($zamowienie->hasConfirmedKsef())
-                                             title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
-                                             @elseif($zamowienie->hasIfirmaInvoiceId())
-                                             title="Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce"
-                                             @endif>
-                                            <span class="text-muted">Numer KSeF:</span>
-                                            <code class="text-success" id="ksefNumberValue">@if($zamowienie->hasConfirmedKsef()){{ $zamowienie->ksef_number }}@else<span class="text-muted">—</span>@endif</code>
-                                            @if($zamowienie->hasIfirmaInvoiceId())
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
-                                                        id="syncIfirmaKsefBtn"
-                                                        title="Pobierz numer KSeF i daty FV z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
-                                                        aria-label="Synchronizuj numer KSeF i daty FV z iFirma">
-                                                    <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
-                                                </button>
-                                            @endif
-                                        </div>
                                         <div id="ifirmaInvoiceIdDisplay"
                                              class="mt-1 small @if(! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
                                              title="Wewnętrzny Identyfikator dokumentu w iFirma (nie numer FV)">
@@ -830,6 +811,27 @@ nowoczesna-edukacja.pl </div>
                                             <label class="form-check-label small text-muted" for="status_completed">
                                                 Zakończone — pole historyczne; do anulowania użyj „Anuluj zamówienie”
                                             </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-2">
+                                        <div id="ksefNumberDisplay"
+                                             class="small border rounded px-2 py-1 bg-light @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
+                                             @if($zamowienie->hasConfirmedKsef())
+                                             title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
+                                             @elseif($zamowienie->hasIfirmaInvoiceId())
+                                             title="Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce"
+                                             @endif>
+                                            <span class="text-muted">Numer KSeF:</span>
+                                            <code class="text-success text-break" id="ksefNumberValue">@if($zamowienie->hasConfirmedKsef()){{ $zamowienie->ksef_number }}@else<span class="text-muted">—</span>@endif</code>
+                                            @if($zamowienie->hasIfirmaInvoiceId())
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
+                                                        id="syncIfirmaKsefBtn"
+                                                        title="Pobierz numer KSeF i daty FV z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
+                                                        aria-label="Synchronizuj numer KSeF i daty FV z iFirma">
+                                                    <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
+                                                </button>
+                                            @endif
                                         </div>
                                     </div>
                                     <div class="col-12 mt-2">
