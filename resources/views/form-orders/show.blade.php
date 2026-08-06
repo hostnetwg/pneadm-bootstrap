@@ -819,6 +819,13 @@ nowoczesna-edukacja.pl </div>
                                             <span class="text-muted">ID iFirma:</span>
                                             <code class="text-secondary" id="ifirmaInvoiceIdValue">{{ $zamowienie->hasIfirmaInvoiceId() ? $zamowienie->ifirma_invoice_id : '' }}</code>
                                         </div>
+                                        <div class="mt-1 small">
+                                            <span class="text-muted">Data wystawienia FV:</span>
+                                            <strong>{{ $zamowienie->invoice_issue_date?->format('d.m.Y') ?: '—' }}</strong>
+                                            <span class="mx-1 text-muted">·</span>
+                                            <span class="text-muted">Termin płatności:</span>
+                                            <strong>{{ $zamowienie->invoice_due_date?->format('d.m.Y') ?: '—' }}</strong>
+                                        </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="status_completed" class="form-label small">

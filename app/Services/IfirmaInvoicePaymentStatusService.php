@@ -79,7 +79,10 @@ class IfirmaInvoicePaymentStatusService
         if (! empty($snapshot['invoice_number']) && empty($case->invoice_number)) {
             $case->invoice_number = (string) $snapshot['invoice_number'];
         }
-        if (! empty($snapshot['due_date']) && $case->due_date === null) {
+        if (! empty($snapshot['issue_date'])) {
+            $case->invoice_date = $snapshot['issue_date'];
+        }
+        if (! empty($snapshot['due_date'])) {
             $case->due_date = $snapshot['due_date'];
         }
         if ($snapshot['gross_amount'] !== null && $case->amount_gross === null) {
@@ -92,12 +95,28 @@ class IfirmaInvoicePaymentStatusService
         }
         $case->save();
 
+        $orderDirty = false;
         if (! empty($snapshot['invoice_id'])) {
             $invoiceId = (string) $snapshot['invoice_id'];
             if (empty($order->ifirma_invoice_id) || (string) $order->ifirma_invoice_id !== $invoiceId) {
                 $order->ifirma_invoice_id = $invoiceId;
-                $order->save();
+                $orderDirty = true;
             }
+        }
+        if (! empty($snapshot['invoice_number']) && empty($order->invoice_number)) {
+            $order->invoice_number = (string) $snapshot['invoice_number'];
+            $orderDirty = true;
+        }
+        if (! empty($snapshot['issue_date'])) {
+            $order->invoice_issue_date = $snapshot['issue_date'];
+            $orderDirty = true;
+        }
+        if (! empty($snapshot['due_date'])) {
+            $order->invoice_due_date = $snapshot['due_date'];
+            $orderDirty = true;
+        }
+        if ($orderDirty) {
+            $order->save();
         }
 
         $paid = $snapshot['paid_amount'];

@@ -567,6 +567,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::delete('/{debtCase}/contacts/{contact}', [AccountingController::class, 'collectionsContactDestroy'])->name('contacts.destroy');
             Route::post('/{debtCase}/sync-ifirma', [AccountingController::class, 'collectionsSyncIfirma'])->name('sync-ifirma');
             Route::post('/{debtCase}/send-reminder', [AccountingController::class, 'collectionsSendReminder'])->name('send-reminder');
+            Route::post('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfUpload'])->name('invoice-pdf.upload');
+            Route::get('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfPreview'])->name('invoice-pdf.preview');
+            Route::delete('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfDestroy'])->name('invoice-pdf.destroy');
             Route::get('/{debtCase}/bank-transactions/search', [AccountingController::class, 'collectionsBankTransactionSearch'])->name('bank-transactions.search');
             Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');
             Route::post('/{debtCase}/bank-matches/{match}/unlink', [AccountingController::class, 'collectionsBankTransactionUnlink'])->name('bank-matches.unlink');

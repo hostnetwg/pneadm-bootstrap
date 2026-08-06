@@ -312,8 +312,11 @@
                                             <span class="text-muted fw-normal">Kwota:</span>
                                             {{ number_format($amountGross, 2, ',', ' ') }} zł
                                             <span class="mx-2 text-muted fw-normal">·</span>
-                                            <span class="text-muted fw-normal text-uppercase">Termin:</span>
-                                            {{ $case->due_date?->format('d.m.Y') ?: '—' }}
+                                            <span class="text-muted fw-normal text-uppercase">Wystawiono:</span>
+                                            {{ $case->invoice_date?->format('d.m.Y') ?: ($order->invoice_issue_date?->format('d.m.Y') ?: '—') }}
+                                            <span class="mx-2 text-muted fw-normal">·</span>
+                                            <span class="text-muted fw-normal text-uppercase">Termin płatności:</span>
+                                            {{ $case->due_date?->format('d.m.Y') ?: ($order->invoice_due_date?->format('d.m.Y') ?: '—') }}
                                             @if($dueDaysLabel)
                                                 <span @class([
                                                     'ms-1',
@@ -351,6 +354,91 @@
                                         @endif
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="border rounded-2 p-2 mb-3">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                    <div class="small text-uppercase fw-bold mb-0" style="letter-spacing: .03em;">
+                                        PDF faktury
+                                    </div>
+                                    @if($caseHasInvoicePdf ?? $case->hasInvoicePdf())
+                                        <div class="small text-muted">
+                                            {{ $case->invoice_pdf_original_name ?: 'faktura.pdf' }}
+                                            @if($case->invoice_pdf_uploaded_at)
+                                                · {{ $case->invoice_pdf_uploaded_at->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                                @if($caseHasInvoicePdf ?? $case->hasInvoicePdf())
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="button"
+                                                class="btn btn-primary btn-sm"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#caseInvoicePdfPreviewModal">
+                                            <i class="bi bi-eye"></i> Podgląd PDF
+                                        </button>
+                                        <a href="{{ route('accounting.collections.invoice-pdf.preview', $case) }}"
+                                           class="btn btn-outline-primary btn-sm"
+                                           target="_blank"
+                                           rel="noopener">
+                                            <i class="bi bi-box-arrow-up-right"></i> Otwórz w nowej karcie
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#caseInvoicePdfDeleteModal">
+                                            <i class="bi bi-trash"></i> Usuń
+                                        </button>
+                                    </div>
+                                    <form method="POST"
+                                          action="{{ route('accounting.collections.invoice-pdf.upload', $case) }}"
+                                          enctype="multipart/form-data"
+                                          class="row g-2 align-items-end mt-2">
+                                        @csrf
+                                        <div class="col-12 col-md">
+                                            <label class="form-label small mb-1" for="case_invoice_pdf_replace">Zastąp innym PDF</label>
+                                            <input type="file"
+                                                   class="form-control form-control-sm @error('invoice_pdf') is-invalid @enderror"
+                                                   id="case_invoice_pdf_replace"
+                                                   name="invoice_pdf"
+                                                   accept="application/pdf,.pdf"
+                                                   required>
+                                            @error('invoice_pdf')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                                <i class="bi bi-upload"></i> Wgraj ponownie
+                                            </button>
+                                        </div>
+                                    </form>
+                                @else
+                                    <form method="POST"
+                                          action="{{ route('accounting.collections.invoice-pdf.upload', $case) }}"
+                                          enctype="multipart/form-data"
+                                          class="row g-2 align-items-end">
+                                        @csrf
+                                        <div class="col-12 col-md">
+                                            <label class="form-label small mb-1" for="case_invoice_pdf">Wgraj PDF faktury (max 5 MB)</label>
+                                            <input type="file"
+                                                   class="form-control form-control-sm @error('invoice_pdf') is-invalid @enderror"
+                                                   id="case_invoice_pdf"
+                                                   name="invoice_pdf"
+                                                   accept="application/pdf,.pdf"
+                                                   required>
+                                            @error('invoice_pdf')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-upload"></i> Wgraj PDF
+                                            </button>
+                                        </div>
+                                    </form>
+                                @endif
                             </div>
 
                             {{-- Szkolenie --}}
@@ -956,6 +1044,63 @@
         </div>
     </div>
 
+    @if($caseHasInvoicePdf ?? $case->hasInvoicePdf())
+    <div class="modal fade" id="caseInvoicePdfPreviewModal" tabindex="-1" aria-labelledby="caseInvoicePdfPreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="caseInvoicePdfPreviewModalLabel">
+                        Podgląd PDF faktury
+                        @if($case->invoice_pdf_original_name)
+                            <span class="text-muted fw-normal">· {{ $case->invoice_pdf_original_name }}</span>
+                        @endif
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body p-0" style="min-height: 70vh;">
+                    <iframe
+                        title="Podgląd PDF faktury"
+                        src="{{ route('accounting.collections.invoice-pdf.preview', $case) }}"
+                        class="w-100 border-0"
+                        style="height: 70vh;"></iframe>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ route('accounting.collections.invoice-pdf.preview', $case) }}"
+                       class="btn btn-outline-primary"
+                       target="_blank"
+                       rel="noopener">Otwórz w nowej karcie</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="caseInvoicePdfDeleteModal" tabindex="-1" aria-labelledby="caseInvoicePdfDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('accounting.collections.invoice-pdf.destroy', $case) }}">
+                    @csrf
+                    @method('DELETE')
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="caseInvoicePdfDeleteModalLabel">Usuń PDF faktury</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Czy na pewno usunąć PDF faktury ze sprawy <strong>#{{ $case->id }}</strong>?</p>
+                        <div class="border rounded p-2 bg-light small fw-semibold">
+                            {{ $case->invoice_pdf_original_name ?: 'faktura.pdf' }}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-danger">Usuń PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="modal fade" id="debtReminderModal" tabindex="-1" aria-labelledby="debtReminderModalLabel" aria-hidden="true"
          data-templates='@json($reminderTemplatePayloads ?? [])'
          data-recipients='@json($reminderRecipientOptions ?? [])'>
@@ -1065,6 +1210,22 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            @if($reminderCanAttachCasePdf ?? false)
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           value="1"
+                                           id="debtReminderAttachCasePdf"
+                                           name="attach_case_pdf"
+                                           @checked(old('attach_case_pdf', true))>
+                                    <label class="form-check-label" for="debtReminderAttachCasePdf">
+                                        Załącz PDF faktury ze sprawy
+                                        @if($case->invoice_pdf_original_name)
+                                            <span class="text-muted">({{ $case->invoice_pdf_original_name }})</span>
+                                        @endif
+                                    </label>
+                                </div>
+                            @endif
                             @if($reminderCanAttachIfirmaPdf ?? false)
                                 <div class="form-check mb-2">
                                     <input class="form-check-input"
@@ -1077,7 +1238,7 @@
                                         Załącz PDF faktury z iFirma
                                     </label>
                                 </div>
-                            @else
+                            @elseif(!($reminderCanAttachCasePdf ?? false))
                                 <div class="form-text text-muted mb-2">Brak ID/numeru FV — nie można pobrać PDF z iFirma.</div>
                             @endif
                             <label class="form-label fw-bold" for="debtReminderAttachment">Dodatkowy załącznik (PDF)</label>

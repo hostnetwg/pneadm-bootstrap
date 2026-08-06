@@ -217,6 +217,8 @@ class FormOrder extends Model
 
         // Dane do faktury
         'invoice_number',
+        'invoice_issue_date',
+        'invoice_due_date',
         'ifirma_invoice_id',
         'invoice_notes',
         'invoice_payment_delay',
@@ -270,6 +272,8 @@ class FormOrder extends Model
         'course_price_variant_id' => 'integer',
         'publigo_sent' => 'integer',
         'order_date' => 'datetime',
+        'invoice_issue_date' => 'date',
+        'invoice_due_date' => 'date',
         'publigo_sent_at' => 'datetime',
         'pnedu_provisioned_at' => 'datetime',
         'pnedu_user_existed_before' => 'boolean',
@@ -687,6 +691,22 @@ class FormOrder extends Model
     {
         return is_string($this->ifirma_invoice_id)
             && trim($this->ifirma_invoice_id) !== '';
+    }
+
+    /**
+     * Zapisuje daty dokumentu FV (wystawienie / termin płatności) na zamówieniu.
+     */
+    public function applyInvoiceDocumentDates(?string $issueDate, ?string $dueDate): void
+    {
+        $issue = is_string($issueDate) ? trim($issueDate) : '';
+        $due = is_string($dueDate) ? trim($dueDate) : '';
+
+        if ($issue !== '') {
+            $this->invoice_issue_date = $issue;
+        }
+        if ($due !== '') {
+            $this->invoice_due_date = $due;
+        }
     }
 
     /**

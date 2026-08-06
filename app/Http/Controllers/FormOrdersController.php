@@ -2116,6 +2116,7 @@ class FormOrdersController extends Controller
                         if (! empty($invoiceId)) {
                             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
                         }
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2473,6 +2474,7 @@ class FormOrdersController extends Controller
                         if (! empty($invoiceId)) {
                             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
                         }
+                        $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
                         $zamowienie->save();
 
                         // Logowanie operacji wystawienia faktury
@@ -2859,6 +2861,7 @@ class FormOrdersController extends Controller
             );
             $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+            $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData);
             $zamowienie->save();
 
             $resolvedInvoiceNumber = (string) ($invoiceNumber ?: $invoiceId);
@@ -3365,6 +3368,18 @@ class FormOrdersController extends Controller
     private function ifirmaBruttoTotalForOrder(FormOrder $zamowienie): float
     {
         return round((float) $zamowienie->product_price, 2);
+    }
+
+    /**
+     * Zapisuje na zamówieniu daty FV z payloadu wysłanego/odebranego z iFirma.
+     *
+     * @param  array<string, mixed>  $invoiceData
+     */
+    private function applyInvoiceDocumentDatesFromPayload(FormOrder $zamowienie, array $invoiceData): void
+    {
+        $issue = isset($invoiceData['DataWystawienia']) ? (string) $invoiceData['DataWystawienia'] : null;
+        $due = isset($invoiceData['TerminPlatnosci']) ? (string) $invoiceData['TerminPlatnosci'] : null;
+        $zamowienie->applyInvoiceDocumentDates($issue, $due);
     }
 
     /**

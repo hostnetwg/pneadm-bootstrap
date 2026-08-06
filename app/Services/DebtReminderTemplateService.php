@@ -150,8 +150,13 @@ class DebtReminderTemplateService
             return $case->due_date->format('d.m.Y');
         }
 
-        if ($order?->order_date && $order->invoice_payment_delay) {
-            return $order->order_date->copy()->addDays((int) $order->invoice_payment_delay)->format('d.m.Y');
+        if ($order?->invoice_due_date) {
+            return $order->invoice_due_date->format('d.m.Y');
+        }
+
+        $dueBase = $order?->invoice_issue_date?->copy() ?? $order?->order_date?->copy();
+        if ($dueBase && $order?->invoice_payment_delay) {
+            return $dueBase->copy()->addDays((int) $order->invoice_payment_delay)->format('d.m.Y');
         }
 
         return '—';

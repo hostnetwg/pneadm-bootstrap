@@ -16,6 +16,7 @@ use App\Models\RevenueRecord;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
+use App\Services\DebtCaseInvoicePdfService;
 use App\Services\DebtCustomerProfileService;
 use App\Services\DebtReminderMailService;
 use App\Services\DebtReminderTemplateService;
@@ -393,9 +394,14 @@ class AccountingController extends Controller
         }
 
         $profile = $profileService->profileForOrder($order);
-        $delay = (int) ($order->invoice_payment_delay ?: 14);
-        $invoiceDate = $order->order_date?->copy();
-        $dueDate = $invoiceDate?->copy()->addDays($delay);
+        $invoiceDate = $order->invoice_issue_date?->copy()
+            ?? $order->order_date?->copy();
+        $dueDate = $order->invoice_due_date?->copy();
+        if ($dueDate === null) {
+            $delay = (int) ($order->invoice_payment_delay ?: 14);
+            $dueBase = $order->invoice_issue_date?->copy() ?? $order->order_date?->copy();
+            $dueDate = $dueBase?->copy()->addDays($delay);
+        }
 
         $case = DebtCase::create([
             'form_order_id' => $order->id,
@@ -475,21 +481,26 @@ class AccountingController extends Controller
 
         $identity = $profile['identity'];
         $relatedOrders = $profileService->relatedOrders($identity);
-        $relatedOrders->load([
-            'debtCases' => fn ($query) => $query->orderByDesc('id'),
-        ]);
-        $relatedOrders = $relatedOrders->map(function (FormOrder $relatedOrder) use ($profileService, $identity) {
-            $relatedOrder->setAttribute(
+        $relatedOrdersById = FormOrder::query()
+            ->whereIn('id', $relatedOrders->pluck('id')->all())
+            ->with([
+                'debtCases' => fn ($query) => $query->orderByDesc('id'),
+            ])
+            ->get()
+            ->keyBy('id');
+        $relatedOrders = $relatedOrders->map(function (FormOrder $relatedOrder) use ($profileService, $identity, $relatedOrdersById) {
+            $hydrated = $relatedOrdersById->get($relatedOrder->id) ?? $relatedOrder;
+            $hydrated->setAttribute(
                 'link_reasons',
-                $profileService->linkReasonsForRelatedOrder($relatedOrder, $identity)
+                $profileService->linkReasonsForRelatedOrder($hydrated, $identity)
             );
-            $relatedOrder->setAttribute(
+            $hydrated->setAttribute(
                 'related_debt_case',
-                $relatedOrder->debtCases->first(fn (DebtCase $relatedCase) => $relatedCase->status !== DebtCase::STATUS_CLOSED)
-                    ?? $relatedOrder->debtCases->first()
+                $hydrated->debtCases->first(fn (DebtCase $relatedCase) => $relatedCase->status !== DebtCase::STATUS_CLOSED)
+                    ?? $hydrated->debtCases->first()
             );
 
-            return $relatedOrder;
+            return $hydrated;
         });
 
         $reminderTemplates = app(DebtReminderTemplateService::class);
@@ -530,7 +541,9 @@ class AccountingController extends Controller
             'reminderTemplatePayloads' => $reminderTemplatePayloads,
             'reminderRecipientOptions' => $reminderTemplates->recipientOptions($debtCase),
             'reminderCanAttachIfirmaPdf' => $reminderTemplates->canAttachIfirmaPdf($debtCase),
+            'reminderCanAttachCasePdf' => $debtCase->hasInvoicePdf(),
             'reminderDefaultTestEmail' => Auth::user()?->email ?: 'waldemar.grabowski@hostnet.pl',
+            'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
         ]);
     }
 
@@ -539,6 +552,7 @@ class AccountingController extends Controller
         DebtCase $debtCase,
         DebtReminderMailService $mailService,
         DebtReminderTemplateService $templates,
+        DebtCaseInvoicePdfService $invoicePdfService,
     ) {
         $debtCase->load(['formOrder.primaryParticipant', 'contacts']);
 
@@ -550,6 +564,7 @@ class AccountingController extends Controller
             'recipient_email' => ['nullable', 'email', 'max:255'],
             'test_email' => ['nullable', 'email', 'max:255'],
             'attach_ifirma_pdf' => ['nullable', 'boolean'],
+            'attach_case_pdf' => ['nullable', 'boolean'],
             'attachment' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ];
 
@@ -573,6 +588,14 @@ class AccountingController extends Controller
                 ->with('error', 'Brak danych do pobrania PDF faktury z iFirma dla tej sprawy.');
         }
 
+        $attachCasePdf = $request->boolean('attach_case_pdf');
+        if ($attachCasePdf && ! $invoicePdfService->hasPdf($debtCase)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withInput()
+                ->with('error', 'Brak wgranego PDF faktury na tej sprawie.');
+        }
+
         $result = $mailService->send(
             case: $debtCase,
             toEmail: $toEmail,
@@ -580,6 +603,7 @@ class AccountingController extends Controller
             body: $validated['body'],
             isTest: $isTest,
             attachIfirmaPdf: $attachIfirma,
+            attachCasePdf: $attachCasePdf,
             uploadedFile: $request->file('attachment'),
         );
 
@@ -593,6 +617,58 @@ class AccountingController extends Controller
         return redirect()
             ->route('accounting.collections.show', $debtCase)
             ->with('success', $result['message']);
+    }
+
+    public function collectionsInvoicePdfUpload(
+        Request $request,
+        DebtCase $debtCase,
+        DebtCaseInvoicePdfService $invoicePdfService,
+    ) {
+        $validated = $request->validate([
+            'invoice_pdf' => ['required', 'file', 'mimes:pdf', 'max:'.DebtCaseInvoicePdfService::MAX_KB],
+        ], [
+            'invoice_pdf.required' => 'Wybierz plik PDF faktury.',
+            'invoice_pdf.mimes' => 'Dozwolony jest tylko plik PDF.',
+            'invoice_pdf.max' => 'Maksymalny rozmiar PDF to 5 MB.',
+        ]);
+
+        $invoicePdfService->store($debtCase, $validated['invoice_pdf']);
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Wgrano PDF faktury do sprawy.');
+    }
+
+    public function collectionsInvoicePdfPreview(
+        DebtCase $debtCase,
+        DebtCaseInvoicePdfService $invoicePdfService,
+    ) {
+        $path = $invoicePdfService->absolutePath($debtCase);
+        if ($path === null) {
+            abort(404, 'Brak PDF faktury na sprawie.');
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$invoicePdfService->downloadName($debtCase).'"',
+        ]);
+    }
+
+    public function collectionsInvoicePdfDestroy(
+        DebtCase $debtCase,
+        DebtCaseInvoicePdfService $invoicePdfService,
+    ) {
+        if (! $invoicePdfService->hasPdf($debtCase)) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('error', 'Brak PDF faktury do usunięcia.');
+        }
+
+        $invoicePdfService->delete($debtCase);
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('success', 'Usunięto PDF faktury ze sprawy.');
     }
 
     public function collectionsBankTransactionSearch(Request $request, DebtCase $debtCase)

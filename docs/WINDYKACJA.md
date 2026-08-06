@@ -32,7 +32,8 @@ Pierwszy etap obejmuje:
 - przy tworzeniu sprawy: wyszukiwarka numeru faktury / KSeF z przyciskami „Utwórz sprawę” / „Otwórz sprawę” / „Wstaw ID” (korzysta z `accounting.debtors.lookup`),
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,
-- **wysyłka e-maila z karty sprawy**: przycisk „Wyślij przypomnienie” → modal (jak linki do prowadzącego) z szablonami przypomnienie/ponaglenie, edycją treści, wyborem odbiorcy (zamawiający / uczestnik / kontakty), wysyłką właściwą i testową, opcjonalnym PDF z iFirma + upload PDF; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady; SMS później,
+- **wysyłka e-maila z karty sprawy**: przycisk „Wyślij przypomnienie” → modal (jak linki do prowadzącego) z szablonami przypomnienie/ponaglenie, edycją treści, wyborem odbiorcy (zamawiający / uczestnik / kontakty), wysyłką właściwą i testową, opcjonalnym PDF ze sprawy / z iFirma + upload PDF; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady; SMS później,
+- **PDF faktury na sprawie**: upload w sekcji „PDF faktury” (`debt_cases.invoice_pdf_*`, dysk `local`); podgląd w modalu iframe + otwarcie w nowej karcie; zastąpienie / usunięcie (modal Bootstrap),
 - alternatywne kontakty (dodawanie i usuwanie z karty sprawy),
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
 - ostrzeżenie VIP / lojalny klient,
@@ -92,8 +93,12 @@ Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
    (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
-5. Na karcie sprawy **„Odśwież status z iFirma”** nadal **nie** zamyka sprawy automatycznie — tylko cache + podpowiedź UI.
-6. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
+5. Sync **zawsze nadpisuje** na sprawie `invoice_date` ← `DataWystawienia` oraz `due_date` ← `TerminPlatnosci` (gdy API je zwraca) — nie zostawia szacunku `order_date + delay`.
+6. Te same daty zapisuje też na zamówieniu: `form_orders.invoice_issue_date` / `invoice_due_date` (oraz uzupełnia `ifirma_invoice_id` / `invoice_number` gdy brak).
+7. Na karcie sprawy **„Odśwież status z iFirma”** nadal **nie** zamyka sprawy automatycznie — tylko cache + podpowiedź UI.
+8. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
+
+Daty FV na zamówieniu są też zapisywane **przy wystawianiu** faktury w panelu (`DataWystawienia` / `TerminPlatnosci` z payloadu). Tworzenie sprawy preferuje `invoice_issue_date` / `invoice_due_date`; dopiero gdy brak — szacunek od daty zamówienia/wystawienia + `invoice_payment_delay`.
 
 Testy: `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=AccountingCollectionsTest`.
 
@@ -113,7 +118,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - dopracowanie sugestii dopasowań (fuzzy nazwa, bulk),
 - ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
 - ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone (wąski zakres)**: po akceptacji z wyciągu, gdy iFirma potwierdza pełną opłatę (`oplacone`); nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka,
-- magazyn PDF FV na sprawie (pobranie przy utworzeniu + checkbox „załącz FV ze sprawy” przy wysyłce),
+- ~~magazyn PDF FV na sprawie (pobranie przy utworzeniu + checkbox „załącz FV ze sprawy” przy wysyłce)~~ — **częściowo wdrożone**: ręczny upload + podgląd na karcie sprawy + checkbox „Załącz PDF faktury ze sprawy” przy wysyłce; auto-pobranie z iFirma przy tworzeniu sprawy — później,
 - SMS do dłużnika (ten sam flow co e-mail, inny kanał).
 
 ## Import wyciągu mBank (MVP)

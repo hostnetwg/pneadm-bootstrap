@@ -29,6 +29,7 @@ class DebtReminderMailService
         string $body,
         bool $isTest,
         bool $attachIfirmaPdf,
+        bool $attachCasePdf = false,
         ?UploadedFile $uploadedFile = null,
     ): array {
         $attachments = [];
@@ -36,6 +37,24 @@ class DebtReminderMailService
         $attachmentLabels = [];
 
         try {
+            if ($attachCasePdf) {
+                $casePdfService = app(DebtCaseInvoicePdfService::class);
+                $casePath = $casePdfService->absolutePath($case);
+                if ($casePath === null) {
+                    return [
+                        'ok' => false,
+                        'message' => 'Brak wgranego PDF faktury na tej sprawie.',
+                    ];
+                }
+                $caseName = $casePdfService->downloadName($case);
+                $attachments[] = [
+                    'path' => $casePath,
+                    'name' => $caseName,
+                    'mime' => 'application/pdf',
+                ];
+                $attachmentLabels[] = 'PDF ze sprawy ('.$caseName.')';
+            }
+
             if ($attachIfirmaPdf) {
                 $lookup = $this->templates->ifirmaPdfLookupKey($case);
                 if ($lookup === null) {

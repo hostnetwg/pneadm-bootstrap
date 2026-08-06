@@ -519,6 +519,8 @@ class AccountingCollectionsTest extends TestCase
             'form_order_id' => $order->id,
             'status' => DebtCase::STATUS_OPEN,
             'invoice_number' => '50/7/2026',
+            'invoice_date' => '2026-06-30',
+            'due_date' => '2026-07-14',
             'opened_at' => now(),
         ]);
 
@@ -530,9 +532,10 @@ class AccountingCollectionsTest extends TestCase
                     'status' => 'success',
                     'data' => [
                         'PelnyNumer' => '50/7/2026',
-                        'Zaplacono' => 365,
+                        'Zaplacono' => 0,
                         'Brutto' => 365,
-                        'TerminPlatnosci' => now()->subDays(10)->toDateString(),
+                        'DataWystawienia' => '2026-07-13',
+                        'TerminPlatnosci' => '2026-07-27',
                     ],
                 ]);
         });
@@ -543,19 +546,28 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSessionHas('success');
 
         $case->refresh();
-        $this->assertSame(\App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID, $case->ifirma_payment_status);
+        $order->refresh();
+        $this->assertSame(\App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE, $case->ifirma_payment_status);
+        $this->assertSame('2026-07-13', $case->invoice_date?->toDateString());
+        $this->assertSame('2026-07-27', $case->due_date?->toDateString());
+        $this->assertSame('2026-07-13', $order->invoice_issue_date?->toDateString());
+        $this->assertSame('2026-07-27', $order->invoice_due_date?->toDateString());
         $this->assertNotNull($case->ifirma_synced_at);
         $this->assertDatabaseHas('debt_case_actions', [
             'debt_case_id' => $case->id,
             'action_type' => DebtCaseAction::TYPE_IFIRMA_SYNC,
-            'outcome' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID,
+            'outcome' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE,
             'user_id' => $user->id,
         ]);
 
         $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
         $show->assertOk();
         $show->assertSee('Odśwież status z iFirma', false);
-        $show->assertSee('Opłacona', false);
+        $show->assertSee('Przeterminowana', false);
+        $show->assertSee('Wystawiono:', false);
+        $show->assertSee('13.07.2026', false);
+        $show->assertSee('Termin płatności:', false);
+        $show->assertSee('27.07.2026', false);
     }
 
     public function test_user_can_manually_link_unlinked_bank_transfer_from_case(): void

@@ -65,6 +65,10 @@ class DebtCase extends Model
         'closed_at',
         'summary',
         'closure_reason',
+        'invoice_pdf_path',
+        'invoice_pdf_original_name',
+        'invoice_pdf_uploaded_at',
+        'invoice_pdf_uploaded_by',
     ];
 
     protected $casts = [
@@ -78,6 +82,7 @@ class DebtCase extends Model
         'next_action_at' => 'datetime',
         'last_action_at' => 'datetime',
         'closed_at' => 'datetime',
+        'invoice_pdf_uploaded_at' => 'datetime',
     ];
 
     public function formOrder(): BelongsTo
@@ -108,6 +113,16 @@ class DebtCase extends Model
     public function bankTransactionMatches(): HasMany
     {
         return $this->hasMany(BankTransactionMatch::class);
+    }
+
+    public function invoicePdfUploadedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'invoice_pdf_uploaded_by');
+    }
+
+    public function hasInvoicePdf(): bool
+    {
+        return app(\App\Services\DebtCaseInvoicePdfService::class)->hasPdf($this);
     }
 
     public function scopeActive($query)
