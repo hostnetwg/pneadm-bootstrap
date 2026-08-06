@@ -851,7 +851,6 @@
                                         <th>ID</th>
                                         <th>Faktura</th>
                                         <th>Szkolenie</th>
-                                        <th>Powiązanie</th>
                                         <th class="text-end">Kwota</th>
                                     </tr>
                                 </thead>
@@ -860,41 +859,80 @@
                                         @php
                                             $linkReasons = $relatedOrder->link_reasons ?? [];
                                             $isCurrentOrder = (int) $relatedOrder->id === (int) ($order->id ?? 0);
+                                            /** @var \App\Models\DebtCase|null $relatedDebtCase */
+                                            $relatedDebtCase = $relatedOrder->related_debt_case ?? null;
+                                            $isCurrentCase = $relatedDebtCase && (int) $relatedDebtCase->id === (int) $case->id;
+                                            $relatedCaseIsActive = $relatedDebtCase && $relatedDebtCase->status !== \App\Models\DebtCase::STATUS_CLOSED;
                                         @endphp
                                         <tr @class(['table-primary' => $isCurrentOrder])>
                                             <td>
-                                                <a href="{{ route('form-orders.show', $relatedOrder->id) }}">#{{ $relatedOrder->id }}</a>
-                                                @if($isCurrentOrder)
-                                                    <span class="badge text-bg-dark ms-1">ta sprawa</span>
+                                                <div>
+                                                    <a href="{{ route('form-orders.show', $relatedOrder->id) }}">#{{ $relatedOrder->id }}</a>
+                                                </div>
+                                                @if($relatedDebtCase)
+                                                    <div class="mt-1">
+                                                        @php
+                                                            $caseBadgeTooltip = $isCurrentCase
+                                                                ? 'To zamówienie należy do obecnie otwartej karty sprawy.'
+                                                                : ($relatedCaseIsActive
+                                                                    ? 'Inna niezamknięta sprawa windykacyjna dla tego zamówienia. Kliknij, aby otworzyć.'
+                                                                    : 'Zamknięta sprawa windykacyjna dla tego zamówienia. Kliknij, aby otworzyć.');
+                                                        @endphp
+                                                        <a href="{{ route('accounting.collections.show', $relatedDebtCase) }}"
+                                                           class="text-decoration-none">
+                                                            <span @class([
+                                                                'badge',
+                                                                'text-bg-dark' => $isCurrentCase,
+                                                                'text-bg-danger' => ! $isCurrentCase && $relatedCaseIsActive,
+                                                                'text-bg-success' => ! $isCurrentCase && ! $relatedCaseIsActive,
+                                                            ])
+                                                                  data-bs-toggle="tooltip"
+                                                                  data-bs-title="{{ $caseBadgeTooltip }}">
+                                                                @if($isCurrentCase)
+                                                                    ta sprawa
+                                                                @else
+                                                                    #{{ $relatedDebtCase->id }} · {{ $relatedDebtCase->statusLabel() }}
+                                                                @endif
+                                                            </span>
+                                                        </a>
+                                                    </div>
+                                                @endif
+                                                @if(count($linkReasons) > 0)
+                                                    <div class="mt-1">
+                                                        @foreach($linkReasons as $reason)
+                                                            @php
+                                                                $badgeClass = match ($reason['strength'] ?? '') {
+                                                                    'high' => 'text-bg-primary',
+                                                                    'medium' => 'text-bg-warning',
+                                                                    default => 'text-bg-light border',
+                                                                };
+                                                                $reasonExplain = match ($reason['key'] ?? '') {
+                                                                    'recipient_nip' => 'Powiązane, bo ma ten sam NIP odbiorcy',
+                                                                    'recipient_profile' => 'Powiązane, bo ma te same dane odbiorcy (nazwa, adres, kod, miasto)',
+                                                                    'buyer_nip' => 'Powiązane, bo ma ten sam NIP nabywcy',
+                                                                    'orderer_email' => 'Powiązane, bo ma ten sam e-mail zamawiającego',
+                                                                    default => 'Powód powiązania z historią klienta',
+                                                                };
+                                                                $reasonTooltip = ! empty($reason['value'])
+                                                                    ? $reasonExplain.': '.$reason['value']
+                                                                    : $reasonExplain.'.';
+                                                            @endphp
+                                                            <span class="badge {{ $badgeClass }} me-1 mb-1"
+                                                                  data-bs-toggle="tooltip"
+                                                                  data-bs-title="{{ $reasonTooltip }}">
+                                                                {{ $reason['label'] }}
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
                                                 @endif
                                             </td>
                                             <td>{{ $relatedOrder->invoice_number ?: '—' }}</td>
                                             <td>{{ $relatedOrder->product_name ?: '—' }}</td>
-                                            <td>
-                                                @forelse($linkReasons as $reason)
-                                                    @php
-                                                        $badgeClass = match ($reason['strength'] ?? '') {
-                                                            'high' => 'text-bg-primary',
-                                                            'medium' => 'text-bg-warning',
-                                                            default => 'text-bg-light border',
-                                                        };
-                                                    @endphp
-                                                    <span class="badge {{ $badgeClass }} me-1 mb-1"
-                                                          @if(! empty($reason['value']))
-                                                              data-bs-toggle="tooltip"
-                                                              data-bs-title="{{ $reason['value'] }}"
-                                                          @endif>
-                                                        {{ $reason['label'] }}
-                                                    </span>
-                                                @empty
-                                                    <span class="text-muted">—</span>
-                                                @endforelse
-                                            </td>
                                             <td class="text-end">{{ number_format((float) ($relatedOrder->product_price ?? 0), 2, ',', ' ') }} zł</td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="5" class="text-muted text-center py-3">Brak powiązanych zamówień.</td>
+                                            <td colspan="4" class="text-muted text-center py-3">Brak powiązanych zamówień.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

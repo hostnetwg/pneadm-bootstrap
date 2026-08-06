@@ -442,10 +442,19 @@ class AccountingController extends Controller
             ->first(['id']);
 
         $identity = $profile['identity'];
-        $relatedOrders = $profileService->relatedOrders($identity)->map(function (FormOrder $relatedOrder) use ($profileService, $identity) {
+        $relatedOrders = $profileService->relatedOrders($identity);
+        $relatedOrders->load([
+            'debtCases' => fn ($query) => $query->orderByDesc('id'),
+        ]);
+        $relatedOrders = $relatedOrders->map(function (FormOrder $relatedOrder) use ($profileService, $identity) {
             $relatedOrder->setAttribute(
                 'link_reasons',
                 $profileService->linkReasonsForRelatedOrder($relatedOrder, $identity)
+            );
+            $relatedOrder->setAttribute(
+                'related_debt_case',
+                $relatedOrder->debtCases->first(fn (DebtCase $relatedCase) => $relatedCase->status !== DebtCase::STATUS_CLOSED)
+                    ?? $relatedOrder->debtCases->first()
             );
 
             return $relatedOrder;

@@ -75,10 +75,10 @@ E-mail uczestnika nie bierze udziału w tej regule, bo uczestnik szkolenia częs
 
 Ta sama reguła buduje historię powiązanych zamówień na `/accounting/debtors` (`accounting.debtors.lookup` → `DebtCustomerProfileService::relatedOrders`), na karcie sprawy oraz przy liczeniu VIP. Filtry checkboxów na debtors tylko zawężają widok po typie `link_reasons` zwróconym dla aktywnej strategii — nie łączą już OR-em NIP nabywcy / e-maili uczestnika z NIP odbiorcy.
 
-Na karcie sprawy (`/accounting/collections/{id}`) sekcja **Historia powiązanych zamówień** pokazuje:
-- linię **Identyfikacja:** ze strategią i wartością (`DebtCustomerProfileService::identitySummary`),
-- kolumnę **Powiązanie** z badge’ami powodów (`linkReasonsForRelatedOrder`; tooltip z wartością NIP/e-mail/danych),
-- wyróżnienie wiersza zamówienia bieżącej sprawy (`ta sprawa`).
+Na karcie sprawy (`/accounting/collections/{id}`) sekcja **Historia powiązanych zamówień** pokazuje w kolumnie **ID** (pod numerem zamówienia):
+- badge sprawy: `ta sprawa` (bieżąca) albo link do innej aktywnej/zamkniętej sprawy (tooltip wyjaśnia znaczenie),
+- badge’e powodów powiązania (`linkReasonsForRelatedOrder`; tooltip z opisem reguły i wartością),
+oraz nad tabelą linię **Identyfikacja:** (`identitySummary`). Bez osobnych kolumn Powiązanie / Sprawa.
 
 ## Synchronizacja statusu płatności z iFirma (odczyt)
 

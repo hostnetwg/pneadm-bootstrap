@@ -452,7 +452,7 @@ class AccountingCollectionsTest extends TestCase
             'recipient_nip' => '1111111111',
             'orderer_email' => 'sekretariat@example.test',
         ]);
-        FormOrder::create([
+        $relatedOrder = FormOrder::create([
             'product_name' => 'Szkolenie powiązane',
             'product_price' => 500,
             'order_date' => now()->subDays(40),
@@ -466,6 +466,24 @@ class AccountingCollectionsTest extends TestCase
             'status' => DebtCase::STATUS_OPEN,
             'opened_at' => now(),
         ]);
+        $relatedCase = DebtCase::create([
+            'form_order_id' => $relatedOrder->id,
+            'status' => DebtCase::STATUS_IN_PROGRESS,
+            'opened_at' => now()->subDays(5),
+        ]);
+        DebtCase::create([
+            'form_order_id' => FormOrder::create([
+                'product_name' => 'Szkolenie zamknięte powiązane',
+                'product_price' => 300,
+                'order_date' => now()->subDays(90),
+                'invoice_number' => '10/5/2026',
+                'buyer_nip' => '7777777777',
+                'recipient_nip' => '1111111111',
+            ])->id,
+            'status' => DebtCase::STATUS_CLOSED,
+            'opened_at' => now()->subDays(80),
+            'closed_at' => now()->subDays(60),
+        ]);
 
         $response = $this->actingAs($user)->get(route('accounting.collections.show', $case));
 
@@ -474,7 +492,13 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee('Identyfikacja:', false);
         $response->assertSee('NIP odbiorcy: 1111111111', false);
         $response->assertSee('ta sprawa', false);
+        $response->assertSee('To zamówienie należy do obecnie otwartej karty sprawy.', false);
+        $response->assertSee('Powiązane, bo ma ten sam NIP odbiorcy', false);
         $response->assertSee('Szkolenie powiązane', false);
+        $response->assertSee('#'.$relatedCase->id.' · '.$relatedCase->statusLabel(), false);
+        $response->assertSee('Inna niezamknięta sprawa windykacyjna dla tego zamówienia.', false);
+        $response->assertSee(route('accounting.collections.show', $relatedCase), false);
+        $response->assertSee('Zamknięte', false);
     }
 
     public function test_user_can_sync_ifirma_payment_status_on_debt_case(): void
