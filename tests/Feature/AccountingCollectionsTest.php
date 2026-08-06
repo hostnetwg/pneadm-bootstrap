@@ -149,6 +149,114 @@ class AccountingCollectionsTest extends TestCase
         ]);
     }
 
+    public function test_user_cannot_create_debt_case_without_invoice(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Bez FV',
+            'product_price' => 100,
+            'order_date' => now(),
+            'invoice_number' => null,
+            'ifirma_invoice_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->from(route('form-orders.show', $order))->post(route('accounting.collections.store'), [
+            'form_order_id' => $order->id,
+        ]);
+
+        $response->assertRedirect(route('form-orders.show', $order));
+        $response->assertSessionHas('error');
+        $this->assertDatabaseCount('debt_cases', 0);
+    }
+
+    public function test_user_can_soft_delete_mistaken_debt_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Pomyłka',
+            'product_price' => 200,
+            'order_date' => now(),
+            'invoice_number' => '99/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('accounting.collections.destroy', $case), [
+            'reason' => 'Utworzono przez pomyłkę',
+        ]);
+
+        $response->assertRedirect(route('accounting.collections.index'));
+        $this->assertSoftDeleted('debt_cases', ['id' => $case->id]);
+    }
+
+    public function test_user_cannot_soft_delete_case_with_accepted_bank_match(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Z przelewem',
+            'product_price' => 200,
+            'order_date' => now(),
+            'invoice_number' => '100/8/2026',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        $import = \App\Models\BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_soft_delete.csv',
+            'file_hash' => str_repeat('s', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+        $tx = \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 200,
+            'currency' => 'PLN',
+            'description' => 'FV 100/8/2026',
+            'account_label' => 'Szkoła',
+            'fingerprint' => str_repeat('t', 64),
+            'is_incoming' => true,
+        ]);
+        \App\Models\BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'debt_case_id' => $case->id,
+            'form_order_id' => $order->id,
+            'status' => \App\Models\BankTransactionMatch::STATUS_ACCEPTED,
+            'confidence' => \App\Models\BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['manual_case_link'],
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('accounting.collections.destroy', $case));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('error');
+        $this->assertNotSoftDeleted('debt_cases', ['id' => $case->id]);
+    }
+
     public function test_user_can_add_payment_promise_action(): void
     {
         $user = User::factory()->create([

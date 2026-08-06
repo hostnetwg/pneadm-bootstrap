@@ -383,6 +383,14 @@ class AccountingController extends Controller
         ]);
 
         $order = FormOrder::with(['primaryParticipant', 'onlinePaymentOrders'])->findOrFail($validated['form_order_id']);
+
+        if (! $order->hasIssuedInvoice()) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Nie można utworzyć sprawy windykacyjnej bez wystawionej faktury. Najpierw wystaw FV w zamówieniu.');
+        }
+
         $existing = DebtCase::withTrashed()->where('form_order_id', $order->id)->first();
         if ($existing !== null && $existing->trashed()) {
             $existing->restore();
@@ -435,6 +443,43 @@ class AccountingController extends Controller
         return redirect()
             ->route('accounting.collections.show', $case)
             ->with('success', 'Utworzono sprawę windykacyjną.');
+    }
+
+    public function collectionsDestroy(DebtCase $debtCase, DebtCaseInvoicePdfService $invoicePdfService)
+    {
+        if (! $debtCase->canSoftDeleteAsMistake()) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('error', 'Nie można usunąć sprawy z zaakceptowanym przelewem z wyciągu. Najpierw cofnij przypisanie wpłaty albo zamknij sprawę.');
+        }
+
+        $caseId = $debtCase->id;
+        $orderId = $debtCase->form_order_id;
+
+        $validated = request()->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $reason = trim((string) ($validated['reason'] ?? ''));
+
+        $debtCase->actions()->create([
+            'user_id' => Auth::id(),
+            'action_type' => DebtCaseAction::TYPE_NOTE,
+            'channel' => 'panel',
+            'happened_at' => now(),
+            'note' => $reason !== ''
+                ? 'Usunięto błędną sprawę (soft delete): '.$reason
+                : 'Usunięto błędną sprawę (soft delete).',
+        ]);
+
+        if ($debtCase->hasInvoicePdf()) {
+            $invoicePdfService->delete($debtCase);
+        }
+
+        $debtCase->delete();
+
+        return redirect()
+            ->route('accounting.collections.index')
+            ->with('success', "Usunięto błędną sprawę #{$caseId} (zamówienie #{$orderId}). Można utworzyć sprawę ponownie.");
     }
 
     public function collectionsShow(Request $request, DebtCase $debtCase, DebtCustomerProfileService $profileService)

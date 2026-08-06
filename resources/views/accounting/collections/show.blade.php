@@ -95,6 +95,13 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger">
                     <div class="fw-semibold mb-1">Nie udało się zapisać danych:</div>
@@ -117,6 +124,14 @@
                     <a href="{{ route('accounting.debtors.index') }}" class="btn btn-outline-success btn-sm">
                         Lookup faktury
                     </a>
+                    @if($case->canSoftDeleteAsMistake())
+                        <button type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#deleteMistakenDebtCaseModal">
+                            <i class="bi bi-trash"></i> Usuń błędną sprawę
+                        </button>
+                    @endif
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center"
                      id="caseNavControls"
@@ -1094,6 +1109,47 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
                         <button type="submit" class="btn btn-danger">Usuń PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if($case->canSoftDeleteAsMistake())
+    <div class="modal fade" id="deleteMistakenDebtCaseModal" tabindex="-1" aria-labelledby="deleteMistakenDebtCaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('accounting.collections.destroy', $case) }}">
+                    @csrf
+                    @method('DELETE')
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteMistakenDebtCaseModalLabel">
+                            <i class="bi bi-trash"></i> Usunąć błędną sprawę?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            Soft-delete sprawy <strong>#{{ $case->id }}</strong> (zamówienie
+                            <strong>#{{ $order->id }}</strong>). Używaj tylko gdy sprawa powstała przez pomyłkę.
+                        </p>
+                        <div class="mb-3">
+                            <label for="delete_mistaken_case_reason" class="form-label small">Powód (opcjonalnie)</label>
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   id="delete_mistaken_case_reason"
+                                   name="reason"
+                                   maxlength="500"
+                                   placeholder="np. utworzono bez FV / zły numer zamówienia">
+                        </div>
+                        <div class="alert alert-warning small mb-0">
+                            Nie usuwa zamówienia ani faktury. Przy zaakceptowanym przelewie z wyciągu usuwanie jest zablokowane.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">Usuń sprawę</button>
                     </div>
                 </form>
             </div>

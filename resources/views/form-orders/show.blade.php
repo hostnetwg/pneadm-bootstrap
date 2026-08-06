@@ -708,13 +708,24 @@ nowoczesna-edukacja.pl </div>
                                     <p class="small text-muted mb-2">
                                         Brak aktywnej sprawy. Utwórz ją, jeśli faktura wymaga ponaglenia lub ręcznej weryfikacji płatności.
                                     </p>
-                                    <form method="POST" action="{{ route('accounting.collections.store') }}" class="d-inline">
-                                        @csrf
-                                        <input type="hidden" name="form_order_id" value="{{ $zamowienie->id }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    @if($zamowienie->hasIssuedInvoice())
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#createDebtCaseModal">
                                             <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
                                         </button>
-                                    </form>
+                                    @else
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                disabled
+                                                title="Najpierw wystaw fakturę">
+                                            <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
+                                        </button>
+                                        <div class="small text-muted mt-1">
+                                            Najpierw wystaw fakturę — sprawy windykacyjnej nie tworzy się bez FV.
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                             @if($zamowienie->orderer_email)
@@ -3103,6 +3114,45 @@ nowoczesna-edukacja.pl `;
             </div>
         </div>
     </div>
+
+    @if($zamowienie->activeDebtCases->isEmpty() && $zamowienie->hasIssuedInvoice())
+    <div class="modal fade" id="createDebtCaseModal" tabindex="-1" aria-labelledby="createDebtCaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('accounting.collections.store') }}">
+                    @csrf
+                    <input type="hidden" name="form_order_id" value="{{ $zamowienie->id }}">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="createDebtCaseModalLabel">
+                            <i class="bi bi-exclamation-octagon"></i> Utworzyć sprawę windykacyjną?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Zostanie otwarta sprawa windykacyjna dla zamówienia <strong>#{{ $zamowienie->id }}</strong>.</p>
+                        <div class="border rounded p-2 bg-light small mb-3">
+                            <div><strong>FV:</strong> {{ $zamowienie->invoice_number ?: '—' }}</div>
+                            <div><strong>Kwota:</strong> {{ number_format((float) $zamowienie->product_price, 2, ',', ' ') }} zł</div>
+                            <div>
+                                <strong>Termin płatności:</strong>
+                                {{ $zamowienie->invoice_due_date?->format('d.m.Y') ?: '—' }}
+                            </div>
+                        </div>
+                        <div class="alert alert-warning small mb-0">
+                            Twórz sprawę tylko gdy faktura wymaga ponaglenia lub ręcznej weryfikacji płatności.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-plus-circle"></i> Utwórz sprawę
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modal potwierdzenia resetowania statusu Publigo --}}
     <div class="modal fade" id="resetPubligoModal" tabindex="-1" aria-labelledby="resetPubligoModalLabel" aria-hidden="true">

@@ -12,6 +12,18 @@
 
     <div class="py-3">
         <div class="container-fluid px-4">
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
             <div class="card mb-3">
                 <div class="card-body">
                     <label for="invoiceLookup" class="form-label fw-semibold mb-2">Numer faktury lub KSeF</label>
@@ -185,13 +197,13 @@
                 }
 
                 return `
-                    <form method="POST" action="${collectionsStoreUrl}" class="d-inline">
-                        <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
-                        <input type="hidden" name="form_order_id" value="${escapeHtml(item.id)}">
-                        <button type="submit" class="btn btn-sm btn-danger">
-                            <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
-                        </button>
-                    </form>
+                    <button type="button"
+                            class="btn btn-sm btn-danger js-confirm-create-case"
+                            data-order-id="${escapeHtml(item.id)}"
+                            data-invoice="${escapeHtml(item.invoice_number || '')}"
+                            data-product="${escapeHtml(item.product_name || '')}">
+                        <i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną
+                    </button>
                 `;
             };
 
@@ -567,6 +579,59 @@
                     performLookup(q);
                 }
             });
+
+            document.addEventListener('click', (event) => {
+                const createBtn = event.target.closest('.js-confirm-create-case');
+                if (!createBtn) {
+                    return;
+                }
+                const orderId = createBtn.getAttribute('data-order-id');
+                const invoice = createBtn.getAttribute('data-invoice') || '';
+                const product = createBtn.getAttribute('data-product') || '';
+                const orderIdInput = document.getElementById('confirmCreateDebtCaseOrderId');
+                const summary = document.getElementById('confirmCreateDebtCaseSummary');
+                const modalEl = document.getElementById('confirmCreateDebtCaseModal');
+                if (!orderIdInput || !summary || !modalEl || !window.bootstrap?.Modal) {
+                    return;
+                }
+                orderIdInput.value = String(orderId || '');
+                summary.innerHTML = `
+                    <div><strong>Zamówienie:</strong> #${escapeHtml(orderId)}</div>
+                    ${invoice ? `<div><strong>FV:</strong> ${escapeHtml(invoice)}</div>` : ''}
+                    ${product ? `<div class="text-muted">${escapeHtml(product)}</div>` : ''}
+                `;
+                window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            });
         })();
     </script>
+
+    <div class="modal fade" id="confirmCreateDebtCaseModal" tabindex="-1" aria-labelledby="confirmCreateDebtCaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('accounting.collections.store') }}">
+                    @csrf
+                    <input type="hidden" name="form_order_id" id="confirmCreateDebtCaseOrderId" value="">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="confirmCreateDebtCaseModalLabel">
+                            <i class="bi bi-exclamation-octagon"></i> Utworzyć sprawę windykacyjną?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Sprawa zostanie otwarta dla wskazanego zamówienia.</p>
+                        <div id="confirmCreateDebtCaseSummary" class="border rounded p-2 bg-light small mb-3"></div>
+                        <div class="alert alert-warning small mb-0">
+                            Twórz sprawę tylko gdy faktura wymaga ponaglenia lub weryfikacji płatności.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-plus-circle"></i> Utwórz sprawę
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </x-app-layout>

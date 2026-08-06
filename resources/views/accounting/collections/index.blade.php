@@ -27,6 +27,13 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger">
                     <div class="fw-semibold mb-1">Nie udało się zapisać danych:</div>
@@ -154,13 +161,13 @@
                                         @csrf
                                         <label for="form_order_id" class="form-label small mb-1">ID zamówienia `form_orders`</label>
                                         <div class="input-group input-group-sm">
-                                            <input type="number" min="1" id="form_order_id" name="form_order_id" class="form-control" required>
-                                            <button type="submit" class="btn btn-success">
+                                            <input type="number" min="1" id="form_order_id" name="form_order_id" class="form-control" required value="{{ old('form_order_id') }}">
+                                            <button type="submit" class="btn btn-success" id="createDebtCaseSubmitBtn">
                                                 <i class="bi bi-plus-circle"></i> Dodaj
                                             </button>
                                         </div>
                                         <div class="form-text">
-                                            Status płatności potwierdzasz w iFirma; tutaj rejestrujemy działania i kontekst.
+                                            Wymagana wystawiona FV. Status płatności potwierdzasz w iFirma; tutaj rejestrujemy działania i kontekst.
                                         </div>
                                     </form>
                                     <div class="mt-2">
@@ -331,11 +338,13 @@
 
                 return `
                     <div class="d-flex flex-column gap-1">
-                        <form method="POST" action="${collectionsStoreUrl}">
-                            <input type="hidden" name="_token" value="${escapeHtml(csrfToken)}">
-                            <input type="hidden" name="form_order_id" value="${escapeHtml(match.id)}">
-                            <button type="submit" class="btn btn-sm btn-danger w-100">Utwórz sprawę</button>
-                        </form>
+                        <button type="button"
+                                class="btn btn-sm btn-danger w-100 js-confirm-create-case"
+                                data-order-id="${escapeHtml(match.id)}"
+                                data-invoice="${escapeHtml(match.invoice_number || '')}"
+                                data-product="${escapeHtml(match.product_name || '')}">
+                            Utwórz sprawę
+                        </button>
                         <button type="button"
                                 class="btn btn-sm btn-outline-secondary js-use-order-id"
                                 data-order-id="${escapeHtml(match.id)}">
@@ -454,11 +463,53 @@
             });
 
             resultsEl.addEventListener('click', (event) => {
-                const button = event.target.closest('.js-use-order-id');
-                if (!button) {
+                const useBtn = event.target.closest('.js-use-order-id');
+                if (useBtn) {
+                    useOrderId(useBtn.getAttribute('data-order-id'));
                     return;
                 }
-                useOrderId(button.getAttribute('data-order-id'));
+
+                const createBtn = event.target.closest('.js-confirm-create-case');
+                if (createBtn) {
+                    openCreateCaseModal({
+                        orderId: createBtn.getAttribute('data-order-id'),
+                        invoice: createBtn.getAttribute('data-invoice') || '',
+                        product: createBtn.getAttribute('data-product') || '',
+                    });
+                }
+            });
+
+            const createForm = document.getElementById('createDebtCaseForm');
+            const confirmModalEl = document.getElementById('confirmCreateDebtCaseModal');
+            const confirmForm = document.getElementById('confirmCreateDebtCaseForm');
+            const confirmOrderIdInput = document.getElementById('confirmCreateDebtCaseOrderId');
+            const confirmSummary = document.getElementById('confirmCreateDebtCaseSummary');
+            let createCaseModal = null;
+
+            const openCreateCaseModal = ({ orderId, invoice = '', product = '' }) => {
+                if (!confirmModalEl || !confirmOrderIdInput || !confirmSummary || !window.bootstrap?.Modal) {
+                    return;
+                }
+                confirmOrderIdInput.value = String(orderId || '');
+                const invoiceLine = invoice ? `<div><strong>FV:</strong> ${escapeHtml(invoice)}</div>` : '';
+                const productLine = product ? `<div class="text-muted">${escapeHtml(product)}</div>` : '';
+                confirmSummary.innerHTML = `
+                    <div><strong>Zamówienie:</strong> #${escapeHtml(orderId)}</div>
+                    ${invoiceLine}
+                    ${productLine}
+                `;
+                createCaseModal = window.bootstrap.Modal.getOrCreateInstance(confirmModalEl);
+                createCaseModal.show();
+            };
+
+            createForm?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const orderId = orderIdInput.value.trim();
+                if (!orderId) {
+                    orderIdInput.focus();
+                    return;
+                }
+                openCreateCaseModal({ orderId });
             });
 
             if (window.bootstrap?.Tooltip) {
@@ -468,4 +519,34 @@
             }
         })();
     </script>
+
+    <div class="modal fade" id="confirmCreateDebtCaseModal" tabindex="-1" aria-labelledby="confirmCreateDebtCaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('accounting.collections.store') }}" id="confirmCreateDebtCaseForm">
+                    @csrf
+                    <input type="hidden" name="form_order_id" id="confirmCreateDebtCaseOrderId" value="">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="confirmCreateDebtCaseModalLabel">
+                            <i class="bi bi-exclamation-octagon"></i> Utworzyć sprawę windykacyjną?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Sprawa zostanie otwarta dla wskazanego zamówienia.</p>
+                        <div id="confirmCreateDebtCaseSummary" class="border rounded p-2 bg-light small mb-3"></div>
+                        <div class="alert alert-warning small mb-0">
+                            Wymagana wystawiona FV. Twórz sprawę tylko gdy faktura wymaga ponaglenia lub weryfikacji płatności.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-plus-circle"></i> Utwórz sprawę
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </x-app-layout>

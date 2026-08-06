@@ -125,6 +125,16 @@ class DebtCase extends Model
         return app(\App\Services\DebtCaseInvoicePdfService::class)->hasPdf($this);
     }
 
+    /**
+     * Soft-delete „błędnej sprawy”: tylko gdy nie ma zaakceptowanego przelewu z wyciągu.
+     */
+    public function canSoftDeleteAsMistake(): bool
+    {
+        return ! $this->bankTransactionMatches()
+            ->where('status', BankTransactionMatch::STATUS_ACCEPTED)
+            ->exists();
+    }
+
     public function scopeActive($query)
     {
         return $query->whereNotIn('status', [self::STATUS_CLOSED]);

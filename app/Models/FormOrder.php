@@ -694,6 +694,14 @@ class FormOrder extends Model
     }
 
     /**
+     * Czy zamówienie ma wystawioną fakturę (warunek utworzenia sprawy windykacyjnej z panelu).
+     */
+    public function hasIssuedInvoice(): bool
+    {
+        return $this->has_invoice || $this->hasIfirmaInvoiceId();
+    }
+
+    /**
      * Zapisuje daty dokumentu FV (wystawienie / termin płatności) na zamówieniu.
      */
     public function applyInvoiceDocumentDates(?string $issueDate, ?string $dueDate): void

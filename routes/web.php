@@ -562,6 +562,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/settings', [AccountingController::class, 'collectionsSettingsUpdate'])->name('settings.update');
             Route::get('/{debtCase}', [AccountingController::class, 'collectionsShow'])->name('show');
             Route::put('/{debtCase}', [AccountingController::class, 'collectionsUpdate'])->name('update');
+            Route::delete('/{debtCase}', [AccountingController::class, 'collectionsDestroy'])->name('destroy');
             Route::post('/{debtCase}/actions', [AccountingController::class, 'collectionsActionStore'])->name('actions.store');
             Route::post('/{debtCase}/contacts', [AccountingController::class, 'collectionsContactStore'])->name('contacts.store');
             Route::delete('/{debtCase}/contacts/{contact}', [AccountingController::class, 'collectionsContactDestroy'])->name('contacts.destroy');
