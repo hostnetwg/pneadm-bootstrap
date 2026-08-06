@@ -1,8 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="fw-semibold fs-4 text-dark mb-0">
-            Wprowadź dane księgowe
-        </h2>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h2 class="fw-semibold fs-4 text-dark mb-0">
+                Wprowadź dane księgowe
+            </h2>
+            <a href="{{ route('accounting.reports.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Wróć do raportów
+            </a>
+        </div>
     </x-slot>
 
     <div class="py-3">

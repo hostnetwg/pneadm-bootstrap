@@ -358,13 +358,8 @@
             <div class="collapse {{ request()->routeIs('accounting.*') ? 'show' : '' }}" id="accounting-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li>
-                        <a href="{{ route('accounting.reports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.reports.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                        <a href="{{ route('accounting.reports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.reports.*', 'accounting.data-entry.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             Raporty
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('accounting.data-entry.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('accounting.data-entry.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Wprowadź dane
                         </a>
                     </li>
                     @if(auth()->user()?->isSuperAdmin())

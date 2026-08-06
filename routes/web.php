@@ -540,7 +540,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/{id}', [ActivityLogController::class, 'show'])->name('show');
     });
 
-    // Księgowość - Raporty i Wprowadź dane
+    // Księgowość — Raporty (+ Wprowadź dane z przycisku na stronie raportów; trasy data-entry bez pozycji w menu)
     Route::prefix('accounting')->name('accounting.')->group(function () {
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [AccountingController::class, 'reportsIndex'])->name('index');
