@@ -834,7 +834,8 @@ nowoczesna-edukacja.pl </div>
                                             @endif
                                         </div>
                                     </div>
-                                    <div class="col-12 mt-2">
+                                    <div id="invoiceDatesDisplay"
+                                         class="col-12 mt-2 @if(! $zamowienie->invoice_issue_date && ! $zamowienie->invoice_due_date && ! $zamowienie->hasIfirmaInvoiceId() && blank($zamowienie->invoice_number)) d-none @endif">
                                         <div class="small border rounded px-2 py-1 bg-light">
                                             <span class="text-muted">Data wystawienia FV:</span>
                                             <strong id="invoiceIssueDateValue">{{ $zamowienie->invoice_issue_date?->format('d.m.Y') ?: '—' }}</strong>
@@ -2096,6 +2097,7 @@ nowoczesna-edukacja.pl `;
                 invoiceNumberInput.style.backgroundColor = '';
             }, 2000);
 
+            revealInvoiceDatesDisplay();
             refreshOperationalStatusPanel();
         }
 
@@ -2148,6 +2150,7 @@ nowoczesna-edukacja.pl `;
             }
             valueEl.textContent = invoiceId;
             wrap.classList.remove('d-none');
+            revealInvoiceDatesDisplay();
         }
 
         function formatInvoiceDateDisplay(isoDate) {
@@ -2161,6 +2164,13 @@ nowoczesna-edukacja.pl `;
             return `${parts[2]}.${parts[1]}.${parts[0]}`;
         }
 
+        function revealInvoiceDatesDisplay() {
+            const wrap = document.getElementById('invoiceDatesDisplay');
+            if (wrap) {
+                wrap.classList.remove('d-none');
+            }
+        }
+
         function applyInvoiceDatesDisplay(issueDate, dueDate) {
             const issueEl = document.getElementById('invoiceIssueDateValue');
             const dueEl = document.getElementById('invoiceDueDateValue');
@@ -2169,6 +2179,9 @@ nowoczesna-edukacja.pl `;
             }
             if (dueEl && dueDate !== undefined) {
                 dueEl.textContent = formatInvoiceDateDisplay(dueDate);
+            }
+            if (issueDate || dueDate) {
+                revealInvoiceDatesDisplay();
             }
         }
 
