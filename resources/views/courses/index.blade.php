@@ -534,14 +534,28 @@
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants_count }}</span><br>
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $course->participants_complete_count }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates_count }}</span><br>
-                            @if($course->orders_count > 0)
-                                <a href="{{ route('form-orders.index', ['filter' => 'handling', 'course_id' => $course->id]) }}" 
-                                   class="badge bg-danger text-decoration-none" 
-                                   title="Zamówienia wymagające obsługi: wystawienie FV, dodanie uczestników lub anulowanie">
-                                    {{ $course->orders_count }}
+                            @php
+                                $ordersNeedingParticipants = (int) ($course->orders_needing_participants_count ?? 0);
+                                $ordersNeedingInvoice = (int) ($course->orders_needing_invoice_count ?? 0);
+                            @endphp
+                            @if($ordersNeedingParticipants > 0)
+                                <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'new', 'course_id' => $course->id]) }}"
+                                   class="badge bg-danger text-decoration-none"
+                                   title="Zamówienia, w których trzeba dodać uczestnika do szkolenia">
+                                    U {{ $ordersNeedingParticipants }}
                                 </a>
                             @else
-                                <span class="badge bg-secondary" title="Brak zamówień wymagających obsługi (FV + uczestnicy lub anulowanie)">0</span>
+                                <span class="badge bg-secondary" title="Brak zamówień z niedodanym uczestnikiem">U 0</span>
+                            @endif
+                            <br>
+                            @if($ordersNeedingInvoice > 0)
+                                <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'needs_invoice', 'course_id' => $course->id]) }}"
+                                   class="badge bg-warning text-dark text-decoration-none"
+                                   title="Zamówienia bez wystawionej faktury i bez oznaczenia bez FV">
+                                    FV {{ $ordersNeedingInvoice }}
+                                </a>
+                            @else
+                                <span class="badge bg-secondary" title="Brak zamówień do wystawienia FV">FV 0</span>
                             @endif
                         </td>
                         <td class="text-center align-middle small" style="line-height: 1.35;">

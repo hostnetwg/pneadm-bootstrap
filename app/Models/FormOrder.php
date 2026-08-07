@@ -380,6 +380,14 @@ class FormOrder extends Model
     }
 
     /**
+     * Scope - ważne zamówienia bez FV i bez oznaczenia "bez faktury".
+     */
+    public function scopeNeedsInvoice($query)
+    {
+        return app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsInvoice($query);
+    }
+
+    /**
      * Scope - zamówienia zakończone
      */
     public function scopeCompleted($query)

@@ -18,6 +18,17 @@ Endpoint: `POST /form-orders/{id}/pnedu/provision`
 
 Status w panelu: `form_orders.pnedu_provisioned_at`, `pnedu_user_existed_before`, pola `pnedu_clickmeeting_*`.
 
+## Liczniki na liście szkoleń
+
+Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dla zamówień FORM danego szkolenia:
+
+| Badge | Znaczenie | Link |
+|-------|-----------|------|
+| `U` | Ważne zamówienia, w których trzeba jeszcze dodać uczestnika do szkolenia | `/form-orders?quick=all&filter=new&course_id={courseId}` |
+| `FV` | Ważne zamówienia bez wystawionej faktury i bez oznaczenia „Bezpłatny dostęp - bez FV” | `/form-orders?quick=all&filter=needs_invoice&course_id={courseId}` |
+
+Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`.
+
 ## ClickMeeting
 
 ### Integracja API

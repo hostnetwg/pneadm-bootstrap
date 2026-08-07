@@ -321,31 +321,139 @@ class FormOrderOperationalStatusService
     }
 
     /**
+     * Liczba ważnych zamówień per kurs, w których trzeba jeszcze dodać uczestnika.
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array<int, int>
+     */
+    public function countNeedsProvisioningByCourseIds(array $courseIds): array
+    {
+        if ($courseIds === []) {
+            return [];
+        }
+
+        $provisionedSql = $this->participantProvisionedExistsSql('fop_cnt', 'c.id');
+
+        return $this->courseOrdersBaseQuery($courseIds)
+            ->whereNull('fo.cancelled_at')
+            ->whereNull('fo.legacy_handled_at')
+            ->where(function ($outer) use ($provisionedSql) {
+                $outer->whereNotExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from('form_order_participants as fop_has')
+                        ->whereColumn('fop_has.form_order_id', 'fo.id')
+                        ->whereNull('fop_has.deleted_at')
+                        ->whereRaw("TRIM(fop_has.participant_email) != ''");
+                })->orWhereExists(function ($sub) use ($provisionedSql) {
+                    $sub->selectRaw('1')
+                        ->from('form_order_participants as fop_cnt')
+                        ->whereColumn('fop_cnt.form_order_id', 'fo.id')
+                        ->whereNull('fop_cnt.deleted_at')
+                        ->whereRaw("TRIM(fop_cnt.participant_email) != ''")
+                        ->whereRaw("NOT ({$provisionedSql})");
+                });
+            })
+            ->groupBy('c.id')
+            ->select('c.id as course_id', DB::raw('COUNT(DISTINCT fo.id) as cnt'))
+            ->pluck('cnt', 'course_id')
+            ->map(fn ($cnt) => (int) $cnt)
+            ->all();
+    }
+
+    /**
+     * Liczba ważnych zamówień per kurs, w których trzeba wystawić FV albo oznaczyć zwolnienie z FV.
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array<int, int>
+     */
+    public function countNeedsInvoiceByCourseIds(array $courseIds): array
+    {
+        if ($courseIds === []) {
+            return [];
+        }
+
+        return $this->courseOrdersBaseQuery($courseIds)
+            ->whereNull('fo.cancelled_at')
+            ->whereNull('fo.legacy_handled_at')
+            ->whereNull('fo.invoice_exempt_at')
+            ->where(function ($noInv) {
+                $noInv->whereNull('fo.invoice_number')
+                    ->orWhere('fo.invoice_number', '')
+                    ->orWhere('fo.invoice_number', '0');
+            })
+            ->groupBy('c.id')
+            ->select('c.id as course_id', DB::raw('COUNT(DISTINCT fo.id) as cnt'))
+            ->pluck('cnt', 'course_id')
+            ->map(fn ($cnt) => (int) $cnt)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $courseIds
+     */
+    private function courseOrdersBaseQuery(array $courseIds): \Illuminate\Database\Query\Builder
+    {
+        return DB::connection('mysql')
+            ->table('courses as c')
+            ->join('form_orders as fo', function ($join) {
+                $join->whereNull('fo.deleted_at')
+                    ->where(function ($q) {
+                        $q->whereColumn('fo.product_id', 'c.id')
+                            ->orWhere(function ($q2) {
+                                $q2->whereNotNull('c.id_old')
+                                    ->where('c.id_old', '!=', '')
+                                    ->whereColumn('fo.publigo_product_id', 'c.id_old');
+                            });
+                    });
+            })
+            ->whereIn('c.id', $courseIds);
+    }
+
+    /**
      * Filtr „Nieprzetworzone” — wymaga dodania uczestnika(ów) do szkolenia.
      */
     public function scopeNeedsAttention(Builder $query): Builder
     {
         $table = $query->getModel()->getTable();
+        $courseSql = $this->resolveCourseIdSql($table);
+        $provisioned = $this->participantProvisionedExistsSql('fop_unprov', $courseSql);
 
         return $query
             ->whereNull("{$table}.cancelled_at")
-            ->whereExists(function ($sub) use ($table) {
-                $sub->selectRaw('1')
-                    ->from('form_order_participants as fop_need')
-                    ->whereColumn('fop_need.form_order_id', "{$table}.id")
-                    ->whereNull('fop_need.deleted_at')
-                    ->whereRaw("TRIM(fop_need.participant_email) != ''");
-            })
-            ->whereExists(function ($sub) use ($table) {
-                $courseSql = $this->resolveCourseIdSql($table);
-                $provisioned = $this->participantProvisionedExistsSql('fop_unprov', $courseSql);
+            ->whereNull("{$table}.legacy_handled_at")
+            ->where(function ($outer) use ($table, $provisioned) {
+                $outer->whereNotExists(function ($sub) use ($table) {
+                    $sub->selectRaw('1')
+                        ->from('form_order_participants as fop_need')
+                        ->whereColumn('fop_need.form_order_id', "{$table}.id")
+                        ->whereNull('fop_need.deleted_at')
+                        ->whereRaw("TRIM(fop_need.participant_email) != ''");
+                })->orWhereExists(function ($sub) use ($table, $provisioned) {
+                    $sub->selectRaw('1')
+                        ->from('form_order_participants as fop_unprov')
+                        ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
+                        ->whereNull('fop_unprov.deleted_at')
+                        ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
+                        ->whereRaw("NOT ({$provisioned})");
+                });
+            });
+    }
 
-                $sub->selectRaw('1')
-                    ->from('form_order_participants as fop_unprov')
-                    ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
-                    ->whereNull('fop_unprov.deleted_at')
-                    ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
-                    ->whereRaw("NOT ({$provisioned})");
+    /**
+     * Filtr „Do wystawienia FV” — ważne zamówienia bez faktury i bez zwolnienia z FV.
+     */
+    public function scopeNeedsInvoice(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query
+            ->whereNull("{$table}.cancelled_at")
+            ->whereNull("{$table}.legacy_handled_at")
+            ->whereNull("{$table}.invoice_exempt_at")
+            ->where(function ($noInv) use ($table) {
+                $noInv->whereNull("{$table}.invoice_number")
+                    ->orWhere("{$table}.invoice_number", '')
+                    ->orWhere("{$table}.invoice_number", '0');
             });
     }
 

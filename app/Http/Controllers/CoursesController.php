@@ -226,7 +226,8 @@ class CoursesController extends Controller
 
         if (! empty($courseIdsOnPage)) {
             $operational = app(\App\Services\FormOrderOperationalStatusService::class);
-            $ordersCountsByCourseId = $operational->countNeedsHandlingByCourseIds($courseIdsOnPage);
+            $ordersNeedingParticipantsByCourseId = $operational->countNeedsProvisioningByCourseIds($courseIdsOnPage);
+            $ordersNeedingInvoiceByCourseId = $operational->countNeedsInvoiceByCourseIds($courseIdsOnPage);
 
             $closedPaidIds = $courses->getCollection()
                 ->filter(fn (Course $c) => $c->category === 'closed' && $c->is_paid)
@@ -236,8 +237,9 @@ class CoursesController extends Controller
             $uninvoicedOrderIdByCourseId = CourseFormOrderBillingService::firstUninvoicedOrderIdByCourseIds($closedPaidIds);
             $firstInvoiceNumberByCourseId = CourseFormOrderBillingService::firstInvoiceNumberByCourseIds($closedPaidIds);
 
-            $courses->getCollection()->transform(function ($course) use ($ordersCountsByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId, $firstInvoiceNumberByCourseId) {
-                $course->orders_count = (int) ($ordersCountsByCourseId[$course->id] ?? 0);
+            $courses->getCollection()->transform(function ($course) use ($ordersNeedingParticipantsByCourseId, $ordersNeedingInvoiceByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId, $firstInvoiceNumberByCourseId) {
+                $course->orders_needing_participants_count = (int) ($ordersNeedingParticipantsByCourseId[$course->id] ?? 0);
+                $course->orders_needing_invoice_count = (int) ($ordersNeedingInvoiceByCourseId[$course->id] ?? 0);
                 $summary = $billingByCourseId[$course->id] ?? null;
                 $course->closed_billing_status = $summary['status'] ?? (
                     ($course->category === 'closed' && $course->is_paid)
@@ -253,7 +255,8 @@ class CoursesController extends Controller
             });
         } else {
             $courses->getCollection()->transform(function ($course) {
-                $course->orders_count = 0;
+                $course->orders_needing_participants_count = 0;
+                $course->orders_needing_invoice_count = 0;
                 $course->closed_billing_status = CourseFormOrderBillingService::STATUS_NOT_APPLICABLE;
                 $course->closed_billing_orders_total = 0;
                 $course->closed_billing_orders_invoiced = 0;

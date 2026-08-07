@@ -106,6 +106,7 @@
                         $processingLabels = [
                             '' => ['bg-primary text-white', 'Wszystkie zamówienia'],
                             'new' => ['bg-warning text-dark', 'Nieprzetworzone (brak dostępu uczestnika na szkoleniu)'],
+                            'needs_invoice' => ['bg-warning text-dark', 'Do wystawienia FV (brak FV i brak zwolnienia z FV)'],
                             'handling' => ['bg-danger text-white', 'Do obsługi — aktywne szkolenia (brak FV i/lub uczestnika)'],
                             'handling_all' => ['bg-dark text-white', 'Do obsługi — pełny backlog (w tym legacy)'],
                             'processed' => ['bg-info text-dark', 'Przetworzone (FV + uczestnicy na szkoleniu)'],
@@ -218,6 +219,7 @@
                                     <option value="handling" {{ $filter === 'handling' ? 'selected' : '' }}>Do obsługi (aktywne)</option>
                                     <option value="handling_all" {{ $filter === 'handling_all' ? 'selected' : '' }}>Do obsługi (backlog)</option>
                                     <option value="new" {{ $filter === 'new' ? 'selected' : '' }}>Nieprzetworzone (uczestnik)</option>
+                                    <option value="needs_invoice" {{ $filter === 'needs_invoice' ? 'selected' : '' }}>Do wystawienia FV</option>
                                     <option value="processed" {{ $filter === 'processed' ? 'selected' : '' }}>Przetworzone</option>
                                     <option value="cancelled" {{ $filter === 'cancelled' ? 'selected' : '' }}>Anulowane</option>
                                 </select>

@@ -39,4 +39,17 @@ class FormOrderOperationalStatusServiceSqlTest extends TestCase
         $this->assertStringContainsString('invoice_number', $sql);
         $this->assertStringContainsString('form_order_participants', $sql);
     }
+
+    public function test_scope_needs_invoice_sql_checks_invoice_exemption_and_cancellation(): void
+    {
+        $service = new FormOrderOperationalStatusService;
+        $query = \App\Models\FormOrder::query();
+        $service->scopeNeedsInvoice($query);
+        $sql = $query->toSql();
+
+        $this->assertStringContainsString('cancelled_at', $sql);
+        $this->assertStringContainsString('legacy_handled_at', $sql);
+        $this->assertStringContainsString('invoice_exempt_at', $sql);
+        $this->assertStringContainsString('invoice_number', $sql);
+    }
 }

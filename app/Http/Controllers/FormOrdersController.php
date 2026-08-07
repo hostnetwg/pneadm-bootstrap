@@ -45,9 +45,9 @@ class FormOrdersController extends Controller
         //                (legacy: quick=new → handling; quick='' → all)
         //  - 'filter' => wyłącznie pole „Przetwarzanie” w formularzu (+ pozostałe pola formularza).
         //                Formularz zawsze wysyła quick=all, więc nie dziedziczy kolejki z buttonów.
-        //                Dozwolone: '' | handling | new | processed | cancelled | handling_all
+        //                Dozwolone: '' | handling | new | needs_invoice | processed | cancelled | handling_all
         $filter = $request->get('filter', '');
-        $filter = in_array($filter, ['new', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
+        $filter = in_array($filter, ['new', 'needs_invoice', 'processed', 'cancelled', 'handling', 'handling_all'], true) ? $filter : '';
         $invoiceSearchActive = $invoiceSearch !== '';
         // Wyszukiwarka FV/KSeF zawsze w całej bazie — bez kolejki „Do obsługi” / innych filtrów przetwarzania.
         if ($invoiceSearchActive) {
@@ -460,6 +460,7 @@ class FormOrdersController extends Controller
     /**
      * Dokłada do zapytania warunek statusu przetwarzania zamówienia.
      * Wartości: '' (brak filtra) | 'new' (brak dostępu uczestnika(ów) na szkoleniu, nieanulowane)
+     * | 'needs_invoice' (brak FV i brak zwolnienia z FV, nieanulowane)
      * | 'handling' (brak FV i/lub brak pełnego dostępu uczestników, nieanulowane)
      * | 'processed' (wszyscy uczestnicy na szkoleniu, nieanulowane)
      * | 'cancelled' (cancelled_at ustawione)
@@ -470,6 +471,8 @@ class FormOrdersController extends Controller
     {
         if ($value === 'new') {
             $query->new();
+        } elseif ($value === 'needs_invoice') {
+            $query->needsInvoice();
         } elseif ($value === 'handling') {
             $query->needsActiveHandling();
         } elseif ($value === 'handling_all') {
@@ -3400,7 +3403,7 @@ class FormOrdersController extends Controller
      * Preferuje pola z GET faktury iFirma (jak sync KSeF); fallback: payload wysłany przy wystawieniu.
      *
      * @param  array<string, mixed>  $outboundInvoiceData
-     * @param  array<string, mixed>|null  $fetchedInvoiceData surowa odpowiedź getInvoice / data
+     * @param  array<string, mixed>|null  $fetchedInvoiceData  surowa odpowiedź getInvoice / data
      */
     private function applyInvoiceDocumentDatesFromPayload(
         FormOrder $zamowienie,

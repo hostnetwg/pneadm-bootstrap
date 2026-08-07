@@ -159,6 +159,73 @@ class FormOrderOperationalStatusTest extends TestCase
         $this->assertTrue(FormOrder::processed()->whereKey($order->id)->exists());
     }
 
+    public function test_course_badge_counts_split_missing_participants_from_missing_invoices(): void
+    {
+        $courseId = $this->createCourse();
+        $service = app(FormOrderOperationalStatusService::class);
+
+        $missingBoth = $this->createOrderWithParticipant($courseId, [], [
+            'participant_email' => 'missing-both@example.test',
+        ]);
+
+        $missingInvoice = $this->createOrderWithParticipant($courseId, [], [
+            'participant_email' => 'missing-invoice@example.test',
+        ]);
+        $missingInvoiceParticipant = Participant::create([
+            'course_id' => $courseId,
+            'first_name' => 'Anna',
+            'last_name' => 'Faktura',
+            'email' => 'missing-invoice@example.test',
+            'order' => 1,
+        ]);
+        FormOrderParticipant::where('form_order_id', $missingInvoice->id)
+            ->update(['participant_id' => $missingInvoiceParticipant->id]);
+
+        $missingParticipant = $this->createOrderWithParticipant($courseId, ['invoice_number' => 'FV/1/2026'], [
+            'participant_email' => 'missing-participant@example.test',
+        ]);
+
+        $freeAccessDone = $this->createOrderWithParticipant($courseId, [
+            'invoice_exempt_at' => now(),
+            'invoice_exempt_reason' => 'Bezpłatny dostęp',
+        ], [
+            'participant_email' => 'free-access@example.test',
+        ]);
+        $freeAccessParticipant = Participant::create([
+            'course_id' => $courseId,
+            'first_name' => 'Darmowy',
+            'last_name' => 'Dostep',
+            'email' => 'free-access@example.test',
+            'order' => 1,
+        ]);
+        FormOrderParticipant::where('form_order_id', $freeAccessDone->id)
+            ->update(['participant_id' => $freeAccessParticipant->id]);
+
+        $cancelled = $this->createOrderWithParticipant($courseId, [
+            'cancelled_at' => now(),
+            'cancelled_reason' => 'duplikat',
+        ], [
+            'participant_email' => 'cancelled@example.test',
+        ]);
+
+        $participantsCounts = $service->countNeedsProvisioningByCourseIds([$courseId]);
+        $invoiceCounts = $service->countNeedsInvoiceByCourseIds([$courseId]);
+
+        $this->assertSame(2, $participantsCounts[$courseId] ?? 0);
+        $this->assertSame(2, $invoiceCounts[$courseId] ?? 0);
+
+        $this->assertTrue(FormOrder::new()->whereKey($missingBoth->id)->exists());
+        $this->assertTrue(FormOrder::needsInvoice()->whereKey($missingBoth->id)->exists());
+        $this->assertFalse(FormOrder::new()->whereKey($missingInvoice->id)->exists());
+        $this->assertTrue(FormOrder::needsInvoice()->whereKey($missingInvoice->id)->exists());
+        $this->assertTrue(FormOrder::new()->whereKey($missingParticipant->id)->exists());
+        $this->assertFalse(FormOrder::needsInvoice()->whereKey($missingParticipant->id)->exists());
+        $this->assertFalse(FormOrder::new()->whereKey($freeAccessDone->id)->exists());
+        $this->assertFalse(FormOrder::needsInvoice()->whereKey($freeAccessDone->id)->exists());
+        $this->assertFalse(FormOrder::new()->whereKey($cancelled->id)->exists());
+        $this->assertFalse(FormOrder::needsInvoice()->whereKey($cancelled->id)->exists());
+    }
+
     public function test_status_completed_without_participant_still_needs_attention(): void
     {
         $courseId = $this->createCourse();
