@@ -1242,7 +1242,7 @@
                                     $optionEmailLower = mb_strtolower($option['email']);
                                     $optionDomId = 'debtReminderRecipient_'.preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $option['key']);
                                     $isChecked = in_array($optionEmailLower, $oldRecipientEmails, true)
-                                        || (empty($oldRecipientEmails) && ! old('recipient_email') && $option['key'] === 'orderer');
+                                        || (empty($oldRecipientEmails) && ! old('recipient_email'));
                                 @endphp
                                 <div class="form-check">
                                     <input class="form-check-input debt-reminder-recipient-checkbox"

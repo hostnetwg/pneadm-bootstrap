@@ -42,6 +42,14 @@ class DebtReminderMailTest extends TestCase
     {
         [$user, $case] = $this->caseWithOrder();
 
+        DebtCaseContact::create([
+            'debt_case_id' => $case->id,
+            'created_by' => $user->id,
+            'contact_type' => DebtCaseContact::TYPE_EMAIL,
+            'value' => 'sekretariat@szkola.test',
+            'label' => 'Sekretariat',
+        ]);
+
         $response = $this->actingAs($user)->get(route('accounting.collections.show', $case));
 
         $response->assertOk();
@@ -54,6 +62,14 @@ class DebtReminderMailTest extends TestCase
         $response->assertSee('Zamawiający', false);
         $response->assertSee('dluznik@example.test', false);
         $response->assertDontSee('debtReminderRecipientKey', false);
+        $response->assertSee('value="dluznik@example.test"', false);
+        $response->assertSee('value="sekretariat@szkola.test"', false);
+        $html = $response->getContent();
+        $this->assertGreaterThanOrEqual(2, substr_count($html, 'name="recipient_emails[]"'));
+        $this->assertGreaterThanOrEqual(
+            2,
+            preg_match_all('/name="recipient_emails\[]"[^>]*\bchecked\b|\bchecked\b[^>]*name="recipient_emails\[]"/is', $html)
+        );
     }
 
     public function test_user_can_send_test_reminder_email(): void
