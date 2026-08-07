@@ -480,13 +480,13 @@
             });
 
             const createForm = document.getElementById('createDebtCaseForm');
-            const confirmModalEl = document.getElementById('confirmCreateDebtCaseModal');
-            const confirmForm = document.getElementById('confirmCreateDebtCaseForm');
-            const confirmOrderIdInput = document.getElementById('confirmCreateDebtCaseOrderId');
-            const confirmSummary = document.getElementById('confirmCreateDebtCaseSummary');
-            let createCaseModal = null;
 
+            // Modal HTML jest poniżej tego skryptu — elementy pobieramy dopiero przy kliknięciu
+            // (jak na /accounting/debtors). Cache przy starcie IIFE zwracałby null.
             const openCreateCaseModal = ({ orderId, invoice = '', product = '' }) => {
+                const confirmModalEl = document.getElementById('confirmCreateDebtCaseModal');
+                const confirmOrderIdInput = document.getElementById('confirmCreateDebtCaseOrderId');
+                const confirmSummary = document.getElementById('confirmCreateDebtCaseSummary');
                 if (!confirmModalEl || !confirmOrderIdInput || !confirmSummary || !window.bootstrap?.Modal) {
                     return;
                 }
@@ -498,8 +498,7 @@
                     ${invoiceLine}
                     ${productLine}
                 `;
-                createCaseModal = window.bootstrap.Modal.getOrCreateInstance(confirmModalEl);
-                createCaseModal.show();
+                window.bootstrap.Modal.getOrCreateInstance(confirmModalEl).show();
             };
 
             createForm?.addEventListener('submit', (event) => {
