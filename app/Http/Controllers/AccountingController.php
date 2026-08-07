@@ -276,50 +276,56 @@ class AccountingController extends Controller
         $status = $rawStatus === '' ? 'all' : $rawStatus;
         $segment = (string) $request->get('segment', '');
         $search = trim((string) $request->get('search', ''));
+        $sort = (string) $request->get('sort', 'id');
+        $direction = strtolower((string) $request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['id', 'invoice', 'due_date'];
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'id';
+        }
 
         $casesQuery = DebtCase::query()
-            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy'])
-            ->latest('id');
+            ->select('debt_cases.*')
+            ->leftJoin('form_orders', 'form_orders.id', '=', 'debt_cases.form_order_id')
+            ->with(['formOrder.primaryParticipant', 'assignedTo', 'createdBy']);
 
         if ($status === 'active') {
             $casesQuery->active();
         } elseif ($status !== 'all' && array_key_exists($status, DebtCase::statusLabels())) {
-            $casesQuery->where('status', $status);
+            $casesQuery->where('debt_cases.status', $status);
         }
 
         if ($segment !== '' && array_key_exists($segment, DebtCase::segmentLabels())) {
-            $casesQuery->where('customer_segment', $segment);
+            $casesQuery->where('debt_cases.customer_segment', $segment);
         }
 
         if ($search !== '') {
             $casesQuery->where(function ($query) use ($search) {
-                $query->where('invoice_number', 'like', "%{$search}%")
-                    ->orWhere('ksef_number', 'like', "%{$search}%")
-                    ->orWhereHas('formOrder', function ($formOrderQuery) use ($search) {
-                        $formOrderQuery->where('invoice_number', 'like', "%{$search}%")
-                            ->orWhere('ksef_number', 'like', "%{$search}%")
-                            ->orWhere('buyer_name', 'like', "%{$search}%")
-                            ->orWhere('recipient_name', 'like', "%{$search}%")
-                            ->orWhere('orderer_email', 'like', "%{$search}%")
-                            ->orWhere('buyer_nip', 'like', "%{$search}%")
-                            ->orWhere('recipient_nip', 'like', "%{$search}%");
-
-                        if (ctype_digit($search)) {
-                            $formOrderQuery->orWhere('id', (int) $search);
-                        }
-                    });
+                $query->where('debt_cases.invoice_number', 'like', "%{$search}%")
+                    ->orWhere('debt_cases.ksef_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.invoice_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.ksef_number', 'like', "%{$search}%")
+                    ->orWhere('form_orders.buyer_name', 'like', "%{$search}%")
+                    ->orWhere('form_orders.recipient_name', 'like', "%{$search}%")
+                    ->orWhere('form_orders.orderer_email', 'like', "%{$search}%")
+                    ->orWhere('form_orders.buyer_nip', 'like', "%{$search}%")
+                    ->orWhere('form_orders.recipient_nip', 'like', "%{$search}%");
 
                 if (ctype_digit($search)) {
-                    $query->orWhere('id', (int) $search)
-                        ->orWhere('form_order_id', (int) $search);
+                    $query->orWhere('debt_cases.id', (int) $search)
+                        ->orWhere('debt_cases.form_order_id', (int) $search)
+                        ->orWhere('form_orders.id', (int) $search);
                 }
             });
         }
+
+        $this->applyCollectionsListSort($casesQuery, $sort, $direction);
 
         $cases = $casesQuery->paginate(25)->appends([
             'search' => $search,
             'status' => $status,
             'segment' => $segment,
+            'sort' => $sort,
+            'dir' => $direction,
         ]);
 
         $stats = [
@@ -340,9 +346,44 @@ class AccountingController extends Controller
             'status' => $status,
             'segment' => $segment,
             'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
             'statusLabels' => DebtCase::statusLabels(),
             'segmentLabels' => DebtCase::segmentLabels(),
         ]);
+    }
+
+    /**
+     * Sortowanie listy spraw: id, termin, FV nr/miesiąc/rok (rok → miesiąc → numer).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\DebtCase>  $query
+     */
+    private function applyCollectionsListSort($query, string $sort, string $direction): void
+    {
+        $dir = $direction === 'asc' ? 'asc' : 'desc';
+
+        if ($sort === 'due_date') {
+            $query->orderByRaw('CASE WHEN debt_cases.due_date IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('debt_cases.due_date', $dir)
+                ->orderBy('debt_cases.id', $dir);
+
+            return;
+        }
+
+        if ($sort === 'invoice') {
+            // FV w formacie nr/miesiąc/rok, np. 5/7/2026 lub 260/7/2026
+            $invoiceExpr = "COALESCE(NULLIF(TRIM(debt_cases.invoice_number), ''), NULLIF(TRIM(form_orders.invoice_number), ''), '')";
+
+            $query->orderByRaw("CASE WHEN {$invoiceExpr} REGEXP '^[0-9]+/[0-9]+/[0-9]{4}$' THEN 0 ELSE 1 END")
+                ->orderByRaw("CAST(SUBSTRING_INDEX({$invoiceExpr}, '/', -1) AS UNSIGNED) {$dir}")
+                ->orderByRaw("CAST(SUBSTRING_INDEX(SUBSTRING_INDEX({$invoiceExpr}, '/', 2), '/', -1) AS UNSIGNED) {$dir}")
+                ->orderByRaw("CAST(SUBSTRING_INDEX({$invoiceExpr}, '/', 1) AS UNSIGNED) {$dir}")
+                ->orderBy('debt_cases.id', $dir);
+
+            return;
+        }
+
+        $query->orderBy('debt_cases.id', $dir);
     }
 
     public function collectionsSettingsEdit()

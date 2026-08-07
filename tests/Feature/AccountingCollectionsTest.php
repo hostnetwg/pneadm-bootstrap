@@ -52,6 +52,125 @@ class AccountingCollectionsTest extends TestCase
         $response->assertSee('createInvoiceLookupBtn', false);
         $response->assertSee('Niezamknięte', false);
         $response->assertSee('Pokaż niezamknięte', false);
+        $response->assertSee('sort=id', false);
+        $response->assertSee('sort=invoice', false);
+        $response->assertSee('sort=due_date', false);
+        $response->assertSee('bi-arrow-down-up', false);
+    }
+
+    public function test_collections_index_sorts_by_invoice_year_month_number(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $cases = [];
+        foreach ([
+            '5/7/2026',
+            '260/7/2026',
+            '10/1/2025',
+            '1/8/2026',
+        ] as $invoice) {
+            $order = FormOrder::create([
+                'product_name' => 'Sort FV '.$invoice,
+                'product_price' => 100,
+                'order_date' => now()->subDays(5),
+                'invoice_number' => $invoice,
+            ]);
+            $cases[$invoice] = DebtCase::create([
+                'form_order_id' => $order->id,
+                'status' => DebtCase::STATUS_OPEN,
+                'invoice_number' => $invoice,
+                'opened_at' => now(),
+            ]);
+        }
+
+        $asc = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'active',
+            'sort' => 'invoice',
+            'dir' => 'asc',
+        ]));
+        $asc->assertOk();
+        $ascBody = $asc->getContent();
+        $pos2025 = strpos($ascBody, 'FV: 10/1/2025');
+        $posJuly5 = strpos($ascBody, 'FV: 5/7/2026');
+        $posJuly260 = strpos($ascBody, 'FV: 260/7/2026');
+        $posAug = strpos($ascBody, 'FV: 1/8/2026');
+        $this->assertNotFalse($pos2025);
+        $this->assertNotFalse($posJuly5);
+        $this->assertNotFalse($posJuly260);
+        $this->assertNotFalse($posAug);
+        $this->assertTrue($pos2025 < $posJuly5);
+        $this->assertTrue($posJuly5 < $posJuly260);
+        $this->assertTrue($posJuly260 < $posAug);
+
+        $desc = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'active',
+            'sort' => 'invoice',
+            'dir' => 'desc',
+        ]));
+        $descBody = $desc->getContent();
+        $this->assertTrue(strpos($descBody, 'FV: 1/8/2026') < strpos($descBody, 'FV: 10/1/2025'));
+    }
+
+    public function test_collections_index_sorts_by_due_date_and_case_id(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $earlyOrder = FormOrder::create([
+            'product_name' => 'Wcześniejszy termin',
+            'product_price' => 100,
+            'order_date' => now()->subDays(20),
+            'invoice_number' => '11/8/2026',
+        ]);
+        $early = DebtCase::create([
+            'form_order_id' => $earlyOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '11/8/2026',
+            'due_date' => '2026-07-01',
+            'opened_at' => now(),
+        ]);
+
+        $lateOrder = FormOrder::create([
+            'product_name' => 'Późniejszy termin',
+            'product_price' => 100,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '12/8/2026',
+        ]);
+        $late = DebtCase::create([
+            'form_order_id' => $lateOrder->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '12/8/2026',
+            'due_date' => '2026-08-01',
+            'opened_at' => now(),
+        ]);
+
+        $byDue = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'active',
+            'sort' => 'due_date',
+            'dir' => 'asc',
+        ]));
+        $byDue->assertOk();
+        $dueBody = $byDue->getContent();
+        $this->assertTrue(
+            strpos($dueBody, 'FV: 11/8/2026') < strpos($dueBody, 'FV: 12/8/2026')
+        );
+
+        $byIdDesc = $this->actingAs($user)->get(route('accounting.collections.index', [
+            'status' => 'active',
+            'sort' => 'id',
+            'dir' => 'desc',
+        ]));
+        $byIdDesc->assertOk();
+        $idBody = $byIdDesc->getContent();
+        $this->assertTrue($late->id > $early->id);
+        $this->assertTrue(
+            strpos($idBody, 'FV: 12/8/2026') < strpos($idBody, 'FV: 11/8/2026')
+        );
     }
 
     public function test_collections_index_defaults_to_active_and_hides_closed(): void

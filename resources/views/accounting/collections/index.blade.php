@@ -88,6 +88,8 @@
                         <div class="card-header fw-semibold">Filtry listy spraw</div>
                         <div class="card-body">
                             <form method="GET" action="{{ route('accounting.collections.index') }}" class="row g-2 align-items-end">
+                                <input type="hidden" name="sort" value="{{ $sort ?? 'id' }}">
+                                <input type="hidden" name="dir" value="{{ $direction ?? 'desc' }}">
                                 <div class="col-12">
                                     <label for="search" class="form-label small mb-1">Szukaj w sprawach</label>
                                     <input type="text" id="search" name="search" class="form-control form-control-sm"
@@ -189,17 +191,61 @@
                     <span class="fw-semibold">Sprawy windykacyjne</span>
                     <span class="small text-muted">Wyświetlanie {{ $cases->firstItem() ?? 0 }}-{{ $cases->lastItem() ?? 0 }} z {{ $cases->total() }}</span>
                 </div>
+                @php
+                    $currentSort = $sort ?? 'id';
+                    $currentDir = $direction ?? 'desc';
+                    $collectionsSortLink = function (string $column) use ($currentSort, $currentDir) {
+                        if ($currentSort === $column) {
+                            $newDir = $currentDir === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            $newDir = $column === 'due_date' ? 'asc' : 'desc';
+                        }
+
+                        return route('accounting.collections.index', array_merge(
+                            request()->except('page'),
+                            ['sort' => $column, 'dir' => $newDir]
+                        ));
+                    };
+                    $collectionsSortIcon = function (string $column) use ($currentSort, $currentDir) {
+                        if ($currentSort !== $column) {
+                            return 'bi-arrow-down-up text-muted';
+                        }
+
+                        return ($currentDir === 'asc' ? 'bi-sort-up' : 'bi-sort-down').' text-primary';
+                    };
+                @endphp
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Sprawa</th>
-                                <th>Zamówienie / faktura</th>
+                                <th>
+                                    <a href="{{ $collectionsSortLink('id') }}"
+                                       class="text-decoration-none text-dark d-inline-flex align-items-center gap-1"
+                                       title="Sortuj po numerze sprawy">
+                                        Sprawa
+                                        <i class="bi {{ $collectionsSortIcon('id') }}" aria-hidden="true"></i>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="{{ $collectionsSortLink('invoice') }}"
+                                       class="text-decoration-none text-dark d-inline-flex align-items-center gap-1"
+                                       title="Sortuj po FV: rok → miesiąc → numer">
+                                        Zamówienie / faktura
+                                        <i class="bi {{ $collectionsSortIcon('invoice') }}" aria-hidden="true"></i>
+                                    </a>
+                                </th>
                                 <th>Klient</th>
                                 <th>Status</th>
                                 <th>Segment</th>
                                 <th>Opiekun</th>
-                                <th>Termin</th>
+                                <th>
+                                    <a href="{{ $collectionsSortLink('due_date') }}"
+                                       class="text-decoration-none text-dark d-inline-flex align-items-center gap-1"
+                                       title="Sortuj po terminie płatności">
+                                        Termin
+                                        <i class="bi {{ $collectionsSortIcon('due_date') }}" aria-hidden="true"></i>
+                                    </a>
+                                </th>
                                 <th>Następny krok</th>
                                 <th class="text-end">Kwota</th>
                             </tr>
