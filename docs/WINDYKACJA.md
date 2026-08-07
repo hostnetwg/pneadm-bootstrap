@@ -36,7 +36,7 @@ Pierwszy etap obejmuje:
 - na `/accounting/debtors`: numer zamówienia nad fakturą oraz skrót do utworzenia/otwarcia sprawy windykacyjnej,
 - historię działań: notatka, e-mail, SMS, telefon, iFirma, obietnica płatności, sporne, wstrzymanie, zamknięcie,
 - **wysyłka e-maila z karty sprawy**: przycisk „Wyślij przypomnienie” → modal (jak linki do prowadzącego) z szablonami przypomnienie/ponaglenie, edycją treści, wyborem odbiorcy (zamawiający / uczestnik / kontakty), wysyłką właściwą i testową, opcjonalnym PDF ze sprawy / z iFirma + upload PDF; wpis w historii `email`; VIP / `do_not_auto_dun` = ostrzeżenie, bez blokady; SMS później,
-- **PDF faktury na sprawie**: upload w sekcji „PDF faktury” (`debt_cases.invoice_pdf_*`, dysk `local`); podgląd w modalu iframe + otwarcie w nowej karcie; zastąpienie / usunięcie (modal Bootstrap),
+- **PDF faktury na sprawie**: upload w sekcji „PDF faktury” (`debt_cases.invoice_pdf_*`, dysk `local`); podgląd w modalu iframe + otwarcie w nowej karcie; zastąpienie / usunięcie (modal Bootstrap); na liście spraw ikona PDF obok numeru FV (link do podglądu), gdy plik jest załączony,
 - alternatywne kontakty (dodawanie i usuwanie z karty sprawy),
 - segmentację klienta (`standard`, `risk`, `vip`, `vip_with_overdue`, `manual_review`),
 - ostrzeżenie VIP / lojalny klient,

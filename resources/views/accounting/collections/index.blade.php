@@ -218,7 +218,21 @@
                                     </td>
                                     <td>
                                         <a href="{{ route('form-orders.show', $order->id) }}" class="text-decoration-none">#{{ $order->id }}</a>
-                                        <div class="small text-muted">FV: {{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</div>
+                                        <div class="small text-muted d-flex align-items-center flex-wrap gap-1">
+                                            <span>FV: {{ $case->invoice_number ?: $order->invoice_number ?: '—' }}</span>
+                                            @if($case->hasInvoicePdf())
+                                                <a href="{{ route('accounting.collections.invoice-pdf.preview', $case) }}"
+                                                   class="text-danger text-decoration-none"
+                                                   target="_blank"
+                                                   rel="noopener"
+                                                   title="{{ $case->invoice_pdf_original_name ?: 'PDF faktury' }}"
+                                                   data-bs-toggle="tooltip"
+                                                   data-bs-title="PDF faktury załączony{{ $case->invoice_pdf_original_name ? ' · '.$case->invoice_pdf_original_name : '' }}">
+                                                    <i class="bi bi-file-earmark-pdf-fill" aria-hidden="true"></i>
+                                                    <span class="visually-hidden">PDF faktury</span>
+                                                </a>
+                                            @endif
+                                        </div>
                                         @if($case->ksef_number || $order->ksef_number)
                                             <div class="small text-success">KSeF: {{ $case->ksef_number ?: $order->ksef_number }}</div>
                                         @endif

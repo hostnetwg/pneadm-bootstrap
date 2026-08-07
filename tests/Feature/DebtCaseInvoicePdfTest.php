@@ -69,6 +69,25 @@ class DebtCaseInvoicePdfTest extends TestCase
         $this->assertFalse($case->fresh()->hasInvoicePdf());
     }
 
+    public function test_collections_index_shows_pdf_icon_when_invoice_pdf_attached(): void
+    {
+        [$user, $case] = $this->caseWithOrder();
+
+        $withoutPdf = $this->actingAs($user)->get(route('accounting.collections.index'));
+        $withoutPdf->assertOk();
+        $withoutPdf->assertSee('FV: 26/8/2026', false);
+        $withoutPdf->assertDontSee('bi-file-earmark-pdf-fill', false);
+
+        $this->actingAs($user)->post(route('accounting.collections.invoice-pdf.upload', $case), [
+            'invoice_pdf' => UploadedFile::fake()->create('faktura-26.pdf', 120, 'application/pdf'),
+        ])->assertRedirect();
+
+        $withPdf = $this->actingAs($user)->get(route('accounting.collections.index'));
+        $withPdf->assertOk();
+        $withPdf->assertSee('bi-file-earmark-pdf-fill', false);
+        $withPdf->assertSee(route('accounting.collections.invoice-pdf.preview', $case), false);
+    }
+
     /**
      * @return array{0: User, 1: DebtCase}
      */
