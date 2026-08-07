@@ -76,6 +76,11 @@ class BankStatementImportTest extends TestCase
 
         $this->assertNotNull($match, 'Expected high-confidence suggestion for FV 320/7/2026');
 
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('findSalesInvoiceByPelnyNumer')
+                ->andReturn(['status' => 'not_found', 'message' => 'Brak FV w teście accept']);
+        });
+
         $accept = $this->actingAs($user)->post(
             route('accounting.bank-imports.matches.accept', [$import, $match])
         );
@@ -109,6 +114,49 @@ class BankStatementImportTest extends TestCase
             ->get(route('accounting.bank-imports.index'))
             ->assertOk()
             ->assertSee('Import wyciągu mBank', false);
+    }
+
+    public function test_index_shows_review_progress_and_coverage_gaps(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-07'));
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_lipiec.csv',
+            'file_hash' => hash('sha256', 'gap-review-test'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'period_from' => '2026-07-01',
+            'period_to' => '2026-07-31',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+            'rows_matched' => 0,
+            'rows_duplicate' => 0,
+        ]);
+
+        \App\Models\BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-07-15',
+            'amount' => 100,
+            'currency' => 'PLN',
+            'description' => 'Test wpływ bez decyzji',
+            'fingerprint' => hash('sha256', 'gap-review-tx'),
+            'is_incoming' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('accounting.bank-imports.index'));
+
+        $response->assertOk();
+        $response->assertSee('Do przeglądu: 1', false);
+        $response->assertSee('Luki w okresach wyciągów', false);
+        $response->assertSee('2026-08-01', false);
+
+        \Carbon\Carbon::setTestNow();
     }
 
     public function test_show_page_has_unlinked_filter_for_transactions_without_suggestions(): void
@@ -312,6 +360,19 @@ class BankStatementImportTest extends TestCase
 
         $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
             $mock->shouldNotReceive('registerInvoicePayment');
+            $mock->shouldReceive('getInvoice')
+                ->once()
+                ->with('555001')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '320/7/2026',
+                        'Zaplacono' => 365,
+                        'Brutto' => 365,
+                        'FakturaId' => 555001,
+                    ],
+                ]);
+            $mock->shouldReceive('unwrapInvoicePayload')->andReturnUsing(fn ($d) => is_array($d) ? $d : []);
         });
 
         $accept = $this->actingAs($user)->post(
@@ -380,10 +441,21 @@ class BankStatementImportTest extends TestCase
         $this->assertNotNull($match);
 
         $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            // 1) auto-sync przy tworzeniu sprawy, 2–3) rejestracja wpłaty + ponowny sync
             $mock->shouldReceive('getInvoice')
-                ->twice()
+                ->times(3)
                 ->with('555001')
                 ->andReturn(
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '320/7/2026',
+                            'Zaplacono' => 0,
+                            'Brutto' => 365,
+                            'FakturaId' => 555001,
+                            'TerminPlatnosci' => '2026-08-01',
+                        ],
+                    ],
                     [
                         'status' => 'success',
                         'data' => [
@@ -468,6 +540,11 @@ class BankStatementImportTest extends TestCase
             ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
             ->first();
         $this->assertNotNull($match);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('findSalesInvoiceByPelnyNumer')
+                ->andReturn(['status' => 'not_found', 'message' => 'Brak FV w teście local accept']);
+        });
 
         $this->actingAs($user)->post(
             route('accounting.bank-imports.matches.accept', [$import, $match])
@@ -631,6 +708,11 @@ class BankStatementImportTest extends TestCase
         $lookup->assertJsonPath('orders.0.id', $order->id);
         $lookup->assertJsonPath('orders.0.order_date', $orderDate->format('Y-m-d'));
         $lookup->assertJsonPath('orders.0.course_date', $courseStart->format('Y-m-d'));
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('findSalesInvoiceByPelnyNumer')
+                ->andReturn(['status' => 'not_found', 'message' => 'Brak FV w teście']);
+        });
 
         $link = $this->actingAs($user)->post(
             route('accounting.bank-imports.transactions.link-case', [$import, $transaction]),
@@ -912,10 +994,21 @@ class BankStatementImportTest extends TestCase
         ]);
 
         $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            // 1) auto-sync przy tworzeniu sprawy, 2–3) rejestracja wpłaty + ponowny sync
             $mock->shouldReceive('getInvoice')
-                ->twice()
+                ->times(3)
                 ->with('777115')
                 ->andReturn(
+                    [
+                        'status' => 'success',
+                        'data' => [
+                            'PelnyNumer' => '115/7/2026',
+                            'Zaplacono' => 0,
+                            'Brutto' => 365,
+                            'FakturaId' => 777115,
+                            'TerminPlatnosci' => '2026-08-01',
+                        ],
+                    ],
                     [
                         'status' => 'success',
                         'data' => [

@@ -7,7 +7,9 @@ use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Odczyt statusu płatności faktury z iFirma (źródło prawdy) → cache na debt_cases.
@@ -47,6 +49,53 @@ class IfirmaInvoicePaymentStatusService
      *     changed?: bool
      * }
      */
+    /**
+     * Best-effort sync po utworzeniu sprawy — nie przerywa flow gdy iFirma nie odpowie.
+     * Gdy wywołane w transakcji DB, sync odpala się po commit (API poza lockiem).
+     *
+     * @return array{success: bool, message: string, status?: string}|null  null = zaplanowano po commit
+     */
+    public function syncDebtCaseAfterCreate(DebtCase $case, ?User $user = null): ?array
+    {
+        $caseId = (int) $case->id;
+        $userId = $user?->id;
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(function () use ($caseId, $userId) {
+                $fresh = DebtCase::query()->find($caseId);
+                if ($fresh === null) {
+                    return;
+                }
+                $actor = $userId ? User::query()->find($userId) : null;
+                $this->syncDebtCaseQuietly($fresh, $actor);
+            });
+
+            return null;
+        }
+
+        return $this->syncDebtCaseQuietly($case, $user);
+    }
+
+    /**
+     * @return array{success: bool, message: string, status?: string, ...}
+     */
+    public function syncDebtCaseQuietly(DebtCase $case, ?User $user = null): array
+    {
+        try {
+            return $this->syncDebtCase($case, $user);
+        } catch (Throwable $e) {
+            Log::warning('iFirma payment sync after case create failed', [
+                'debt_case_id' => $case->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Nie udało się pobrać statusu z iFirma: '.$e->getMessage(),
+            ];
+        }
+    }
+
     public function syncDebtCase(DebtCase $case, ?User $user = null): array
     {
         $case->loadMissing('formOrder');

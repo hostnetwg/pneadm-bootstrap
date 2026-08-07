@@ -40,7 +40,15 @@
                             {{ $import->period_from?->format('Y-m-d') ?? '—' }} → {{ $import->period_to?->format('Y-m-d') ?? '—' }}
                         </div>
                         <div class="col-md-2"><span class="text-muted">Wpływy:</span> {{ $import->rows_incoming }}</div>
-                        <div class="col-md-3"><span class="text-muted">Wgrał:</span> {{ $import->uploader?->name ?? '—' }} {{ $import->created_at?->format('Y-m-d H:i') }}</div>
+                        <div class="col-md-3">
+                            <span class="text-muted">Przegląd:</span>
+                            @if(($counts['unmatched'] ?? 0) === 0)
+                                <span class="badge text-bg-success">Przejrzany</span>
+                            @else
+                                <span class="badge text-bg-warning text-dark">Do przeglądu: {{ $counts['unmatched'] }}</span>
+                            @endif
+                        </div>
+                        <div class="col-md-4"><span class="text-muted">Wgrał:</span> {{ $import->uploader?->name ?? '—' }} {{ $import->created_at?->format('Y-m-d H:i') }}</div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 mt-2">
                         <form method="POST" action="{{ route('accounting.bank-imports.rematch', $import) }}">

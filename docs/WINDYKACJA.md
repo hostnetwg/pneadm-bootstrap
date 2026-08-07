@@ -104,6 +104,8 @@ Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
 Daty FV na zamówieniu są też zapisywane **przy wystawianiu** faktury w panelu (`DataWystawienia` / `TerminPlatnosci` z payloadu). Tworzenie sprawy preferuje `invoice_issue_date` / `invoice_due_date`; dopiero gdy brak — szacunek od daty zamówienia/wystawienia + `invoice_payment_delay`.
 
+**Auto-sync przy utworzeniu sprawy:** po `collections.store` (lista windykacji, debtors, form-orders) oraz po utworzeniu sprawy przy akceptacji/ręcznym powiązaniu przelewu z bank-imports (`BankStatementImportService::createDebtCaseFromOrder`) wywoływany jest ten sam sync statusu iFirma (best-effort; przy błędzie API sprawa powstaje, flash `warning`). Przywrócenie soft-deleted sprawy też odświeża status.
+
 Testy: `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=AccountingCollectionsTest`.
 
 ## Publiczny Formularz
@@ -114,7 +116,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 
 ## Kolejne Etapy
 
-- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania na samym syncu karty,
+- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy **oraz automatycznie przy tworzeniu sprawy**; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania na samym syncu karty,
 - ~~import CSV wyciągów bankowych~~ — **wdrożone (MVP mBank)**: `Księgowość → Import wyciągu` (`accounting.bank-imports.*`); tabele `bank_statement_imports` / `bank_transactions` / `bank_transaction_matches`; parser `MbankStatementParser`; sugestie FV / KSeF / `#ID` / NIP / **imię+nazwisko nabywcy (tylko FV bez NIP) + kwota** → Medium; ręczna akceptacja → lokalny link + `debt_case_actions.bank_match`; przy zgodnej kwocie opcjonalnie **rejestracja wpłaty w iFirma** + sync statusu,
 - ~~ręczne powiązanie przelewu od strony sprawy~~ — **wdrożone**: na karcie sprawy sekcja „Wpłaty z wyciągu” ma wyszukiwarkę niepowiązanych wpływów (domyślnie po kwocie sprawy + fraza z opisu/nadawcy/konta) i modal Bootstrap „Powiąż lokalnie” / „+ wpłata iFirma”,
 - ~~cofnięcie przypisania przelewu~~ — **wdrożone**: „Cofnij” na karcie sprawy + „Cofnij przypisanie” w imporcie; lokalnie match → `rejected`, historia `bank_unmatch`, zamknięta sprawa → `open`; best-effort usunięcie wpłaty w iFirma (`DELETE faktury/wplaty/...`, oficjalne API dokumentuje tylko POST — przy failu ostrzeżenie i ręczna korekta w iFirma),
@@ -128,7 +130,9 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 ## Import wyciągu mBank (MVP)
 
 - Menu: `Księgowość → Import wyciągu`.
-- Lista importów: nagłówki kolumn mają tooltipy Bootstrap (ID, plik, okres, wpływy/wszystkie, sugestie, duplikaty, status, kto, kiedy, akcje).
+- Lista importów: nagłówki kolumn mają tooltipy Bootstrap (ID, plik, okres, wpływy/wszystkie, sugestie, duplikaty, **przegląd**, kto, kiedy, akcje).
+- **Przegląd w tabeli:** kolumna pokazuje, czy wpływy z importu mają już decyzję operatora — `Przejrzany` (każdy wpływ accepted/ignored), `Do przeglądu: N` albo `Brak wpływów`. To nie jest status parsowania pliku („Sparsowany”).
+- **Luki dat (okresy wyciągów):** na liście importów alert z lukami między polami `#Za okres` ze wszystkich importów (nakładające się / stykające się okresy są łączone); zgłaszany jest też brak pokrycia od końca ostatniego okresu do dziś. Po nowym imporcie ostrzeżenie flash, jeśli luki istnieją. Serwis: `BankStatementCoverageService`.
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.
 - Tylko wpływy (`amount > 0`) idą do UI dopasowań; wydatki mogą być zapisane, ale nie są przeglądane w MVP.
 - Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, `PayNow`, `Ignorowane`, `Wszystkie wpływy`.
@@ -148,4 +152,4 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - Ikona oka przy wierszu → modal Bootstrap z porównaniem **przelew z wyciągu** ↔ **zamówienie/sugestia** (FV z opisu, KSeF z tytułu, nabywca, NIP, e-mail, podstawa dopasowania).
 - Pliku produkcyjnego z PII **nie** commitować; fixture testowa: `tests/fixtures/bank/mbank_sample.csv`.
 
-Testy: `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest`, `--filter=BankStatementImportTest`, `--filter=BankTransactionUnlinkTest`.
+Testy: `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest`, `--filter=BankStatementImportTest`, `--filter=BankTransactionUnlinkTest`, `--filter=BankStatementCoverageServiceTest`.

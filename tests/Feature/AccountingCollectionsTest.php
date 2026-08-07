@@ -239,12 +239,29 @@ class AccountingCollectionsTest extends TestCase
             'product_price' => 365,
             'order_date' => now()->subDays(20),
             'invoice_number' => '43/7/2026',
+            'ifirma_invoice_id' => '998877',
             'invoice_payment_delay' => 14,
             'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
             'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
             'orderer_email' => 'sekretariat@example.test',
             'buyer_nip' => '1234567890',
         ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->once()
+                ->with('998877')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '43/7/2026',
+                        'Zaplacono' => 0,
+                        'Brutto' => 365,
+                        'DataWystawienia' => '2026-07-01',
+                        'TerminPlatnosci' => '2026-07-15',
+                    ],
+                ]);
+        });
 
         $response = $this->actingAs($user)->post(route('accounting.collections.store'), [
             'form_order_id' => $order->id,
@@ -265,6 +282,14 @@ class AccountingCollectionsTest extends TestCase
             'debt_case_id' => $case->id,
             'action_type' => DebtCaseAction::TYPE_CASE_OPENED,
             'user_id' => $user->id,
+        ]);
+        $case->refresh();
+        $this->assertSame(\App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE, $case->ifirma_payment_status);
+        $this->assertNotNull($case->ifirma_synced_at);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_IFIRMA_SYNC,
+            'outcome' => \App\Services\IfirmaInvoicePaymentStatusService::STATUS_OVERDUE,
         ]);
     }
 
@@ -619,6 +644,11 @@ class AccountingCollectionsTest extends TestCase
             'orderer_email' => 'vip@example.test',
             'buyer_nip' => '1234567890',
         ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('findSalesInvoiceByPelnyNumer')
+                ->andReturn(['status' => 'not_found', 'message' => 'Brak FV w teście VIP']);
+        });
 
         $this->actingAs($user)->post(route('accounting.collections.store'), [
             'form_order_id' => $newOrder->id,

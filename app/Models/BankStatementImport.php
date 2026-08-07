@@ -53,4 +53,46 @@ class BankStatementImport extends Model
             default => (string) $this->status,
         };
     }
+
+    /**
+     * Liczba wpływów bez decyzji operatora (brak accepted/ignored).
+     * Wymaga withCount(`pending_review_count`) albo osobnego zapytania.
+     */
+    public function pendingReviewCount(): int
+    {
+        if (isset($this->attributes['pending_review_count']) || isset($this->pending_review_count)) {
+            return (int) $this->pending_review_count;
+        }
+
+        return (int) $this->transactions()
+            ->where('is_incoming', true)
+            ->whereDoesntHave('matches', fn ($q) => $q->whereIn('status', [
+                BankTransactionMatch::STATUS_ACCEPTED,
+                BankTransactionMatch::STATUS_IGNORED,
+            ]))
+            ->count();
+    }
+
+    public function isFullyReviewed(): bool
+    {
+        if ((int) $this->rows_incoming === 0) {
+            return true;
+        }
+
+        return $this->pendingReviewCount() === 0;
+    }
+
+    public function reviewProgressLabel(): string
+    {
+        if ((int) $this->rows_incoming === 0) {
+            return 'Brak wpływów';
+        }
+
+        $pending = $this->pendingReviewCount();
+        if ($pending === 0) {
+            return 'Przejrzany';
+        }
+
+        return 'Do przeglądu: '.$pending;
+    }
 }

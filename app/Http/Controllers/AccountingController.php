@@ -415,8 +415,11 @@ class AccountingController extends Controller
             ->with('success', 'Zapisano ustawienia windykacji.');
     }
 
-    public function collectionsStore(Request $request, DebtCustomerProfileService $profileService)
-    {
+    public function collectionsStore(
+        Request $request,
+        DebtCustomerProfileService $profileService,
+        IfirmaInvoicePaymentStatusService $ifirmaPaymentStatus,
+    ) {
         $validated = $request->validate([
             'form_order_id' => ['required', 'integer', 'exists:form_orders,id'],
             'summary' => ['nullable', 'string', 'max:2000'],
@@ -435,6 +438,12 @@ class AccountingController extends Controller
         $existing = DebtCase::withTrashed()->where('form_order_id', $order->id)->first();
         if ($existing !== null && $existing->trashed()) {
             $existing->restore();
+            $sync = $ifirmaPaymentStatus->syncDebtCaseAfterCreate($existing, Auth::user());
+            $redirect = redirect()
+                ->route('accounting.collections.show', $existing)
+                ->with('success', 'Przywrócono sprawę windykacyjną dla tego zamówienia.');
+
+            return $this->withOptionalIfirmaSyncWarning($redirect, $sync);
         }
         if ($existing !== null) {
             return redirect()
@@ -481,9 +490,29 @@ class AccountingController extends Controller
                 : 'Utworzono sprawę windykacyjną.',
         ]);
 
-        return redirect()
+        $sync = $ifirmaPaymentStatus->syncDebtCaseAfterCreate($case, Auth::user());
+
+        $redirect = redirect()
             ->route('accounting.collections.show', $case)
             ->with('success', 'Utworzono sprawę windykacyjną.');
+
+        return $this->withOptionalIfirmaSyncWarning($redirect, $sync);
+    }
+
+    /**
+     * @param  array{success?: bool, message?: string}|null  $sync
+     */
+    private function withOptionalIfirmaSyncWarning(\Illuminate\Http\RedirectResponse $redirect, ?array $sync): \Illuminate\Http\RedirectResponse
+    {
+        if ($sync !== null && ! ($sync['success'] ?? false)) {
+            $redirect->with(
+                'warning',
+                'Sprawę zapisano, ale nie udało się odświeżyć statusu z iFirma'
+                .(isset($sync['message']) ? ': '.$sync['message'] : '.')
+            );
+        }
+
+        return $redirect;
     }
 
     public function collectionsDestroy(DebtCase $debtCase, DebtCaseInvoicePdfService $invoicePdfService)

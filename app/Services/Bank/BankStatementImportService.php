@@ -8,7 +8,9 @@ use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\DebtCaseAction;
 use App\Models\FormOrder;
+use App\Models\User;
 use App\Services\DebtCustomerProfileService;
+use App\Services\IfirmaInvoicePaymentStatusService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,7 @@ class BankStatementImportService
         private readonly BankTransactionMatcher $matcher = new BankTransactionMatcher,
         private readonly DebtCustomerProfileService $profileService = new DebtCustomerProfileService,
         private readonly PayNowGatewayPayoutDetector $payNowGatewayPayoutDetector = new PayNowGatewayPayoutDetector,
+        private readonly ?IfirmaInvoicePaymentStatusService $ifirmaPaymentStatus = null,
     ) {}
 
     public function importUploadedFile(UploadedFile $file, ?int $userId = null): BankStatementImport
@@ -602,6 +605,10 @@ class BankStatementImportService
             'happened_at' => now(),
             'note' => 'Utworzono sprawę przy akceptacji dopasowania przelewu z wyciągu mBank.',
         ]);
+
+        $ifirma = $this->ifirmaPaymentStatus ?? app(IfirmaInvoicePaymentStatusService::class);
+        $actor = $userId ? User::query()->find($userId) : null;
+        $ifirma->syncDebtCaseAfterCreate($case, $actor);
 
         return $case;
     }

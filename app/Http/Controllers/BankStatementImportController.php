@@ -8,6 +8,7 @@ use App\Models\BankTransactionMatch;
 use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\User;
+use App\Services\Bank\BankStatementCoverageService;
 use App\Services\Bank\BankStatementImportService;
 use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
@@ -18,18 +19,32 @@ use Illuminate\Validation\ValidationException;
 
 class BankStatementImportController extends Controller
 {
-    public function index()
+    public function index(BankStatementCoverageService $coverageService)
     {
         $imports = BankStatementImport::query()
             ->with('uploader')
+            ->withCount([
+                'transactions as pending_review_count' => function ($q) {
+                    $q->where('is_incoming', true)
+                        ->whereDoesntHave('matches', fn ($m) => $m->whereIn('status', [
+                            BankTransactionMatch::STATUS_ACCEPTED,
+                            BankTransactionMatch::STATUS_IGNORED,
+                        ]));
+                },
+            ])
             ->latest('id')
             ->paginate(20);
 
-        return view('accounting.bank-imports.index', compact('imports'));
+        $coverageGaps = $coverageService->detectGaps();
+
+        return view('accounting.bank-imports.index', compact('imports', 'coverageGaps'));
     }
 
-    public function store(Request $request, BankStatementImportService $importService)
-    {
+    public function store(
+        Request $request,
+        BankStatementImportService $importService,
+        BankStatementCoverageService $coverageService
+    ) {
         @set_time_limit(600);
         @ini_set('max_execution_time', '600');
 
@@ -52,7 +67,7 @@ class BankStatementImportController extends Controller
             ]);
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('accounting.bank-imports.show', $import)
             ->with('success', sprintf(
                 'Zaimportowano: %d wierszy (%d wpływów, %d z sugestią, %d duplikatów pominiętych).',
@@ -61,6 +76,18 @@ class BankStatementImportController extends Controller
                 $import->rows_matched,
                 $import->rows_duplicate
             ));
+
+        $gaps = $coverageService->detectGaps();
+        if ($gaps !== []) {
+            $summary = $coverageService->formatGapsSummary($gaps);
+            $redirect->with(
+                'warning',
+                'Wykryto lukę w okresach wyciągów (pole „Za okres”): '.$summary
+                .'. Sprawdź, czy nie brakuje eksportu z mBank między tymi datami.'
+            );
+        }
+
+        return $redirect;
     }
 
     public function rematch(BankStatementImport $bankImport, BankStatementImportService $importService)

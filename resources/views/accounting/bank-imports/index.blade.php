@@ -17,11 +17,43 @@
                 </div>
             @endif
 
+            @if(session('warning'))
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    {{ session('warning') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger">
                     <ul class="mb-0">
                         @foreach($errors->all() as $error)
                             <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            @if(!empty($coverageGaps))
+                <div class="alert alert-warning" role="alert">
+                    <div class="fw-semibold mb-1">Luki w okresach wyciągów</div>
+                    <p class="small mb-2">
+                        Porównanie pól <code>#Za okres</code> ze wszystkich importów (nakładające się / stykające się okresy łączymy).
+                        Brak pokrycia do dziś też jest zgłaszany.
+                    </p>
+                    <ul class="mb-0 small">
+                        @foreach($coverageGaps as $gap)
+                            <li>
+                                @if($gap['from'] === $gap['to'])
+                                    {{ $gap['from'] }}
+                                @else
+                                    {{ $gap['from'] }} → {{ $gap['to'] }}
+                                    <span class="text-muted">({{ $gap['days'] }} dni)</span>
+                                @endif
+                                @if(!empty($gap['trailing']))
+                                    <span class="badge text-bg-light border ms-1">do dziś</span>
+                                @endif
+                            </li>
                         @endforeach
                     </ul>
                 </div>
@@ -104,8 +136,8 @@
                                         class="text-nowrap"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
-                                        title="Status przetwarzania importu: „Sparsowany” = plik wczytany do bazy i gotowy do ręcznego przeglądu; „Przejrzany” = oznaczony jako przejrzany (jeśli używane).">
-                                        Status
+                                        title="Postęp ręcznego przeglądu wpływów z tego importu. „Przejrzany” = każdy wpływ ma decyzję (zaakceptowany lub zignorowany). „Do przeglądu: N” = ile wpływów jeszcze czeka (sugestia lub bez powiązania). „Brak wpływów” = w pliku nie zapisano nowych wpływów (np. same duplikaty / wydatki).">
+                                        Przegląd
                                     </th>
                                     <th scope="col"
                                         class="text-nowrap"
@@ -147,7 +179,19 @@
                                         <td>{{ $import->rows_incoming }} / {{ $import->rows_total }}</td>
                                         <td>{{ $import->rows_matched }}</td>
                                         <td>{{ $import->rows_duplicate }}</td>
-                                        <td><span class="badge text-bg-light border">{{ $import->statusLabel() }}</span></td>
+                                        <td>
+                                            @php
+                                                $pendingReview = (int) ($import->pending_review_count ?? $import->pendingReviewCount());
+                                                $reviewLabel = $import->reviewProgressLabel();
+                                            @endphp
+                                            @if((int) $import->rows_incoming === 0)
+                                                <span class="badge text-bg-light border">{{ $reviewLabel }}</span>
+                                            @elseif($pendingReview === 0)
+                                                <span class="badge text-bg-success">{{ $reviewLabel }}</span>
+                                            @else
+                                                <span class="badge text-bg-warning text-dark">{{ $reviewLabel }}</span>
+                                            @endif
+                                        </td>
                                         <td class="small">{{ $import->uploader?->name ?? '—' }}</td>
                                         <td class="small">{{ $import->created_at?->format('Y-m-d H:i') }}</td>
                                         <td class="text-end">
