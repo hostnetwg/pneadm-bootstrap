@@ -1222,24 +1222,51 @@
                         </div>
                         <hr>
                         <div class="mb-3">
-                            <label class="form-label fw-bold" for="debtReminderRecipientKey">Odbiorca (wybór z listy)</label>
-                            <select class="form-select" id="debtReminderRecipientKey">
-                                <option value="">— wybierz —</option>
-                                @foreach(($reminderRecipientOptions ?? []) as $option)
-                                    <option value="{{ $option['key'] }}"
-                                            data-email="{{ $option['email'] }}"
-                                            @selected(old('recipient_email') === $option['email'])>
-                                        {{ $option['label'] }} ({{ $option['email'] }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if(empty($reminderRecipientOptions))
-                                <div class="form-text text-warning">Brak gotowych adresów — wpisz e-mail ręcznie poniżej.</div>
-                            @endif
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <label class="form-label fw-bold mb-0">Odbiorcy</label>
+                                @if(!empty($reminderRecipientOptions))
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Zaznaczanie odbiorców">
+                                        <button type="button" class="btn btn-outline-secondary" id="debtReminderSelectAllRecipients">Zaznacz wszystkich</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="debtReminderClearRecipients">Wyczyść</button>
+                                    </div>
+                                @endif
+                            </div>
+                            @php
+                                $oldRecipientEmails = collect(old('recipient_emails', []))
+                                    ->map(fn ($email) => mb_strtolower(trim((string) $email)))
+                                    ->filter()
+                                    ->all();
+                            @endphp
+                            @forelse(($reminderRecipientOptions ?? []) as $option)
+                                @php
+                                    $optionEmailLower = mb_strtolower($option['email']);
+                                    $optionDomId = 'debtReminderRecipient_'.preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $option['key']);
+                                    $isChecked = in_array($optionEmailLower, $oldRecipientEmails, true)
+                                        || (empty($oldRecipientEmails) && ! old('recipient_email') && $option['key'] === 'orderer');
+                                @endphp
+                                <div class="form-check">
+                                    <input class="form-check-input debt-reminder-recipient-checkbox"
+                                           type="checkbox"
+                                           name="recipient_emails[]"
+                                           value="{{ $option['email'] }}"
+                                           id="{{ $optionDomId }}"
+                                           @checked($isChecked)>
+                                    <label class="form-check-label" for="{{ $optionDomId }}">
+                                        <span class="fw-semibold">{{ $option['label'] }}</span>
+                                        <span class="text-muted">({{ $option['email'] }})</span>
+                                    </label>
+                                </div>
+                            @empty
+                                <div class="form-text text-warning mb-0">Brak gotowych adresów — wpisz dodatkowy e-mail poniżej.</div>
+                            @endforelse
+                            @error('recipient_emails')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Możesz zaznaczyć kilku odbiorców — jedna wiadomość pójdzie na wszystkie zaznaczone adresy.</div>
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-12 col-md-6">
-                                <label class="form-label fw-bold" for="debtReminderRecipientEmail">E-mail odbiorcy</label>
+                                <label class="form-label fw-bold" for="debtReminderRecipientEmail">Dodatkowy e-mail (opcjonalnie)</label>
                                 <input type="email"
                                        class="form-control @error('recipient_email') is-invalid @enderror"
                                        id="debtReminderRecipientEmail"
@@ -1451,24 +1478,22 @@
                 }
 
                 var templates = {};
-                var recipients = [];
                 try {
                     templates = JSON.parse(modalEl.getAttribute('data-templates') || '{}');
                 } catch (e) {
                     templates = {};
                 }
-                try {
-                    recipients = JSON.parse(modalEl.getAttribute('data-recipients') || '[]');
-                } catch (e) {
-                    recipients = [];
-                }
 
                 var templateSelect = document.getElementById('debtReminderTemplate');
                 var subjectInput = document.getElementById('debtReminderSubject');
                 var bodyInput = document.getElementById('debtReminderBody');
-                var recipientKey = document.getElementById('debtReminderRecipientKey');
-                var recipientEmail = document.getElementById('debtReminderRecipientEmail');
+                var selectAllBtn = document.getElementById('debtReminderSelectAllRecipients');
+                var clearBtn = document.getElementById('debtReminderClearRecipients');
                 var keepEditedContent = {{ old('subject') || old('body') ? 'true' : 'false' }};
+
+                function recipientCheckboxes() {
+                    return modalEl.querySelectorAll('.debt-reminder-recipient-checkbox');
+                }
 
                 function applyTemplate(force) {
                     if (!templateSelect || !subjectInput || !bodyInput) {
@@ -1493,18 +1518,24 @@
                     });
                 }
 
-                if (recipientKey && recipientEmail) {
-                    recipientKey.addEventListener('change', function () {
-                        var option = recipientKey.options[recipientKey.selectedIndex];
-                        if (option && option.dataset.email) {
-                            recipientEmail.value = option.dataset.email;
-                        }
+                if (selectAllBtn) {
+                    selectAllBtn.addEventListener('click', function () {
+                        recipientCheckboxes().forEach(function (el) {
+                            el.checked = true;
+                        });
+                    });
+                }
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', function () {
+                        recipientCheckboxes().forEach(function (el) {
+                            el.checked = false;
+                        });
                     });
                 }
 
                 applyTemplate(!keepEditedContent);
 
-                @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'test_email', 'attachment', 'send_target']))
+                @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'recipient_emails', 'test_email', 'attachment', 'send_target']))
                     if (window.bootstrap && window.bootstrap.Modal) {
                         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
                     }

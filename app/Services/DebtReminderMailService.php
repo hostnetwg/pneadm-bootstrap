@@ -20,11 +20,12 @@ class DebtReminderMailService
     ) {}
 
     /**
+     * @param  string|list<string>  $toEmails
      * @return array{ok: bool, message: string}
      */
     public function send(
         DebtCase $case,
-        string $toEmail,
+        string|array $toEmails,
         string $subject,
         string $body,
         bool $isTest,
@@ -32,6 +33,15 @@ class DebtReminderMailService
         bool $attachCasePdf = false,
         ?UploadedFile $uploadedFile = null,
     ): array {
+        $recipients = $this->normalizeEmails($toEmails);
+        if ($recipients === []) {
+            return [
+                'ok' => false,
+                'message' => 'Podaj co najmniej jeden prawidłowy adres e-mail odbiorcy.',
+            ];
+        }
+
+        $toLabel = implode(', ', $recipients);
         $attachments = [];
         $tempPaths = [];
         $attachmentLabels = [];
@@ -99,11 +109,11 @@ class DebtReminderMailService
                 $attachmentLabels[] = 'upload ('.$uploadedFile->getClientOriginalName().')';
             }
 
-            Mail::to($toEmail)->send(new DebtReminderMail($body, $subject, $attachments));
+            Mail::to($recipients)->send(new DebtReminderMail($body, $subject, $attachments));
         } catch (Throwable $e) {
             Log::error('Debt reminder email failed', [
                 'debt_case_id' => $case->id,
-                'to' => $toEmail,
+                'to' => $toLabel,
                 'message' => $e->getMessage(),
             ]);
 
@@ -121,14 +131,37 @@ class DebtReminderMailService
             @unlink($path);
         }
 
-        $this->logAction($case, $toEmail, $subject, $isTest, $attachmentLabels);
+        $this->logAction($case, $toLabel, $subject, $isTest, $attachmentLabels);
+
+        $addressWord = count($recipients) === 1 ? 'adres' : 'adresy';
 
         return [
             'ok' => true,
             'message' => $isTest
-                ? 'Wiadomość testowa została wysłana na adres '.$toEmail.'.'
-                : 'Wiadomość została wysłana na adres '.$toEmail.'.',
+                ? 'Wiadomość testowa została wysłana na '.$addressWord.' '.$toLabel.'.'
+                : 'Wiadomość została wysłana na '.$addressWord.' '.$toLabel.'.',
         ];
+    }
+
+    /**
+     * @param  string|list<string>  $emails
+     * @return list<string>
+     */
+    public function normalizeEmails(string|array $emails): array
+    {
+        $items = is_array($emails) ? $emails : [$emails];
+        $normalized = [];
+
+        foreach ($items as $email) {
+            $email = trim((string) $email);
+            if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $key = mb_strtolower($email);
+            $normalized[$key] = $email;
+        }
+
+        return array_values($normalized);
     }
 
     /**
@@ -136,14 +169,14 @@ class DebtReminderMailService
      */
     private function logAction(
         DebtCase $case,
-        string $toEmail,
+        string $toLabel,
         string $subject,
         bool $isTest,
         array $attachmentLabels,
     ): void {
         $parts = [
             $isTest ? '[TEST]' : '[WYSYŁKA]',
-            'Do: '.$toEmail,
+            'Do: '.$toLabel,
             'Temat: '.$subject,
         ];
         if ($attachmentLabels !== []) {

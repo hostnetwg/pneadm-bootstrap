@@ -606,6 +606,8 @@ class AccountingController extends Controller
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string', 'max:20000'],
             'send_target' => ['required', 'string', 'in:recipient,test'],
+            'recipient_emails' => ['nullable', 'array'],
+            'recipient_emails.*' => ['email', 'max:255'],
             'recipient_email' => ['nullable', 'email', 'max:255'],
             'test_email' => ['nullable', 'email', 'max:255'],
             'attach_ifirma_pdf' => ['nullable', 'boolean'],
@@ -615,15 +617,43 @@ class AccountingController extends Controller
 
         if ($request->input('send_target') === 'test') {
             $rules['test_email'] = ['required', 'email', 'max:255'];
-        } else {
-            $rules['recipient_email'] = ['required', 'email', 'max:255'];
         }
 
         $validated = $request->validate($rules);
         $isTest = $validated['send_target'] === 'test';
-        $toEmail = trim($isTest
-            ? (string) $validated['test_email']
-            : (string) $validated['recipient_email']);
+
+        if ($isTest) {
+            $toEmails = [(string) $validated['test_email']];
+        } else {
+            $allowedEmails = collect($templates->recipientOptions($debtCase))
+                ->pluck('email')
+                ->map(fn ($email) => mb_strtolower(trim((string) $email)))
+                ->filter()
+                ->unique()
+                ->all();
+
+            $selected = collect($validated['recipient_emails'] ?? [])
+                ->map(fn ($email) => trim((string) $email))
+                ->filter(fn ($email) => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL))
+                ->filter(fn ($email) => in_array(mb_strtolower($email), $allowedEmails, true))
+                ->values()
+                ->all();
+
+            $extra = trim((string) ($validated['recipient_email'] ?? ''));
+            if ($extra !== '' && filter_var($extra, FILTER_VALIDATE_EMAIL)) {
+                $selected[] = $extra;
+            }
+
+            $toEmails = $mailService->normalizeEmails($selected);
+            if ($toEmails === []) {
+                return redirect()
+                    ->route('accounting.collections.show', $debtCase)
+                    ->withInput($request->except('attachment'))
+                    ->withErrors([
+                        'recipient_emails' => 'Zaznacz co najmniej jednego odbiorcę albo wpisz dodatkowy e-mail.',
+                    ]);
+            }
+        }
 
         $attachIfirma = $request->boolean('attach_ifirma_pdf');
         if ($attachIfirma && ! $templates->canAttachIfirmaPdf($debtCase)) {
@@ -643,7 +673,7 @@ class AccountingController extends Controller
 
         $result = $mailService->send(
             case: $debtCase,
-            toEmail: $toEmail,
+            toEmails: $toEmails,
             subject: $validated['subject'],
             body: $validated['body'],
             isTest: $isTest,
