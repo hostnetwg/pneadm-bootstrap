@@ -949,7 +949,7 @@
                 }
             }
 
-            function checkIfirmaStatus(url, button) {
+            function checkIfirmaStatus(url, button, payload) {
                 if (!url) return;
 
                 resetIfirmaStatusPanel();
@@ -966,7 +966,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify(payload || {}),
                 })
                     .then(function (response) {
                         return response.json().then(function (data) {
@@ -1166,6 +1166,7 @@
             var currentPreviewBtn = null;
             var lookupCasesUrl = @json(route('accounting.bank-imports.lookup-cases'));
             var lookupOrderPreviewUrl = @json(route('accounting.bank-imports.lookup-order-preview'));
+            var lookupIfirmaStatusUrl = @json(route('accounting.bank-imports.lookup-ifirma-status'));
             var csrfToken = @json(csrf_token());
             var originalOrderSnapshot = null;
             var peekedOrderId = null;
@@ -1265,7 +1266,20 @@
                     } else {
                         reasonsEl.innerHTML = '<div class="text-warning">Kwota różni się od przelewu — dostępne tylko powiązanie lokalne.</div>';
                     }
+                    var peekOrderId = ctx.orderId || order.id;
+                    if (peekOrderId || ctx.caseId) {
+                        peekLinks.push('<button type="button" class="btn btn-sm btn-outline-success" id="bankTxPreviewIfirmaStatusBtn">Sprawdź status z iFirma</button>');
+                    }
                     linksEl.innerHTML = peekLinks.join(' ');
+                    var peekIfirmaStatusBtn = document.getElementById('bankTxPreviewIfirmaStatusBtn');
+                    if (peekIfirmaStatusBtn) {
+                        peekIfirmaStatusBtn.addEventListener('click', function () {
+                            var body = {};
+                            if (peekOrderId) body.form_order_id = Number(peekOrderId);
+                            if (ctx.caseId) body.debt_case_id = Number(ctx.caseId);
+                            checkIfirmaStatus(lookupIfirmaStatusUrl, peekIfirmaStatusBtn, body);
+                        });
+                    }
                     setClearPeekBtnVisible(true);
                     return;
                 }

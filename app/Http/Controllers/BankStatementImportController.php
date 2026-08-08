@@ -700,6 +700,96 @@ class BankStatementImportController extends Controller
         ]);
     }
 
+    /**
+     * Status płatności iFirma dla kandydata z ręcznego wyszukiwania (bez istniejącego matcha).
+     */
+    public function lookupIfirmaStatus(
+        Request $request,
+        IfirmaInvoicePaymentStatusService $statusService
+    ) {
+        $validated = $request->validate([
+            'form_order_id' => ['nullable', 'integer', 'exists:form_orders,id'],
+            'debt_case_id' => ['nullable', 'integer', 'exists:debt_cases,id'],
+        ]);
+
+        if (empty($validated['form_order_id']) && empty($validated['debt_case_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Podaj zamówienie albo sprawę, aby sprawdzić status w iFirma.',
+            ], 422);
+        }
+
+        $debtCase = null;
+        if (! empty($validated['debt_case_id'])) {
+            $debtCase = DebtCase::query()
+                ->with('formOrder')
+                ->findOrFail($validated['debt_case_id']);
+        }
+
+        $order = $debtCase?->formOrder;
+        if ($order === null && ! empty($validated['form_order_id'])) {
+            $order = FormOrder::query()->findOrFail($validated['form_order_id']);
+        }
+
+        if ($order === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Brak powiązanego zamówienia — nie można sprawdzić statusu w iFirma.',
+            ], 422);
+        }
+
+        if ($debtCase !== null) {
+            $result = $statusService->syncDebtCase($debtCase, $request->user());
+        } else {
+            $snapshot = $statusService->fetchPaymentSnapshotForOrder(
+                $order,
+                $order->invoice_number ?: null,
+                $order->order_date
+            );
+            if (! ($snapshot['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $snapshot['message'] ?? 'Nie udało się pobrać statusu z iFirma.',
+                ], 422);
+            }
+
+            $result = [
+                'success' => true,
+                'message' => 'Pobrano status płatności z iFirma.',
+                'status' => $snapshot['status'],
+                'status_label' => $statusService->statusLabel((string) $snapshot['status']),
+                'paid_amount' => $snapshot['paid_amount'],
+                'gross_amount' => $snapshot['gross_amount'],
+                'invoice_id' => $snapshot['invoice_id'] ?? null,
+                'invoice_number' => $snapshot['invoice_number'] ?? null,
+                'due_date' => $snapshot['due_date'] ?? null,
+                'source' => $snapshot['source'] ?? null,
+            ];
+        }
+
+        if (! ($result['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Nie udało się pobrać statusu z iFirma.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'status' => $result['status'] ?? null,
+            'status_label' => $result['status_label'] ?? $statusService->statusLabel($result['status'] ?? null),
+            'paid_amount' => $result['paid_amount'] ?? null,
+            'gross_amount' => $result['gross_amount'] ?? null,
+            'invoice_id' => $result['invoice_id'] ?? null,
+            'invoice_number' => $result['invoice_number'] ?? null,
+            'due_date' => $result['due_date'] ?? null,
+            'source' => $result['source'] ?? null,
+            // Brak sugestii match — akceptacja „już opłacone” idzie przez ręczne powiązanie lokalne.
+            'can_accept_as_paid' => false,
+        ]);
+    }
+
     public function linkTransactionToCase(
         Request $request,
         BankStatementImport $bankImport,

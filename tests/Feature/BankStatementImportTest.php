@@ -260,6 +260,53 @@ class BankStatementImportTest extends TestCase
         ]);
     }
 
+    public function test_lookup_ifirma_status_works_for_order_without_match(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie ręczny kandydat',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '212/4/2026',
+            'ifirma_invoice_id' => '660901',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_nip' => '5250001009',
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->once()
+                ->with('660901')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '212/4/2026',
+                        'Zaplacono' => 0,
+                        'Brutto' => 365,
+                        'FakturaId' => 660901,
+                        'TerminPlatnosci' => '2026-05-14',
+                    ],
+                ]);
+            $mock->shouldReceive('unwrapInvoicePayload')->andReturnUsing(fn ($d) => is_array($d) ? $d : []);
+        });
+
+        $response = $this->actingAs($user)->postJson(
+            route('accounting.bank-imports.lookup-ifirma-status'),
+            ['form_order_id' => $order->id]
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('can_accept_as_paid', false)
+            ->assertJsonPath('invoice_number', '212/4/2026');
+    }
+
     public function test_accept_reuses_existing_closed_debt_case_instead_of_duplicate(): void
     {
         $user = User::factory()->create([

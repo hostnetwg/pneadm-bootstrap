@@ -580,6 +580,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/', [BankStatementImportController::class, 'store'])->name('store');
             Route::get('/lookup-cases', [BankStatementImportController::class, 'lookupDebtCases'])->name('lookup-cases');
             Route::get('/lookup-order-preview', [BankStatementImportController::class, 'lookupOrderPreview'])->name('lookup-order-preview');
+            Route::post('/lookup-ifirma-status', [BankStatementImportController::class, 'lookupIfirmaStatus'])->name('lookup-ifirma-status');
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
             Route::post('/{bankImport}/ignore-paynow-payouts', [BankStatementImportController::class, 'ignorePayNowGatewayPayouts'])->name('ignore-paynow-payouts');
