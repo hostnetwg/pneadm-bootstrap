@@ -251,16 +251,34 @@ class IfirmaInvoicePaymentStatusService
             ];
         }
 
-        [$dataOd, $dataDo] = $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint);
+        // API listy wymaga dataOd (https://api.ifirma.pl/lista-faktur/) — najpierw wąski zakres, potem szerszy.
+        $searches = [
+            $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint),
+            $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint, wide: true),
+        ];
 
-        $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo);
-        if (($found['status'] ?? null) === 'not_found') {
-            // Ponów bez filtra typu — na liście bywają inne rodzaje dokumentów sprzedaży.
-            $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo, null);
+        $found = null;
+        $usedRange = $searches[0];
+        $rangeHints = [];
+
+        foreach ($searches as $range) {
+            [$dataOd, $dataDo] = $range;
+            $rangeHints[] = "{$dataOd} – {$dataDo}";
+            $usedRange = $range;
+
+            $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo);
+            if (($found['status'] ?? null) === 'not_found') {
+                // Ponów bez filtra typu — na liście bywają inne rodzaje dokumentów sprzedaży.
+                $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo, null);
+            }
+
+            if (($found['status'] ?? null) === 'success' && ! empty($found['invoice']) && is_array($found['invoice'])) {
+                break;
+            }
         }
 
         if (($found['status'] ?? null) !== 'success' || empty($found['invoice']) || ! is_array($found['invoice'])) {
-            $rangeHint = "{$dataOd} – {$dataDo}";
+            $rangeHint = implode('; ', array_unique($rangeHints));
 
             return [
                 'success' => false,
@@ -271,11 +289,35 @@ class IfirmaInvoicePaymentStatusService
 
         $row = $found['invoice'];
         $foundId = $row['FakturaId'] ?? $row['Identyfikator'] ?? null;
+        $foundId = $foundId !== null && $foundId !== '' ? (string) $foundId : null;
+
+        // Dwukrok: lista → ID, potem szczegóły fakturakraj/{id} (pewniejsze Zaplacono / WartoscBrutto).
+        if ($foundId !== null) {
+            $detail = $this->api->getInvoice($foundId);
+            if (($detail['status'] ?? null) === 'success') {
+                $detailRow = $this->api->unwrapInvoicePayload($detail['data'] ?? null);
+                if (is_array($detailRow) && $detailRow !== []) {
+                    return $this->snapshotFromInvoiceRow(
+                        $detailRow,
+                        'fakturakraj/'.$foundId.' (po faktury.json)',
+                        $foundId
+                    );
+                }
+            }
+
+            Log::warning('iFirma payment sync: getInvoice after list lookup failed, using list row', [
+                'form_order_id' => $order->id,
+                'ifirma_invoice_id' => $foundId,
+                'result_status' => $detail['status'] ?? null,
+                'message' => $detail['message'] ?? null,
+                'search_range' => $usedRange[0].' – '.$usedRange[1],
+            ]);
+        }
 
         return $this->snapshotFromInvoiceRow(
             $row,
             'faktury.json (PelnyNumer)',
-            $foundId !== null ? (string) $foundId : null
+            $foundId
         );
     }
 
@@ -455,12 +497,16 @@ class IfirmaInvoicePaymentStatusService
      * Preferuje miesiąc z numeru FV (np. 239/6/2026 → czerwiec), potem datę z sprawy / zamówienia.
      * Dzięki temu sync działa także gdy order_date jest w innym miesiącu niż wystawienie FV.
      *
+     * Oficjalne API: parametr dataOd jest wymagany; bez dataDo lista obejmuje tylko 30 dni od dataOd
+     * (@see https://api.ifirma.pl/lista-faktur/).
+     *
      * @return array{0: string, 1: string}
      */
     public function resolveSearchDateRange(
         FormOrder $order,
         ?string $invoiceNumber = null,
-        mixed $invoiceDateHint = null
+        mixed $invoiceDateHint = null,
+        bool $wide = false
     ): array {
         $points = [];
 
@@ -478,6 +524,9 @@ class IfirmaInvoicePaymentStatusService
             $points[] = $hint->copy()->endOfMonth();
         }
 
+        if ($order->invoice_issue_date) {
+            $points[] = $order->invoice_issue_date->copy()->startOfDay();
+        }
         if ($order->order_date) {
             $points[] = $order->order_date->copy()->startOfDay();
         }
@@ -502,9 +551,12 @@ class IfirmaInvoicePaymentStatusService
             }
         }
 
+        $padBefore = $wide ? 60 : 14;
+        $padAfter = $wide ? 120 : 45;
+
         return [
-            $min->copy()->subDays(14)->toDateString(),
-            $max->copy()->addDays(45)->toDateString(),
+            $min->copy()->subDays($padBefore)->toDateString(),
+            $max->copy()->addDays($padAfter)->toDateString(),
         ];
     }
 

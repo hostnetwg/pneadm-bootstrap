@@ -560,6 +560,10 @@ class IfirmaApiService
     /**
      * Lista dokumentów sprzedaży (GET faktury.json).
      *
+     * Oficjalna dokumentacja: https://api.ifirma.pl/ (kanon w docs/IFIRMA_API.md)
+     * oraz https://api.ifirma.pl/lista-faktur/ — parametr dataOd jest wymagany;
+     * bez dataDo API zwraca tylko ~30 dni od dataOd.
+     *
      * @param  array<string, mixed>  $params  dataOd (wymagane), dataDo, status, strona, iloscNaStronie, …
      * @return array Wynik żądania
      *

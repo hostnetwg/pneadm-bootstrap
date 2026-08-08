@@ -197,6 +197,8 @@ Spóźnione webhooki `cancelled` / `failed` ze starszych prób nie mogą degrado
 
 ### Faktury, KSeF I iFirma
 
+Oficjalna dokumentacja API iFirma (kanon w repo): [docs/IFIRMA_API.md](../IFIRMA_API.md) → [https://api.ifirma.pl/](https://api.ifirma.pl/).
+
 Tracking powinien zapisywać tylko neutralne metadane:
 
 - `invoice_path_type`,

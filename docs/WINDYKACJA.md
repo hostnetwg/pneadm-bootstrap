@@ -89,11 +89,16 @@ oraz nad tabelą linię **Identyfikacja:** (`identitySummary`). Bez osobnych kol
 
 ## Synchronizacja statusu płatności z iFirma (odczyt)
 
+**Dokumentacja API iFirma (kanon):** [docs/IFIRMA_API.md](./IFIRMA_API.md) → [https://api.ifirma.pl/](https://api.ifirma.pl/)
+
 Endpoint: `POST /accounting/collections/{debtCase}/sync-ifirma`  
 Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
 1. Jeśli `form_orders.ifirma_invoice_id` jest ustawione → `GET fakturakraj/{id}.json`.
-2. W przeciwnym razie → `GET faktury.json` z zakresem dat obejmującym **miesiąc z numeru FV** (np. `239/6/2026` → czerwiec) oraz `order_date` / datę z sprawy; dopasowanie po `PelnyNumer` (przy znalezieniu uzupełnia `ifirma_invoice_id`).
+2. W przeciwnym razie (**dwukrok**, bo API listy wymaga `dataOd` — [lista faktur](https://api.ifirma.pl/lista-faktur/)):
+   1. `GET faktury.json` w zakresie dat (miesiąc z numeru FV + `invoice_issue_date` / `order_date` / data sprawy; przy pudle **szerszy** zakres ±60/120 dni) — dopasowanie po `PelnyNumer` (najpierw typ krajowy, potem bez filtra typu),
+   2. po znalezieniu `FakturaId` → `GET fakturakraj/{id}.json` (pewniejsze `Zaplacono` / `WartoscBrutto`); gdy szczegóły padną — fallback do wiersza z listy,
+   3. zapis `ifirma_invoice_id` na zamówieniu na kolejne syncy.
 3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
    (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
