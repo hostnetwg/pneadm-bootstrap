@@ -240,6 +240,7 @@
                                                 'id' => $order->id,
                                                 'url' => route('form-orders.show', $order->id),
                                                 'invoice' => $order->invoice_number ?: '—',
+                                                'invoice_issue_date' => $order->invoice_issue_date?->format('Y-m-d'),
                                                 'ksef' => $order->ksef_number ?: '—',
                                                 'amount' => $order->product_price !== null
                                                     ? number_format((float) $order->product_price, 2, ',', ' ').' PLN'
@@ -912,17 +913,57 @@
                 panel.innerHTML = '';
             }
 
+            function polishDaysWord(days) {
+                var n = Math.abs(Number(days) || 0);
+                if (n === 1) return 'dzień';
+                var mod10 = n % 10;
+                var mod100 = n % 100;
+                if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+                    return 'dni';
+                }
+                return 'dni';
+            }
+
             function renderIfirmaStatusPanel(data) {
                 var panel = document.getElementById('bankTxPreviewIfirmaStatus');
                 if (!panel) return;
 
                 var status = data.status || '';
                 var isPaid = status === 'oplacone';
-                var alertClass = isPaid ? 'alert-success' : (status === 'unknown' ? 'alert-secondary' : 'alert-warning');
+                var daysOverdue = Number(data.days_overdue || 0);
+                var alertClass = isPaid
+                    ? 'alert-success'
+                    : (daysOverdue > 0 ? 'alert-danger' : (status === 'unknown' ? 'alert-secondary' : 'alert-warning'));
+                var invoiceLine = 'Faktura: ' + esc(data.invoice_number || '—');
+                if (data.issue_date) {
+                    invoiceLine += ' · wyst. ' + esc(data.issue_date);
+                }
+                invoiceLine += ' · źródło: ' + esc(data.source || '—');
+
                 var html = '<div class="alert ' + alertClass + ' mb-0 small" role="alert">'
                     + '<div class="fw-semibold mb-1">Status iFirma: ' + esc(data.status_label || '—') + '</div>'
                     + '<div>Zapłacono: ' + formatMoney(data.paid_amount) + ' / brutto: ' + formatMoney(data.gross_amount) + '</div>'
-                    + '<div>Faktura: ' + esc(data.invoice_number || '—') + ' · źródło: ' + esc(data.source || '—') + '</div>';
+                    + '<div>' + invoiceLine + '</div>';
+
+                if (!isPaid && daysOverdue > 0) {
+                    html += '<div class="fw-semibold mt-2">'
+                        + 'Po terminie o ' + esc(String(daysOverdue)) + ' ' + polishDaysWord(daysOverdue)
+                        + (data.due_date ? ' (termin: ' + esc(data.due_date) + ')' : '')
+                        + '.'
+                        + '</div>';
+                } else if (!isPaid && data.due_date) {
+                    html += '<div class="mt-1 text-muted">Termin płatności: ' + esc(data.due_date) + '</div>';
+                }
+
+                if (data.debt_case && data.debt_case.id && data.debt_case.url) {
+                    html += '<div class="mt-2">'
+                        + 'Sprawa windykacyjna: '
+                        + '<a href="' + esc(data.debt_case.url) + '" target="_blank" rel="noopener" class="fw-semibold">'
+                        + '#' + esc(String(data.debt_case.id))
+                        + '</a>'
+                        + (data.debt_case.status_label ? ' · ' + esc(data.debt_case.status_label) : '')
+                        + '</div>';
+                }
 
                 if (isPaid && data.can_accept_as_paid) {
                     html += '<div class="mt-2">'
@@ -1002,6 +1043,12 @@
                     var value = data[key];
                     if (key === 'id' && data.url) {
                         el.innerHTML = '<a href="' + esc(data.url) + '" target="_blank" rel="noopener">#' + esc(data.id) + '</a>';
+                    } else if (key === 'invoice') {
+                        var invoiceText = value || '—';
+                        if (data.invoice_issue_date) {
+                            invoiceText += ' · wyst. ' + data.invoice_issue_date;
+                        }
+                        el.textContent = invoiceText;
                     } else if (key === 'product' && data.course_id && data.course_url) {
                         el.innerHTML = '<a href="' + esc(data.course_url) + '" target="_blank" rel="noopener">#' + esc(data.course_id) + '</a> '
                             + esc(value || '—');

@@ -14,6 +14,8 @@ use App\Services\Bank\BankTransactionUnlinkService;
 use App\Services\DebtCaseAutoCloseService;
 use App\Services\IfirmaInvoicePaymentRegistrationService;
 use App\Services\IfirmaInvoicePaymentStatusService;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -406,6 +408,7 @@ class BankStatementImportController extends Controller
                 'gross_amount' => $snapshot['gross_amount'],
                 'invoice_id' => $snapshot['invoice_id'] ?? null,
                 'invoice_number' => $snapshot['invoice_number'] ?? null,
+                'issue_date' => $snapshot['issue_date'] ?? null,
                 'due_date' => $snapshot['due_date'] ?? null,
                 'source' => $snapshot['source'] ?? null,
                 'changed' => null,
@@ -419,20 +422,13 @@ class BankStatementImportController extends Controller
             ], 422);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => $result['message'],
-            'status' => $result['status'] ?? null,
-            'status_label' => $result['status_label'] ?? $statusService->statusLabel($result['status'] ?? null),
-            'paid_amount' => $result['paid_amount'] ?? null,
-            'gross_amount' => $result['gross_amount'] ?? null,
-            'invoice_id' => $result['invoice_id'] ?? null,
-            'invoice_number' => $result['invoice_number'] ?? null,
-            'due_date' => $result['due_date'] ?? null,
-            'source' => $result['source'] ?? null,
-            'can_accept_as_paid' => ($result['status'] ?? null) === IfirmaInvoicePaymentStatusService::STATUS_PAID
+        return $this->ifirmaStatusJsonResponse(
+            $result,
+            $order,
+            $statusService,
+            canAcceptAsPaid: ($result['status'] ?? null) === IfirmaInvoicePaymentStatusService::STATUS_PAID
                 && $match->status === BankTransactionMatch::STATUS_SUGGESTED,
-        ]);
+        );
     }
 
     public function reject(
@@ -762,6 +758,7 @@ class BankStatementImportController extends Controller
                 'gross_amount' => $snapshot['gross_amount'],
                 'invoice_id' => $snapshot['invoice_id'] ?? null,
                 'invoice_number' => $snapshot['invoice_number'] ?? null,
+                'issue_date' => $snapshot['issue_date'] ?? null,
                 'due_date' => $snapshot['due_date'] ?? null,
                 'source' => $snapshot['source'] ?? null,
             ];
@@ -774,20 +771,8 @@ class BankStatementImportController extends Controller
             ], 422);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => $result['message'],
-            'status' => $result['status'] ?? null,
-            'status_label' => $result['status_label'] ?? $statusService->statusLabel($result['status'] ?? null),
-            'paid_amount' => $result['paid_amount'] ?? null,
-            'gross_amount' => $result['gross_amount'] ?? null,
-            'invoice_id' => $result['invoice_id'] ?? null,
-            'invoice_number' => $result['invoice_number'] ?? null,
-            'due_date' => $result['due_date'] ?? null,
-            'source' => $result['source'] ?? null,
-            // Brak sugestii match — akceptacja „już opłacone” idzie przez ręczne powiązanie lokalne.
-            'can_accept_as_paid' => false,
-        ]);
+        // Brak sugestii match — akceptacja „już opłacone” idzie przez ręczne powiązanie lokalne.
+        return $this->ifirmaStatusJsonResponse($result, $order, $statusService, canAcceptAsPaid: false);
     }
 
     public function linkTransactionToCase(
@@ -959,6 +944,7 @@ class BankStatementImportController extends Controller
             'id' => $order->id,
             'url' => route('form-orders.show', $order->id),
             'invoice' => $order->invoice_number ?: '—',
+            'invoice_issue_date' => $order->invoice_issue_date?->format('Y-m-d'),
             'ksef' => $order->ksef_number ?: '—',
             'amount' => $order->product_price !== null
                 ? number_format((float) $order->product_price, 2, ',', ' ').' PLN'
@@ -983,9 +969,63 @@ class BankStatementImportController extends Controller
             'orderer_name' => trim((string) ($order->orderer_name ?? '')) ?: '—',
             'orderer_email' => trim((string) ($order->orderer_email ?? '')) ?: '',
             'order_date' => $order->order_date
-                ? \Illuminate\Support\Carbon::parse($order->order_date)->format('Y-m-d')
+                ? Carbon::parse($order->order_date)->format('Y-m-d')
                 : '—',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function ifirmaStatusJsonResponse(
+        array $result,
+        FormOrder $order,
+        IfirmaInvoicePaymentStatusService $statusService,
+        bool $canAcceptAsPaid,
+    ): JsonResponse {
+        $status = $result['status'] ?? null;
+        $issueDate = $result['issue_date'] ?? $order->invoice_issue_date?->format('Y-m-d');
+        $dueDate = $result['due_date'] ?? $order->invoice_due_date?->format('Y-m-d');
+
+        $daysOverdue = null;
+        if ($status !== IfirmaInvoicePaymentStatusService::STATUS_PAID && is_string($dueDate) && $dueDate !== '') {
+            try {
+                $due = Carbon::parse($dueDate)->startOfDay();
+                $today = Carbon::today();
+                if ($due->lt($today)) {
+                    $daysOverdue = (int) $due->diffInDays($today);
+                }
+            } catch (\Throwable) {
+                $daysOverdue = null;
+            }
+        }
+
+        $debtCase = DebtCase::query()
+            ->where('form_order_id', $order->id)
+            ->orderByDesc('id')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'] ?? 'Pobrano status płatności z iFirma.',
+            'status' => $status,
+            'status_label' => $result['status_label'] ?? $statusService->statusLabel($status),
+            'paid_amount' => $result['paid_amount'] ?? null,
+            'gross_amount' => $result['gross_amount'] ?? null,
+            'invoice_id' => $result['invoice_id'] ?? null,
+            'invoice_number' => $result['invoice_number'] ?? null,
+            'issue_date' => $issueDate,
+            'due_date' => $dueDate,
+            'days_overdue' => $daysOverdue,
+            'source' => $result['source'] ?? null,
+            'debt_case' => $debtCase ? [
+                'id' => $debtCase->id,
+                'url' => route('accounting.collections.show', $debtCase),
+                'status' => $debtCase->status,
+                'status_label' => $debtCase->statusLabel(),
+            ] : null,
+            'can_accept_as_paid' => $canAcceptAsPaid,
+        ]);
     }
 
     private function countByConfidence(BankStatementImport $import, string $confidence): int

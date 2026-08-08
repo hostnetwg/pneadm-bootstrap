@@ -279,6 +279,18 @@ class BankStatementImportTest extends TestCase
             'buyer_nip' => '5250001009',
         ]);
 
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 365,
+            'currency' => 'PLN',
+            'invoice_number' => '212/4/2026',
+            'opened_at' => now()->subDays(5),
+            'summary' => 'Sprawa do statusu iFirma',
+        ]);
+
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-08'));
+
         $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
             $mock->shouldReceive('getInvoice')
                 ->once()
@@ -290,6 +302,7 @@ class BankStatementImportTest extends TestCase
                         'Zaplacono' => 0,
                         'Brutto' => 365,
                         'FakturaId' => 660901,
+                        'DataWystawienia' => '2026-04-30',
                         'TerminPlatnosci' => '2026-05-14',
                     ],
                 ]);
@@ -304,7 +317,14 @@ class BankStatementImportTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('can_accept_as_paid', false)
-            ->assertJsonPath('invoice_number', '212/4/2026');
+            ->assertJsonPath('invoice_number', '212/4/2026')
+            ->assertJsonPath('issue_date', '2026-04-30')
+            ->assertJsonPath('due_date', '2026-05-14')
+            ->assertJsonPath('days_overdue', 86)
+            ->assertJsonPath('debt_case.id', $case->id)
+            ->assertJsonPath('debt_case.url', route('accounting.collections.show', $case));
+
+        \Carbon\Carbon::setTestNow();
     }
 
     public function test_accept_reuses_existing_closed_debt_case_instead_of_duplicate(): void
