@@ -51,9 +51,9 @@
                         <div class="col-md-4"><span class="text-muted">Wgrał:</span> {{ $import->uploader?->name ?? '—' }} {{ $import->created_at?->format('Y-m-d H:i') }}</div>
                     </div>
                     <div class="d-flex flex-wrap gap-2 mt-2">
-                        <form method="POST" action="{{ route('accounting.bank-imports.rematch', $import) }}">
+                        <form method="POST" action="{{ route('accounting.bank-imports.rematch', $import) }}" data-loading-submit data-loading-text="Przeliczam…">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-outline-primary">Przelicz sugestie</button>
+                            <button type="submit" class="btn btn-sm btn-outline-primary" data-loading-text="Przeliczam…">Przelicz sugestie</button>
                         </form>
                         <button type="button"
                                 class="btn btn-sm btn-outline-secondary"
@@ -360,28 +360,30 @@
                                                     <form method="POST"
                                                           action="{{ route('accounting.bank-imports.matches.accept', [$import, $suggestBest]) }}"
                                                           class="bank-import-accept-form"
+                                                          data-loading-submit
+                                                          data-loading-text="Akceptuję…"
                                                           @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true)) data-amount-mismatch="1" @endif>
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">
                                                         <input type="hidden" name="ifirma_already_paid" value="0" class="bank-import-ifirma-already-paid">
-                                                        <button type="submit" class="btn btn-sm btn-success">Akceptuj</button>
+                                                        <button type="submit" class="btn btn-sm btn-success" data-loading-text="Akceptuję…">Akceptuj</button>
                                                     </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.matches.reject', [$import, $suggestBest]) }}">
+                                                    <form method="POST" action="{{ route('accounting.bank-imports.matches.reject', [$import, $suggestBest]) }}" data-loading-submit data-loading-text="Odrzucam…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Odrzuć</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odrzucam…">Odrzuć</button>
                                                     </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.matches.ignore', [$import, $suggestBest]) }}">
+                                                    <form method="POST" action="{{ route('accounting.bank-imports.matches.ignore', [$import, $suggestBest]) }}" data-loading-submit data-loading-text="Ignoruję…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Ignoruj</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
                                                     </form>
                                                 @elseif(! $accepted)
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}">
+                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Ignoruj transakcję</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj transakcję</button>
                                                     </form>
                                                 @else
                                                     <button type="button"
@@ -435,9 +437,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                    <form method="POST" action="{{ route('accounting.bank-imports.ignore-paynow-payouts', $import) }}">
+                    <form method="POST" action="{{ route('accounting.bank-imports.ignore-paynow-payouts', $import) }}" data-loading-submit data-loading-text="Ignoruję…">
                         @csrf
-                        <button type="submit" class="btn btn-secondary">Ignoruj wypłaty PayNow</button>
+                        <button type="submit" class="btn btn-secondary" data-loading-text="Ignoruję…">Ignoruj wypłaty PayNow</button>
                     </form>
                 </div>
             </div>
@@ -562,25 +564,25 @@
                         </button>
                     </div>
                     <div class="d-flex flex-wrap gap-2" id="bankTxPreviewActionButtons">
-                        <form method="POST" id="bankTxPreviewAcceptForm" class="d-none bank-import-accept-form">
+                        <form method="POST" id="bankTxPreviewAcceptForm" class="d-none bank-import-accept-form" data-loading-submit data-loading-text="Akceptuję…">
                             @csrf
                             <input type="hidden" name="filter" value="{{ $filter }}">
                             <input type="hidden" name="preview" value="">
                             <input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">
                             <input type="hidden" name="ifirma_already_paid" value="0" class="bank-import-ifirma-already-paid">
-                            <button type="submit" class="btn btn-success">Akceptuj</button>
+                            <button type="submit" class="btn btn-success" data-loading-text="Akceptuję…">Akceptuj</button>
                         </form>
-                        <form method="POST" id="bankTxPreviewRejectForm" class="d-none">
+                        <form method="POST" id="bankTxPreviewRejectForm" class="d-none" data-loading-submit data-loading-text="Odrzucam…">
                             @csrf
                             <input type="hidden" name="filter" value="{{ $filter }}">
                             <input type="hidden" name="preview" value="">
-                            <button type="submit" class="btn btn-outline-danger">Odrzuć</button>
+                            <button type="submit" class="btn btn-outline-danger" data-loading-text="Odrzucam…">Odrzuć</button>
                         </form>
-                        <form method="POST" id="bankTxPreviewIgnoreForm" class="d-none">
+                        <form method="POST" id="bankTxPreviewIgnoreForm" class="d-none" data-loading-submit data-loading-text="Ignoruję…">
                             @csrf
                             <input type="hidden" name="filter" value="{{ $filter }}">
                             <input type="hidden" name="preview" value="">
-                            <button type="submit" class="btn btn-outline-secondary" id="bankTxPreviewIgnoreBtn">Ignoruj</button>
+                            <button type="submit" class="btn btn-outline-secondary" id="bankTxPreviewIgnoreBtn" data-loading-text="Ignoruję…">Ignoruj</button>
                         </form>
                         <button type="button"
                                 class="btn btn-outline-danger d-none"
@@ -601,7 +603,7 @@
     <div class="modal fade" id="bankImportUnlinkModal" tabindex="-1" aria-labelledby="bankImportUnlinkModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="" id="bankImportUnlinkForm">
+                <form method="POST" action="" id="bankImportUnlinkForm" data-loading-submit data-loading-text="Cofam…">
                     @csrf
                     <input type="hidden" name="filter" value="{{ $filter }}">
                     <div class="modal-header text-bg-danger">
@@ -621,7 +623,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                        <button type="submit" class="btn btn-danger">Cofnij przypisanie</button>
+                        <button type="submit" class="btn btn-danger" data-loading-text="Cofam…">Cofnij przypisanie</button>
                     </div>
                 </form>
             </div>
@@ -631,7 +633,7 @@
     <div class="modal fade" id="bankImportManualLinkConfirmModal" tabindex="-1" aria-labelledby="bankImportManualLinkConfirmModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="" id="bankImportManualLinkConfirmForm">
+                <form method="POST" action="" id="bankImportManualLinkConfirmForm" data-loading-submit data-loading-text="Powiązuję…">
                     @csrf
                     <input type="hidden" name="debt_case_id" value="" id="bankImportManualLinkCaseId">
                     <input type="hidden" name="form_order_id" value="" id="bankImportManualLinkOrderId">
@@ -650,7 +652,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-                        <button type="submit" class="btn btn-primary" id="bankImportManualLinkSubmit">Powiąż lokalnie</button>
+                        <button type="submit" class="btn btn-primary" id="bankImportManualLinkSubmit" data-loading-text="Powiązuję…">Powiąż lokalnie</button>
                     </div>
                 </form>
             </div>
@@ -681,7 +683,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                    <button type="button" class="btn btn-warning" id="bankImportAcceptWarnConfirmBtn">Akceptuj tylko lokalnie</button>
+                    <button type="button" class="btn btn-warning" id="bankImportAcceptWarnConfirmBtn" data-loading-text="Akceptuję…">Akceptuj tylko lokalnie</button>
                 </div>
             </div>
         </div>
@@ -703,8 +705,8 @@
                 </div>
                 <div class="modal-footer flex-wrap gap-2">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                    <button type="button" class="btn btn-outline-success" id="bankImportAcceptLocalOnlyBtn">Tylko lokalnie</button>
-                    <button type="button" class="btn btn-success" id="bankImportAcceptIfirmaConfirmBtn">Akceptuj + wpłata w iFirma</button>
+                    <button type="button" class="btn btn-outline-success" id="bankImportAcceptLocalOnlyBtn" data-loading-text="Akceptuję…">Tylko lokalnie</button>
+                    <button type="button" class="btn btn-success" id="bankImportAcceptIfirmaConfirmBtn" data-loading-text="Rejestruję wpłatę…">Akceptuj + wpłata w iFirma</button>
                 </div>
             </div>
         </div>
@@ -788,8 +790,17 @@
                 }
             }
 
-            function submitAcceptForm(form) {
+            function submitAcceptForm(form, triggerBtn) {
                 form.setAttribute('data-accept-confirmed', '1');
+                if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                    if (triggerBtn) {
+                        window.PneButtonLoading.setButtonLoading(triggerBtn, true, triggerBtn.getAttribute('data-loading-text') || 'Akceptuję…');
+                    }
+                    var formBtn = form.querySelector('button[type="submit"]');
+                    if (formBtn) {
+                        window.PneButtonLoading.setButtonLoading(formBtn, true, formBtn.getAttribute('data-loading-text') || 'Akceptuję…');
+                    }
+                }
                 form.requestSubmit();
             }
 
@@ -830,7 +841,7 @@
                     if (acceptWarnModal) {
                         acceptWarnModal.hide();
                     }
-                    submitAcceptForm(form);
+                    submitAcceptForm(form, acceptWarnConfirmBtn);
                 });
             }
 
@@ -847,7 +858,7 @@
                     if (acceptIfirmaModal) {
                         acceptIfirmaModal.hide();
                     }
-                    submitAcceptForm(form);
+                    submitAcceptForm(form, acceptLocalOnlyBtn);
                 });
             }
 
@@ -864,7 +875,7 @@
                     if (acceptIfirmaModal) {
                         acceptIfirmaModal.hide();
                     }
-                    submitAcceptForm(form);
+                    submitAcceptForm(form, acceptIfirmaConfirmBtn);
                 });
             }
 
@@ -985,7 +996,7 @@
                         if (!form || form.classList.contains('d-none')) return;
                         setRegisterIfirma(form, false);
                         setIfirmaAlreadyPaid(form, true);
-                        submitAcceptForm(form);
+                        submitAcceptForm(form, acceptPaidBtn);
                     });
                 }
             }
@@ -994,10 +1005,11 @@
                 if (!url) return;
 
                 resetIfirmaStatusPanel();
-                var originalText = button ? button.textContent : '';
-                if (button) {
+                if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                    window.PneButtonLoading.setButtonLoading(button, true, 'Sprawdzam…');
+                } else if (button) {
                     button.disabled = true;
-                    button.textContent = 'Sprawdzam...';
+                    button.textContent = 'Sprawdzam…';
                 }
 
                 fetch(url, {
@@ -1028,9 +1040,11 @@
                         }
                     })
                     .finally(function () {
-                        if (button) {
+                        if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                            window.PneButtonLoading.setButtonLoading(button, false);
+                        } else if (button) {
                             button.disabled = false;
-                            button.textContent = originalText || 'Sprawdź status z iFirma';
+                            button.textContent = 'Sprawdź status z iFirma';
                         }
                     });
             }
@@ -1364,11 +1378,11 @@
                 }
                 var registerIfirmaUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-register-ifirma-url') || '') : '';
                 if (registerIfirmaUrl) {
-                    links.push('<form method="POST" action="' + esc(registerIfirmaUrl) + '" class="d-inline">'
+                    links.push('<form method="POST" action="' + esc(registerIfirmaUrl) + '" class="d-inline" data-loading-submit data-loading-text="Rejestruję…">'
                         + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
                         + '<input type="hidden" name="filter" value="{{ $filter }}">'
                         + '<input type="hidden" name="preview" value="' + esc(txId || '') + '">'
-                        + '<button type="submit" class="btn btn-sm btn-outline-success">Zarejestruj wpłatę iFirma</button>'
+                        + '<button type="submit" class="btn btn-sm btn-outline-success" data-loading-text="Rejestruję…">Zarejestruj wpłatę iFirma</button>'
                         + '</form>');
                 }
                 linksEl.innerHTML = links.join(' ');

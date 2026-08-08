@@ -189,9 +189,9 @@
                     <div class="card h-100 case-details-card">
                         <div class="card-header py-2 fw-semibold d-flex flex-wrap align-items-center justify-content-between gap-2">
                             <span>Dane sprawy</span>
-                            <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mb-0">
+                            <form method="POST" action="{{ route('accounting.collections.sync-ifirma', $case) }}" class="mb-0" data-loading-submit data-loading-text="Odświeżam…">
                                 @csrf
-                                <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-2">
+                                <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-2" data-loading-text="Odświeżam…">
                                     <i class="bi bi-arrow-repeat"></i> Odśwież status z iFirma
                                 </button>
                             </form>
@@ -592,7 +592,7 @@
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Status operacyjny</div>
                         <div class="card-body">
-                            <form method="POST" action="{{ route('accounting.collections.update', $case) }}" class="row g-2">
+                            <form method="POST" action="{{ route('accounting.collections.update', $case) }}" class="row g-2" data-loading-submit data-loading-text="Zapisuję…">
                                 @csrf
                                 @method('PUT')
                                 <div class="col-6">
@@ -819,7 +819,7 @@
                     <div class="card h-100">
                         <div class="card-header fw-semibold">Dodaj działanie</div>
                         <div class="card-body">
-                            <form method="POST" action="{{ route('accounting.collections.actions.store', $case) }}" class="row g-2">
+                            <form method="POST" action="{{ route('accounting.collections.actions.store', $case) }}" class="row g-2" data-loading-submit data-loading-text="Zapisuję…">
                                 @csrf
                                 <div class="col-6 col-lg-4">
                                     <label class="form-label small mb-1" for="action_type">Typ</label>
@@ -1183,7 +1183,9 @@
                     <form id="formDebtReminder"
                           method="POST"
                           action="{{ route('accounting.collections.send-reminder', $case) }}"
-                          enctype="multipart/form-data">
+                          enctype="multipart/form-data"
+                          data-loading-submit
+                          data-loading-text="Wysyłam…">
                         @csrf
                         <div class="mb-3">
                             <label class="form-label fw-bold" for="debtReminderTemplate">Szablon</label>
@@ -1336,10 +1338,10 @@
                             <div class="form-text">Opcjonalnie, max 5 MB.</div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button type="submit" name="send_target" value="recipient" class="btn btn-primary">
+                            <button type="submit" name="send_target" value="recipient" class="btn btn-primary" data-loading-text="Wysyłam…">
                                 <i class="bi bi-envelope me-1"></i>Wyślij e-mail do dłużnika
                             </button>
-                            <button type="submit" name="send_target" value="test" class="btn btn-outline-primary">
+                            <button type="submit" name="send_target" value="test" class="btn btn-outline-primary" data-loading-text="Wysyłam test…">
                                 <i class="bi bi-flask me-1"></i>Wyślij e-mail testowy
                             </button>
                         </div>
@@ -1355,7 +1357,7 @@
     <div class="modal fade" id="bankPaymentUnlinkModal" tabindex="-1" aria-labelledby="bankPaymentUnlinkModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="" id="bankPaymentUnlinkForm">
+                <form method="POST" action="" id="bankPaymentUnlinkForm" data-loading-submit data-loading-text="Cofam…">
                     @csrf
                     <div class="modal-header text-bg-danger">
                         <h5 class="modal-title" id="bankPaymentUnlinkModalLabel">Cofnij przypisanie przelewu</h5>
@@ -1377,7 +1379,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                        <button type="submit" class="btn btn-danger">Cofnij przypisanie</button>
+                        <button type="submit" class="btn btn-danger" data-loading-text="Cofam…">Cofnij przypisanie</button>
                     </div>
                 </form>
             </div>
@@ -1387,7 +1389,7 @@
     <div class="modal fade" id="bankTransactionLinkConfirmModal" tabindex="-1" aria-labelledby="bankTransactionLinkConfirmModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="" id="bankTransactionLinkConfirmForm">
+                <form method="POST" action="" id="bankTransactionLinkConfirmForm" data-loading-submit data-loading-text="Powiązuję…">
                     @csrf
                     <input type="hidden" name="register_ifirma_payment" value="0" id="bankTransactionLinkRegisterIfirma">
                     <div class="modal-header">
@@ -1410,7 +1412,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-                        <button type="submit" class="btn btn-primary" id="bankTransactionLinkSubmit">Powiąż lokalnie</button>
+                        <button type="submit" class="btn btn-primary" id="bankTransactionLinkSubmit" data-loading-text="Powiązuję…">Powiąż lokalnie</button>
                     </div>
                 </form>
             </div>
@@ -1909,6 +1911,10 @@
                     return;
                 }
 
+                var searchBtn = document.getElementById('bankTransferSearchBtn');
+                if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                    window.PneButtonLoading.setButtonLoading(searchBtn, true, 'Szukam…');
+                }
                 setSearchStatus('Szukam…');
                 var params = new URLSearchParams();
                 params.set('bank_search', q);
@@ -1949,6 +1955,10 @@
                         searchResults.innerHTML = '<div class="text-danger small">Nie udało się wyszukać przelewów.</div>';
                     }
                     setSearchStatus(e.message || 'Nie udało się wyszukać.');
+                } finally {
+                    if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                        window.PneButtonLoading.setButtonLoading(searchBtn, false);
+                    }
                 }
             }
 

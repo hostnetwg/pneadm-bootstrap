@@ -159,12 +159,12 @@
                                 </div>
 
                                 <div class="col-12 col-md-6">
-                                    <form method="POST" action="{{ route('accounting.collections.store') }}" id="createDebtCaseForm">
+                                    <form method="POST" action="{{ route('accounting.collections.store') }}" id="createDebtCaseForm" data-loading-submit data-loading-text="Tworzę sprawę…">
                                         @csrf
                                         <label for="form_order_id" class="form-label small mb-1">ID zamówienia `form_orders`</label>
                                         <div class="input-group input-group-sm">
                                             <input type="number" min="1" id="form_order_id" name="form_order_id" class="form-control" required value="{{ old('form_order_id') }}">
-                                            <button type="submit" class="btn btn-success" id="createDebtCaseSubmitBtn">
+                                            <button type="submit" class="btn btn-success" id="createDebtCaseSubmitBtn" data-loading-text="Tworzę sprawę…">
                                                 <i class="bi bi-plus-circle"></i> Dodaj
                                             </button>
                                         </div>
@@ -582,7 +582,7 @@
     <div class="modal fade" id="confirmCreateDebtCaseModal" tabindex="-1" aria-labelledby="confirmCreateDebtCaseModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="{{ route('accounting.collections.store') }}" id="confirmCreateDebtCaseForm">
+                <form method="POST" action="{{ route('accounting.collections.store') }}" id="confirmCreateDebtCaseForm" data-loading-submit data-loading-text="Tworzę sprawę…">
                     @csrf
                     <input type="hidden" name="form_order_id" id="confirmCreateDebtCaseOrderId" value="">
                     <div class="modal-header bg-danger text-white">
@@ -600,7 +600,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                        <button type="submit" class="btn btn-danger">
+                        <button type="submit" class="btn btn-danger" data-loading-text="Tworzę sprawę…">
                             <i class="bi bi-plus-circle"></i> Utwórz sprawę
                         </button>
                     </div>

@@ -69,13 +69,13 @@
                                 Po imporcie dopasowania zatwierdzasz ręcznie — bez rejestracji wpłat w iFirma.
                                 Duży plik (kilka tysięcy wierszy) może zająć ok. 1–2 minuty.
                             </p>
-                            <form method="POST" action="{{ route('accounting.bank-imports.store') }}" enctype="multipart/form-data">
+                            <form method="POST" action="{{ route('accounting.bank-imports.store') }}" enctype="multipart/form-data" data-loading-submit data-loading-text="Importuję…">
                                 @csrf
                                 <div class="mb-3">
                                     <label for="csv_file" class="form-label">Plik CSV</label>
                                     <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv,text/csv,text/plain" required>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Importuj i dopasuj</button>
+                                <button type="submit" class="btn btn-primary" data-loading-text="Importuję…">Importuj i dopasuj</button>
                                 <a href="{{ route('accounting.collections.index') }}" class="btn btn-outline-secondary">Windykacja</a>
                             </form>
                         </div>
