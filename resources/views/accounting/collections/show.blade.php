@@ -1304,7 +1304,7 @@
                                            value="1"
                                            id="debtReminderOrderConfirmationLink"
                                            name="include_order_confirmation_link"
-                                           @checked((string) old('include_order_confirmation_link', '1') === '1')>
+                                           @checked((string) old('include_order_confirmation_link', '0') === '1')>
                                     <label class="form-check-label" for="debtReminderOrderConfirmationLink">
                                         Dołącz w treści link do potwierdzenia zamówienia
                                         <span class="text-muted">(zamawiający / uczestnicy)</span>
@@ -1313,12 +1313,13 @@
                             @endif
                             @if($reminderCanAttachCasePdf ?? false)
                                 <div class="form-check mb-2">
+                                    <input type="hidden" name="attach_case_pdf" value="0">
                                     <input class="form-check-input"
                                            type="checkbox"
                                            value="1"
                                            id="debtReminderAttachCasePdf"
                                            name="attach_case_pdf"
-                                           @checked(old('attach_case_pdf', true))>
+                                           @checked((string) old('attach_case_pdf', '1') === '1')>
                                     <label class="form-check-label" for="debtReminderAttachCasePdf">
                                         Załącz PDF faktury ze sprawy
                                         @if($case->invoice_pdf_original_name)
@@ -1328,13 +1329,17 @@
                                 </div>
                             @endif
                             @if($reminderCanAttachIfirmaPdf ?? false)
+                                @php
+                                    $defaultAttachIfirma = ($reminderCanAttachCasePdf ?? false) ? '0' : '1';
+                                @endphp
                                 <div class="form-check mb-2">
+                                    <input type="hidden" name="attach_ifirma_pdf" value="0">
                                     <input class="form-check-input"
                                            type="checkbox"
                                            value="1"
                                            id="debtReminderAttachIfirma"
                                            name="attach_ifirma_pdf"
-                                           @checked(old('attach_ifirma_pdf'))>
+                                           @checked((string) old('attach_ifirma_pdf', $defaultAttachIfirma) === '1')>
                                     <label class="form-check-label" for="debtReminderAttachIfirma">
                                         Załącz PDF faktury z iFirma
                                     </label>
@@ -1508,8 +1513,12 @@
                 var selectAllBtn = document.getElementById('debtReminderSelectAllRecipients');
                 var clearBtn = document.getElementById('debtReminderClearRecipients');
                 var orderConfirmationCheckbox = document.getElementById('debtReminderOrderConfirmationLink');
+                var attachCasePdfCheckbox = document.getElementById('debtReminderAttachCasePdf');
+                var attachIfirmaCheckbox = document.getElementById('debtReminderAttachIfirma');
+                var attachmentInput = document.getElementById('debtReminderAttachment');
                 var keepEditedContent = {{ old('subject') || old('body') ? 'true' : 'false' }};
                 var orderConfirmationBlock = '';
+                var invoiceAttachmentSentence = @json(\App\Services\DebtReminderTemplateService::INVOICE_ATTACHMENT_SENTENCE);
                 try {
                     orderConfirmationBlock = JSON.parse(modalEl.getAttribute('data-order-confirmation-block') || '""') || '';
                 } catch (e) {
@@ -1531,16 +1540,54 @@
                         .replace(/\s+$/, '');
                 }
 
-                function syncOrderConfirmationInBody() {
-                    if (!bodyInput || !orderConfirmationBlock) {
+                function stripInvoiceAttachmentSentence(text) {
+                    if (!text) {
+                        return text;
+                    }
+                    return text
+                        .replace(/\n{0,2}W załączeniu przesyłamy fakturę(?: \(jeśli została dołączona\))?\.?/g, '')
+                        .replace(/\n{3,}/g, '\n\n')
+                        .replace(/\s+$/, '');
+                }
+
+                function insertBlockBeforeSignature(text, block) {
+                    var normalized = (text || '').replace(/\r\n|\r/g, '\n').replace(/\s+$/, '');
+                    var needle = '\nZ poważaniem,';
+                    var pos = normalized.lastIndexOf(needle);
+                    if (pos === -1 && normalized.indexOf('Z poważaniem,') === 0) {
+                        return block + '\n\n' + normalized;
+                    }
+                    if (pos === -1) {
+                        return normalized + '\n\n' + block;
+                    }
+                    return normalized.slice(0, pos).replace(/\s+$/, '') + '\n\n' + block + '\n\n' + normalized.slice(pos + 1);
+                }
+
+                function hasInvoiceAttachmentSelected() {
+                    if (attachCasePdfCheckbox && attachCasePdfCheckbox.checked) {
+                        return true;
+                    }
+                    if (attachIfirmaCheckbox && attachIfirmaCheckbox.checked) {
+                        return true;
+                    }
+                    if (attachmentInput && attachmentInput.files && attachmentInput.files.length > 0) {
+                        return true;
+                    }
+                    return false;
+                }
+
+                function syncDynamicBodyBlocks() {
+                    if (!bodyInput) {
                         return;
                     }
-                    var base = stripOrderConfirmationFromBody(bodyInput.value || '');
-                    if (orderConfirmationCheckbox && orderConfirmationCheckbox.checked) {
-                        bodyInput.value = base.replace(/\s+$/, '') + '\n\n' + orderConfirmationBlock;
-                    } else {
-                        bodyInput.value = base;
+                    var base = stripInvoiceAttachmentSentence(stripOrderConfirmationFromBody(bodyInput.value || ''));
+                    if (hasInvoiceAttachmentSelected()) {
+                        base = insertBlockBeforeSignature(base, invoiceAttachmentSentence);
                     }
+                    if (orderConfirmationCheckbox && orderConfirmationCheckbox.checked && orderConfirmationBlock) {
+                        base = insertBlockBeforeSignature(base, orderConfirmationBlock);
+                    }
+                    bodyInput.value = base;
                 }
 
                 function applyTemplate(force) {
@@ -1557,7 +1604,9 @@
                     }
                     if (force || !bodyInput.value) {
                         bodyInput.value = payload.body || '';
-                        syncOrderConfirmationInBody();
+                        syncDynamicBodyBlocks();
+                    } else if (force) {
+                        syncDynamicBodyBlocks();
                     }
                 }
 
@@ -1569,7 +1618,19 @@
 
                 if (orderConfirmationCheckbox) {
                     orderConfirmationCheckbox.addEventListener('change', function () {
-                        syncOrderConfirmationInBody();
+                        syncDynamicBodyBlocks();
+                    });
+                }
+                [attachCasePdfCheckbox, attachIfirmaCheckbox].forEach(function (el) {
+                    if (el) {
+                        el.addEventListener('change', function () {
+                            syncDynamicBodyBlocks();
+                        });
+                    }
+                });
+                if (attachmentInput) {
+                    attachmentInput.addEventListener('change', function () {
+                        syncDynamicBodyBlocks();
                     });
                 }
 
@@ -1590,7 +1651,7 @@
 
                 applyTemplate(!keepEditedContent);
                 if (keepEditedContent) {
-                    syncOrderConfirmationInBody();
+                    syncDynamicBodyBlocks();
                 }
 
                 @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'recipient_emails', 'test_email', 'attachment', 'send_target']))

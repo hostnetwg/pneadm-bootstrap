@@ -72,7 +72,7 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertStringContainsString('SZKOLENIE: AI w edukacji', $reminder['subject']);
         $this->assertStringContainsString('499,50', $reminder['body']);
         $this->assertStringContainsString('Temat: AI w edukacji', $reminder['body']);
-        $this->assertStringContainsString('Data startu: '.$start->format('d.m.Y H:i'), $reminder['body']);
+        $this->assertStringContainsString('Data szkolenia: '.$start->format('d.m.Y H:i'), $reminder['body']);
         $this->assertStringContainsString('Prowadzący: Anna Nowak', $reminder['body']);
         $this->assertStringContainsString('12 3456 7890 1234 5678 9012 3456', $reminder['body']);
         $this->assertStringContainsString('tel. +48 600 100 200', $reminder['body']);
@@ -81,6 +81,8 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertStringContainsString('nieuregulowana', $dunning['body']);
         $this->assertStringContainsString('Prowadzący: Anna Nowak', $dunning['body']);
         $this->assertStringContainsString('tel. +48 600 100 200', $dunning['body']);
+        $this->assertStringNotContainsString('W załączeniu przesyłamy fakturę', $dunning['body']);
+        $this->assertStringNotContainsString('jeśli została dołączona', $dunning['body']);
         $this->assertTrue($service->canAttachIfirmaPdf($case));
         $this->assertSame('88_8_2026', $service->ifirmaPdfLookupKey($case));
         $this->assertFalse($service->canIncludeOrderConfirmationLink($case));
@@ -126,6 +128,18 @@ class DebtReminderTemplateServiceTest extends TestCase
         $without = $service->syncOrderConfirmationLinkInBody($withLink, $case, false);
         $this->assertStringNotContainsString($url, $without);
         $this->assertStringContainsString('Dzień dobry', $without);
+
+        $withSignature = $service->syncOrderConfirmationLinkInBody(
+            "Treść główna.\n\nZ poważaniem,\nZespół Platformy Nowoczesnej Edukacji\nkontakt@pnedu.pl",
+            $case,
+            true
+        );
+        $this->assertMatchesRegularExpression(
+            '/Treść główna\.\n\nFaktura została wystawiona na podstawie zamówienia #'.$order->id
+            .', pobierz potwierdzenie zamówienia: '.preg_quote($url, '/')
+            ."\n\nZ poważaniem,/u",
+            $withSignature
+        );
     }
 
     public function test_order_confirmation_link_skipped_without_ident(): void
@@ -149,5 +163,24 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertFalse($service->canIncludeOrderConfirmationLink($case));
         $body = "Treść bez zmian";
         $this->assertSame($body, $service->syncOrderConfirmationLinkInBody($body, $case, true));
+    }
+
+    public function test_dunning_invoice_attachment_sentence_sync(): void
+    {
+        $service = app(DebtReminderTemplateService::class);
+        $base = "Prosimy o płatność.\n\nZ poważaniem,\nZespół";
+
+        $with = $service->syncInvoiceAttachmentSentenceInBody($base, true);
+        $this->assertStringContainsString(DebtReminderTemplateService::INVOICE_ATTACHMENT_SENTENCE, $with);
+        $this->assertMatchesRegularExpression(
+            '/Prosimy o płatność\.\n\nW załączeniu przesyłamy fakturę\.\n\nZ poważaniem,/u',
+            $with
+        );
+        $this->assertStringNotContainsString('jeśli została dołączona', $with);
+
+        $legacy = "Prosimy o płatność.\nW załączeniu przesyłamy fakturę (jeśli została dołączona).\n\nZ poważaniem,\nZespół";
+        $stripped = $service->syncInvoiceAttachmentSentenceInBody($legacy, false);
+        $this->assertStringNotContainsString('W załączeniu przesyłamy fakturę', $stripped);
+        $this->assertStringContainsString('Z poważaniem,', $stripped);
     }
 }

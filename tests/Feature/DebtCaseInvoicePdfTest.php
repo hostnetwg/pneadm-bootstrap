@@ -59,6 +59,15 @@ class DebtCaseInvoicePdfTest extends TestCase
         $showAfter->assertOk();
         $showAfter->assertSee('Podgląd PDF', false);
         $showAfter->assertSee('Załącz PDF faktury ze sprawy', false);
+        $html = $showAfter->getContent();
+        $this->assertMatchesRegularExpression(
+            '/id="debtReminderAttachCasePdf"[^>]*\bchecked\b|\bchecked\b[^>]*id="debtReminderAttachCasePdf"/is',
+            $html
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/id="debtReminderAttachIfirma"[^>]*\bchecked\b|\bchecked\b[^>]*id="debtReminderAttachIfirma"/is',
+            $html
+        );
 
         $preview = $this->actingAs($user)->get(route('accounting.collections.invoice-pdf.preview', $case));
         $preview->assertOk();

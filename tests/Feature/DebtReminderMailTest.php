@@ -59,13 +59,21 @@ class DebtReminderMailTest extends TestCase
         $response->assertSee('Ponaglenie (formalniejsze)', false);
         $response->assertSee('Załącz PDF faktury z iFirma', false);
         $response->assertSee('Dołącz w treści link do potwierdzenia zamówienia', false);
+        $html = $response->getContent();
+        $this->assertMatchesRegularExpression(
+            '/id="debtReminderAttachIfirma"[^>]*\bchecked\b|\bchecked\b[^>]*id="debtReminderAttachIfirma"/is',
+            $html
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/id="debtReminderAttachCasePdf"/i',
+            $html
+        );
         $response->assertSee('debt-reminder-recipient-checkbox', false);
         $response->assertSee('Zamawiający', false);
         $response->assertSee('dluznik@example.test', false);
         $response->assertDontSee('debtReminderRecipientKey', false);
         $response->assertSee('value="dluznik@example.test"', false);
         $response->assertSee('value="sekretariat@szkola.test"', false);
-        $html = $response->getContent();
         $this->assertGreaterThanOrEqual(2, substr_count($html, 'name="recipient_emails[]"'));
         $this->assertGreaterThanOrEqual(
             2,
@@ -283,6 +291,83 @@ class DebtReminderMailTest extends TestCase
         Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
             return ! str_contains($mail->plainBody, 'https://pnedu.pl/orders/260808-TEST02/pdf')
                 && str_contains($mail->plainBody, 'prosimy o płatność');
+        });
+    }
+
+    public function test_dunning_send_adds_invoice_sentence_only_when_attached(): void
+    {
+        Mail::fake();
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+        [$user, $case] = $this->caseWithOrder(['ident' => '260808-DUN01', 'ifirma_invoice_id' => 999]);
+
+        $without = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'dunning',
+            'subject' => 'Ponaglenie bez FV',
+            'body' => "Treść.\n\nZ poważaniem,\nZespół",
+            'send_target' => 'recipient',
+            'recipient_emails' => ['dluznik@example.test'],
+            'attach_ifirma_pdf' => '0',
+            'include_order_confirmation_link' => '0',
+        ]);
+        $without->assertRedirect(route('accounting.collections.show', $case));
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
+            return ! str_contains($mail->plainBody, 'W załączeniu przesyłamy fakturę');
+        });
+
+        $ifirma = Mockery::mock(IfirmaApiService::class);
+        $ifirma->shouldReceive('downloadInvoicePdf')
+            ->once()
+            ->with('999')
+            ->andReturn([
+                'status' => 'success',
+                'content' => '%PDF-1.4 fake',
+            ]);
+        $this->app->instance(IfirmaApiService::class, $ifirma);
+
+        $with = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'dunning',
+            'subject' => 'Ponaglenie z FV',
+            'body' => "Treść.\n\nZ poważaniem,\nZespół",
+            'send_target' => 'recipient',
+            'recipient_emails' => ['dluznik@example.test'],
+            'attach_ifirma_pdf' => '1',
+            'include_order_confirmation_link' => '0',
+        ]);
+        $with->assertRedirect(route('accounting.collections.show', $case));
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
+            return str_contains($mail->plainBody, 'W załączeniu przesyłamy fakturę.')
+                && ! str_contains($mail->plainBody, 'jeśli została dołączona');
+        });
+    }
+
+    public function test_reminder_send_adds_invoice_sentence_when_attached(): void
+    {
+        Mail::fake();
+        [$user, $case] = $this->caseWithOrder(['ifirma_invoice_id' => 1001]);
+
+        $ifirma = Mockery::mock(IfirmaApiService::class);
+        $ifirma->shouldReceive('downloadInvoicePdf')
+            ->once()
+            ->with('1001')
+            ->andReturn([
+                'status' => 'success',
+                'content' => '%PDF-1.4 fake',
+            ]);
+        $this->app->instance(IfirmaApiService::class, $ifirma);
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'reminder',
+            'subject' => 'Przypomnienie z FV',
+            'body' => "Treść.\n\nZ poważaniem,\nZespół",
+            'send_target' => 'recipient',
+            'recipient_emails' => ['dluznik@example.test'],
+            'attach_ifirma_pdf' => '1',
+            'include_order_confirmation_link' => '0',
+        ]);
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
+            return str_contains($mail->plainBody, 'W załączeniu przesyłamy fakturę.');
         });
     }
 

@@ -744,8 +744,16 @@ class AccountingController extends Controller
                 ->with('error', 'Brak wgranego PDF faktury na tej sprawie.');
         }
 
-        $body = $templates->syncOrderConfirmationLinkInBody(
+        $hasInvoiceAttachment = $attachIfirma
+            || $attachCasePdf
+            || $request->file('attachment') !== null;
+
+        $body = $templates->syncInvoiceAttachmentSentenceInBody(
             $validated['body'],
+            $hasInvoiceAttachment
+        );
+        $body = $templates->syncOrderConfirmationLinkInBody(
+            $body,
             $debtCase,
             $request->boolean('include_order_confirmation_link')
         );

@@ -12,6 +12,8 @@ class DebtReminderTemplateService
 
     public const TEMPLATE_DUNNING = 'dunning';
 
+    public const INVOICE_ATTACHMENT_SENTENCE = 'W załączeniu przesyłamy fakturę.';
+
     /**
      * @return array<string, string>
      */
@@ -169,11 +171,12 @@ class DebtReminderTemplateService
         }
 
         return 'Faktura została wystawiona na podstawie zamówienia #'.$order->id
-            .", pobierz potwierdzenie zamówienia:\n".$url;
+            .', pobierz potwierdzenie zamówienia: '.$url;
     }
 
     /**
      * Synchronizuje blok linku w treści wg checkboxa. Brak ident/URL → bez zmian (pomijamy).
+     * Blok wstawiany nad podpisem („Z poważaniem,”), nie na samym końcu.
      */
     public function syncOrderConfirmationLinkInBody(string $body, DebtCase $case, bool $include): string
     {
@@ -188,16 +191,54 @@ class DebtReminderTemplateService
             return $stripped;
         }
 
-        return rtrim($stripped)."\n\n".$block;
+        return $this->insertBlockBeforeSignature($stripped, $block);
+    }
+
+    /**
+     * Zdanie o załączonej FV — gdy faktycznie dołączono PDF faktury (przypomnienie lub ponaglenie).
+     * Usuwa też starą wersję z dopiskiem „(jeśli została dołączona)”.
+     */
+    public function syncInvoiceAttachmentSentenceInBody(string $body, bool $include): string
+    {
+        $stripped = $this->stripInvoiceAttachmentSentence($body);
+        if (! $include) {
+            return $stripped;
+        }
+
+        return $this->insertBlockBeforeSignature($stripped, self::INVOICE_ATTACHMENT_SENTENCE);
+    }
+
+    private function stripInvoiceAttachmentSentence(string $body): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $body);
+        $pattern = '/(?:\n{0,2})W załączeniu przesyłamy fakturę(?: \(jeśli została dołączona\))?\.?/u';
+        $cleaned = preg_replace($pattern, '', $normalized);
+
+        return is_string($cleaned) ? rtrim($cleaned) : rtrim($body);
+    }
+
+    private function insertBlockBeforeSignature(string $body, string $block): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", rtrim($body));
+        $needle = "\nZ poważaniem,";
+        $pos = mb_strrpos($normalized, $needle);
+        if ($pos === false && str_starts_with($normalized, 'Z poważaniem,')) {
+            return $block."\n\n".$normalized;
+        }
+        if ($pos === false) {
+            return $normalized."\n\n".$block;
+        }
+
+        return rtrim(mb_substr($normalized, 0, $pos))."\n\n".$block."\n\n".ltrim(mb_substr($normalized, $pos), "\n");
     }
 
     private function stripOrderConfirmationBlock(string $body, string $url): string
     {
         $normalized = str_replace(["\r\n", "\r"], "\n", $body);
         $escapedUrl = preg_quote($url, '/');
-        // Usuń blok: opcjonalna pusta linia + zdanie o zamówieniu + linia z URL
+        // Usuń blok (URL w tej samej linii albo w następnym wierszu — stary format)
         $pattern = '/(?:\n{0,2})Faktura została wystawiona na podstawie zamówienia #\d+,\s*'
-            .'pobierz potwierdzenie zamówienia:\n'.$escapedUrl.'/u';
+            .'pobierz potwierdzenie zamówienia:\s*\n?'.$escapedUrl.'/u';
         $cleaned = preg_replace($pattern, '', $normalized);
         if (! is_string($cleaned)) {
             return rtrim($body);
@@ -311,7 +352,7 @@ class DebtReminderTemplateService
         return [
             'Dotyczy szkolenia:',
             'Temat: '.$training['title'],
-            'Data startu: '.$training['start'],
+            'Data szkolenia: '.$training['start'],
             'Prowadzący: '.$training['instructor'],
             '',
         ];
@@ -367,7 +408,6 @@ class DebtReminderTemplateService
 
         $lines = array_merge($lines, [
             'Prosimy o niezwłoczne uregulowanie należności lub kontakt w celu wyjaśnienia sprawy.',
-            'W załączeniu przesyłamy fakturę (jeśli została dołączona).',
             '',
             ...$this->signatureLines(),
         ]);
