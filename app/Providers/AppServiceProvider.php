@@ -7,11 +7,13 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 use App\Models\Course;
+use App\Models\DebtCase;
 use App\Models\FormOrder;
 use App\Models\Participant;
 use App\Models\CoursePriceVariant;
 use App\Observers\CourseObserver;
 use App\Observers\CoursePriceVariantObserver;
+use App\Observers\DebtCaseObserver;
 use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 
@@ -40,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
 
         Course::observe(CourseObserver::class);
         CoursePriceVariant::observe(CoursePriceVariantObserver::class);
+        DebtCase::observe(DebtCaseObserver::class);
 
         Event::listen(MessageSent::class, [OutboundMailCapture::class, 'record']);
     }

@@ -38,6 +38,15 @@ class DebtCaseInvoicePdfService
 
     public function delete(DebtCase $case): DebtCase
     {
+        $hasMeta = filled($case->invoice_pdf_path)
+            || filled($case->invoice_pdf_original_name)
+            || $case->invoice_pdf_uploaded_at !== null
+            || $case->invoice_pdf_uploaded_by !== null;
+
+        if (! $hasMeta && ! $this->hasPdf($case)) {
+            return $case;
+        }
+
         $this->deleteStoredFile($case);
 
         $case->invoice_pdf_path = null;

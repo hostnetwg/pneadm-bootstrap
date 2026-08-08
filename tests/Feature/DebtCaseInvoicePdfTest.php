@@ -78,6 +78,58 @@ class DebtCaseInvoicePdfTest extends TestCase
         $this->assertFalse($case->fresh()->hasInvoicePdf());
     }
 
+    public function test_closing_debt_case_deletes_invoice_pdf_from_storage(): void
+    {
+        [$user, $case] = $this->caseWithOrder();
+
+        $this->actingAs($user)->post(route('accounting.collections.invoice-pdf.upload', $case), [
+            'invoice_pdf' => UploadedFile::fake()->create('faktura-26.pdf', 120, 'application/pdf'),
+        ])->assertRedirect();
+
+        $case->refresh();
+        $path = $case->invoice_pdf_path;
+        $this->assertNotNull($path);
+        Storage::disk('local')->assertExists($path);
+
+        $close = $this->actingAs($user)->post(route('accounting.collections.actions.store', $case), [
+            'action_type' => \App\Models\DebtCaseAction::TYPE_CLOSE,
+            'note' => 'Opłacone — zamykam',
+        ]);
+        $close->assertRedirect(route('accounting.collections.show', $case));
+
+        $case->refresh();
+        $this->assertSame(DebtCase::STATUS_CLOSED, $case->status);
+        $this->assertNull($case->invoice_pdf_path);
+        $this->assertNull($case->invoice_pdf_original_name);
+        $this->assertFalse($case->hasInvoicePdf());
+        Storage::disk('local')->assertMissing($path);
+    }
+
+    public function test_auto_close_also_deletes_invoice_pdf(): void
+    {
+        [$user, $case] = $this->caseWithOrder();
+
+        $this->actingAs($user)->post(route('accounting.collections.invoice-pdf.upload', $case), [
+            'invoice_pdf' => UploadedFile::fake()->create('faktura-auto.pdf', 80, 'application/pdf'),
+        ])->assertRedirect();
+
+        $case->refresh();
+        $path = $case->invoice_pdf_path;
+        Storage::disk('local')->assertExists($path);
+
+        $closed = app(\App\Services\DebtCaseAutoCloseService::class)->closeIfFullyPaid(
+            $case,
+            $user,
+            \App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID
+        );
+
+        $this->assertTrue($closed);
+        $case->refresh();
+        $this->assertSame(DebtCase::STATUS_CLOSED, $case->status);
+        $this->assertNull($case->invoice_pdf_path);
+        Storage::disk('local')->assertMissing($path);
+    }
+
     public function test_collections_index_shows_pdf_icon_when_invoice_pdf_attached(): void
     {
         [$user, $case] = $this->caseWithOrder();
