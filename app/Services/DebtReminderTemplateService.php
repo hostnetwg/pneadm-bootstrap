@@ -130,6 +130,85 @@ class DebtReminderTemplateService
         return str_replace('/', '_', $invoice);
     }
 
+    /**
+     * Czy można wstawić do treści link do publicznego PDF potwierdzenia zamówienia (pnedu).
+     */
+    public function canIncludeOrderConfirmationLink(DebtCase $case): bool
+    {
+        return $this->orderConfirmationPdfUrl($case) !== null;
+    }
+
+    /**
+     * Publiczny URL PDF potwierdzenia zamówienia na pnedu (ten sam co po złożeniu zamówienia).
+     */
+    public function orderConfirmationPdfUrl(DebtCase $case): ?string
+    {
+        $order = $case->formOrder;
+        $ident = trim((string) ($order?->ident ?? ''));
+        if ($ident === '') {
+            return null;
+        }
+
+        $base = rtrim((string) config('services.pnedu_frontend_url', ''), '/');
+        if ($base === '') {
+            return null;
+        }
+
+        return $base.'/orders/'.rawurlencode($ident).'/pdf';
+    }
+
+    /**
+     * Blok tekstu do treści e-maila (plain text; URL klikalny przez linkify).
+     */
+    public function orderConfirmationBodyBlock(DebtCase $case): ?string
+    {
+        $url = $this->orderConfirmationPdfUrl($case);
+        $order = $case->formOrder;
+        if ($url === null || $order === null) {
+            return null;
+        }
+
+        return 'Faktura została wystawiona na podstawie zamówienia #'.$order->id
+            .", pobierz potwierdzenie zamówienia:\n".$url;
+    }
+
+    /**
+     * Synchronizuje blok linku w treści wg checkboxa. Brak ident/URL → bez zmian (pomijamy).
+     */
+    public function syncOrderConfirmationLinkInBody(string $body, DebtCase $case, bool $include): string
+    {
+        $block = $this->orderConfirmationBodyBlock($case);
+        $url = $this->orderConfirmationPdfUrl($case);
+        if ($block === null || $url === null) {
+            return $body;
+        }
+
+        $stripped = $this->stripOrderConfirmationBlock($body, $url);
+        if (! $include) {
+            return $stripped;
+        }
+
+        return rtrim($stripped)."\n\n".$block;
+    }
+
+    private function stripOrderConfirmationBlock(string $body, string $url): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $body);
+        $escapedUrl = preg_quote($url, '/');
+        // Usuń blok: opcjonalna pusta linia + zdanie o zamówieniu + linia z URL
+        $pattern = '/(?:\n{0,2})Faktura została wystawiona na podstawie zamówienia #\d+,\s*'
+            .'pobierz potwierdzenie zamówienia:\n'.$escapedUrl.'/u';
+        $cleaned = preg_replace($pattern, '', $normalized);
+        if (! is_string($cleaned)) {
+            return rtrim($body);
+        }
+
+        // Gdy w treści został sam URL (ręczna edycja) — też usuń linię z URL
+        $cleaned = preg_replace('/\n?'.preg_quote($url, '/').'(?=\n|$)/u', '', $cleaned);
+
+        return is_string($cleaned) ? rtrim($cleaned) : rtrim($body);
+    }
+
     private function invoiceNumber(DebtCase $case, ?FormOrder $order): string
     {
         $invoice = trim((string) ($case->invoice_number ?: $order?->invoice_number ?: ''));

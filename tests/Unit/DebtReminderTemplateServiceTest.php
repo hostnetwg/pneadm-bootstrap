@@ -83,5 +83,71 @@ class DebtReminderTemplateServiceTest extends TestCase
         $this->assertStringContainsString('tel. +48 600 100 200', $dunning['body']);
         $this->assertTrue($service->canAttachIfirmaPdf($case));
         $this->assertSame('88_8_2026', $service->ifirmaPdfLookupKey($case));
+        $this->assertFalse($service->canIncludeOrderConfirmationLink($case));
+    }
+
+    public function test_order_confirmation_link_helpers_and_body_sync(): void
+    {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie',
+            'product_price' => 100,
+            'order_date' => now(),
+            'invoice_number' => '1/1/2026',
+            'ident' => '260808-ABC123',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '1/1/2026',
+            'amount_gross' => 100,
+            'opened_at' => now(),
+        ]);
+        $case->setRelation('formOrder', $order);
+
+        $service = app(DebtReminderTemplateService::class);
+        $this->assertTrue($service->canIncludeOrderConfirmationLink($case));
+        $url = 'https://pnedu.pl/orders/260808-ABC123/pdf';
+        $this->assertSame($url, $service->orderConfirmationPdfUrl($case));
+
+        $block = $service->orderConfirmationBodyBlock($case);
+        $this->assertNotNull($block);
+        $this->assertStringContainsString('zamówienia #'.$order->id, $block);
+        $this->assertStringContainsString($url, $block);
+
+        $withLink = $service->syncOrderConfirmationLinkInBody("Dzień dobry,\n\ntest", $case, true);
+        $this->assertStringContainsString($url, $withLink);
+        $this->assertSame(1, substr_count($withLink, $url));
+
+        $again = $service->syncOrderConfirmationLinkInBody($withLink, $case, true);
+        $this->assertSame(1, substr_count($again, $url));
+
+        $without = $service->syncOrderConfirmationLinkInBody($withLink, $case, false);
+        $this->assertStringNotContainsString($url, $without);
+        $this->assertStringContainsString('Dzień dobry', $without);
+    }
+
+    public function test_order_confirmation_link_skipped_without_ident(): void
+    {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
+        $order = FormOrder::create([
+            'product_name' => 'Bez ident',
+            'product_price' => 100,
+            'order_date' => now(),
+            'ident' => null,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+        $case->setRelation('formOrder', $order);
+
+        $service = app(DebtReminderTemplateService::class);
+        $this->assertFalse($service->canIncludeOrderConfirmationLink($case));
+        $body = "Treść bez zmian";
+        $this->assertSame($body, $service->syncOrderConfirmationLinkInBody($body, $case, true));
     }
 }

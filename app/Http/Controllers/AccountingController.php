@@ -657,6 +657,8 @@ class AccountingController extends Controller
             'reminderRecipientOptions' => $reminderTemplates->recipientOptions($debtCase),
             'reminderCanAttachIfirmaPdf' => $reminderTemplates->canAttachIfirmaPdf($debtCase),
             'reminderCanAttachCasePdf' => $debtCase->hasInvoicePdf(),
+            'reminderCanIncludeOrderConfirmationLink' => $reminderTemplates->canIncludeOrderConfirmationLink($debtCase),
+            'reminderOrderConfirmationBodyBlock' => $reminderTemplates->orderConfirmationBodyBlock($debtCase),
             'reminderDefaultTestEmail' => Auth::user()?->email ?: 'waldemar.grabowski@hostnet.pl',
             'caseHasInvoicePdf' => $debtCase->hasInvoicePdf(),
         ]);
@@ -682,6 +684,7 @@ class AccountingController extends Controller
             'test_email' => ['nullable', 'email', 'max:255'],
             'attach_ifirma_pdf' => ['nullable', 'boolean'],
             'attach_case_pdf' => ['nullable', 'boolean'],
+            'include_order_confirmation_link' => ['nullable', 'boolean'],
             'attachment' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ];
 
@@ -741,11 +744,17 @@ class AccountingController extends Controller
                 ->with('error', 'Brak wgranego PDF faktury na tej sprawie.');
         }
 
+        $body = $templates->syncOrderConfirmationLinkInBody(
+            $validated['body'],
+            $debtCase,
+            $request->boolean('include_order_confirmation_link')
+        );
+
         $result = $mailService->send(
             case: $debtCase,
             toEmails: $toEmails,
             subject: $validated['subject'],
-            body: $validated['body'],
+            body: $body,
             isTest: $isTest,
             attachIfirmaPdf: $attachIfirma,
             attachCasePdf: $attachCasePdf,

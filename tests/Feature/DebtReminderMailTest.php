@@ -58,6 +58,7 @@ class DebtReminderMailTest extends TestCase
         $response->assertSee('Przypomnienie o płatności', false);
         $response->assertSee('Ponaglenie (formalniejsze)', false);
         $response->assertSee('Załącz PDF faktury z iFirma', false);
+        $response->assertSee('Dołącz w treści link do potwierdzenia zamówienia', false);
         $response->assertSee('debt-reminder-recipient-checkbox', false);
         $response->assertSee('Zamawiający', false);
         $response->assertSee('dluznik@example.test', false);
@@ -236,6 +237,55 @@ class DebtReminderMailTest extends TestCase
         });
     }
 
+    public function test_send_includes_order_confirmation_link_in_body_when_checked(): void
+    {
+        Mail::fake();
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+        [$user, $case] = $this->caseWithOrder(['ident' => '260808-TEST01']);
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'reminder',
+            'subject' => 'Z linkiem zamówienia',
+            'body' => "Dzień dobry,\n\nprosimy o płatność.",
+            'send_target' => 'recipient',
+            'recipient_emails' => ['dluznik@example.test'],
+            'include_order_confirmation_link' => '1',
+        ]);
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+
+        $orderId = $case->form_order_id;
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) use ($orderId) {
+            return str_contains($mail->plainBody, 'zamówienia #'.$orderId)
+                && str_contains($mail->plainBody, 'https://pnedu.pl/orders/260808-TEST01/pdf');
+        });
+    }
+
+    public function test_send_skips_order_confirmation_link_when_unchecked(): void
+    {
+        Mail::fake();
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+        [$user, $case] = $this->caseWithOrder(['ident' => '260808-TEST02']);
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.send-reminder', $case), [
+            'template' => 'reminder',
+            'subject' => 'Bez linku',
+            'body' => "Dzień dobry,\n\nprosimy o płatność.\n\nFaktura została wystawiona na podstawie zamówienia #{$case->form_order_id}, pobierz potwierdzenie zamówienia:\nhttps://pnedu.pl/orders/260808-TEST02/pdf",
+            'send_target' => 'recipient',
+            'recipient_emails' => ['dluznik@example.test'],
+            'include_order_confirmation_link' => '0',
+        ]);
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+
+        Mail::assertSent(DebtReminderMail::class, function (DebtReminderMail $mail) {
+            return ! str_contains($mail->plainBody, 'https://pnedu.pl/orders/260808-TEST02/pdf')
+                && str_contains($mail->plainBody, 'prosimy o płatność');
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $orderAttrs
      * @return array{0: User, 1: DebtCase}
@@ -256,6 +306,7 @@ class DebtReminderMailTest extends TestCase
             'orderer_name' => 'Jan Kowalski',
             'orderer_email' => 'dluznik@example.test',
             'invoice_payment_delay' => 14,
+            'ident' => '260808-MAIL01',
         ], $orderAttrs));
 
         $case = DebtCase::create([

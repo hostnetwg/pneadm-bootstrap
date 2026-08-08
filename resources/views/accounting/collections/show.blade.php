@@ -1159,6 +1159,7 @@
 
     <div class="modal fade" id="debtReminderModal" tabindex="-1" aria-labelledby="debtReminderModalLabel" aria-hidden="true"
          data-templates='@json($reminderTemplatePayloads ?? [])'
+         data-order-confirmation-block='@json($reminderOrderConfirmationBodyBlock ?? '')'
          data-recipients='@json($reminderRecipientOptions ?? [])'>
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -1295,6 +1296,21 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            @if($reminderCanIncludeOrderConfirmationLink ?? false)
+                                <div class="form-check mb-2">
+                                    <input type="hidden" name="include_order_confirmation_link" value="0">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           value="1"
+                                           id="debtReminderOrderConfirmationLink"
+                                           name="include_order_confirmation_link"
+                                           @checked((string) old('include_order_confirmation_link', '1') === '1')>
+                                    <label class="form-check-label" for="debtReminderOrderConfirmationLink">
+                                        Dołącz w treści link do potwierdzenia zamówienia
+                                        <span class="text-muted">(zamawiający / uczestnicy)</span>
+                                    </label>
+                                </div>
+                            @endif
                             @if($reminderCanAttachCasePdf ?? false)
                                 <div class="form-check mb-2">
                                     <input class="form-check-input"
@@ -1323,7 +1339,7 @@
                                         Załącz PDF faktury z iFirma
                                     </label>
                                 </div>
-                            @elseif(!($reminderCanAttachCasePdf ?? false))
+                            @elseif(!($reminderCanAttachCasePdf ?? false) && !($reminderCanIncludeOrderConfirmationLink ?? false))
                                 <div class="form-text text-muted mb-2">Brak ID/numeru FV — nie można pobrać PDF z iFirma.</div>
                             @endif
                             <label class="form-label fw-bold" for="debtReminderAttachment">Dodatkowy załącznik (PDF)</label>
@@ -1491,10 +1507,40 @@
                 var bodyInput = document.getElementById('debtReminderBody');
                 var selectAllBtn = document.getElementById('debtReminderSelectAllRecipients');
                 var clearBtn = document.getElementById('debtReminderClearRecipients');
+                var orderConfirmationCheckbox = document.getElementById('debtReminderOrderConfirmationLink');
                 var keepEditedContent = {{ old('subject') || old('body') ? 'true' : 'false' }};
+                var orderConfirmationBlock = '';
+                try {
+                    orderConfirmationBlock = JSON.parse(modalEl.getAttribute('data-order-confirmation-block') || '""') || '';
+                } catch (e) {
+                    orderConfirmationBlock = '';
+                }
 
                 function recipientCheckboxes() {
                     return modalEl.querySelectorAll('.debt-reminder-recipient-checkbox');
+                }
+
+                function stripOrderConfirmationFromBody(text) {
+                    if (!orderConfirmationBlock || !text) {
+                        return text;
+                    }
+                    var escaped = orderConfirmationBlock.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    return text
+                        .replace(new RegExp('\\n{0,2}' + escaped, 'g'), '')
+                        .replace(/\n{3,}/g, '\n\n')
+                        .replace(/\s+$/, '');
+                }
+
+                function syncOrderConfirmationInBody() {
+                    if (!bodyInput || !orderConfirmationBlock) {
+                        return;
+                    }
+                    var base = stripOrderConfirmationFromBody(bodyInput.value || '');
+                    if (orderConfirmationCheckbox && orderConfirmationCheckbox.checked) {
+                        bodyInput.value = base.replace(/\s+$/, '') + '\n\n' + orderConfirmationBlock;
+                    } else {
+                        bodyInput.value = base;
+                    }
                 }
 
                 function applyTemplate(force) {
@@ -1511,12 +1557,19 @@
                     }
                     if (force || !bodyInput.value) {
                         bodyInput.value = payload.body || '';
+                        syncOrderConfirmationInBody();
                     }
                 }
 
                 if (templateSelect) {
                     templateSelect.addEventListener('change', function () {
                         applyTemplate(true);
+                    });
+                }
+
+                if (orderConfirmationCheckbox) {
+                    orderConfirmationCheckbox.addEventListener('change', function () {
+                        syncOrderConfirmationInBody();
                     });
                 }
 
@@ -1536,6 +1589,9 @@
                 }
 
                 applyTemplate(!keepEditedContent);
+                if (keepEditedContent) {
+                    syncOrderConfirmationInBody();
+                }
 
                 @if($errors->hasAny(['template', 'subject', 'body', 'recipient_email', 'recipient_emails', 'test_email', 'attachment', 'send_target']))
                     if (window.bootstrap && window.bootstrap.Modal) {
