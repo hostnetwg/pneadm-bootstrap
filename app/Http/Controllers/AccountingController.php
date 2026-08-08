@@ -1062,7 +1062,8 @@ class AccountingController extends Controller
 
     public function collectionsSyncIfirma(
         DebtCase $debtCase,
-        IfirmaInvoicePaymentStatusService $paymentStatusService
+        IfirmaInvoicePaymentStatusService $paymentStatusService,
+        DebtCaseAutoCloseService $autoClose
     ) {
         $result = $paymentStatusService->syncDebtCase($debtCase, Auth::user());
 
@@ -1074,8 +1075,13 @@ class AccountingController extends Controller
 
         $message = $result['message'];
         if (($result['status'] ?? null) === IfirmaInvoicePaymentStatusService::STATUS_PAID
-            && $debtCase->fresh()->status !== DebtCase::STATUS_CLOSED) {
-            $message .= ' Możesz ręcznie zamknąć sprawę po weryfikacji.';
+            && $autoClose->closeIfFullyPaid(
+                $debtCase,
+                Auth::user(),
+                IfirmaInvoicePaymentStatusService::STATUS_PAID,
+                DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC
+            )) {
+            $message .= ' Sprawę zamknięto automatycznie.';
         }
 
         return redirect()

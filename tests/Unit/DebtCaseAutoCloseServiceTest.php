@@ -76,6 +76,27 @@ class DebtCaseAutoCloseServiceTest extends TestCase
         $this->assertSame(DebtCase::STATUS_IN_PROGRESS, $case->fresh()->status);
     }
 
+    public function test_uses_custom_closure_reason_when_provided(): void
+    {
+        $case = $this->makeCase(DebtCase::STATUS_OPEN);
+
+        $closed = app(DebtCaseAutoCloseService::class)->closeIfFullyPaid(
+            $case,
+            null,
+            IfirmaInvoicePaymentStatusService::STATUS_PAID,
+            DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC
+        );
+
+        $this->assertTrue($closed);
+        $case->refresh();
+        $this->assertSame(DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC, $case->closure_reason);
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
+            'note' => DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC,
+        ]);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

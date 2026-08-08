@@ -8,11 +8,13 @@ use App\Models\User;
 
 /**
  * Auto-zamknięcie sprawy windykacyjnej po potwierdzeniu pełnej opłaty w iFirma
- * (ścieżka akceptacji przelewu z wyciągu).
+ * (akceptacja przelewu z wyciągu albo odświeżenie statusu na karcie sprawy).
  */
 class DebtCaseAutoCloseService
 {
     public const CLOSURE_REASON = 'Zamknięto automatycznie — FV opłacona w iFirma po akceptacji przelewu z wyciągu.';
+
+    public const CLOSURE_REASON_IFIRMA_SYNC = 'Zamknięto automatycznie — FV opłacona w iFirma po odświeżeniu statusu.';
 
     /**
      * Zamyka sprawę gdy status iFirma = oplacone i sprawa nie jest closed/disputed.
@@ -22,7 +24,8 @@ class DebtCaseAutoCloseService
     public function closeIfFullyPaid(
         DebtCase $case,
         ?User $user = null,
-        ?string $ifirmaStatus = null
+        ?string $ifirmaStatus = null,
+        ?string $closureReason = null
     ): bool {
         $case->refresh();
 
@@ -35,6 +38,7 @@ class DebtCaseAutoCloseService
             return false;
         }
 
+        $reason = $closureReason ?: self::CLOSURE_REASON;
         $happenedAt = now();
 
         $case->actions()->create([
@@ -43,13 +47,13 @@ class DebtCaseAutoCloseService
             'channel' => 'system',
             'outcome' => IfirmaInvoicePaymentStatusService::STATUS_PAID,
             'happened_at' => $happenedAt,
-            'note' => self::CLOSURE_REASON,
+            'note' => $reason,
         ]);
 
         $case->forceFill([
             'status' => DebtCase::STATUS_CLOSED,
             'closed_at' => $happenedAt,
-            'closure_reason' => self::CLOSURE_REASON,
+            'closure_reason' => $reason,
             'last_action_at' => $happenedAt,
             'ifirma_payment_status' => IfirmaInvoicePaymentStatusService::STATUS_PAID,
             'assigned_to_id' => $user?->id ?: $case->assigned_to_id,

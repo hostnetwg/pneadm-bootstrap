@@ -105,7 +105,7 @@ Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
 5. Sync **zawsze nadpisuje** na sprawie `invoice_date` ← `DataWystawienia` oraz `due_date` ← `TerminPlatnosci` (gdy API je zwraca) — nie zostawia szacunku `order_date + delay`.
 6. Te same daty zapisuje też na zamówieniu: `form_orders.invoice_issue_date` / `invoice_due_date` (oraz uzupełnia `ifirma_invoice_id` / `invoice_number` gdy brak).
-7. Na karcie sprawy **„Odśwież status z iFirma”** nadal **nie** zamyka sprawy automatycznie — tylko cache + podpowiedź UI.
+7. Na karcie sprawy **„Odśwież status z iFirma”**: gdy sync zwróci `oplacone` i sprawa nie jest `closed`/`disputed` → **auto-zamknięcie** (`DebtCaseAutoCloseService`, powód: po odświeżeniu statusu). Flash: „… Sprawę zamknięto automatycznie.”
 8. **Auto-zamknięcie po akceptacji przelewu z wyciągu** (osobna ścieżka): gdy status iFirma = `oplacone` po **Akceptuj + wpłata w iFirma** albo po **Zaakceptuj jako opłacone w iFirma** / fladze `ifirma_already_paid` — sprawa dostaje `close` + `closed_at`, o ile nie jest już `closed` ani `disputed`. „Tylko lokalnie” bez potwierdzenia pełnej opłaty **nie** zamyka.
 
 Daty FV na zamówieniu są też zapisywane **przy wystawianiu** faktury w panelu (`DataWystawienia` / `TerminPlatnosci` z payloadu). Tworzenie sprawy preferuje `invoice_issue_date` / `invoice_due_date`; dopiero gdy brak — szacunek od daty zamówienia/wystawienia + `invoice_payment_delay`.
@@ -122,14 +122,14 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 
 ## Kolejne Etapy
 
-- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy **oraz automatycznie przy tworzeniu sprawy**; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; **bez** auto-zamykania na samym syncu karty,
+- ~~synchronizacja statusów faktur z iFirma API~~ — **wdrożone (odczyt)**: przycisk „Odśwież status z iFirma” na karcie sprawy **oraz automatycznie przy tworzeniu sprawy**; cache w `debt_cases.ifirma_payment_status` / `ifirma_synced_at`; preferowany klucz `form_orders.ifirma_invoice_id`, fallback lista `faktury.json` po `PelnyNumer`; przy syncu karty gdy `oplacone` → auto-zamknięcie (jak wyciąg),
 - ~~import CSV wyciągów bankowych~~ — **wdrożone (MVP mBank)**: `Księgowość → Import wyciągu` (`accounting.bank-imports.*`); tabele `bank_statement_imports` / `bank_transactions` / `bank_transaction_matches`; parser `MbankStatementParser`; sugestie FV / KSeF / `#ID` / NIP / **imię+nazwisko nabywcy (tylko FV bez NIP) + kwota** → Medium; ręczna akceptacja → lokalny link + `debt_case_actions.bank_match`; przy zgodnej kwocie opcjonalnie **rejestracja wpłaty w iFirma** + sync statusu,
 - ~~ręczne powiązanie przelewu od strony sprawy~~ — **wdrożone**: na karcie sprawy sekcja „Wpłaty z wyciągu” ma wyszukiwarkę niepowiązanych wpływów (domyślnie po kwocie sprawy + fraza z opisu/nadawcy/konta) i modal Bootstrap „Powiąż lokalnie” / „+ wpłata iFirma”,
 - ~~cofnięcie przypisania przelewu~~ — **wdrożone**: „Cofnij” na karcie sprawy + „Cofnij przypisanie” w imporcie; lokalnie match → `rejected`, historia `bank_unmatch`, zamknięta sprawa → `open`; best-effort usunięcie wpłaty w iFirma (`DELETE faktury/wplaty/...`, oficjalne API dokumentuje tylko POST — przy failu ostrzeżenie i ręczna korekta w iFirma),
 - ~~ręczne powiązanie od strony przelewu~~ — **wdrożone**: w modalu podglądu importu wyszukiwarka niezamkniętych spraw + powiązanie lokalne / + iFirma,
 - dopracowanie sugestii dopasowań (fuzzy nazwa, bulk),
 - ~~ewentualne rejestrowanie wpłat w iFirma dopiero po potwierdzeniu operatora~~ — **wdrożone** (modal przy akceptacji importu: „Akceptuj + wpłata w iFirma” / „Tylko lokalnie”),
-- ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone (wąski zakres)**: po akceptacji z wyciągu, gdy iFirma potwierdza pełną opłatę (`oplacone`); nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka,
+- ~~automatyczne zamykanie spraw po matchu~~ — **wdrożone**: po akceptacji z wyciągu **oraz** po „Odśwież status z iFirma” na karcie, gdy iFirma = `oplacone`; nie zamyka `disputed` / już `closed`; zwykłe „Tylko lokalnie” bez potwierdzenia opłaty nie zamyka,
 - ~~magazyn PDF FV na sprawie (pobranie przy utworzeniu + checkbox „załącz FV ze sprawy” przy wysyłce)~~ — **częściowo wdrożone**: ręczny upload + podgląd na karcie sprawy + checkbox „Załącz PDF faktury ze sprawy” przy wysyłce; auto-pobranie z iFirma przy tworzeniu sprawy — później,
 - SMS do dłużnika (ten sam flow co e-mail, inny kanał).
 
@@ -155,7 +155,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - Przy **zgodnej kwocie**: modal wyboru — **Akceptuj + wpłata w iFirma** (POST `faktury/wplaty/...` + odświeżenie statusu na sprawie) albo **Tylko lokalnie**.
 - Przy fakturze krajowej, gdy przelew jest wcześniejszy niż data wystawienia FV, rejestracja wpłaty w iFirma idzie bez pola `Data` (API wymaga tylko `Kwota`), aby nie blokować opłacenia faktury wystawionej po otrzymaniu przelewu.
 - W podglądzie sugestii / kandydata ręcznego: **Sprawdź status z iFirma** (bez tworzenia sprawy, jeśli jeszcze jej nie ma). Panel pokazuje też datę wystawienia FV, liczbę dni po terminie (gdy nieopłacona i po `TerminPlatnosci`) oraz istniejącą sprawę windykacyjną z linkiem. Przy numerze FV w prawej kolumnie widać datę wystawienia z zamówienia (`invoice_issue_date`), gdy jest. Gdy iFirma zwraca `Opłacona`, operator może wybrać **Zaakceptuj jako opłacone w iFirma** — lokalny `bank_match`, bez rejestracji kolejnej wpłaty.
-- **Auto-zamknięcie sprawy** (`DebtCaseAutoCloseService`): po **Akceptuj + wpłata w iFirma** gdy sync = `oplacone`, oraz po **Zaakceptuj jako opłacone w iFirma** (`ifirma_already_paid`). Pomija `disputed` i już `closed`. Powód: „Zamknięto automatycznie — FV opłacona w iFirma po akceptacji przelewu z wyciągu.”
+- **Auto-zamknięcie sprawy** (`DebtCaseAutoCloseService`): po **Akceptuj + wpłata w iFirma** gdy sync = `oplacone`, po **Zaakceptuj jako opłacone w iFirma** (`ifirma_already_paid`), oraz po **Odśwież status z iFirma** na karcie gdy wynik = `oplacone`. Pomija `disputed` i już `closed`. Powody: akceptacja wyciągu vs odświeżenie statusu (osobne stałe `CLOSURE_REASON` / `CLOSURE_REASON_IFIRMA_SYNC`).
 - Ikona oka przy wierszu → modal Bootstrap z porównaniem **przelew z wyciągu** ↔ **zamówienie/sugestia** (FV z opisu, KSeF z tytułu, nabywca, NIP, e-mail, podstawa dopasowania).
 - Pliku produkcyjnego z PII **nie** commitować; fixture testowa: `tests/fixtures/bank/mbank_sample.csv`.
 

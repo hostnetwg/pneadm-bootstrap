@@ -827,6 +827,69 @@ class AccountingCollectionsTest extends TestCase
         $show->assertSee('27.07.2026', false);
     }
 
+    public function test_sync_ifirma_paid_auto_closes_open_debt_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie sync paid',
+            'product_price' => 365,
+            'order_date' => now()->subDays(30),
+            'invoice_number' => '51/7/2026',
+            'ifirma_invoice_id' => '654321',
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '51/7/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $this->partialMock(\App\Services\IfirmaApiService::class, function ($mock) {
+            $mock->shouldReceive('getInvoice')
+                ->once()
+                ->with('654321')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'PelnyNumer' => '51/7/2026',
+                        'Zaplacono' => 365,
+                        'Brutto' => 365,
+                        'DataWystawienia' => '2026-07-01',
+                        'TerminPlatnosci' => '2026-07-15',
+                    ],
+                ]);
+            $mock->shouldReceive('unwrapInvoicePayload')->andReturnUsing(fn ($d) => is_array($d) ? $d : []);
+        });
+
+        $response = $this->actingAs($user)->post(route('accounting.collections.sync-ifirma', $case));
+
+        $response->assertRedirect(route('accounting.collections.show', $case));
+        $response->assertSessionHas('success');
+        $this->assertStringContainsString(
+            'Sprawę zamknięto automatycznie',
+            (string) session('success')
+        );
+
+        $case->refresh();
+        $this->assertSame(DebtCase::STATUS_CLOSED, $case->status);
+        $this->assertSame(\App\Services\IfirmaInvoicePaymentStatusService::STATUS_PAID, $case->ifirma_payment_status);
+        $this->assertNotNull($case->closed_at);
+        $this->assertSame(
+            \App\Services\DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC,
+            $case->closure_reason
+        );
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_CLOSE,
+            'note' => \App\Services\DebtCaseAutoCloseService::CLOSURE_REASON_IFIRMA_SYNC,
+        ]);
+    }
+
     public function test_user_can_manually_link_unlinked_bank_transfer_from_case(): void
     {
         $user = User::factory()->create([
