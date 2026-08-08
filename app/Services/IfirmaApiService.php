@@ -575,16 +575,23 @@ class IfirmaApiService
     }
 
     /**
-     * Szuka faktury krajowej po PelnyNumer w zadanym zakresie dat (stronicowanie).
+     * Szuka faktury po PelnyNumer (opcjonalnie też KSeF) w zadanym zakresie dat (stronicowanie).
+     *
+     * API nie filtruje po numerze FV — przeglądamy listę. Dlatego ważne są: wąski zakres dat,
+     * opcjonalny filtr kwoty oraz wystarczający limit stron.
      *
      * @param  string|null  $invoiceType  np. prz_faktura_kraj; null = bez filtra typu
-     * @return array{status: string, invoice?: array, message?: string}
+     * @param  array{amount?: float|null, ksef_number?: string|null, max_pages?: int}  $options
+     * @return array{status: string, invoice?: array, message?: string, pages_scanned?: int, hit_page_limit?: bool}
+     *
+     * @see https://api.ifirma.pl/lista-faktur/
      */
     public function findSalesInvoiceByPelnyNumer(
         string $pelnyNumer,
         string $dataOd,
         ?string $dataDo = null,
-        ?string $invoiceType = 'prz_faktura_kraj'
+        ?string $invoiceType = 'prz_faktura_kraj',
+        array $options = []
     ): array {
         $needle = $this->normalizeInvoiceNumber($pelnyNumer);
         if ($needle === '') {
@@ -594,9 +601,15 @@ class IfirmaApiService
             ];
         }
 
+        $ksefNeedle = isset($options['ksef_number'])
+            ? strtoupper(trim((string) $options['ksef_number']))
+            : '';
+        $amount = isset($options['amount']) && is_numeric($options['amount'])
+            ? round((float) $options['amount'], 2)
+            : null;
         $page = 1;
         $perPage = 50;
-        $maxPages = 20;
+        $maxPages = max(1, (int) ($options['max_pages'] ?? 80));
 
         while ($page <= $maxPages) {
             $params = [
@@ -610,12 +623,19 @@ class IfirmaApiService
             if ($invoiceType !== null && $invoiceType !== '') {
                 $params['typ'] = $invoiceType;
             }
+            if ($amount !== null) {
+                // Filtr kwoty mocno zmniejsza listę (API: kwotaOd / kwotaDo).
+                $params['kwotaOd'] = number_format(max(0, $amount - 0.05), 2, '.', '');
+                $params['kwotaDo'] = number_format($amount + 0.05, 2, '.', '');
+            }
 
             $result = $this->listSalesDocuments($params);
             if (($result['status'] ?? null) !== 'success') {
                 return [
                     'status' => $result['status'] ?? 'error',
                     'message' => $result['message'] ?? 'Nie udało się pobrać listy faktur z iFirma.',
+                    'pages_scanned' => $page,
+                    'hit_page_limit' => false,
                 ];
             }
 
@@ -629,19 +649,42 @@ class IfirmaApiService
                     return [
                         'status' => 'success',
                         'invoice' => $row,
+                        'pages_scanned' => $page,
+                        'hit_page_limit' => false,
                     ];
+                }
+                if ($ksefNeedle !== '') {
+                    $rowKsef = $this->extractNumerKSeFFromInvoicePayload($row);
+                    if ($rowKsef !== null && strtoupper($rowKsef) === $ksefNeedle) {
+                        return [
+                            'status' => 'success',
+                            'invoice' => $row,
+                            'pages_scanned' => $page,
+                            'hit_page_limit' => false,
+                        ];
+                    }
                 }
             }
 
             if (count($rows) < $perPage) {
-                break;
+                return [
+                    'status' => 'not_found',
+                    'message' => 'Nie znaleziono faktury o podanym numerze w iFirma na liście w tym zakresie dat (przeszukano całą listę).',
+                    'pages_scanned' => $page,
+                    'hit_page_limit' => false,
+                ];
             }
             $page++;
         }
 
+        $scannedApprox = $maxPages * $perPage;
+
         return [
             'status' => 'not_found',
-            'message' => 'Nie znaleziono faktury o podanym numerze w iFirma (w zakresie dat).',
+            'message' => 'Nie znaleziono faktury o podanym numerze w iFirma — limit stron listy API '
+                ."(~{$scannedApprox} dokumentów w zakresie). Faktura może istnieć, ale nie zmieściła się w przeskanowanych stronach.",
+            'pages_scanned' => $maxPages,
+            'hit_page_limit' => true,
         ];
     }
 

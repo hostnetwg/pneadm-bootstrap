@@ -125,13 +125,30 @@ class IfirmaInvoicePaymentStatusServiceTest extends TestCase
         $order = new FormOrder;
         $order->invoice_number = '40/6/2026';
 
-        [$narrowFrom, $narrowTo] = $service->resolveSearchDateRange($order);
-        [$wideFrom, $wideTo] = $service->resolveSearchDateRange($order, wide: true);
+        [$narrowFrom, $narrowTo] = $service->resolveSearchDateRange($order, modeOrWide: 'normal');
+        [$wideFrom, $wideTo] = $service->resolveSearchDateRange($order, modeOrWide: 'wide');
+        [$monthFrom, $monthTo] = $service->resolveSearchDateRange($order, modeOrWide: 'month');
 
+        $this->assertSame('2026-06-01', $monthFrom);
+        $this->assertSame('2026-06-30', $monthTo);
         $this->assertTrue($wideFrom < $narrowFrom, "wideFrom={$wideFrom} narrowFrom={$narrowFrom}");
         $this->assertTrue($wideTo > $narrowTo, "wideTo={$wideTo} narrowTo={$narrowTo}");
         $this->assertSame('2026-04-02', $wideFrom); // 2026-06-01 - 60
         $this->assertSame('2026-10-28', $wideTo); // 2026-06-30 + 120
+    }
+
+    public function test_resolve_search_date_ranges_starts_with_invoice_month(): void
+    {
+        $service = app(IfirmaInvoicePaymentStatusService::class);
+
+        $order = new FormOrder;
+        $order->invoice_number = '40/6/2026';
+        $order->created_at = \Carbon\Carbon::parse('2026-08-08');
+
+        $ranges = $service->resolveSearchDateRanges($order);
+
+        $this->assertSame(['2026-06-01', '2026-06-30'], $ranges[0]);
+        $this->assertGreaterThan(1, count($ranges));
     }
 
     public function test_fetch_snapshot_resolves_id_from_list_then_loads_invoice_detail(): void
@@ -148,6 +165,8 @@ class IfirmaInvoicePaymentStatusServiceTest extends TestCase
                     'Brutto' => 365,
                     'TerminPlatnosci' => '2026-06-15',
                 ],
+                'pages_scanned' => 1,
+                'hit_page_limit' => false,
             ]);
         $api->shouldReceive('getInvoice')
             ->once()

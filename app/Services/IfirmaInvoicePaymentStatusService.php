@@ -251,39 +251,70 @@ class IfirmaInvoicePaymentStatusService
             ];
         }
 
-        // API listy wymaga dataOd (https://api.ifirma.pl/lista-faktur/) — najpierw wąski zakres, potem szerszy.
-        $searches = [
-            $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint),
-            $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint, wide: true),
-        ];
+        // API listy wymaga dataOd i nie filtruje po numerze FV — szukamy od najciaśniejszego
+        // okna (miesiąc z numeru) + filtr kwoty, potem szersze zakresy. Limit stron listy = ryzyko pudła.
+        $amount = $order->product_price !== null ? (float) $order->product_price : null;
+        $ksefNumber = trim((string) ($order->ksef_number ?? ''));
+        $lookupOptionsBase = array_filter([
+            'ksef_number' => $ksefNumber !== '' ? $ksefNumber : null,
+            'max_pages' => 80,
+        ], static fn ($v) => $v !== null);
 
+        $searches = $this->resolveSearchDateRanges($order, $invoiceNumber, $invoiceDateHint);
         $found = null;
-        $usedRange = $searches[0];
+        $usedRange = $searches[0] ?? null;
         $rangeHints = [];
+        $lastHitPageLimit = false;
 
         foreach ($searches as $range) {
             [$dataOd, $dataDo] = $range;
             $rangeHints[] = "{$dataOd} – {$dataDo}";
             $usedRange = $range;
 
-            $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo);
-            if (($found['status'] ?? null) === 'not_found') {
-                // Ponów bez filtra typu — na liście bywają inne rodzaje dokumentów sprzedaży.
-                $found = $this->api->findSalesInvoiceByPelnyNumer($invoiceNumber, $dataOd, $dataDo, null);
-            }
+            // Najpierw z filtrem kwoty (mniej dokumentów na liście), potem bez.
+            $optionPasses = $amount !== null
+                ? [array_merge($lookupOptionsBase, ['amount' => $amount]), $lookupOptionsBase]
+                : [$lookupOptionsBase];
 
-            if (($found['status'] ?? null) === 'success' && ! empty($found['invoice']) && is_array($found['invoice'])) {
-                break;
+            foreach ($optionPasses as $options) {
+                $found = $this->api->findSalesInvoiceByPelnyNumer(
+                    $invoiceNumber,
+                    $dataOd,
+                    $dataDo,
+                    'prz_faktura_kraj',
+                    $options
+                );
+                if (($found['status'] ?? null) === 'not_found') {
+                    $found = $this->api->findSalesInvoiceByPelnyNumer(
+                        $invoiceNumber,
+                        $dataOd,
+                        $dataDo,
+                        null,
+                        $options
+                    );
+                }
+
+                $lastHitPageLimit = (bool) ($found['hit_page_limit'] ?? false);
+
+                if (($found['status'] ?? null) === 'success' && ! empty($found['invoice']) && is_array($found['invoice'])) {
+                    break 2;
+                }
             }
         }
 
         if (($found['status'] ?? null) !== 'success' || empty($found['invoice']) || ! is_array($found['invoice'])) {
             $rangeHint = implode('; ', array_unique($rangeHints));
+            $baseMessage = $found['message'] ?? 'Nie znaleziono faktury w iFirma po numerze.';
+            $hint = " Przeszukane zakresy: {$rangeHint}.";
+            if ($lastHitPageLimit) {
+                $hint .= ' Uwaga: osiągnięto limit stron listy API — zawęż zakres lub uzupełnij ifirma_invoice_id na zamówieniu.';
+            } else {
+                $hint .= ' Jeśli FV widać w panelu iFirma, uzupełnij „ID iFirma” na zamówieniu (wtedy sync idzie bez listy).';
+            }
 
             return [
                 'success' => false,
-                'message' => ($found['message'] ?? 'Nie znaleziono faktury w iFirma po numerze.')
-                    ." Zakres wyszukiwania: {$rangeHint}.",
+                'message' => $baseMessage.$hint,
             ];
         }
 
@@ -493,21 +524,53 @@ class IfirmaInvoicePaymentStatusService
     }
 
     /**
+     * Kolejne okna dat od najciaśniejszego (miesiąc z numeru FV) do szerszych.
+     * Szersze okna zwiększają ryzyko limitu stron listy — dlatego idą na końcu.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public function resolveSearchDateRanges(
+        FormOrder $order,
+        ?string $invoiceNumber = null,
+        mixed $invoiceDateHint = null
+    ): array {
+        $ranges = [];
+        $seen = [];
+
+        foreach (['month', 'normal', 'wide'] as $mode) {
+            [$from, $to] = $this->resolveSearchDateRange($order, $invoiceNumber, $invoiceDateHint, $mode);
+            $key = $from.'|'.$to;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $ranges[] = [$from, $to];
+        }
+
+        return $ranges;
+    }
+
+    /**
      * Zakres dat do GET faktury.json.
-     * Preferuje miesiąc z numeru FV (np. 239/6/2026 → czerwiec), potem datę z sprawy / zamówienia.
-     * Dzięki temu sync działa także gdy order_date jest w innym miesiącu niż wystawienie FV.
      *
      * Oficjalne API: parametr dataOd jest wymagany; bez dataDo lista obejmuje tylko 30 dni od dataOd
      * (@see https://api.ifirma.pl/lista-faktur/).
      *
+     * @param  string|bool  $modeOrWide  'month'|'normal'|'wide' albo legacy bool $wide
      * @return array{0: string, 1: string}
      */
     public function resolveSearchDateRange(
         FormOrder $order,
         ?string $invoiceNumber = null,
         mixed $invoiceDateHint = null,
-        bool $wide = false
+        string|bool $modeOrWide = 'normal'
     ): array {
+        $mode = match (true) {
+            $modeOrWide === true, $modeOrWide === 'wide' => 'wide',
+            $modeOrWide === 'month' => 'month',
+            default => 'normal',
+        };
+
         $points = [];
 
         $fromNumber = $this->parseIssueMonthFromInvoiceNumber(
@@ -518,20 +581,26 @@ class IfirmaInvoicePaymentStatusService
             $points[] = $fromNumber->copy()->endOfMonth();
         }
 
-        $hint = $this->toCarbonDate($invoiceDateHint);
-        if ($hint !== null) {
-            $points[] = $hint->copy()->startOfMonth();
-            $points[] = $hint->copy()->endOfMonth();
-        }
+        // Tryb „month”: tylko miesiąc z numeru FV (bez order_date / created_at), żeby lista była krótka.
+        if ($mode !== 'month') {
+            $hint = $this->toCarbonDate($invoiceDateHint);
+            if ($hint !== null) {
+                $points[] = $hint->copy()->startOfMonth();
+                $points[] = $hint->copy()->endOfMonth();
+            }
 
-        if ($order->invoice_issue_date) {
-            $points[] = $order->invoice_issue_date->copy()->startOfDay();
-        }
-        if ($order->order_date) {
-            $points[] = $order->order_date->copy()->startOfDay();
-        }
-        if ($order->created_at) {
-            $points[] = $order->created_at->copy()->startOfDay();
+            if ($order->invoice_issue_date) {
+                $points[] = $order->invoice_issue_date->copy()->startOfDay();
+            }
+            if ($order->order_date) {
+                $points[] = $order->order_date->copy()->startOfDay();
+            }
+            if ($order->created_at) {
+                $points[] = $order->created_at->copy()->startOfDay();
+            }
+        } elseif ($points === [] && $order->invoice_issue_date) {
+            $points[] = $order->invoice_issue_date->copy()->startOfMonth();
+            $points[] = $order->invoice_issue_date->copy()->endOfMonth();
         }
 
         if ($points === []) {
@@ -551,8 +620,11 @@ class IfirmaInvoicePaymentStatusService
             }
         }
 
-        $padBefore = $wide ? 60 : 14;
-        $padAfter = $wide ? 120 : 45;
+        [$padBefore, $padAfter] = match ($mode) {
+            'month' => [0, 0],
+            'wide' => [60, 120],
+            default => [14, 45],
+        };
 
         return [
             $min->copy()->subDays($padBefore)->toDateString(),

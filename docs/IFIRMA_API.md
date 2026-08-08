@@ -17,7 +17,7 @@ Przed każdą zmianą w integracji z iFirma (wystawianie FV, lista, wpłaty, KSe
 ## Ważne ograniczenia (stan wg docs)
 
 - **Lista faktur:** parametr `dataOd` jest **wymagany**. Bez `dataDo` API zwraca dokumenty z okresu **30 dni** od `dataOd` — dlatego w kodzie zawsze ustawiamy też `dataDo`.
-- **Brak endpointu „po numerze FV”:** przy braku `ifirma_invoice_id` szukamy na liście po `PelnyNumer`, potem (preferowane) ładujemy szczegóły `GET fakturakraj/{id}`.
+- **Brak endpointu „po numerze FV”:** przy braku `ifirma_invoice_id` szukamy na liście po `PelnyNumer` (opcjonalnie filtr kwoty / KSeF), **od miesiąca z numeru FV**, potem szersze okna; potem (preferowane) ładujemy szczegóły `GET fakturakraj/{id}`. Limit stron listy chroni przed nieskończoną pętlą — przy pudle komunikat wyjaśnia, czy lista się skończyła, czy ucięliśmy skan.
 - **Limity:** 15 000 zapytań/dzień, 100/minutę (patrz strona główna API).
 
 ## Kod w tym repo

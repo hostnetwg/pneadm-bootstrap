@@ -95,10 +95,11 @@ Endpoint: `POST /accounting/collections/{debtCase}/sync-ifirma`
 Serwis: `App\Services\IfirmaInvoicePaymentStatusService`
 
 1. Jeśli `form_orders.ifirma_invoice_id` jest ustawione → `GET fakturakraj/{id}.json`.
-2. W przeciwnym razie (**dwukrok**, bo API listy wymaga `dataOd` — [lista faktur](https://api.ifirma.pl/lista-faktur/)):
-   1. `GET faktury.json` w zakresie dat (miesiąc z numeru FV + `invoice_issue_date` / `order_date` / data sprawy; przy pudle **szerszy** zakres ±60/120 dni) — dopasowanie po `PelnyNumer` (najpierw typ krajowy, potem bez filtra typu),
+2. W przeciwnym razie (**dwukrok**, bo API listy wymaga `dataOd` i **nie filtruje po numerze FV** — [lista faktur](https://api.ifirma.pl/lista-faktur/)):
+   1. `GET faktury.json` w kolejnych oknach dat od najciaśniejszego: **miesiąc z numeru FV** → normalny (±14/45 z datami zamówienia) → szeroki (±60/120); przy każdym oknie najpierw filtr `kwotaOd`/`kwotaDo` (gdy znamy kwotę), potem bez; typ krajowy, potem bez typu; dopasowanie po `PelnyNumer` lub numerze KSeF; limit stron listy podniesiony (żeby nie ucinać w środku miesiąca),
    2. po znalezieniu `FakturaId` → `GET fakturakraj/{id}.json` (pewniejsze `Zaplacono` / `WartoscBrutto`); gdy szczegóły padną — fallback do wiersza z listy,
    3. zapis `ifirma_invoice_id` na zamówieniu na kolejne syncy.
+   Komunikat błędu rozróżnia „przeszukano całą listę” vs „osiągnięto limit stron” i podpowiada uzupełnienie ID iFirma.
 3. Status wyliczany z `Zaplacono` / `Brutto`|`WartoscBrutto` / `TerminPlatnosci`: `oplacone`, `oplaconeCzesciowo`, `nieoplacone`, `przeterminowane`.
    (Lista faktur zwraca `Brutto`; szczegóły `fakturakraj/{id}` — `WartoscBrutto`.)
 4. Zapis cache na `debt_cases` + wpis historii `ifirma_sync`.
