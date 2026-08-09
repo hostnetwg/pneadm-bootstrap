@@ -52,6 +52,7 @@ class NativeSurveyProvisioner
                 'source' => 'pnedu',
                 'channel' => SurveySetting::CHANNEL_NATIVE,
                 'is_anonymous' => (bool) $link->is_anonymous,
+                'allow_multiple_responses' => (bool) $link->allow_multiple_responses,
                 'total_responses' => 0,
                 'metadata' => [
                     'provisioned_from_template' => $template->id,

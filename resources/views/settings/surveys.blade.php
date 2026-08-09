@@ -95,10 +95,11 @@
                     <input class="form-check-input" type="checkbox" name="allow_multiple_responses" id="allow_multiple_responses" value="1"
                         {{ old('allow_multiple_responses', $settings->allow_multiple_responses) ? 'checked' : '' }}>
                     <label class="form-check-label" for="allow_multiple_responses">
-                        Zezwalaj na wielokrotne wypełnienie tej samej ankiety natywnej
+                        Domyślnie zezwalaj na wielokrotne wypełnienie (przy tworzeniu nowej ankiety)
                     </label>
                     <div class="form-text">
-                        Domyślnie wyłączone: nieanonimowa = max 1× na e-mail/konto;
+                        Dotyczy tylko nowych ankiet — na karcie szkolenia można zmienić per ankieta.
+                        Gdy wyłączone przy ankiecie: nieanonimowa = max 1× na e-mail/konto;
                         anonimowa = miękki limit (cookie w przeglądarce).
                     </div>
                 </div>

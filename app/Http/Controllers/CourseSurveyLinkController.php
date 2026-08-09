@@ -32,6 +32,7 @@ class CourseSurveyLinkController extends Controller
             'defaults' => [
                 'channel' => $settings->default_channel,
                 'is_anonymous' => (bool) $settings->default_is_anonymous,
+                'allow_multiple_responses' => (bool) $settings->allow_multiple_responses,
                 'open_mode' => $settings->open_mode,
                 'default_template_id' => $settings->default_template_id,
                 'suggested_title' => $this->provisioner->defaultNativeSurveyTitle($course),
@@ -111,10 +112,11 @@ class CourseSurveyLinkController extends Controller
                 $surveyLink->update(['survey_id' => $surveyLink->survey_id]);
             }
 
-            // Aktualizacja anonimowości / tytułu na powiązanej ankiecie natywnej
+            // Aktualizacja anonimowości / limitu / tytułu na powiązanej ankiecie natywnej
             if ($surveyLink->survey_id) {
                 $surveyUpdates = [
                     'is_anonymous' => (bool) $surveyLink->is_anonymous,
+                    'allow_multiple_responses' => (bool) $surveyLink->allow_multiple_responses,
                 ];
                 if ($surveyLink->fresh()->isNative() && filled($surveyLink->title)) {
                     $surveyUpdates['title'] = $surveyLink->title;
@@ -171,6 +173,7 @@ class CourseSurveyLinkController extends Controller
             'title' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
             'is_anonymous' => 'nullable|boolean',
+            'allow_multiple_responses' => 'nullable|boolean',
             'survey_template_id' => 'nullable|exists:survey_templates,id',
             'opens_at' => 'nullable|date',
             'closes_at' => 'nullable|date|after_or_equal:opens_at',
@@ -194,6 +197,9 @@ class CourseSurveyLinkController extends Controller
             'channel' => $isNative ? CourseSurveyLink::CHANNEL_NATIVE : CourseSurveyLink::CHANNEL_EXTERNAL,
             'provider' => $isNative ? 'pnedu' : CourseSurveyLink::detectProvider($url),
             'is_anonymous' => $request->boolean('is_anonymous', true),
+            'allow_multiple_responses' => $request->has('allow_multiple_responses')
+                ? $request->boolean('allow_multiple_responses')
+                : (bool) SurveySetting::getSettings()->allow_multiple_responses,
             'survey_template_id' => $isNative ? ($request->input('survey_template_id') ?: SurveySetting::getSettings()->default_template_id) : null,
             'is_active' => $request->boolean('is_active', true),
             'opens_at' => $request->filled('opens_at')
@@ -218,6 +224,7 @@ class CourseSurveyLinkController extends Controller
             'provider' => $link->provider,
             'channel' => $link->channel ?? CourseSurveyLink::CHANNEL_EXTERNAL,
             'is_anonymous' => (bool) $link->is_anonymous,
+            'allow_multiple_responses' => (bool) $link->allow_multiple_responses,
             'provider_label' => $link->providerLabel(),
             'provider_icon' => $link->providerIconClass(),
             'is_active' => $link->is_active,

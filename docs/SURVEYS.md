@@ -58,7 +58,7 @@ Szablon:    survey_templates + survey_template_questions
 | `auto_open_offset_hours` | godziny względem `courses.end_date` (domyślnie **−2**; ujemny = przed końcem, zakres −24…720) |
 | `auto_close_after_days` | zamknięcie N dni po otwarciu (opcjonalnie) |
 | `default_is_anonymous` | domyślna anonimowość (nadpisywalna per ankieta) |
-| `allow_multiple_responses` | `false` = limit 1× (nieanon: e-mail/konto; anon: cookie); `true` = bez limitu |
+| `allow_multiple_responses` | **domyślna** wartość przy tworzeniu nowej ankiety (nie steruje już istniejącymi) |
 | `default_template_id` | szablon kopiowany przy ankiecie natywnej |
 
 Model: `SurveySetting` (singleton id=1, cache).
@@ -83,6 +83,7 @@ Na liście szkoleń (`/courses`) oraz na karcie szkolenia → modal **Ankiety**:
 
 - kanał: Natywna / Zewnętrzna (Google…),
 - anonimowa: tak/nie,
+- zezwolenie na wielokrotne wypełnienie: tak/nie (per ankieta; domyślnie z ustawień),
 - szablon (tylko native),
 - URL (tylko external),
 - okno `opens_at` / `closes_at`, aktywność, kolejność.
@@ -108,7 +109,8 @@ Link dla uczestnika: zawsze `{PNEDU_FRONTEND_URL}/ankieta/{public_token}`.
 - Anonimowa: bez e-maila.
 - Z tożsamością: wymagany e-mail **tylko gdy niezalogowany**; zalogowany na pnedu.pl — blok e-mail ukryty, adres brany z konta.
 - Opcjonalne powiązanie z `participants` po e-mailu + `course_id`.
-- **Limit wypełnień** (gdy `allow_multiple_responses=false`, domyślnie): nieanonimowa = 1× na e-mail/konto; anonimowa = cookie przeglądarki (miękkie). Przełącznik: **Ankiety → Ustawienia**.
+- **Limit wypełnień** (gdy na danej ankiecie `course_survey_links.allow_multiple_responses=false`): nieanonimowa = 1× na e-mail/konto; anonimowa = cookie przeglądarki (miękkie). Flaga per ankieta w modalu; w **Ankiety → Ustawienia** tylko domyślna wartość przy tworzeniu.
+- Po wypełnieniu natywnej ankiety blok „Ankiety po szkoleniu” na `/dashboard/szkolenia/{participant}/wideo` znika (gdy nie ma innych niewypełnionych).
 - Pytania `question_type=testimonial` są **pomijane** w formularzu głównym.
 - Wyniki od razu widoczne w adm (lista ankiet / szczegóły / PDF jak dotychczas).
 
@@ -117,14 +119,15 @@ Link dla uczestnika: zawsze `{PNEDU_FRONTEND_URL}/ankieta/{public_token}`.
 ## 7. Rekomendacje na homepage
 
 Po wysłaniu ankiety natywnej uczestnik trafia na osobny krok `/ankieta/{token}/rekomendacja`
-(może pominąć). Formularz zbiera: cytat, imię, stanowisko, miasto, ocenę 1–5, zgodę na publikację,
-oraz awatar (24 przykładowe SVG DiceBear Avataaars w `pnedu/public/images/avatars/` — kobiety/mężczyźni —
-albo upload własnego zdjęcia do `images/avatars/uploads/`). Powiązanie z `survey_response_id` przez sesję.
+(może pominąć). Formularz zbiera: ocenę 1–5 (wymagana), cytat, imię, stanowisko, miasto
+oraz opcjonalny awatar. Wysłanie = zgoda na publikację (tekst przy przycisku; `publish_consent=true`).
+Powiązanie z `survey_response_id` przez sesję.
 
 **Moderacja adm:** `Ankiety → Rekomendacje` → `/surveys/testimonials`  
-Publikacja tylko gdy `publish_consent` + ręczne „Publikuj”.
+Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).
 
-**pnedu homepage:** `HomeController` ładuje `SurveyTestimonial::published()` (maks. 6).  
+**pnedu homepage:** `HomeController` ładuje **6 losowych** opublikowanych rekomendacji;
+przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  
 Migracja seeduje dwie dotychczasowe opinie placeholder (Anna Nowak, Piotr Zieliński) jako opublikowane.
 
 ---

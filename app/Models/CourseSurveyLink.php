@@ -63,6 +63,7 @@ class CourseSurveyLink extends Model
         'provider',
         'channel',
         'is_anonymous',
+        'allow_multiple_responses',
         'is_active',
         'opens_at',
         'closes_at',
@@ -73,6 +74,7 @@ class CourseSurveyLink extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'is_anonymous' => 'boolean',
+        'allow_multiple_responses' => 'boolean',
         'opens_at' => 'datetime',
         'closes_at' => 'datetime',
         'order' => 'integer',

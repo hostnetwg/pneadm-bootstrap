@@ -22,6 +22,7 @@ class Survey extends Model
         'source',
         'channel',
         'is_anonymous',
+        'allow_multiple_responses',
         'total_responses',
         'original_file_path',
         'metadata',
@@ -31,6 +32,7 @@ class Survey extends Model
         'imported_at' => 'datetime',
         'metadata' => 'array',
         'is_anonymous' => 'boolean',
+        'allow_multiple_responses' => 'boolean',
     ];
 
     /**

@@ -3,9 +3,13 @@
 Data utworzenia/aktualizacji: 2026-08-08  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-08-09) — limit wielokrotnego wypełnienia ankiet natywnych
+## Ostatnio (2026-08-09) — homepage: 6 losowych rekomendacji + „Pokaż więcej”
 
-Domyślnie off w **Ankiety → Ustawienia**: nieanonimowa 1× na e-mail/konto; anonimowa cookie. Flaga `allow_multiple_responses`.
+Na `/` w sekcji opinii: 6 losowych opublikowanych; przy `total > 6` przycisk dociąga kolejne partie (fragment).
+
+## Ostatnio (2026-08-09) — limit wielokrotnego wypełnienia per ankieta
+
+Flaga `allow_multiple_responses` na `course_survey_links` (+ sync do `surveys`). W **Ankiety → Ustawienia** tylko **domyślna** wartość przy tworzeniu. Runtime (pnedu) czyta flagę z linku.
 
 ## Ostatnio (2026-08-09) — osobne menu Ankiety w adm
 

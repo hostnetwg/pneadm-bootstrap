@@ -1188,6 +1188,13 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="survey_link_allow_multiple{{ $course->id }}" name="allow_multiple_responses" value="1">
+                            <label class="form-check-label" for="survey_link_allow_multiple{{ $course->id }}">
+                                Zezwalaj na wielokrotne wypełnienie tej ankiety
+                            </label>
+                            <div class="form-text">Domyślna wartość z ustawień Ankiety; możesz zmienić tylko dla tej ankiety.</div>
+                        </div>
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-plus-circle me-1"></i>
@@ -1274,6 +1281,12 @@
                                     <label class="form-check-label" for="survey_link_edit_is_anonymous{{ $course->id }}">Anonimowa</label>
                                 </div>
                             </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="survey_link_edit_allow_multiple{{ $course->id }}" name="allow_multiple_responses" value="1">
+                            <label class="form-check-label" for="survey_link_edit_allow_multiple{{ $course->id }}">
+                                Zezwalaj na wielokrotne wypełnienie tej ankiety
+                            </label>
                         </div>
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
@@ -1816,6 +1829,10 @@
                         if (anon && typeof data.defaults.is_anonymous === 'boolean') {
                             anon.checked = !!data.defaults.is_anonymous;
                         }
+                        const multi = document.getElementById('survey_link_allow_multiple{{ $course->id }}');
+                        if (multi && typeof data.defaults.allow_multiple_responses === 'boolean') {
+                            multi.checked = !!data.defaults.allow_multiple_responses;
+                        }
                         const ch = data.defaults.channel === 'external' ? 'external' : 'native';
                         const radio = document.getElementById(ch === 'native' ? 'survey_link_channel_native{{ $course->id }}' : 'survey_link_channel_external{{ $course->id }}');
                         if (radio) {
@@ -1937,6 +1954,9 @@
                 if (!fd.has('is_anonymous')) {
                     fd.append('is_anonymous', '0');
                 }
+                if (!fd.has('allow_multiple_responses')) {
+                    fd.append('allow_multiple_responses', '0');
+                }
                 fetch('{{ route('courses.survey-links.store', $course->id) }}', {
                     method: 'POST',
                     body: fd,
@@ -1989,6 +2009,7 @@
             const orderEl = document.getElementById('survey_link_edit_order{{ $course->id }}');
             const activeEl = document.getElementById('survey_link_edit_is_active{{ $course->id }}');
             const anonEl = document.getElementById('survey_link_edit_is_anonymous{{ $course->id }}');
+            const multiEl = document.getElementById('survey_link_edit_allow_multiple{{ $course->id }}');
             if (!idInput || !urlEl || !titleEl || !opensEl || !closesEl || !orderEl || !activeEl) {
                 return;
             }
@@ -2001,6 +2022,7 @@
             orderEl.value = typeof link.order === 'number' ? link.order : parseInt(link.order || '0', 10);
             activeEl.checked = !!link.is_active;
             if (anonEl) anonEl.checked = !!link.is_anonymous;
+            if (multiEl) multiEl.checked = !!link.allow_multiple_responses;
             const ch = link.channel === 'native' ? 'native' : 'external';
             const chRadio = document.getElementById(ch === 'native' ? 'survey_link_edit_channel_native{{ $course->id }}' : 'survey_link_edit_channel_external{{ $course->id }}');
             if (chRadio) chRadio.checked = true;
@@ -2077,6 +2099,9 @@
                 }
                 if (!fd.has('is_anonymous')) {
                     fd.append('is_anonymous', '0');
+                }
+                if (!fd.has('allow_multiple_responses')) {
+                    fd.append('allow_multiple_responses', '0');
                 }
                 fd.set('_method', 'PUT');
                 const updateUrlBase = "{{ route('courses.survey-links.update', [$course->id, ':surveyLinkId']) }}".replace(':surveyLinkId', pk);
