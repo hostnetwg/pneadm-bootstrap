@@ -1109,14 +1109,15 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="surveyLinkModalLabel{{ $course->id }}">
                         <i class="fas fa-clipboard-list me-2"></i>
-                        Ankiety zewnętrzne — {{ $course->title }}
+                        Ankiety — {{ $course->title }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small">
-                        Wklej publiczny link do formularza, np. Google Forms (<code>docs.google.com/forms/...</code> lub <code>forms.gle/...</code>),
-                        Microsoft Forms, Typeform itp. Możesz opcjonalnie ustawić okno czasowe — ankieta będzie oznaczona jako dostępna tylko między datą otwarcia i zamknięcia.
+                        Wybierz <strong>ankietę natywną</strong> (formularz na pnedu.pl) albo <strong>zewnętrzną</strong> (Google Forms itd.).
+                        Uczestnik zawsze dostaje link bramki <code>pnedu.pl/ankieta/…</code>.
+                        Domyślne ustawienia: <a href="{{ route('settings.surveys.edit') }}" target="_blank">Ustawienia → Ankiety</a>.
                     </p>
                     <div id="surveyLinksList{{ $course->id }}">
                         <div class="text-center py-3">
@@ -1130,10 +1131,27 @@
                     <form id="surveyLinkForm{{ $course->id }}" class="needs-validation" novalidate>
                         @csrf
                         <div class="mb-3">
+                            <label class="form-label d-block">Kanał</label>
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="channel" id="survey_link_channel_native{{ $course->id }}" value="native" checked autocomplete="off"
+                                       onchange="window.toggleSurveyLinkChannelFields{{ $course->id }}('native')">
+                                <label class="btn btn-outline-primary" for="survey_link_channel_native{{ $course->id }}">Natywna (pnedu.pl)</label>
+                                <input type="radio" class="btn-check" name="channel" id="survey_link_channel_external{{ $course->id }}" value="external" autocomplete="off"
+                                       onchange="window.toggleSurveyLinkChannelFields{{ $course->id }}('external')">
+                                <label class="btn btn-outline-secondary" for="survey_link_channel_external{{ $course->id }}">Zewnętrzna (Google…)</label>
+                            </div>
+                        </div>
+                        <div class="mb-3" id="survey_link_url_wrap{{ $course->id }}" style="display:none;">
                             <label for="survey_link_url{{ $course->id }}" class="form-label">URL ankiety <span class="text-danger">*</span></label>
-                            <input type="url" class="form-control" id="survey_link_url{{ $course->id }}" name="url" required
+                            <input type="url" class="form-control" id="survey_link_url{{ $course->id }}" name="url"
                                    placeholder="https://docs.google.com/forms/d/e/.../viewform">
                             <div class="invalid-feedback">Podaj prawidłowy adres URL (https).</div>
+                        </div>
+                        <div class="mb-3" id="survey_link_template_wrap{{ $course->id }}">
+                            <label for="survey_link_template{{ $course->id }}" class="form-label">Szablon pytań</label>
+                            <select class="form-select" id="survey_link_template{{ $course->id }}" name="survey_template_id">
+                                <option value="">— domyślny —</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="survey_link_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
@@ -1144,26 +1162,28 @@
                             <div class="col-md-6 mb-3">
                                 <label for="survey_link_opens_at{{ $course->id }}" class="form-label">Otwarcie (opcjonalnie)</label>
                                 <input type="datetime-local" class="form-control" id="survey_link_opens_at{{ $course->id }}" name="opens_at">
-                                <small class="form-text text-muted">Od kiedy ankieta jest aktywna</small>
+                                <small class="form-text text-muted">Puste + tryb auto w ustawieniach = po końcu szkolenia</small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="survey_link_closes_at{{ $course->id }}" class="form-label">Zamknięcie (opcjonalnie)</label>
                                 <input type="datetime-local" class="form-control" id="survey_link_closes_at{{ $course->id }}" name="closes_at">
-                                <small class="form-text text-muted">Do kiedy ankieta jest aktywna</small>
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label for="survey_link_order{{ $course->id }}" class="form-label">Kolejność</label>
                                 <input type="number" class="form-control" id="survey_link_order{{ $course->id }}" name="order" value="1" min="0">
-                                <small class="form-text text-muted">Niższa liczba = wyżej na liście</small>
                             </div>
-                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="col-md-4 mb-3 d-flex align-items-end">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="survey_link_is_active{{ $course->id }}" name="is_active" value="1" checked>
-                                    <label class="form-check-label" for="survey_link_is_active{{ $course->id }}">
-                                        Aktywna
-                                    </label>
+                                    <label class="form-check-label" for="survey_link_is_active{{ $course->id }}">Aktywna</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="survey_link_is_anonymous{{ $course->id }}" name="is_anonymous" value="1" checked>
+                                    <label class="form-check-label" for="survey_link_is_anonymous{{ $course->id }}">Anonimowa</label>
                                 </div>
                             </div>
                         </div>
@@ -1199,9 +1219,26 @@
                         <input type="hidden" name="_method" value="PUT">
                         <input type="hidden" id="survey_link_edit_id{{ $course->id }}" value="">
                         <div class="mb-3">
+                            <label class="form-label d-block">Kanał</label>
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="channel" id="survey_link_edit_channel_native{{ $course->id }}" value="native" autocomplete="off"
+                                       onchange="window.toggleSurveyLinkEditChannelFields{{ $course->id }}('native')">
+                                <label class="btn btn-outline-primary" for="survey_link_edit_channel_native{{ $course->id }}">Natywna</label>
+                                <input type="radio" class="btn-check" name="channel" id="survey_link_edit_channel_external{{ $course->id }}" value="external" autocomplete="off"
+                                       onchange="window.toggleSurveyLinkEditChannelFields{{ $course->id }}('external')">
+                                <label class="btn btn-outline-secondary" for="survey_link_edit_channel_external{{ $course->id }}">Zewnętrzna</label>
+                            </div>
+                        </div>
+                        <div class="mb-3" id="survey_link_edit_url_wrap{{ $course->id }}">
                             <label for="survey_link_edit_url{{ $course->id }}" class="form-label">URL ankiety <span class="text-danger">*</span></label>
-                            <input type="url" class="form-control" id="survey_link_edit_url{{ $course->id }}" name="url" required placeholder="https://...">
+                            <input type="url" class="form-control" id="survey_link_edit_url{{ $course->id }}" name="url" placeholder="https://...">
                             <div class="invalid-feedback">Podaj prawidłowy adres URL (https).</div>
+                        </div>
+                        <div class="mb-3" id="survey_link_edit_template_wrap{{ $course->id }}" style="display:none;">
+                            <label for="survey_link_edit_template{{ $course->id }}" class="form-label">Szablon pytań</label>
+                            <select class="form-select" id="survey_link_edit_template{{ $course->id }}" name="survey_template_id">
+                                <option value="">— domyślny —</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="survey_link_edit_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
@@ -1218,14 +1255,20 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label for="survey_link_edit_order{{ $course->id }}" class="form-label">Kolejność</label>
                                 <input type="number" class="form-control" id="survey_link_edit_order{{ $course->id }}" name="order" min="0" value="1">
                             </div>
-                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="col-md-4 mb-3 d-flex align-items-end">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="survey_link_edit_is_active{{ $course->id }}" name="is_active" value="1" checked>
                                     <label class="form-check-label" for="survey_link_edit_is_active{{ $course->id }}">Aktywna</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="survey_link_edit_is_anonymous{{ $course->id }}" name="is_anonymous" value="1" checked>
+                                    <label class="form-check-label" for="survey_link_edit_is_anonymous{{ $course->id }}">Anonimowa</label>
                                 </div>
                             </div>
                         </div>
@@ -1706,7 +1749,49 @@
             .catch(() => alert('Wystąpił błąd podczas usuwania linku.'));
         };
 
-        // ---------- Obsługa linków do ankiet zewnętrznych ----------
+        // ---------- Obsługa linków / ankiet (native + external) ----------
+        window.toggleSurveyLinkChannelFields{{ $course->id }} = function(channel) {
+            const urlWrap = document.getElementById('survey_link_url_wrap{{ $course->id }}');
+            const urlInput = document.getElementById('survey_link_url{{ $course->id }}');
+            const tplWrap = document.getElementById('survey_link_template_wrap{{ $course->id }}');
+            const isNative = channel === 'native';
+            if (urlWrap) urlWrap.style.display = isNative ? 'none' : '';
+            if (tplWrap) tplWrap.style.display = isNative ? '' : 'none';
+            if (urlInput) {
+                urlInput.required = !isNative;
+                if (isNative) urlInput.value = '';
+            }
+        };
+
+        window.toggleSurveyLinkEditChannelFields{{ $course->id }} = function(channel) {
+            const urlWrap = document.getElementById('survey_link_edit_url_wrap{{ $course->id }}');
+            const urlInput = document.getElementById('survey_link_edit_url{{ $course->id }}');
+            const tplWrap = document.getElementById('survey_link_edit_template_wrap{{ $course->id }}');
+            const isNative = channel === 'native';
+            if (urlWrap) urlWrap.style.display = isNative ? 'none' : '';
+            if (tplWrap) tplWrap.style.display = isNative ? '' : 'none';
+            if (urlInput) {
+                urlInput.required = !isNative;
+            }
+        };
+
+        function fillSurveyTemplateSelects{{ $course->id }}(templates, defaults) {
+            ['survey_link_template{{ $course->id }}', 'survey_link_edit_template{{ $course->id }}'].forEach(function(id) {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const current = sel.value;
+                sel.innerHTML = '<option value="">— domyślny —</option>';
+                (templates || []).forEach(function(t) {
+                    const opt = document.createElement('option');
+                    opt.value = String(t.id);
+                    opt.textContent = t.name + (t.is_default ? ' (domyślny)' : '');
+                    sel.appendChild(opt);
+                });
+                if (current) sel.value = current;
+                else if (defaults && defaults.default_template_id) sel.value = String(defaults.default_template_id);
+            });
+        }
+
         function loadSurveyLinks{{ $course->id }}() {
             fetch('{{ route('courses.survey-links.index', $course->id) }}')
                 .then(response => response.json())
@@ -1718,6 +1803,23 @@
                     window.courseSurveyLinksCache{{ $course->id }} = [];
                     if (data.success && data.survey_links) {
                         window.courseSurveyLinksCache{{ $course->id }} = data.survey_links;
+                    }
+                    if (data.templates) {
+                        fillSurveyTemplateSelects{{ $course->id }}(data.templates, data.defaults || {});
+                    }
+                    if (data.defaults) {
+                        const anon = document.getElementById('survey_link_is_anonymous{{ $course->id }}');
+                        if (anon && typeof data.defaults.is_anonymous === 'boolean') {
+                            anon.checked = !!data.defaults.is_anonymous;
+                        }
+                        const ch = data.defaults.channel === 'external' ? 'external' : 'native';
+                        const radio = document.getElementById(ch === 'native' ? 'survey_link_channel_native{{ $course->id }}' : 'survey_link_channel_external{{ $course->id }}');
+                        if (radio) {
+                            radio.checked = true;
+                            window.toggleSurveyLinkChannelFields{{ $course->id }}(ch);
+                        }
+                    } else {
+                        window.toggleSurveyLinkChannelFields{{ $course->id }}('native');
                     }
 
                     if (data.success && data.survey_links && data.survey_links.length > 0) {
@@ -1743,8 +1845,15 @@
                             const providerIcon = escAttr(link.provider_icon || 'fas fa-clipboard-list text-secondary');
                             const gateHref = escAttr(link.participant_facing_url || '');
                             const gateText = escHtml(link.participant_facing_url || '');
+                            const isNative = link.channel === 'native';
 
                             let badges = `<span class="badge bg-light text-dark border ms-2">Nr ${link.order}</span>`;
+                            badges += isNative
+                                ? '<span class="badge bg-primary ms-1">Natywna</span>'
+                                : '<span class="badge bg-info text-dark ms-1">Zewnętrzna</span>';
+                            badges += link.is_anonymous
+                                ? '<span class="badge bg-light text-dark border ms-1">Anonimowa</span>'
+                                : '<span class="badge bg-light text-dark border ms-1">Z tożsamością</span>';
                             badges += link.is_active
                                 ? '<span class="badge bg-success ms-1">Aktywna</span>'
                                 : '<span class="badge bg-secondary ms-1">Wyłączona</span>';
@@ -1761,6 +1870,10 @@
                                 timing += '</small>';
                             }
 
+                            const urlLine = (!isNative && urlHref)
+                                ? `<small class="text-break"><a href="${urlHref}" target="_blank" rel="noopener noreferrer" class="text-muted">${urlText}</a></small>`
+                                : (isNative ? '<small class="text-muted">Formularz na pnedu.pl</small>' : '');
+
                             html += `
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1 me-2">
@@ -1769,7 +1882,7 @@
                                             <strong>${title || 'Bez tytułu'}</strong>
                                             <small class="text-muted ms-1">(${providerLabel})</small>
                                         </div>
-                                        <small class="text-break"><a href="${urlHref}" target="_blank" rel="noopener noreferrer" class="text-muted">${urlText}</a></small>
+                                        ${urlLine}
                                         ${gateHref ? `<br><small class="text-primary text-break"><i class="fas fa-user-check me-1"></i>Uczestnik (pnedu): <a href="${gateHref}" target="_blank" rel="noopener noreferrer">${gateText}</a></small>` : ''}
                                         ${timing}
                                         <div class="mt-1">${badges}</div>
@@ -1812,6 +1925,9 @@
                 const fd = new FormData(surveyLinkForm{{ $course->id }});
                 if (!fd.has('is_active')) {
                     fd.append('is_active', '0');
+                }
+                if (!fd.has('is_anonymous')) {
+                    fd.append('is_anonymous', '0');
                 }
                 fetch('{{ route('courses.survey-links.store', $course->id) }}', {
                     method: 'POST',
@@ -1864,6 +1980,7 @@
             const closesEl = document.getElementById('survey_link_edit_closes_at{{ $course->id }}');
             const orderEl = document.getElementById('survey_link_edit_order{{ $course->id }}');
             const activeEl = document.getElementById('survey_link_edit_is_active{{ $course->id }}');
+            const anonEl = document.getElementById('survey_link_edit_is_anonymous{{ $course->id }}');
             if (!idInput || !urlEl || !titleEl || !opensEl || !closesEl || !orderEl || !activeEl) {
                 return;
             }
@@ -1874,6 +1991,13 @@
             closesEl.value = link.closes_at || '';
             orderEl.value = typeof link.order === 'number' ? link.order : parseInt(link.order || '0', 10);
             activeEl.checked = !!link.is_active;
+            if (anonEl) anonEl.checked = !!link.is_anonymous;
+            const ch = link.channel === 'native' ? 'native' : 'external';
+            const chRadio = document.getElementById(ch === 'native' ? 'survey_link_edit_channel_native{{ $course->id }}' : 'survey_link_edit_channel_external{{ $course->id }}');
+            if (chRadio) chRadio.checked = true;
+            window.toggleSurveyLinkEditChannelFields{{ $course->id }}(ch);
+            const tplSel = document.getElementById('survey_link_edit_template{{ $course->id }}');
+            if (tplSel && link.survey_template_id) tplSel.value = String(link.survey_template_id);
 
             const form = document.getElementById('surveyLinkEditForm{{ $course->id }}');
             if (form) {
@@ -1941,6 +2065,9 @@
                 const fd = new FormData(surveyLinkEditForm{{ $course->id }});
                 if (!fd.has('is_active')) {
                     fd.append('is_active', '0');
+                }
+                if (!fd.has('is_anonymous')) {
+                    fd.append('is_anonymous', '0');
                 }
                 fd.set('_method', 'PUT');
                 const updateUrlBase = "{{ route('courses.survey-links.update', [$course->id, ':surveyLinkId']) }}".replace(':surveyLinkId', pk);

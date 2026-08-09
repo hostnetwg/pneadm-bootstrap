@@ -1,7 +1,42 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-04  
+Data utworzenia/aktualizacji: 2026-08-08  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-08) — modal ankiet na liście `/courses`
+
+Modal z listy szkoleń ma ten sam UX co karta szkolenia: kanał **Natywna / Zewnętrzna**, szablon, anonimowość.
+
+## Ostatnio (2026-08-08) — rekomendacja po ankiecie (osobny krok)
+
+Decyzja Waldemara: prośba o rekomendację **po** wysłaniu ankiety (nie w formularzu).
+
+**Wdrożone lokalnie (pnedu):**
+
+- po `POST /ankieta/{token}` → `/ankieta/{token}/rekomendacja` (sesja 2h),
+- formularz rekomendacji + „Pomiń” → `/dziekujemy`,
+- główny formularz bez bloku rekomendacji/awatarów,
+- kanon: `docs/SURVEYS.md`.
+
+## Ostatnio (2026-08-08) — MVP ankiet natywnych (wdrożone lokalnie)
+
+Decyzje Waldemara: anonimowość per ankieta; edycja pytań w szablonie; auto/ręcznie w ustawieniach; Google nadal do wyboru; rekomendacje na homepage.
+
+**Wdrożone lokalnie (pneadm + pnedu):**
+
+- migracja `2026_08_08_160000_create_native_survey_foundation` (szablony, settings, testimonials, rozszerzenia linków/surveys),
+- `Ustawienia → Ankiety`, `Szkolenia → Szablony ankiet`, `Szkolenia → Rekomendacje`,
+- modal na karcie szkolenia: kanał native/external + anonimowość,
+- formularz `pnedu.pl/ankieta/{token}` (zapis od razu do `survey_responses`),
+- homepage opinie z `survey_testimonials` (moderacja w adm),
+- awatary DiceBear Avataaars (self-hosted) + upload,
+- Google Forms + import CSV bez zmian (równolegle).
+
+Kanon: `docs/SURVEYS.md`. **Deploy prod:** migracja pneadm + kod obu aplikacji.
+
+## Ostatnio (2026-08-08 wcześniej) — dokumentacja ankiet
+
+- Uzupełniono kanon `docs/SURVEYS.md`, `SYSTEM_OVERVIEW`, `PROJECT_CONTEXT`.
 
 ## Ostatnio (2026-08-04) — lejek na `/courses`
 
@@ -13,6 +48,17 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 ## Cel Dokumentu
 
 Dokument określa najbliższe kroki po utworzeniu dokumentacji. Ma chronić projekt przed chaotycznym wdrożeniem analityki i przypominać, że obecny etap dotyczy dokumentacji, nie kodu.
+
+## Ankiety natywne — MVP lokalnie / backlog (2026-08-08)
+
+Stan: **`docs/SURVEYS.md`**. MVP działa lokalnie; Google pozostaje opcją.
+
+**Backlog po MVP:**
+
+1. Deploy prod (migracja pneadm + kod pnedu/pneadm).
+2. Job/cron: auto-tworzenie ankiety po końcu szkolenia (nie tylko auto-daty przy ręcznym dodaniu).
+3. Edycja pytań już utworzonej instancji Survey (nie tylko szablonu).
+4. Testy automatyczne + deduplikacja odpowiedzi.
 
 ## Pakiet Rozliczenia — ZAMKNIĘTY NA R3 (2026-06-26)
 

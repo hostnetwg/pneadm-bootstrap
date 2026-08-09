@@ -14,19 +14,23 @@ class Survey extends Model
     protected $fillable = [
         'course_id',
         'instructor_id',
+        'survey_template_id',
         'title',
         'description',
         'imported_at',
         'imported_by',
         'source',
+        'channel',
+        'is_anonymous',
         'total_responses',
         'original_file_path',
-        'metadata'
+        'metadata',
     ];
 
     protected $casts = [
         'imported_at' => 'datetime',
-        'metadata' => 'array'
+        'metadata' => 'array',
+        'is_anonymous' => 'boolean',
     ];
 
     /**
@@ -43,6 +47,16 @@ class Survey extends Model
     public function instructor(): BelongsTo
     {
         return $this->belongsTo(Instructor::class);
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(SurveyTemplate::class, 'survey_template_id');
+    }
+
+    public function testimonials(): HasMany
+    {
+        return $this->hasMany(SurveyTestimonial::class);
     }
 
     /**
@@ -75,7 +89,7 @@ class Survey extends Model
     public function getAverageRating(): float
     {
         $ratingQuestions = $this->questions()->where('question_type', 'rating')->get();
-        
+
         if ($ratingQuestions->isEmpty()) {
             return 0;
         }
@@ -108,7 +122,7 @@ class Survey extends Model
     public function getResponseStats(): array
     {
         $stats = [];
-        
+
         foreach ($this->questions as $question) {
             $responses = $this->responses()
                 ->get()
@@ -121,7 +135,7 @@ class Survey extends Model
             $stats[$question->question_text] = [
                 'type' => $question->question_type,
                 'total_responses' => $responses->count(),
-                'responses' => $responses->values()->toArray()
+                'responses' => $responses->values()->toArray(),
             ];
         }
 
@@ -152,16 +166,16 @@ class Survey extends Model
                     'question_type' => $question->question_type,
                     'questions' => $gridGroup,
                     'is_rating_grid' => $question->isRating(),
-                    'is_choice_grid' => $question->isMultipleChoice() || $question->isSingleChoice()
+                    'is_choice_grid' => $question->isMultipleChoice() || $question->isSingleChoice(),
                 ]);
-                
+
                 // Oznacz wszystkie pytania z grupy jako przetworzone
                 $processed = $processed->merge($gridGroup->pluck('id'));
             } else {
                 // Pojedyncze pytanie
                 $grouped->push([
                     'type' => 'single',
-                    'question' => $question
+                    'question' => $question,
                 ]);
                 $processed->push($question->id);
             }
@@ -184,16 +198,16 @@ class Survey extends Model
     public function getNPS(): array
     {
         $npsResponses = [];
-        
+
         // Wzorce pytania NPS
         $npsQuestionPatterns = [
             '/czy.*poleci.*szkolenie.*innym/i',
             '/poleci.*szkolenie.*innym/i',
             '/poleci.*innym.*osobom/i',
             '/czy.*poleci.*innym/i',
-            '/poleci.*innym/i'
+            '/poleci.*innym/i',
         ];
-        
+
         foreach ($this->responses as $response) {
             foreach ($response->response_data as $questionText => $answer) {
                 // Sprawdź czy to pytanie NPS
@@ -204,28 +218,28 @@ class Survey extends Model
                         break;
                     }
                 }
-                
+
                 if ($isNpsQuestion && is_numeric($answer) && $answer >= 1 && $answer <= 5) {
                     $npsResponses[] = (int) $answer;
                 }
             }
         }
-        
+
         if (empty($npsResponses)) {
             return [
                 'nps' => 0,
                 'promoters' => 0,
                 'detractors' => 0,
                 'passives' => 0,
-                'total_responses' => 0
+                'total_responses' => 0,
             ];
         }
-        
+
         $totalResponses = count($npsResponses);
         $promoters = 0; // 4-5
         $detractors = 0; // 1-2
         $passives = 0; // 3
-        
+
         foreach ($npsResponses as $rating) {
             if ($rating >= 4) {
                 $promoters++;
@@ -235,17 +249,17 @@ class Survey extends Model
                 $passives++;
             }
         }
-        
+
         $promotersPercent = ($promoters / $totalResponses) * 100;
         $detractorsPercent = ($detractors / $totalResponses) * 100;
         $nps = round($promotersPercent - $detractorsPercent, 1);
-        
+
         return [
             'nps' => $nps,
             'promoters' => $promoters,
             'detractors' => $detractors,
             'passives' => $passives,
-            'total_responses' => $totalResponses
+            'total_responses' => $totalResponses,
         ];
     }
 }

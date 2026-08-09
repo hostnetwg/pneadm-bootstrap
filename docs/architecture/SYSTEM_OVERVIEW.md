@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-07-31  
+Data utworzenia/aktualizacji: 2026-08-08  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -55,6 +55,7 @@ Kluczowe obszary:
 - panel użytkownika,
 - dostęp do nagrań i materiałów,
 - certyfikaty,
+- bramka ankiet `/ankieta/{token}` (native form + opcjonalna `/rekomendacja`, albo redirect external),
 - newsletter,
 - SEO.
 
@@ -148,7 +149,7 @@ To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie
 | statystyki obecne | `marketing_campaign_stats_daily`, `course_page_stats_daily` | oba |
 | uczestnicy | `participants`, `participant_emails`, `participant_live_access` | `adm.pnedu.pl`, panel w `pnedu.pl` |
 | certyfikaty | `certificates`, `certificate_templates`, `certificate_email_logs` | oba |
-| ankiety | `surveys`, `survey_questions`, `survey_responses` | `adm.pnedu.pl` |
+| ankiety | `surveys`, `survey_questions`, `survey_responses`, `course_survey_links`, `survey_templates`, `survey_template_questions`, `survey_settings`, `survey_testimonials` | wyniki/import/szablony/moderacja: `adm.pnedu.pl`; wypełnianie native + bramka: `pnedu.pl` (`/ankieta/{token}`); szczegóły: `docs/SURVEYS.md` |
 | LMS | `online_courses`, `online_course_modules`, `online_course_lessons` | oba |
 
 ## Obecne Integracje
@@ -161,6 +162,7 @@ To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie
 - Sendy,
 - ClickMeeting,
 - Google Calendar,
+- Formularze Google (obecnie: wypełnianie ankiet + ręczny import CSV do adm; docelowo do wycofania — zob. `docs/SURVEYS.md`),
 - AWS SES,
 - legacy `certgen`.
 

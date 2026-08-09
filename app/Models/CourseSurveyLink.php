@@ -50,11 +50,19 @@ class CourseSurveyLink extends Model
         return $raw;
     }
 
+    public const CHANNEL_EXTERNAL = 'external';
+
+    public const CHANNEL_NATIVE = 'native';
+
     protected $fillable = [
         'course_id',
+        'survey_id',
+        'survey_template_id',
         'url',
         'title',
         'provider',
+        'channel',
+        'is_anonymous',
         'is_active',
         'opens_at',
         'closes_at',
@@ -64,6 +72,7 @@ class CourseSurveyLink extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_anonymous' => 'boolean',
         'opens_at' => 'datetime',
         'closes_at' => 'datetime',
         'order' => 'integer',
@@ -72,6 +81,26 @@ class CourseSurveyLink extends Model
     public function course()
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function survey()
+    {
+        return $this->belongsTo(Survey::class);
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(SurveyTemplate::class, 'survey_template_id');
+    }
+
+    public function isNative(): bool
+    {
+        return ($this->channel ?? self::CHANNEL_EXTERNAL) === self::CHANNEL_NATIVE;
+    }
+
+    public function isExternal(): bool
+    {
+        return ! $this->isNative();
     }
 
     /**
@@ -161,11 +190,16 @@ class CourseSurveyLink extends Model
      */
     public function providerLabel(): string
     {
+        if ($this->isNative()) {
+            return 'Ankieta pnedu.pl';
+        }
+
         return match ($this->provider) {
             'google_forms' => 'Google Forms',
             'microsoft_forms' => 'Microsoft Forms',
             'typeform' => 'Typeform',
             'survey_monkey' => 'SurveyMonkey',
+            'pnedu' => 'Ankieta pnedu.pl',
             default => 'Inny',
         };
     }
@@ -175,11 +209,16 @@ class CourseSurveyLink extends Model
      */
     public function providerIconClass(): string
     {
+        if ($this->isNative()) {
+            return 'fas fa-laptop-house text-primary';
+        }
+
         return match ($this->provider) {
             'google_forms' => 'fab fa-google text-danger',
             'microsoft_forms' => 'fab fa-microsoft text-primary',
             'typeform' => 'fas fa-poll text-dark',
             'survey_monkey' => 'fas fa-poll-h text-success',
+            'pnedu' => 'fas fa-laptop-house text-primary',
             default => 'fas fa-clipboard-list text-secondary',
         };
     }

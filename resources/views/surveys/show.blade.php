@@ -714,13 +714,14 @@
                                                         <td style="max-width: 200px; word-wrap: break-word;">
                                                             @php
                                                                 $answer = $response->getAnswerForQuestion($question->question_text);
+                                                                $answerDisplay = $response->formatAnswerForDisplay($question->question_text, $question->isText() ? 100 : 50);
                                                             @endphp
-                                                            @if($question->isRating())
+                                                            @if($question->question_type === 'testimonial')
+                                                                <small class="text-muted">—</small>
+                                                            @elseif($question->isRating() && is_numeric($answer))
                                                                 <span class="badge bg-primary">{{ $answer }}</span>
-                                                            @elseif($question->isText())
-                                                                <small>{{ Str::limit($answer, 100) }}</small>
                                                             @else
-                                                                <small>{{ Str::limit($answer, 50) }}</small>
+                                                                <small>{{ $answerDisplay }}</small>
                                                             @endif
                                                         </td>
                                                     @endforeach
@@ -1118,18 +1119,20 @@
                 const answer = response.response_data[question.text];
                 
                 if (answer !== null && answer !== undefined && answer !== '') {
-                    if (question.type === 'rating') {
-                        answerElement.innerHTML = `<span class="badge bg-warning fs-6">${answer}/5</span>`;
+                    const esc = (s) => String(s)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                    if (question.type === 'testimonial') {
+                        answerElement.innerHTML = '<span class="badge bg-secondary">Osobny krok</span>';
+                    } else if (question.type === 'rating') {
+                        answerElement.innerHTML = `<span class="badge bg-warning fs-6">${esc(answer)}/5</span>`;
+                    } else if (Array.isArray(answer)) {
+                        answerElement.innerHTML = answer.map(a => `<span class="badge bg-primary me-1">${esc(a)}</span>`).join('');
                     } else if (question.type === 'text') {
-                        answerElement.innerHTML = `<div class="alert alert-light mb-0"><small>${answer}</small></div>`;
+                        answerElement.innerHTML = `<div class="alert alert-light mb-0"><small>${esc(answer)}</small></div>`;
                     } else if (question.type === 'single_choice') {
-                        answerElement.innerHTML = `<span class="badge bg-success">${answer}</span>`;
-                    } else if (question.type === 'multiple_choice') {
-                        if (Array.isArray(answer)) {
-                            answerElement.innerHTML = answer.map(a => `<span class="badge bg-primary me-1">${a}</span>`).join('');
-                        } else {
-                            answerElement.innerHTML = `<span class="badge bg-primary">${answer}</span>`;
-                        }
+                        answerElement.innerHTML = `<span class="badge bg-success">${esc(answer)}</span>`;
+                    } else {
+                        answerElement.innerHTML = `<span class="badge bg-primary">${esc(answer)}</span>`;
                     }
                 }
             });

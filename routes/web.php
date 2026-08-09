@@ -42,8 +42,11 @@ use App\Http\Controllers\RSPOController;
 use App\Http\Controllers\RSPOImportController;
 use App\Http\Controllers\SendyController;
 use App\Http\Controllers\Settings\PneduPurchasesController;
+use App\Http\Controllers\Settings\SurveySettingsController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveyImportController;
+use App\Http\Controllers\SurveyTemplateController;
+use App\Http\Controllers\SurveyTestimonialController;
 use App\Http\Controllers\TrainingOfferController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UserPreferencesController;
@@ -505,6 +508,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     // Ankiety
     Route::get('/surveys/bulk-report', [SurveyController::class, 'generateBulkReport'])->name('surveys.bulk-report');
+    Route::get('/surveys/templates', [SurveyTemplateController::class, 'index'])->name('surveys.templates.index');
+    Route::get('/surveys/templates/{template}/edit', [SurveyTemplateController::class, 'edit'])->name('surveys.templates.edit');
+    Route::put('/surveys/templates/{template}', [SurveyTemplateController::class, 'update'])->name('surveys.templates.update');
+    Route::post('/surveys/templates/{template}/questions', [SurveyTemplateController::class, 'storeQuestion'])->name('surveys.templates.questions.store');
+    Route::put('/surveys/templates/{template}/questions/{question}', [SurveyTemplateController::class, 'updateQuestion'])->name('surveys.templates.questions.update');
+    Route::delete('/surveys/templates/{template}/questions/{question}', [SurveyTemplateController::class, 'destroyQuestion'])->name('surveys.templates.questions.destroy');
+    Route::get('/surveys/testimonials', [SurveyTestimonialController::class, 'index'])->name('surveys.testimonials.index');
+    Route::post('/surveys/testimonials/{testimonial}/publish', [SurveyTestimonialController::class, 'publish'])->name('surveys.testimonials.publish');
+    Route::post('/surveys/testimonials/{testimonial}/unpublish', [SurveyTestimonialController::class, 'unpublish'])->name('surveys.testimonials.unpublish');
+    Route::delete('/surveys/testimonials/{testimonial}', [SurveyTestimonialController::class, 'destroy'])->name('surveys.testimonials.destroy');
     Route::resource('surveys', SurveyController::class);
     Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');
     Route::get('/surveys/{survey}/report/form', [SurveyController::class, 'showReportForm'])->name('surveys.report.form');
@@ -614,6 +627,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             ->whereIn('scope', ['funnel', 'analytics'])
             ->whereIn('action', ['enable', 'disable'])
             ->name('pnedu-purchases.funnel-skip');
+        Route::get('ankiety', [SurveySettingsController::class, 'edit'])->name('surveys.edit');
+        Route::post('ankiety', [SurveySettingsController::class, 'update'])->name('surveys.update');
     });
 });
 

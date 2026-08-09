@@ -70,6 +70,8 @@
                     <li><a href="{{ route('online-courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('online-courses.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Kursy online (nagrane)</a></li>
                     <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>
                     <li><a href="{{ route('surveys.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Ankiety</a></li>
+                    <li><a href="{{ route('surveys.templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.templates.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Szablony ankiet</a></li>
+                    <li><a href="{{ route('surveys.testimonials.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.testimonials.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Rekomendacje</a></li>
                 </ul>
             </div>
         </li>
@@ -401,6 +403,11 @@
                     <li>
                         <a href="{{ route('settings.analytics.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.analytics.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             GA i lejek (cookie)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('settings.surveys.edit') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.surveys.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Ankiety
                         </a>
                     </li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>

@@ -1,6 +1,6 @@
 # Kontekst Projektu PNEdu
 
-Data utworzenia/aktualizacji: 2026-06-24  
+Data utworzenia/aktualizacji: 2026-08-08  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -123,8 +123,11 @@ Zawiera m.in.:
 - `marketing_campaign_stats_daily`,
 - `course_page_stats_daily`,
 - `certificates`,
-- `surveys`,
+- `surveys`, `survey_questions`, `survey_responses`,
+- `course_survey_links` (linki do zewnętrznych formularzy + token bramki pnedu),
 - `activity_logs`.
+
+Ankiety (stan 2026-08): wypełnianie w Formularzach Google, import CSV i raporty PDF w adm, dystrybucja linku przez `pnedu.pl/ankieta/{token}`. Kanon: `docs/SURVEYS.md`.
 
 ### `pnedu`
 
