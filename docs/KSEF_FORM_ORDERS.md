@@ -284,10 +284,13 @@ faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON)
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
 **Synchronizacja KSeF po ręcznej wysyłce (2026-08):** ikona odświeżenia przy polu
-Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`. Pobiera `NumerKSeF`
-z iFirma po **`ifirma_invoice_id`** (nie po `invoice_number`) oraz **nadpisuje daty FV**
+Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`. Preferuje
+**`ifirma_invoice_id`**; gdy ID brak, a jest **`invoice_number`** (np. FV wystawiona
+ręcznie w panelu iFirma) — wyszukuje dokument na liście iFirma (jak sync windykacji),
+zapisuje ID, potem pobiera szczegóły. Aktualizuje **ID iFirma**, **daty FV**
 (`DataWystawienia` → `invoice_issue_date`, `TerminPlatnosci` → `invoice_due_date`;
-także na powiązanych sprawach windykacyjnych). Serwis:
+także na powiązanych sprawach windykacyjnych) oraz **NumerKSeF**. Ręcznie wpisanego
+`invoice_number` **nie nadpisuje** (uzupełnia tylko gdy puste). Serwis:
 `App\Services\IfirmaFormOrderKsefSyncService`. Gdy dokument w iFirma **nie ma**
 `NumerKSeF`, synchronizacja **czyści** zapisany numer KSeF (oraz status/datę KSeF) w zamówieniu;
 daty FV i tak są odświeżane, jeśli są w payloadzie. Po korekcie anulującej i nowym

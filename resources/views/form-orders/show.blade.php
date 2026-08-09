@@ -2236,10 +2236,14 @@ nowoczesna-edukacja.pl `;
                         const datesLine = (data.invoice_issue_date || data.invoice_due_date)
                             ? `<br><span class="text-muted">Data FV:</span> ${formatInvoiceDateDisplay(data.invoice_issue_date)} · <span class="text-muted">Termin:</span> ${formatInvoiceDateDisplay(data.invoice_due_date)}`
                             : '';
+                        const idLine = data.ifirma_invoice_id
+                            ? `<br><span class="text-muted">ID iFirma:</span> <code>${data.ifirma_invoice_id}</code>`
+                            : '';
                         resultDiv.innerHTML = `
                             <div class="alert ${alertClass} alert-dismissible fade show py-2 small mb-0" role="alert">
                                 <i class="bi ${iconClass}"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
                                 ${data.ksef_number ? `<br><span class="text-muted">Numer KSeF:</span> <code>${data.ksef_number}</code>` : ''}
+                                ${idLine}
                                 ${datesLine}
                                 <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
                             </div>`;

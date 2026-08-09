@@ -1804,8 +1804,8 @@ class FormOrdersController extends Controller
     }
 
     /**
-     * Pobiera z iFirma NumerKSeF (i potwierdza ifirma_invoice_id) po zapisanym ID dokumentu.
-     * Użyteczne po ręcznej wysyłce do KSeF z panelu iFirma (fioletowy przycisk bez auto-KSeF).
+     * Pobiera z iFirma NumerKSeF / daty FV / ifirma_invoice_id.
+     * Preferuje zapisane ID; gdy brak — wyszukuje po invoice_number.
      */
     public function syncIfirmaKsefMetadata($id)
     {

@@ -8,14 +8,14 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Pobiera z iFirma aktualny NumerKSeF (i potwierdza ifirma_invoice_id) dla zamówienia
- * po wewnętrznym Identyfikatorze dokumentu — np. po ręcznej wysyłce do KSeF z panelu iFirma.
- * Przy tej samej odpowiedzi nadpisuje też daty FV (wystawienie / termin płatności).
+ * Pobiera z iFirma aktualny NumerKSeF oraz daty FV dla zamówienia.
+ * Preferuje ifirma_invoice_id; gdy brak — wyszukuje dokument po invoice_number (lista iFirma).
  */
 class IfirmaFormOrderKsefSyncService
 {
     public function __construct(
-        private IfirmaApiService $api
+        private IfirmaApiService $api,
+        private IfirmaInvoicePaymentStatusService $paymentStatus,
     ) {}
 
     /**
@@ -33,13 +33,19 @@ class IfirmaFormOrderKsefSyncService
      */
     public function syncFromIfirmaInvoiceId(FormOrder $order): array
     {
-        $invoiceId = trim((string) ($order->ifirma_invoice_id ?? ''));
+        $idBeforeSync = trim((string) ($order->ifirma_invoice_id ?? ''));
+        $invoiceId = $idBeforeSync;
+
         if ($invoiceId === '') {
-            return [
-                'success' => false,
-                'message' => 'Brak ID iFirma w zamówieniu. Wystaw fakturę przyciskiem iFirma (fioletowy lub czerwony), '
-                    .'aby zapisać identyfikator dokumentu — synchronizacja KSeF działa po tym ID, nie po numerze FV.',
-            ];
+            $resolved = $this->resolveInvoiceIdFromNumber($order);
+            if (! ($resolved['success'] ?? false)) {
+                return [
+                    'success' => false,
+                    'message' => $resolved['message'] ?? 'Nie udało się ustalić ID faktury w iFirma.',
+                ];
+            }
+            $invoiceId = (string) $resolved['invoice_id'];
+            $order->ifirma_invoice_id = $invoiceId;
         }
 
         $result = $this->api->getInvoice($invoiceId);
@@ -71,12 +77,12 @@ class IfirmaFormOrderKsefSyncService
         $dueDate = $this->parseDateString($payload['TerminPlatnosci'] ?? null);
 
         $previousKsef = trim((string) ($order->ksef_number ?? ''));
-        $previousId = trim((string) ($order->ifirma_invoice_id ?? ''));
         $previousIssue = $order->invoice_issue_date?->toDateString();
         $previousDue = $order->invoice_due_date?->toDateString();
+        $previousInvoiceNumber = trim((string) ($order->invoice_number ?? ''));
         $changed = false;
 
-        if ($resolvedId !== '' && $previousId !== $resolvedId) {
+        if ($resolvedId !== '' && $idBeforeSync !== $resolvedId) {
             $order->ifirma_invoice_id = $resolvedId;
             $changed = true;
         }
@@ -87,6 +93,11 @@ class IfirmaFormOrderKsefSyncService
         }
         if ($dueDate !== null && $previousDue !== $dueDate) {
             $order->invoice_due_date = $dueDate;
+            $changed = true;
+        }
+
+        if ($previousInvoiceNumber === '' && $pelnyNumer !== null) {
+            $order->invoice_number = $pelnyNumer;
             $changed = true;
         }
 
@@ -141,9 +152,13 @@ class IfirmaFormOrderKsefSyncService
             'invoice_due_date' => $order->invoice_due_date?->toDateString(),
         ];
 
+        $invoiceNumberForResponse = $previousInvoiceNumber !== ''
+            ? $previousInvoiceNumber
+            : ($order->invoice_number ?: $pelnyNumer);
+
         if ($ksefNumber === null || $ksefNumber === '') {
             $message = $changed
-                ? 'W iFirma brak numeru KSeF dla tego dokumentu — wyczyszczono zapisany numer KSeF w zamówieniu.'
+                ? 'W iFirma brak numeru KSeF dla tego dokumentu — zaktualizowano ID/daty FV; wyczyszczono zapisany numer KSeF w zamówieniu (jeśli był).'
                 : 'W iFirma brak numeru KSeF dla tego dokumentu. Zamówienie nie miało zapisanego numeru KSeF.';
 
             return array_merge([
@@ -151,7 +166,7 @@ class IfirmaFormOrderKsefSyncService
                 'message' => $message,
                 'ksef_number' => null,
                 'ifirma_invoice_id' => $order->ifirma_invoice_id,
-                'invoice_number' => $pelnyNumer,
+                'invoice_number' => $invoiceNumberForResponse,
                 'ksef_status' => null,
                 'changed' => $changed,
                 'ksef_cleared' => $changed && $previousKsef !== '',
@@ -159,7 +174,7 @@ class IfirmaFormOrderKsefSyncService
         }
 
         $message = $changed
-            ? 'Zaktualizowano dane KSeF i daty FV z iFirma.'
+            ? 'Zaktualizowano dane KSeF, ID iFirma i daty FV z iFirma.'
             : 'Dane KSeF i daty FV w zamówieniu są już zgodne z iFirma.';
 
         return array_merge([
@@ -167,10 +182,57 @@ class IfirmaFormOrderKsefSyncService
             'message' => $message,
             'ksef_number' => $order->ksef_number,
             'ifirma_invoice_id' => $order->ifirma_invoice_id,
-            'invoice_number' => $pelnyNumer,
+            'invoice_number' => $invoiceNumberForResponse,
             'ksef_status' => $order->ksef_status,
             'changed' => $changed,
         ], $datesPayload);
+    }
+
+    /**
+     * @return array{success: bool, message?: string, invoice_id?: string}
+     */
+    private function resolveInvoiceIdFromNumber(FormOrder $order): array
+    {
+        $invoiceNumber = trim((string) ($order->invoice_number ?? ''));
+        if ($invoiceNumber === '' || $invoiceNumber === '0') {
+            return [
+                'success' => false,
+                'message' => 'Brak ID iFirma i numeru FV w zamówieniu. Wpisz numer faktury albo wystaw FV przyciskiem iFirma, potem odśwież KSeF.',
+            ];
+        }
+
+        $snapshot = $this->paymentStatus->fetchPaymentSnapshotForOrder(
+            $order,
+            $invoiceNumber,
+            $order->invoice_issue_date
+        );
+
+        if (! ($snapshot['success'] ?? false)) {
+            return [
+                'success' => false,
+                'message' => $snapshot['message'] ?? 'Nie znaleziono faktury w iFirma po numerze FV.',
+            ];
+        }
+
+        $id = trim((string) ($snapshot['invoice_id'] ?? ''));
+        if ($id === '') {
+            return [
+                'success' => false,
+                'message' => 'Znaleziono fakturę po numerze, ale iFirma nie zwróciło ID dokumentu. Uzupełnij „ID iFirma” ręcznie.',
+            ];
+        }
+
+        Log::info('iFirma KSeF sync: resolved ifirma_invoice_id from invoice_number', [
+            'form_order_id' => $order->id,
+            'invoice_number' => $invoiceNumber,
+            'ifirma_invoice_id' => $id,
+            'source' => $snapshot['source'] ?? null,
+        ]);
+
+        return [
+            'success' => true,
+            'invoice_id' => $id,
+        ];
     }
 
     /**

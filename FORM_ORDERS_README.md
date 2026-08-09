@@ -177,8 +177,9 @@ Implementacja: `FormOrdersController::createIfirmaInvoiceWithReceiver()` +
 
 Gdy faktura została wystawiona **fioletowym** przyciskiem (bez auto-KSeF), a do KSeF wysłano ją ręcznie w panelu iFirma,
 na szczegółach zamówienia przy polu **Numer KSeF** jest ikona odświeżenia. Wywołuje
-`POST /form-orders/{id}/ifirma/sync-ksef` — pobiera `NumerKSeF` z iFirma po zapisanym **`ifirma_invoice_id`**
-(nie po numerze FV). Serwis: `IfirmaFormOrderKsefSyncService`.
+`POST /form-orders/{id}/ifirma/sync-ksef` — pobiera `NumerKSeF`, daty FV i ID dokumentu z iFirma:
+preferuje zapisane **`ifirma_invoice_id`**; gdy brak ID, wyszukuje po **`invoice_number`**.
+Serwis: `IfirmaFormOrderKsefSyncService`.
 
 ## iFirma - integracja z KSeF (Krajowy System e-Faktur)
 
