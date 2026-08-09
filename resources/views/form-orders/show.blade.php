@@ -47,27 +47,6 @@
                 </ol>
             </nav>
 
-            @if(!empty($pneduOrderFormEditUrl))
-                <div class="alert alert-light border mb-4">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <div>
-                            <strong><i class="bi bi-link-45deg"></i> Formularz zamówienia na PNEDU</strong>
-                            <span class="text-muted small d-block">Wyślij dyrektorowi do uzupełnienia lub edycji (ident: <code>{{ $zamowienie->ident }}</code>)</span>
-                        </div>
-                        <div class="input-group" style="max-width: 36rem;">
-                            <input type="text" class="form-control form-control-sm font-monospace" id="pnedu-order-form-edit-url" value="{{ $pneduOrderFormEditUrl }}" readonly>
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('pnedu-order-form-edit-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
-                                Kopiuj link
-                            </button>
-                            <a href="{{ $pneduOrderFormEditUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-box-arrow-up-right"></i> Otwórz
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             {{-- Przyciski akcji --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
@@ -277,24 +256,26 @@
                             </h6>
                         </div>
                         <div class="card-body py-2">
-                            {{-- NABYWCA --}}
-                            <div class="mb-2">
-                                <div class="border rounded p-2 bg-light" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>NABYWCA:</strong>
+                            <div class="row g-2 mb-2">
+                                {{-- NABYWCA --}}
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light h-100" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>NABYWCA:</strong>
 {{ $zamowienie->buyer_name ?? '—' }}
 {{ $zamowienie->buyer_address ?? '—' }}
 {{ $zamowienie->buyer_postal_code ?? '—' }} {{ $zamowienie->buyer_city ?? '—' }}
 @if($zamowienie->buyer_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->buyer_nip) }}@endif</div>
-                            </div>
+                                </div>
 
-                            {{-- ODBIORCA --}}
-                            <div class="mb-2">
-                                <div class="border rounded p-2 bg-light" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>ODBIORCA:</strong>
+                                {{-- ODBIORCA --}}
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light h-100" style="font-family: monospace; white-space: pre-line; user-select: text;"><strong>ODBIORCA:</strong>
 {{ $zamowienie->recipient_name ?? '—' }}
 {{ $zamowienie->recipient_address ?? '—' }}
 {{ $zamowienie->recipient_postal_code ?? '—' }} {{ $zamowienie->recipient_city ?? '—' }}
 @if($zamowienie->recipient_nip)NIP: {{ preg_replace('/[^0-9]/', '', $zamowienie->recipient_nip) }}
 @endif
 nowoczesna-edukacja.pl </div>
+                                </div>
                             </div>
 
                             {{-- Przyciski kopiowania --}}
@@ -309,7 +290,8 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             </div>
 
-                            {{-- KSeF – Podmiot3 (metadane) — podgląd (synchronizowany po zapisie z panelu po prawej) --}}
+                            {{-- KSeF Podmiot3: edycja (AJAX) + podgląd efektywnych metadanych — w jednej karcie z danymi FV --}}
+                            @include('form-orders.partials.ksef-additional-entity-inline', ['zamowienie' => $zamowienie])
                             <div id="ksefSummaryReadonly">
                                 @include('form-orders.partials.ksef-additional-entity-show', ['zamowienie' => $zamowienie])
                             </div>
@@ -358,10 +340,14 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             @endif
 
-                    {{-- Button Dodaj zamówienie przez PUBLIGO (wymaga: product_id + price_id + publigo_sent != 1) + Dodaj tylko do PNEDU --}}
-                            <div class="mt-3 pt-3 border-top">
-                    @if($zamowienie->pnedu_provisioned_at)
-                                    <div class="alert alert-success mb-3">
+                            {{-- PNEDU + PUBLIGO: obok siebie gdy są efektywne ID Publigo (zamówienie lub course.id_old), inaczej PNEDU na całą szerokość --}}
+                            @php
+                                $hasPubligoIds = $zamowienie->hasEffectivePubligoIds();
+                                $publigoAlreadySent = (int) $zamowienie->publigo_sent === 1;
+                            @endphp
+                            <div class="mt-2">
+                                @if($zamowienie->pnedu_provisioned_at)
+                                    <div class="alert alert-success mb-2">
                                         <i class="bi bi-check-circle"></i>
                                         <strong>Dostęp PNEDU został przyznany.</strong>
                                         <small class="d-block text-muted mt-1">
@@ -455,185 +441,81 @@ nowoczesna-edukacja.pl </div>
                                             </div>
                                         @endif
                                     </div>
-                    @endif
-                            <div id="pneduResult" class="mt-2"></div>
-                    @if(!empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id) && $zamowienie->publigo_sent != 1)
-                                    <div class="row g-2">
-                                        <div class="col-md-6">
-                                            <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
-                                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
-                                            </button>
-                                        </div>
-                                        <div class="col-md-6">
-                                            @unless($zamowienie->pnedu_provisioned_at)
-                                            <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
-                                                <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
-                                            </button>
-                                            @else
-                                            <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
-                                                <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
-                                            </div>
-                                            @endunless
-                                        </div>
-                                    </div>
-                            <div id="publigoResult" class="mt-2"></div>
-                    @elseif($zamowienie->publigo_sent == 1)
-                                    {{-- Informacja o statusie Publigo --}}
-                                    <div class="alert alert-success mb-0">
-                                <i class="bi bi-check-circle"></i> 
-                                <strong>Zamówienie zostało wysłane do Publigo</strong>
-                                <small class="d-block text-muted mt-1">
-                                    Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') : 'Nieznana' }}
-                                </small>
-                                
-                                {{-- Przycisk resetowania dla administratorów --}}
-                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
-                                    <div class="mt-2">
-                                                <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                        data-bs-toggle="modal" 
+                                @endif
+
+                                @if($publigoAlreadySent)
+                                    <div class="alert alert-success mb-2">
+                                        <i class="bi bi-check-circle"></i>
+                                        <strong>Zamówienie zostało wysłane do Publigo</strong>
+                                        <small class="d-block text-muted mt-1">
+                                            Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') : 'Nieznana' }}
+                                        </small>
+                                        @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        data-bs-toggle="modal"
                                                         data-bs-target="#resetPubligoModal">
-                                            <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
-                                        </button>
+                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
+                                                </button>
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
-                            </div>
-                                    {{-- Ten sam układ co przy aktywnym Publigo: przycisk widoczny, lecz nieaktywny (jak „PNEDU — wykonano”) --}}
-                                    <div class="row g-2 mt-2">
+
+                                @if($hasPubligoIds)
+                                    <div class="row g-2">
                                         <div class="col-md-6">
-                                            <button type="button"
-                                                    class="btn btn-primary w-100"
-                                                    disabled
-                                                    title="Zamówienie zostało już wysłane do Publigo">
-                                                <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
-                                            </button>
+                                            @if($publigoAlreadySent)
+                                                <button type="button"
+                                                        class="btn btn-primary w-100"
+                                                        disabled
+                                                        title="Zamówienie zostało już wysłane do Publigo">
+                                                    <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
+                                                    <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
+                                                </button>
+                                            @endif
                                         </div>
                                         <div class="col-md-6">
                                             @unless($zamowienie->pnedu_provisioned_at)
-                                            <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtnSent" onclick="provisionPnedu({{ $zamowienie->id }})">
-                                                <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
-                                            </button>
+                                                <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
+                                                    <i class="bi bi-plus-circle"></i> Dodaj uczestnika do PNEDU
+                                                </button>
                                             @else
-                                            <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
-                                                <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
-                                            </div>
+                                                <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
+                                                    <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
+                                                </div>
                                             @endunless
                                         </div>
                                     </div>
                                     <div id="publigoResult" class="mt-2"></div>
-                    @else
-                        {{-- Brak przycisku: zwykle brak publigo_price_id lub publigo_product_id (badge może pokazywać sam produkt) --}}
-                        @if(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
-                            <div class="alert alert-warning mb-0 py-2 small">
-                                <i class="bi bi-info-circle"></i>
-                                <strong>Przycisk Publigo jest ukryty</strong> — do wysyłki potrzebne są <strong>ID produktu</strong> i <strong>ID ceny</strong> Publigo w tym zamówieniu.
-                                @if(!empty($zamowienie->publigo_product_id) && empty($zamowienie->publigo_price_id))
-                                    <span class="d-block mt-1 mb-0">Masz produkt <code>#{{ $zamowienie->publigo_product_id }}</code>, ale <strong>brak <code>publigo_price_id</code></strong> (ID ceny w Publigo). Uzupełnij w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a> lub w danych kursu.</span>
-                                @elseif(empty($zamowienie->publigo_product_id) && !empty($zamowienie->publigo_price_id))
-                                    <span class="d-block mt-1 mb-0">Brak <strong><code>publigo_product_id</code></strong> — uzupełnij w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a>.</span>
-                                @else
-                                    <span class="d-block mt-1 mb-0">Uzupełnij oba pola w <a href="{{ route('form-orders.edit', $zamowienie->id) }}" class="alert-link">edycji zamówienia</a>.</span>
+                                @elseif(! $zamowienie->pnedu_provisioned_at)
+                                    <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
+                                        <i class="bi bi-plus-circle"></i> Dodaj uczestnika do PNEDU
+                                    </button>
                                 @endif
+
+                                <div id="pneduResult" class="mt-2"></div>
                             </div>
-                        @endif
-                        <div class="row g-2 mt-2">
-                            <div class="col-12 col-md-6 ms-md-auto">
-                                @unless($zamowienie->pnedu_provisioned_at)
-                                <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtnFallback" onclick="provisionPnedu({{ $zamowienie->id }})">
-                                    <i class="bi bi-plus-circle"></i> Dodaj tylko do PNEDU
-                                </button>
-                                @else
-                                <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light">
-                                    <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
-                                </div>
-                                @endunless
-                            </div>
-                        </div>
-                    @endif
-                        </div>
                         </div>
                     </div>
 
                     {{-- Buttons iFirma --}}
                     <div class="mb-3 d-flex flex-column gap-2">
-                        {{-- Button Wystaw PRO-FORMA iFirma --}}
-                        <div class="w-100">
-                            <div class="form-check mb-2" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" value="1"
-                                       id="ifirma_prefix_szkolenie_in_product_name" checked>
-                                <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
-                                    Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
-                                </label>
-                            </div>
-                            <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
-                                <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturaproformakraj.json</code>, bez wysyłki do KSeF.
-                                <strong>Nie wysyła</strong> bloku <code>PodmiotyDodatkowe</code> (Podmiot3) — publiczna dokumentacja iFirma
-                                nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF.
-                            </div>
+                        {{-- Wspólny checkbox: prefiks SZKOLENIE (wszystkie ścieżki API iFirma) --}}
+                        <div class="form-check" style="font-size: 0.875rem;">
+                            <input class="form-check-input" type="checkbox" value="1"
+                                   id="ifirma_prefix_szkolenie_in_product_name" checked>
+                            <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
+                                Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
+                            </label>
                         </div>
 
-                        {{-- Button Wystaw Fakturę iFirma --}}
+                        {{-- Button Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF (czerwony) --}}
                         <div class="w-100">
-                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn" 
-                                    onclick="checkAndCreateInvoice({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
-                                Ta ścieżka <strong>nigdy</strong> nie dołącza <code>PodmiotyDodatkowe</code>
-                                (Podmiot3), niezależnie od metadanych KSeF w zamówieniu.
-                                Do faktury z Podmiotem3 użyj „Wystaw Fakturę iFirma z Odbiorcą” (bez KSeF)
-                                lub czerwonego przycisku (z KSeF).
-                            </div>
-                            
-                            {{-- Button Wystaw Fakturę iFirma z Odbiorcą --}}
-                            <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithReceiverBtn" 
-                                    style="background-color: #6f42c1; border-color: #6f42c1; color: white;"
-                                    onclick="checkAndCreateInvoiceWithReceiver({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithReceiver">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithReceiver">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
-                                Domyślnie nabywca + odbiorca z pól <code>recipient_*</code>, jeśli podano
-                                co najmniej nazwę, kod i miejscowość; inaczej tylko nabywca.
-                                Gdy w sekcji KSeF – Podmiot3 ustawiono źródło <code>recipient</code>,
-                                stosowane są pełne metadane (rola, NIP, fail-fast).
-                            </div>
-
-                            {{-- Button Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF --}}
-                            <button type="button" class="btn w-100 mt-2" id="ifirmaInvoiceWithKsefBtn" 
+                            <button type="button" class="btn w-100" id="ifirmaInvoiceWithKsefBtn"
                                     style="background-color: #dc3545; border-color: #dc3545; color: white;"
                                     onclick="checkAndCreateInvoiceWithKsef({{ $zamowienie->id }})">
                                 <i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF
@@ -657,21 +539,120 @@ nowoczesna-edukacja.pl </div>
                                 <strong>Uwaga:</strong> faktura trafia do rządowego KSeF — używaj świadomie.
                             </div>
                         </div>
+
+                        {{-- Button Wystaw Fakturę iFirma --}}
+                        <div class="w-100">
+                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn"
+                                    onclick="checkAndCreateInvoice({{ $zamowienie->id }})">
+                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
+                            </button>
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
+                                Ta ścieżka <strong>nigdy</strong> nie dołącza <code>PodmiotyDodatkowe</code>
+                                (Podmiot3), niezależnie od metadanych KSeF w zamówieniu.
+                                Do faktury z Podmiotem3 użyj „Wystaw Fakturę iFirma z Odbiorcą” (bez KSeF)
+                                lub czerwonego przycisku (z KSeF).
+                            </div>
+                        </div>
+
+                        {{-- Button Wystaw Fakturę iFirma z Odbiorcą --}}
+                        <div class="w-100">
+                            <button type="button" class="btn w-100" id="ifirmaInvoiceWithReceiverBtn"
+                                    style="background-color: #6f42c1; border-color: #6f42c1; color: white;"
+                                    onclick="checkAndCreateInvoiceWithReceiver({{ $zamowienie->id }})">
+                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą
+                            </button>
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithReceiver">
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithReceiver">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
+                                Domyślnie nabywca + odbiorca z pól <code>recipient_*</code>, jeśli podano
+                                co najmniej nazwę, kod i miejscowość; inaczej tylko nabywca.
+                                Gdy w sekcji KSeF – Podmiot3 ustawiono źródło <code>recipient</code>,
+                                stosowane są pełne metadane (rola, NIP, fail-fast).
+                            </div>
+                        </div>
+
+                        {{-- Button Wystaw PRO-FORMA iFirma (zielony) --}}
+                        <div class="w-100">
+                            <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
+                                <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
+                            </button>
+                            <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
+                                <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
+                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                    @if(!empty($zamowienie->orderer_email))
+                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                    @endif
+                                </label>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-info-circle"></i>
+                                Endpoint <code>fakturaproformakraj.json</code>, bez wysyłki do KSeF.
+                                <strong>Nie wysyła</strong> bloku <code>PodmiotyDodatkowe</code> (Podmiot3) — publiczna dokumentacja iFirma
+                                nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF.
+                            </div>
+                        </div>
                     </div>
                     <div id="ifirmaResult" class="mt-2"></div>
                     
-                    @if(empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id))
+                    @unless($zamowienie->hasEffectivePubligoIds())
                         <div class="mb-3 mt-3">
                             <small class="text-muted">
                                 <i class="bi bi-info-circle"></i> 
-                                Brak danych produktu Publigo - zamówienie nie może być przesłane do Publigo
+                                Brak danych produktu Publigo (ani w zamówieniu, ani w powiązanym szkoleniu) — zamówienie nie może być przesłane do Publigo
                             </small>
                         </div>
-                    @endif
+                    @endunless
                 </div>
 
                 {{-- Prawa kolumna: Faktura - kompaktowe --}}
                 <div class="col-md-6">
+                    {{-- INFORMACJE O FAKTURZE — na górze prawej kolumny --}}
+                    @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
+                        <div class="card mb-3">
+                            <div class="card-header bg-warning text-dark py-2">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
+                                </h6>
+                            </div>
+                            <div class="card-body py-2">
+                                @if($zamowienie->invoice_notes)
+                                    <div class="mb-1">
+                                        <small class="text-danger" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
+                                    </div>
+                                @endif
+                                @if($zamowienie->invoice_payment_delay)
+                                    <div class="mb-1">
+                                        <small class="text-danger">
+                                            <strong>Odroczenie:</strong>
+                                            <span class="badge bg-danger">{{ $zamowienie->invoice_payment_delay }} dni</span>
+                                        </small>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="card mb-3">
                         <div class="card-header bg-secondary text-white py-2">
                             <h6 class="mb-0">
@@ -875,34 +856,6 @@ nowoczesna-edukacja.pl </div>
                                 </button>
                             </form>
 
-                            {{-- INFORMACJE O FAKTURZE - kompaktowe --}}
-                            @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
-                                <div class="card mt-3">
-                                    <div class="card-header bg-warning text-dark py-2">
-                                        <h6 class="mb-0">
-                                            <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
-                                        </h6>
-                                    </div>
-                                    <div class="card-body py-2">
-                                        @if($zamowienie->invoice_notes)
-                                            <div class="mb-1">
-                                                <small class="text-danger" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
-                                            </div>
-                                        @endif
-                                        @if($zamowienie->invoice_payment_delay)
-                                            <div class="mb-1">
-                                                <small class="text-danger">
-                                                    <strong>Odroczenie:</strong> 
-                                                    <span class="badge bg-danger">{{ $zamowienie->invoice_payment_delay }} dni</span>
-                                                </small>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
-
-                            @include('form-orders.partials.ksef-additional-entity-inline', ['zamowienie' => $zamowienie])
-                            
                             {{-- UWAGI DO FAKTURY (edytowalne dla API iFirma) --}}
                             <div class="card mt-3">
                                 <div class="card-header bg-primary text-white py-2">
@@ -1006,8 +959,29 @@ nowoczesna-edukacja.pl </div>
                 </div>
             </div>
 
+            @if(!empty($pneduOrderFormEditUrl))
+                <div class="alert alert-light border mt-4 mb-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <strong><i class="bi bi-link-45deg"></i> Formularz zamówienia na PNEDU</strong>
+                            <span class="text-muted small d-block">Wyślij dyrektorowi do uzupełnienia lub edycji (ident: <code>{{ $zamowienie->ident }}</code>)</span>
+                        </div>
+                        <div class="input-group" style="max-width: 36rem;">
+                            <input type="text" class="form-control form-control-sm font-monospace" id="pnedu-order-form-edit-url" value="{{ $pneduOrderFormEditUrl }}" readonly>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('pnedu-order-form-edit-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
+                                Kopiuj link
+                            </button>
+                            <a href="{{ $pneduOrderFormEditUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> Otwórz
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Przyciski akcji na dole strony --}}
-            <div class="d-flex justify-content-end mt-4 mb-4">
+            <div class="d-flex justify-content-end mb-4 {{ empty($pneduOrderFormEditUrl) ? 'mt-4' : '' }}">
                 <div class="btn-group" role="group">
                     <a href="{{ route('form-orders.create', ['clone_from' => $zamowienie->id]) }}" class="btn btn-outline-primary">
                         <i class="bi bi-files"></i> Kopiuj zamówienie
@@ -2956,7 +2930,7 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // KSeF Podmiot3 — automatyczny zapis z panelu po prawej (bez przeładowania strony)
+        // KSeF Podmiot3 — automatyczny zapis w karcie DANE DO FAKTURY (bez przeładowania strony)
         (function initKsefInlineSettings() {
             const formRoot = document.getElementById('ksefSettingsForm');
             if (!formRoot) {
@@ -2981,11 +2955,26 @@ nowoczesna-edukacja.pl `;
                 statusBadge.className = 'badge bg-' + (variant || 'secondary');
             }
 
+            function isRecipientSourceEnabled() {
+                const el = document.getElementById('show_ksef_entity_source');
+                return !!(el && el.checked);
+            }
+
+            function ensureRecipientSourceForSpecialRoles() {
+                const role = document.getElementById('show_ksef_additional_entity_role')?.value;
+                const sourceEl = document.getElementById('show_ksef_entity_source');
+                if (!sourceEl) {
+                    return;
+                }
+                if ((role === 'jst_recipient' || role === 'vat_group_member') && !sourceEl.checked) {
+                    sourceEl.checked = true;
+                }
+            }
+
             function updateRoleHints() {
-                const source = document.getElementById('show_ksef_entity_source')?.value;
                 const role = document.getElementById('show_ksef_additional_entity_role')?.value;
                 const idType = document.getElementById('show_ksef_additional_entity_id_type')?.value;
-                const isRecipient = source === 'recipient';
+                const isRecipient = isRecipientSourceEnabled();
 
                 document.getElementById('ksefRoleHintJst')?.classList.toggle('d-none', !(isRecipient && role === 'jst_recipient'));
                 document.getElementById('ksefRoleHintVat')?.classList.toggle('d-none', !(isRecipient && role === 'vat_group_member'));
@@ -3026,7 +3015,7 @@ nowoczesna-edukacja.pl `;
 
             function collectPayload() {
                 return {
-                    ksef_entity_source: document.getElementById('show_ksef_entity_source')?.value || 'none',
+                    ksef_entity_source: isRecipientSourceEnabled() ? 'recipient' : 'none',
                     ksef_additional_entity_role: document.getElementById('show_ksef_additional_entity_role')?.value || null,
                     ksef_additional_entity_id_type: document.getElementById('show_ksef_additional_entity_id_type')?.value || null,
                     ksef_additional_entity_identifier: document.getElementById('show_ksef_additional_entity_identifier')?.value?.trim() || null,
@@ -3094,6 +3083,7 @@ nowoczesna-edukacja.pl `;
             }
 
             function scheduleSave() {
+                ensureRecipientSourceForSpecialRoles();
                 updateRoleHints();
                 if (saveTimer) {
                     window.clearTimeout(saveTimer);
@@ -3104,7 +3094,7 @@ nowoczesna-edukacja.pl `;
 
             formRoot.querySelectorAll('[data-ksef-field]').forEach(function (el) {
                 el.addEventListener('change', scheduleSave);
-                if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+                if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'checkbox')) {
                     el.addEventListener('input', scheduleSave);
                 }
             });
@@ -3281,7 +3271,7 @@ nowoczesna-edukacja.pl `;
                     </div>
                     <div class="alert alert-warning mt-3 mb-0">
                         <i class="bi bi-info-circle"></i>
-                        <strong>Uwaga:</strong> Resetowanie statusu odblokuje przycisk „Dodaj tylko do PNEDU” dla tego zamówienia.
+                        <strong>Uwaga:</strong> Resetowanie statusu odblokuje przycisk „Dodaj uczestnika do PNEDU” dla tego zamówienia.
                     </div>
                 </div>
                 <div class="modal-footer">

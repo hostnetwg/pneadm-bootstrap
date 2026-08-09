@@ -1,5 +1,5 @@
 {{--
-    Sekcja formularza „KSeF – Podmiot3 (metadane)” — ETAP 2.
+    Sekcja formularza „KSeF – Podmiot3 (metadane)” — stan: ETAP 3 (adm.pnedu.pl).
 
     Dokumentacja techniczna: docs/KSEF_FORM_ORDERS.md
     Założenia:
@@ -7,14 +7,20 @@
       - `ksef_entity_source ∈ {none, recipient}`,
       - kolumny `recipient_*` są historycznie nazwane, ale pełnią rolę danych Podmiotu3
         niezależnie od wybranej roli (nota nazewnicza w KSEF_FORM_ORDERS.md),
+      - payload iFirma: root PodmiotyDodatkowe (od 2026-08-04; nie Kontrahent.OdbiorcaNaFakturze),
       - inne role / id_type niż NIP → fail-fast (HTTP 422 w kontrolerze),
       - dla JST i grupy VAT dodatkowo wymagany niepusty NIP — fail-fast przed requestem do iFirma.
+      - bez zmian w publicznym formularzu pnedu.pl.
 --}}
 @php
     /** @var \App\Models\FormOrder|null $zamowienie */
     use App\Models\FormOrder;
 
-    $ksefSource = old('ksef_entity_source', $zamowienie?->ksef_entity_source ?? FormOrder::KSEF_ENTITY_SOURCE_NONE);
+    // Nowe zamówienie: domyślnie włączony Podmiot3 z recipient_*; edycja: wartość z rekordu.
+    $ksefSourceDefault = $zamowienie
+        ? ($zamowienie->ksef_entity_source ?? FormOrder::KSEF_ENTITY_SOURCE_NONE)
+        : FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT;
+    $ksefSource = old('ksef_entity_source', $ksefSourceDefault);
     $ksefRole = old('ksef_additional_entity_role', $zamowienie?->ksef_additional_entity_role);
     $ksefIdType = old('ksef_additional_entity_id_type', $zamowienie?->ksef_additional_entity_id_type);
     $ksefIdentifier = old('ksef_additional_entity_identifier', $zamowienie?->ksef_additional_entity_identifier);
@@ -45,7 +51,7 @@
 <div class="card mb-4">
     <div class="card-header bg-warning text-dark">
         <h6 class="mb-0">
-            <i class="bi bi-shield-check"></i> KSeF – Podmiot3 (metadane) <span class="badge bg-dark ms-2">ETAP 2</span>
+            <i class="bi bi-shield-check"></i> KSeF – Podmiot3 (metadane) <span class="badge bg-dark ms-2">ETAP 3</span>
         </h6>
     </div>
     <div class="card-body">
@@ -72,26 +78,25 @@
             </div>
         @endif
 
-        <div class="row">
+        <div class="row g-3 mb-2 align-items-end">
             <div class="col-md-6">
-                <label for="ksef_entity_source" class="form-label">Źródło danych Podmiotu3</label>
-                <select class="form-select @error('ksef_entity_source') is-invalid @enderror"
-                        id="ksef_entity_source" name="ksef_entity_source">
-                    <option value="{{ FormOrder::KSEF_ENTITY_SOURCE_NONE }}" @selected($ksefSource === FormOrder::KSEF_ENTITY_SOURCE_NONE)>
-                        Brak dodatkowego podmiotu (none)
-                    </option>
-                    <option value="{{ FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT }}" @selected($ksefSource === FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT)>
-                        Dane Podmiotu3 z kolumn recipient_* — wymaga wypełnionych recipient_name / recipient_postal_code / recipient_city
-                    </option>
-                </select>
-                @error('ksef_entity_source')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-                <div class="form-text">
-                    <code>none</code> = faktura bez <code>PodmiotyDodatkowe</code>; <code>recipient</code> = Podmiot3 budowany z danych ODBIORCA powyżej.
+                <input type="hidden" name="ksef_entity_source" value="{{ FormOrder::KSEF_ENTITY_SOURCE_NONE }}">
+                <div class="form-check mb-0">
+                    <input class="form-check-input @error('ksef_entity_source') is-invalid @enderror"
+                           type="checkbox" id="ksef_entity_source" name="ksef_entity_source"
+                           value="{{ FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT }}"
+                           @checked($isRecipient)>
+                    <label class="form-check-label" for="ksef_entity_source">
+                        Użyj danych Odbiorcy (<code>recipient_*</code>) jako Podmiot3 na fakturze
+                    </label>
+                    @error('ksef_entity_source')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="form-text mb-0">
+                    Zaznaczone = Podmiot3 z ODBIORCY. Odznaczone = bez <code>PodmiotyDodatkowe</code> (rola ignorowana przy wystawianiu).
                 </div>
             </div>
-
             <div class="col-md-6">
                 <label for="ksef_additional_entity_role" class="form-label">Rola Podmiotu3 (kanoniczny kod)</label>
                 <select class="form-select @error('ksef_additional_entity_role') is-invalid @enderror"
@@ -112,20 +117,20 @@
                 @error('ksef_additional_entity_role')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
-                @if ($isRoleJst && $isRecipient)
-                    <div class="alert alert-info py-1 mt-2 mb-0 small">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>JST — rola 8:</strong> w <code>recipient_*</code> powinny być dane <strong>jednostki samorządu terytorialnego</strong> (gminy/powiatu/województwa), a nie jednostki podrzędnej. NIP podmiotu jest obowiązkowy — przy pustym NIP request do iFirma zostanie zablokowany (fail-fast).
-                    </div>
-                @endif
-                @if ($isRoleVatGroup && $isRecipient)
-                    <div class="alert alert-info py-1 mt-2 mb-0 small">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Członek grupy VAT — rola 9:</strong> w <code>recipient_*</code> powinny być dane <strong>członka grupy VAT</strong> (jednostka, która faktycznie otrzymała towar/usługę) z jego NIP. NIP <strong>grupy VAT</strong> wpisujesz w nagłówku nabywcy (firm_nip). NIP członka jest obowiązkowy — fail-fast przy pustym NIP.
-                    </div>
-                @endif
             </div>
         </div>
+        @if ($isRoleJst && $isRecipient)
+            <div class="alert alert-info py-1 mb-2 small">
+                <i class="bi bi-info-circle"></i>
+                <strong>JST — rola 8:</strong> w <code>recipient_*</code> powinny być dane <strong>jednostki samorządu terytorialnego</strong> (gminy/powiatu/województwa), a nie jednostki podrzędnej. NIP podmiotu jest obowiązkowy — przy pustym NIP request do iFirma zostanie zablokowany (fail-fast).
+            </div>
+        @endif
+        @if ($isRoleVatGroup && $isRecipient)
+            <div class="alert alert-info py-1 mb-2 small">
+                <i class="bi bi-info-circle"></i>
+                <strong>Członek grupy VAT — rola 9:</strong> w <code>recipient_*</code> powinny być dane <strong>członka grupy VAT</strong> (jednostka, która faktycznie otrzymała towar/usługę) z jego NIP. NIP <strong>grupy VAT</strong> wpisujesz w nagłówku nabywcy (firm_nip). NIP członka jest obowiązkowy — fail-fast przy pustym NIP.
+            </div>
+        @endif
 
         <div class="row mt-3">
             <div class="col-md-4">
@@ -182,7 +187,23 @@
 
         <div class="alert alert-secondary py-2 mt-3 mb-0 small">
             <i class="bi bi-info-circle"></i>
-            Gdy <code>ksef_entity_source = none</code>, wartości roli / typu identyfikatora / identyfikatora nie są usuwane automatycznie — pozostają w bazie, ale są ignorowane przez mapowanie do iFirma. Jeśli chcesz je zresetować, wyczyść je ręcznie i zapisz formularz.
+            Gdy checkbox Podmiot3 jest odznaczony, wartości roli / typu identyfikatora / identyfikatora nie są usuwane automatycznie — pozostają w bazie, ale są ignorowane przez mapowanie do iFirma. Jeśli chcesz je zresetować, wyczyść je ręcznie i zapisz formularz.
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const roleEl = document.getElementById('ksef_additional_entity_role');
+        const sourceEl = document.getElementById('ksef_entity_source');
+        if (!roleEl || !sourceEl) {
+            return;
+        }
+        roleEl.addEventListener('change', function () {
+            const role = roleEl.value;
+            if ((role === 'jst_recipient' || role === 'vat_group_member') && !sourceEl.checked) {
+                sourceEl.checked = true;
+            }
+        });
+    })();
+</script>

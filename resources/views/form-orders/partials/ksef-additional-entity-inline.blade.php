@@ -1,6 +1,6 @@
 {{--
-    Edytowalna sekcja KSeF – Podmiot3 na widoku szczegółów zamówienia (zapis AJAX).
-    Dokumentacja: docs/KSEF_FORM_ORDERS.md
+    Edytowalna sekcja KSeF – Podmiot3 na widoku szczegółów (w karcie DANE DO FAKTURY).
+    Zapis AJAX. Dokumentacja: docs/KSEF_FORM_ORDERS.md
 --}}
 @php
     /** @var \App\Models\FormOrder $zamowienie */
@@ -34,15 +34,16 @@
         || ($ksefAdminNote !== null && trim((string) $ksefAdminNote) !== '');
 @endphp
 
-<div class="card mt-3" id="ksefSettingsCard">
-    <div class="card-header bg-warning text-dark py-1 px-2 d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 small">
+<div class="border rounded mt-2 bg-white" id="ksefSettingsCard">
+    <div class="bg-warning bg-opacity-25 border-bottom px-2 py-1 d-flex justify-content-between align-items-center">
+        <strong class="small mb-0">
             <i class="bi bi-shield-check"></i> KSeF Podmiot3
-            <span class="badge bg-dark ms-1" style="font-size:0.65rem">ETAP 2</span>
-        </h6>
+            <span class="badge bg-dark ms-1" style="font-size:0.65rem">ETAP 3</span>
+            <span class="text-muted fw-normal ms-1">· ustawienia</span>
+        </strong>
         <span class="badge bg-secondary" id="ksefSaveStatus" style="font-size:0.65rem" title="Status zapisu">—</span>
     </div>
-    <div class="card-body py-2 px-2" id="ksefSettingsForm"
+    <div class="p-2" id="ksefSettingsForm"
          data-save-url="{{ route('form-orders.ksef-settings.update', $zamowienie->id) }}">
 
         <div id="ksefValidationErrors" class="alert alert-danger py-1 px-2 mb-1 small d-none" role="alert"></div>
@@ -56,19 +57,18 @@
             </div>
         @endif
 
-        <div class="row g-1 mb-1">
-            <div class="col-6">
-                <label for="show_ksef_entity_source" class="form-label small mb-0 text-muted">Źródło Podmiot3</label>
-                <select class="form-select form-select-sm" id="show_ksef_entity_source" data-ksef-field>
-                    <option value="{{ FormOrder::KSEF_ENTITY_SOURCE_NONE }}" @selected($ksefSource === FormOrder::KSEF_ENTITY_SOURCE_NONE)>
-                        Brak (none)
-                    </option>
-                    <option value="{{ FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT }}" @selected($ksefSource === FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT)>
-                        recipient_*
-                    </option>
-                </select>
+        <div class="row g-2 mb-1 align-items-end">
+            <div class="col-md-6">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="show_ksef_entity_source"
+                           data-ksef-field value="{{ FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT }}"
+                           @checked($isRecipient)>
+                    <label class="form-check-label small" for="show_ksef_entity_source">
+                        Użyj danych Odbiorcy (<code>recipient_*</code>) jako Podmiot3
+                    </label>
+                </div>
             </div>
-            <div class="col-6">
+            <div class="col-md-6">
                 <label for="show_ksef_additional_entity_role" class="form-label small mb-0 text-muted">Rola (kod)</label>
                 <select class="form-select form-select-sm" id="show_ksef_additional_entity_role" data-ksef-field>
                     <option value="" @selected($ksefRole === null || $ksefRole === '')>— odbiorca —</option>
@@ -132,3 +132,4 @@
         </div>
     </div>
 </div>
+{{-- /ksefSettingsCard --}}

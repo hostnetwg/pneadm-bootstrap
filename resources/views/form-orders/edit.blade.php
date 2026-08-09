@@ -363,7 +363,7 @@
                             </div>
                         </div>
 
-                        {{-- KSeF – Podmiot3 (metadane) — ETAP 1 --}}
+                        {{-- KSeF – Podmiot3 (metadane) — ETAP 3 (adm) --}}
                         @include('form-orders.partials.ksef-additional-entity-form', ['zamowienie' => $zamowienie])
 
                         {{-- UWAGI DO FAKTURY --}}

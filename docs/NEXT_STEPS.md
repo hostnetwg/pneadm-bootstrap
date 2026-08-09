@@ -153,6 +153,7 @@ Dalsze kroki:
 |-------|-----------|----------------|
 | `participant_live_access` (tokeny CM per uczestnik) | `e7f4389` | `docs/FORM_ORDERS_PNEDU_PROVISION.md`, `docs/deploy/2026-07-participant-live-access-and-tests.md` |
 | KSeF dwufazowy + podgląd etapów po sukcesie | `9ef8045`, `97518ff` | `docs/KSEF_FORM_ORDERS.md` |
+| KSeF Podmiot3 ETAP 1–3 w adm (`PodmiotyDodatkowe`, role 1/8/9, przyciski iFirma) | wdrożone lokalnie / prod wg deploy | `docs/KSEF_FORM_ORDERS.md` (status + proponowany kolejny krok) |
 | Pełny `sail test` na zielono (510 passed) | `8963e23` | `docs/TESTING.md` |
 | Windykacja MVP (sprawy, działania, kontakty, VIP, skróty, Poprzednia/Następna) | lokalnie → do deploy | `docs/WINDYKACJA.md`, `docs/deploy/2026-07-windykacja-mvp-deploy.md` |
 | `form_orders.ifirma_invoice_id` (wewnętrzny ID iFirma obok FV i KSeF) | lokalnie → do deploy | `docs/KSEF_FORM_ORDERS.md`, `docs/deploy/2026-07-ifirma-invoice-id-deploy.md` |
@@ -164,6 +165,8 @@ Dalsze kroki:
 **Backlog (uzgodnione, nie wdrożone):** wysyłka maili z linkiem live z listy uczestników (hurt/indywidualnie).
 
 **Windykacja — kolejne etapy:** ~~synchronizacja statusów faktur z iFirma (odczyt)~~ **wdrożone lokalnie**; ~~import CSV mBank + ręczne dopasowania~~ **wdrożone lokalnie**; ~~opcjonalna rejestracja wpłat w iFirma po potwierdzeniu~~ **wdrożone lokalnie** (modal przy akceptacji, zgodna kwota); dalej: dopracowanie sugestii (nazwa/bulk), dyskretne ograniczenia płatności odroczonej w publicznym formularzu dla wysokiego ryzyka.
+
+**KSeF / iFirma Podmiot3:** ETAP 1–3 wdrożone w **adm** (metadane + przyciski + `PodmiotyDodatkowe`). Publiczny formularz pnedu.pl — bez zmian. Kolejny krok: smoke test ścieżki fioletowej/czerwonej, potem decyzja ETAP 4.1 (A IdWew / B nowa rola / C tylko procedura / D pnedu później) — szczegóły w `docs/KSEF_FORM_ORDERS.md` sekcja „Proponowany kolejny krok operacyjny”.
 
 ## Najbliższe 10 Kroków
 

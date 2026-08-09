@@ -2,8 +2,8 @@
     Blok prezentacji „KSeF – Podmiot3 (metadane)” na widoku szczegółów zamówienia.
     Tylko do odczytu. Logika i ograniczenia opisane w docs/KSEF_FORM_ORDERS.md.
 
-    ETAP 2: obsługiwane role → odbiorca, jst_recipient (rola 8), vat_group_member (rola 9).
-    Dla JST i grupy VAT wymagany jest niepusty NIP (fail-fast przed requestem do iFirma).
+    Stan ETAP 3: obsługiwane role → odbiorca, jst_recipient (rola 8), vat_group_member (rola 9).
+    Payload iFirma: PodmiotyDodatkowe. Dla JST i grupy VAT wymagany niepusty NIP (fail-fast).
 --}}
 @php
     /** @var \App\Models\FormOrder $zamowienie */
@@ -49,11 +49,11 @@
     }
 @endphp
 
-<div class="mt-2 p-2 border rounded bg-white small">
+<div class="mt-2 p-2 border rounded bg-light small">
     <div class="d-flex justify-content-between align-items-center mb-1">
         <strong>
-            <i class="bi bi-shield-check"></i> KSeF – Podmiot3 (metadane)
-            <span class="badge bg-dark ms-1">ETAP 2</span>
+            <i class="bi bi-eye"></i> KSeF – Podmiot3 (metadane)
+            <span class="text-muted fw-normal">· podgląd efektywny</span>
         </strong>
         @if ($isActive)
             <span class="badge bg-success">aktywny</span>

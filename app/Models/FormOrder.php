@@ -755,6 +755,49 @@ class FormOrder extends Model
     }
 
     /**
+     * Efektywne ID produktu Publigo: z zamówienia, a gdy brak — z courses.id_old powiązanego szkolenia.
+     */
+    public function effectivePubligoProductId(): ?int
+    {
+        if ($this->publigo_product_id !== null && $this->publigo_product_id !== '') {
+            return (int) $this->publigo_product_id;
+        }
+
+        $courseIdOld = $this->course?->id_old;
+        if ($courseIdOld !== null && $courseIdOld !== '') {
+            return (int) $courseIdOld;
+        }
+
+        return null;
+    }
+
+    /**
+     * Efektywne ID ceny Publigo: z zamówienia, a gdy brak przy znanym produkcie — domyślnie 1
+     * (jak przy zmianie szkolenia w edycji zamówienia).
+     */
+    public function effectivePubligoPriceId(): ?int
+    {
+        if ($this->publigo_price_id !== null && $this->publigo_price_id !== '') {
+            return (int) $this->publigo_price_id;
+        }
+
+        if ($this->effectivePubligoProductId() !== null) {
+            return 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * Czy da się wystawić zamówienie w Publigo (efektywne ID produktu i ceny).
+     */
+    public function hasEffectivePubligoIds(): bool
+    {
+        return $this->effectivePubligoProductId() !== null
+            && $this->effectivePubligoPriceId() !== null;
+    }
+
+    /**
      * Accessor - sformatowany NIP (tylko cyfry)
      */
     public function getFormattedNipAttribute(): ?string

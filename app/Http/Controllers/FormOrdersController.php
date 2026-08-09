@@ -759,7 +759,7 @@ class FormOrdersController extends Controller
                 'recipient_postal_code' => $request->recipient_postal_code,
                 'recipient_city' => $request->recipient_city,
                 'recipient_nip' => $request->recipient_nip,
-                'ksef_entity_source' => $request->input('ksef_entity_source', FormOrder::KSEF_ENTITY_SOURCE_NONE),
+                'ksef_entity_source' => $request->input('ksef_entity_source', FormOrder::KSEF_ENTITY_SOURCE_RECIPIENT),
                 'ksef_additional_entity_role' => $request->input('ksef_additional_entity_role') ?: null,
                 'ksef_additional_entity_id_type' => $request->input('ksef_additional_entity_id_type') ?: null,
                 'ksef_additional_entity_identifier' => $request->input('ksef_additional_entity_identifier') ?: null,
@@ -1112,7 +1112,7 @@ class FormOrdersController extends Controller
         try {
             // Blokada wiersza: zapobiega równoległemu podwójnemu wysłaniu (wyścig → mylący błąd + duplikat w Publigo)
             return DB::connection('mysql')->transaction(function () use ($id) {
-                $zamowienie = FormOrder::with('primaryParticipant')->lockForUpdate()->find($id);
+                $zamowienie = FormOrder::with(['primaryParticipant', 'course'])->lockForUpdate()->find($id);
 
                 if (! $zamowienie) {
                     return response()->json([
@@ -1121,8 +1121,11 @@ class FormOrdersController extends Controller
                     ], 404);
                 }
 
-                // Sprawdzenie czy zamówienie ma dane Publigo
-                if (empty($zamowienie->publigo_product_id) || empty($zamowienie->publigo_price_id)) {
+                $publigoProductId = $zamowienie->effectivePubligoProductId();
+                $publigoPriceId = $zamowienie->effectivePubligoPriceId();
+
+                // Sprawdzenie czy zamówienie ma dane Publigo (zamówienie lub fallback ze szkolenia)
+                if ($publigoProductId === null || $publigoPriceId === null) {
                     return response()->json([
                         'success' => false,
                         'error' => 'Brak danych produktu Publigo. Zamówienie nie może być przesłane do Publigo.',
@@ -1170,8 +1173,8 @@ class FormOrdersController extends Controller
                     'odb_adres' => $zamowienie->buyer_address, // Używamy adresu nabywcy
                     'odb_kod' => $zamowienie->buyer_postal_code, // Używamy kodu pocztowego nabywcy
                     'odb_poczta' => $zamowienie->buyer_city, // Używamy miasta nabywcy
-                    'idProdPubligo' => $zamowienie->publigo_product_id,
-                    'price_idProdPubligo' => $zamowienie->publigo_price_id,
+                    'idProdPubligo' => $publigoProductId,
+                    'price_idProdPubligo' => $publigoPriceId,
                 ];
 
                 // Przygotowanie i wysłanie zamówienia do Publigo
@@ -1184,6 +1187,13 @@ class FormOrdersController extends Controller
                     // Aktualizacja statusu zamówienia po udanym wysłaniu
                     $zamowienie->publigo_sent = 1;
                     $zamowienie->publigo_sent_at = now();
+                    // Utrwal efektywne ID (np. z course.id_old), żeby historia zamówienia miała konkretne wartości
+                    if (empty($zamowienie->publigo_product_id)) {
+                        $zamowienie->publigo_product_id = $publigoProductId;
+                    }
+                    if (empty($zamowienie->publigo_price_id)) {
+                        $zamowienie->publigo_price_id = $publigoPriceId;
+                    }
                     if (! $zamowienie->save()) {
                         Log::error('FormOrdersController: publigo_sent — save() zwróciło false', ['form_order_id' => $zamowienie->id]);
 
