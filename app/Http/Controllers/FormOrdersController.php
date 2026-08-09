@@ -908,11 +908,22 @@ class FormOrdersController extends Controller
                     'ksef_admin_note' => 'nullable|string',
                 ]);
 
-                // Jeżeli zmieniono szkolenie, przepnij powiązane pola produktu (id/nazwa/publigo).
+                // Jeżeli zmieniono szkolenie, przepnij powiązane pola produktu (id/nazwa/publigo/wariant cenowy).
                 $newCourseId = (int) $request->input('course_id');
+                $priceAfterCourseChange = null;
                 if ($newCourseId > 0 && $newCourseId !== (int) $zamowienie->product_id) {
-                    $newCourse = \App\Models\Course::find((int) $newCourseId);
+                    $newCourse = \App\Models\Course::with('priceVariants')->find((int) $newCourseId);
                     if ($newCourse) {
+                        $previousVariantId = $zamowienie->course_price_variant_id
+                            ? (int) $zamowienie->course_price_variant_id
+                            : null;
+                        $previousVariantName = null;
+                        if ($previousVariantId) {
+                            $previousVariantName = \App\Models\CoursePriceVariant::query()
+                                ->whereKey($previousVariantId)
+                                ->value('name');
+                        }
+
                         $zamowienie->product_id = (int) $newCourse->id;
                         $zamowienie->product_name = (string) $newCourse->title;
                         $zamowienie->product_description = $newCourse->description;
@@ -920,13 +931,25 @@ class FormOrdersController extends Controller
                         if (empty($zamowienie->publigo_price_id)) {
                             $zamowienie->publigo_price_id = 1;
                         }
+
+                        // Stary course_price_variant_id należy do poprzedniego szkolenia — inaczej
+                        // publiczny formularz pnedu waliduje: „Wybierz prawidłowy wariant cenowy…”.
+                        $matchedVariant = $this->matchPriceVariantForCourse(
+                            $newCourse,
+                            is_string($previousVariantName) ? $previousVariantName : null
+                        );
+                        $zamowienie->course_price_variant_id = $matchedVariant?->id;
+                        if ($matchedVariant !== null) {
+                            $priceAfterCourseChange = $matchedVariant->getCurrentPrice();
+                            $zamowienie->product_price = $priceAfterCourseChange;
+                        }
                     }
                 }
 
                 $zamowienie->fill([
                     // product_name nadpisujemy tylko jeśli nie nastąpiła zmiana kursu — w przeciwnym razie wartość ustawiona powyżej.
                     'product_name' => $zamowienie->product_name,
-                    'product_price' => $request->input('product_price'),
+                    'product_price' => $priceAfterCourseChange ?? $request->input('product_price'),
                     'orderer_name' => $request->input('orderer_name'),
                     'orderer_phone' => $request->input('orderer_phone'),
                     'orderer_email' => $request->input('orderer_email'),
@@ -3309,6 +3332,35 @@ class FormOrdersController extends Controller
                 'message' => 'Wystąpił błąd podczas zapisywania ustawień KSeF: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Dobierz aktywny wariant cenowy nowego szkolenia (po nazwie ze starego, inaczej najniższe ID).
+     */
+    private function matchPriceVariantForCourse(\App\Models\Course $course, ?string $preferredName = null): ?\App\Models\CoursePriceVariant
+    {
+        $courseEnded = $course->hasEnded();
+        $variants = $course->priceVariants
+            ->filter(fn (\App\Models\CoursePriceVariant $v) => (bool) $v->is_active)
+            ->filter(fn (\App\Models\CoursePriceVariant $v) => $v->isAvailableForCourseEndState($courseEnded))
+            ->sortBy(fn (\App\Models\CoursePriceVariant $v) => (int) $v->id)
+            ->values();
+
+        if ($variants->isEmpty()) {
+            return null;
+        }
+
+        if (filled($preferredName)) {
+            $needle = mb_strtolower(trim($preferredName));
+            $byName = $variants->first(
+                fn (\App\Models\CoursePriceVariant $v) => mb_strtolower(trim((string) $v->name)) === $needle
+            );
+            if ($byName) {
+                return $byName;
+            }
+        }
+
+        return $variants->first();
     }
 
     /**
