@@ -136,6 +136,8 @@ Po zapisie ustawień adm czyści cache pnedu (`POST /api/internal/cache/survey-s
 przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  
 Migracja seeduje dwie dotychczasowe opinie placeholder (Anna Nowak, Piotr Zieliński) jako opublikowane.
 
+**RODO / Polityka (pnedu, 2026-08-09):** klauzula RODO + Polityka prywatności opisują rekomendacje (zgoda, opcjonalne zdjęcie, publikacja po moderacji, wycofanie przez e-mail). Formularz: tekst zgody + linki (bez osobnego checkboxa). Polityka: domena `pnedu.pl`.
+
 ---
 
 ## 8. Import CSV (Google Forms) — nadal wspierany
