@@ -1805,9 +1805,9 @@ class FormOrdersController extends Controller
 
     /**
      * Pobiera z iFirma NumerKSeF / daty FV / ifirma_invoice_id.
-     * Preferuje zapisane ID; gdy brak — wyszukuje po invoice_number.
+     * Preferuje zapisane ID; gdy brak lub prefer_number_lookup — wyszukuje po invoice_number.
      */
-    public function syncIfirmaKsefMetadata($id)
+    public function syncIfirmaKsefMetadata(Request $request, $id)
     {
         try {
             $zamowienie = FormOrder::find($id);
@@ -1819,8 +1819,17 @@ class FormOrdersController extends Controller
                 ], 404);
             }
 
+            $invoiceNumberOverride = trim((string) $request->input('invoice_number', ''));
+            if ($invoiceNumberOverride === '') {
+                $invoiceNumberOverride = null;
+            }
+
             $result = app(\App\Services\IfirmaFormOrderKsefSyncService::class)
-                ->syncFromIfirmaInvoiceId($zamowienie);
+                ->syncFromIfirmaInvoiceId(
+                    $zamowienie,
+                    $invoiceNumberOverride,
+                    $request->boolean('prefer_number_lookup')
+                );
 
             if (! ($result['success'] ?? false)) {
                 return response()->json([

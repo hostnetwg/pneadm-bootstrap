@@ -283,19 +283,16 @@ formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
 faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
-**Synchronizacja KSeF po ręcznej wysyłce (2026-08):** ikona odświeżenia przy polu
-Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`. Preferuje
-**`ifirma_invoice_id`**; gdy ID brak, a jest **`invoice_number`** (np. FV wystawiona
-ręcznie w panelu iFirma) — wyszukuje dokument na liście iFirma (jak sync windykacji),
-zapisuje ID, potem pobiera szczegóły. Aktualizuje **ID iFirma**, **daty FV**
-(`DataWystawienia` → `invoice_issue_date`, `TerminPlatnosci` → `invoice_due_date`;
-także na powiązanych sprawach windykacyjnych) oraz **NumerKSeF**. Ręcznie wpisanego
-`invoice_number` **nie nadpisuje** (uzupełnia tylko gdy puste). Serwis:
-`App\Services\IfirmaFormOrderKsefSyncService`. Gdy dokument w iFirma **nie ma**
-`NumerKSeF`, synchronizacja **czyści** zapisany numer KSeF (oraz status/datę KSeF) w zamówieniu;
-daty FV i tak są odświeżane, jeśli są w payloadzie. Po korekcie anulującej i nowym
-dokumencie w iFirma trzeba najpierw wystawić fakturę ponownie z panelu (nowe ID),
-potem zsynchronizować KSeF.
+**Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**
+oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.
+Przycisk przy numerze FV wysyła `prefer_number_lookup=1` + aktualną wartość z inputa
+(nawet niespiętą „Zapisz”). Preferuje wyszukanie dokumentu po **`invoice_number`**
+(lista iFirma, jak windykacja) — przydatne po ręcznym wystawieniu FV w panelu iFirma
+lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Zapisuje **ID iFirma**,
+**daty FV** oraz **NumerKSeF** gdy iFirma je zwróci. Ręcznie wpisanego `invoice_number`
+**nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
+czyszczony** (wcześniej sync kasował ręczny wpis). Serwis:
+`App\Services\IfirmaFormOrderKsefSyncService`.
 
 **Daty FV przy wystawianiu (2026-08):** po `fakturakraj.json` panel robi `GET` faktury
 (jak przy sync KSeF) i zapisuje `invoice_issue_date` / `invoice_due_date` od razu

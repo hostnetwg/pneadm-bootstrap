@@ -798,13 +798,22 @@ nowoczesna-edukacja.pl </div>
                                         <label for="invoice_number" class="form-label small">
                                             <strong>Numer faktury:</strong>
                                         </label>
-                                        <input type="text" class="form-control form-control-sm @if($zamowienie->is_new) border-danger bg-danger bg-opacity-10 @endif" 
-                                               id="invoice_number" name="invoice_number" 
-                                               value="{{ $zamowienie->invoice_number }}" 
-                                               placeholder="Wprowadź numer faktury"
-                                               @if($zamowienie->is_new) 
-                                               style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);" 
-                                               @endif>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control @if($zamowienie->is_new) border-danger bg-danger bg-opacity-10 @endif"
+                                                   id="invoice_number" name="invoice_number"
+                                                   value="{{ $zamowienie->invoice_number }}"
+                                                   placeholder="Wprowadź numer faktury"
+                                                   @if($zamowienie->is_new)
+                                                   style="border-width: 2px; box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);"
+                                                   @endif>
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary"
+                                                    id="syncIfirmaByInvoiceNumberBtn"
+                                                    title="Pobierz z iFirma: ID dokumentu, daty FV i numer KSeF na podstawie numeru faktury"
+                                                    aria-label="Synchronizuj dane FV z iFirma po numerze faktury">
+                                                <i class="bi bi-arrow-repeat" id="syncIfirmaByInvoiceNumberIcon"></i>
+                                            </button>
+                                        </div>
                                         <div id="ifirmaInvoiceIdDisplay"
                                              class="mt-1 small @if(! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
                                              title="Wewnętrzny Identyfikator dokumentu w iFirma (nie numer FV)">
@@ -826,23 +835,21 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                     <div class="col-12 mt-2">
                                         <div id="ksefNumberDisplay"
-                                             class="small border rounded px-2 py-1 bg-light @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId()) d-none @endif"
+                                             class="small border rounded px-2 py-1 bg-light @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId() && blank($zamowienie->invoice_number)) d-none @endif"
                                              @if($zamowienie->hasConfirmedKsef())
                                              title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
-                                             @elseif($zamowienie->hasIfirmaInvoiceId())
-                                             title="Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce"
+                                             @else
+                                             title="Synchronizuj z iFirma po numerze FV lub ID dokumentu"
                                              @endif>
                                             <span class="text-muted">Numer KSeF:</span>
                                             <code class="text-success text-break" id="ksefNumberValue">@if($zamowienie->hasConfirmedKsef()){{ $zamowienie->ksef_number }}@else<span class="text-muted">—</span>@endif</code>
-                                            @if($zamowienie->hasIfirmaInvoiceId())
-                                                <button type="button"
-                                                        class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
-                                                        id="syncIfirmaKsefBtn"
-                                                        title="Pobierz numer KSeF i daty FV z iFirma (ID dokumentu: {{ $zamowienie->ifirma_invoice_id }})"
-                                                        aria-label="Synchronizuj numer KSeF i daty FV z iFirma">
-                                                    <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
-                                                </button>
-                                            @endif
+                                            <button type="button"
+                                                    class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
+                                                    id="syncIfirmaKsefBtn"
+                                                    title="Pobierz ID iFirma, daty FV i numer KSeF z iFirma (po numerze FV lub ID)"
+                                                    aria-label="Synchronizuj dane FV i KSeF z iFirma">
+                                                <i class="bi bi-arrow-repeat" id="syncIfirmaKsefIcon"></i>
+                                            </button>
                                         </div>
                                     </div>
                                     <div id="invoiceDatesDisplay"
@@ -2198,16 +2205,36 @@ nowoczesna-edukacja.pl `;
             }
         }
 
-        async function syncIfirmaKsefFromPanel(orderId) {
-            const btn = document.getElementById('syncIfirmaKsefBtn');
-            const icon = document.getElementById('syncIfirmaKsefIcon');
+        async function syncIfirmaKsefFromPanel(orderId, options) {
+            options = options || {};
+            const preferNumber = !!options.preferNumber;
+            const btn = options.button || document.getElementById('syncIfirmaKsefBtn');
+            const icon = options.icon || (btn ? btn.querySelector('i') : null) || document.getElementById('syncIfirmaKsefIcon');
             const resultDiv = document.getElementById('ifirmaResult');
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            const invoiceNumber = (invoiceNumberInput?.value || '').trim();
+
             if (!btn) {
                 return;
             }
 
+            if (preferNumber && !invoiceNumber) {
+                if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning alert-dismissible fade show py-2 small mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> Wpisz numer faktury (np. 277/8/2026), potem kliknij odświeżanie.
+                            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                        </div>`;
+                }
+                return;
+            }
+
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            btn.disabled = true;
+            const allSyncBtns = [
+                document.getElementById('syncIfirmaKsefBtn'),
+                document.getElementById('syncIfirmaByInvoiceNumberBtn'),
+            ].filter(Boolean);
+            allSyncBtns.forEach(function (el) { el.disabled = true; });
             if (icon) {
                 icon.classList.add('spinner-border', 'spinner-border-sm');
                 icon.classList.remove('bi-arrow-repeat');
@@ -2221,6 +2248,10 @@ nowoczesna-edukacja.pl `;
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': csrfToken,
                     },
+                    body: JSON.stringify({
+                        invoice_number: invoiceNumber || null,
+                        prefer_number_lookup: preferNumber,
+                    }),
                 });
                 const data = await response.json();
 
@@ -2230,6 +2261,10 @@ nowoczesna-edukacja.pl `;
                         applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
                     }
                     applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
+                    const ksefDisplay = document.getElementById('ksefNumberDisplay');
+                    if (ksefDisplay) {
+                        ksefDisplay.classList.remove('d-none');
+                    }
                     if (resultDiv) {
                         const alertClass = data.ksef_cleared ? 'alert-info' : 'alert-success';
                         const iconClass = data.ksef_cleared ? 'bi-info-circle' : 'bi-check-circle';
@@ -2265,7 +2300,7 @@ nowoczesna-edukacja.pl `;
                         </div>`;
                 }
             } finally {
-                btn.disabled = false;
+                allSyncBtns.forEach(function (el) { el.disabled = false; });
                 if (icon) {
                     icon.classList.remove('spinner-border', 'spinner-border-sm');
                     icon.classList.add('bi-arrow-repeat');
@@ -2274,10 +2309,25 @@ nowoczesna-edukacja.pl `;
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            const orderId = {{ $zamowienie->id }};
             const syncKsefBtn = document.getElementById('syncIfirmaKsefBtn');
             if (syncKsefBtn) {
                 syncKsefBtn.addEventListener('click', function () {
-                    syncIfirmaKsefFromPanel({{ $zamowienie->id }});
+                    syncIfirmaKsefFromPanel(orderId, {
+                        preferNumber: false,
+                        button: syncKsefBtn,
+                        icon: document.getElementById('syncIfirmaKsefIcon'),
+                    });
+                });
+            }
+            const syncByNumberBtn = document.getElementById('syncIfirmaByInvoiceNumberBtn');
+            if (syncByNumberBtn) {
+                syncByNumberBtn.addEventListener('click', function () {
+                    syncIfirmaKsefFromPanel(orderId, {
+                        preferNumber: true,
+                        button: syncByNumberBtn,
+                        icon: document.getElementById('syncIfirmaByInvoiceNumberIcon'),
+                    });
                 });
             }
         });

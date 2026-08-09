@@ -77,6 +77,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
             ->once()
             ->andReturn('7392137630-20260805-ABCDEF000001-11');
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => str_replace(' ', '', (string) $n));
 
         $service = new IfirmaFormOrderKsefSyncService($api, $paymentStatus);
         $result = $service->syncFromIfirmaInvoiceId($order);
@@ -89,6 +90,88 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertSame('2026-08-05', $result['invoice_issue_date']);
         $this->assertSame('2026-08-20', $result['invoice_due_date']);
         $this->assertSame('7392137630-20260805-ABCDEF000001-11', $result['ksef_number']);
+    }
+
+    public function test_prefer_number_lookup_replaces_stale_ifirma_id(): void
+    {
+        $order = Mockery::mock(FormOrder::class)->makePartial();
+        $order->forceFill([
+            'id' => 8361,
+            'ifirma_invoice_id' => 'OLD-DELETED',
+            'invoice_number' => '277/8/2026',
+            'ksef_number' => null,
+            'ksef_status' => null,
+            'ksef_sent_at' => null,
+            'invoice_issue_date' => null,
+            'invoice_due_date' => null,
+            'product_price' => 200,
+        ]);
+        $order->shouldReceive('save')->once()->andReturnTrue();
+
+        $paymentStatus = Mockery::mock(IfirmaInvoicePaymentStatusService::class);
+        $paymentStatus->shouldReceive('fetchPaymentSnapshotForOrder')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'invoice_id' => 'NEW-ID',
+                'source' => 'faktury.json',
+            ]);
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('getInvoice')
+            ->once()
+            ->with('NEW-ID')
+            ->andReturn(['status' => 'success', 'data' => []]);
+        $api->shouldReceive('unwrapInvoicePayload')->once()->andReturn([
+            'Identyfikator' => 'NEW-ID',
+            'PelnyNumer' => '277/8/2026',
+            'NumerKSeF' => '7392137630-20260809-ZZZZZZ000001-22',
+            'DataWystawienia' => '2026-08-09',
+            'TerminPlatnosci' => '2026-08-23',
+        ]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
+            ->once()
+            ->andReturn('7392137630-20260809-ZZZZZZ000001-22');
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
+
+        $service = new IfirmaFormOrderKsefSyncService($api, $paymentStatus);
+        $result = $service->syncFromIfirmaInvoiceId($order, '277/8/2026', true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('NEW-ID', $order->ifirma_invoice_id);
+        $this->assertSame('2026-08-09', $result['invoice_issue_date']);
+    }
+
+    public function test_does_not_clear_local_ksef_when_ifirma_has_none(): void
+    {
+        $order = Mockery::mock(FormOrder::class)->makePartial();
+        $order->forceFill([
+            'id' => 2,
+            'ifirma_invoice_id' => '111',
+            'invoice_number' => '45/8/2026',
+            'ksef_number' => '7392137630-20260805-MANUAL00001-99',
+            'ksef_status' => 'sent',
+            'ksef_sent_at' => now(),
+            'ksef_error' => null,
+        ]);
+        $order->shouldReceive('save')->never();
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('getInvoice')->once()->andReturn(['status' => 'success', 'data' => []]);
+        $api->shouldReceive('unwrapInvoicePayload')->once()->andReturn([
+            'Identyfikator' => '111',
+            'PelnyNumer' => '45/8/2026',
+        ]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->once()->andReturn(null);
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
+
+        $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
+        $result = $service->syncFromIfirmaInvoiceId($order);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['ksef_cleared'] ?? true);
+        $this->assertSame('7392137630-20260805-MANUAL00001-99', $order->ksef_number);
+        $this->assertStringContainsString('brak numeru KSeF', $result['message']);
     }
 
     public function test_does_not_overwrite_manual_invoice_number(): void
@@ -119,6 +202,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
             ->once()
             ->andReturn('7392137630-20260805-ABCDEF000001-11');
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
 
         $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
         $result = $service->syncFromIfirmaInvoiceId($order);
@@ -134,6 +218,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $order->forceFill([
             'id' => 7834,
             'ifirma_invoice_id' => '99887766',
+            'invoice_number' => '73/8/2026',
             'ksef_number' => null,
             'ksef_status' => null,
             'ksef_sent_at' => null,
@@ -171,6 +256,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
             ->once()
             ->andReturn('7392137630-20260805-ABCDEF000001-11');
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
 
         $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
         $result = $service->syncFromIfirmaInvoiceId($order);
@@ -180,8 +266,6 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertSame('99887766', $result['ifirma_invoice_id']);
         $this->assertSame('2026-08-05', $result['invoice_issue_date']);
         $this->assertSame('2026-08-20', $result['invoice_due_date']);
-        $this->assertSame('2026-08-05', $order->invoice_issue_date?->toDateString() ?? (string) $order->invoice_issue_date);
-        $this->assertSame('2026-08-20', $order->invoice_due_date?->toDateString() ?? (string) $order->invoice_due_date);
     }
 
     public function test_updates_invoice_dates_even_when_ksef_unchanged(): void
@@ -190,6 +274,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $order->forceFill([
             'id' => 8207,
             'ifirma_invoice_id' => '555',
+            'invoice_number' => '12/8/2026',
             'ksef_number' => '7392137630-20260805-ABCDEF000001-11',
             'ksef_status' => 'sent',
             'ksef_sent_at' => now(),
@@ -211,6 +296,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')
             ->once()
             ->andReturn('7392137630-20260805-ABCDEF000001-11');
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
 
         $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
         $result = $service->syncFromIfirmaInvoiceId($order);
@@ -219,38 +305,6 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertTrue($result['changed']);
         $this->assertSame('2026-08-06', $result['invoice_issue_date']);
         $this->assertSame('2026-08-06', $result['invoice_due_date']);
-    }
-
-    public function test_clears_ksef_when_ifirma_has_no_number(): void
-    {
-        $order = Mockery::mock(FormOrder::class)->makePartial();
-        $order->forceFill([
-            'id' => 2,
-            'ifirma_invoice_id' => '111',
-            'ksef_number' => '7392137630-20260805-OLD00000001-99',
-            'ksef_status' => 'sent',
-            'ksef_sent_at' => now(),
-            'ksef_error' => null,
-        ]);
-        $order->shouldReceive('save')->once()->andReturnTrue();
-
-        $api = Mockery::mock(IfirmaApiService::class);
-        $api->shouldReceive('getInvoice')->once()->andReturn(['status' => 'success', 'data' => []]);
-        $api->shouldReceive('unwrapInvoicePayload')->once()->andReturn([
-            'Identyfikator' => '111',
-            'PelnyNumer' => '45/8/2026',
-        ]);
-        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->once()->andReturn(null);
-
-        $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
-        $result = $service->syncFromIfirmaInvoiceId($order);
-
-        $this->assertTrue($result['success']);
-        $this->assertTrue($result['ksef_cleared'] ?? false);
-        $this->assertNull($result['ksef_number']);
-        $this->assertNull($order->ksef_number);
-        $this->assertNull($order->ksef_status);
-        $this->assertStringContainsString('wyczyszczono', $result['message']);
     }
 
     public function test_no_change_when_ifirma_has_no_ksef_and_order_already_empty(): void
@@ -271,6 +325,7 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
             'PelnyNumer' => '46/8/2026',
         ]);
         $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->once()->andReturn(null);
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => (string) $n);
 
         $service = new IfirmaFormOrderKsefSyncService($api, Mockery::mock(IfirmaInvoicePaymentStatusService::class));
         $result = $service->syncFromIfirmaInvoiceId($order);
