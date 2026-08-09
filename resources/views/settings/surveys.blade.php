@@ -104,10 +104,92 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card-header bg-light border-top">
+                <h5 class="mb-0">Awatary w formularzu rekomendacji</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Katalog: <strong>{{ $avatarCatalogCount ?? 0 }}</strong> awatarów (DiceBear).
+                    Zaznacz, które mają być dostępne na pnedu.pl przy rekomendacji.
+                    Wyłączenie nie usuwa już zapisanych rekomendacji. Zawsze: <strong>Tylko inicjały</strong> oraz <strong>własne zdjęcie</strong>.
+                    Przycisk „Zestaw profesjonalny” zaznacza domyślne 16.
+                </p>
+                @error('enabled_avatar_presets')
+                    <div class="alert alert-danger py-2">{{ $message }}</div>
+                @enderror
+                @error('enabled_avatar_presets.*')
+                    <div class="alert alert-danger py-2">{{ $message }}</div>
+                @enderror
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="avatarPresetProfessional">
+                        Zestaw profesjonalny
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="avatarPresetAll">
+                        Zaznacz wszystkie
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="avatarPresetNone">
+                        Odznacz wszystkie
+                    </button>
+                </div>
+
+                @php
+                    $enabledSet = array_fill_keys($enabledAvatarPresets ?? [], true);
+                    $professionalSet = array_fill_keys($professionalAvatarKeys ?? [], true);
+                @endphp
+
+                @foreach($avatarPresetsByGroup ?? [] as $groupName => $presets)
+                    <div class="mb-3">
+                        <div class="fw-semibold mb-2">{{ $groupName }}</div>
+                        <div class="row g-2">
+                            @foreach($presets as $preset)
+                                @php
+                                    $key = $preset['key'];
+                                    $checked = isset($enabledSet[$key]);
+                                    $isProfessional = isset($professionalSet[$key]);
+                                @endphp
+                                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                                    <label class="border rounded p-2 d-flex flex-column align-items-center h-100 text-center"
+                                           style="cursor:pointer;{{ $checked ? 'border-color:var(--bs-primary)!important;background:#f0f7ff;' : '' }}">
+                                        <input class="form-check-input align-self-start mb-1 js-avatar-preset-cb"
+                                               type="checkbox"
+                                               name="enabled_avatar_presets[]"
+                                               value="{{ $key }}"
+                                               data-professional="{{ $isProfessional ? '1' : '0' }}"
+                                               {{ $checked ? 'checked' : '' }}>
+                                        <img src="{{ $preset['url'] }}" alt="{{ $preset['label'] }}"
+                                             width="64" height="64" class="rounded-circle mb-1"
+                                             style="object-fit:cover;background:#eef2f6;">
+                                        <span class="small">{{ $preset['label'] }}</span>
+                                    </label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <a href="{{ route('surveys.templates.index') }}" class="btn btn-outline-secondary btn-sm">Edytuj szablony pytań</a>
                 <button type="submit" class="btn btn-primary">Zapisz ustawienia</button>
             </div>
         </form>
     </div>
+
+    @push('scripts')
+    <script>
+    (function () {
+        const boxes = () => Array.from(document.querySelectorAll('.js-avatar-preset-cb'));
+        const setAll = (on) => boxes().forEach((cb) => { cb.checked = !!on; });
+        const setProfessional = () => boxes().forEach((cb) => {
+            cb.checked = cb.getAttribute('data-professional') === '1';
+        });
+
+        document.getElementById('avatarPresetAll')?.addEventListener('click', () => setAll(true));
+        document.getElementById('avatarPresetNone')?.addEventListener('click', () => setAll(false));
+        document.getElementById('avatarPresetProfessional')?.addEventListener('click', setProfessional);
+    })();
+    </script>
+    @endpush
 </x-app-layout>

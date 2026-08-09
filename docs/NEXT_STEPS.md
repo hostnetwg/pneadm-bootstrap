@@ -3,6 +3,15 @@
 Data utworzenia/aktualizacji: 2026-08-08  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-08-09) — nowy zestaw 16 awatarów „nauczycielskich”
+
+Zregenerowano SVG (DiceBear, jawne opcje płci/fryzury); stare pliki w `public/images/avatars/_legacy_dicebear_2026_08/`.
+Ustawienia: checkboxy włączonych awatarów; migracja mapuje stare klucze w `survey_testimonials`.
+
+## Ostatnio (2026-08-09) — wybór awatarów rekomendacji w ustawieniach
+
+`Ankiety → Ustawienia`: które SVG pokazywać w formularzu. Kolumna `enabled_avatar_presets`.
+
 ## Ostatnio (2026-08-09) — homepage: 6 losowych rekomendacji + „Pokaż więcej”
 
 Na `/` w sekcji opinii: 6 losowych opublikowanych; przy `total > 6` przycisk dociąga kolejne partie (fragment).

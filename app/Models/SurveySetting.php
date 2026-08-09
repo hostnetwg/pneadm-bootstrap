@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SurveyAvatarPresets;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
@@ -34,6 +35,7 @@ class SurveySetting extends Model
         'default_channel',
         'default_is_anonymous',
         'allow_multiple_responses',
+        'enabled_avatar_presets',
         'default_template_id',
     ];
 
@@ -42,6 +44,7 @@ class SurveySetting extends Model
         'auto_close_after_days' => 'integer',
         'default_is_anonymous' => 'boolean',
         'allow_multiple_responses' => 'boolean',
+        'enabled_avatar_presets' => 'array',
     ];
 
     public static function forgetSettingsCache(): void
@@ -69,6 +72,7 @@ class SurveySetting extends Model
                         'default_channel' => self::CHANNEL_NATIVE,
                         'default_is_anonymous' => true,
                         'allow_multiple_responses' => false,
+                        'enabled_avatar_presets' => SurveyAvatarPresets::defaultEnabledKeys(),
                         'default_template_id' => SurveyTemplate::query()->where('is_default', true)->value('id'),
                     ]);
                 } catch (\Throwable) {
@@ -79,6 +83,7 @@ class SurveySetting extends Model
                         'default_channel' => self::CHANNEL_NATIVE,
                         'default_is_anonymous' => true,
                         'allow_multiple_responses' => false,
+                        'enabled_avatar_presets' => SurveyAvatarPresets::defaultEnabledKeys(),
                         'default_template_id' => null,
                     ]);
                     $fallback->id = self::SINGLETON_ID;
@@ -97,5 +102,23 @@ class SurveySetting extends Model
     public function isAutoOpenMode(): bool
     {
         return $this->open_mode === self::OPEN_MODE_AUTO;
+    }
+
+    /**
+     * Klucze awatarów widocznych w formularzu rekomendacji.
+     * null w DB → zestaw profesjonalny; pusta tablica → tylko BRAK / własne zdjęcie.
+     *
+     * @return list<string>
+     */
+    public function enabledAvatarPresets(): array
+    {
+        $raw = $this->enabled_avatar_presets;
+        if (! is_array($raw)) {
+            return SurveyAvatarPresets::defaultEnabledKeys();
+        }
+
+        $valid = array_values(array_intersect($raw, SurveyAvatarPresets::keys()));
+
+        return array_values(array_unique($valid));
     }
 }

@@ -126,6 +126,12 @@ Powiązanie z `survey_response_id` przez sesję.
 **Moderacja adm:** `Ankiety → Rekomendacje` → `/surveys/testimonials`  
 Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).
 
+**Awatary w formularzu:** `Ankiety → Ustawienia` → checkboxy (`survey_settings.enabled_avatar_presets`).
+Katalog: **32** self-hosted SVG (DiceBear Avataaars, zestaw „nauczycielski” — nie pełna biblioteka).
+Domyślnie włączone **16** (rdzeń); w ustawieniach można włączyć kolejne.
+Zawsze: BRAK + własne zdjęcie. Stare klucze mapowane w `SurveyAvatarPresets::migrateLegacyKey()`.
+Po zapisie ustawień adm czyści cache pnedu (`POST /api/internal/cache/survey-settings`) — bez tego formularz mógł trzymać starą listę do ~120 s.
+
 **pnedu homepage:** `HomeController` ładuje **6 losowych** opublikowanych rekomendacji;
 przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  
 Migracja seeduje dwie dotychczasowe opinie placeholder (Anna Nowak, Piotr Zieliński) jako opublikowane.
