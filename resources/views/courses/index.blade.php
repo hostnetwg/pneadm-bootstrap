@@ -935,8 +935,9 @@
         </div>
     </div>
 
-    {{-- Modal edycji ankiety zewnętrznej --}}
-    <div class="modal fade" id="surveyLinkEditModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkEditModalLabel{{ $course->id }}" aria-hidden="true">
+    {{-- Modal edycji ankiety (nad listą — bez ukrywania list modal, żeby nie zostawał backdrop) --}}
+    <div class="modal fade" id="surveyLinkEditModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkEditModalLabel{{ $course->id }}" aria-hidden="true"
+         data-bs-backdrop="static" data-bs-keyboard="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1075,6 +1076,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
                 bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+
+            // Awaryjne sprzątanie backdropu (gdy Vite/app.js jeszcze bez globalnego handlera).
+            document.addEventListener('hidden.bs.modal', function () {
+                requestAnimationFrame(function () {
+                    if (document.querySelector('.modal.show')) {
+                        return;
+                    }
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                });
             });
 
             // Dla każdego modala załaduj listę nagrań
@@ -1787,47 +1801,9 @@
                 if (!modalEl) {
                     return;
                 }
-                const editModalBootstrap = bootstrap.Modal.getOrCreateInstance(modalEl);
-                const listModalEl = document.getElementById('surveyLinkModal{{ $course->id }}');
-
-                window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
-
-                const showEdit = function () {
-                    editModalBootstrap.show();
-                };
-
-                if (listModalEl && listModalEl.classList.contains('show')) {
-                    window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = true;
-                    const listBootstrap = bootstrap.Modal.getInstance(listModalEl);
-                    const openEditWhenListClosed = function () {
-                        listModalEl.removeEventListener('hidden.bs.modal', openEditWhenListClosed);
-                        showEdit();
-                    };
-                    listModalEl.addEventListener('hidden.bs.modal', openEditWhenListClosed);
-                    if (listBootstrap) {
-                        listBootstrap.hide();
-                    } else {
-                        showEdit();
-                    }
-                } else {
-                    showEdit();
-                }
+                // Lista zostaje otwarta pod spodem — unikamy hide/show, które zostawiało ciemny backdrop.
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
             };
-
-            const editSurveyLinkModalIdxEl{{ $course->id }} = document.getElementById('surveyLinkEditModal{{ $course->id }}');
-            if (editSurveyLinkModalIdxEl{{ $course->id }}) {
-                editSurveyLinkModalIdxEl{{ $course->id }}.addEventListener('hidden.bs.modal', function () {
-                    if (!window.surveyLinkReopenListModalAfterEdit{{ $course->id }}) {
-                        return;
-                    }
-                    window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
-                    const listModalEl = document.getElementById('surveyLinkModal{{ $course->id }}');
-                    if (listModalEl) {
-                        bootstrap.Modal.getOrCreateInstance(listModalEl).show();
-                        loadSurveyLinks{{ $course->id }}();
-                    }
-                });
-            }
 
             const surveyLinkEditFormIdx{{ $course->id }} = document.getElementById('surveyLinkEditForm{{ $course->id }}');
             if (surveyLinkEditFormIdx{{ $course->id }}) {
@@ -1864,7 +1840,6 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
                             const editModalEl = document.getElementById('surveyLinkEditModal{{ $course->id }}');
                             if (editModalEl) {
                                 const inst = bootstrap.Modal.getInstance(editModalEl);

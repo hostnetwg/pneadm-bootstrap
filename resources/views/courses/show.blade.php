@@ -1211,7 +1211,8 @@
     </div>
 
     {{-- Modal edycji ankiety zewnętrznej --}}
-    <div class="modal fade" id="surveyLinkEditModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkEditModalLabel{{ $course->id }}" aria-hidden="true">
+    <div class="modal fade" id="surveyLinkEditModal{{ $course->id }}" tabindex="-1" aria-labelledby="surveyLinkEditModalLabel{{ $course->id }}" aria-hidden="true"
+         data-bs-backdrop="static" data-bs-keyboard="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1375,6 +1376,18 @@
     <script>
         // Obsługa usuwania wariantów przez AJAX
         document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('hidden.bs.modal', function () {
+                requestAnimationFrame(function () {
+                    if (document.querySelector('.modal.show')) {
+                        return;
+                    }
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                });
+            });
+
             @foreach($course->priceVariants as $variant)
                 const form{{ $variant->id }} = document.getElementById('deleteVariantForm{{ $variant->id }}');
                 if (form{{ $variant->id }}) {
@@ -2038,47 +2051,9 @@
             if (!modalEl) {
                 return;
             }
-            const editModalBootstrap = bootstrap.Modal.getOrCreateInstance(modalEl);
-            const listModalEl = document.getElementById('surveyLinkModal{{ $course->id }}');
-
-            window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
-
-            const showEdit = function () {
-                editModalBootstrap.show();
-            };
-
-            if (listModalEl && listModalEl.classList.contains('show')) {
-                window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = true;
-                const listBootstrap = bootstrap.Modal.getInstance(listModalEl);
-                const openEditWhenListClosed = function () {
-                    listModalEl.removeEventListener('hidden.bs.modal', openEditWhenListClosed);
-                    showEdit();
-                };
-                listModalEl.addEventListener('hidden.bs.modal', openEditWhenListClosed);
-                if (listBootstrap) {
-                    listBootstrap.hide();
-                } else {
-                    showEdit();
-                }
-            } else {
-                showEdit();
-            }
+            // Lista zostaje otwarta pod spodem — unikamy hide/show, które zostawiało ciemny backdrop.
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         };
-
-        const editSurveyLinkModalEl{{ $course->id }} = document.getElementById('surveyLinkEditModal{{ $course->id }}');
-        if (editSurveyLinkModalEl{{ $course->id }}) {
-            editSurveyLinkModalEl{{ $course->id }}.addEventListener('hidden.bs.modal', function () {
-                if (!window.surveyLinkReopenListModalAfterEdit{{ $course->id }}) {
-                    return;
-                }
-                window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
-                const listModal = document.getElementById('surveyLinkModal{{ $course->id }}');
-                if (listModal) {
-                    bootstrap.Modal.getOrCreateInstance(listModal).show();
-                    loadSurveyLinks{{ $course->id }}();
-                }
-            });
-        }
 
         const surveyLinkEditForm{{ $course->id }} = document.getElementById('surveyLinkEditForm{{ $course->id }}');
         if (surveyLinkEditForm{{ $course->id }}) {
@@ -2115,7 +2090,6 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        window.surveyLinkReopenListModalAfterEdit{{ $course->id }} = false;
                         const editModalEl = document.getElementById('surveyLinkEditModal{{ $course->id }}');
                         if (editModalEl) {
                             const inst = bootstrap.Modal.getInstance(editModalEl);

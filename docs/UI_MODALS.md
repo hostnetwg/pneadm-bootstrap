@@ -38,6 +38,12 @@ Helper JS: `resources/js/button-loading.js` → `window.PneButtonLoading.setButt
 
 Przykłady: windykacja (`Odśwież status z iFirma`), import wyciągu (`Importuj`, `Przelicz sugestie`, akceptacje, sprawdzenie statusu iFirma).
 
+## Zagnieżdżone modale (uwaga)
+
+Nie zamykaj jednego modala (`hide`) tylko po to, by zaraz otworzyć drugi — Bootstrap potrafi zostawić `.modal-backdrop` i stronę „ciemną / nieaktywną”.
+
+Preferuj: drugi modal nad otwartą listą albo jeden modal z przełączaną treścią. Globalne sprzątanie osieroconych backdropów: `resources/js/app.js` (event `hidden.bs.modal`).
+
 ## Dla AI (Cursor)
 
 Przy każdej nowej akcji wymagającej potwierdzenia **od razu** dodawaj modal — użytkownik nie powinien musieć o tym przypominać.
