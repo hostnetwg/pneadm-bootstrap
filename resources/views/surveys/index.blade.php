@@ -56,6 +56,14 @@
                                 <input type="text" class="form-control" id="search" name="search" 
                                        value="{{ request('search') }}" placeholder="Tytuł, opis, szkolenie...">
                             </div>
+                            <div class="col-md-2">
+                                <label for="channel" class="form-label">Kanał</label>
+                                <select class="form-select" id="channel" name="channel">
+                                    <option value="">Wszystkie</option>
+                                    <option value="native" {{ request('channel') === 'native' ? 'selected' : '' }}>Natywna (pnedu.pl)</option>
+                                    <option value="external" {{ request('channel') === 'external' ? 'selected' : '' }}>Zewnętrzna / import</option>
+                                </select>
+                            </div>
                             <div class="col-md-3">
                                 <label for="instructor_id" class="form-label">Instruktor</label>
                                 <select class="form-select" id="instructor_id" name="instructor_id">
@@ -68,12 +76,12 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="date_from" class="form-label">Data od</label>
                                 <input type="date" class="form-control" id="date_from" name="date_from" 
                                        value="{{ request('date_from') }}">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="date_to" class="form-label">Data do</label>
                                 <input type="date" class="form-control" id="date_to" name="date_to" 
                                        value="{{ request('date_to') }}">
@@ -218,13 +226,27 @@
 
             <!-- Lista ankiet -->
             @if($surveys->count() > 0)
+                <div class="d-flex flex-wrap gap-3 align-items-center mb-3 small text-muted">
+                    <span><span class="badge text-bg-info me-1">Natywna (pnedu.pl)</span> wypełniana na stronie</span>
+                    <span><span class="badge text-bg-secondary me-1">Zewnętrzna / import</span> Google Forms, CSV</span>
+                </div>
                 <div class="row">
                     @foreach($surveys as $survey)
                         <div class="col-md-6 col-lg-4 mb-4">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">{{ Str::limit($survey->title, 40) }}</h6>
-                                    <span class="badge bg-primary">{{ $survey->total_responses }}</span>
+                            <div class="card h-100 border-start border-4 {{ $survey->channelCardBorderClass() }}">
+                                <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-w-0">
+                                        <h6 class="mb-1 text-truncate" title="{{ $survey->title }}">{{ Str::limit($survey->title, 40) }}</h6>
+                                        <span class="badge {{ $survey->channelBadgeClass() }}">
+                                            @if($survey->isNativeChannel())
+                                                <i class="fas fa-globe me-1"></i>
+                                            @else
+                                                <i class="fas fa-file-import me-1"></i>
+                                            @endif
+                                            {{ $survey->channelLabel() }}
+                                        </span>
+                                    </div>
+                                    <span class="badge bg-primary flex-shrink-0" title="Liczba odpowiedzi">{{ $survey->total_responses }}</span>
                                 </div>
                                 <div class="card-body">
                                     <p class="text-muted mb-2">

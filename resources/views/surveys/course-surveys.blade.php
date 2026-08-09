@@ -67,10 +67,20 @@
                 <div class="row">
                     @foreach($surveys as $survey)
                         <div class="col-md-6 col-lg-4 mb-4">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">{{ Str::limit($survey->title, 40) }}</h6>
-                                    <span class="badge bg-primary">{{ $survey->total_responses }}</span>
+                            <div class="card h-100 border-start border-4 {{ $survey->channelCardBorderClass() }}">
+                                <div class="card-header d-flex justify-content-between align-items-start gap-2">
+                                    <div class="min-w-0">
+                                        <h6 class="mb-1 text-truncate" title="{{ $survey->title }}">{{ Str::limit($survey->title, 40) }}</h6>
+                                        <span class="badge {{ $survey->channelBadgeClass() }}">
+                                            @if($survey->isNativeChannel())
+                                                <i class="fas fa-globe me-1"></i>
+                                            @else
+                                                <i class="fas fa-file-import me-1"></i>
+                                            @endif
+                                            {{ $survey->channelLabel() }}
+                                        </span>
+                                    </div>
+                                    <span class="badge bg-primary flex-shrink-0" title="Liczba odpowiedzi">{{ $survey->total_responses }}</span>
                                 </div>
                                 <div class="card-body">
                                     @if($survey->description)

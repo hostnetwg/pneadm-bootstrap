@@ -11,6 +11,10 @@ class Survey extends Model
 {
     use HasFactory;
 
+    public const CHANNEL_NATIVE = 'native';
+
+    public const CHANNEL_EXTERNAL = 'external';
+
     protected $fillable = [
         'course_id',
         'instructor_id',
@@ -83,6 +87,33 @@ class Survey extends Model
     public function responses(): HasMany
     {
         return $this->hasMany(SurveyResponse::class);
+    }
+
+    /**
+     * Ankieta natywna (wypełniana na pnedu.pl), nie import CSV / Google.
+     */
+    public function isNativeChannel(): bool
+    {
+        if (($this->channel ?? '') === self::CHANNEL_NATIVE) {
+            return true;
+        }
+
+        return strtolower((string) ($this->source ?? '')) === 'pnedu';
+    }
+
+    public function channelLabel(): string
+    {
+        return $this->isNativeChannel() ? 'Natywna (pnedu.pl)' : 'Zewnętrzna / import';
+    }
+
+    public function channelBadgeClass(): string
+    {
+        return $this->isNativeChannel() ? 'text-bg-info' : 'text-bg-secondary';
+    }
+
+    public function channelCardBorderClass(): string
+    {
+        return $this->isNativeChannel() ? 'border-info' : 'border-secondary';
     }
 
     /**

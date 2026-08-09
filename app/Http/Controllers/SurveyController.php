@@ -73,6 +73,8 @@ class SurveyController extends Controller
             });
         }
 
+        $this->applyChannelFilter($query, $request);
+
         // JOIN z jawnym określeniem kolumn, aby uniknąć problemów z niejednoznacznymi kolumnami
         $surveys = $query->join('courses', 'surveys.course_id', '=', 'courses.id')
                         ->orderBy('courses.start_date', 'desc')
@@ -168,6 +170,8 @@ class SurveyController extends Controller
                   });
             });
         }
+
+        $this->applyChannelFilter($query, $request);
 
         // Pobierz wszystkie przefiltrowane ankiety
         $surveys = $query->get();
@@ -1064,5 +1068,32 @@ class SurveyController extends Controller
             'passives' => $passives,
             'total_responses' => $totalResponses
         ];
+    }
+
+    /**
+     * Filtr listy: natywna (pnedu.pl) vs zewnętrzna / import CSV.
+     */
+    private function applyChannelFilter($query, Request $request): void
+    {
+        if ($request->input('channel') === Survey::CHANNEL_NATIVE) {
+            $query->where(function ($q) {
+                $q->where('surveys.channel', Survey::CHANNEL_NATIVE)
+                    ->orWhere('surveys.source', 'pnedu');
+            });
+
+            return;
+        }
+
+        if ($request->input('channel') === Survey::CHANNEL_EXTERNAL) {
+            $query->where(function ($q) {
+                $q->where(function ($q2) {
+                    $q2->whereNull('surveys.channel')
+                        ->orWhere('surveys.channel', '!=', Survey::CHANNEL_NATIVE);
+                })->where(function ($q2) {
+                    $q2->whereNull('surveys.source')
+                        ->orWhere('surveys.source', '!=', 'pnedu');
+                });
+            });
+        }
     }
 }
