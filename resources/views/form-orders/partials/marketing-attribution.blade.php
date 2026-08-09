@@ -52,7 +52,7 @@
             </span>
         @endif
     @elseif($variant === 'subtle')
-        <p class="small text-muted mb-0 mt-1 form-order-marketing-subtle">
+        <p class="small text-muted mb-0 form-order-marketing-subtle text-break">
             <i class="bi bi-megaphone opacity-50" aria-hidden="true"></i>
             <span>Pozyskano:</span>
             @if($sourceName)
@@ -67,7 +67,7 @@
                    title="Podgląd kampanii{{ $campaignDeleted ? ' (usunięta)' : '' }}">
                     <code class="text-muted">{{ $campaignCode }}</code>
                     @if($campaignName)
-                        <span>— {{ Str::limit($campaignName, 50) }}</span>
+                        <span>— {{ $campaignName }}</span>
                     @endif
                 </a>
                 @if($utmContent)
@@ -102,7 +102,7 @@
             <span class="text-truncate" style="max-width: 14rem;">{{ Str::limit($placementLabel, 36) }}</span>
         </span>
     @elseif($variant === 'subtle')
-        <p class="small text-muted mb-0 mt-1 form-order-placement-subtle">
+        <p class="small text-muted mb-0 mt-1 form-order-placement-subtle text-break">
             <i class="bi bi-layout-sidebar-inset opacity-50" aria-hidden="true"></i>
             <span>Konwersja z:</span>
             <span class="badge rounded-pill fw-normal"

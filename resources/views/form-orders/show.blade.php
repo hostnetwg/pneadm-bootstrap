@@ -48,13 +48,9 @@
             </nav>
 
             {{-- Przyciski akcji --}}
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
                 <div>
                     <h2 class="d-inline-block mb-0 @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
-                    @include('form-orders.partials.marketing-attribution', [
-                        'zamowienie' => $zamowienie,
-                        'variant' => 'subtle',
-                    ])
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
@@ -78,7 +74,12 @@
                                value="{{ request('course_id') }}"
                                title="Wprowadź ID szkolenia (courses.id) do filtrowania zamówień przy Poprzednie/Następne">
                     </div>
-                    
+                    <span id="navigationFilterCountBadge"
+                          class="badge text-bg-secondary align-self-center"
+                          style="min-width: 2.25rem;"
+                          title="Liczba zamówień według aktywnych filtrów (ładowane po stronie)"
+                          data-count-url="{{ route('form-orders.navigation-filter-count') }}">…</span>
+
                     <div class="btn-group me-2" role="group">
                         <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
                            class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
@@ -101,6 +102,13 @@
                 </div>
             </div>
 
+            {{-- Atrybucja marketingowa — pełna szerokość pod paskiem filtrów / nawigacji --}}
+            <div class="w-100 mb-4">
+                @include('form-orders.partials.marketing-attribution', [
+                    'zamowienie' => $zamowienie,
+                    'variant' => 'subtle',
+                ])
+            </div>
 
             {{-- Komunikaty --}}
             @if(session('success'))
@@ -190,7 +198,14 @@
                             <span class="ms-1">·</span> prowadzący: <span class="fw-semibold text-white">{{ $courseInstructor }}</span>
                         </div>
                         <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            ID szkolenia (courses): <span class="fw-semibold text-white">{{ $zamowienie->course->id }}</span>
+                            ID szkolenia (courses):
+                            <button type="button"
+                                    class="btn btn-link btn-sm p-0 align-baseline fw-semibold text-white text-decoration-underline"
+                                    style="font-size: inherit; line-height: inherit;"
+                                    title="Wstaw {{ $zamowienie->course->id }} do filtra „ID szkolenia courses” (Poprzednie/Następne)"
+                                    onclick="fillCourseIdFilter({{ (int) $zamowienie->course->id }})">
+                                {{ $zamowienie->course->id }}
+                            </button>
                             @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
                                 <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->course->id_old }}</span>
                             @endif
@@ -198,7 +213,14 @@
                         </div>
                     @elseif($zamowienie->product_id)
                         <div class="small text-warning mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            <span>Brak rekordu courses</span> dla <code class="text-white">product_id</code> = {{ $zamowienie->product_id }}
+                            <span>Brak rekordu courses</span> dla <code class="text-white">product_id</code> =
+                            <button type="button"
+                                    class="btn btn-link btn-sm p-0 align-baseline text-white text-decoration-underline"
+                                    style="font-size: inherit; line-height: inherit;"
+                                    title="Wstaw {{ $zamowienie->product_id }} do filtra „ID szkolenia courses”"
+                                    onclick="fillCourseIdFilter({{ (int) $zamowienie->product_id }})">
+                                {{ $zamowienie->product_id }}
+                            </button>
                             <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
                         </div>
                     @elseif($zamowienie->publigo_product_id)
@@ -2700,6 +2722,22 @@ nowoczesna-edukacja.pl `;
             });
         }
 
+        // Wstaw ID szkolenia do filtra (klik w „ID szkolenia (courses): …”)
+        function fillCourseIdFilter(courseId) {
+            const courseIdInput = document.getElementById('courseIdFilter');
+            if (!courseIdInput) {
+                return;
+            }
+            const value = String(courseId ?? '').trim();
+            if (!value) {
+                return;
+            }
+            courseIdInput.value = value;
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('course_id', value);
+            window.location.href = currentUrl.toString();
+        }
+
         // Checkbox „tylko niewprowadzone” + pole course_id (filtr po courses.id / form_orders.product_id)
         document.addEventListener('DOMContentLoaded', function() {
             const filterCheckbox = document.getElementById('filterNewOnly');
@@ -2748,8 +2786,9 @@ nowoczesna-edukacja.pl `;
                 window.location.href = currentUrl.toString();
             });
             
-            // Pole: courses.id → query course_id (prev/next po product_id)
-            courseIdInput.addEventListener('input', function() {
+            // Pole: courses.id → query course_id (prev/next po product_id); Enter lub blur (change).
+            // Klik w ID szkolenia na karcie produktu: fillCourseIdFilter().
+            courseIdInput.addEventListener('change', function() {
                 const courseId = this.value.trim();
                 const currentUrl = new URL(window.location);
                 
@@ -2762,7 +2801,67 @@ nowoczesna-edukacja.pl `;
                 // Przeładowujemy stronę z nowym filtrem
                 window.location.href = currentUrl.toString();
             });
+            courseIdInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Licznik rekordów wg filtrów — po wczytaniu strony (nie blokuje Poprzednie/Następne)
+            loadNavigationFilterCount();
         });
+
+        function loadNavigationFilterCount() {
+            const badge = document.getElementById('navigationFilterCountBadge');
+            if (!badge) {
+                return;
+            }
+            const url = new URL(badge.dataset.countUrl || '/form-orders/navigation-filter-count', window.location.origin);
+            const pageUrl = new URL(window.location.href);
+            if (pageUrl.searchParams.get('filter_new') === '1') {
+                url.searchParams.set('filter_new', '1');
+            }
+            const courseId = pageUrl.searchParams.get('course_id')
+                || (document.getElementById('courseIdFilter')?.value || '').trim();
+            if (courseId) {
+                url.searchParams.set('course_id', courseId);
+            }
+
+            badge.textContent = '…';
+            badge.classList.remove('text-bg-primary', 'text-bg-warning');
+            badge.classList.add('text-bg-secondary');
+
+            fetch(url.toString(), {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    const count = Number(data.count || 0);
+                    badge.textContent = String(count);
+                    const hasFilter = !!(data.filter_new || data.course_id);
+                    badge.classList.remove('text-bg-secondary', 'text-bg-primary', 'text-bg-warning');
+                    badge.classList.add(hasFilter ? 'text-bg-primary' : 'text-bg-secondary');
+                    let title = 'Zamówień w zakresie nawigacji: ' + count;
+                    if (data.course_id) {
+                        title += ' · szkolenie #' + data.course_id;
+                    }
+                    if (data.filter_new) {
+                        title += ' · tylko niewprowadzone';
+                    }
+                    badge.title = title;
+                })
+                .catch(function () {
+                    badge.textContent = '—';
+                    badge.title = 'Nie udało się pobrać liczby zamówień';
+                });
+        }
 
         // Inicjalizacja tooltipów Bootstrap
         document.addEventListener('DOMContentLoaded', function() {

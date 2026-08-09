@@ -804,56 +804,18 @@ class FormOrdersController extends Controller
         }
 
         // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
-        $filterNew = $request->has('filter_new') && $request->input('filter_new') == '1';
+        $filterNew = $request->boolean('filter_new');
 
         // Sprawdzamy czy mamy filtrować po ID szkolenia
         $courseId = $request->input('course_id');
 
-        // Pobieramy poprzednie i następne zamówienie
-        if ($filterNew || $courseId) {
-            // Filtrujemy zamówienia
-            $prevQuery = FormOrder::where('id', '<', $id);
-            $nextQuery = FormOrder::where('id', '>', $id);
-
-            // Dodajemy filtr dla niewprowadzonych zamówień
-            if ($filterNew) {
-                $prevQuery->where(function ($q) {
-                    $q->whereNull('invoice_number')
-                        ->orWhere('invoice_number', '')
-                        ->orWhere('invoice_number', '0');
-                })->where(function ($q) {
-                    $q->where('status_completed', '!=', 1)
-                        ->orWhereNull('status_completed');
-                });
-
-                $nextQuery->where(function ($q) {
-                    $q->whereNull('invoice_number')
-                        ->orWhere('invoice_number', '')
-                        ->orWhere('invoice_number', '0');
-                })->where(function ($q) {
-                    $q->where('status_completed', '!=', 1)
-                        ->orWhereNull('status_completed');
-                });
-            }
-
-            // Filtr po courses.id (form_orders.product_id), nie po Publigo (id_old)
-            if ($courseId !== null && $courseId !== '') {
-                $prevQuery->where('product_id', (int) $courseId);
-                $nextQuery->where('product_id', (int) $courseId);
-            }
-
-            $prevOrder = $prevQuery->orderByDesc('id')->first();
-            $nextOrder = $nextQuery->orderBy('id')->first();
-        } else {
-            // Standardowe pobieranie wszystkich zamówień
-            $prevOrder = FormOrder::where('id', '<', $id)
-                ->orderByDesc('id')
-                ->first();
-
-            $nextOrder = FormOrder::where('id', '>', $id)
-                ->orderBy('id')
-                ->first();
-        }
+        // Pobieramy poprzednie i następne zamówienie (te same filtry co navigationFilterCount)
+        $prevQuery = FormOrder::query()->where('id', '<', $id);
+        $nextQuery = FormOrder::query()->where('id', '>', $id);
+        $this->applyShowNavigationFilters($prevQuery, $filterNew, $courseId);
+        $this->applyShowNavigationFilters($nextQuery, $filterNew, $courseId);
+        $prevOrder = $prevQuery->orderByDesc('id')->first();
+        $nextOrder = $nextQuery->orderBy('id')->first();
 
         $duplicateSiblingsCount = FormOrder::findDuplicatesFor($id)->count();
 
@@ -870,6 +832,49 @@ class FormOrdersController extends Controller
         }
 
         return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'duplicateSiblingsCount', 'pneduOrderFormEditUrl'));
+    }
+
+    /**
+     * Licznik zamówień dla filtrów nawigacji na stronie szczegółów (AJAX, po załadowaniu UI).
+     *
+     * Query: filter_new=1, course_id= — te same reguły co Poprzednie/Następne.
+     */
+    public function navigationFilterCount(Request $request)
+    {
+        $filterNew = $request->boolean('filter_new');
+        $courseId = $request->input('course_id');
+
+        $query = FormOrder::query();
+        $this->applyShowNavigationFilters($query, $filterNew, $courseId);
+
+        return response()->json([
+            'count' => (int) $query->count(),
+            'filter_new' => $filterNew,
+            'course_id' => ($courseId !== null && $courseId !== '') ? (int) $courseId : null,
+        ]);
+    }
+
+    /**
+     * Filtry wspólne dla prev/next oraz navigationFilterCount na /form-orders/{id}.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>  $query
+     */
+    private function applyShowNavigationFilters($query, bool $filterNew, mixed $courseId): void
+    {
+        if ($filterNew) {
+            $query->where(function ($q) {
+                $q->whereNull('invoice_number')
+                    ->orWhere('invoice_number', '')
+                    ->orWhere('invoice_number', '0');
+            })->where(function ($q) {
+                $q->where('status_completed', '!=', 1)
+                    ->orWhereNull('status_completed');
+            });
+        }
+
+        if ($courseId !== null && $courseId !== '') {
+            $query->where('product_id', (int) $courseId);
+        }
     }
 
     /**
