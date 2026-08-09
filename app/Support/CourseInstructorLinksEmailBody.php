@@ -67,24 +67,22 @@ class CourseInstructorLinksEmailBody
             $n++;
         }
 
-        // Materiały
-        $materialLines = [];
+        // Materiały — bez tytułów, tylko URL (jak w ANKIETA)
+        $materialUrls = [];
         foreach ($course->fileLinks->sortBy('order') as $fl) {
             $url = trim((string) ($fl->url ?? ''));
-            if ($url === '') {
-                continue;
-            }
-            $label = trim((string) ($fl->title ?? ''));
-            if ($label !== '') {
-                $materialLines[] = '   '.$label.': '.$url;
-            } else {
-                $materialLines[] = '   '.$url;
+            if ($url !== '') {
+                $materialUrls[] = $url;
             }
         }
-        if ($materialLines !== []) {
-            $lines[] = "{$n}) MATERIAŁY:";
-            foreach ($materialLines as $ml) {
-                $lines[] = $ml;
+        if ($materialUrls !== []) {
+            if (count($materialUrls) === 1) {
+                $lines[] = "{$n}) MATERIAŁY: ".$materialUrls[0];
+            } else {
+                $lines[] = "{$n}) MATERIAŁY:";
+                foreach ($materialUrls as $url) {
+                    $lines[] = '   '.$url;
+                }
             }
             $lines[] = '';
             $n++;
@@ -101,25 +99,24 @@ class CourseInstructorLinksEmailBody
             }
         }
 
-        // Ankiety zewnętrzne (Formularze)
+        // Ankiety — bez tytułów, tylko URL uczestnika
         $surveyLines = [];
         foreach ($course->surveyLinks->sortBy('order') as $sl) {
             $participantUrl = trim((string) $sl->participantFacingSurveyUrl());
             if ($participantUrl === '') {
                 continue;
             }
-            $label = trim((string) ($sl->title ?? ''));
             $suffix = $sl->isAvailableNow() ? '' : ' (ankieta nieaktywna lub poza terminem dostępu w systemie)';
-            if ($label !== '') {
-                $surveyLines[] = '   '.$label.': '.$participantUrl.$suffix;
-            } else {
-                $surveyLines[] = '   '.$participantUrl.$suffix;
-            }
+            $surveyLines[] = $participantUrl.$suffix;
         }
         if ($surveyLines !== []) {
-            $lines[] = "{$n}) ANKIETA:";
-            foreach ($surveyLines as $sl) {
-                $lines[] = $sl;
+            if (count($surveyLines) === 1) {
+                $lines[] = "{$n}) ANKIETA: ".$surveyLines[0];
+            } else {
+                $lines[] = "{$n}) ANKIETA:";
+                foreach ($surveyLines as $surveyLine) {
+                    $lines[] = '   '.$surveyLine;
+                }
             }
             $lines[] = '';
         }

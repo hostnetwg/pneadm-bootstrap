@@ -43,7 +43,8 @@ class PlainTextEmailHtml
      * w całości w &lt;strong&gt;. W linii z datą pogrubiona jest sama wartość (np. godziny),
      * napis „Termin szkolenia:” (lub stare „Data szkolenia:”) jest zwykły (bez pogrubienia).
      * Dwie pierwsze niepuste linie po „poniżej przesyłam linki na szkolenie:” to tytuł i ta linia daty.
-     * Nagłówki sekcji „N) MATERIAŁY:” oraz „N) ANKIETA:” (N – numer) też są w całości pogrubione.
+     * Nagłówki sekcji „N) MATERIAŁY:” oraz „N) ANKIETA:” (N – numer) są pogrubione;
+     * gdy URL jest w tej samej linii, zostaje klikalny (poza &lt;strong&gt;).
      */
     public static function formatTrainingLinksEmailHtml(string $plainBody): string
     {
@@ -64,9 +65,8 @@ class PlainTextEmailHtml
             } elseif ($titleIdx !== null && $dateIdx !== null && $idx === $dateIdx) {
                 $dateHtml = self::trainingLinksDateLineHtml($line);
                 $out .= $dateHtml !== null ? $dateHtml : self::linkifyForEmail($line);
-            } elseif (self::isMaterialOrSurveySectionHeading($trimmed)) {
-                $safe = htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                $out .= '<strong style="font-weight:700;">'.$safe.'</strong>';
+            } elseif (($sectionHtml = self::materialOrSurveySectionLineHtml($line)) !== null) {
+                $out .= $sectionHtml;
             } else {
                 $out .= self::linkifyForEmail($line);
             }
@@ -127,9 +127,23 @@ class PlainTextEmailHtml
         return [null, null];
     }
 
-    private static function isMaterialOrSurveySectionHeading(string $trimmedLine): bool
+    /**
+     * Linia „N) MATERIAŁY:” / „N) ANKIETA:” (opcjonalnie z URL w tej samej linii).
+     */
+    private static function materialOrSurveySectionLineHtml(string $line): ?string
     {
-        return (bool) preg_match('/^\d+\)\s*MATERIAŁY:\s*$/u', $trimmedLine)
-            || (bool) preg_match('/^\d+\)\s*ANKIETA:\s*$/u', $trimmedLine);
+        if (! preg_match('/^(\s*\d+\)\s*(?:MATERIAŁY|ANKIETA):\s*)(.*)$/u', $line, $m)) {
+            return null;
+        }
+
+        $labelHtml = '<strong style="font-weight:700;">'
+            .htmlspecialchars($m[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            .'</strong>';
+
+        if ($m[2] === '') {
+            return $labelHtml;
+        }
+
+        return $labelHtml.self::linkifyForEmail($m[2]);
     }
 }
