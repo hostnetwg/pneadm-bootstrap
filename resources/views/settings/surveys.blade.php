@@ -6,7 +6,7 @@
     <div class="py-3">
         <p class="text-muted mb-4">
             Domyślne zachowanie ankiet po szkoleniu: kanał (natywna / Google), anonimowość oraz tryb otwierania (ręczny / automatyczny).
-            Szablony pytań edytujesz w <a href="{{ route('surveys.templates.index') }}">Szkolenia → Ankiety → Szablony</a>.
+            Szablony pytań edytujesz w <a href="{{ route('surveys.templates.index') }}">Ankiety → Szablony</a>.
         </p>
 
         @if(session('success'))
@@ -56,9 +56,13 @@
 
                 <div class="row mb-4">
                     <div class="col-md-4">
-                        <label for="auto_open_offset_hours" class="form-label">Offset otwarcia (godziny po końcu szkolenia)</label>
-                        <input type="number" min="0" max="720" class="form-control" id="auto_open_offset_hours" name="auto_open_offset_hours"
+                        <label for="auto_open_offset_hours" class="form-label">Offset otwarcia (godziny względem końca szkolenia)</label>
+                        <input type="number" min="-24" max="720" class="form-control" id="auto_open_offset_hours" name="auto_open_offset_hours"
                                value="{{ old('auto_open_offset_hours', $settings->auto_open_offset_hours) }}">
+                        <div class="form-text">
+                            Ujemny = przed planowanym końcem (np. <code>-2</code> = 2&nbsp;h wcześniej).
+                            Dodatni = po końcu.
+                        </div>
                     </div>
                     <div class="col-md-4">
                         <label for="auto_close_after_days" class="form-label">Zamknięcie po (dni od otwarcia)</label>
@@ -85,6 +89,18 @@
                     <label class="form-check-label" for="default_is_anonymous">
                         Domyślnie ankieta anonimowa (można zmienić per ankieta na karcie szkolenia)
                     </label>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="allow_multiple_responses" id="allow_multiple_responses" value="1"
+                        {{ old('allow_multiple_responses', $settings->allow_multiple_responses) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="allow_multiple_responses">
+                        Zezwalaj na wielokrotne wypełnienie tej samej ankiety natywnej
+                    </label>
+                    <div class="form-text">
+                        Domyślnie wyłączone: nieanonimowa = max 1× na e-mail/konto;
+                        anonimowa = miękki limit (cookie w przeglądarce).
+                    </div>
                 </div>
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">

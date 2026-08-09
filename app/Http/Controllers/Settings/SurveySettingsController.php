@@ -23,20 +23,22 @@ class SurveySettingsController extends Controller
     {
         $validated = $request->validate([
             'open_mode' => 'required|in:manual,auto',
-            'auto_open_offset_hours' => 'nullable|integer|min:0|max:720',
+            'auto_open_offset_hours' => 'nullable|integer|min:-24|max:720',
             'auto_close_after_days' => 'nullable|integer|min:1|max:365',
             'default_channel' => 'required|in:native,external',
             'default_is_anonymous' => 'nullable|boolean',
+            'allow_multiple_responses' => 'nullable|boolean',
             'default_template_id' => 'nullable|exists:survey_templates,id',
         ]);
 
         $settings = SurveySetting::getSettings();
         $settings->fill([
             'open_mode' => $validated['open_mode'],
-            'auto_open_offset_hours' => (int) ($validated['auto_open_offset_hours'] ?? 0),
+            'auto_open_offset_hours' => (int) ($validated['auto_open_offset_hours'] ?? -2),
             'auto_close_after_days' => $validated['auto_close_after_days'] ?? null,
             'default_channel' => $validated['default_channel'],
             'default_is_anonymous' => $request->boolean('default_is_anonymous'),
+            'allow_multiple_responses' => $request->boolean('allow_multiple_responses'),
             'default_template_id' => $validated['default_template_id'] ?? null,
         ]);
         $settings->save();

@@ -49,15 +49,16 @@ Szablon:    survey_templates + survey_template_questions
 
 ## 3. Ustawienia globalne
 
-**UI:** `Ustawienia → Ankiety` → `/settings/ankiety`
+**UI:** menu **Ankiety → Ustawienia** → `/settings/ankiety`
 
 | Pole | Znaczenie |
 |------|-----------|
 | `default_channel` | `native` / `external` — domyślnie przy dodawaniu ankiety na szkoleniu |
 | `open_mode` | `manual` / `auto` — czy puste daty uzupełniać z końca szkolenia |
-| `auto_open_offset_hours` | godziny po `courses.end_date` |
+| `auto_open_offset_hours` | godziny względem `courses.end_date` (domyślnie **−2**; ujemny = przed końcem, zakres −24…720) |
 | `auto_close_after_days` | zamknięcie N dni po otwarciu (opcjonalnie) |
 | `default_is_anonymous` | domyślna anonimowość (nadpisywalna per ankieta) |
+| `allow_multiple_responses` | `false` = limit 1× (nieanon: e-mail/konto; anon: cookie); `true` = bez limitu |
 | `default_template_id` | szablon kopiowany przy ankiecie natywnej |
 
 Model: `SurveySetting` (singleton id=1, cache).
@@ -66,7 +67,7 @@ Model: `SurveySetting` (singleton id=1, cache).
 
 ## 4. Szablony pytań
 
-**UI:** `Szkolenia → Szablony ankiet` → `/surveys/templates`
+**UI:** `Ankiety → Szablony` → `/surveys/templates`
 
 - Seed: szablon **„Ewaluacja szkolenia (standard)”** (`ewaluacja-szkolenia`) — odpowiednik Google Form (pytanie `testimonial` w szablonie jest pomijane w fill — rekomendacja to osobny krok).
 - Edycja: dodawanie / usuwanie / zmiana treści, typu, kolejności, opcji.
@@ -87,6 +88,7 @@ Na liście szkoleń (`/courses`) oraz na karcie szkolenia → modal **Ankiety**:
 - okno `opens_at` / `closes_at`, aktywność, kolejność.
 
 Przy **native** system tworzy `Survey` + kopię pytań (`NativeSurveyProvisioner`) i wiąże `course_survey_links.survey_id`.  
+Tytuł: wzorzec `ANKIETA: {tytuł szkolenia bez HTML/&nbsp;} (YYYY-MM-DD)` (data z `start_date`) jest **wstawiany do pola „Tytuł / opis”** przy otwarciu modala — można go zmienić przed zapisem/edycją; przy native aktualizuje też `surveys.title`.  
 Link dla uczestnika: zawsze `{PNEDU_FRONTEND_URL}/ankieta/{public_token}`.
 
 ---
@@ -101,10 +103,12 @@ Link dla uczestnika: zawsze `{PNEDU_FRONTEND_URL}/ankieta/{public_token}`.
 | `POST /ankieta/{token}/rekomendacja` | zapis `survey_testimonials` (+ honeypot) |
 | `GET /ankieta/{token}/rekomendacja/pomin` | pominięcie rekomendacji → dzięki |
 | `GET /ankieta/{token}/dziekujemy` | podziękowanie (`?rec=1` gdy wysłano opinię) |
+| `GET /ankieta/{token}/juz-wypelniona` | komunikat przy ponownej próbie (limit 1×) |
 
 - Anonimowa: bez e-maila.
 - Z tożsamością: wymagany e-mail **tylko gdy niezalogowany**; zalogowany na pnedu.pl — blok e-mail ukryty, adres brany z konta.
 - Opcjonalne powiązanie z `participants` po e-mailu + `course_id`.
+- **Limit wypełnień** (gdy `allow_multiple_responses=false`, domyślnie): nieanonimowa = 1× na e-mail/konto; anonimowa = cookie przeglądarki (miękkie). Przełącznik: **Ankiety → Ustawienia**.
 - Pytania `question_type=testimonial` są **pomijane** w formularzu głównym.
 - Wyniki od razu widoczne w adm (lista ankiet / szczegóły / PDF jak dotychczas).
 
@@ -117,7 +121,7 @@ Po wysłaniu ankiety natywnej uczestnik trafia na osobny krok `/ankieta/{token}/
 oraz awatar (24 przykładowe SVG DiceBear Avataaars w `pnedu/public/images/avatars/` — kobiety/mężczyźni —
 albo upload własnego zdjęcia do `images/avatars/uploads/`). Powiązanie z `survey_response_id` przez sesję.
 
-**Moderacja adm:** `Szkolenia → Rekomendacje` → `/surveys/testimonials`  
+**Moderacja adm:** `Ankiety → Rekomendacje` → `/surveys/testimonials`  
 Publikacja tylko gdy `publish_consent` + ręczne „Publikuj”.
 
 **pnedu homepage:** `HomeController` ładuje `SurveyTestimonial::published()` (maks. 6).  
@@ -188,4 +192,3 @@ Wymagane: `PNEDU_FRONTEND_URL` w adm (budowa linków uczestnika).
 - Automatyczne tworzenie ankiety przy końcu szkolenia (job/cron przy `open_mode=auto`) — dziś auto uzupełnia daty przy **tworzeniu** linku
 - Edycja pytań już utworzonej instancji `Survey` (nie tylko szablonu)
 - Testy automatyczne importu / native submit / bramki
-- Deduplikacja odpowiedzi (1× na e-mail / token)

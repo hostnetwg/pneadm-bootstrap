@@ -11,6 +11,7 @@ use App\Models\SurveyTemplate;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Tworzy natywną ankietę (Survey + pytania ze szablonu) i wiąże z CourseSurveyLink.
@@ -36,11 +37,15 @@ class NativeSurveyProvisioner
         $settings = SurveySetting::getSettings();
 
         return DB::transaction(function () use ($link, $template, $course, $settings) {
+            $autoTitle = $this->defaultNativeSurveyTitle($course);
+            // Wzorzec jak przy imporcie CSV; opcjonalny tytuł z formularza nadpisuje tylko gdy podany.
+            $surveyTitle = filled($link->title) ? (string) $link->title : $autoTitle;
+
             $survey = Survey::create([
                 'course_id' => $course->id,
                 'instructor_id' => $course->instructor_id,
                 'survey_template_id' => $template->id,
-                'title' => $link->title ?: ('ANKIETA: '.$course->title),
+                'title' => $surveyTitle,
                 'description' => 'Ankieta natywna (pnedu.pl)',
                 'imported_at' => now(),
                 'imported_by' => Auth::id() ?? 1,
@@ -72,12 +77,28 @@ class NativeSurveyProvisioner
                 'channel' => SurveySetting::CHANNEL_NATIVE,
                 'provider' => 'pnedu',
                 'url' => null,
+                'title' => filled($link->title) ? $link->title : $autoTitle,
                 'opens_at' => $link->opens_at ?? $window['opens_at'],
                 'closes_at' => $link->closes_at ?? $window['closes_at'],
             ])->save();
 
             return $survey->load('questions');
         });
+    }
+
+    /**
+     * Tytuł: ANKIETA: {tytuł szkolenia bez HTML/&nbsp;} (YYYY-MM-DD).
+     * Data = start_date szkolenia (fallback: end_date).
+     */
+    public function defaultNativeSurveyTitle(Course $course): string
+    {
+        $plainTitle = $course->plainTitle('Szkolenie');
+
+        $datePart = $course->start_date
+            ? $course->start_date->format('Y-m-d')
+            : ($course->end_date ? $course->end_date->format('Y-m-d') : 'brak daty');
+
+        return Str::limit('ANKIETA: '.$plainTitle.' ('.$datePart.')', 255, '');
     }
 
     /**

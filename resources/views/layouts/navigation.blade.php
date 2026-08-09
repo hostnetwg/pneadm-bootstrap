@@ -18,9 +18,9 @@
 
         <!-- Dashboard -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('dashboard') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#dashboard-collapse"
-                    aria-expanded="{{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('dashboard') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#home"></use>
                 </svg>
@@ -29,7 +29,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('dashboard') || request()->routeIs('dashboard.surveys*') ? 'show' : '' }}" id="dashboard-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('dashboard') ? 'show' : '' }}" id="dashboard-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li>
                         <a href="{{ route('dashboard') }}"
@@ -38,22 +38,15 @@
                             Zamówienia
                         </a>
                     </li>
-                    <li>
-                        <a href="{{ route('dashboard.surveys') }}"
-                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('dashboard.surveys*') ? 'active fw-semibold text-white' : '' }}"
-                           onclick="event.stopPropagation();">
-                            Ankiety
-                        </a>
-                    </li>
                 </ul>
             </div>
         </li>
 
         <!-- Szkolenia -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('online-courses.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#courses-collapse"
-                    aria-expanded="{{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('online-courses.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#speedometer2"></use>
                 </svg>
@@ -62,16 +55,72 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('participants.*') || request()->routeIs('surveys.*') || request()->routeIs('online-courses.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('online-courses.*') ? 'show' : '' }}" id="courses-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Lista szkoleń</a></li>
                     <li><a href="{{ route('training-offers.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('training-offers.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Oferty szkoleń</a></li>
                     <li><a href="{{ route('courses.series.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Serie szkoleń</a></li>
                     <li><a href="{{ route('online-courses.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('online-courses.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Kursy online (nagrane)</a></li>
                     <li><a href="{{ route('courses.instructors.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Instruktorzy</a></li>
-                    <li><a href="{{ route('surveys.index') }}" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">Ankiety</a></li>
-                    <li><a href="{{ route('surveys.templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.templates.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Szablony ankiet</a></li>
-                    <li><a href="{{ route('surveys.testimonials.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.testimonials.*') ? 'fw-semibold text-white' : '' }}" onclick="event.stopPropagation();">Rekomendacje</a></li>
+                </ul>
+            </div>
+        </li>
+
+        <!-- Ankiety -->
+        @php
+            $surveyMenuActive = request()->routeIs('dashboard.surveys*')
+                || request()->routeIs('surveys.*')
+                || request()->routeIs('settings.surveys.*');
+        @endphp
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ $surveyMenuActive ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#surveys-collapse"
+                    aria-expanded="{{ $surveyMenuActive ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#table"></use>
+                </svg>
+                Ankiety
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ $surveyMenuActive ? 'show' : '' }}" id="surveys-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('dashboard.surveys') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('dashboard.surveys*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Podsumowanie
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('surveys.index') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.*') && ! request()->routeIs('surveys.templates.*') && ! request()->routeIs('surveys.testimonials.*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Lista ankiet
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('surveys.templates.index') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.templates.*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Szablony
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('surveys.testimonials.index') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('surveys.testimonials.*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Rekomendacje
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('settings.surveys.edit') }}"
+                           class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.surveys.*') ? 'active fw-semibold text-white' : '' }}"
+                           onclick="event.stopPropagation();">
+                            Ustawienia
+                        </a>
+                    </li>
                 </ul>
             </div>
         </li>
@@ -382,9 +431,12 @@
         
         <!-- Ustawienia -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('settings.*') ? '' : 'collapsed' }}"
+            @php
+                $settingsMenuActive = request()->routeIs('settings.*') && ! request()->routeIs('settings.surveys.*');
+            @endphp
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ $settingsMenuActive ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#settings-collapse"
-                    aria-expanded="{{ request()->routeIs('settings.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ $settingsMenuActive ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#sliders"></use>
                 </svg>
@@ -393,7 +445,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('settings.*') ? 'show' : '' }}" id="settings-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ $settingsMenuActive ? 'show' : '' }}" id="settings-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li>
                         <a href="{{ route('settings.pnedu-purchases.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.pnedu-purchases.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
@@ -403,11 +455,6 @@
                     <li>
                         <a href="{{ route('settings.analytics.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.analytics.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
                             GA i lejek (cookie)
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('settings.surveys.edit') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('settings.surveys.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
-                            Ankiety
                         </a>
                     </li>
                     <li><a href="#" class="link-light d-inline-flex text-decoration-none rounded" onclick="event.stopPropagation();">AI</a></li>

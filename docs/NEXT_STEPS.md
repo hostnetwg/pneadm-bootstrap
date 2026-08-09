@@ -3,6 +3,14 @@
 Data utworzenia/aktualizacji: 2026-08-08  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-08-09) — limit wielokrotnego wypełnienia ankiet natywnych
+
+Domyślnie off w **Ankiety → Ustawienia**: nieanonimowa 1× na e-mail/konto; anonimowa cookie. Flaga `allow_multiple_responses`.
+
+## Ostatnio (2026-08-09) — osobne menu Ankiety w adm
+
+W sidebarze: **Ankiety** (Podsumowanie, Lista, Szablony, Rekomendacje, Ustawienia). Usunięte ze Szkolenia / Dashboard / Ustawienia.
+
 ## Ostatnio (2026-08-08) — modal ankiet na liście `/courses`
 
 Modal z listy szkoleń ma ten sam UX co karta szkolenia: kanał **Natywna / Zewnętrzna**, szablon, anonimowość.

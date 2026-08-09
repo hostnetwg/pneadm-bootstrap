@@ -34,6 +34,7 @@ class CourseSurveyLinkController extends Controller
                 'is_anonymous' => (bool) $settings->default_is_anonymous,
                 'open_mode' => $settings->open_mode,
                 'default_template_id' => $settings->default_template_id,
+                'suggested_title' => $this->provisioner->defaultNativeSurveyTitle($course),
             ],
             'templates' => $templates,
         ]);
@@ -110,11 +111,15 @@ class CourseSurveyLinkController extends Controller
                 $surveyLink->update(['survey_id' => $surveyLink->survey_id]);
             }
 
-            // Aktualizacja anonimowości na powiązanej ankiecie
+            // Aktualizacja anonimowości / tytułu na powiązanej ankiecie natywnej
             if ($surveyLink->survey_id) {
-                $surveyLink->survey()?->update([
+                $surveyUpdates = [
                     'is_anonymous' => (bool) $surveyLink->is_anonymous,
-                ]);
+                ];
+                if ($surveyLink->fresh()->isNative() && filled($surveyLink->title)) {
+                    $surveyUpdates['title'] = $surveyLink->title;
+                }
+                $surveyLink->survey()?->update($surveyUpdates);
             }
 
             return response()->json([

@@ -57,11 +57,12 @@ return new class extends Migration
                 $table->id();
                 // manual | auto — jak domyślnie ustawiać okno otwarcia nowych ankiet
                 $table->string('open_mode', 20)->default('manual');
-                $table->unsignedInteger('auto_open_offset_hours')->default(0);
+                $table->integer('auto_open_offset_hours')->default(-2);
                 $table->unsignedInteger('auto_close_after_days')->nullable();
                 // native | external
                 $table->string('default_channel', 20)->default('native');
                 $table->boolean('default_is_anonymous')->default(true);
+                $table->boolean('allow_multiple_responses')->default(false);
                 $table->foreignId('default_template_id')->nullable()->constrained('survey_templates')->nullOnDelete();
                 $table->timestamps();
             });
@@ -339,10 +340,11 @@ return new class extends Migration
             DB::table('survey_settings')->insert([
                 'id' => 1,
                 'open_mode' => 'manual',
-                'auto_open_offset_hours' => 0,
+                'auto_open_offset_hours' => -2,
                 'auto_close_after_days' => 14,
                 'default_channel' => 'native',
                 'default_is_anonymous' => true,
+                'allow_multiple_responses' => false,
                 'default_template_id' => $templateId,
                 'created_at' => now(),
                 'updated_at' => now(),

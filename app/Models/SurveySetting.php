@@ -33,6 +33,7 @@ class SurveySetting extends Model
         'auto_close_after_days',
         'default_channel',
         'default_is_anonymous',
+        'allow_multiple_responses',
         'default_template_id',
     ];
 
@@ -40,6 +41,7 @@ class SurveySetting extends Model
         'auto_open_offset_hours' => 'integer',
         'auto_close_after_days' => 'integer',
         'default_is_anonymous' => 'boolean',
+        'allow_multiple_responses' => 'boolean',
     ];
 
     public static function forgetSettingsCache(): void
@@ -62,19 +64,21 @@ class SurveySetting extends Model
                     return self::query()->create([
                         'id' => self::SINGLETON_ID,
                         'open_mode' => self::OPEN_MODE_MANUAL,
-                        'auto_open_offset_hours' => 0,
+                        'auto_open_offset_hours' => -2,
                         'auto_close_after_days' => 14,
                         'default_channel' => self::CHANNEL_NATIVE,
                         'default_is_anonymous' => true,
+                        'allow_multiple_responses' => false,
                         'default_template_id' => SurveyTemplate::query()->where('is_default', true)->value('id'),
                     ]);
                 } catch (\Throwable) {
                     $fallback = new self([
                         'open_mode' => self::OPEN_MODE_MANUAL,
-                        'auto_open_offset_hours' => 0,
+                        'auto_open_offset_hours' => -2,
                         'auto_close_after_days' => 14,
                         'default_channel' => self::CHANNEL_NATIVE,
                         'default_is_anonymous' => true,
+                        'allow_multiple_responses' => false,
                         'default_template_id' => null,
                     ]);
                     $fallback->id = self::SINGLETON_ID;

@@ -882,9 +882,10 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="survey_link_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
+                            <label for="survey_link_title{{ $course->id }}" class="form-label">Tytuł / opis</label>
                             <input type="text" class="form-control" id="survey_link_title{{ $course->id }}" name="title"
-                                   placeholder="Np. Ankieta ewaluacyjna po szkoleniu">
+                                   placeholder="ANKIETA: Tytuł szkolenia (RRRR-MM-DD)" maxlength="255">
+                            <small class="form-text text-muted">Domyślnie uzupełniany wzorcem — możesz zmienić przed zapisem.</small>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -966,9 +967,10 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="survey_link_edit_title{{ $course->id }}" class="form-label">Tytuł / opis (opcjonalnie)</label>
+                            <label for="survey_link_edit_title{{ $course->id }}" class="form-label">Tytuł / opis</label>
                             <input type="text" class="form-control" id="survey_link_edit_title{{ $course->id }}" name="title"
-                                   placeholder="Np. Ankieta ewaluacyjna po szkoleniu">
+                                   placeholder="ANKIETA: Tytuł szkolenia (RRRR-MM-DD)" maxlength="255">
+                            <small class="form-text text-muted">Możesz zmienić tytuł — przy ankiecie natywnej zaktualizuje też Survey.</small>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -1590,6 +1592,7 @@
                             fillSurveyTemplateSelects{{ $course->id }}(data.templates, data.defaults || {});
                         }
                         if (data.defaults) {
+                            window.surveyLinkDefaults{{ $course->id }} = data.defaults;
                             const anon = document.getElementById('survey_link_is_anonymous{{ $course->id }}');
                             if (anon && typeof data.defaults.is_anonymous === 'boolean') {
                                 anon.checked = !!data.defaults.is_anonymous;
@@ -1599,6 +1602,10 @@
                             if (radio) {
                                 radio.checked = true;
                                 window.toggleSurveyLinkChannelFields{{ $course->id }}(ch);
+                            }
+                            const titleInput = document.getElementById('survey_link_title{{ $course->id }}');
+                            if (titleInput && data.defaults.suggested_title) {
+                                titleInput.value = data.defaults.suggested_title;
                             }
                         } else {
                             window.toggleSurveyLinkChannelFields{{ $course->id }}('native');
@@ -1738,7 +1745,8 @@
                 }
                 idInput.value = String(link.id);
                 urlEl.value = link.url || '';
-                titleEl.value = link.title || '';
+                const suggested = (window.surveyLinkDefaults{{ $course->id }} || {}).suggested_title || '';
+                titleEl.value = link.title || suggested || '';
                 opensEl.value = link.opens_at || '';
                 closesEl.value = link.closes_at || '';
                 orderEl.value = typeof link.order === 'number' ? link.order : parseInt(link.order || '0', 10);
