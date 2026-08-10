@@ -86,7 +86,7 @@
         </div>
 
         <div id="ksefRoleHintJst" class="small text-info mb-1 @if(!($isRoleJst && $isRecipient)) d-none @endif">
-            <i class="bi bi-info-circle"></i> JST: wymagany NIP (recipient_* lub identyfikator).
+            <i class="bi bi-info-circle"></i> JST: wymagany NIP w Odbiorcy. Przy typie IDWew wysyłamy też ID wewnętrzny (NIP+IDWew).
         </div>
         <div id="ksefRoleHintVat" class="small text-info mb-1 @if(!($isRoleVatGroup && $isRecipient)) d-none @endif">
             <i class="bi bi-info-circle"></i> Grupa VAT: NIP członka obowiązkowy.
@@ -121,7 +121,7 @@
                     <label for="show_ksef_additional_entity_identifier" class="form-label small mb-0 text-muted">Wartość ID</label>
                     <input type="text" maxlength="50" class="form-control form-control-sm"
                            id="show_ksef_additional_entity_identifier" data-ksef-field
-                           value="{{ $ksefIdentifier }}" placeholder="NIP">
+                           value="{{ $ksefIdentifier }}" placeholder="NIP lub 7743211258-00709">
                 </div>
             </div>
             <div class="mb-0">

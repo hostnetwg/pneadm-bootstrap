@@ -24,7 +24,9 @@ use RuntimeException;
  *  - rola spoza obsługiwanej listy              ⇒ RuntimeException,
  *  - `id_type` inny niż NULL/''/'NIP'/'IDWew'     ⇒ RuntimeException (zero cichego fallbacku),
  *  - niekompletne dane `recipient_*`            ⇒ RuntimeException,
- *  - rola wymagająca NIP (JST, grupa VAT) + pusty NIP ⇒ RuntimeException.
+ *  - rola wymagająca NIP (JST, grupa VAT) + pusty NIP ⇒ RuntimeException,
+ *  - typ IDWew + JST/VAT: `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip` (A2),
+ *  - typ IDWew + odbiorca: tylko `IdentyfikatorWewnetrznyZNip`.
  *
  * Legacy: `buildLegacyRecipientPhysicalOnly()` — zwykły odbiorca (rola ODBIORCA)
  * wyłącznie z `recipient_*`, gdy KSeF jest wyłączony (`ksef_entity_source=none`).
@@ -92,20 +94,28 @@ class IfirmaAdditionalEntityMapper
         }
 
         if ($idType === FormOrder::KSEF_ID_TYPE_IDWEW) {
-            if (FormOrder::isKsefRoleRequiringNip($role)) {
-                throw new RuntimeException(
-                    'KSeF Podmiot3: rola "'.$role.'" wymaga NIP — identyfikator wewnętrzny (IDWew) jest dostępny tylko dla roli odbiorcy.'
-                );
-            }
-
             $idwew = $this->normalizeIdwewIdentifier(trim((string) $order->ksef_additional_entity_identifier));
             if ($idwew === null) {
                 throw new RuntimeException(
-                    'KSeF Podmiot3: brak lub niepoprawny identyfikator wewnętrzny (IDWew) w ksef_additional_entity_identifier.'
+                    'KSeF Podmiot3: brak lub niepoprawny identyfikator wewnętrzny (IDWew) w ksef_additional_entity_identifier. '
+                    .'Oczekiwany format: 10 cyfr NIP + „-” + 5 cyfr (np. 7743211258-00709).'
                 );
             }
 
             $podmiot['IdentyfikatorWewnetrznyZNip'] = $idwew;
+
+            // A2: JST / grupa VAT — IDWew + NIP Podmiotu3 z recipient_nip (dokumentacja iFirma:
+            // https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/ — oba pola dozwolone).
+            if (FormOrder::isKsefRoleRequiringNip($role)) {
+                $nip = $this->resolveRecipientNipOnly($order);
+                if ($nip === null || $nip === '') {
+                    throw new RuntimeException(
+                        'KSeF Podmiot3: rola "'.$role.'" z typem IDWew wymaga też NIP Podmiotu3 w recipient_nip '
+                        .'(obok IdentyfikatorWewnetrznyZNip). Uzupełnij NIP w karcie ODBIORCA / Podmiot3.'
+                    );
+                }
+                $podmiot['NIP'] = $nip;
+            }
         } else {
             $nip = $this->resolveNip($order);
 
@@ -191,7 +201,7 @@ class IfirmaAdditionalEntityMapper
     }
 
     /**
-     * Rozwiąż wartość pola NIP w payloadzie iFirma.
+     * Rozwiąż wartość pola NIP w payloadzie iFirma (ścieżka typ NIP / brak typu).
      */
     private function resolveNip(FormOrder $order): ?string
     {
@@ -204,6 +214,14 @@ class IfirmaAdditionalEntityMapper
             return $normalized !== '' ? $normalized : null;
         }
 
+        return $this->resolveRecipientNipOnly($order);
+    }
+
+    /**
+     * NIP wyłącznie z kolumny recipient_nip (nie z identyfikatora — ten przy IDWew to ID wewnętrzny).
+     */
+    private function resolveRecipientNipOnly(FormOrder $order): ?string
+    {
         $recipientNip = trim((string) $order->recipient_nip);
         if ($recipientNip === '') {
             return null;

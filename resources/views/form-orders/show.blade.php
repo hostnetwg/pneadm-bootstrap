@@ -3117,9 +3117,11 @@ nowoczesna-edukacja.pl `;
 
                 document.getElementById('ksefRoleHintJst')?.classList.toggle('d-none', !(isRecipient && role === 'jst_recipient'));
                 document.getElementById('ksefRoleHintVat')?.classList.toggle('d-none', !(isRecipient && role === 'vat_group_member'));
+                // Obsługiwane: brak / NIP / IDWew — ostrzeżenie tylko dla PESEL, BrakID itd.
+                const idTypeSupported = !idType || idType === '' || idType === 'NIP' || idType === 'IDWew';
                 document.getElementById('ksefIdTypeWarning')?.classList.toggle(
                     'd-none',
-                    !(isRecipient && idType && idType !== '' && idType !== 'NIP')
+                    !(isRecipient && idType && !idTypeSupported)
                 );
             }
 

@@ -19,7 +19,7 @@ Dokument opisuje wdrożenie obsługi dodatkowego podmiotu na fakturze
 | **ETAP 1** | Kolumny metadanych `ksef_*` + backfill `recipient` → `odbiorca` | ✅ wdrożony |
 | **ETAP 2** | Role `odbiorca` / `jst_recipient` (8) / `vat_group_member` (9), UI metadanych w adm, fail-fast | ✅ wdrożony |
 | **ETAP 3** | Przyciski iFirma na `/form-orders/{id}`, `IfirmaKontrahentBuilder`, `PodmiotyDodatkowe` (zmiana API iFirma 2026-08-04), dwufazowy czerwony przycisk + sync KSeF | ✅ wdrożony w **adm** |
-| **ETAP 4** | Faktor / inne role / `IdentyfikatorWewnetrznyZNip` / rename `recipient_*` / Podmiot3 na pro formie | ⏸ nie rozpoczęty — wymaga decyzji |
+| **ETAP 4** | Faktor / inne role / rename `recipient_*` / Podmiot3 na pro formie | ⏸ częściowo: **A2 wdrożone** (JST/VAT + IDWew → `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip`) |
 | **pnedu.pl** | Oznaczenia KSeF / role w publicznym formularzu zamówienia | ❌ poza zakresem (świadomie) |
 
 Badge „ETAP 3” w UI adm (`show` / `edit` / `create`) oznacza powyższy stan metadanych +
@@ -158,14 +158,17 @@ przypadkach:
 1. `ksef_entity_source = 'recipient'` + rola inna niż `null`/`''`/
    jedna z obsługiwanych (`odbiorca`, `jst_recipient`, `vat_group_member`)
    → komunikat z listą dozwolonych wartości.
-2. `ksef_entity_source = 'recipient'` + `id_type` inny niż `null`/`''`/`'NIP'`
+2. `ksef_entity_source = 'recipient'` + `id_type` spoza `null`/`''`/`NIP`/`IDWew`
    → komunikat. **Nigdy nie wykonujemy cichego fallbacku do `recipient_nip`**
-   dla innych `id_type`.
+   dla innych `id_type` (np. PESEL, BrakID).
 3. `ksef_entity_source = 'recipient'` + brak któregokolwiek z:
    `recipient_name`, `recipient_postal_code`, `recipient_city`.
 4. `ksef_entity_source = 'recipient'` + rola ∈ `{jst_recipient, vat_group_member}`
    + pusty NIP (po normalizacji cyfrowej). KSeF nie przyjmie JST ani
    członka grupy VAT bez NIP, więc odrzucamy request przed uderzeniem do iFirma.
+5. `id_type = IDWew` + rola JST/VAT + pusty `recipient_nip` → fail-fast
+   (wymagane oba: `IdentyfikatorWewnetrznyZNip` z identyfikatora oraz `NIP`
+   z `recipient_nip` — wariant A2).
 
 Dodatkowo kontroler zwraca **HTTP 400**, gdy
 `ksef_entity_source = 'none'` w ścieżkach explicit wymagających Podmiotu3
@@ -422,8 +425,10 @@ Powiązane: `IfirmaAdditionalEntityMapperTest`, `FormOrderKsefHelpersTest`,
 - Potwierdzenie i ewentualne wdrożenie obsługi faktora / `DOKONUJACY_PLATNOSCI`
   po zweryfikowaniu mapowania w iFirma (w publicznej dokumentacji brak osobnej
   wartości `FAKTOR` w polu `Rola`).
-- Obsługa `IdentyfikatorWewnetrznyZNip` (obok NIP) dla edge-case JST / grupy VAT
-  — pole jest w [dokumentacji iFirma](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/).
+- ✅ **A2 (2026-08):** `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip`
+  dla ról JST / grupa VAT przy `id_type=IDWew`
+  ([dokumentacja iFirma](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/)).
+  Dla `odbiorca` + IDWew nadal tylko `IdentyfikatorWewnetrznyZNip`.
 - Dodatkowe role (`DODATKOWY_NABYWCA`, `DOKONUJACY_PLATNOSCI`, `PRACOWNIK`, `INNA`)
   tylko przy realnym przypadku biznesowym.
 - Podmiot3 na pro formie — **tylko** po potwierdzeniu w dokumentacji iFirma
@@ -446,13 +451,13 @@ dopiero potem kod ETAP 4.
    - na drugim zamówieniu / po resecie: rola `jst_recipient` + NIP JST →
      **czerwony** przycisk (create → KSeF) → sprawdź `NumerKSeF` w adm i w iFirma;
    - upewnij się, że e-mail z FV idzie dopiero po nadaniu numeru KSeF.
-2. **Decyzja Waldemara — co jest ETAP 4.1 w kodzie (wybierz jeden):**
-   - **A)** `IdentyfikatorWewnetrznyZNip` w mapperze (gdy JST ma ID wewnętrzny obok NIP);
+2. **Decyzja Waldemara — ETAP 4.1:**
+   - **A2)** ✅ wdrożone — JST/VAT + IDWew → `IdentyfikatorWewnetrznyZNip` + `NIP` (`recipient_nip`);
    - **B)** nowa rola biznesowa (np. płatnik), jeśli pojawi się konkretne zamówienie;
-   - **C)** nic w kodzie — tylko procedura operacyjna + szkolenie zespołu z UI adm;
-   - **D)** dopiero później: pola KSeF w formularzu publicznym pnedu.pl (osobny projekt).
+   - **C)** procedura operacyjna + szkolenie zespołu z UI adm;
+   - **D)** później: pola KSeF w formularzu publicznym pnedu.pl (osobny projekt).
 
-Dopóki nie ma decyzji A/B/D, domyślny następny krok = **C + punkt 1 (smoke test)**.
+Następny krok po A2: smoke na zamówieniu z JST+IDWew (np. #7987) fioletowym/czerwonym przyciskiem.
 
 ## Identyfikatory faktury na `form_orders`
 

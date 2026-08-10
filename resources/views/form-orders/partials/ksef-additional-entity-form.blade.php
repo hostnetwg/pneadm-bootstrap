@@ -57,7 +57,7 @@
     <div class="card-body">
         <p class="text-muted small mb-3">
             Metadane sterujące traktowaniem danych <code>recipient_*</code> jako Podmiotu3 (dodatkowego podmiotu na fakturze) przy wystawianiu faktury w iFirma i wysyłce do KSeF.
-            Obsługiwane role: <code>odbiorca</code> (iFirma: <code>ODBIORCA</code>), <code>jst_recipient</code> (iFirma: <code>JEDN_SAMORZADU_TERYT</code>, KSeF rola 8), <code>vat_group_member</code> (iFirma: <code>CZLONEK_GRUPY_VAT</code>, KSeF rola 9). Typ identyfikatora: wyłącznie <code>NIP</code>.
+            Obsługiwane role: <code>odbiorca</code> (iFirma: <code>ODBIORCA</code>), <code>jst_recipient</code> (iFirma: <code>JEDN_SAMORZADU_TERYT</code>, KSeF rola 8), <code>vat_group_member</code> (iFirma: <code>CZLONEK_GRUPY_VAT</code>, KSeF rola 9). Typ ID: <code>NIP</code> lub <code>IDWew</code> (przy JST/VAT + IDWew wymagany też NIP w <code>recipient_nip</code>).
             Szczegóły: <code>docs/KSEF_FORM_ORDERS.md</code>.
         </p>
 

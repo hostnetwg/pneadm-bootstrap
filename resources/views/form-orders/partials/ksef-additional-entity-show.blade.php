@@ -2,8 +2,8 @@
     Blok prezentacji „KSeF – Podmiot3 (metadane)” na widoku szczegółów zamówienia.
     Tylko do odczytu. Logika i ograniczenia opisane w docs/KSEF_FORM_ORDERS.md.
 
-    Stan ETAP 3: obsługiwane role → odbiorca, jst_recipient (rola 8), vat_group_member (rola 9).
-    Payload iFirma: PodmiotyDodatkowe. Dla JST i grupy VAT wymagany niepusty NIP (fail-fast).
+    Stan ETAP 3 + A2: role odbiorca / jst_recipient / vat_group_member.
+    Payload iFirma: PodmiotyDodatkowe. JST/VAT: NIP obowiązkowy; przy IDWew też IdentyfikatorWewnetrznyZNip.
 --}}
 @php
     /** @var \App\Models\FormOrder $zamowienie */
@@ -24,7 +24,16 @@
     $effectiveIfirmaRole = $isActive && $roleSupported ? FormOrder::ksefRoleIfirmaCode($effectiveRole) : null;
 
     $effectiveIdentifier = null;
+    $effectiveIdwew = null;
     if ($isActive) {
+        if ($idType === FormOrder::KSEF_ID_TYPE_IDWEW && ! empty(trim((string) $identifier))) {
+            $rawIdwew = trim((string) $identifier);
+            if (preg_match('/^[0-9]{10}-[0-9]{5}$/', $rawIdwew) || preg_match('/^[0-9]{15}$/', $rawIdwew)) {
+                $effectiveIdwew = preg_match('/^[0-9]{15}$/', $rawIdwew)
+                    ? substr($rawIdwew, 0, 10).'-'.substr($rawIdwew, 10)
+                    : $rawIdwew;
+            }
+        }
         if ($idType === FormOrder::KSEF_ID_TYPE_NIP && ! empty(trim((string) $identifier))) {
             $effectiveIdentifier = preg_replace('/[^0-9]/', '', (string) $identifier);
         } elseif (! empty(trim((string) $zamowienie->recipient_nip))) {
@@ -95,6 +104,9 @@
             <span class="text-muted">Podmiot3 efektywny:</span>
             rola <code>{{ $effectiveRole }}</code> (iFirma: <code>{{ $effectiveIfirmaRole }}</code>),
             NIP w payloadzie: <code>{{ $effectiveIdentifier ?: '— brak NIP —' }}</code>
+            @if ($effectiveIdwew)
+                · IDWew: <code>{{ $effectiveIdwew }}</code>
+            @endif
             @if ($missingRequiredNip)
                 <span class="badge bg-warning text-dark ms-1" title="Rola wymaga niepustego NIP — mapper zablokuje request (fail-fast)">fail-fast: brak NIP</span>
             @endif
