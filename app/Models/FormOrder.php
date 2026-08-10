@@ -943,6 +943,16 @@ class FormOrder extends Model
     }
 
     /**
+     * Bramka online bez statusu „Opłacone” — ostrzeż przed dodaniem uczestnika / wystawieniem FV.
+     * (Oczekuje na płatność, anulowane, błąd, złożone itd.)
+     */
+    public function shouldWarnUnpaidOnlineGateway(): bool
+    {
+        return $this->payment_mode === self::PAYMENT_MODE_ONLINE_GATEWAY
+            && $this->payment_status !== self::PAYMENT_STATUS_PAID;
+    }
+
+    /**
      * Płatność online przez PayU ze statusem „opłacone” – najwyższy priorytet przy wyborze zamówienia w grupie duplikatów.
      */
     public function isPayuPaidOnlineOrder(): bool

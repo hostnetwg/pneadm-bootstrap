@@ -1208,7 +1208,50 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        function provisionPnedu(orderId) {
+        // Ostrzeżenie: płatność online nie „Opłacone” (w trakcie / anulowane / błąd) — przed PNEDU i iFirma
+        window.formOrderUnpaidOnlineWarning = {
+            needed: @json($zamowienie->shouldWarnUnpaidOnlineGateway()),
+            statusLabel: @json(\App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status)),
+            modeLabel: @json($zamowienie->paymentModeLabelWithGateway()),
+        };
+
+        function withUnpaidOnlinePaymentWarning(confirmButtonLabel, proceedFn) {
+            if (!window.formOrderUnpaidOnlineWarning || !window.formOrderUnpaidOnlineWarning.needed) {
+                proceedFn();
+                return;
+            }
+            const modalEl = document.getElementById('unpaidOnlinePaymentWarningModal');
+            const confirmBtn = document.getElementById('unpaidOnlinePaymentWarningConfirmBtn');
+            const statusEl = document.getElementById('unpaidOnlinePaymentWarningStatus');
+            const modeEl = document.getElementById('unpaidOnlinePaymentWarningMode');
+            if (!modalEl || !confirmBtn) {
+                proceedFn();
+                return;
+            }
+            if (statusEl) {
+                statusEl.textContent = window.formOrderUnpaidOnlineWarning.statusLabel || '—';
+            }
+            if (modeEl) {
+                modeEl.textContent = window.formOrderUnpaidOnlineWarning.modeLabel || 'Płatność online';
+            }
+            confirmBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (confirmButtonLabel || 'Mimo to kontynuuj');
+            confirmBtn.onclick = function () {
+                const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                instance.hide();
+                proceedFn();
+            };
+            (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
+        }
+
+        function provisionPnedu(orderId, options) {
+            options = options || {};
+            if (!options.skipUnpaidOnlineWarning) {
+                withUnpaidOnlinePaymentWarning('Mimo to dodaj uczestnika', function () {
+                    provisionPnedu(orderId, { skipUnpaidOnlineWarning: true });
+                });
+                return;
+            }
+
             const buttons = document.querySelectorAll('.js-pnedu-provision-btn');
             const resultDiv = document.getElementById('pneduResult');
             buttons.forEach((btn) => {
@@ -1307,7 +1350,15 @@ nowoczesna-edukacja.pl `;
         }
 
         // Funkcja do wystawiania faktury pro forma w iFirma
-        function createIfirmaProForma(orderId) {
+        function createIfirmaProForma(orderId, options) {
+            options = options || {};
+            if (!options.skipUnpaidOnlineWarning) {
+                withUnpaidOnlinePaymentWarning('Mimo to wystaw pro-formę', function () {
+                    createIfirmaProForma(orderId, { skipUnpaidOnlineWarning: true });
+                });
+                return;
+            }
+
             const button = document.getElementById('ifirmaProFormaBtn');
             const resultDiv = document.getElementById('ifirmaResult');
             
@@ -1437,7 +1488,15 @@ nowoczesna-edukacja.pl `;
         window.invoiceType = 'standard'; // 'standard' lub 'with-receiver'
 
         // Funkcja sprawdzająca czy invoice_number jest wypełnione w bazie danych przed wystawieniem faktury
-        function checkAndCreateInvoice(orderId) {
+        function checkAndCreateInvoice(orderId, options) {
+            options = options || {};
+            if (!options.skipUnpaidOnlineWarning) {
+                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę', function () {
+                    checkAndCreateInvoice(orderId, { skipUnpaidOnlineWarning: true });
+                });
+                return;
+            }
+
             const button = document.getElementById('ifirmaInvoiceBtn');
             const invoiceNumberInput = document.getElementById('invoice_number');
             
@@ -1693,7 +1752,15 @@ nowoczesna-edukacja.pl `;
         }
 
         // Funkcja sprawdzająca czy invoice_number jest wypełnione w bazie danych przed wystawieniem faktury z odbiorcą
-        function checkAndCreateInvoiceWithReceiver(orderId) {
+        function checkAndCreateInvoiceWithReceiver(orderId, options) {
+            options = options || {};
+            if (!options.skipUnpaidOnlineWarning) {
+                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę', function () {
+                    checkAndCreateInvoiceWithReceiver(orderId, { skipUnpaidOnlineWarning: true });
+                });
+                return;
+            }
+
             const button = document.getElementById('ifirmaInvoiceWithReceiverBtn');
             const invoiceNumberInput = document.getElementById('invoice_number');
             
@@ -1969,7 +2036,15 @@ nowoczesna-edukacja.pl `;
         }
 
         // Funkcja sprawdzająca czy invoice_number jest wypełnione przed wystawieniem faktury z KSeF
-        function checkAndCreateInvoiceWithKsef(orderId) {
+        function checkAndCreateInvoiceWithKsef(orderId, options) {
+            options = options || {};
+            if (!options.skipUnpaidOnlineWarning) {
+                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę z KSeF', function () {
+                    checkAndCreateInvoiceWithKsef(orderId, { skipUnpaidOnlineWarning: true });
+                });
+                return;
+            }
+
             const button = document.getElementById('ifirmaInvoiceWithKsefBtn');
             const invoiceNumberInput = document.getElementById('invoice_number');
             
@@ -3267,6 +3342,43 @@ nowoczesna-edukacja.pl `;
                     </button>
                     <button type="button" class="btn btn-warning" id="ksefWarningConfirmBtn">
                         <i class="bi bi-check-circle"></i> Kontynuuj - Wystaw fakturę i wyślij na e-mail
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Ostrzeżenie: bramka online bez statusu Opłacone — przed PNEDU / iFirma --}}
+    <div class="modal fade" id="unpaidOnlinePaymentWarningModal" tabindex="-1" aria-labelledby="unpaidOnlinePaymentWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="unpaidOnlinePaymentWarningModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Płatność online nie jest opłacona
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">
+                        Zamówienie <strong>#{{ $zamowienie->id }}</strong> jest przez bramkę online, ale status płatności
+                        <strong>nie jest „Opłacone”</strong>.
+                    </p>
+                    <div class="border rounded p-2 bg-light small mb-3">
+                        <div><strong>Rozliczenie:</strong> <span id="unpaidOnlinePaymentWarningMode">{{ $zamowienie->paymentModeLabelWithGateway() }}</span></div>
+                        <div><strong>Status płatności:</strong> <span id="unpaidOnlinePaymentWarningStatus">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span></div>
+                    </div>
+                    <div class="alert alert-warning mb-0 small">
+                        <i class="bi bi-info-circle"></i>
+                        Dodanie uczestnika lub wystawienie faktury przy statusie „w trakcie” / „Anulowane” / błędzie płatności
+                        może skutkować dostępem lub FV bez potwierdzonej wpłaty. Kontynuuj tylko świadomie.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Wróć
+                    </button>
+                    <button type="button" class="btn btn-warning" id="unpaidOnlinePaymentWarningConfirmBtn">
+                        <i class="bi bi-exclamation-triangle"></i> Mimo to kontynuuj
                     </button>
                 </div>
             </div>
