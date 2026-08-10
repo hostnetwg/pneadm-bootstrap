@@ -364,6 +364,14 @@
                                     'emailType' => \App\Models\CertificateEmailLog::TYPE_COURSE_ACCESS,
                                     'iconTitle' => $courseAccessEmailLabel ?? 'Dostęp do szkolenia',
                                 ])
+                                @if($courseLiveMeetingEmailAvailable ?? false)
+                                    @include('participants.partials.email-delivery-icon', [
+                                        'participant' => $participant,
+                                        'emailRow' => $emailRow,
+                                        'emailType' => \App\Models\CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
+                                        'iconTitle' => 'Link do spotkania na żywo',
+                                    ])
+                                @endif
                                 @include('participants.partials.email-delivery-icon', [
                                     'participant' => $participant,
                                     'emailRow' => $emailRow,
@@ -446,6 +454,18 @@
                                         E-mail: nagranie
                                     </button>
                                 @endif
+                                @php
+                                    $participantHasCmToken = ! empty($participant->liveAccess?->token);
+                                    $participantCanSendLiveLink = ($courseLiveMeetingEmailAvailable ?? false)
+                                        && ! $course->hasEnded()
+                                        && (
+                                            $participantHasCmToken
+                                            || (
+                                                ! ($courseLiveMeetingRequiresToken ?? false)
+                                                && ! empty($participant->email)
+                                            )
+                                        );
+                                @endphp
                                 @if(($courseLiveAccessAvailable ?? false) && !empty($participant->email))
                                     @php
                                         $liveAccessRegistered = $participant->liveAccess?->isSuccessful();
@@ -473,32 +493,70 @@
                                             @endif
                                         </button>
                                     </form>
-                                    @if(!empty($participant->liveAccess?->token))
+                                    @if($participantHasCmToken)
+                                        @php
+                                            $invalidateParticipantName = trim(($participant->first_name ?? '').' '.($participant->last_name ?? ''));
+                                            $invalidateCourseTitle = trim(html_entity_decode(strip_tags((string) $course->title), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                                            $invalidateTrainerName = $course->instructor
+                                                ? trim((string) ($course->instructor->full_title_name ?: $course->instructor->full_name))
+                                                : '—';
+                                            $invalidateCourseDate = $course->start_date
+                                                ? $course->start_date->format('d.m.Y H:i')
+                                                : '—';
+                                            $invalidateLiveAccessConfirmMessage = "Unieważnić token {$participant->liveAccess->token} w ClickMeeting?\n\n"
+                                                ."Uczestnik: ".($invalidateParticipantName !== '' ? $invalidateParticipantName : '—')."\n"
+                                                ."E-mail: ".($participant->email ?: '—')."\n"
+                                                ."Szkolenie: ".($invalidateCourseTitle !== '' ? $invalidateCourseTitle : '—')."\n"
+                                                ."Trener: {$invalidateTrainerName}\n"
+                                                ."Data: {$invalidateCourseDate}\n\n"
+                                                .'Lokalny token też zostanie usunięty — można potem ponownie pobrać przez CM OK.';
+                                            $invalidateLiveAccessConfirmAlert = 'Uczestnik nie wejdzie już tym linkiem!';
+                                        @endphp
                                         <span class="small text-muted d-block" title="Token przypisany do e-maila uczestnika">
-                                            CM: <code class="user-select-all">{{ e($participant->liveAccess->token) }}</code>
+                                            CM: <code class="user-select-all text-danger">{{ e($participant->liveAccess->token) }}</code>
                                         </span>
-                                        @if(! $course->hasEnded())
-                                            <form id="sendLiveMeetingLinkForm{{ $participant->id }}"
-                                                  action="{{ route('participants.send-live-meeting-link', [$course, $participant]) }}"
-                                                  method="POST"
-                                                  class="d-block mt-1">
-                                                @csrf
-                                                <button type="button"
-                                                        class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap"
-                                                        title="Wyślij e-mail z bezpośrednim linkiem do spotkania na żywo"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#formConfirmModal"
-                                                        data-confirm-title="Wyślij link do live"
-                                                        data-confirm-message="Wysłać e-mail z linkiem do spotkania na żywo na adres {{ e($participant->email) }}?"
-                                                        data-confirm-form="#sendLiveMeetingLinkForm{{ $participant->id }}"
-                                                        data-confirm-btn-class="btn-primary"
-                                                        data-confirm-btn-text="Wyślij e-mail"
-                                                        data-confirm-header-class="bg-primary text-white">
-                                                    <i class="bi bi-envelope"></i> Wyślij link do live
-                                                </button>
-                                            </form>
-                                        @endif
+                                        <form id="invalidateLiveAccessTokenForm{{ $participant->id }}"
+                                              action="{{ route('participants.invalidate-live-access-token', [$course, $participant]) }}"
+                                              method="POST"
+                                              class="d-block mt-1">
+                                            @csrf
+                                            <button type="button"
+                                                    class="btn btn-outline-danger btn-sm px-2 py-0 small text-nowrap"
+                                                    title="Unieważnij token dostępu w ClickMeeting"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#formConfirmModal"
+                                                    data-confirm-title="Unieważnij token ClickMeeting"
+                                                    data-confirm-message='@json($invalidateLiveAccessConfirmMessage)'
+                                                    data-confirm-alert='@json($invalidateLiveAccessConfirmAlert)'
+                                                    data-confirm-form="#invalidateLiveAccessTokenForm{{ $participant->id }}"
+                                                    data-confirm-btn-class="btn-danger"
+                                                    data-confirm-btn-text="Unieważnij token"
+                                                    data-confirm-header-class="bg-danger text-white">
+                                                <i class="bi bi-x-octagon"></i> Unieważnij token
+                                            </button>
+                                        </form>
                                     @endif
+                                @endif
+                                @if($participantCanSendLiveLink)
+                                    <form id="sendLiveMeetingLinkForm{{ $participant->id }}"
+                                          action="{{ route('participants.send-live-meeting-link', [$course, $participant]) }}"
+                                          method="POST"
+                                          class="d-block mt-1">
+                                        @csrf
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm px-2 py-0 small text-nowrap"
+                                                title="Wyślij e-mail z bezpośrednim linkiem do spotkania na żywo"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#formConfirmModal"
+                                                data-confirm-title="Wyślij link do live"
+                                                data-confirm-message="Wysłać e-mail z linkiem do spotkania na żywo na adres {{ e($participant->email) }}?"
+                                                data-confirm-form="#sendLiveMeetingLinkForm{{ $participant->id }}"
+                                                data-confirm-btn-class="btn-primary"
+                                                data-confirm-btn-text="Wyślij e-mail"
+                                                data-confirm-header-class="bg-primary text-white">
+                                            <i class="bi bi-envelope"></i> Wyślij link do live
+                                        </button>
+                                    </form>
                                 @endif
                                 @php
                                     $reminderEligibility = $accessExpiryReminderEligibilityByParticipantId[$participant->id] ?? ['eligible' => false, 'reason' => null];
@@ -1023,6 +1081,56 @@
             </div>
         </div>
 
+        @if($courseLiveMeetingEmailAvailable ?? false)
+        <div class="modal fade" id="bulkEmailLiveMeetingModal" tabindex="-1" aria-labelledby="bulkEmailLiveMeetingModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title" id="bulkEmailLiveMeetingModalLabel">
+                            <i class="fas fa-broadcast-tower me-2"></i>Wyślij linki do spotkania na żywo
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            Wyśle e-mail z informacją o szkoleniu i linkiem do spotkania
+                            @if($courseLiveMeetingRequiresToken ?? false)
+                                do uczestników z wygenerowanym tokenem ClickMeeting
+                            @else
+                                do wszystkich uczestników z adresem e-mail (wspólny link bez tokenu)
+                            @endif
+                            (kwalifikuje się: <strong>{{ (int) ($courseLiveMeetingEligibleCount ?? 0) }}</strong>).
+                        </p>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="bulk_email_live_meeting_mode" id="bulk_email_live_meeting_mode_unsent" value="unsent" checked>
+                            <label class="form-check-label" for="bulk_email_live_meeting_mode_unsent">Wyślij tylko do tych, do których jeszcze nie wysłano</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="bulk_email_live_meeting_mode" id="bulk_email_live_meeting_mode_resend" value="resend_all">
+                            <label class="form-check-label" for="bulk_email_live_meeting_mode_resend">Wyślij ponownie do wszystkich kwalifikujących się</label>
+                        </div>
+                        <div class="alert alert-info mb-0 small">
+                            Wysyłka odbywa się w tle (kolejka). Wymaga działającego workera:
+                            <code>sail artisan queue:work</code>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle"></i> Anuluj
+                        </button>
+                        <form action="{{ route('participants.send-live-meeting-links-bulk', $course) }}" method="POST" class="d-inline" data-loading-submit>
+                            @csrf
+                            <input type="hidden" name="mode" id="bulk_email_live_meeting_mode_input" value="unsent">
+                            <button type="submit" class="btn btn-success" @disabled(($courseLiveMeetingEligibleCount ?? 0) < 1)>
+                                <i class="fas fa-paper-plane me-1"></i> Wyślij
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         @include('participants.partials.form-confirm-modal')
 
     </div>
@@ -1147,6 +1255,7 @@
             bind('bulk_email_list_mode', 'bulk_email_list_mode_input');
             bind('bulk_email_single_mode', 'bulk_email_single_mode_input');
             bind('bulk_email_course_access_mode', 'bulk_email_course_access_mode_input');
+            bind('bulk_email_live_meeting_mode', 'bulk_email_live_meeting_mode_input');
             bind('bulk_expiry_reminder_mode', 'bulk_expiry_reminder_mode_input');
         })();
 
@@ -1161,6 +1270,7 @@
             if (type === 'single_certificate') return 'to zaświadczenie';
             if (type === 'list_link') return 'lista zaświadczeń';
             if (type === 'course_access') return 'nagranie/materiały';
+            if (type === 'live_meeting_link') return 'link do live';
             if (type === 'access_expiry_reminder') return 'przypomnienie o wygaśnięciu dostępu';
             return type || 'e-maile';
         }
@@ -1434,9 +1544,10 @@
                 check('single_certificate'),
                 check('list_link'),
                 check('course_access'),
+                check('live_meeting_link'),
                 check('access_expiry_reminder'),
             ]).then(function(results) {
-                var activeType = results[0] || results[1] || results[2] || results[3];
+                var activeType = results[0] || results[1] || results[2] || results[3] || results[4];
                 if (activeType) startEmailPolling(alertEl, activeType);
             });
         })();

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\SendAccessExpiryReminderEmailJob;
 use App\Jobs\SendCertificateLinkEmailJob;
 use App\Jobs\SendCourseAccessEmailJob;
+use App\Jobs\SendLiveMeetingLinkEmailJob;
 use App\Models\Certificate;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
@@ -14,12 +15,11 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
 use App\Models\PneduUser;
-use App\Notifications\ParticipantLiveMeetingLinkNotification;
 use App\Services\Mail\SystemMailDiagnostics;
 use App\Services\ParticipantAccessExpiryReminderService;
 use App\Services\ParticipantAccessExpiryService;
 use App\Services\ParticipantLiveAccessService;
-use App\Services\PneduProvisionEmailContextBuilder;
+use App\Services\ParticipantLiveMeetingLinkMailService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -600,7 +599,7 @@ class ParticipantController extends Controller
      */
     public function index(Request $request, Course $course)
     {
-        $course->loadMissing('onlineDetails');
+        $course->loadMissing(['onlineDetails', 'instructor']);
         $query = Participant::with(['certificate', 'liveAccess'])->where('participants.course_id', $course->id);
 
         // Obsługa wyszukiwania
@@ -792,6 +791,15 @@ class ParticipantController extends Controller
             && $courseClickMeetingEventId !== ''
             && ! $course->hasEnded();
 
+        $liveMeetingMailService = app(ParticipantLiveMeetingLinkMailService::class);
+        $courseLiveMeetingEmailAvailable = $liveMeetingMailService->courseSupportsLiveMeetingEmails($course);
+        $courseLiveMeetingRequiresToken = $courseLiveMeetingEmailAvailable
+            ? $liveMeetingMailService->courseRequiresAccessToken($course)
+            : false;
+        $courseLiveMeetingEligibleCount = $courseLiveMeetingEmailAvailable
+            ? $liveMeetingMailService->eligibleParticipantsCount($course)
+            : 0;
+
         return view('participants.index', compact(
             'participants',
             'course',
@@ -818,6 +826,9 @@ class ParticipantController extends Controller
             'accessExpiryReminderUnsentCount',
             'accessExpiryReminderEligibilityByParticipantId',
             'courseLiveAccessAvailable',
+            'courseLiveMeetingEmailAvailable',
+            'courseLiveMeetingRequiresToken',
+            'courseLiveMeetingEligibleCount',
         ));
     }
 
@@ -1045,6 +1056,33 @@ class ParticipantController extends Controller
     }
 
     /**
+     * Unieważnia token ClickMeeting uczestnika (API CM + czyszczenie lokalnego tokenu).
+     */
+    public function invalidateLiveAccessToken(Course $course, Participant $participant)
+    {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $result = app(ParticipantLiveAccessService::class)->invalidateClickMeetingToken(
+            $participant,
+            $course
+        );
+
+        if ($result['success'] ?? false) {
+            return redirect()->route('participants.index', $course)->with(
+                'success',
+                ($result['detail'] ?? 'Token ClickMeeting został unieważniony.').' Możesz ponownie pobrać token przez CM OK.'
+            );
+        }
+
+        return redirect()->route('participants.index', $course)->with(
+            'error',
+            $result['detail'] ?? 'Nie udało się unieważnić tokenu ClickMeeting.'
+        );
+    }
+
+    /**
      * Wysyła e-mail z bezpośrednim linkiem do spotkania na żywo (ClickMeeting / live access).
      */
     public function sendLiveMeetingLink(Course $course, Participant $participant)
@@ -1053,105 +1091,20 @@ class ParticipantController extends Controller
             return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
         }
 
-        $email = trim((string) ($participant->email ?? ''));
-        if ($email === '' || ! str_contains($email, '@')) {
-            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie ma prawidłowego adresu e-mail.');
-        }
-
-        $participant->loadMissing('liveAccess');
-        $liveAccess = $participant->liveAccess;
-        if ($liveAccess === null || ! $liveAccess->isSuccessful()) {
-            return redirect()->route('participants.index', $course)->with(
-                'error',
-                'Brak aktywnej rejestracji ClickMeeting dla tego uczestnika. Najpierw użyj przycisku ClickMeeting / CM OK.'
-            );
-        }
-
-        if (trim((string) ($liveAccess->token ?? '')) === '') {
-            return redirect()->route('participants.index', $course)->with(
-                'error',
-                'Brak tokenu ClickMeeting — nie można wysłać linku live dla tego uczestnika.'
-            );
-        }
-
-        if ($course->hasEnded()) {
-            return redirect()->route('participants.index', $course)->with(
-                'info',
-                'Szkolenie zostało zakończone — link do spotkania na żywo nie jest już wysyłany.'
-            );
-        }
-
-        $course->loadMissing(['onlineDetails', 'instructor']);
-        $liveService = app(ParticipantLiveAccessService::class);
-        $liveContext = app(PneduProvisionEmailContextBuilder::class)->build(
-            $course,
-            $liveService->toEmailClickMeetingPayload($liveAccess)
+        $result = app(ParticipantLiveMeetingLinkMailService::class)->sendToParticipant(
+            $course->loadMissing(['onlineDetails', 'instructor']),
+            $participant->loadMissing('liveAccess'),
+            createdBy: Auth::id()
         );
 
-        if (! $liveContext->showLiveSection || ! $liveContext->joinUrl) {
+        if (! ($result['success'] ?? false)) {
             return redirect()->route('participants.index', $course)->with(
                 'error',
-                'Nie udało się zbudować linku do spotkania (brak room URL / meeting_link).'
+                $result['error'] ?? 'Nie udało się wysłać e-maila z linkiem live.'
             );
         }
 
-        $instructorLine = null;
-        if ($course->instructor) {
-            $name = trim((string) ($course->instructor->full_name ?? ''));
-            $title = trim((string) ($course->instructor->title ?? ''));
-            $display = trim(($title !== '' ? $title.' ' : '').$name);
-            if ($display !== '') {
-                $instructorLine = 'Prowadzący: '.$display;
-            }
-        }
-
-        $scheduleLine = $this->formatCourseScheduleLineForEmail($course);
-        $dashboardUrl = rtrim((string) config('services.pnedu_frontend_url', 'http://localhost:8081'), '/').'/dashboard/szkolenia';
-
-        $createdBy = Auth::id();
-        $log = CertificateEmailLog::create([
-            'course_id' => $course->id,
-            'participant_id' => $participant->id,
-            'type' => CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
-            'status' => CertificateEmailLog::STATUS_QUEUED,
-            'created_by' => $createdBy,
-            'queued_at' => now(),
-            'meta' => [
-                'join_url' => $liveContext->joinUrl,
-                'platform' => $liveContext->platformLabel,
-                'has_token' => filled($liveContext->token),
-            ],
-        ]);
-
-        try {
-            Notification::route('mail', $email)->notify(new ParticipantLiveMeetingLinkNotification(
-                courseTitle: (string) $course->title,
-                participantFirstName: (string) ($participant->first_name ?? ''),
-                instructorLine: $instructorLine,
-                scheduleLine: $scheduleLine,
-                liveAccess: $liveContext,
-                dashboardSzkoleniaUrl: $dashboardUrl,
-            ));
-
-            $log->update([
-                'status' => CertificateEmailLog::STATUS_SENT,
-                'sent_at' => now(),
-                'meta' => array_merge($log->meta ?? [], [
-                    'delivery' => SystemMailDiagnostics::currentConfig(),
-                ]),
-            ]);
-        } catch (\Throwable $e) {
-            $log->update([
-                'status' => CertificateEmailLog::STATUS_FAILED,
-                'failed_at' => now(),
-                'error_message' => $e->getMessage(),
-            ]);
-
-            return redirect()->route('participants.index', $course)->with(
-                'error',
-                'Nie udało się wysłać e-maila z linkiem live: '.$e->getMessage()
-            );
-        }
+        $email = trim((string) ($participant->email ?? ''));
 
         return redirect()->route('participants.index', $course)->with(
             'success',
@@ -1159,25 +1112,66 @@ class ParticipantController extends Controller
         );
     }
 
-    private function formatCourseScheduleLineForEmail(Course $course): ?string
+    /**
+     * Zbiorcza wysyłka e-maili z linkiem do spotkania na żywo.
+     *
+     * Tryby: unsent | resend_all
+     * - pokój z tokenami: tylko uczestnicy z tokenem
+     * - pokój bez tokenu: wszyscy z e-mailem (wspólny link)
+     */
+    public function sendLiveMeetingLinksBulk(Request $request, Course $course)
     {
-        if (! $course->start_date) {
-            return null;
+        $request->validate([
+            'mode' => 'required|string|in:unsent,resend_all',
+        ]);
+
+        $mode = $request->string('mode')->toString();
+        $mailService = app(ParticipantLiveMeetingLinkMailService::class);
+
+        if (! $mailService->courseSupportsLiveMeetingEmails($course)) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                'Dla tego szkolenia nie skonfigurowano linku do spotkania na żywo.'
+            );
         }
 
-        $tz = (string) config('app.timezone', 'Europe/Warsaw');
-        $start = $course->start_date->copy()->timezone($tz)->format('d.m.Y G:i');
-
-        if ($course->end_date) {
-            $end = $course->end_date->copy()->timezone($tz);
-            if ($course->start_date->copy()->timezone($tz)->isSameDay($end)) {
-                return 'Termin: '.$start.'–'.$end->format('G:i');
-            }
-
-            return 'Termin: '.$start.' – '.$end->format('d.m.Y G:i');
+        $participants = $mailService->eligibleParticipants($course, $mode);
+        if ($participants->isEmpty()) {
+            return redirect()->route('participants.index', $course)->with(
+                'info',
+                $mailService->courseRequiresAccessToken($course)
+                    ? 'Brak uczestników z tokenem ClickMeeting spełniających warunki wysyłki.'
+                    : 'Brak uczestników z adresem e-mail spełniających warunki wysyłki.'
+            );
         }
 
-        return 'Termin: '.$start;
+        $createdBy = Auth::id();
+        $jobs = [];
+        $logIds = [];
+
+        foreach ($participants as $participant) {
+            $log = CertificateEmailLog::create([
+                'course_id' => $course->id,
+                'participant_id' => $participant->id,
+                'type' => CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
+                'status' => CertificateEmailLog::STATUS_QUEUED,
+                'created_by' => $createdBy,
+                'queued_at' => now(),
+            ]);
+            $logIds[] = $log->id;
+            $jobs[] = new SendLiveMeetingLinkEmailJob($course->id, $participant->id, $log->id);
+        }
+
+        $batch = Bus::batch($jobs)
+            ->name($this->emailBatchName($course, CertificateEmailLog::TYPE_LIVE_MEETING_LINK))
+            ->dispatch();
+
+        CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+
+        return redirect()->route('participants.index', $course)->with(
+            'success',
+            "Zlecono wysyłkę {$participants->count()} e-maili z linkiem do spotkania na żywo. Wysyłka odbywa się w tle."
+        );
     }
 
     /**
@@ -2307,6 +2301,10 @@ class ParticipantController extends Controller
                 $courseId,
                 [CertificateEmailLog::TYPE_COURSE_ACCESS]
             ),
+            CertificateEmailLog::TYPE_LIVE_MEETING_LINK => $this->buildCourseEmailDeliveryStatsForTypes(
+                $courseId,
+                [CertificateEmailLog::TYPE_LIVE_MEETING_LINK]
+            ),
             CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER => $this->buildCourseEmailDeliveryStatsForTypes(
                 $courseId,
                 [CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER]
@@ -2323,6 +2321,7 @@ class ParticipantController extends Controller
             CertificateEmailLog::TYPE_LIST_LINK,
             CertificateEmailLog::TYPE_SINGLE_CERTIFICATE,
             CertificateEmailLog::TYPE_COURSE_ACCESS,
+            CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
             CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
         ];
     }
@@ -2399,6 +2398,7 @@ class ParticipantController extends Controller
             $byParticipant[$pid] = [
                 CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK => $emptyType,
                 CertificateEmailLog::TYPE_COURSE_ACCESS => $emptyType,
+                CertificateEmailLog::TYPE_LIVE_MEETING_LINK => $emptyType,
                 CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER => $emptyType,
             ];
         }
@@ -2410,6 +2410,7 @@ class ParticipantController extends Controller
                 CertificateEmailLog::certificateLinkTypes(),
                 [
                     CertificateEmailLog::TYPE_COURSE_ACCESS,
+                    CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
                     CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER,
                 ]
             ))
@@ -2468,6 +2469,15 @@ class ParticipantController extends Controller
                 $access['has_failed'] = false;
             }
             $byParticipant[$pid][CertificateEmailLog::TYPE_COURSE_ACCESS] = $access;
+
+            $live = $buckets[CertificateEmailLog::TYPE_LIVE_MEETING_LINK];
+            if ($live['sent_count'] > 0) {
+                $live['has_queued'] = false;
+                $live['has_failed'] = false;
+            } elseif ($live['has_queued']) {
+                $live['has_failed'] = false;
+            }
+            $byParticipant[$pid][CertificateEmailLog::TYPE_LIVE_MEETING_LINK] = $live;
 
             $reminder = $buckets[CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER];
             if ($reminder['sent_count'] > 0) {

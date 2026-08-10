@@ -67,9 +67,11 @@
 
     $isCertificate = $emailType === CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK;
     $isExpiryReminder = $emailType === CertificateEmailLog::TYPE_ACCESS_EXPIRY_REMINDER;
+    $isLiveMeeting = $emailType === CertificateEmailLog::TYPE_LIVE_MEETING_LINK;
     $glyph = match (true) {
         $isExpiryReminder => 'fa-bell',
         $isCertificate => 'fa-certificate',
+        $isLiveMeeting => 'fa-broadcast-tower',
         default => 'fa-video',
     };
 

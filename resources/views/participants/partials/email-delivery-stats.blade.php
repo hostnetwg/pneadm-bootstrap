@@ -2,10 +2,14 @@
     $eligible = (int) ($participantsWithEmailCount ?? 0);
     $listStats = $courseEmailDeliveryStats[\App\Models\CertificateEmailLog::AGGREGATE_CERTIFICATE_LINK] ?? ['sent' => 0, 'queued' => 0, 'failed_without_sent' => 0];
     $accessStats = $courseEmailDeliveryStats[\App\Models\CertificateEmailLog::TYPE_COURSE_ACCESS] ?? ['sent' => 0, 'queued' => 0, 'failed_without_sent' => 0];
+    $liveStats = $courseEmailDeliveryStats[\App\Models\CertificateEmailLog::TYPE_LIVE_MEETING_LINK] ?? ['sent' => 0, 'queued' => 0, 'failed_without_sent' => 0];
     $listSent = (int) ($listStats['sent'] ?? 0);
     $accessSent = (int) ($accessStats['sent'] ?? 0);
+    $liveSent = (int) ($liveStats['sent'] ?? 0);
+    $liveEligible = (int) ($courseLiveMeetingEligibleCount ?? 0);
     $listPct = $eligible > 0 ? min(100, (int) round($listSent / $eligible * 100)) : 0;
     $accessPct = $eligible > 0 ? min(100, (int) round($accessSent / $eligible * 100)) : 0;
+    $livePct = $liveEligible > 0 ? min(100, (int) round($liveSent / $liveEligible * 100)) : 0;
 @endphp
 <div class="row g-3 mb-4">
     <div class="col-md-6">
@@ -95,4 +99,55 @@
             </div>
         </div>
     </div>
+    @if($courseLiveMeetingEmailAvailable ?? false)
+        <div class="col-md-12">
+            <div class="card h-100 border">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                            <i class="fas fa-broadcast-tower text-success me-2"></i>
+                            <strong>Link do spotkania na żywo</strong>
+                            <div class="small text-muted mt-1">
+                                Zbiorcze i indywidualne „Wyślij link do live”
+                                @if($courseLiveMeetingRequiresToken ?? false)
+                                    — tylko uczestnicy z tokenem ClickMeeting
+                                @else
+                                    — wspólny link (bez tokenu) do osób z e-mailem
+                                @endif
+                            </div>
+                        </div>
+                        <span class="badge {{ $liveSent > 0 ? 'bg-success' : 'bg-secondary' }} fs-6">
+                            {{ $liveSent }}/{{ $liveEligible }}
+                        </span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button type="button"
+                                class="btn btn-outline-success btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#bulkEmailLiveMeetingModal"
+                                @disabled($liveEligible < 1)>
+                            <i class="fas fa-envelope me-1"></i> Wyślij linki do live
+                        </button>
+                    </div>
+                    <p class="mb-2 mb-md-1">
+                        Wysłano do <strong>{{ $liveSent }}</strong> z <strong>{{ $liveEligible }}</strong> osób kwalifikujących się do tej wysyłki.
+                    </p>
+                    <div class="progress mb-2" style="height: 6px;" role="progressbar" aria-valuenow="{{ $livePct }}" aria-valuemin="0" aria-valuemax="100" aria-label="Postęp wysyłki linku do spotkania na żywo">
+                        <div class="progress-bar {{ $liveSent > 0 ? 'bg-success' : 'bg-secondary' }}" style="width: {{ $livePct }}%"></div>
+                    </div>
+                    @if(($liveStats['queued'] ?? 0) > 0 || ($liveStats['failed_without_sent'] ?? 0) > 0)
+                        <p class="small text-muted mb-0">
+                            @if(($liveStats['queued'] ?? 0) > 0)
+                                <i class="fas fa-clock text-warning me-1"></i>{{ $liveStats['queued'] }} w kolejce
+                            @endif
+                            @if(($liveStats['failed_without_sent'] ?? 0) > 0)
+                                @if(($liveStats['queued'] ?? 0) > 0)<span class="mx-1">·</span>@endif
+                                <i class="fas fa-exclamation-circle text-danger me-1"></i>{{ $liveStats['failed_without_sent'] }} bez udanej wysyłki
+                            @endif
+                        </p>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

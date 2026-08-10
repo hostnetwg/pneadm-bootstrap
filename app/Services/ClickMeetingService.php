@@ -348,4 +348,80 @@ class ClickMeetingService
 
         return $roomUrl.'/'.$token;
     }
+
+    /**
+     * Dezaktywuje wskazane tokeny dostępu (access_type = 3).
+     *
+     * @param  list<string>  $tokens
+     * @return array{success: bool, error?: string, status_code?: int, data?: mixed}
+     */
+    public function deactivateTokens(string $eventId, array $tokens): array
+    {
+        $config = $this->apiConfig();
+        if ($config === null) {
+            return [
+                'success' => false,
+                'error' => 'Brak konfiguracji ClickMeeting API token.',
+            ];
+        }
+
+        $normalized = [];
+        foreach ($tokens as $token) {
+            $value = trim((string) $token);
+            if ($value !== '') {
+                $normalized[] = $value;
+            }
+        }
+        $normalized = array_values(array_unique($normalized));
+
+        if ($normalized === []) {
+            return [
+                'success' => false,
+                'error' => 'Brak tokenów do unieważnienia.',
+            ];
+        }
+
+        try {
+            $response = Http::baseUrl($config['base_url'])
+                ->withHeaders(['X-Api-Key' => $config['api_key']])
+                ->asForm()
+                ->send('DELETE', 'conferences/'.urlencode($eventId).'/tokens', [
+                    'form_params' => [
+                        'tokens' => $normalized,
+                    ],
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('ClickMeetingService: deactivateTokens failed', [
+                    'event_id' => $eventId,
+                    'tokens' => $normalized,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => 'ClickMeeting zwrócił HTTP '.$response->status().' przy unieważnianiu tokenu.',
+                    'status_code' => $response->status(),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data' => $response->json(),
+                'status_code' => $response->status(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('ClickMeetingService: deactivateTokens exception', [
+                'event_id' => $eventId,
+                'tokens' => $normalized,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Błąd komunikacji z ClickMeeting: '.$e->getMessage(),
+            ];
+        }
+    }
 }

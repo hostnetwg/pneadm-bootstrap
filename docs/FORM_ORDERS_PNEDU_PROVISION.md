@@ -128,9 +128,19 @@ Lista: `/courses/{id}/participants` → przycisk **ClickMeeting** (gdy platforma
 
 Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
 
-Gdy widoczny jest token (`CM: …`), poniżej pojawia się **Wyślij link do live** — e-mail systemowy z bezpośrednim linkiem do spotkania (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`).
+Gdy widoczny jest token (`CM: …`):
 
-Route: `POST /courses/{course}/participants/{participant}/send-live-meeting-link`
+- **Unieważnij token** — `DELETE` w API ClickMeeting (`…/conferences/{event_id}/tokens` + lista tokenów), potem czyszczenie lokalnego `participant_live_access.token`. Status CM OK zostaje; ponowne pobranie przez przycisk CM OK.
+- **Wyślij link do live** — e-mail systemowy z bezpośrednim linkiem do spotkania (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`).
+
+Routes:
+
+- `POST /courses/{course}/participants/{participant}/invalidate-live-access-token`
+- `POST /courses/{course}/participants/{participant}/send-live-meeting-link`
+- `POST /courses/{course}/participants/send-live-meeting-links-bulk` — zbiorcza wysyłka (tryby `unsent` / `resend_all`)
+  - pokój z tokenami (`access_type = 3`): tylko uczestnicy z tokenem
+  - pokój bez tokenu: wszyscy z e-mailem, wspólny `room_url` / `meeting_link`
+  - kolejka: `SendLiveMeetingLinkEmailJob`, log `certificate_email_logs.type = live_meeting_link`
 
 ## Cleanup tokenów po szkoleniu
 

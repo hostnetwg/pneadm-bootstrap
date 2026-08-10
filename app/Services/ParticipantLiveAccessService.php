@@ -153,6 +153,77 @@ class ParticipantLiveAccessService
         ParticipantLiveAccess::query()->where('participant_id', $participantId)->delete();
     }
 
+    /**
+     * Unieważnia token ClickMeeting w API i czyści go lokalnie w participant_live_access.
+     *
+     * @return array{success: bool, status?: string, detail?: string, token?: string|null}
+     */
+    public function invalidateClickMeetingToken(Participant $participant, Course $course): array
+    {
+        $participant->loadMissing('liveAccess');
+        $liveAccess = $participant->liveAccess;
+
+        if ($liveAccess === null) {
+            return [
+                'success' => false,
+                'status' => 'missing',
+                'detail' => 'Brak rekordu dostępu ClickMeeting dla tego uczestnika.',
+            ];
+        }
+
+        $token = trim((string) ($liveAccess->token ?? ''));
+        if ($token === '') {
+            return [
+                'success' => false,
+                'status' => 'missing_token',
+                'detail' => 'Brak zapisanego tokenu ClickMeeting do unieważnienia.',
+            ];
+        }
+
+        $course->loadMissing('onlineDetails');
+        $eventId = trim((string) ($liveAccess->clickmeeting_event_id
+            ?: optional($course->onlineDetails)->clickmeeting_event_id));
+
+        if ($eventId === '') {
+            return [
+                'success' => false,
+                'status' => 'missing_event_id',
+                'detail' => 'Brak ID wydarzenia ClickMeeting — nie można unieważnić tokenu w API.',
+            ];
+        }
+
+        $apiResult = app(ClickMeetingService::class)->deactivateTokens($eventId, [$token]);
+        if (! ($apiResult['success'] ?? false)) {
+            return [
+                'success' => false,
+                'status' => 'failed',
+                'detail' => (string) ($apiResult['error'] ?? 'Nie udało się unieważnić tokenu w ClickMeeting.'),
+                'token' => $token,
+            ];
+        }
+
+        $detail = 'Token ClickMeeting został unieważniony ('.$token.').';
+        $liveAccess->forceFill([
+            'token' => null,
+            'message' => $detail,
+            'synced_at' => now(),
+        ])->save();
+
+        if ($liveAccess->form_order_id) {
+            $this->syncFormOrderClickMeetingSnapshot((int) $liveAccess->form_order_id, [
+                'status' => $liveAccess->status ?? 'success',
+                'detail' => $detail,
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'status' => 'invalidated',
+            'detail' => $detail,
+            'token' => null,
+        ];
+    }
+
     public function cleanupExpiredRecords(): int
     {
         return ParticipantLiveAccess::query()

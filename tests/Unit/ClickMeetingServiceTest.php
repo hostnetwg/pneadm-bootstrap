@@ -112,4 +112,42 @@ class ClickMeetingServiceTest extends TestCase
             $service->buildJoinUrl('https://pnedu.clickmeeting.com/wydarzenie-testowe', null)
         );
     }
+
+    public function test_deactivate_tokens_sends_delete_with_token_list(): void
+    {
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088701/tokens' => Http::response([
+                'status' => 'deleted',
+                'message' => 'The tokens is not accessible anymore',
+            ], 200),
+        ]);
+
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+        ]);
+
+        $result = app(ClickMeetingService::class)->deactivateTokens('10088701', ['XF34TY']);
+
+        $this->assertTrue($result['success']);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'DELETE'
+                && $request->url() === 'https://api.clickmeeting.com/v1/conferences/10088701/tokens'
+                && data_get($request->data(), 'tokens.0') === 'XF34TY';
+        });
+    }
+
+    public function test_deactivate_tokens_rejects_empty_list(): void
+    {
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+        ]);
+
+        $result = app(ClickMeetingService::class)->deactivateTokens('10088701', ['', '  ']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Brak tokenów', (string) ($result['error'] ?? ''));
+    }
 }

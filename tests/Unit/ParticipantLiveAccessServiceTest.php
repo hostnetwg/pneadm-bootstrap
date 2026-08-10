@@ -9,11 +9,15 @@ use App\Models\ParticipantLiveAccess;
 use App\Services\ClickMeetingService;
 use App\Services\ParticipantLiveAccessService;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
 
 class ParticipantLiveAccessServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function tearDown(): void
     {
         Mockery::close();
@@ -127,5 +131,90 @@ class ParticipantLiveAccessServiceTest extends TestCase
 
         $this->assertSame('success', $result['status']);
         $this->assertSame('ABC123', $result['token']);
+    }
+
+    public function test_invalidate_clickmeeting_token_calls_api_and_clears_local_token(): void
+    {
+        if (! Schema::hasTable('participant_live_access')
+            || ! Schema::hasTable('courses')
+            || ! Schema::hasTable('participants')) {
+            $this->markTestSkipped('Brak wymaganych tabel w środowisku testowym.');
+        }
+
+        $course = Course::query()->create([
+            'title' => 'Live invalidate',
+            'description' => 'Opis',
+            'start_date' => now()->addDay(),
+            'end_date' => now()->addDay()->addHours(2),
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/PNE',
+        ]);
+
+        CourseOnlineDetails::query()->create([
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10088701',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/test-room',
+        ]);
+
+        $participant = Participant::query()->create([
+            'course_id' => $course->id,
+            'order' => 1,
+            'first_name' => 'Jan',
+            'last_name' => 'Kowalski',
+            'email' => 'jan.invalidate@example.com',
+        ]);
+
+        $access = ParticipantLiveAccess::query()->create([
+            'participant_id' => $participant->id,
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10088701',
+            'access_type' => ClickMeetingService::ACCESS_TYPE_TOKEN,
+            'room_url' => 'https://pnedu.clickmeeting.com/test-room',
+            'token' => 'XF34TY',
+            'status' => 'success',
+            'synced_at' => now(),
+        ]);
+
+        $mock = Mockery::mock(ClickMeetingService::class);
+        $mock->shouldReceive('deactivateTokens')
+            ->once()
+            ->with('10088701', ['XF34TY'])
+            ->andReturn(['success' => true, 'data' => ['status' => 'deleted']]);
+        $this->app->instance(ClickMeetingService::class, $mock);
+
+        $result = app(ParticipantLiveAccessService::class)->invalidateClickMeetingToken(
+            $participant->fresh(['liveAccess']),
+            $course->fresh(['onlineDetails'])
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('invalidated', $result['status']);
+        $this->assertNull($access->fresh()->token);
+        $this->assertSame('success', $access->fresh()->status);
+        $this->assertStringContainsString('unieważniony', (string) $access->fresh()->message);
+    }
+
+    public function test_invalidate_clickmeeting_token_fails_without_saved_token(): void
+    {
+        $course = new Course(['title' => 'Live']);
+        $participant = new Participant(['email' => 'a@example.com']);
+        $participant->setRelation('liveAccess', new ParticipantLiveAccess([
+            'status' => 'success',
+            'token' => null,
+            'clickmeeting_event_id' => '10088701',
+        ]));
+
+        $result = app(ParticipantLiveAccessService::class)->invalidateClickMeetingToken(
+            $participant,
+            $course
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('missing_token', $result['status']);
     }
 }

@@ -48,6 +48,15 @@
                 } catch (parseError) {
                     message = message.replace(/\\n/g, '\n');
                 }
+                var alertText = trigger.getAttribute('data-confirm-alert') || '';
+                try {
+                    var parsedAlert = JSON.parse(alertText);
+                    if (typeof parsedAlert === 'string') {
+                        alertText = parsedAlert;
+                    }
+                } catch (parseAlertError) {
+                    // zwykły tekst w atrybucie
+                }
                 var formSelector = trigger.getAttribute('data-confirm-form');
                 var btnClass = trigger.getAttribute('data-confirm-btn-class') || 'btn-primary';
                 var btnText = trigger.getAttribute('data-confirm-btn-text') || 'Potwierdź';
@@ -55,6 +64,17 @@
 
                 titleEl.textContent = title;
                 bodyEl.textContent = message;
+                if (alertText) {
+                    var alertEl = document.createElement('div');
+                    alertEl.className = 'alert alert-danger fw-semibold mb-0 mt-3';
+                    alertEl.setAttribute('role', 'alert');
+                    var iconEl = document.createElement('i');
+                    iconEl.className = 'bi bi-exclamation-triangle-fill me-1';
+                    iconEl.setAttribute('aria-hidden', 'true');
+                    alertEl.appendChild(iconEl);
+                    alertEl.appendChild(document.createTextNode(alertText));
+                    bodyEl.appendChild(alertEl);
+                }
 
                 pendingForm = formSelector ? document.querySelector(formSelector) : trigger.closest('form');
                 if (!pendingForm) {
