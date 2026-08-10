@@ -1,6 +1,7 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-08-10  
+Data aktualizacji: 2026-08-10 (ponowna wysyłka e-maila dostępu)  
+
 
 Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
 
@@ -126,6 +127,15 @@ Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_
 **Nie usuwa** rekordu z tabeli `participants` ani konta `pnedu.users`.  
 Ponowne **Dodaj uczestnika do PNEDU** odnajduje uczestnika po `course_id` + e-mail, wiąże go z zamówieniem, ustawia `pnedu_provisioned_at` i ponawia kroki ClickMeeting + e-mail.
 
+## Ponowna wysyłka e-maila (krok 3)
+
+Na `/form-orders/{id}` przy przyznanym PNEDU: przycisk **Prześlij dostęp** (obok resetu).
+
+1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny).
+2. **Anuluj** / **Skopiuj treść** / **Wyślij**.
+3. Endpoints: `GET …/pnedu/access-email-preview`, `POST …/pnedu/resend-access-email`.
+4. Przy „nowe konto” świeży token resetu hasła powstaje dopiero przy **Wyślij** (w podglądzie placeholder).
+
 ## Uczestnicy kursu — ręczna rejestracja ClickMeeting
 
 Lista: `/courses/{id}/participants` → przycisk **ClickMeeting** (gdy platforma = clickmeeting, jest event_id, szkolenie nie zakończone).
@@ -162,6 +172,7 @@ sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
 sail test --filter=ParticipantLiveAccessServiceTest
 sail test --filter=FormOrderPneduProvisionRelinkTest
+sail test --filter=FormOrderPneduAccessEmailResendTest
 sail test   # pełny suite — patrz docs/TESTING.md
 ```
 

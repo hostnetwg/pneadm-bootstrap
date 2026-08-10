@@ -1363,6 +1363,30 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Podgląd e-maila z dostępem PNEDU (krok 3 provisionu) — bez wysyłki.
+     */
+    public function previewPneduAccessEmail(int $id)
+    {
+        $result = app(FormOrderPneduProvisionService::class)->previewProvisionAccessEmail($id);
+        $http = (int) ($result['http_code'] ?? 500);
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Ponowna wysyłka e-maila z dostępem PNEDU (krok 3).
+     */
+    public function resendPneduAccessEmail(int $id)
+    {
+        $result = app(FormOrderPneduProvisionService::class)->resendProvisionAccessEmail($id);
+        $http = (int) ($result['http_code'] ?? 500);
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
      * Anuluje zamówienie (void) — opcjonalnie wypisuje uczestników powiązanych przez participant_id.
      */
     public function cancelOrder(Request $request, int $id)

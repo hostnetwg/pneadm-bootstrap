@@ -228,6 +228,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
             Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
             Route::post('/{id}/pnedu/provision', [FormOrdersController::class, 'provisionPneduAccess'])->name('pnedu.provision');
+            Route::get('/{id}/pnedu/access-email-preview', [FormOrdersController::class, 'previewPneduAccessEmail'])->name('pnedu.access-email-preview');
+            Route::post('/{id}/pnedu/resend-access-email', [FormOrdersController::class, 'resendPneduAccessEmail'])->name('pnedu.resend-access-email');
             Route::post('/{id}/cancel', [FormOrdersController::class, 'cancelOrder'])->name('cancel');
             Route::post('/{id}/restore', [FormOrdersController::class, 'restoreOrder'])->name('restore');
             Route::post('/{id}/invoice-exempt', [FormOrdersController::class, 'markInvoiceExempt'])->name('invoice-exempt');

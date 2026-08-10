@@ -257,6 +257,266 @@ class FormOrderPneduProvisionService
         }
     }
 
+    /**
+     * Podgląd e-maila z kroku 3 provisionu (bez wysyłki).
+     *
+     * @return array{success: bool, error?: string, http_code: int, to?: string, subject?: string, body?: string, variant?: string, variant_label?: string}
+     */
+    public function previewProvisionAccessEmail(int $formOrderId): array
+    {
+        $resolved = $this->resolveProvisionAccessEmailContext($formOrderId);
+        if (! ($resolved['success'] ?? false)) {
+            return $resolved;
+        }
+
+        $notification = $this->makeProvisionAccessNotification(
+            $resolved,
+            previewPlaceholderToken: true
+        );
+        $mail = $notification->toMail($resolved['pnedu_user']);
+
+        return [
+            'success' => true,
+            'http_code' => 200,
+            'to' => $resolved['email'],
+            'subject' => (string) ($mail->subject ?? ''),
+            'body' => $this->mailMessageToPlainText($mail),
+            'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
+            'variant_label' => $resolved['is_new_account']
+                ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
+                : 'E-mail informacyjny (konto już istniało)',
+        ];
+    }
+
+    /**
+     * Ponowna wysyłka e-maila z kroku 3 provisionu.
+     *
+     * @return array{success: bool, error?: string, message?: string, http_code: int}
+     */
+    public function resendProvisionAccessEmail(int $formOrderId): array
+    {
+        $resolved = $this->resolveProvisionAccessEmailContext($formOrderId);
+        if (! ($resolved['success'] ?? false)) {
+            return $resolved;
+        }
+
+        try {
+            $notification = $this->makeProvisionAccessNotification(
+                $resolved,
+                previewPlaceholderToken: false
+            );
+            $resolved['pnedu_user']->notify($notification);
+
+            Log::info('FormOrderPneduProvisionService: ponowna wysyłka e-maila dostępu', [
+                'form_order_id' => $formOrderId,
+                'email' => $resolved['email'],
+                'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
+            ]);
+
+            return [
+                'success' => true,
+                'http_code' => 200,
+                'message' => $resolved['is_new_account']
+                    ? 'Wysłano e-mail z linkiem do ustawienia hasła.'
+                    : 'Wysłano e-mail informacyjny na adres uczestnika.',
+                'to' => $resolved['email'],
+            ];
+        } catch (Throwable $e) {
+            Log::error('FormOrderPneduProvisionService: błąd ponownej wysyłki e-maila', [
+                'form_order_id' => $formOrderId,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Nie udało się wysłać e-maila: '.$e->getMessage(),
+                'http_code' => 500,
+            ];
+        }
+    }
+
+    /**
+     * @return array{
+     *     success: bool,
+     *     error?: string,
+     *     http_code: int,
+     *     email?: string,
+     *     pnedu_user?: PneduUser,
+     *     course_title?: string,
+     *     instructor_line?: ?string,
+     *     start_date_line?: ?string,
+     *     live_access?: PneduProvisionLiveAccessContext,
+     *     is_new_account?: bool
+     * }
+     */
+    private function resolveProvisionAccessEmailContext(int $formOrderId): array
+    {
+        $order = FormOrder::with(['primaryParticipant.participant.liveAccess', 'course.instructor', 'course.onlineDetails'])
+            ->find($formOrderId);
+
+        if (! $order) {
+            return ['success' => false, 'error' => 'Zamówienie nie zostało znalezione.', 'http_code' => 404];
+        }
+
+        if ($order->pnedu_provisioned_at === null) {
+            return [
+                'success' => false,
+                'error' => 'Najpierw przyznaj dostęp PNEDU — e-mail z dostępem dotyczy już provisionowanego zamówienia.',
+                'http_code' => 400,
+            ];
+        }
+
+        $p = $order->primaryParticipant;
+        $emailRaw = $p ? trim((string) ($p->participant_email ?? '')) : '';
+        $email = strtolower($emailRaw);
+        if ($email === '' || ! str_contains($email, '@')) {
+            return [
+                'success' => false,
+                'error' => 'Brak prawidłowego e-maila uczestnika.',
+                'http_code' => 400,
+            ];
+        }
+
+        $course = $order->course ?? Course::query()->with(['instructor', 'onlineDetails'])->find($order->product_id);
+        if (! $course) {
+            return [
+                'success' => false,
+                'error' => 'Nie znaleziono szkolenia dla tego zamówienia.',
+                'http_code' => 400,
+            ];
+        }
+
+        $pneduUser = PneduUser::query()->where('email', $email)->first();
+        if (! $pneduUser) {
+            return [
+                'success' => false,
+                'error' => 'Brak konta użytkownika w bazie pnedu dla tego e-maila.',
+                'http_code' => 400,
+            ];
+        }
+
+        $participant = $p?->participant;
+        $clickMeetingResult = $this->clickMeetingResultFromLiveAccess($participant?->liveAccess);
+        $liveAccess = app(PneduProvisionEmailContextBuilder::class)->build($course, $clickMeetingResult);
+
+        // true = przy provision utworzono nowe konto → mail z ustawieniem hasła
+        $isNewAccount = $order->pnedu_user_existed_before === false;
+
+        return [
+            'success' => true,
+            'http_code' => 200,
+            'email' => $email,
+            'pnedu_user' => $pneduUser,
+            'course_title' => (string) $course->title,
+            'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
+            'start_date_line' => $this->startDateLineForProvisionEmail($course),
+            'live_access' => $liveAccess,
+            'is_new_account' => $isNewAccount,
+        ];
+    }
+
+    /**
+     * @param  array{
+     *     pnedu_user: PneduUser,
+     *     course_title: string,
+     *     instructor_line: ?string,
+     *     start_date_line: ?string,
+     *     live_access: PneduProvisionLiveAccessContext,
+     *     is_new_account: bool,
+     *     email: string
+     * }  $resolved
+     */
+    private function makeProvisionAccessNotification(array $resolved, bool $previewPlaceholderToken): PneduFormOrderProvisionedNewUser|PneduFormOrderProvisionedExistingUser
+    {
+        if (! $resolved['is_new_account']) {
+            return new PneduFormOrderProvisionedExistingUser(
+                $resolved['course_title'],
+                $resolved['instructor_line'],
+                $resolved['start_date_line'],
+                $resolved['live_access'],
+            );
+        }
+
+        $token = $previewPlaceholderToken
+            ? 'PODGLAD-LINK-WYGENEROWANY-PRZY-WYSYLCE'
+            : Password::broker('pnedu_users')->createToken($resolved['pnedu_user']);
+
+        return new PneduFormOrderProvisionedNewUser(
+            $token,
+            $resolved['course_title'],
+            $resolved['instructor_line'],
+            $resolved['start_date_line'],
+            $resolved['live_access'],
+        );
+    }
+
+    private function clickMeetingResultFromLiveAccess(?\App\Models\ParticipantLiveAccess $liveAccess): ?array
+    {
+        if (! $liveAccess) {
+            return null;
+        }
+
+        $roomUrl = trim((string) ($liveAccess->room_url ?? ''));
+        $token = trim((string) ($liveAccess->token ?? ''));
+        if ($roomUrl === '' && $token === '') {
+            return null;
+        }
+
+        return [
+            'success' => true,
+            'status' => 'success',
+            'token' => $token !== '' ? $token : null,
+            'room_url' => $roomUrl !== '' ? $roomUrl : null,
+            'access_type' => $liveAccess->access_type,
+        ];
+    }
+
+    private function mailMessageToPlainText(\Illuminate\Notifications\Messages\MailMessage $mail): string
+    {
+        $lines = [];
+
+        if (filled($mail->greeting)) {
+            $lines[] = $this->plainTextFromMailLine($mail->greeting);
+            $lines[] = '';
+        }
+
+        foreach ($mail->introLines as $line) {
+            $text = $this->plainTextFromMailLine($line);
+            if ($text !== '') {
+                $lines[] = $text;
+            }
+        }
+
+        if (filled($mail->actionText) && filled($mail->actionUrl)) {
+            $lines[] = '';
+            $lines[] = (string) $mail->actionText.':';
+            $lines[] = (string) $mail->actionUrl;
+        }
+
+        foreach ($mail->outroLines as $line) {
+            $text = $this->plainTextFromMailLine($line);
+            if ($text !== '') {
+                $lines[] = $text;
+            }
+        }
+
+        if (filled($mail->salutation)) {
+            $lines[] = '';
+            $lines[] = $this->plainTextFromMailLine($mail->salutation);
+        }
+
+        return trim(implode("\n", $lines));
+    }
+
+    private function plainTextFromMailLine(mixed $line): string
+    {
+        $raw = (string) $line;
+        $raw = preg_replace('/<br\s*\/?>/i', "\n", $raw) ?? $raw;
+        $raw = html_entity_decode(strip_tags($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(preg_replace("/[ \t]+/u", ' ', $raw) ?? $raw);
+    }
+
     private function shouldIncludeParticipantInSendy(FormOrder $order, bool $addParticipantToSendy): bool
     {
         $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? '')));
