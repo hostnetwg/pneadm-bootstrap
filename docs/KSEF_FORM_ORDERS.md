@@ -298,14 +298,22 @@ wystawiana jest faktura tylko z nabywcą (bez `PodmiotyDodatkowe`). Tryb
 z twardym wymogiem Podmiotu3 — obecnie kontroler `form_orders` go nie używa.
 
 **E-mail przy czerwonym przycisku:** wysyłka z iFirma (`sendInvoiceByEmail`) jest
-wykonywana dopiero po **sukcesie** `sendInvoiceToKsef` (przy błędzie KSeF
-kontroler zwraca odpowiedź błędu przed blokiem wysyłki e-mail).
+wykonywana dopiero po **sukcesie** KSeF (NumerKSeF). Przy starcie fazy `ksef`, gdy
+`send_email=true`, zapisywane jest `form_orders.ksef_email_pending = true` **przed**
+pollem — intencja przeżywa timeout HTTP / brak NumerKSeF. Po pełnym sukcesie maili
+flaga wraca do `false`. Przy błędzie / częściowej wysyłce flaga zostaje (można
+dogonić przez **Odśwież KSeF**).
 
 **UI / API (2026-07):** przycisk czerwony wywołuje endpoint w **dwóch fazach**
 (`phase=create` → zapis `invoice_number` w zamówieniu i odświeżenie pola w
 formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
 faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
+
+**Filtr nawigacji „Tylko bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
+`filter_no_ksef=1` — zamówienia z wypełnionym `invoice_number` i pustym
+`ksef_number` (kolejka po zatorze iFirma/MF). Współdziała z `filter_new` i
+`course_id` (prev/next + badge licznika).
 
 **Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**
 oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.
@@ -315,7 +323,12 @@ Przycisk przy numerze FV wysyła `prefer_number_lookup=1` + aktualną wartość 
 lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Zapisuje **ID iFirma**,
 **daty FV** oraz **NumerKSeF** gdy iFirma je zwróci. Ręcznie wpisanego `invoice_number`
 **nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
-czyszczony** (wcześniej sync kasował ręczny wpis). Serwis:
+czyszczony** (wcześniej sync kasował ręczny wpis). Gdy sync uzyska NumerKSeF i
+`ksef_email_pending=true`, wysyła FV mailem przez iFirma (te same adresy co czerwony
+przycisk; ~400 ms między adresami; bez agresywnego retry). Po pełnym sukcesie
+czyści flagę — kolejne Odśwież nie wysyła ponownie. **Bez** flagi sync **nie** wysyła
+maila. Zbiorcze Odśwież / kolejka KSeF — poza zakresem tego etapu (gdy bulk: kolejka
+concurrency 1 + opóźnienie między jobami). Serwis:
 `App\Services\IfirmaFormOrderKsefSyncService`.
 
 **Daty FV przy wystawianiu (2026-08):** po `fakturakraj.json` panel robi `GET` faktury
@@ -448,6 +461,7 @@ Obok klasycznego numeru i KSeF zapisujemy wewnętrzny ID dokumentu iFirma:
 |---------|---------------|--------|
 | `invoice_number` | `PelnyNumer` | Numer widoczny dla klienta / księgowości |
 | `ksef_number` (+ `ksef_status`, `ksef_sent_at`, …) | NumerKSeF | Po akceptacji w KSeF |
+| `ksef_email_pending` | — (panel) | Intencja: wyślij FV mailem po NumerKSeF; migracja `2026_08_10_101120_add_ksef_email_pending_to_form_orders_table.php` |
 | `ifirma_invoice_id` | `Identyfikator` / FakturaId | Migracja `2026_07_31_160000_add_ifirma_invoice_id_to_form_orders_table.php`; klucz do API `fakturakraj/{id}` |
 
 Zapis `ifirma_invoice_id` przy wystawianiu FV krajowej, FV z odbiorcą oraz FV+KSeF

@@ -238,6 +238,7 @@ class FormOrder extends Model
         'ksef_sent_at',
         'ksef_status',
         'ksef_error',
+        'ksef_email_pending',
 
         // Metadane KSeF Podmiot3 (ETAP 1) — patrz docs/KSEF_FORM_ORDERS.md
         'ksef_entity_source',
@@ -285,6 +286,7 @@ class FormOrder extends Model
         'cancelled_at' => 'datetime',
         'updated_manually_at' => 'datetime',
         'ksef_sent_at' => 'datetime',
+        'ksef_email_pending' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

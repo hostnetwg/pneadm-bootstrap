@@ -30,7 +30,11 @@ class IfirmaFormOrderKsefSyncService
      *     invoice_due_date?: string|null,
      *     ksef_status?: string|null,
      *     changed?: bool,
-     *     ksef_cleared?: bool
+     *     ksef_cleared?: bool,
+     *     email_sent?: bool,
+     *     emails_sent?: list<string>,
+     *     email_errors?: list<array{email: string, error: string}>,
+     *     ksef_email_pending?: bool
      * }
      */
     public function syncFromIfirmaInvoiceId(
@@ -228,12 +232,24 @@ class IfirmaFormOrderKsefSyncService
                 'ksef_status' => $order->ksef_status,
                 'changed' => $changed,
                 'ksef_cleared' => false,
+                'ksef_email_pending' => (bool) $order->ksef_email_pending,
             ], $datesPayload);
+        }
+
+        $emailResult = $this->sendPendingInvoiceEmailsAfterKsef($order, (string) $order->ifirma_invoice_id, $invoiceNumberForResponse);
+        if ($emailResult['changed']) {
+            $changed = true;
         }
 
         $message = $changed
             ? 'Zaktualizowano dane KSeF, ID iFirma i daty FV z iFirma.'
             : 'Dane KSeF i daty FV w zamówieniu są już zgodne z iFirma.';
+        if ($emailResult['emails_sent'] !== []) {
+            $message .= ' E-mail FV wysłany na: '.implode(', ', $emailResult['emails_sent']).'.';
+        }
+        if ($emailResult['email_errors'] !== []) {
+            $message .= ' Błędy wysyłki e-mail: '.count($emailResult['email_errors']).' (intencja pozostaje — można ponowić Odśwież KSeF).';
+        }
 
         return array_merge([
             'success' => true,
@@ -244,7 +260,116 @@ class IfirmaFormOrderKsefSyncService
             'ksef_status' => $order->ksef_status,
             'changed' => $changed,
             'ksef_cleared' => false,
+            'email_sent' => $emailResult['emails_sent'] !== [],
+            'emails_sent' => $emailResult['emails_sent'],
+            'email_errors' => $emailResult['email_errors'],
+            'ksef_email_pending' => (bool) $order->ksef_email_pending,
         ], $datesPayload);
+    }
+
+    /**
+     * Po uzyskaniu NumerKSeF — wyślij FV mailem, jeśli czerwony przycisk zapisał intencję.
+     *
+     * @return array{
+     *     changed: bool,
+     *     emails_sent: list<string>,
+     *     email_errors: list<array{email: string, error: string}>
+     * }
+     */
+    private function sendPendingInvoiceEmailsAfterKsef(
+        FormOrder $order,
+        string $invoiceId,
+        ?string $invoiceNumber
+    ): array {
+        $empty = ['changed' => false, 'emails_sent' => [], 'email_errors' => []];
+
+        if (! $order->ksef_email_pending) {
+            return $empty;
+        }
+
+        $invoiceId = trim($invoiceId);
+        if ($invoiceId === '') {
+            return $empty;
+        }
+
+        $emails = [];
+        if (! empty($order->orderer_email)) {
+            $emails[] = strtolower(trim($order->orderer_email));
+        }
+        if (! empty(trim($order->display_participant_email ?? ''))) {
+            $participantEmail = strtolower(trim($order->display_participant_email));
+            if (! in_array($participantEmail, $emails, true)) {
+                $emails[] = $participantEmail;
+            }
+        }
+
+        if ($emails === []) {
+            $order->ksef_email_pending = false;
+            $order->save();
+
+            return ['changed' => true, 'emails_sent' => [], 'email_errors' => []];
+        }
+
+        $emailsSent = [];
+        $emailErrors = [];
+        $invoiceNumber = trim((string) ($invoiceNumber ?: $order->invoice_number ?: $invoiceId));
+
+        foreach ($emails as $index => $email) {
+            if ($index > 0) {
+                usleep(400_000);
+            }
+
+            try {
+                $sendResult = $this->api->sendInvoiceByEmail(
+                    $invoiceId,
+                    $email,
+                    $invoiceNumber,
+                    $order->id,
+                    'invoice'
+                );
+
+                if (($sendResult['status'] ?? null) === 'success') {
+                    $emailsSent[] = $email;
+                } else {
+                    $emailErrors[] = [
+                        'email' => $email,
+                        'error' => $sendResult['message'] ?? 'Nieznany błąd',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $emailErrors[] = [
+                    'email' => $email,
+                    'error' => $e->getMessage(),
+                ];
+                Log::error('iFirma KSeF sync: exception podczas wysyłki FV po NumerKSeF', [
+                    'form_order_id' => $order->id,
+                    'invoice_id' => $invoiceId,
+                    'email' => $email,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $changed = false;
+        if ($emailErrors === []) {
+            $order->ksef_email_pending = false;
+            $order->save();
+            $changed = true;
+        }
+
+        Log::info('iFirma KSeF sync: pending invoice email after NumerKSeF', [
+            'form_order_id' => $order->id,
+            'invoice_id' => $invoiceId,
+            'emails_sent' => $emailsSent,
+            'email_errors_count' => count($emailErrors),
+            'ksef_email_pending' => (bool) $order->ksef_email_pending,
+        ]);
+
+        return [
+            'changed' => $changed,
+            'emails_sent' => $emailsSent,
+            'email_errors' => $emailErrors,
+        ];
     }
 
     /**

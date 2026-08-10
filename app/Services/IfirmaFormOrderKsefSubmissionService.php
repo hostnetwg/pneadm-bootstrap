@@ -18,9 +18,18 @@ class IfirmaFormOrderKsefSubmissionService
         Request $request
     ): JsonResponse {
         $invoiceNumber = trim((string) ($invoiceNumber ?: $zamowienie->invoice_number ?: $invoiceId));
+        $sendEmail = filter_var($request->input('send_email', false), FILTER_VALIDATE_BOOLEAN);
 
         if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== (string) $invoiceId) {
             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+        }
+
+        // Intencja maila przed pollem — przeżywa timeout HTTP / brak NumerKSeF.
+        if ($sendEmail && ! $zamowienie->ksef_email_pending) {
+            $zamowienie->ksef_email_pending = true;
+        }
+
+        if ($zamowienie->isDirty()) {
             $zamowienie->save();
         }
 
@@ -28,6 +37,7 @@ class IfirmaFormOrderKsefSubmissionService
             'order_id' => $zamowienie->id,
             'invoice_id' => $invoiceId,
             'invoice_number' => $invoiceNumber,
+            'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
         ]);
 
         $ksefResult = $ifirmaService->sendInvoiceToKsef($invoiceId, 'fakturakraj');
@@ -77,6 +87,7 @@ class IfirmaFormOrderKsefSubmissionService
                 'order_id' => $zamowienie->id,
                 'invoice_id' => $invoiceId,
                 'poll_attempts' => $poll['attempts'],
+                'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
             ]);
 
             return response()->json($this->partialFailurePayload(
@@ -84,7 +95,12 @@ class IfirmaFormOrderKsefSubmissionService
                 'ksef_acceptance_timeout',
                 $invoiceId,
                 $invoiceNumber,
-                ['poll_attempts' => $poll['attempts'], 'can_retry' => true, 'ksef_status' => 'pending']
+                [
+                    'poll_attempts' => $poll['attempts'],
+                    'can_retry' => true,
+                    'ksef_status' => 'pending',
+                    'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
+                ]
             ), 504);
         }
 
@@ -121,25 +137,17 @@ class IfirmaFormOrderKsefSubmissionService
         ]);
         $zamowienie->refresh();
 
-        $sendEmail = $request->input('send_email', false);
         $emailsSent = [];
         $emailErrors = [];
 
         if ($sendEmail && $invoiceId !== '') {
-            $emails = [];
+            $emails = $this->invoiceEmailRecipients($zamowienie);
 
-            if (! empty($zamowienie->orderer_email)) {
-                $emails[] = strtolower(trim($zamowienie->orderer_email));
-            }
-
-            if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
-                $participantEmail = strtolower(trim($zamowienie->display_participant_email));
-                if (! in_array($participantEmail, $emails, true)) {
-                    $emails[] = $participantEmail;
+            foreach ($emails as $index => $email) {
+                if ($index > 0) {
+                    usleep(400_000);
                 }
-            }
 
-            foreach ($emails as $email) {
                 try {
                     $sendResult = $ifirmaService->sendInvoiceByEmail(
                         $invoiceId,
@@ -169,6 +177,12 @@ class IfirmaFormOrderKsefSubmissionService
                     ]);
                 }
             }
+
+            // Brak adresów albo pełny sukces → czyścimy intencję; częściowy błąd zostawia flagę pod Odśwież KSeF.
+            if ($emailErrors === []) {
+                $zamowienie->ksef_email_pending = false;
+                $zamowienie->save();
+            }
         }
 
         $message = 'Faktura została wystawiona w iFirma.pl';
@@ -197,7 +211,29 @@ class IfirmaFormOrderKsefSubmissionService
             'email_sent' => $emailsSent !== [],
             'emails_sent' => $emailsSent,
             'email_errors' => $emailErrors,
+            'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function invoiceEmailRecipients(FormOrder $zamowienie): array
+    {
+        $emails = [];
+
+        if (! empty($zamowienie->orderer_email)) {
+            $emails[] = strtolower(trim($zamowienie->orderer_email));
+        }
+
+        if (! empty(trim($zamowienie->display_participant_email ?? ''))) {
+            $participantEmail = strtolower(trim($zamowienie->display_participant_email));
+            if (! in_array($participantEmail, $emails, true)) {
+                $emails[] = $participantEmail;
+            }
+        }
+
+        return $emails;
     }
 
     /**

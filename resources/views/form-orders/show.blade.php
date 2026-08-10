@@ -61,6 +61,13 @@
                             <i class="bi bi-funnel"></i> Tylko niewprowadzone
                         </label>
                     </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterNoKsefOnly"
+                               {{ request('filter_no_ksef') || !empty($filterNoKsef) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterNoKsefOnly">
+                            <i class="bi bi-funnel"></i> Tylko bez KSeF
+                        </label>
+                    </div>
                     
                     {{-- Pole input do filtrowania po courses.id (Poprzednie/Następne) --}}
                     <div class="input-group" style="width: 200px;">
@@ -81,7 +88,7 @@
                           data-count-url="{{ route('form-orders.navigation-filter-count') }}">…</span>
 
                     <div class="btn-group me-2" role="group">
-                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
+                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'filter_no_ksef' => request('filter_no_ksef') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
                            class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
                            @if(!$prevOrder) onclick="return false;" @endif
@@ -91,7 +98,7 @@
                         <a href="{{ route('form-orders.index') }}" class="btn btn-outline-primary">
                             <i class="bi bi-list"></i> Lista
                         </a>
-                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
+                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'filter_no_ksef' => request('filter_no_ksef') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
                            class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
                            @if(!$nextOrder) onclick="return false;" @endif
@@ -2270,12 +2277,20 @@ nowoczesna-edukacja.pl `;
                         const idLine = data.ifirma_invoice_id
                             ? `<br><span class="text-muted">ID iFirma:</span> <code>${data.ifirma_invoice_id}</code>`
                             : '';
+                        let emailLine = '';
+                        if (Array.isArray(data.emails_sent) && data.emails_sent.length) {
+                            emailLine += `<br><span class="text-muted">E-mail FV:</span> ${data.emails_sent.join(', ')}`;
+                        }
+                        if (Array.isArray(data.email_errors) && data.email_errors.length) {
+                            emailLine += `<br><span class="text-danger">Błędy e-mail (${data.email_errors.length}) — intencja wysyłki pozostaje.</span>`;
+                        }
                         resultDiv.innerHTML = `
                             <div class="alert ${alertClass} alert-dismissible fade show py-2 small mb-0" role="alert">
                                 <i class="bi ${iconClass}"></i> ${data.message || 'Zsynchronizowano KSeF z iFirma.'}
                                 ${data.ksef_number ? `<br><span class="text-muted">Numer KSeF:</span> <code>${data.ksef_number}</code>` : ''}
                                 ${idLine}
                                 ${datesLine}
+                                ${emailLine}
                                 <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
                             </div>`;
                     }
@@ -2738,53 +2753,32 @@ nowoczesna-edukacja.pl `;
             window.location.href = currentUrl.toString();
         }
 
-        // Checkbox „tylko niewprowadzone” + pole course_id (filtr po courses.id / form_orders.product_id)
+        // Checkboxy filtrów nawigacji + pole course_id (filtr po courses.id / form_orders.product_id)
         document.addEventListener('DOMContentLoaded', function() {
             const filterCheckbox = document.getElementById('filterNewOnly');
+            const filterNoKsefCheckbox = document.getElementById('filterNoKsefOnly');
             const courseIdInput = document.getElementById('courseIdFilter');
-            const prevOrderBtn = document.getElementById('prevOrderBtn');
-            const nextOrderBtn = document.getElementById('nextOrderBtn');
-            
-            // Przechowujemy oryginalne linki
-            const originalPrevHref = prevOrderBtn.href;
-            const originalNextHref = nextOrderBtn.href;
-            
-            filterCheckbox.addEventListener('change', function() {
-                const currentOrderId = {{ $zamowienie->id }};
-                const filterNew = this.checked ? '1' : '';
-                
-                // Aktualizujemy linki nawigacyjne
-                if (filterNew) {
-                    // Dodajemy parametr filter_new=1
-                    const prevUrl = new URL(originalPrevHref);
-                    const nextUrl = new URL(originalNextHref);
-                    
-                    prevUrl.searchParams.set('filter_new', '1');
-                    nextUrl.searchParams.set('filter_new', '1');
-                    
-                    prevOrderBtn.href = prevUrl.toString();
-                    nextOrderBtn.href = nextUrl.toString();
+
+            function reloadWithNavFilterParam(paramName, enabled) {
+                const currentUrl = new URL(window.location.href);
+                if (enabled) {
+                    currentUrl.searchParams.set(paramName, '1');
                 } else {
-                    // Usuwamy parametr filter_new
-                    const prevUrl = new URL(originalPrevHref);
-                    const nextUrl = new URL(originalNextHref);
-                    
-                    prevUrl.searchParams.delete('filter_new');
-                    nextUrl.searchParams.delete('filter_new');
-                    
-                    prevOrderBtn.href = prevUrl.toString();
-                    nextOrderBtn.href = nextUrl.toString();
-                }
-                
-                // Przeładowujemy stronę z nowym filtrem
-                const currentUrl = new URL(window.location);
-                if (filterNew) {
-                    currentUrl.searchParams.set('filter_new', '1');
-                } else {
-                    currentUrl.searchParams.delete('filter_new');
+                    currentUrl.searchParams.delete(paramName);
                 }
                 window.location.href = currentUrl.toString();
-            });
+            }
+
+            if (filterCheckbox) {
+                filterCheckbox.addEventListener('change', function() {
+                    reloadWithNavFilterParam('filter_new', this.checked);
+                });
+            }
+            if (filterNoKsefCheckbox) {
+                filterNoKsefCheckbox.addEventListener('change', function() {
+                    reloadWithNavFilterParam('filter_no_ksef', this.checked);
+                });
+            }
             
             // Pole: courses.id → query course_id (prev/next po product_id); Enter lub blur (change).
             // Klik w ID szkolenia na karcie produktu: fillCourseIdFilter().
@@ -2822,6 +2816,9 @@ nowoczesna-edukacja.pl `;
             if (pageUrl.searchParams.get('filter_new') === '1') {
                 url.searchParams.set('filter_new', '1');
             }
+            if (pageUrl.searchParams.get('filter_no_ksef') === '1') {
+                url.searchParams.set('filter_no_ksef', '1');
+            }
             const courseId = pageUrl.searchParams.get('course_id')
                 || (document.getElementById('courseIdFilter')?.value || '').trim();
             if (courseId) {
@@ -2845,7 +2842,7 @@ nowoczesna-edukacja.pl `;
                 .then(function (data) {
                     const count = Number(data.count || 0);
                     badge.textContent = String(count);
-                    const hasFilter = !!(data.filter_new || data.course_id);
+                    const hasFilter = !!(data.filter_new || data.filter_no_ksef || data.course_id);
                     badge.classList.remove('text-bg-secondary', 'text-bg-primary', 'text-bg-warning');
                     badge.classList.add(hasFilter ? 'text-bg-primary' : 'text-bg-secondary');
                     let title = 'Zamówień w zakresie nawigacji: ' + count;
@@ -2854,6 +2851,9 @@ nowoczesna-edukacja.pl `;
                     }
                     if (data.filter_new) {
                         title += ' · tylko niewprowadzone';
+                    }
+                    if (data.filter_no_ksef) {
+                        title += ' · tylko bez KSeF';
                     }
                     badge.title = title;
                 })

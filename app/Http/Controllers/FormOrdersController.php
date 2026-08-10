@@ -805,6 +805,7 @@ class FormOrdersController extends Controller
 
         // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
         $filterNew = $request->boolean('filter_new');
+        $filterNoKsef = $request->boolean('filter_no_ksef');
 
         // Sprawdzamy czy mamy filtrować po ID szkolenia
         $courseId = $request->input('course_id');
@@ -812,8 +813,8 @@ class FormOrdersController extends Controller
         // Pobieramy poprzednie i następne zamówienie (te same filtry co navigationFilterCount)
         $prevQuery = FormOrder::query()->where('id', '<', $id);
         $nextQuery = FormOrder::query()->where('id', '>', $id);
-        $this->applyShowNavigationFilters($prevQuery, $filterNew, $courseId);
-        $this->applyShowNavigationFilters($nextQuery, $filterNew, $courseId);
+        $this->applyShowNavigationFilters($prevQuery, $filterNew, $filterNoKsef, $courseId);
+        $this->applyShowNavigationFilters($nextQuery, $filterNew, $filterNoKsef, $courseId);
         $prevOrder = $prevQuery->orderByDesc('id')->first();
         $nextOrder = $nextQuery->orderBy('id')->first();
 
@@ -831,25 +832,27 @@ class FormOrdersController extends Controller
             }
         }
 
-        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'duplicateSiblingsCount', 'pneduOrderFormEditUrl'));
+        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'filterNoKsef', 'duplicateSiblingsCount', 'pneduOrderFormEditUrl'));
     }
 
     /**
      * Licznik zamówień dla filtrów nawigacji na stronie szczegółów (AJAX, po załadowaniu UI).
      *
-     * Query: filter_new=1, course_id= — te same reguły co Poprzednie/Następne.
+     * Query: filter_new=1, filter_no_ksef=1, course_id= — te same reguły co Poprzednie/Następne.
      */
     public function navigationFilterCount(Request $request)
     {
         $filterNew = $request->boolean('filter_new');
+        $filterNoKsef = $request->boolean('filter_no_ksef');
         $courseId = $request->input('course_id');
 
         $query = FormOrder::query();
-        $this->applyShowNavigationFilters($query, $filterNew, $courseId);
+        $this->applyShowNavigationFilters($query, $filterNew, $filterNoKsef, $courseId);
 
         return response()->json([
             'count' => (int) $query->count(),
             'filter_new' => $filterNew,
+            'filter_no_ksef' => $filterNoKsef,
             'course_id' => ($courseId !== null && $courseId !== '') ? (int) $courseId : null,
         ]);
     }
@@ -859,7 +862,7 @@ class FormOrdersController extends Controller
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>  $query
      */
-    private function applyShowNavigationFilters($query, bool $filterNew, mixed $courseId): void
+    private function applyShowNavigationFilters($query, bool $filterNew, bool $filterNoKsef, mixed $courseId): void
     {
         if ($filterNew) {
             $query->where(function ($q) {
@@ -869,6 +872,18 @@ class FormOrdersController extends Controller
             })->where(function ($q) {
                 $q->where('status_completed', '!=', 1)
                     ->orWhereNull('status_completed');
+            });
+        }
+
+        if ($filterNoKsef) {
+            // FV jest, NumerKSeF nie — kolejka do dogonięcia po zatorze iFirma/MF
+            $query->where(function ($q) {
+                $q->whereNotNull('invoice_number')
+                    ->where('invoice_number', '!=', '')
+                    ->where('invoice_number', '!=', '0');
+            })->where(function ($q) {
+                $q->whereNull('ksef_number')
+                    ->orWhere('ksef_number', '');
             });
         }
 
@@ -1890,6 +1905,10 @@ class FormOrdersController extends Controller
                 'ksef_status' => $result['ksef_status'] ?? null,
                 'changed' => $result['changed'] ?? false,
                 'ksef_cleared' => $result['ksef_cleared'] ?? false,
+                'email_sent' => $result['email_sent'] ?? false,
+                'emails_sent' => $result['emails_sent'] ?? [],
+                'email_errors' => $result['email_errors'] ?? [],
+                'ksef_email_pending' => $result['ksef_email_pending'] ?? (bool) $zamowienie->ksef_email_pending,
             ]);
         } catch (Exception $e) {
             Log::error('iFirma KSeF sync failed', [
