@@ -926,7 +926,7 @@ nowoczesna-edukacja.pl </div>
                                                    id="ifirma_include_participant_in_remarks"
                                                    data-participants-prefix="{{ $invoiceParticipantsPrefix }}"
                                                    data-participants-names="{{ $invoiceParticipantsCsv }}"
-                                                   {{ $invoiceParticipantRowsCount === 0 ? 'disabled' : '' }}>
+                                                   {{ $invoiceParticipantRowsCount === 0 ? 'disabled' : 'checked' }}>
                                             <label class="form-check-label small" for="ifirma_include_participant_in_remarks">
                                                 Dodaj w uwagach faktury <strong>UCZESTNIKÓW</strong>
                                                 @if($invoiceParticipantRowsCount > 0)
@@ -1294,13 +1294,6 @@ nowoczesna-edukacja.pl `;
             }
             ta.value = body;
         }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const cb = document.getElementById('ifirma_include_participant_in_remarks');
-            if (cb) {
-                cb.addEventListener('change', applyParticipantInRemarks);
-            }
-        });
 
         // Funkcja do wystawiania faktury pro forma w iFirma
         function createIfirmaProForma(orderId) {
@@ -2871,24 +2864,35 @@ nowoczesna-edukacja.pl `;
             });
         });
 
-        // Funkcja do zapamiętywania stanu checkboxów e-mail w bazie danych (per użytkownik)
+        // Zapamiętywanie checkboxów iFirma w preferencjach użytkownika (per operator)
         function initializeEmailCheckboxes() {
             console.log('Initializing email checkboxes...');
             
             const proformaCheckbox = document.getElementById('sendEmailCheckboxProforma');
             const invoiceCheckbox = document.getElementById('sendEmailCheckboxInvoice');
+            const participantRemarksCheckbox = document.getElementById('ifirma_include_participant_in_remarks');
             
             // Sprawdź czy checkboxy istnieją
-            if (!proformaCheckbox && !invoiceCheckbox) {
-                console.warn('Email checkboxes not found on page');
+            if (!proformaCheckbox && !invoiceCheckbox && !participantRemarksCheckbox) {
+                console.warn('iFirma preference checkboxes not found on page');
                 return;
             }
             
-            console.log('Checkboxes found:', { proforma: !!proformaCheckbox, invoice: !!invoiceCheckbox });
+            console.log('Checkboxes found:', {
+                proforma: !!proformaCheckbox,
+                invoice: !!invoiceCheckbox,
+                participantRemarks: !!participantRemarksCheckbox,
+            });
+
+            // Domyślnie zaznaczony — uzupełnij uwagi od razu (zanim dojdą preferencje z API)
+            if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled && participantRemarksCheckbox.checked) {
+                applyParticipantInRemarks();
+            }
             
             // Klucze preferencji
             const PROFORMA_KEY = 'ifirma_send_email_proforma';
             const INVOICE_KEY = 'ifirma_send_email_invoice';
+            const PARTICIPANT_REMARKS_KEY = 'ifirma_include_participant_in_remarks';
             
             // Funkcja do pobierania preferencji z serwera
             function loadPreferences() {
@@ -3004,6 +3008,21 @@ nowoczesna-edukacja.pl `;
                         console.log('Invoice checkbox changed to:', this.checked);
                         savePreference(INVOICE_KEY, this.checked);
                     });
+                }
+
+                // Checkbox „Dodaj w uwagach faktury UCZESTNIKÓW” — domyślnie zaznaczony
+                if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled) {
+                    const saved = preferences[PARTICIPANT_REMARKS_KEY];
+                    participantRemarksCheckbox.checked = saved === undefined ? true : !!saved;
+                    applyParticipantInRemarks();
+
+                    participantRemarksCheckbox.addEventListener('change', function () {
+                        applyParticipantInRemarks();
+                        savePreference(PARTICIPANT_REMARKS_KEY, this.checked);
+                    });
+                } else if (participantRemarksCheckbox) {
+                    // Brak uczestników — tylko synchronizuj pole uwag przy zmianie (bez zapisu preferencji)
+                    participantRemarksCheckbox.addEventListener('change', applyParticipantInRemarks);
                 }
             });
         }
