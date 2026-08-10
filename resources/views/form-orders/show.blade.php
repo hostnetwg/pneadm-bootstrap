@@ -53,17 +53,31 @@
                     <h2 class="d-inline-block mb-0 @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
                 </div>
                 <div class="d-flex align-items-center gap-3">
-                    {{-- Checkbox do filtrowania tylko niewprowadzonych zamówień --}}
+                    @php
+                        $navFilterQuery = array_filter([
+                            'filter_no_participant' => (!empty($filterNoParticipant) || request()->boolean('filter_no_participant')) ? '1' : null,
+                            'filter_no_invoice' => (!empty($filterNoInvoice) || request()->boolean('filter_no_invoice') || (request()->boolean('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice'))) ? '1' : null,
+                            'filter_no_ksef' => (!empty($filterNoKsef) || request()->boolean('filter_no_ksef')) ? '1' : null,
+                            'course_id' => request('course_id') ?: null,
+                        ]);
+                    @endphp
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="filterNewOnly" 
-                               {{ request('filter_new') ? 'checked' : '' }}>
-                        <label class="form-check-label small" for="filterNewOnly">
-                            <i class="bi bi-funnel"></i> Tylko niewprowadzone
+                        <input class="form-check-input" type="checkbox" id="filterNoParticipantOnly"
+                               {{ !empty($navFilterQuery['filter_no_participant']) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterNoParticipantOnly">
+                            <i class="bi bi-funnel"></i> bez wprowadzonego uczestnika
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterNoInvoiceOnly"
+                               {{ !empty($navFilterQuery['filter_no_invoice']) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterNoInvoiceOnly">
+                            <i class="bi bi-funnel"></i> bez wystawionej faktury
                         </label>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="filterNoKsefOnly"
-                               {{ request('filter_no_ksef') || !empty($filterNoKsef) ? 'checked' : '' }}>
+                               {{ !empty($navFilterQuery['filter_no_ksef']) ? 'checked' : '' }}>
                         <label class="form-check-label small" for="filterNoKsefOnly">
                             <i class="bi bi-funnel"></i> Tylko bez KSeF
                         </label>
@@ -88,7 +102,7 @@
                           data-count-url="{{ route('form-orders.navigation-filter-count') }}">…</span>
 
                     <div class="btn-group me-2" role="group">
-                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'filter_no_ksef' => request('filter_no_ksef') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
+                        <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], $navFilterQuery)) : '#' }}" 
                            class="btn {{ $prevOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $prevOrder ? 'Poprzednie zamówienie' : 'Brak poprzedniego zamówienia' }}"
                            @if(!$prevOrder) onclick="return false;" @endif
@@ -98,7 +112,7 @@
                         <a href="{{ route('form-orders.index') }}" class="btn btn-outline-primary">
                             <i class="bi bi-list"></i> Lista
                         </a>
-                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], array_filter(['filter_new' => request('filter_new') ? '1' : null, 'filter_no_ksef' => request('filter_no_ksef') ? '1' : null, 'course_id' => request('course_id')]))) : '#' }}" 
+                        <a href="{{ $nextOrder ? route('form-orders.show', array_merge(['id' => $nextOrder->id], $navFilterQuery)) : '#' }}" 
                            class="btn {{ $nextOrder ? 'btn-outline-primary' : 'btn-outline-secondary disabled' }}" 
                            title="{{ $nextOrder ? 'Następne zamówienie' : 'Brak następnego zamówienia' }}"
                            @if(!$nextOrder) onclick="return false;" @endif
@@ -796,13 +810,10 @@ nowoczesna-edukacja.pl </div>
                                 @method('PUT')
                                 {{-- Ukryte pole informujące że formularz jest ze strony szczegółów --}}
                                 <input type="hidden" name="from_show_page" value="1">
-                                {{-- Przekazujemy parametry filtrów --}}
-                                @if(request('filter_new'))
-                                    <input type="hidden" name="filter_new" value="{{ request('filter_new') }}">
-                                @endif
-                                @if(request('course_id'))
-                                    <input type="hidden" name="course_id" value="{{ request('course_id') }}">
-                                @endif
+                                {{-- Przekazujemy parametry filtrów nawigacji --}}
+                                @foreach($navFilterQuery as $navFilterKey => $navFilterValue)
+                                    <input type="hidden" name="{{ $navFilterKey }}" value="{{ $navFilterValue }}">
+                                @endforeach
                                 <div class="row">
                                     <div class="col-md-6">
                                         <label for="invoice_number" class="form-label small">
@@ -1015,7 +1026,7 @@ nowoczesna-edukacja.pl </div>
                     <a href="{{ route('form-orders.create', ['clone_from' => $zamowienie->id]) }}" class="btn btn-outline-primary">
                         <i class="bi bi-files"></i> Kopiuj zamówienie
                     </a>
-                    <a href="{{ route('form-orders.edit', array_merge(['id' => $zamowienie->id], array_filter(['filter_new' => request('filter_new'), 'course_id' => request('course_id')]))) }}" class="btn btn-warning">
+                    <a href="{{ route('form-orders.edit', array_merge(['id' => $zamowienie->id], $navFilterQuery)) }}" class="btn btn-warning">
                         <i class="bi bi-pencil"></i> Edytuj
                     </a>
                     <button type="button" class="btn btn-danger" 
@@ -2748,12 +2759,15 @@ nowoczesna-edukacja.pl `;
 
         // Checkboxy filtrów nawigacji + pole course_id (filtr po courses.id / form_orders.product_id)
         document.addEventListener('DOMContentLoaded', function() {
-            const filterCheckbox = document.getElementById('filterNewOnly');
+            const filterNoParticipantCheckbox = document.getElementById('filterNoParticipantOnly');
+            const filterNoInvoiceCheckbox = document.getElementById('filterNoInvoiceOnly');
             const filterNoKsefCheckbox = document.getElementById('filterNoKsefOnly');
             const courseIdInput = document.getElementById('courseIdFilter');
 
             function reloadWithNavFilterParam(paramName, enabled) {
                 const currentUrl = new URL(window.location.href);
+                // Stare zakładki filter_new — nie mieszaj ze split filtrami
+                currentUrl.searchParams.delete('filter_new');
                 if (enabled) {
                     currentUrl.searchParams.set(paramName, '1');
                 } else {
@@ -2762,9 +2776,14 @@ nowoczesna-edukacja.pl `;
                 window.location.href = currentUrl.toString();
             }
 
-            if (filterCheckbox) {
-                filterCheckbox.addEventListener('change', function() {
-                    reloadWithNavFilterParam('filter_new', this.checked);
+            if (filterNoParticipantCheckbox) {
+                filterNoParticipantCheckbox.addEventListener('change', function() {
+                    reloadWithNavFilterParam('filter_no_participant', this.checked);
+                });
+            }
+            if (filterNoInvoiceCheckbox) {
+                filterNoInvoiceCheckbox.addEventListener('change', function() {
+                    reloadWithNavFilterParam('filter_no_invoice', this.checked);
                 });
             }
             if (filterNoKsefCheckbox) {
@@ -2806,12 +2825,11 @@ nowoczesna-edukacja.pl `;
             }
             const url = new URL(badge.dataset.countUrl || '/form-orders/navigation-filter-count', window.location.origin);
             const pageUrl = new URL(window.location.href);
-            if (pageUrl.searchParams.get('filter_new') === '1') {
-                url.searchParams.set('filter_new', '1');
-            }
-            if (pageUrl.searchParams.get('filter_no_ksef') === '1') {
-                url.searchParams.set('filter_no_ksef', '1');
-            }
+            ['filter_no_participant', 'filter_no_invoice', 'filter_no_ksef', 'filter_new'].forEach(function (key) {
+                if (pageUrl.searchParams.get(key) === '1') {
+                    url.searchParams.set(key, '1');
+                }
+            });
             const courseId = pageUrl.searchParams.get('course_id')
                 || (document.getElementById('courseIdFilter')?.value || '').trim();
             if (courseId) {
@@ -2835,15 +2853,18 @@ nowoczesna-edukacja.pl `;
                 .then(function (data) {
                     const count = Number(data.count || 0);
                     badge.textContent = String(count);
-                    const hasFilter = !!(data.filter_new || data.filter_no_ksef || data.course_id);
+                    const hasFilter = !!(data.filter_no_participant || data.filter_no_invoice || data.filter_no_ksef || data.course_id);
                     badge.classList.remove('text-bg-secondary', 'text-bg-primary', 'text-bg-warning');
                     badge.classList.add(hasFilter ? 'text-bg-primary' : 'text-bg-secondary');
                     let title = 'Zamówień w zakresie nawigacji: ' + count;
                     if (data.course_id) {
                         title += ' · szkolenie #' + data.course_id;
                     }
-                    if (data.filter_new) {
-                        title += ' · tylko niewprowadzone';
+                    if (data.filter_no_participant) {
+                        title += ' · bez wprowadzonego uczestnika';
+                    }
+                    if (data.filter_no_invoice) {
+                        title += ' · bez wystawionej faktury';
                     }
                     if (data.filter_no_ksef) {
                         title += ' · tylko bez KSeF';

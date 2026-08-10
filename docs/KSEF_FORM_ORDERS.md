@@ -312,8 +312,9 @@ Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
 **Filtr nawigacji „Tylko bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
 `filter_no_ksef=1` — zamówienia z wypełnionym `invoice_number` i pustym
-`ksef_number` (kolejka po zatorze iFirma/MF). Współdziała z `filter_new` i
-`course_id` (prev/next + badge licznika).
+`ksef_number` (kolejka po zatorze iFirma/MF). Współdziała z
+`filter_no_participant`, `filter_no_invoice` i `course_id` (prev/next + badge).
+Legacy `filter_new=1` mapuje się na `filter_no_invoice`.
 
 **Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**
 oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.

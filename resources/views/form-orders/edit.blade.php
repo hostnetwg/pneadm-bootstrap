@@ -57,12 +57,15 @@
                         <input type="hidden" name="from_edit_page" value="1">
                         
                         {{-- Przekazanie parametrów filtrów --}}
-                        @if(request('filter_new'))
-                            <input type="hidden" name="filter_new" value="{{ request('filter_new') }}">
-                        @endif
-                        @if(request('course_id'))
-                            <input type="hidden" name="course_id" value="{{ request('course_id') }}">
-                        @endif
+                        @foreach(array_filter([
+                            'filter_no_participant' => request('filter_no_participant') ? '1' : null,
+                            'filter_no_invoice' => request('filter_no_invoice') || (request('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice')) ? '1' : null,
+                            'filter_no_ksef' => request('filter_no_ksef') ? '1' : null,
+                            'filter_new' => request('filter_new') ? '1' : null,
+                            'course_id' => request('course_id') ?: null,
+                        ]) as $navFilterKey => $navFilterValue)
+                            <input type="hidden" name="{{ $navFilterKey }}" value="{{ $navFilterValue }}">
+                        @endforeach
 
                         {{-- Informacje o szkoleniu --}}
                         <div class="card mb-4">
@@ -459,7 +462,12 @@
 
                         {{-- Przyciski akcji --}}
                         <div class="d-flex justify-content-between">
-                            <a href="{{ route('form-orders.show', array_merge(['id' => $zamowienie->id], array_filter(['filter_new' => request('filter_new'), 'course_id' => request('course_id')]))) }}" class="btn btn-secondary">
+                            <a href="{{ route('form-orders.show', array_merge(['id' => $zamowienie->id], array_filter([
+                                'filter_no_participant' => request('filter_no_participant') ? '1' : null,
+                                'filter_no_invoice' => request('filter_no_invoice') || (request('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice')) ? '1' : null,
+                                'filter_no_ksef' => request('filter_no_ksef') ? '1' : null,
+                                'course_id' => request('course_id') ?: null,
+                            ]))) }}" class="btn btn-secondary">
                                 <i class="bi bi-x-circle"></i> Anuluj
                             </a>
                             <button type="submit" class="btn btn-success btn-lg">

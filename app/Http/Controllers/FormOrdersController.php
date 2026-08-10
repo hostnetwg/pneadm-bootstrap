@@ -803,18 +803,17 @@ class FormOrdersController extends Controller
             abort(404, 'Zamówienie nie zostało znalezione.');
         }
 
-        // Sprawdzamy czy mamy filtrować tylko niewprowadzone zamówienia
-        $filterNew = $request->boolean('filter_new');
-        $filterNoKsef = $request->boolean('filter_no_ksef');
-
-        // Sprawdzamy czy mamy filtrować po ID szkolenia
-        $courseId = $request->input('course_id');
+        $navFilters = $this->resolveShowNavigationFilters($request);
+        $filterNoParticipant = $navFilters['filter_no_participant'];
+        $filterNoInvoice = $navFilters['filter_no_invoice'];
+        $filterNoKsef = $navFilters['filter_no_ksef'];
+        $courseId = $navFilters['course_id'];
 
         // Pobieramy poprzednie i następne zamówienie (te same filtry co navigationFilterCount)
         $prevQuery = FormOrder::query()->where('id', '<', $id);
         $nextQuery = FormOrder::query()->where('id', '>', $id);
-        $this->applyShowNavigationFilters($prevQuery, $filterNew, $filterNoKsef, $courseId);
-        $this->applyShowNavigationFilters($nextQuery, $filterNew, $filterNoKsef, $courseId);
+        $this->applyShowNavigationFilters($prevQuery, $filterNoParticipant, $filterNoInvoice, $filterNoKsef, $courseId);
+        $this->applyShowNavigationFilters($nextQuery, $filterNoParticipant, $filterNoInvoice, $filterNoKsef, $courseId);
         $prevOrder = $prevQuery->orderByDesc('id')->first();
         $nextOrder = $nextQuery->orderBy('id')->first();
 
@@ -832,29 +831,99 @@ class FormOrdersController extends Controller
             }
         }
 
-        return view('form-orders.show', compact('zamowienie', 'prevOrder', 'nextOrder', 'filterNew', 'filterNoKsef', 'duplicateSiblingsCount', 'pneduOrderFormEditUrl'));
+        return view('form-orders.show', compact(
+            'zamowienie',
+            'prevOrder',
+            'nextOrder',
+            'filterNoParticipant',
+            'filterNoInvoice',
+            'filterNoKsef',
+            'duplicateSiblingsCount',
+            'pneduOrderFormEditUrl'
+        ));
     }
 
     /**
      * Licznik zamówień dla filtrów nawigacji na stronie szczegółów (AJAX, po załadowaniu UI).
      *
-     * Query: filter_new=1, filter_no_ksef=1, course_id= — te same reguły co Poprzednie/Następne.
+     * Query: filter_no_participant=1, filter_no_invoice=1, filter_no_ksef=1, course_id=
+     * (legacy: filter_new=1 → jak filter_no_invoice).
      */
     public function navigationFilterCount(Request $request)
     {
-        $filterNew = $request->boolean('filter_new');
-        $filterNoKsef = $request->boolean('filter_no_ksef');
-        $courseId = $request->input('course_id');
+        $navFilters = $this->resolveShowNavigationFilters($request);
 
         $query = FormOrder::query();
-        $this->applyShowNavigationFilters($query, $filterNew, $filterNoKsef, $courseId);
+        $this->applyShowNavigationFilters(
+            $query,
+            $navFilters['filter_no_participant'],
+            $navFilters['filter_no_invoice'],
+            $navFilters['filter_no_ksef'],
+            $navFilters['course_id']
+        );
 
         return response()->json([
             'count' => (int) $query->count(),
-            'filter_new' => $filterNew,
-            'filter_no_ksef' => $filterNoKsef,
-            'course_id' => ($courseId !== null && $courseId !== '') ? (int) $courseId : null,
+            'filter_no_participant' => $navFilters['filter_no_participant'],
+            'filter_no_invoice' => $navFilters['filter_no_invoice'],
+            'filter_no_ksef' => $navFilters['filter_no_ksef'],
+            'course_id' => ($navFilters['course_id'] !== null && $navFilters['course_id'] !== '')
+                ? (int) $navFilters['course_id']
+                : null,
         ]);
+    }
+
+    /**
+     * @return array{
+     *     filter_no_participant: bool,
+     *     filter_no_invoice: bool,
+     *     filter_no_ksef: bool,
+     *     course_id: mixed
+     * }
+     */
+    private function resolveShowNavigationFilters(Request $request): array
+    {
+        $filterNoParticipant = $request->boolean('filter_no_participant');
+        $filterNoInvoice = $request->boolean('filter_no_invoice');
+        $filterNoKsef = $request->boolean('filter_no_ksef');
+
+        // Stare zakładki ?filter_new=1 → kolejka bez faktury
+        $hasSplitFilters = $request->has('filter_no_participant') || $request->has('filter_no_invoice');
+        if ($request->boolean('filter_new') && ! $hasSplitFilters) {
+            $filterNoInvoice = true;
+        }
+
+        return [
+            'filter_no_participant' => $filterNoParticipant,
+            'filter_no_invoice' => $filterNoInvoice,
+            'filter_no_ksef' => $filterNoKsef,
+            'course_id' => $request->input('course_id'),
+        ];
+    }
+
+    /**
+     * Query string filtrów show przy redirect po zapisie (bez legacy filter_new).
+     *
+     * @return array<string, string|int>
+     */
+    private function showNavigationRedirectParams(Request $request): array
+    {
+        $nav = $this->resolveShowNavigationFilters($request);
+        $params = [];
+        if ($nav['filter_no_participant']) {
+            $params['filter_no_participant'] = '1';
+        }
+        if ($nav['filter_no_invoice']) {
+            $params['filter_no_invoice'] = '1';
+        }
+        if ($nav['filter_no_ksef']) {
+            $params['filter_no_ksef'] = '1';
+        }
+        if ($nav['course_id'] !== null && $nav['course_id'] !== '') {
+            $params['course_id'] = $nav['course_id'];
+        }
+
+        return $params;
     }
 
     /**
@@ -862,17 +931,33 @@ class FormOrdersController extends Controller
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>  $query
      */
-    private function applyShowNavigationFilters($query, bool $filterNew, bool $filterNoKsef, mixed $courseId): void
-    {
-        if ($filterNew) {
-            $query->where(function ($q) {
-                $q->whereNull('invoice_number')
-                    ->orWhere('invoice_number', '')
-                    ->orWhere('invoice_number', '0');
-            })->where(function ($q) {
-                $q->where('status_completed', '!=', 1)
-                    ->orWhereNull('status_completed');
-            });
+    private function applyShowNavigationFilters(
+        $query,
+        bool $filterNoParticipant,
+        bool $filterNoInvoice,
+        bool $filterNoKsef,
+        mixed $courseId
+    ): void {
+        if ($filterNoParticipant) {
+            // Brak uczestnika na szkoleniu (albo brak e-maila uczestnika) — jak lista „Nieprzetworzone”
+            app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsAttention($query);
+        }
+
+        if ($filterNoInvoice) {
+            // Brak klasycznego numeru FV i brak ID iFirma (kolejka do wystawienia)
+            $table = $query->getModel()->getTable();
+            $query->whereNull("{$table}.cancelled_at")
+                ->whereNull("{$table}.legacy_handled_at")
+                ->whereNull("{$table}.invoice_exempt_at")
+                ->where(function ($noInv) use ($table) {
+                    $noInv->whereNull("{$table}.invoice_number")
+                        ->orWhere("{$table}.invoice_number", '')
+                        ->orWhere("{$table}.invoice_number", '0');
+                })
+                ->where(function ($noIfirma) use ($table) {
+                    $noIfirma->whereNull("{$table}.ifirma_invoice_id")
+                        ->orWhere("{$table}.ifirma_invoice_id", '');
+                });
         }
 
         if ($filterNoKsef) {
@@ -1038,27 +1123,15 @@ class FormOrdersController extends Controller
 
             // Przekierowanie w zależności od źródła
             if ($isFromEditPage) {
-                // Zachowujemy parametry filtrów przy przekierowaniu z formularza edycji
-                $redirectParams = [];
-                if ($request->has('filter_new')) {
-                    $redirectParams['filter_new'] = $request->input('filter_new');
-                }
-                if ($request->has('course_id')) {
-                    $redirectParams['course_id'] = $request->input('course_id');
-                }
-
-                return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
+                return redirect()->route('form-orders.show', array_merge(
+                    ['id' => $id],
+                    $this->showNavigationRedirectParams($request)
+                ))->with('success', 'Zamówienie zostało zaktualizowane.');
             } elseif ($isFromShowPage) {
-                // Zachowujemy parametry filtrów przy przekierowaniu
-                $redirectParams = [];
-                if ($request->has('filter_new')) {
-                    $redirectParams['filter_new'] = $request->input('filter_new');
-                }
-                if ($request->has('course_id')) {
-                    $redirectParams['course_id'] = $request->input('course_id');
-                }
-
-                return redirect()->route('form-orders.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Zamówienie zostało zaktualizowane.');
+                return redirect()->route('form-orders.show', array_merge(
+                    ['id' => $id],
+                    $this->showNavigationRedirectParams($request)
+                ))->with('success', 'Zamówienie zostało zaktualizowane.');
             } else {
                 // Wracamy do listy z zachowaniem parametrów
                 $redirectParams = [];
@@ -1103,18 +1176,15 @@ class FormOrdersController extends Controller
             }
 
             if ($isFromEditPage) {
-                // Zachowujemy parametry filtrów przy przekierowaniu z błędem
-                $redirectParams = [];
-                if ($request->has('filter_new')) {
-                    $redirectParams['filter_new'] = $request->input('filter_new');
-                }
-                if ($request->has('course_id')) {
-                    $redirectParams['course_id'] = $request->input('course_id');
-                }
-
-                return redirect()->route('form-orders.edit', array_merge(['id' => $id], $redirectParams))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: '.$e->getMessage());
+                return redirect()->route('form-orders.edit', array_merge(
+                    ['id' => $id],
+                    $this->showNavigationRedirectParams($request)
+                ))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia: '.$e->getMessage());
             } elseif ($isFromShowPage) {
-                return redirect()->route('form-orders.show', $id)->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
+                return redirect()->route('form-orders.show', array_merge(
+                    ['id' => $id],
+                    $this->showNavigationRedirectParams($request)
+                ))->with('error', 'Wystąpił błąd podczas aktualizacji zamówienia.');
             } else {
                 $redirectParams = [];
                 if ($request->has('per_page')) {
