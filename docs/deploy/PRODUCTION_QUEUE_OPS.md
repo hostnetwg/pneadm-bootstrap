@@ -34,7 +34,7 @@ pnedu.pl (wizyta / formularz)
     → adm.pnedu.pl API /api/dashboard/live-visitors („Aktywni teraz”)
 ```
 
-Ścieżki prod (dostosuj login):
+Ścieżki prod — **kanon:** [`PRODUCTION_PATHS.md`](./PRODUCTION_PATHS.md)
 
 ```text
 pnedu:  ~/domains/pnedu.pl/app

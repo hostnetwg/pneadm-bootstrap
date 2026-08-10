@@ -215,7 +215,8 @@ Po **każdej nowej funkcjonalności** lub **znaczącym etapie** (feature, więks
 | Testy / CI lokalne | `docs/TESTING.md` |
 | Roadmapa | `NEXT_STEPS.md` |
 
-Szablon runbooka deploy: patrz `docs/deploy/2026-07-participant-live-access-and-tests.md`.
+Szablon runbooka deploy: patrz `docs/deploy/2026-07-participant-live-access-and-tests.md`.  
+**Ścieżki prod (SeoHost):** `docs/deploy/PRODUCTION_PATHS.md` — `~/domains/adm.pnedu.pl/pneadm`, `~/domains/pnedu.pl/app`.
 
 ---
 
