@@ -1,6 +1,7 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-07-13  
+Data aktualizacji: 2026-08-10  
+
 Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
 
 Panel: `/form-orders/{id}` → przycisk **Dodaj tylko do PNEDU** (lub wariant z Sendy).
@@ -12,7 +13,7 @@ Endpoint: `POST /form-orders/{id}/pnedu/provision`
 
 | Krok | Operacja | Uwagi |
 |------|----------|--------|
-| **1** | Rekord w `participants` + konto w `pnedu.users` (utworzenie lub powiązanie) | W jednej transakcji DB; **bez** wysyłki e-maila |
+| **1** | Rekord w `participants` + konto w `pnedu.users` (utworzenie lub powiązanie) | W jednej transakcji DB; **bez** wysyłki e-maila. Gdy uczestnik z tym e-mailem **już jest** na szkoleniu (np. po resecie statusu) — **ponowne powiązanie** zamiast błędu. |
 | **2** | ClickMeeting (best-effort) | Tylko gdy `course_online_details.platform = clickmeeting` i jest `clickmeeting_event_id` |
 | **3** | E-mail do uczestnika | Zawsze próbowany po kroku 2, niezależnie od wyniku ClickMeeting |
 
@@ -120,7 +121,10 @@ Maile provision używają **`MAIL_SYSTEM_MAILER`** — przy wartości `log` traf
 
 ## Reset statusu PNEDU
 
-Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_provisioned_at`, `pnedu_clickmeeting_*` oraz rekord `participant_live_access` powiązany z uczestnikiem zamówienia.
+Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_provisioned_at`, `pnedu_user_existed_before`, `pnedu_clickmeeting_*` oraz rekord `participant_live_access` powiązany z uczestnikiem zamówienia.
+
+**Nie usuwa** rekordu z tabeli `participants` ani konta `pnedu.users`.  
+Ponowne **Dodaj uczestnika do PNEDU** odnajduje uczestnika po `course_id` + e-mail, wiąże go z zamówieniem, ustawia `pnedu_provisioned_at` i ponawia kroki ClickMeeting + e-mail.
 
 ## Uczestnicy kursu — ręczna rejestracja ClickMeeting
 
@@ -157,6 +161,7 @@ Cron: codziennie 04:15 (`routes/console.php`) — usuwa całe rekordy `participa
 sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
 sail test --filter=ParticipantLiveAccessServiceTest
+sail test --filter=FormOrderPneduProvisionRelinkTest
 sail test   # pełny suite — patrz docs/TESTING.md
 ```
 

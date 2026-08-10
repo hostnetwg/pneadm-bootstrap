@@ -68,51 +68,51 @@ class FormOrderPneduProvisionService
                     return ['success' => false, 'error' => 'Brak imienia lub nazwiska uczestnika (form_order_participants).', 'http_code' => 400];
                 }
 
-                $participantExists = Participant::query()
+                $existingParticipant = Participant::query()
                     ->where('course_id', $course->id)
                     ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-                    ->exists();
-
-                if ($participantExists) {
-                    return [
-                        'success' => false,
-                        'error' => 'Uczestnik z tym adresem e-mail jest już zapisany na to szkolenie (participants).',
-                        'http_code' => 400,
-                    ];
-                }
+                    ->first();
 
                 ['existed' => $userExisted] = $this->findOrCreatePneduUser($email, $firstName, $lastName);
 
-                $birthData = $this->copyBirthDataFromPreviousParticipant($email);
-                $variant = null;
-                if ($order->course_price_variant_id) {
-                    $variant = CoursePriceVariant::query()
-                        ->where('id', $order->course_price_variant_id)
-                        ->where('course_id', $course->id)
-                        ->first();
-                }
-                $accessExpiresAt = app(ParticipantAccessExpiryService::class)
-                    ->resolveAccessExpiresAtForFormOrderProvisioning(
-                        $variant,
-                        $course,
-                        now(),
-                        $order->order_date,
-                        $order->submission_source === FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM
-                    );
+                $reusedParticipant = $existingParticipant !== null;
 
-                $createdParticipant = Participant::query()->create([
-                    'course_id' => $course->id,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'email' => $emailRaw !== '' ? $emailRaw : $email,
-                    'birth_date' => $birthData['birth_date'],
-                    'birth_place' => $birthData['birth_place'],
-                    'order' => Participant::query()->where('course_id', $course->id)->count() + 1,
-                    'access_expires_at' => $accessExpiresAt,
-                ]);
+                if ($reusedParticipant) {
+                    // Po „Resetuj status PNEDU” uczestnik zostaje na liście szkolenia —
+                    // ponowne dodanie odtwarza powiązanie i status, bez duplikatu w participants.
+                    $courseParticipant = $existingParticipant;
+                } else {
+                    $birthData = $this->copyBirthDataFromPreviousParticipant($email);
+                    $variant = null;
+                    if ($order->course_price_variant_id) {
+                        $variant = CoursePriceVariant::query()
+                            ->where('id', $order->course_price_variant_id)
+                            ->where('course_id', $course->id)
+                            ->first();
+                    }
+                    $accessExpiresAt = app(ParticipantAccessExpiryService::class)
+                        ->resolveAccessExpiresAtForFormOrderProvisioning(
+                            $variant,
+                            $course,
+                            now(),
+                            $order->order_date,
+                            $order->submission_source === FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM
+                        );
+
+                    $courseParticipant = Participant::query()->create([
+                        'course_id' => $course->id,
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'email' => $emailRaw !== '' ? $emailRaw : $email,
+                        'birth_date' => $birthData['birth_date'],
+                        'birth_place' => $birthData['birth_place'],
+                        'order' => Participant::query()->where('course_id', $course->id)->count() + 1,
+                        'access_expires_at' => $accessExpiresAt,
+                    ]);
+                }
 
                 if ($p) {
-                    $p->participant_id = $createdParticipant->id;
+                    $p->participant_id = $courseParticipant->id;
                     $p->save();
                 }
 
@@ -127,21 +127,25 @@ class FormOrderPneduProvisionService
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'user_existed' => $userExisted,
-                    'participant_id' => (int) $createdParticipant->id,
+                    'participant_id' => (int) $courseParticipant->id,
                     'course_title' => (string) $course->title,
                     'course_id' => (int) $course->id,
                     'platform' => trim((string) optional($course->onlineDetails)->platform),
                     'clickmeeting_event_id' => trim((string) optional($course->onlineDetails)->clickmeeting_event_id),
                     'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
                     'start_date_line' => $this->startDateLineForProvisionEmail($course),
+                    'reused_participant' => $reusedParticipant,
                 ];
 
                 return [
                     'success' => true,
-                    'message' => 'Uczestnik dodany, konto PNEDU obsłużone. Wysłano wiadomość e-mail do uczestnika.',
+                    'message' => $reusedParticipant
+                        ? 'Status PNEDU odtworzony — powiązano istniejącego uczestnika szkolenia. Wysłano wiadomość e-mail.'
+                        : 'Uczestnik dodany, konto PNEDU obsłużone. Wysłano wiadomość e-mail do uczestnika.',
                     'http_code' => 200,
                     'provisioned_at' => $order->pnedu_provisioned_at->timezone('Europe/Warsaw')->format('d.m.Y H:i'),
                     'user_existed' => $userExisted,
+                    'reused_participant' => $reusedParticipant,
                 ];
             });
 

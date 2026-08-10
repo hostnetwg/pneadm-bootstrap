@@ -3700,7 +3700,10 @@ nowoczesna-edukacja.pl `;
                     </div>
                     <div class="alert alert-warning mt-3 mb-0">
                         <i class="bi bi-info-circle"></i>
-                        <strong>Uwaga:</strong> Resetowanie statusu odblokuje przycisk „Dodaj uczestnika do PNEDU” dla tego zamówienia.
+                        <strong>Uwaga:</strong> Resetowanie czyści status przy zamówieniu (i token live),
+                        ale nie usuwa uczestnika z listy szkolenia.
+                        Ponowne „Dodaj uczestnika do PNEDU” odtworzy powiązanie i status
+                        (ClickMeeting / e-mail) na podstawie istniejącego rekordu.
                     </div>
                 </div>
                 <div class="modal-footer">
