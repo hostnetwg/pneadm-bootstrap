@@ -3711,8 +3711,16 @@ nowoczesna-edukacja.pl `;
                             <input type="text" class="form-control form-control-sm" id="resendPneduAccessSubject" readonly>
                         </div>
                         <div class="mb-0">
-                            <label class="form-label small fw-semibold mb-1" for="resendPneduAccessBody">Treść</label>
-                            <textarea class="form-control font-monospace small" id="resendPneduAccessBody" rows="16" readonly></textarea>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0" for="resendPneduAccessBodyFrame">Treść (podgląd HTML)</label>
+                                <span class="small text-muted">„Skopiuj treść” bierze wersję tekstową</span>
+                            </div>
+                            <iframe id="resendPneduAccessBodyFrame"
+                                    title="Podgląd wiadomości e-mail"
+                                    class="w-100 border rounded bg-white"
+                                    style="height: 28rem;"
+                                    sandbox=""></iframe>
+                            <textarea class="d-none" id="resendPneduAccessBody" readonly aria-hidden="true"></textarea>
                         </div>
                         <p class="small text-muted mt-2 mb-0" id="resendPneduAccessHint"></p>
                     </div>
@@ -3954,6 +3962,7 @@ nowoczesna-edukacja.pl `;
             const toEl = document.getElementById('resendPneduAccessTo');
             const subjectEl = document.getElementById('resendPneduAccessSubject');
             const bodyEl = document.getElementById('resendPneduAccessBody');
+            const bodyFrameEl = document.getElementById('resendPneduAccessBodyFrame');
             const variantEl = document.getElementById('resendPneduAccessVariant');
             const hintEl = document.getElementById('resendPneduAccessHint');
             const copyBtn = document.getElementById('resendPneduAccessCopyBtn');
@@ -3976,6 +3985,10 @@ nowoczesna-edukacja.pl `;
                 toEl.value = '';
                 subjectEl.value = '';
                 bodyEl.value = '';
+                if (bodyFrameEl) {
+                    bodyFrameEl.removeAttribute('srcdoc');
+                    bodyFrameEl.src = 'about:blank';
+                }
                 variantEl.textContent = '';
                 hintEl.textContent = '';
             }
@@ -4019,6 +4032,17 @@ nowoczesna-edukacja.pl `;
                     toEl.value = data.to || '';
                     subjectEl.value = data.subject || '';
                     bodyEl.value = data.body || '';
+                    if (bodyFrameEl) {
+                        if (data.body_html) {
+                            bodyFrameEl.srcdoc = data.body_html;
+                        } else {
+                            const esc = String(data.body || '')
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;');
+                            bodyFrameEl.srcdoc = '<pre style="font-family:system-ui,sans-serif;padding:1rem;white-space:pre-wrap;margin:0;">' + esc + '</pre>';
+                        }
+                    }
                     variantEl.textContent = data.variant_label
                         ? ('Krok 3: E-mail do uczestnika — ' + data.variant_label)
                         : 'Krok 3: E-mail do uczestnika';

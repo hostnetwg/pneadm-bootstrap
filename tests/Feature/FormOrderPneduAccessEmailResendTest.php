@@ -92,6 +92,8 @@ class FormOrderPneduAccessEmailResendTest extends TestCase
             ->assertJsonPath('to', 'existing.resend@example.test');
         $this->assertNotEmpty($preview->json('subject'));
         $this->assertNotEmpty($preview->json('body'));
+        $this->assertNotEmpty($preview->json('body_html'));
+        $this->assertStringContainsString('<html', (string) $preview->json('body_html'));
 
         $send = $this->actingAs($admin)->postJson(
             route('form-orders.pnedu.resend-access-email', $order->id)

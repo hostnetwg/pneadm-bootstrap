@@ -12,6 +12,8 @@ use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
 use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Mail\Markdown;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -260,7 +262,7 @@ class FormOrderPneduProvisionService
     /**
      * Podgląd e-maila z kroku 3 provisionu (bez wysyłki).
      *
-     * @return array{success: bool, error?: string, http_code: int, to?: string, subject?: string, body?: string, variant?: string, variant_label?: string}
+     * @return array{success: bool, error?: string, http_code: int, to?: string, subject?: string, body?: string, body_html?: string, variant?: string, variant_label?: string}
      */
     public function previewProvisionAccessEmail(int $formOrderId): array
     {
@@ -283,6 +285,7 @@ class FormOrderPneduProvisionService
                 'to' => $resolved['email'],
                 'subject' => (string) ($mail->subject ?? ''),
                 'body' => $this->mailMessageToPlainText($mail),
+                'body_html' => $this->mailMessageToHtml($mail),
                 'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
                 'variant_label' => $resolved['is_new_account']
                     ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
@@ -506,7 +509,17 @@ class FormOrderPneduProvisionService
         ];
     }
 
-    private function mailMessageToPlainText(\Illuminate\Notifications\Messages\MailMessage $mail): string
+    private function mailMessageToHtml(MailMessage $mail): string
+    {
+        $theme = $mail->theme ?? 'default';
+        $view = $mail->markdown ?? 'mail::message';
+
+        return (string) (new Markdown(view(), config('mail.markdown')))
+            ->theme($theme)
+            ->render($view, $mail->data());
+    }
+
+    private function mailMessageToPlainText(MailMessage $mail): string
     {
         $lines = [];
 
