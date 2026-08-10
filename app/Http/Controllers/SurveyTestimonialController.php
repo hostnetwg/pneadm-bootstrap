@@ -13,17 +13,28 @@ class SurveyTestimonialController extends Controller
     {
         $filter = $request->string('filter')->toString();
 
-        $query = SurveyTestimonial::query()->with(['course', 'survey'])->orderByDesc('created_at');
+        $query = SurveyTestimonial::query()->with(['course', 'survey']);
 
         if ($filter === 'pending') {
-            $query->where('publish_consent', true)->where('is_published', false);
+            $query->where('publish_consent', true)->where('is_published', false)
+                ->orderByDesc('created_at');
         } elseif ($filter === 'published') {
-            $query->where('is_published', true);
+            $query->where('is_published', true)
+                ->orderByDesc('is_featured')
+                ->orderBy('display_order')
+                ->orderByDesc('created_at');
+        } elseif ($filter === 'featured') {
+            $query->where('is_featured', true)
+                ->orderBy('display_order')
+                ->orderByDesc('created_at');
+        } else {
+            $query->orderByDesc('created_at');
         }
 
         $testimonials = $query->paginate(30)->withQueryString();
+        $featuredCount = SurveyTestimonial::featuredCount();
 
-        return view('surveys.testimonials.index', compact('testimonials', 'filter'));
+        return view('surveys.testimonials.index', compact('testimonials', 'filter', 'featuredCount'));
     }
 
     public function update(Request $request, SurveyTestimonial $testimonial): RedirectResponse
@@ -68,6 +79,55 @@ class SurveyTestimonialController extends Controller
         return $this->redirectToIndex($request)->with('success', 'Rekomendacja zdjęta z publikacji.');
     }
 
+    public function feature(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    {
+        if (! $testimonial->is_published || ! $testimonial->publish_consent) {
+            return $this->redirectToIndex($request)->with('error', 'Wyróżnić można tylko opublikowaną rekomendację.');
+        }
+
+        if (! $testimonial->is_featured
+            && SurveyTestimonial::featuredCount() >= SurveyTestimonial::FEATURED_SOFT_LIMIT) {
+            return $this->redirectToIndex($request)->with(
+                'error',
+                'Masz już '.SurveyTestimonial::FEATURED_SOFT_LIMIT.' wyróżnionych rekomendacji. '
+                .'Usuń wyróżnienie z jednej z nich (filtr „Wyróżnione”), potem dodaj nową — '
+                .'krótka lista na górze działa lepiej marketingowo.'
+            );
+        }
+
+        $testimonial->feature();
+
+        return $this->redirectToIndex($request)->with(
+            'success',
+            'Rekomendacja wyróżniona — będzie wyświetlana na górze listy na pnedu.pl.'
+        );
+    }
+
+    public function unfeature(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    {
+        $testimonial->unfeature();
+
+        return $this->redirectToIndex($request)->with('success', 'Usunięto wyróżnienie rekomendacji.');
+    }
+
+    public function moveUp(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    {
+        if (! $testimonial->moveFeatured('up')) {
+            return $this->redirectToIndex($request)->with('error', 'Nie można przesunąć wyżej.');
+        }
+
+        return $this->redirectToIndex($request)->with('success', 'Kolejność wyróżnień zaktualizowana.');
+    }
+
+    public function moveDown(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    {
+        if (! $testimonial->moveFeatured('down')) {
+            return $this->redirectToIndex($request)->with('error', 'Nie można przesunąć niżej.');
+        }
+
+        return $this->redirectToIndex($request)->with('success', 'Kolejność wyróżnień zaktualizowana.');
+    }
+
     public function destroy(Request $request, SurveyTestimonial $testimonial): RedirectResponse
     {
         $testimonial->delete();
@@ -92,7 +152,7 @@ class SurveyTestimonialController extends Controller
             }
         }
 
-        $params = in_array($filter, ['pending', 'published'], true)
+        $params = in_array($filter, ['pending', 'published', 'featured'], true)
             ? ['filter' => $filter]
             : [];
 

@@ -521,6 +521,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::put('/surveys/testimonials/{testimonial}', [SurveyTestimonialController::class, 'update'])->name('surveys.testimonials.update');
     Route::post('/surveys/testimonials/{testimonial}/publish', [SurveyTestimonialController::class, 'publish'])->name('surveys.testimonials.publish');
     Route::post('/surveys/testimonials/{testimonial}/unpublish', [SurveyTestimonialController::class, 'unpublish'])->name('surveys.testimonials.unpublish');
+    Route::post('/surveys/testimonials/{testimonial}/feature', [SurveyTestimonialController::class, 'feature'])->name('surveys.testimonials.feature');
+    Route::post('/surveys/testimonials/{testimonial}/unfeature', [SurveyTestimonialController::class, 'unfeature'])->name('surveys.testimonials.unfeature');
+    Route::post('/surveys/testimonials/{testimonial}/move-up', [SurveyTestimonialController::class, 'moveUp'])->name('surveys.testimonials.move-up');
+    Route::post('/surveys/testimonials/{testimonial}/move-down', [SurveyTestimonialController::class, 'moveDown'])->name('surveys.testimonials.move-down');
     Route::delete('/surveys/testimonials/{testimonial}', [SurveyTestimonialController::class, 'destroy'])->name('surveys.testimonials.destroy');
     Route::resource('surveys', SurveyController::class);
     Route::get('/courses/{course}/surveys', [SurveyController::class, 'courseSurveys'])->name('surveys.course');

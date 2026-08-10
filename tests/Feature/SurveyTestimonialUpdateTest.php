@@ -81,4 +81,124 @@ class SurveyTestimonialUpdateTest extends TestCase
             'quote' => 'Oryginalna treść',
         ]);
     }
+
+    public function test_admin_can_feature_published_testimonial(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => false,
+            'display_order' => SurveyTestimonial::DISPLAY_ORDER_UNFEATURED,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('surveys.testimonials.feature', $testimonial));
+
+        $response->assertRedirect(route('surveys.testimonials.index'));
+        $fresh = $testimonial->fresh();
+        $this->assertTrue($fresh->is_featured);
+        $this->assertLessThan(SurveyTestimonial::DISPLAY_ORDER_UNFEATURED, (int) $fresh->display_order);
+    }
+
+    public function test_feature_requires_published_testimonial(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => false,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('surveys.testimonials.feature', $testimonial));
+
+        $response->assertRedirect(route('surveys.testimonials.index'));
+        $response->assertSessionHas('error');
+        $this->assertFalse($testimonial->fresh()->is_featured);
+    }
+
+    public function test_feature_respects_soft_limit(): void
+    {
+        $admin = User::factory()->create();
+
+        for ($i = 1; $i <= SurveyTestimonial::FEATURED_SOFT_LIMIT; $i++) {
+            SurveyTestimonial::query()->create([
+                'author_name' => "Autor {$i}",
+                'quote' => "Opinia {$i}",
+                'publish_consent' => true,
+                'is_published' => true,
+                'is_featured' => true,
+                'display_order' => $i * 10,
+            ]);
+        }
+
+        $extra = SurveyTestimonial::query()->create([
+            'author_name' => 'Extra',
+            'quote' => 'Nadmiar',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => false,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('surveys.testimonials.feature', $extra));
+
+        $response->assertRedirect(route('surveys.testimonials.index'));
+        $response->assertSessionHas('error');
+        $this->assertFalse($extra->fresh()->is_featured);
+    }
+
+    public function test_move_up_swaps_featured_order(): void
+    {
+        $admin = User::factory()->create();
+        $first = SurveyTestimonial::query()->create([
+            'author_name' => 'Pierwsza',
+            'quote' => 'A',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => true,
+            'display_order' => 10,
+        ]);
+        $second = SurveyTestimonial::query()->create([
+            'author_name' => 'Druga',
+            'quote' => 'B',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => true,
+            'display_order' => 20,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('surveys.testimonials.index', ['filter' => 'featured']))
+            ->post(route('surveys.testimonials.move-up', $second), ['filter' => 'featured']);
+
+        $response->assertRedirect(route('surveys.testimonials.index', ['filter' => 'featured']));
+        $this->assertSame(10, (int) $second->fresh()->display_order);
+        $this->assertSame(20, (int) $first->fresh()->display_order);
+    }
+
+    public function test_unpublish_clears_featured_flag(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => true,
+            'display_order' => 10,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('surveys.testimonials.unpublish', $testimonial));
+
+        $fresh = $testimonial->fresh();
+        $this->assertFalse($fresh->is_published);
+        $this->assertFalse($fresh->is_featured);
+        $this->assertSame(SurveyTestimonial::DISPLAY_ORDER_UNFEATURED, (int) $fresh->display_order);
+    }
 }

@@ -7,12 +7,18 @@
         <p class="text-muted mb-3">
             Opinie zebrane z bloku „rekomendacja” w ankiecie natywnej. Publikacja na stronie głównej wymaga zgody uczestnika
             oraz Twojego zatwierdzenia. Możesz poprawić treść i dane autora (np. literówki) przed publikacją.
+            <strong>Wyróżnione</strong> opinie są zawsze na górze na pnedu.pl (kolejność ↑↓) —
+            poniżej pojawiają się najnowsze. Optymalnie 4–8 wyróżnień (limit {{ \App\Models\SurveyTestimonial::FEATURED_SOFT_LIMIT }}).
+            Obecnie wyróżnionych: <strong>{{ (int) ($featuredCount ?? 0) }}</strong>.
         </p>
 
-        <div class="mb-3 btn-group">
+        <div class="mb-3 btn-group flex-wrap">
             <a href="{{ route('surveys.testimonials.index') }}" class="btn btn-sm {{ $filter === '' ? 'btn-primary' : 'btn-outline-primary' }}">Wszystkie</a>
             <a href="{{ route('surveys.testimonials.index', ['filter' => 'pending']) }}" class="btn btn-sm {{ $filter === 'pending' ? 'btn-primary' : 'btn-outline-primary' }}">Do akceptacji</a>
             <a href="{{ route('surveys.testimonials.index', ['filter' => 'published']) }}" class="btn btn-sm {{ $filter === 'published' ? 'btn-primary' : 'btn-outline-primary' }}">Opublikowane</a>
+            <a href="{{ route('surveys.testimonials.index', ['filter' => 'featured']) }}" class="btn btn-sm {{ $filter === 'featured' ? 'btn-primary' : 'btn-outline-primary' }}">
+                Wyróżnione@if(($featuredCount ?? 0) > 0) ({{ $featuredCount }})@endif
+            </a>
         </div>
 
         @if(session('success'))
@@ -42,6 +48,9 @@
                             <th>Wystawiono</th>
                             <th>Zgoda</th>
                             <th>Status</th>
+                            @if($filter === 'featured')
+                                <th class="text-center">Kolejność</th>
+                            @endif
                             <th></th>
                         </tr>
                     </thead>
@@ -93,7 +102,26 @@
                                     @else
                                         <span class="badge bg-warning text-dark">Szkic</span>
                                     @endif
+                                    @if($t->is_featured)
+                                        <span class="badge bg-warning text-dark ms-1" title="Na górze listy na pnedu.pl">
+                                            <i class="bi bi-star-fill"></i> Wyróżniona
+                                        </span>
+                                    @endif
                                 </td>
+                                @if($filter === 'featured')
+                                    <td class="text-center text-nowrap">
+                                        <form method="POST" action="{{ route('surveys.testimonials.move-up', $t) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="filter" value="featured">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Wyżej na homepage">↑</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('surveys.testimonials.move-down', $t) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="filter" value="featured">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Niżej na homepage">↓</button>
+                                        </form>
+                                    </td>
+                                @endif
                                 <td class="text-end text-nowrap">
                                     @php
                                         $editPayloadJson = json_encode([
@@ -121,6 +149,27 @@
                                             <button type="submit" class="btn btn-sm btn-success">Publikuj</button>
                                         </form>
                                     @elseif($t->is_published)
+                                        @if($t->is_featured)
+                                            <form method="POST" action="{{ route('surveys.testimonials.unfeature', $t) }}" class="d-inline">
+                                                @csrf
+                                                @if($filter !== '')
+                                                    <input type="hidden" name="filter" value="{{ $filter }}">
+                                                @endif
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Usuń z góry listy na pnedu.pl">
+                                                    <i class="bi bi-star-fill"></i> Odznacz
+                                                </button>
+                                            </form>
+                                        @else
+                                            <form method="POST" action="{{ route('surveys.testimonials.feature', $t) }}" class="d-inline">
+                                                @csrf
+                                                @if($filter !== '')
+                                                    <input type="hidden" name="filter" value="{{ $filter }}">
+                                                @endif
+                                                <button type="submit" class="btn btn-sm btn-warning" title="Pokaż na górze na pnedu.pl">
+                                                    <i class="bi bi-star"></i> Wyróżnij
+                                                </button>
+                                            </form>
+                                        @endif
                                         <form method="POST" action="{{ route('surveys.testimonials.unpublish', $t) }}" class="d-inline">
                                             @csrf
                                             @if($filter !== '')
@@ -141,7 +190,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td>
+                                <td colspan="{{ $filter === 'featured' ? 8 : 7 }}" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td>
                             </tr>
                         @endforelse
                     </tbody>

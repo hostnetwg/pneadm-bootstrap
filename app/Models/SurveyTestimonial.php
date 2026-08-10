@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SurveyTestimonial extends Model
 {
+    /** Soft limit wyróżnień na homepage (marketing: 4–8). */
+    public const FEATURED_SOFT_LIMIT = 8;
+
+    /** display_order poza listą wyróżnionych. */
+    public const DISPLAY_ORDER_UNFEATURED = 100;
+
     protected $fillable = [
         'survey_id',
         'survey_response_id',
@@ -23,6 +29,7 @@ class SurveyTestimonial extends Model
         'rating',
         'publish_consent',
         'is_published',
+        'is_featured',
         'published_at',
         'display_order',
     ];
@@ -31,6 +38,7 @@ class SurveyTestimonial extends Model
         'rating' => 'integer',
         'publish_consent' => 'boolean',
         'is_published' => 'boolean',
+        'is_featured' => 'boolean',
         'published_at' => 'datetime',
         'display_order' => 'integer',
     ];
@@ -55,7 +63,14 @@ class SurveyTestimonial extends Model
         return $query
             ->where('is_published', true)
             ->where('publish_consent', true)
+            ->orderByDesc('is_featured')
+            ->orderBy('display_order')
             ->orderByDesc('created_at');
+    }
+
+    public static function featuredCount(): int
+    {
+        return (int) self::query()->where('is_featured', true)->count();
     }
 
     public function subtitle(): string
@@ -119,6 +134,71 @@ class SurveyTestimonial extends Model
     {
         $this->update([
             'is_published' => false,
+            'is_featured' => false,
+            'display_order' => self::DISPLAY_ORDER_UNFEATURED,
         ]);
+    }
+
+    public function feature(): void
+    {
+        if ($this->is_featured) {
+            return;
+        }
+
+        $nextOrder = ((int) self::query()->where('is_featured', true)->max('display_order')) + 10;
+
+        $this->update([
+            'is_featured' => true,
+            'display_order' => max($nextOrder, 10),
+        ]);
+    }
+
+    public function unfeature(): void
+    {
+        $this->update([
+            'is_featured' => false,
+            'display_order' => self::DISPLAY_ORDER_UNFEATURED,
+        ]);
+    }
+
+    /**
+     * Przesuń wśród wyróżnionych (direction: up = wyżej na homepage, down = niżej).
+     */
+    public function moveFeatured(string $direction): bool
+    {
+        if (! $this->is_featured) {
+            return false;
+        }
+
+        $neighbors = self::query()
+            ->where('is_featured', true)
+            ->orderBy('display_order')
+            ->orderBy('id')
+            ->get();
+
+        $index = $neighbors->search(fn (self $row) => $row->id === $this->id);
+        if ($index === false) {
+            return false;
+        }
+
+        $swapIndex = $direction === 'up' ? $index - 1 : $index + 1;
+        if ($swapIndex < 0 || $swapIndex >= $neighbors->count()) {
+            return false;
+        }
+
+        /** @var self $other */
+        $other = $neighbors[$swapIndex];
+        $myOrder = (int) $this->display_order;
+        $otherOrder = (int) $other->display_order;
+
+        if ($myOrder === $otherOrder) {
+            $myOrder = ($index + 1) * 10;
+            $otherOrder = ($swapIndex + 1) * 10;
+        }
+
+        $this->update(['display_order' => $otherOrder]);
+        $other->update(['display_order' => $myOrder]);
+
+        return true;
     }
 }
