@@ -36,6 +36,7 @@ class SurveySetting extends Model
         'default_is_anonymous',
         'allow_multiple_responses',
         'enabled_avatar_presets',
+        'show_testimonial_date_on_homepage',
         'default_template_id',
     ];
 
@@ -45,6 +46,7 @@ class SurveySetting extends Model
         'default_is_anonymous' => 'boolean',
         'allow_multiple_responses' => 'boolean',
         'enabled_avatar_presets' => 'array',
+        'show_testimonial_date_on_homepage' => 'boolean',
     ];
 
     public static function forgetSettingsCache(): void
@@ -73,6 +75,7 @@ class SurveySetting extends Model
                         'default_is_anonymous' => true,
                         'allow_multiple_responses' => false,
                         'enabled_avatar_presets' => SurveyAvatarPresets::defaultEnabledKeys(),
+                        'show_testimonial_date_on_homepage' => false,
                         'default_template_id' => SurveyTemplate::query()->where('is_default', true)->value('id'),
                     ]);
                 } catch (\Throwable) {
@@ -84,6 +87,7 @@ class SurveySetting extends Model
                         'default_is_anonymous' => true,
                         'allow_multiple_responses' => false,
                         'enabled_avatar_presets' => SurveyAvatarPresets::defaultEnabledKeys(),
+                        'show_testimonial_date_on_homepage' => false,
                         'default_template_id' => null,
                     ]);
                     $fallback->id = self::SINGLETON_ID;

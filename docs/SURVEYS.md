@@ -1,7 +1,7 @@
 # Ankiety po szkoleniu — dokumentacja (kanon: pneadm)
 
 Opis procesu ankiet ewaluacyjnych w ekosystemie **adm.pnedu.pl** (pneadm) + **pnedu.pl**.  
-Ostatnia aktualizacja: **2026-08-08** (rekomendacja jako osobny krok po ankiecie).
+Ostatnia aktualizacja: **2026-08-10** (przełącznik daty rekomendacji na homepage).
 
 ## Spis treści
 
@@ -127,11 +127,17 @@ Powiązanie z `survey_response_id` przez sesję.
 Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).  
 Edycja: przycisk **Edytuj** — poprawa opinii, autora, stanowiska, miasta i oceny (literówki przed publikacją).
 
-**Awatary w formularzu:** `Ankiety → Ustawienia` → checkboxy (`survey_settings.enabled_avatar_presets`).
+**Awatary w formularzu:** `Ustawienia → Ankiety` → checkboxy (`survey_settings.enabled_avatar_presets`).
 Katalog: **32** self-hosted SVG (DiceBear Avataaars, zestaw „nauczycielski” — nie pełna biblioteka).
 Domyślnie włączone **16** (rdzeń); w ustawieniach można włączyć kolejne.
 Zawsze: BRAK + własne zdjęcie. Stare klucze mapowane w `SurveyAvatarPresets::migrateLegacyKey()`.
 Po zapisie ustawień adm czyści cache pnedu (`POST /api/internal/cache/survey-settings`) — bez tego formularz mógł trzymać starą listę do ~120 s.
+
+**Data na homepage:** `Ustawienia → Ankiety` → checkbox
+„Pokazuj datę rekomendacji na stronie głównej pnedu.pl”
+(`survey_settings.show_testimonial_date_on_homepage`, domyślnie **wyłączone**).
+Gdy włączone: pod autorem wyświetlana jest data wystawienia (`created_at`, `d.m.Y`, Europe/Warsaw)
+na kartach początkowych i dociągniętych przez „Pokaż więcej”.
 
 **pnedu homepage:** `HomeController` ładuje **6 losowych** opublikowanych rekomendacji;
 przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  

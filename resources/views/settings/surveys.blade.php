@@ -106,6 +106,23 @@
             </div>
 
             <div class="card-header bg-light border-top">
+                <h5 class="mb-0">Wyświetlanie rekomendacji na pnedu.pl</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" name="show_testimonial_date_on_homepage" id="show_testimonial_date_on_homepage" value="1"
+                        {{ old('show_testimonial_date_on_homepage', $settings->show_testimonial_date_on_homepage) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="show_testimonial_date_on_homepage">
+                        Pokazuj datę rekomendacji na stronie głównej pnedu.pl
+                    </label>
+                    <div class="form-text">
+                        Data wystawienia (dzień.miesiąc.rok, czas warszawski) pod imieniem autora na kartach opinii.
+                        Domyślnie wyłączone.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-header bg-light border-top">
                 <h5 class="mb-0">Awatary w formularzu rekomendacji</h5>
             </div>
             <div class="card-body">

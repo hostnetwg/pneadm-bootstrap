@@ -48,6 +48,7 @@ class SurveySettingsController extends Controller
             'default_template_id' => 'nullable|exists:survey_templates,id',
             'enabled_avatar_presets' => 'nullable|array',
             'enabled_avatar_presets.*' => ['string', Rule::in(SurveyAvatarPresets::keys())],
+            'show_testimonial_date_on_homepage' => 'nullable|boolean',
         ]);
 
         $enabledAvatars = array_values(array_unique(array_intersect(
@@ -65,6 +66,7 @@ class SurveySettingsController extends Controller
             'allow_multiple_responses' => $request->boolean('allow_multiple_responses'),
             'default_template_id' => $validated['default_template_id'] ?? null,
             'enabled_avatar_presets' => $enabledAvatars,
+            'show_testimonial_date_on_homepage' => $request->boolean('show_testimonial_date_on_homepage'),
         ]);
         $settings->save();
 
