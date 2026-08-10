@@ -1,7 +1,7 @@
 # Ankiety po szkoleniu — dokumentacja (kanon: pneadm)
 
 Opis procesu ankiet ewaluacyjnych w ekosystemie **adm.pnedu.pl** (pneadm) + **pnedu.pl**.  
-Ostatnia aktualizacja: **2026-08-10** (przełącznik daty rekomendacji na homepage).
+Ostatnia aktualizacja: **2026-08-10** (rekomendacje na homepage od najnowszych).
 
 ## Spis treści
 
@@ -139,8 +139,9 @@ Po zapisie ustawień adm czyści cache pnedu (`POST /api/internal/cache/survey-s
 Gdy włączone: pod autorem wyświetlana jest data wystawienia (`created_at`, `d.m.Y`, Europe/Warsaw)
 na kartach początkowych i dociągniętych przez „Pokaż więcej”.
 
-**pnedu homepage:** `HomeController` ładuje **6 losowych** opublikowanych rekomendacji;
-przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  
+**pnedu homepage:** `HomeController` ładuje **6 najnowszych** opublikowanych rekomendacji
+(`orderByDesc(created_at)` — jak lista w `Ankiety → Rekomendacje`);
+przycisk **Pokaż więcej** dociąga kolejne starsze (`/fragments/homepage-testimonials`, bez już pokazanych).  
 Migracja seeduje dwie dotychczasowe opinie placeholder (Anna Nowak, Piotr Zieliński) jako opublikowane.
 
 **RODO / Polityka (pnedu, 2026-08-09):** klauzula RODO + Polityka prywatności opisują rekomendacje (zgoda, opcjonalne zdjęcie, publikacja po moderacji, wycofanie przez e-mail). Formularz: tekst zgody + linki (bez osobnego checkboxa). Polityka: domena `pnedu.pl`.

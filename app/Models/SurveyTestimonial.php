@@ -55,8 +55,7 @@ class SurveyTestimonial extends Model
         return $query
             ->where('is_published', true)
             ->where('publish_consent', true)
-            ->orderBy('display_order')
-            ->orderByDesc('published_at');
+            ->orderByDesc('created_at');
     }
 
     public function subtitle(): string
