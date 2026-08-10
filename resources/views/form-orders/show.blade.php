@@ -1208,6 +1208,105 @@ nowoczesna-edukacja.pl `;
             });
         }
 
+        // Dźwięki UI: sukces / porażka FV / porażka KSeF (Web Audio — bez plików mp3)
+        (function initFormOrderUiSounds() {
+            let audioCtx = null;
+
+            function getAudioContext() {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) {
+                    return null;
+                }
+                if (!audioCtx) {
+                    audioCtx = new AudioContextClass();
+                }
+                return audioCtx;
+            }
+
+            function unlockAudio() {
+                try {
+                    const ctx = getAudioContext();
+                    if (ctx && ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+                } catch (e) {
+                    // fail-silent
+                }
+            }
+
+            function playTone(ctx, frequency, startAt, duration, type, peakGain) {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = type || 'sine';
+                oscillator.frequency.value = frequency;
+                const peak = peakGain == null ? 0.14 : peakGain;
+                gain.gain.setValueAtTime(0.0001, startAt);
+                gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(startAt);
+                oscillator.stop(startAt + duration + 0.05);
+            }
+
+            function playSequence(builder) {
+                try {
+                    const ctx = getAudioContext();
+                    if (!ctx) {
+                        return;
+                    }
+                    if (ctx.state === 'suspended') {
+                        ctx.resume().then(function () {
+                            playSequence(builder);
+                        });
+                        return;
+                    }
+                    builder(ctx, ctx.currentTime);
+                } catch (e) {
+                    // fail-silent
+                }
+            }
+
+            /** Sukces: PNEDU / FV / FV+KSeF */
+            function playSuccess() {
+                playSequence(function (ctx, t0) {
+                    playTone(ctx, 523.25, t0, 0.18, 'sine', 0.12);
+                    playTone(ctx, 659.25, t0 + 0.12, 0.22, 'sine', 0.13);
+                    playTone(ctx, 783.99, t0 + 0.26, 0.28, 'sine', 0.12);
+                });
+            }
+
+            /** Twarda porażka: FV nie wystawiona / błąd połączenia / PNEDU */
+            function playError() {
+                playSequence(function (ctx, t0) {
+                    playTone(ctx, 220, t0, 0.22, 'square', 0.08);
+                    playTone(ctx, 165, t0 + 0.2, 0.28, 'square', 0.07);
+                });
+            }
+
+            /** FV jest (np. 34/8/2026), ale KSeF nie doszedł — inny dźwięk niż twardy błąd */
+            function playKsefError() {
+                playSequence(function (ctx, t0) {
+                    playTone(ctx, 440, t0, 0.16, 'triangle', 0.11);
+                    playTone(ctx, 349.23, t0 + 0.18, 0.16, 'triangle', 0.11);
+                    playTone(ctx, 293.66, t0 + 0.36, 0.28, 'triangle', 0.1);
+                });
+            }
+
+            window.formOrderPlayUiSound = function (kind) {
+                if (kind === 'success') {
+                    playSuccess();
+                } else if (kind === 'ksef_error') {
+                    playKsefError();
+                } else {
+                    playError();
+                }
+            };
+
+            document.addEventListener('click', unlockAudio, { once: true, passive: true });
+            document.addEventListener('keydown', unlockAudio, { once: true });
+        })();
+
         // Ostrzeżenie: płatność online nie „Opłacone” (w trakcie / anulowane / błąd) — przed PNEDU i iFirma
         window.formOrderUnpaidOnlineWarning = {
             needed: @json($zamowienie->shouldWarnUnpaidOnlineGateway()),
@@ -1283,6 +1382,9 @@ nowoczesna-edukacja.pl `;
                         return;
                     }
                     if (data.success) {
+                        if (typeof window.formOrderPlayUiSound === 'function') {
+                            window.formOrderPlayUiSound('success');
+                        }
                         resultDiv.innerHTML = `
                         <div class="alert alert-success alert-dismissible fade show" role="alert">
                             <i class="bi bi-check-circle"></i>
@@ -1291,6 +1393,9 @@ nowoczesna-edukacja.pl `;
                         </div>`;
                         window.location.reload();
                         return;
+                    }
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
                     }
                     const extra = data.sent_at ? ` (wcześniej: ${data.sent_at})` : '';
                     resultDiv.innerHTML = `
@@ -1301,6 +1406,9 @@ nowoczesna-edukacja.pl `;
                         </div>`;
                 })
                 .catch(() => {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
                     if (resultDiv) {
                         resultDiv.innerHTML = `
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -1399,6 +1507,9 @@ nowoczesna-edukacja.pl `;
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('success');
+                    }
                     // Sukces
                     resultDiv.innerHTML = `
                         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -1447,6 +1558,9 @@ nowoczesna-edukacja.pl `;
                         }
                     }
                 } else {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
                     // Błąd
                     resultDiv.innerHTML = `
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -1469,6 +1583,9 @@ nowoczesna-edukacja.pl `;
             })
             .catch(error => {
                 console.error('Error:', error);
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('error');
+                }
                 resultDiv.innerHTML = `
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -1658,6 +1775,9 @@ nowoczesna-edukacja.pl `;
             })
             .then(data => {
                 if (data.success) {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('success');
+                    }
                     // Sukces
                     const alertClass = force ? 'alert-warning' : 'alert-success';
                     const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
@@ -1708,6 +1828,9 @@ nowoczesna-edukacja.pl `;
                     applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
                     
                 } else {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
                     // Błąd
                     resultDiv.innerHTML = `
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -1730,6 +1853,9 @@ nowoczesna-edukacja.pl `;
             })
             .catch(error => {
                 console.error('Error:', error);
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('error');
+                }
                 
                 // Sprawdź czy to błąd 409 (konflikt - faktura już istnieje)
                 const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
@@ -1955,6 +2081,9 @@ nowoczesna-edukacja.pl `;
             })
             .then(data => {
                 if (data.success) {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('success');
+                    }
                     // Sukces
                     const alertClass = force ? 'alert-warning' : 'alert-success';
                     const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
@@ -1992,6 +2121,9 @@ nowoczesna-edukacja.pl `;
                     }
                     applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
                 } else {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
                     // Błąd
                     resultDiv.innerHTML = `
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -2014,6 +2146,9 @@ nowoczesna-edukacja.pl `;
             })
             .catch(error => {
                 console.error('Error:', error);
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('error');
+                }
                 
                 // Sprawdź czy to błąd 409 (konflikt - faktura już istnieje)
                 const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
@@ -2437,6 +2572,9 @@ nowoczesna-edukacja.pl `;
             window.ifirmaResponseData = data;
 
             if (data.success) {
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('success');
+                }
                 const alertClass = force ? 'alert-warning' : 'alert-success';
                 const alertIcon = force ? 'bi-exclamation-triangle' : 'bi-check-circle';
                 const invoiceLine = data.invoice_number
@@ -2480,6 +2618,13 @@ nowoczesna-edukacja.pl `;
             }
 
             const isPartial = data.partial_success || data.invoice_created;
+            const isKsefStageFail = isPartial
+                || data.step === 'ksef_send'
+                || data.step === 'ksef_acceptance_timeout'
+                || data.step === 'ksef_rejected';
+            if (typeof window.formOrderPlayUiSound === 'function') {
+                window.formOrderPlayUiSound(isKsefStageFail ? 'ksef_error' : 'error');
+            }
             const alertClass = isPartial ? 'alert-warning' : 'alert-danger';
             const alertTitle = isPartial ? 'Faktura w iFirma — dalszy etap nieudany' : 'Błąd';
 
@@ -2609,6 +2754,9 @@ nowoczesna-edukacja.pl `;
                 renderIfirmaKsefResult(ksefData, force, resultDiv);
             } catch (error) {
                 console.error('Error:', error);
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('error');
+                }
                 const errorMessage = error.message || 'Wystąpił błąd podczas komunikacji z serwerem.';
                 const isConflict = errorMessage.includes('już została wystawiona') || errorMessage.includes('already');
 
