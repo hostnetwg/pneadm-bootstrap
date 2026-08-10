@@ -851,6 +851,10 @@ class FormOrdersController extends Controller
      */
     public function navigationFilterCount(Request $request)
     {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
         $navFilters = $this->resolveShowNavigationFilters($request);
 
         $query = FormOrder::query();
@@ -1365,8 +1369,13 @@ class FormOrdersController extends Controller
     /**
      * Podgląd e-maila z dostępem PNEDU (krok 3 provisionu) — bez wysyłki.
      */
-    public function previewPneduAccessEmail(int $id)
+    public function previewPneduAccessEmail(Request $request, int $id)
     {
+        // Zwolnij lock sesji — inaczej równoległe AJAX na show mogą blokować ten request.
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
         $result = app(FormOrderPneduProvisionService::class)->previewProvisionAccessEmail($id);
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
@@ -1377,8 +1386,12 @@ class FormOrdersController extends Controller
     /**
      * Ponowna wysyłka e-maila z dostępem PNEDU (krok 3).
      */
-    public function resendPneduAccessEmail(int $id)
+    public function resendPneduAccessEmail(Request $request, int $id)
     {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
         $result = app(FormOrderPneduProvisionService::class)->resendProvisionAccessEmail($id);
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);

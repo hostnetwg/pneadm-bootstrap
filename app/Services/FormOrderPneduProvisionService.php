@@ -264,28 +264,42 @@ class FormOrderPneduProvisionService
      */
     public function previewProvisionAccessEmail(int $formOrderId): array
     {
-        $resolved = $this->resolveProvisionAccessEmailContext($formOrderId);
-        if (! ($resolved['success'] ?? false)) {
-            return $resolved;
+        try {
+            // Bez odczytu pnedu.users — podgląd nie może wisieć na drugim połączeniu DB.
+            $resolved = $this->resolveProvisionAccessEmailContext($formOrderId, requirePneduUser: false);
+            if (! ($resolved['success'] ?? false)) {
+                return $resolved;
+            }
+
+            $notification = $this->makeProvisionAccessNotification(
+                $resolved,
+                previewPlaceholderToken: true
+            );
+            $mail = $notification->toMail($this->mailNotifiableStub($resolved['email']));
+
+            return [
+                'success' => true,
+                'http_code' => 200,
+                'to' => $resolved['email'],
+                'subject' => (string) ($mail->subject ?? ''),
+                'body' => $this->mailMessageToPlainText($mail),
+                'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
+                'variant_label' => $resolved['is_new_account']
+                    ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
+                    : 'E-mail informacyjny (konto już istniało)',
+            ];
+        } catch (Throwable $e) {
+            Log::error('FormOrderPneduProvisionService: błąd podglądu e-maila dostępu', [
+                'form_order_id' => $formOrderId,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Nie udało się przygotować podglądu: '.$e->getMessage(),
+                'http_code' => 500,
+            ];
         }
-
-        $notification = $this->makeProvisionAccessNotification(
-            $resolved,
-            previewPlaceholderToken: true
-        );
-        $mail = $notification->toMail($resolved['pnedu_user']);
-
-        return [
-            'success' => true,
-            'http_code' => 200,
-            'to' => $resolved['email'],
-            'subject' => (string) ($mail->subject ?? ''),
-            'body' => $this->mailMessageToPlainText($mail),
-            'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
-            'variant_label' => $resolved['is_new_account']
-                ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
-                : 'E-mail informacyjny (konto już istniało)',
-        ];
     }
 
     /**
@@ -341,7 +355,7 @@ class FormOrderPneduProvisionService
      *     error?: string,
      *     http_code: int,
      *     email?: string,
-     *     pnedu_user?: PneduUser,
+     *     pnedu_user?: PneduUser|null,
      *     course_title?: string,
      *     instructor_line?: ?string,
      *     start_date_line?: ?string,
@@ -349,7 +363,7 @@ class FormOrderPneduProvisionService
      *     is_new_account?: bool
      * }
      */
-    private function resolveProvisionAccessEmailContext(int $formOrderId): array
+    private function resolveProvisionAccessEmailContext(int $formOrderId, bool $requirePneduUser = true): array
     {
         $order = FormOrder::with(['primaryParticipant.participant.liveAccess', 'course.instructor', 'course.onlineDetails'])
             ->find($formOrderId);
@@ -386,13 +400,16 @@ class FormOrderPneduProvisionService
             ];
         }
 
-        $pneduUser = PneduUser::query()->where('email', $email)->first();
-        if (! $pneduUser) {
-            return [
-                'success' => false,
-                'error' => 'Brak konta użytkownika w bazie pnedu dla tego e-maila.',
-                'http_code' => 400,
-            ];
+        $pneduUser = null;
+        if ($requirePneduUser) {
+            $pneduUser = PneduUser::query()->where('email', $email)->first();
+            if (! $pneduUser) {
+                return [
+                    'success' => false,
+                    'error' => 'Brak konta użytkownika w bazie pnedu dla tego e-maila.',
+                    'http_code' => 400,
+                ];
+            }
         }
 
         $participant = $p?->participant;
@@ -413,6 +430,24 @@ class FormOrderPneduProvisionService
             'live_access' => $liveAccess,
             'is_new_account' => $isNewAccount,
         ];
+    }
+
+    private function mailNotifiableStub(string $email): object
+    {
+        return new class($email)
+        {
+            public function __construct(private string $email) {}
+
+            public function getEmailForPasswordReset(): string
+            {
+                return $this->email;
+            }
+
+            public function routeNotificationFor($channel = null): string
+            {
+                return $this->email;
+            }
+        };
     }
 
     /**

@@ -3056,17 +3056,22 @@ nowoczesna-edukacja.pl `;
             modalEl.addEventListener('show.bs.modal', async function () {
                 resetUi();
                 const previewUrl = openBtn.getAttribute('data-preview-url');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
                 try {
                     const res = await fetch(previewUrl, {
                         headers: {
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
                         },
+                        signal: controller.signal,
+                        credentials: 'same-origin',
                     });
+                    clearTimeout(timeoutId);
                     const data = await res.json().catch(function () { return {}; });
                     loadingEl.classList.add('d-none');
                     if (!res.ok || !data.success) {
-                        errorEl.textContent = data.error || ('Błąd ' + res.status);
+                        errorEl.textContent = data.error || ('Błąd ' + res.status + ' — sprawdź, czy wdrożono trasę access-email-preview (route:cache).');
                         errorEl.classList.remove('d-none');
                         return;
                     }
@@ -3083,8 +3088,11 @@ nowoczesna-edukacja.pl `;
                     copyBtn.disabled = false;
                     sendBtn.disabled = false;
                 } catch (e) {
+                    clearTimeout(timeoutId);
                     loadingEl.classList.add('d-none');
-                    errorEl.textContent = 'Nie udało się pobrać podglądu wiadomości.';
+                    errorEl.textContent = (e && e.name === 'AbortError')
+                        ? 'Podgląd nie odpowiedział w 15 s (możliwa blokada sesji lub brak trasy na serwerze). Odśwież stronę i spróbuj ponownie.'
+                        : 'Nie udało się pobrać podglądu wiadomości.';
                     errorEl.classList.remove('d-none');
                 }
             });
