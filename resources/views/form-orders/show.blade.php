@@ -3000,153 +3000,6 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // Prześlij dostęp — podgląd + ponowna wysyłka e-maila (krok 3)
-        (function () {
-            const modalEl = document.getElementById('resendPneduAccessModal');
-            const openBtn = document.getElementById('resendPneduAccessBtn');
-            if (!modalEl || !openBtn) return;
-
-            const loadingEl = document.getElementById('resendPneduAccessLoading');
-            const errorEl = document.getElementById('resendPneduAccessError');
-            const successEl = document.getElementById('resendPneduAccessSuccess');
-            const contentEl = document.getElementById('resendPneduAccessContent');
-            const toEl = document.getElementById('resendPneduAccessTo');
-            const subjectEl = document.getElementById('resendPneduAccessSubject');
-            const bodyEl = document.getElementById('resendPneduAccessBody');
-            const variantEl = document.getElementById('resendPneduAccessVariant');
-            const hintEl = document.getElementById('resendPneduAccessHint');
-            const copyBtn = document.getElementById('resendPneduAccessCopyBtn');
-            const sendBtn = document.getElementById('resendPneduAccessSendBtn');
-
-            function csrfToken() {
-                return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            }
-
-            function resetUi() {
-                loadingEl.classList.remove('d-none');
-                errorEl.classList.add('d-none');
-                errorEl.textContent = '';
-                successEl.classList.add('d-none');
-                successEl.textContent = '';
-                contentEl.classList.add('d-none');
-                copyBtn.disabled = true;
-                sendBtn.disabled = true;
-                sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
-                toEl.value = '';
-                subjectEl.value = '';
-                bodyEl.value = '';
-                variantEl.textContent = '';
-                hintEl.textContent = '';
-            }
-
-            function copyText(text) {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    return navigator.clipboard.writeText(text);
-                }
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.select();
-                try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
-                return Promise.resolve();
-            }
-
-            modalEl.addEventListener('show.bs.modal', async function () {
-                resetUi();
-                const previewUrl = openBtn.getAttribute('data-preview-url');
-                const controller = new AbortController();
-                const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
-                try {
-                    const res = await fetch(previewUrl, {
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        signal: controller.signal,
-                        credentials: 'same-origin',
-                    });
-                    clearTimeout(timeoutId);
-                    const data = await res.json().catch(function () { return {}; });
-                    loadingEl.classList.add('d-none');
-                    if (!res.ok || !data.success) {
-                        errorEl.textContent = data.error || ('Błąd ' + res.status + ' — sprawdź, czy wdrożono trasę access-email-preview (route:cache).');
-                        errorEl.classList.remove('d-none');
-                        return;
-                    }
-                    toEl.value = data.to || '';
-                    subjectEl.value = data.subject || '';
-                    bodyEl.value = data.body || '';
-                    variantEl.textContent = data.variant_label
-                        ? ('Krok 3: E-mail do uczestnika — ' + data.variant_label)
-                        : 'Krok 3: E-mail do uczestnika';
-                    hintEl.textContent = data.variant === 'new_user'
-                        ? 'Przy wysyłce zostanie wygenerowany świeży link do ustawienia hasła (w podglądzie jest placeholder).'
-                        : 'Zostanie wysłany ten sam typ wiadomości co przy pierwotnym przyznaniu dostępu.';
-                    contentEl.classList.remove('d-none');
-                    copyBtn.disabled = false;
-                    sendBtn.disabled = false;
-                } catch (e) {
-                    clearTimeout(timeoutId);
-                    loadingEl.classList.add('d-none');
-                    errorEl.textContent = (e && e.name === 'AbortError')
-                        ? 'Podgląd nie odpowiedział w 15 s (możliwa blokada sesji lub brak trasy na serwerze). Odśwież stronę i spróbuj ponownie.'
-                        : 'Nie udało się pobrać podglądu wiadomości.';
-                    errorEl.classList.remove('d-none');
-                }
-            });
-
-            copyBtn.addEventListener('click', function () {
-                const text = 'Temat: ' + subjectEl.value + '\n\n' + bodyEl.value;
-                copyText(text).then(function () {
-                    const prev = copyBtn.innerHTML;
-                    copyBtn.innerHTML = '<i class="bi bi-check2"></i> Skopiowano';
-                    setTimeout(function () { copyBtn.innerHTML = prev; }, 1500);
-                });
-            });
-
-            sendBtn.addEventListener('click', async function () {
-                const sendUrl = openBtn.getAttribute('data-send-url');
-                sendBtn.disabled = true;
-                copyBtn.disabled = true;
-                sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wysyłanie…';
-                errorEl.classList.add('d-none');
-                successEl.classList.add('d-none');
-                try {
-                    const res = await fetch(sendUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken(),
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: JSON.stringify({}),
-                    });
-                    const data = await res.json().catch(function () { return {}; });
-                    if (!res.ok || !data.success) {
-                        errorEl.textContent = data.error || ('Błąd ' + res.status);
-                        errorEl.classList.remove('d-none');
-                        sendBtn.disabled = false;
-                        copyBtn.disabled = false;
-                        sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
-                        return;
-                    }
-                    successEl.textContent = data.message || 'Wiadomość została wysłana.';
-                    successEl.classList.remove('d-none');
-                    sendBtn.innerHTML = '<i class="bi bi-check2"></i> Wysłano';
-                    copyBtn.disabled = false;
-                } catch (e) {
-                    errorEl.textContent = 'Nie udało się wysłać wiadomości.';
-                    errorEl.classList.remove('d-none');
-                    sendBtn.disabled = false;
-                    copyBtn.disabled = false;
-                    sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
-                }
-            });
-        })();
-
         // Wstaw ID szkolenia do filtra (klik w „ID szkolenia (courses): …”)
         function fillCourseIdFilter(courseId) {
             const courseIdInput = document.getElementById('courseIdFilter');
@@ -4088,6 +3941,153 @@ nowoczesna-edukacja.pl `;
     </div>
 
     <script>
+        // Prześlij dostęp — musi być PO HTML modala (#resendPneduAccessModal)
+        (function () {
+            const modalEl = document.getElementById('resendPneduAccessModal');
+            const openBtn = document.getElementById('resendPneduAccessBtn');
+            if (!modalEl || !openBtn) return;
+
+            const loadingEl = document.getElementById('resendPneduAccessLoading');
+            const errorEl = document.getElementById('resendPneduAccessError');
+            const successEl = document.getElementById('resendPneduAccessSuccess');
+            const contentEl = document.getElementById('resendPneduAccessContent');
+            const toEl = document.getElementById('resendPneduAccessTo');
+            const subjectEl = document.getElementById('resendPneduAccessSubject');
+            const bodyEl = document.getElementById('resendPneduAccessBody');
+            const variantEl = document.getElementById('resendPneduAccessVariant');
+            const hintEl = document.getElementById('resendPneduAccessHint');
+            const copyBtn = document.getElementById('resendPneduAccessCopyBtn');
+            const sendBtn = document.getElementById('resendPneduAccessSendBtn');
+
+            function csrfToken() {
+                return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            }
+
+            function resetUi() {
+                loadingEl.classList.remove('d-none');
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+                successEl.classList.add('d-none');
+                successEl.textContent = '';
+                contentEl.classList.add('d-none');
+                copyBtn.disabled = true;
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
+                toEl.value = '';
+                subjectEl.value = '';
+                bodyEl.value = '';
+                variantEl.textContent = '';
+                hintEl.textContent = '';
+            }
+
+            function copyText(text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    return navigator.clipboard.writeText(text);
+                }
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+                return Promise.resolve();
+            }
+
+            modalEl.addEventListener('show.bs.modal', async function () {
+                resetUi();
+                const previewUrl = openBtn.getAttribute('data-preview-url');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
+                try {
+                    const res = await fetch(previewUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        signal: controller.signal,
+                        credentials: 'same-origin',
+                    });
+                    clearTimeout(timeoutId);
+                    const data = await res.json().catch(function () { return {}; });
+                    loadingEl.classList.add('d-none');
+                    if (!res.ok || !data.success) {
+                        errorEl.textContent = data.error || ('Błąd ' + res.status + ' — sprawdź route:cache dla access-email-preview.');
+                        errorEl.classList.remove('d-none');
+                        return;
+                    }
+                    toEl.value = data.to || '';
+                    subjectEl.value = data.subject || '';
+                    bodyEl.value = data.body || '';
+                    variantEl.textContent = data.variant_label
+                        ? ('Krok 3: E-mail do uczestnika — ' + data.variant_label)
+                        : 'Krok 3: E-mail do uczestnika';
+                    hintEl.textContent = data.variant === 'new_user'
+                        ? 'Przy wysyłce zostanie wygenerowany świeży link do ustawienia hasła (w podglądzie jest placeholder).'
+                        : 'Zostanie wysłany ten sam typ wiadomości co przy pierwotnym przyznaniu dostępu.';
+                    contentEl.classList.remove('d-none');
+                    copyBtn.disabled = false;
+                    sendBtn.disabled = false;
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    loadingEl.classList.add('d-none');
+                    errorEl.textContent = (e && e.name === 'AbortError')
+                        ? 'Podgląd nie odpowiedział w 15 s. Odśwież stronę i spróbuj ponownie.'
+                        : 'Nie udało się pobrać podglądu wiadomości.';
+                    errorEl.classList.remove('d-none');
+                }
+            });
+
+            copyBtn.addEventListener('click', function () {
+                const text = 'Temat: ' + subjectEl.value + '\n\n' + bodyEl.value;
+                copyText(text).then(function () {
+                    const prev = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="bi bi-check2"></i> Skopiowano';
+                    setTimeout(function () { copyBtn.innerHTML = prev; }, 1500);
+                });
+            });
+
+            sendBtn.addEventListener('click', async function () {
+                const sendUrl = openBtn.getAttribute('data-send-url');
+                sendBtn.disabled = true;
+                copyBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wysyłanie…';
+                errorEl.classList.add('d-none');
+                successEl.classList.add('d-none');
+                try {
+                    const res = await fetch(sendUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({}),
+                    });
+                    const data = await res.json().catch(function () { return {}; });
+                    if (!res.ok || !data.success) {
+                        errorEl.textContent = data.error || ('Błąd ' + res.status);
+                        errorEl.classList.remove('d-none');
+                        sendBtn.disabled = false;
+                        copyBtn.disabled = false;
+                        sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
+                        return;
+                    }
+                    successEl.textContent = data.message || 'Wiadomość została wysłana.';
+                    successEl.classList.remove('d-none');
+                    sendBtn.innerHTML = '<i class="bi bi-check2"></i> Wysłano';
+                    copyBtn.disabled = false;
+                } catch (e) {
+                    errorEl.textContent = 'Nie udało się wysłać wiadomości.';
+                    errorEl.classList.remove('d-none');
+                    sendBtn.disabled = false;
+                    copyBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
+                }
+            });
+        })();
+
         (function () {
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
