@@ -17,7 +17,10 @@
             <a href="{{ route('surveys.testimonials.index', ['filter' => 'pending']) }}" class="btn btn-sm {{ $filter === 'pending' ? 'btn-primary' : 'btn-outline-primary' }}">Do akceptacji</a>
             <a href="{{ route('surveys.testimonials.index', ['filter' => 'published']) }}" class="btn btn-sm {{ $filter === 'published' ? 'btn-primary' : 'btn-outline-primary' }}">Opublikowane</a>
             <a href="{{ route('surveys.testimonials.index', ['filter' => 'featured']) }}" class="btn btn-sm {{ $filter === 'featured' ? 'btn-primary' : 'btn-outline-primary' }}">
-                Wyróżnione@if(($featuredCount ?? 0) > 0) ({{ $featuredCount }})@endif
+                Wyróżnione
+                @if(($featuredCount ?? 0) > 0)
+                    ({{ $featuredCount }})
+                @endif
             </a>
         </div>
 
@@ -280,6 +283,12 @@
         </div>
     </div>
 
+    @php
+        $reopenEditTestimonial = isset($errors) && $errors->any()
+            && old('_method') === 'PUT'
+            && old('quote') !== null;
+    @endphp
+
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -313,17 +322,18 @@
                 });
             }
 
-            @if($errors->any() && old('_method') === 'PUT' && old('quote') !== null)
-            const reopen = document.getElementById('editTestimonialModal');
-            if (reopen && typeof bootstrap !== 'undefined') {
-                document.getElementById('edit_quote').value = @json(old('quote'));
-                document.getElementById('edit_author_name').value = @json(old('author_name'));
-                document.getElementById('edit_author_role').value = @json(old('author_role'));
-                document.getElementById('edit_author_city').value = @json(old('author_city'));
-                document.getElementById('edit_rating').value = @json(old('rating'));
-                bootstrap.Modal.getOrCreateInstance(reopen).show();
+            const shouldReopenEdit = @json($reopenEditTestimonial);
+            if (shouldReopenEdit && typeof bootstrap !== 'undefined') {
+                const reopen = document.getElementById('editTestimonialModal');
+                if (reopen) {
+                    document.getElementById('edit_quote').value = @json(old('quote'));
+                    document.getElementById('edit_author_name').value = @json(old('author_name'));
+                    document.getElementById('edit_author_role').value = @json(old('author_role'));
+                    document.getElementById('edit_author_city').value = @json(old('author_city'));
+                    document.getElementById('edit_rating').value = @json(old('rating'));
+                    bootstrap.Modal.getOrCreateInstance(reopen).show();
+                }
             }
-            @endif
         });
     </script>
     @endpush
