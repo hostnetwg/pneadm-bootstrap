@@ -27,6 +27,25 @@
             background: linear-gradient(145deg, #fff8e1 0%, #ffe0b2 35%, #fff3e0 100%);
             box-shadow: 0 4px 14px rgba(230, 81, 0, 0.12);
         }
+        /* Uwagi zamawiającego w bloku INFORMACJE O FAKTURZE */
+        @keyframes invoice-notes-attention-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.65; }
+        }
+        .invoice-notes-attention-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.55rem;
+            height: 1.55rem;
+            border-radius: 50%;
+            background: #dc3545;
+            color: #fff;
+            font-size: 0.95rem;
+            vertical-align: -0.15em;
+            animation: invoice-notes-attention-pulse 1.1s ease-in-out infinite;
+            box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.55);
+        }
     </style>
 
     <div class="py-3">
@@ -674,8 +693,17 @@ nowoczesna-edukacja.pl </div>
                     @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
                         <div class="card mb-3">
                             <div class="card-header bg-warning text-dark py-2">
-                                <h6 class="mb-0">
-                                    <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
+                                <h6 class="mb-0 d-flex align-items-center gap-2 flex-wrap">
+                                    <span>
+                                        <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
+                                    </span>
+                                    @if(filled(trim((string) $zamowienie->invoice_notes)))
+                                        <span class="invoice-notes-attention-icon"
+                                              title="Zamawiający dodał uwagi do faktury"
+                                              aria-label="Zamawiający dodał uwagi do faktury">
+                                            <i class="bi bi-chat-left-text-fill" aria-hidden="true"></i>
+                                        </span>
+                                    @endif
                                 </h6>
                             </div>
                             <div class="card-body py-2">
