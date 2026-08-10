@@ -116,7 +116,7 @@ class FormOrdersNavigationFilterCountTest extends TestCase
             ->assertJsonPath('filter_no_invoice', true);
     }
 
-    public function test_filters_orders_with_invoice_but_without_ksef_number(): void
+    public function test_filters_orders_with_buyer_nip_invoice_but_without_ksef_number(): void
     {
         $user = User::factory()->create([
             'email_verified_at' => now(),
@@ -124,27 +124,38 @@ class FormOrdersNavigationFilterCountTest extends TestCase
         ]);
 
         FormOrder::create([
-            'product_name' => 'Bez KSeF',
+            'product_name' => 'NIP bez KSeF',
             'invoice_number' => '10/8/2026',
             'ksef_number' => null,
+            'buyer_nip' => '525-234-56-78',
             'orderer_email' => 'noksef@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'FV bez NIP i bez KSeF',
+            'invoice_number' => '12/8/2026',
+            'ksef_number' => null,
+            'buyer_nip' => null,
+            'orderer_email' => 'nonip@example.test',
         ]);
         FormOrder::create([
             'product_name' => 'Z KSeF',
             'invoice_number' => '11/8/2026',
             'ksef_number' => '7392137630-20260805-ABCDEF000001-11',
+            'buyer_nip' => '5252345678',
             'orderer_email' => 'withksef@example.test',
         ]);
         FormOrder::create([
             'product_name' => 'Bez FV',
             'invoice_number' => null,
             'ksef_number' => null,
+            'buyer_nip' => '5252345678',
             'orderer_email' => 'nofv@example.test',
         ]);
         FormOrder::create([
             'product_name' => 'FV zero',
             'invoice_number' => '0',
             'ksef_number' => null,
+            'buyer_nip' => '5252345678',
             'orderer_email' => 'zero@example.test',
         ]);
 

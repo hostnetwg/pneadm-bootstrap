@@ -97,8 +97,8 @@
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="filterNoKsefOnly"
                                {{ !empty($navFilterQuery['filter_no_ksef']) ? 'checked' : '' }}>
-                        <label class="form-check-label small" for="filterNoKsefOnly">
-                            <i class="bi bi-funnel"></i> Tylko bez KSeF
+                        <label class="form-check-label small" for="filterNoKsefOnly" title="Nabywca z NIP, jest numer FV, brak NumerKSeF">
+                            <i class="bi bi-funnel"></i> Tylko z NIP bez KSeF
                         </label>
                     </div>
                     
@@ -3118,7 +3118,7 @@ nowoczesna-edukacja.pl `;
                         title += ' · bez wystawionej faktury';
                     }
                     if (data.filter_no_ksef) {
-                        title += ' · tylko bez KSeF';
+                        title += ' · tylko z NIP bez KSeF';
                     }
                     badge.title = title;
                 })

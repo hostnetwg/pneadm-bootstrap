@@ -313,9 +313,10 @@ formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
 faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
-**Filtr nawigacji „Tylko bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
-`filter_no_ksef=1` — zamówienia z wypełnionym `invoice_number` i pustym
-`ksef_number` (kolejka po zatorze iFirma/MF). Współdziała z
+**Filtr nawigacji „Tylko z NIP bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
+`filter_no_ksef=1` — zamówienia z **NIP nabywcy** (`buyer_nip` z cyframi),
+wypełnionym klasycznym `invoice_number` i pustym `ksef_number`
+(kolejka do dogonięcia KSeF; bez FV lub bez NIP — poza filtrem). Współdziała z
 `filter_no_participant`, `filter_no_invoice` i `course_id` (prev/next + badge).
 Legacy `filter_new=1` mapuje się na `filter_no_invoice`.
 

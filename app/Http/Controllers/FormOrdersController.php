@@ -961,15 +961,18 @@ class FormOrdersController extends Controller
         }
 
         if ($filterNoKsef) {
-            // FV jest, NumerKSeF nie — kolejka do dogonięcia po zatorze iFirma/MF
-            $query->where(function ($q) {
-                $q->whereNotNull('invoice_number')
-                    ->where('invoice_number', '!=', '')
-                    ->where('invoice_number', '!=', '0');
-            })->where(function ($q) {
-                $q->whereNull('ksef_number')
-                    ->orWhere('ksef_number', '');
-            });
+            // Nabywca z NIP + klasyczna FV + brak NumerKSeF (kolejka do dogonięcia KSeF)
+            $table = $query->getModel()->getTable();
+            $query->where(function ($q) use ($table) {
+                $q->whereNotNull("{$table}.invoice_number")
+                    ->where("{$table}.invoice_number", '!=', '')
+                    ->where("{$table}.invoice_number", '!=', '0');
+            })->where(function ($q) use ($table) {
+                $q->whereNull("{$table}.ksef_number")
+                    ->orWhere("{$table}.ksef_number", '');
+            })->whereNotNull("{$table}.buyer_nip")
+                ->where("{$table}.buyer_nip", '!=', '')
+                ->whereRaw("LENGTH(REGEXP_REPLACE(TRIM({$table}.buyer_nip), '[^0-9]', '')) > 0");
         }
 
         if ($courseId !== null && $courseId !== '') {
