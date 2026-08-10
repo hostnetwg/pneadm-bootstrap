@@ -349,8 +349,13 @@ class CertificateController extends Controller
      * Czy trwa generowanie plików PDF w tle dla dowolnego szkolenia (do globalnego komunikatu na listach uczestników).
      * Zwraca pierwszy znaleziony aktywny batch z nazwą kursu.
      */
-    public function pdfGenerationStatusAny()
+    public function pdfGenerationStatusAny(Request $request)
     {
+        // Endpoint tylko pod fetch/XHR — pełna nawigacja przeglądarki nie powinna tu lądować.
+        if (! $request->expectsJson() && ! $request->ajax()) {
+            return redirect()->route('courses.index');
+        }
+
         $connection = config('queue.batching.database');
         $batchTable = config('queue.batching.table', 'job_batches');
         $row = DB::connection($connection)->table($batchTable)
@@ -360,7 +365,7 @@ class CertificateController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
-        if (!$row || !preg_match('/^certificate-pdfs-course-(\d+)$/', $row->name, $m)) {
+        if (! $row || ! preg_match('/^certificate-pdfs-course-(\d+)$/', $row->name, $m)) {
             return response()->json(['active' => false]);
         }
 

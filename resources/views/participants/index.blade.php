@@ -1450,7 +1450,8 @@
                 }).then(function(res) {
                     if (progressIntervalId) clearInterval(progressIntervalId);
                     pdfProgressIntervalId = null;
-                    if (res.redirected) {
+                    // Nie nawiguj na endpointy API JSON (np. status generowania PDF).
+                    if (res.redirected && res.url && res.url.indexOf('/certificates/pdf-generation-status') === -1) {
                         window.location.href = res.url;
                     } else {
                         window.location.reload();

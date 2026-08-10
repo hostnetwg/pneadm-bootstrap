@@ -124,7 +124,8 @@ oraz opcjonalny awatar. Wysłanie = zgoda na publikację (tekst przy przycisku; 
 Powiązanie z `survey_response_id` przez sesję.
 
 **Moderacja adm:** `Ankiety → Rekomendacje` → `/surveys/testimonials`  
-Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).
+Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).  
+Edycja: przycisk **Edytuj** — poprawa opinii, autora, stanowiska, miasta i oceny (literówki przed publikacją).
 
 **Awatary w formularzu:** `Ankiety → Ustawienia` → checkboxy (`survey_settings.enabled_avatar_presets`).
 Katalog: **32** self-hosted SVG (DiceBear Avataaars, zestaw „nauczycielski” — nie pełna biblioteka).

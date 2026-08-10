@@ -518,6 +518,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::put('/surveys/templates/{template}/questions/{question}', [SurveyTemplateController::class, 'updateQuestion'])->name('surveys.templates.questions.update');
     Route::delete('/surveys/templates/{template}/questions/{question}', [SurveyTemplateController::class, 'destroyQuestion'])->name('surveys.templates.questions.destroy');
     Route::get('/surveys/testimonials', [SurveyTestimonialController::class, 'index'])->name('surveys.testimonials.index');
+    Route::put('/surveys/testimonials/{testimonial}', [SurveyTestimonialController::class, 'update'])->name('surveys.testimonials.update');
     Route::post('/surveys/testimonials/{testimonial}/publish', [SurveyTestimonialController::class, 'publish'])->name('surveys.testimonials.publish');
     Route::post('/surveys/testimonials/{testimonial}/unpublish', [SurveyTestimonialController::class, 'unpublish'])->name('surveys.testimonials.unpublish');
     Route::delete('/surveys/testimonials/{testimonial}', [SurveyTestimonialController::class, 'destroy'])->name('surveys.testimonials.destroy');
