@@ -3713,7 +3713,7 @@ nowoczesna-edukacja.pl `;
                         <div class="mb-0">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label small fw-semibold mb-0" for="resendPneduAccessBodyFrame">Treść (podgląd HTML)</label>
-                                <span class="small text-muted">„Skopiuj treść” bierze wersję tekstową</span>
+                                <span class="small text-muted">„Skopiuj treść” = HTML (z formatowaniem)</span>
                             </div>
                             <iframe id="resendPneduAccessBodyFrame"
                                     title="Podgląd wiadomości e-mail"
@@ -3967,6 +3967,7 @@ nowoczesna-edukacja.pl `;
             const hintEl = document.getElementById('resendPneduAccessHint');
             const copyBtn = document.getElementById('resendPneduAccessCopyBtn');
             const sendBtn = document.getElementById('resendPneduAccessSendBtn');
+            let lastBodyHtml = '';
 
             function csrfToken() {
                 return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -3985,6 +3986,7 @@ nowoczesna-edukacja.pl `;
                 toEl.value = '';
                 subjectEl.value = '';
                 bodyEl.value = '';
+                lastBodyHtml = '';
                 if (bodyFrameEl) {
                     bodyFrameEl.removeAttribute('srcdoc');
                     bodyFrameEl.src = 'about:blank';
@@ -4005,6 +4007,25 @@ nowoczesna-edukacja.pl `;
                 ta.select();
                 try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
                 return Promise.resolve();
+            }
+
+            async function copyHtmlContent(html, plain) {
+                const htmlPayload = html || '';
+                const plainPayload = plain || htmlPayload.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({
+                                'text/html': new Blob([htmlPayload], { type: 'text/html' }),
+                                'text/plain': new Blob([plainPayload], { type: 'text/plain' }),
+                            }),
+                        ]);
+                        return;
+                    } catch (e) {
+                        // np. Safari / uprawnienia — spadnij do źródła HTML
+                    }
+                }
+                await copyText(htmlPayload);
             }
 
             modalEl.addEventListener('show.bs.modal', async function () {
@@ -4032,9 +4053,10 @@ nowoczesna-edukacja.pl `;
                     toEl.value = data.to || '';
                     subjectEl.value = data.subject || '';
                     bodyEl.value = data.body || '';
+                    lastBodyHtml = data.body_html || '';
                     if (bodyFrameEl) {
-                        if (data.body_html) {
-                            bodyFrameEl.srcdoc = data.body_html;
+                        if (lastBodyHtml) {
+                            bodyFrameEl.srcdoc = lastBodyHtml;
                         } else {
                             const esc = String(data.body || '')
                                 .replace(/&/g, '&amp;')
@@ -4063,10 +4085,14 @@ nowoczesna-edukacja.pl `;
             });
 
             copyBtn.addEventListener('click', function () {
-                const text = 'Temat: ' + subjectEl.value + '\n\n' + bodyEl.value;
-                copyText(text).then(function () {
+                const htmlToCopy = lastBodyHtml
+                    || ('<p><strong>Temat:</strong> ' + String(subjectEl.value)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p><pre>'
+                        + String(bodyEl.value).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>');
+                const plainToCopy = 'Temat: ' + subjectEl.value + '\n\n' + bodyEl.value;
+                copyHtmlContent(htmlToCopy, plainToCopy).then(function () {
                     const prev = copyBtn.innerHTML;
-                    copyBtn.innerHTML = '<i class="bi bi-check2"></i> Skopiowano';
+                    copyBtn.innerHTML = '<i class="bi bi-check2"></i> Skopiowano HTML';
                     setTimeout(function () { copyBtn.innerHTML = prev; }, 1500);
                 });
             });
