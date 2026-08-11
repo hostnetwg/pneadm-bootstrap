@@ -437,10 +437,6 @@ class FormOrderOperationalStatusService
                     ->orWhere('fo.invoice_number', '')
                     ->orWhere('fo.invoice_number', '0');
             })
-            ->where(function ($noIfirma) {
-                $noIfirma->whereNull('fo.ifirma_invoice_id')
-                    ->orWhere('fo.ifirma_invoice_id', '');
-            })
             ->groupBy('c.id')
             ->select(
                 'c.id as course_id',
@@ -512,8 +508,8 @@ class FormOrderOperationalStatusService
     }
 
     /**
-     * Filtr „Do wystawienia FV” — ważne zamówienia bez faktury i bez zwolnienia z FV.
-     * Wyklucza też rekordy z ID iFirma (FV już wystawiona w iFirma, ewentualnie bez numeru w polu invoice_number).
+     * Filtr „Do wystawienia FV” — ważne zamówienia bez klasycznego numeru FV (invoice_number)
+     * i bez zwolnienia z FV. Samo ID iFirma bez numeru FV nadal trafia do kolejki.
      */
     public function scopeNeedsInvoice(Builder $query): Builder
     {
@@ -527,10 +523,6 @@ class FormOrderOperationalStatusService
                 $noInv->whereNull("{$table}.invoice_number")
                     ->orWhere("{$table}.invoice_number", '')
                     ->orWhere("{$table}.invoice_number", '0');
-            })
-            ->where(function ($noIfirma) use ($table) {
-                $noIfirma->whereNull("{$table}.ifirma_invoice_id")
-                    ->orWhere("{$table}.ifirma_invoice_id", '');
             });
     }
 

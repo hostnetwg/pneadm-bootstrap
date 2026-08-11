@@ -82,7 +82,7 @@ class FormOrdersNavigationFilterCountTest extends TestCase
         ]));
 
         $response->assertOk()
-            ->assertJsonPath('count', 1)
+            ->assertJsonPath('count', 2)
             ->assertJsonPath('filter_no_invoice', true)
             ->assertJsonPath('course_id', 543);
     }

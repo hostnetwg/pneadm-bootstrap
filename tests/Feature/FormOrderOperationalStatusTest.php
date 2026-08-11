@@ -231,7 +231,7 @@ class FormOrderOperationalStatusTest extends TestCase
         $this->assertFalse(FormOrder::needsInvoice()->whereKey($cancelled->id)->exists());
     }
 
-    public function test_needs_invoice_stats_exclude_ifirma_id_without_invoice_number(): void
+    public function test_needs_invoice_stats_include_ifirma_id_without_invoice_number(): void
     {
         $courseId = $this->createCourse();
         $service = app(FormOrderOperationalStatusService::class);
@@ -243,7 +243,7 @@ class FormOrderOperationalStatusTest extends TestCase
             'participant_email' => 'no-invoice@example.test',
         ]);
 
-        $this->createOrderWithParticipant($courseId, [
+        $ifirmaOnly = $this->createOrderWithParticipant($courseId, [
             'invoice_number' => null,
             'ifirma_invoice_id' => '131625449',
         ], [
@@ -252,8 +252,8 @@ class FormOrderOperationalStatusTest extends TestCase
 
         $stats = $service->needsInvoiceStatsByCourseIds([$courseId]);
 
-        $this->assertSame(1, $stats['counts'][$courseId] ?? 0);
-        $this->assertFalse(FormOrder::needsInvoice()->where('product_id', $courseId)->where('ifirma_invoice_id', '131625449')->exists());
+        $this->assertSame(2, $stats['counts'][$courseId] ?? 0);
+        $this->assertTrue(FormOrder::needsInvoice()->whereKey($ifirmaOnly->id)->exists());
     }
 
     public function test_status_completed_without_participant_still_needs_attention(): void

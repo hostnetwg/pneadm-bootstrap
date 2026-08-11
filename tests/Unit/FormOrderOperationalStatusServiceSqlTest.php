@@ -51,6 +51,6 @@ class FormOrderOperationalStatusServiceSqlTest extends TestCase
         $this->assertStringContainsString('legacy_handled_at', $sql);
         $this->assertStringContainsString('invoice_exempt_at', $sql);
         $this->assertStringContainsString('invoice_number', $sql);
-        $this->assertStringContainsString('ifirma_invoice_id', $sql);
+        $this->assertStringNotContainsString('ifirma_invoice_id', $sql);
     }
 }
