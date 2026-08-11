@@ -195,4 +195,51 @@ class FormOrdersNavigationFilterCountTest extends TestCase
             ->assertJsonPath('count', 1)
             ->assertJsonPath('filter_no_participant', true);
     }
+
+    public function test_filter_payment_gateway_includes_online_gateway_any_status_excludes_deferred_and_cancelled(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        FormOrder::create([
+            'product_name' => 'PayU pending',
+            'payment_mode' => FormOrder::PAYMENT_MODE_ONLINE_GATEWAY,
+            'payment_status' => 'awaiting_payment',
+            'orderer_email' => 'payu@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Paynow paid',
+            'payment_mode' => FormOrder::PAYMENT_MODE_ONLINE_GATEWAY,
+            'payment_status' => 'paid',
+            'orderer_email' => 'paynow@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Gateway failed',
+            'payment_mode' => FormOrder::PAYMENT_MODE_ONLINE_GATEWAY,
+            'payment_status' => 'failed',
+            'orderer_email' => 'failed@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Deferred invoice',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'orderer_email' => 'deferred@example.test',
+        ]);
+        FormOrder::create([
+            'product_name' => 'Cancelled gateway',
+            'payment_mode' => FormOrder::PAYMENT_MODE_ONLINE_GATEWAY,
+            'cancelled_at' => now(),
+            'orderer_email' => 'cancelled-gw@example.test',
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('form-orders.navigation-filter-count', [
+            'filter_payment_gateway' => 1,
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('count', 3)
+            ->assertJsonPath('filter_payment_gateway', true)
+            ->assertJsonPath('filter_no_invoice', false);
+    }
 }

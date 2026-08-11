@@ -807,13 +807,28 @@ class FormOrdersController extends Controller
         $filterNoParticipant = $navFilters['filter_no_participant'];
         $filterNoInvoice = $navFilters['filter_no_invoice'];
         $filterNoKsef = $navFilters['filter_no_ksef'];
+        $filterPaymentGateway = $navFilters['filter_payment_gateway'];
         $courseId = $navFilters['course_id'];
 
         // Pobieramy poprzednie i następne zamówienie (te same filtry co navigationFilterCount)
         $prevQuery = FormOrder::query()->where('id', '<', $id);
         $nextQuery = FormOrder::query()->where('id', '>', $id);
-        $this->applyShowNavigationFilters($prevQuery, $filterNoParticipant, $filterNoInvoice, $filterNoKsef, $courseId);
-        $this->applyShowNavigationFilters($nextQuery, $filterNoParticipant, $filterNoInvoice, $filterNoKsef, $courseId);
+        $this->applyShowNavigationFilters(
+            $prevQuery,
+            $filterNoParticipant,
+            $filterNoInvoice,
+            $filterNoKsef,
+            $filterPaymentGateway,
+            $courseId
+        );
+        $this->applyShowNavigationFilters(
+            $nextQuery,
+            $filterNoParticipant,
+            $filterNoInvoice,
+            $filterNoKsef,
+            $filterPaymentGateway,
+            $courseId
+        );
         $prevOrder = $prevQuery->orderByDesc('id')->first();
         $nextOrder = $nextQuery->orderBy('id')->first();
 
@@ -838,6 +853,7 @@ class FormOrdersController extends Controller
             'filterNoParticipant',
             'filterNoInvoice',
             'filterNoKsef',
+            'filterPaymentGateway',
             'duplicateSiblingsCount',
             'pneduOrderFormEditUrl'
         ));
@@ -846,7 +862,8 @@ class FormOrdersController extends Controller
     /**
      * Licznik zamówień dla filtrów nawigacji na stronie szczegółów (AJAX, po załadowaniu UI).
      *
-     * Query: filter_no_participant=1, filter_no_invoice=1, filter_no_ksef=1, course_id=
+     * Query: filter_no_participant=1, filter_no_invoice=1, filter_no_ksef=1,
+     * filter_payment_gateway=1, course_id=
      * (legacy: filter_new=1 → jak filter_no_invoice).
      */
     public function navigationFilterCount(Request $request)
@@ -863,6 +880,7 @@ class FormOrdersController extends Controller
             $navFilters['filter_no_participant'],
             $navFilters['filter_no_invoice'],
             $navFilters['filter_no_ksef'],
+            $navFilters['filter_payment_gateway'],
             $navFilters['course_id']
         );
 
@@ -871,6 +889,7 @@ class FormOrdersController extends Controller
             'filter_no_participant' => $navFilters['filter_no_participant'],
             'filter_no_invoice' => $navFilters['filter_no_invoice'],
             'filter_no_ksef' => $navFilters['filter_no_ksef'],
+            'filter_payment_gateway' => $navFilters['filter_payment_gateway'],
             'course_id' => ($navFilters['course_id'] !== null && $navFilters['course_id'] !== '')
                 ? (int) $navFilters['course_id']
                 : null,
@@ -882,6 +901,7 @@ class FormOrdersController extends Controller
      *     filter_no_participant: bool,
      *     filter_no_invoice: bool,
      *     filter_no_ksef: bool,
+     *     filter_payment_gateway: bool,
      *     course_id: mixed
      * }
      */
@@ -890,6 +910,7 @@ class FormOrdersController extends Controller
         $filterNoParticipant = $request->boolean('filter_no_participant');
         $filterNoInvoice = $request->boolean('filter_no_invoice');
         $filterNoKsef = $request->boolean('filter_no_ksef');
+        $filterPaymentGateway = $request->boolean('filter_payment_gateway');
 
         // Stare zakładki ?filter_new=1 → kolejka bez faktury
         $hasSplitFilters = $request->has('filter_no_participant') || $request->has('filter_no_invoice');
@@ -901,6 +922,7 @@ class FormOrdersController extends Controller
             'filter_no_participant' => $filterNoParticipant,
             'filter_no_invoice' => $filterNoInvoice,
             'filter_no_ksef' => $filterNoKsef,
+            'filter_payment_gateway' => $filterPaymentGateway,
             'course_id' => $request->input('course_id'),
         ];
     }
@@ -923,6 +945,9 @@ class FormOrdersController extends Controller
         if ($nav['filter_no_ksef']) {
             $params['filter_no_ksef'] = '1';
         }
+        if ($nav['filter_payment_gateway']) {
+            $params['filter_payment_gateway'] = '1';
+        }
         if ($nav['course_id'] !== null && $nav['course_id'] !== '') {
             $params['course_id'] = $nav['course_id'];
         }
@@ -940,6 +965,7 @@ class FormOrdersController extends Controller
         bool $filterNoParticipant,
         bool $filterNoInvoice,
         bool $filterNoKsef,
+        bool $filterPaymentGateway,
         mixed $courseId
     ): void {
         if ($filterNoParticipant) {
@@ -964,6 +990,13 @@ class FormOrdersController extends Controller
             })->whereNotNull("{$table}.buyer_nip")
                 ->where("{$table}.buyer_nip", '!=', '')
                 ->whereRaw("LENGTH(REGEXP_REPLACE(TRIM({$table}.buyer_nip), '[^0-9]', '')) > 0");
+        }
+
+        if ($filterPaymentGateway) {
+            // Zamówienia z bramki (PayU/Paynow) — dowolny status płatności; bez anulowanych i bez FV odroczonej
+            $table = $query->getModel()->getTable();
+            $query->where("{$table}.payment_mode", FormOrder::PAYMENT_MODE_ONLINE_GATEWAY)
+                ->whereNull("{$table}.cancelled_at");
         }
 
         if ($courseId !== null && $courseId !== '') {

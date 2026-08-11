@@ -317,8 +317,13 @@ Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 `filter_no_ksef=1` — zamówienia z **NIP nabywcy** (`buyer_nip` z cyframi),
 wypełnionym klasycznym `invoice_number` i pustym `ksef_number`
 (kolejka do dogonięcia KSeF; bez FV lub bez NIP — poza filtrem). Współdziała z
-`filter_no_participant`, `filter_no_invoice` i `course_id` (prev/next + badge).
+`filter_no_participant`, `filter_no_invoice`, `filter_payment_gateway` i `course_id` (prev/next + badge).
 Legacy `filter_new=1` mapuje się na `filter_no_invoice`.
+
+**Filtr nawigacji „bramka płatności” (2026-08):** checkbox `filter_payment_gateway=1` —
+zamówienia z `payment_mode=online_gateway` (PayU/Paynow), **niezależnie od statusu**
+płatności w bramce; **bez** anulowanych (`cancelled_at`); **bez** FV odroczonej
+(`deferred_invoice`).
 
 **Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**,
 przy **ID iFirma** oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.

@@ -61,6 +61,7 @@
                             'filter_no_participant' => request('filter_no_participant') ? '1' : null,
                             'filter_no_invoice' => request('filter_no_invoice') || (request('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice')) ? '1' : null,
                             'filter_no_ksef' => request('filter_no_ksef') ? '1' : null,
+                            'filter_payment_gateway' => request('filter_payment_gateway') ? '1' : null,
                             'filter_new' => request('filter_new') ? '1' : null,
                             'course_id' => request('course_id') ?: null,
                         ]) as $navFilterKey => $navFilterValue)
@@ -466,6 +467,7 @@
                                 'filter_no_participant' => request('filter_no_participant') ? '1' : null,
                                 'filter_no_invoice' => request('filter_no_invoice') || (request('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice')) ? '1' : null,
                                 'filter_no_ksef' => request('filter_no_ksef') ? '1' : null,
+                                'filter_payment_gateway' => request('filter_payment_gateway') ? '1' : null,
                                 'course_id' => request('course_id') ?: null,
                             ]))) }}" class="btn btn-secondary">
                                 <i class="bi bi-x-circle"></i> Anuluj

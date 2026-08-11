@@ -77,6 +77,7 @@
                             'filter_no_participant' => (!empty($filterNoParticipant) || request()->boolean('filter_no_participant')) ? '1' : null,
                             'filter_no_invoice' => (!empty($filterNoInvoice) || request()->boolean('filter_no_invoice') || (request()->boolean('filter_new') && ! request()->has('filter_no_participant') && ! request()->has('filter_no_invoice'))) ? '1' : null,
                             'filter_no_ksef' => (!empty($filterNoKsef) || request()->boolean('filter_no_ksef')) ? '1' : null,
+                            'filter_payment_gateway' => (!empty($filterPaymentGateway) || request()->boolean('filter_payment_gateway')) ? '1' : null,
                             'course_id' => request('course_id') ?: null,
                         ]);
                     @endphp
@@ -99,6 +100,13 @@
                                {{ !empty($navFilterQuery['filter_no_ksef']) ? 'checked' : '' }}>
                         <label class="form-check-label small" for="filterNoKsefOnly" title="Nabywca z NIP, jest numer FV, brak NumerKSeF">
                             <i class="bi bi-funnel"></i> Tylko z NIP bez KSeF
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterPaymentGatewayOnly"
+                               {{ !empty($navFilterQuery['filter_payment_gateway']) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="filterPaymentGatewayOnly" title="payment_mode=online_gateway; bez anulowanych; bez FV odroczonej">
+                            <i class="bi bi-funnel"></i> bramka płatności
                         </label>
                     </div>
                     
@@ -3042,6 +3050,7 @@ nowoczesna-edukacja.pl `;
             const filterNoParticipantCheckbox = document.getElementById('filterNoParticipantOnly');
             const filterNoInvoiceCheckbox = document.getElementById('filterNoInvoiceOnly');
             const filterNoKsefCheckbox = document.getElementById('filterNoKsefOnly');
+            const filterPaymentGatewayCheckbox = document.getElementById('filterPaymentGatewayOnly');
             const courseIdInput = document.getElementById('courseIdFilter');
 
             function reloadWithNavFilterParam(paramName, enabled) {
@@ -3069,6 +3078,11 @@ nowoczesna-edukacja.pl `;
             if (filterNoKsefCheckbox) {
                 filterNoKsefCheckbox.addEventListener('change', function() {
                     reloadWithNavFilterParam('filter_no_ksef', this.checked);
+                });
+            }
+            if (filterPaymentGatewayCheckbox) {
+                filterPaymentGatewayCheckbox.addEventListener('change', function() {
+                    reloadWithNavFilterParam('filter_payment_gateway', this.checked);
                 });
             }
             
@@ -3105,7 +3119,7 @@ nowoczesna-edukacja.pl `;
             }
             const url = new URL(badge.dataset.countUrl || '/form-orders/navigation-filter-count', window.location.origin);
             const pageUrl = new URL(window.location.href);
-            ['filter_no_participant', 'filter_no_invoice', 'filter_no_ksef', 'filter_new'].forEach(function (key) {
+            ['filter_no_participant', 'filter_no_invoice', 'filter_no_ksef', 'filter_payment_gateway', 'filter_new'].forEach(function (key) {
                 if (pageUrl.searchParams.get(key) === '1') {
                     url.searchParams.set(key, '1');
                 }
@@ -3133,7 +3147,7 @@ nowoczesna-edukacja.pl `;
                 .then(function (data) {
                     const count = Number(data.count || 0);
                     badge.textContent = String(count);
-                    const hasFilter = !!(data.filter_no_participant || data.filter_no_invoice || data.filter_no_ksef || data.course_id);
+                    const hasFilter = !!(data.filter_no_participant || data.filter_no_invoice || data.filter_no_ksef || data.filter_payment_gateway || data.course_id);
                     badge.classList.remove('text-bg-secondary', 'text-bg-primary', 'text-bg-warning');
                     badge.classList.add(hasFilter ? 'text-bg-primary' : 'text-bg-secondary');
                     let title = 'Zamówień w zakresie nawigacji: ' + count;
@@ -3148,6 +3162,9 @@ nowoczesna-edukacja.pl `;
                     }
                     if (data.filter_no_ksef) {
                         title += ' · tylko z NIP bez KSeF';
+                    }
+                    if (data.filter_payment_gateway) {
+                        title += ' · bramka płatności';
                     }
                     badge.title = title;
                 })
