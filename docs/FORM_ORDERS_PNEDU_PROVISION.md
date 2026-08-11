@@ -27,9 +27,9 @@ Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dl
 | Badge | Znaczenie | Link |
 |-------|-----------|------|
 | `U` | Ważne zamówienia, w których trzeba jeszcze dodać uczestnika do szkolenia | `/form-orders/{latestId}?filter_no_participant=1&course_id={courseId}` (najwyższe id z tego zbioru) |
-| `FV` | Ważne zamówienia bez wystawionej faktury i bez oznaczenia „Bezpłatny dostęp - bez FV” | `/form-orders/{latestId}?filter_no_invoice=1&course_id={courseId}` (najwyższe id z tego zbioru) |
+| `FV` | Ważne zamówienia bez numeru FV, bez `ifirma_invoice_id` i bez oznaczenia „Bezpłatny dostęp - bez FV" | `/form-orders/{latestId}?filter_no_invoice=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 
-Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`.
+Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`. Licznik `FV` jest spójny z filtrem nawigacji „bez wystawionej faktury" na `/form-orders/{id}` (wyklucza m.in. zamówienia z samym ID iFirma).
 
 ## ClickMeeting
 

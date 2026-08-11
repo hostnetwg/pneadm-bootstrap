@@ -948,20 +948,7 @@ class FormOrdersController extends Controller
         }
 
         if ($filterNoInvoice) {
-            // Brak klasycznego numeru FV i brak ID iFirma (kolejka do wystawienia)
-            $table = $query->getModel()->getTable();
-            $query->whereNull("{$table}.cancelled_at")
-                ->whereNull("{$table}.legacy_handled_at")
-                ->whereNull("{$table}.invoice_exempt_at")
-                ->where(function ($noInv) use ($table) {
-                    $noInv->whereNull("{$table}.invoice_number")
-                        ->orWhere("{$table}.invoice_number", '')
-                        ->orWhere("{$table}.invoice_number", '0');
-                })
-                ->where(function ($noIfirma) use ($table) {
-                    $noIfirma->whereNull("{$table}.ifirma_invoice_id")
-                        ->orWhere("{$table}.ifirma_invoice_id", '');
-                });
+            app(\App\Services\FormOrderOperationalStatusService::class)->scopeNeedsInvoice($query);
         }
 
         if ($filterNoKsef) {
