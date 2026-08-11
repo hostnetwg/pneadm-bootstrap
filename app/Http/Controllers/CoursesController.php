@@ -226,7 +226,9 @@ class CoursesController extends Controller
 
         if (! empty($courseIdsOnPage)) {
             $operational = app(\App\Services\FormOrderOperationalStatusService::class);
-            $ordersNeedingParticipantsByCourseId = $operational->countNeedsProvisioningByCourseIds($courseIdsOnPage);
+            $needsProvisioningStats = $operational->needsProvisioningStatsByCourseIds($courseIdsOnPage);
+            $ordersNeedingParticipantsByCourseId = $needsProvisioningStats['counts'];
+            $latestNeedsProvisioningOrderIdByCourseId = $needsProvisioningStats['latest_ids'];
             $ordersNeedingInvoiceByCourseId = $operational->countNeedsInvoiceByCourseIds($courseIdsOnPage);
 
             $closedPaidIds = $courses->getCollection()
@@ -237,8 +239,9 @@ class CoursesController extends Controller
             $uninvoicedOrderIdByCourseId = CourseFormOrderBillingService::firstUninvoicedOrderIdByCourseIds($closedPaidIds);
             $firstInvoiceNumberByCourseId = CourseFormOrderBillingService::firstInvoiceNumberByCourseIds($closedPaidIds);
 
-            $courses->getCollection()->transform(function ($course) use ($ordersNeedingParticipantsByCourseId, $ordersNeedingInvoiceByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId, $firstInvoiceNumberByCourseId) {
+            $courses->getCollection()->transform(function ($course) use ($ordersNeedingParticipantsByCourseId, $latestNeedsProvisioningOrderIdByCourseId, $ordersNeedingInvoiceByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId, $firstInvoiceNumberByCourseId) {
                 $course->orders_needing_participants_count = (int) ($ordersNeedingParticipantsByCourseId[$course->id] ?? 0);
+                $course->latest_needs_provisioning_order_id = $latestNeedsProvisioningOrderIdByCourseId[$course->id] ?? null;
                 $course->orders_needing_invoice_count = (int) ($ordersNeedingInvoiceByCourseId[$course->id] ?? 0);
                 $summary = $billingByCourseId[$course->id] ?? null;
                 $course->closed_billing_status = $summary['status'] ?? (
@@ -256,6 +259,7 @@ class CoursesController extends Controller
         } else {
             $courses->getCollection()->transform(function ($course) {
                 $course->orders_needing_participants_count = 0;
+                $course->latest_needs_provisioning_order_id = null;
                 $course->orders_needing_invoice_count = 0;
                 $course->closed_billing_status = CourseFormOrderBillingService::STATUS_NOT_APPLICABLE;
                 $course->closed_billing_orders_total = 0;

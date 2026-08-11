@@ -538,7 +538,18 @@
                                 $ordersNeedingParticipants = (int) ($course->orders_needing_participants_count ?? 0);
                                 $ordersNeedingInvoice = (int) ($course->orders_needing_invoice_count ?? 0);
                             @endphp
-                            @if($ordersNeedingParticipants > 0)
+                            @if($ordersNeedingParticipants > 0 && !empty($course->latest_needs_provisioning_order_id))
+                                <a href="{{ route('form-orders.show', [
+                                        $course->latest_needs_provisioning_order_id,
+                                        'filter_no_participant' => 1,
+                                        'filter_no_invoice' => 1,
+                                        'course_id' => $course->id,
+                                    ]) }}"
+                                   class="badge bg-danger text-decoration-none"
+                                   title="Otwórz ostatnie zamówienie bez uczestnika (#{{ $course->latest_needs_provisioning_order_id }}); filtry: bez uczestnika + bez FV">
+                                    U {{ $ordersNeedingParticipants }}
+                                </a>
+                            @elseif($ordersNeedingParticipants > 0)
                                 <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'new', 'course_id' => $course->id]) }}"
                                    class="badge bg-danger text-decoration-none"
                                    title="Zamówienia, w których trzeba dodać uczestnika do szkolenia">

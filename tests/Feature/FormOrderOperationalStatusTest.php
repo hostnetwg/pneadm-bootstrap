@@ -209,9 +209,14 @@ class FormOrderOperationalStatusTest extends TestCase
         ]);
 
         $participantsCounts = $service->countNeedsProvisioningByCourseIds([$courseId]);
+        $latestNeedsProvisioningId = $service->latestNeedsProvisioningOrderIdByCourseIds([$courseId]);
         $invoiceCounts = $service->countNeedsInvoiceByCourseIds([$courseId]);
 
         $this->assertSame(2, $participantsCounts[$courseId] ?? 0);
+        $this->assertSame(
+            max($missingBoth->id, $missingParticipant->id),
+            $latestNeedsProvisioningId[$courseId] ?? null
+        );
         $this->assertSame(2, $invoiceCounts[$courseId] ?? 0);
 
         $this->assertTrue(FormOrder::new()->whereKey($missingBoth->id)->exists());
