@@ -500,7 +500,7 @@ nowoczesna-edukacja.pl </div>
                                                     data-bs-target="#resendPneduAccessModal"
                                                     data-preview-url="{{ route('form-orders.pnedu.access-email-preview', $zamowienie->id) }}"
                                                     data-send-url="{{ route('form-orders.pnedu.resend-access-email', $zamowienie->id) }}">
-                                                <i class="bi bi-envelope"></i> Prześlij dostęp
+                                                <i class="bi bi-envelope"></i> Prześlij dostęp ponownie
                                             </button>
                                             @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
                                                 <button type="button" class="btn btn-sm btn-outline-danger"
@@ -3689,7 +3689,7 @@ nowoczesna-edukacja.pl `;
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="resendPneduAccessModalLabel">
-                        <i class="bi bi-envelope"></i> Prześlij dostęp — Krok 3: E-mail do uczestnika
+                        <i class="bi bi-envelope"></i> Prześlij dostęp ponownie — Krok 3: E-mail do uczestnika
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                 </div>

@@ -129,7 +129,7 @@ Ponowne **Dodaj uczestnika do PNEDU** odnajduje uczestnika po `course_id` + e-ma
 
 ## Ponowna wysyłka e-maila (krok 3)
 
-Na `/form-orders/{id}` przy przyznanym PNEDU: przycisk **Prześlij dostęp** (obok resetu).
+Na `/form-orders/{id}` przy przyznanym PNEDU: przycisk **Prześlij dostęp ponownie** (obok resetu).
 
 1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny).
 2. **Anuluj** / **Skopiuj treść** / **Wyślij**.
