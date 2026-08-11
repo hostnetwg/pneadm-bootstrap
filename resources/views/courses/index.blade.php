@@ -542,11 +542,10 @@
                                 <a href="{{ route('form-orders.show', [
                                         $course->latest_needs_provisioning_order_id,
                                         'filter_no_participant' => 1,
-                                        'filter_no_invoice' => 1,
                                         'course_id' => $course->id,
                                     ]) }}"
                                    class="badge bg-danger text-decoration-none"
-                                   title="Otwórz ostatnie zamówienie bez uczestnika (#{{ $course->latest_needs_provisioning_order_id }}); filtry: bez uczestnika + bez FV">
+                                   title="Otwórz ostatnie zamówienie bez uczestnika (#{{ $course->latest_needs_provisioning_order_id }})">
                                     U {{ $ordersNeedingParticipants }}
                                 </a>
                             @elseif($ordersNeedingParticipants > 0)
