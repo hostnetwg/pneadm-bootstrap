@@ -7,8 +7,8 @@
         <p class="text-muted mb-3">
             Opinie zebrane z bloku „rekomendacja” w ankiecie natywnej. Publikacja na stronie głównej wymaga zgody uczestnika
             oraz Twojego zatwierdzenia. Możesz poprawić treść i dane autora (np. literówki) przed publikacją.
-            <strong>Wyróżnione</strong> opinie są zawsze na górze na pnedu.pl (kolejność ↑↓) —
-            poniżej pojawiają się najnowsze. Optymalnie 4–8 wyróżnień (limit {{ \App\Models\SurveyTestimonial::FEATURED_SOFT_LIMIT }}).
+            <strong>Wyróżnione</strong> opinie są zawsze na górze na pnedu.pl (od najnowszych do najstarszych),
+            poniżej niewyróżnione — też od najnowszych. Optymalnie 4–8 wyróżnień (limit {{ \App\Models\SurveyTestimonial::FEATURED_SOFT_LIMIT }}).
             Obecnie wyróżnionych: <strong id="js-featured-count">{{ (int) ($featuredCount ?? 0) }}</strong>.
         </p>
         <div id="js-testimonial-flash" class="d-none" role="alert"></div>
@@ -52,9 +52,6 @@
                             <th>Wystawiono</th>
                             <th>Zgoda</th>
                             <th>Status</th>
-                            @if($filter === 'featured')
-                                <th class="text-center">Kolejność</th>
-                            @endif
                             <th></th>
                         </tr>
                     </thead>
@@ -122,31 +119,11 @@
                                     @endif
                                 </td>
                                 <td class="js-testimonial-status"></td>
-                                @if($filter === 'featured')
-                                    <td class="text-center text-nowrap">
-                                        <form method="POST" action="{{ route('surveys.testimonials.move-up', $t) }}" class="d-inline">
-                                            @csrf
-                                            <input type="hidden" name="filter" value="featured">
-                                            @if(request()->integer('page') > 1)
-                                                <input type="hidden" name="page" value="{{ request()->integer('page') }}">
-                                            @endif
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Wyżej na homepage">↑</button>
-                                        </form>
-                                        <form method="POST" action="{{ route('surveys.testimonials.move-down', $t) }}" class="d-inline">
-                                            @csrf
-                                            <input type="hidden" name="filter" value="featured">
-                                            @if(request()->integer('page') > 1)
-                                                <input type="hidden" name="page" value="{{ request()->integer('page') }}">
-                                            @endif
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Niżej na homepage">↓</button>
-                                        </form>
-                                    </td>
-                                @endif
                                 <td class="text-end text-nowrap js-testimonial-actions"></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $filter === 'featured' ? 8 : 7 }}" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td>
+                                <td colspan="7" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td>
                             </tr>
                         @endforelse
                     </tbody>

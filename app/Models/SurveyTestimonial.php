@@ -64,7 +64,6 @@ class SurveyTestimonial extends Model
             ->where('is_published', true)
             ->where('publish_consent', true)
             ->orderByDesc('is_featured')
-            ->orderBy('display_order')
             ->orderByDesc('created_at');
     }
 
@@ -159,46 +158,5 @@ class SurveyTestimonial extends Model
             'is_featured' => false,
             'display_order' => self::DISPLAY_ORDER_UNFEATURED,
         ]);
-    }
-
-    /**
-     * Przesuń wśród wyróżnionych (direction: up = wyżej na homepage, down = niżej).
-     */
-    public function moveFeatured(string $direction): bool
-    {
-        if (! $this->is_featured) {
-            return false;
-        }
-
-        $neighbors = self::query()
-            ->where('is_featured', true)
-            ->orderBy('display_order')
-            ->orderBy('id')
-            ->get();
-
-        $index = $neighbors->search(fn (self $row) => $row->id === $this->id);
-        if ($index === false) {
-            return false;
-        }
-
-        $swapIndex = $direction === 'up' ? $index - 1 : $index + 1;
-        if ($swapIndex < 0 || $swapIndex >= $neighbors->count()) {
-            return false;
-        }
-
-        /** @var self $other */
-        $other = $neighbors[$swapIndex];
-        $myOrder = (int) $this->display_order;
-        $otherOrder = (int) $other->display_order;
-
-        if ($myOrder === $otherOrder) {
-            $myOrder = ($index + 1) * 10;
-            $otherOrder = ($swapIndex + 1) * 10;
-        }
-
-        $this->update(['display_order' => $otherOrder]);
-        $other->update(['display_order' => $myOrder]);
-
-        return true;
     }
 }

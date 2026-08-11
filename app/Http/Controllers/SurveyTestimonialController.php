@@ -22,11 +22,9 @@ class SurveyTestimonialController extends Controller
         } elseif ($filter === 'published') {
             $query->where('is_published', true)
                 ->orderByDesc('is_featured')
-                ->orderBy('display_order')
                 ->orderByDesc('created_at');
         } elseif ($filter === 'featured') {
             $query->where('is_featured', true)
-                ->orderBy('display_order')
                 ->orderByDesc('created_at');
         } else {
             $query->orderByDesc('created_at');
@@ -134,24 +132,6 @@ class SurveyTestimonialController extends Controller
             $testimonial,
             'Usunięto wyróżnienie rekomendacji.',
         );
-    }
-
-    public function moveUp(Request $request, SurveyTestimonial $testimonial): RedirectResponse
-    {
-        if (! $testimonial->moveFeatured('up')) {
-            return $this->redirectToIndex($request)->with('error', 'Nie można przesunąć wyżej.');
-        }
-
-        return $this->redirectToIndex($request)->with('success', 'Kolejność wyróżnień zaktualizowana.');
-    }
-
-    public function moveDown(Request $request, SurveyTestimonial $testimonial): RedirectResponse
-    {
-        if (! $testimonial->moveFeatured('down')) {
-            return $this->redirectToIndex($request)->with('error', 'Nie można przesunąć niżej.');
-        }
-
-        return $this->redirectToIndex($request)->with('success', 'Kolejność wyróżnień zaktualizowana.');
     }
 
     public function destroy(Request $request, SurveyTestimonial $testimonial): RedirectResponse

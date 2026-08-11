@@ -192,35 +192,6 @@ class SurveyTestimonialUpdateTest extends TestCase
         $this->assertFalse($extra->fresh()->is_featured);
     }
 
-    public function test_move_up_swaps_featured_order(): void
-    {
-        $admin = User::factory()->create();
-        $first = SurveyTestimonial::query()->create([
-            'author_name' => 'Pierwsza',
-            'quote' => 'A',
-            'publish_consent' => true,
-            'is_published' => true,
-            'is_featured' => true,
-            'display_order' => 10,
-        ]);
-        $second = SurveyTestimonial::query()->create([
-            'author_name' => 'Druga',
-            'quote' => 'B',
-            'publish_consent' => true,
-            'is_published' => true,
-            'is_featured' => true,
-            'display_order' => 20,
-        ]);
-
-        $response = $this->actingAs($admin)
-            ->from(route('surveys.testimonials.index', ['filter' => 'featured']))
-            ->post(route('surveys.testimonials.move-up', $second), ['filter' => 'featured']);
-
-        $response->assertRedirect(route('surveys.testimonials.index', ['filter' => 'featured']));
-        $this->assertSame(10, (int) $second->fresh()->display_order);
-        $this->assertSame(20, (int) $first->fresh()->display_order);
-    }
-
     public function test_unpublish_clears_featured_flag(): void
     {
         $admin = User::factory()->create();

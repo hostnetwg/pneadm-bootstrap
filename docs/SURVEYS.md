@@ -1,7 +1,7 @@
 # Ankiety po szkoleniu — dokumentacja (kanon: pneadm)
 
 Opis procesu ankiet ewaluacyjnych w ekosystemie **adm.pnedu.pl** (pneadm) + **pnedu.pl**.  
-Ostatnia aktualizacja: **2026-08-10** (wyróżnione rekomendacje na górze homepage).
+Ostatnia aktualizacja: **2026-08-11** (kolejność homepage: wyróżnione/nowe bez ↑↓).
 
 ## Spis treści
 
@@ -129,8 +129,8 @@ Edycja: przycisk **Edytuj** — poprawa opinii, autora, stanowiska, miasta i oce
 **Publikuj / Wyróżnij / Odznacz / Ukryj** działają przez AJAX (bez przeładowania — zostajesz na tej samej stronie paginacji).
 
 **Wyróżnienie (pin):** przy opublikowanej rekomendacji **Wyróżnij** / **Odznacz**
-(`survey_testimonials.is_featured`). Wyróżnione są zawsze **pierwsze** na homepage;
-kolejność wśród nich: ↑↓ w filtrze „Wyróżnione” (`display_order`).
+(`survey_testimonials.is_featured`). Wyróżnione są zawsze **pierwsze** na homepage,
+wśród nich **od najnowszych** (`created_at` DESC); potem niewyróżnione również od najnowszych.
 Soft limit: **8** (komunikat przy próbie dodania kolejnej — krótkie wyróżnienia działają lepiej marketingowo).
 Po „Ukryj” wyróżnienie jest zdejmowane. Domyślnie po publikacji: **bez** wyróżnienia.
 
@@ -146,8 +146,8 @@ Po zapisie ustawień adm czyści cache pnedu (`POST /api/internal/cache/survey-s
 Gdy włączone: pod autorem wyświetlana jest data wystawienia (`created_at`, `d.m.Y`, Europe/Warsaw)
 na kartach początkowych i dociągniętych przez „Pokaż więcej”.
 
-**pnedu homepage:** kolejność: **wyróżnione** (`display_order` ASC), potem pozostałe **od najnowszych**
-(`created_at` DESC). `HomeController` ładuje pierwsze **6**;
+**pnedu homepage:** kolejność: **wyróżnione od najnowszych**, potem **pozostałe od najnowszych**
+(`is_featured` DESC, `created_at` DESC). `HomeController` ładuje pierwsze **6**;
 przycisk **Pokaż więcej** dociąga kolejne (`/fragments/homepage-testimonials`, bez już pokazanych).  
 Migracja seeduje dwie dotychczasowe opinie placeholder (Anna Nowak, Piotr Zieliński) jako opublikowane.
 
