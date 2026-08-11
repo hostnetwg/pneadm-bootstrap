@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-08  
+Data utworzenia/aktualizacji: 2026-08-11  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-11) — link „ustaw hasło” ważny 2 miesiące
+
+Domyślnie `PASSWORD_RESET_EXPIRE_MINUTES=86400` (pneadm + pnedu). Mail provision informuje o terminie i podaje `/forgot-password`. Na prod: ustawić `.env` i odświeżyć config cache. Kanon: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
 
 ## Ostatnio (2026-08-09) — nowy zestaw 16 awatarów „nauczycielskich”
 

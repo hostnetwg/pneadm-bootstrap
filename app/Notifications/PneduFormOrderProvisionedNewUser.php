@@ -70,9 +70,12 @@ class PneduFormOrderProvisionedNewUser extends Notification
             $message->line($html);
         }
 
+        $forgotUrl = $base.'/forgot-password';
+
         return $message
-            ->line('Aby się zalogować, najpierw ustaw hasło — kliknij przycisk poniżej. Link możesz wykorzystać w dowolnym momencie.')
+            ->line('Aby się zalogować, najpierw ustaw hasło — kliknij przycisk poniżej. Link jest ważny przez 2 miesiące.')
             ->action('Ustaw hasło na pnedu.pl', $url)
+            ->line('Jeśli link wygasł lub nie działa, na stronie logowania użyj opcji „Nie pamiętam hasła”: '.$forgotUrl)
             ->line('Po zalogowaniu znajdziesz materiały powiązane z tym szkoleniem (zgodnie z dostępem przypisanym do Twojego konta).')
             ->line('Jeśli to nie Ty zapisałeś się na szkolenie, zignoruj tę wiadomość lub skontaktuj się z biurem.');
     }

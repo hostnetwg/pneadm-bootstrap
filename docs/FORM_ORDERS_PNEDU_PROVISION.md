@@ -1,6 +1,6 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-08-10 (ponowna wysyłka e-maila dostępu)  
+Data aktualizacji: 2026-08-11 (ważność linku ustawienia hasła: 2 miesiące)  
 
 
 Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
@@ -134,7 +134,19 @@ Na `/form-orders/{id}` przy przyznanym PNEDU: przycisk **Prześlij dostęp** (ob
 1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny).
 2. **Anuluj** / **Skopiuj treść** / **Wyślij**.
 3. Endpoints: `GET …/pnedu/access-email-preview`, `POST …/pnedu/resend-access-email`.
-4. Przy „nowe konto” świeży token resetu hasła powstaje dopiero przy **Wyślij** (w podglądzie placeholder).
+4. Przy „nowe konto” świeży token resetu hasła powstaje dopiero przy **Wyślij** (w podglądzie placeholder).  
+   Ponowna wysyłka **unieważnia** poprzedni link ustawienia hasła (Laravel: jeden aktywny token na e-mail).
+
+## Ważność linku „ustaw hasło”
+
+Link w mailu dla nowego konta to standardowy token resetu Laravel (`password_reset_tokens`).  
+Ważność: `PASSWORD_RESET_EXPIRE_MINUTES` w `.env` **pnedu** i **pneadm** (domyślnie **86400** = 60 dni ≈ **2 miesiące**).
+
+- Walidacja przy kliknięciu odbywa się na **pnedu.pl** (`config/auth.php` → `passwords.users.expire`).
+- Po zmianie na produkcji: ustaw `.env`, potem `php artisan config:clear` i ewentualnie `config:cache` na **obu** aplikacjach.
+- Komunikat „link nieprawidłowy lub wygasł” obejmuje też: token już użyty, nowszy token z „Prześlij dostęp” / „Nie pamiętam hasła”, uszkodzony URL.
+
+W mailu: informacja o 2 miesiącach + link awaryjny do `/forgot-password`.
 
 ## Uczestnicy kursu — ręczna rejestracja ClickMeeting
 

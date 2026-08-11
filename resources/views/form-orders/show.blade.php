@@ -493,7 +493,7 @@ nowoczesna-edukacja.pl </div>
                                                 <span class="badge bg-success">Wykonano</span>
                                             </div>
                                         </div>
-                                        <div class="mt-2 d-flex flex-wrap gap-2">
+                                        <div class="mt-2 d-flex flex-wrap gap-2 justify-content-between align-items-center">
                                             <button type="button" class="btn btn-sm btn-outline-primary"
                                                     id="resendPneduAccessBtn"
                                                     data-bs-toggle="modal"
