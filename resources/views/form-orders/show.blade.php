@@ -876,6 +876,13 @@ nowoczesna-edukacja.pl </div>
                                              title="Wewnętrzny Identyfikator dokumentu w iFirma (nie numer FV)">
                                             <span class="text-muted">ID iFirma:</span>
                                             <code class="text-secondary" id="ifirmaInvoiceIdValue">{{ $zamowienie->hasIfirmaInvoiceId() ? $zamowienie->ifirma_invoice_id : '' }}</code>
+                                            <button type="button"
+                                                    class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
+                                                    id="syncIfirmaByIdBtn"
+                                                    title="Pobierz z iFirma po ID dokumentu: numer FV, daty i Numer KSeF"
+                                                    aria-label="Synchronizuj dane FV z iFirma po ID dokumentu">
+                                                <i class="bi bi-arrow-repeat" id="syncIfirmaByIdIcon"></i>
+                                            </button>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -2486,6 +2493,7 @@ nowoczesna-edukacja.pl `;
             const allSyncBtns = [
                 document.getElementById('syncIfirmaKsefBtn'),
                 document.getElementById('syncIfirmaByInvoiceNumberBtn'),
+                document.getElementById('syncIfirmaByIdBtn'),
             ].filter(Boolean);
             allSyncBtns.forEach(function (el) { el.disabled = true; });
             if (icon) {
@@ -2509,6 +2517,9 @@ nowoczesna-edukacja.pl `;
                 const data = await response.json();
 
                 if (data.success) {
+                    if (data.invoice_number) {
+                        applyInvoiceNumberFieldValue(data.invoice_number);
+                    }
                     applyKsefNumberDisplay(data.ksef_number || null);
                     if (data.ifirma_invoice_id) {
                         applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
@@ -2588,6 +2599,16 @@ nowoczesna-edukacja.pl `;
                         preferNumber: true,
                         button: syncByNumberBtn,
                         icon: document.getElementById('syncIfirmaByInvoiceNumberIcon'),
+                    });
+                });
+            }
+            const syncByIdBtn = document.getElementById('syncIfirmaByIdBtn');
+            if (syncByIdBtn) {
+                syncByIdBtn.addEventListener('click', function () {
+                    syncIfirmaKsefFromPanel(orderId, {
+                        preferNumber: false,
+                        button: syncByIdBtn,
+                        icon: document.getElementById('syncIfirmaByIdIcon'),
                     });
                 });
             }

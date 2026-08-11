@@ -320,14 +320,15 @@ wypełnionym klasycznym `invoice_number` i pustym `ksef_number`
 `filter_no_participant`, `filter_no_invoice` i `course_id` (prev/next + badge).
 Legacy `filter_new=1` mapuje się na `filter_no_invoice`.
 
-**Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**
-oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.
+**Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**,
+przy **ID iFirma** oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.
 Przycisk przy numerze FV wysyła `prefer_number_lookup=1` + aktualną wartość z inputa
 (nawet niespiętą „Zapisz”). Preferuje wyszukanie dokumentu po **`invoice_number`**
 (lista iFirma, jak windykacja) — przydatne po ręcznym wystawieniu FV w panelu iFirma
-lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Zapisuje **ID iFirma**,
-**daty FV** oraz **NumerKSeF** gdy iFirma je zwróci. Ręcznie wpisanego `invoice_number`
-**nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
+lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Ikona przy **ID iFirma**
+(oraz przy KSeF) synchronizuje po zapisanym `ifirma_invoice_id` (`prefer_number_lookup=0`)
+— uzupełnia brakujący `invoice_number` z `PelnyNumer`, **daty FV** oraz **NumerKSeF**.
+Ręcznie wpisanego `invoice_number` **nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
 czyszczony** (wcześniej sync kasował ręczny wpis). Gdy sync uzyska NumerKSeF i
 `ksef_email_pending=true`, wysyła FV mailem przez iFirma (te same adresy co czerwony
 przycisk; ~400 ms między adresami; bez agresywnego retry). Po pełnym sukcesie
@@ -474,5 +475,5 @@ Obok klasycznego numeru i KSeF zapisujemy wewnętrzny ID dokumentu iFirma:
 Zapis `ifirma_invoice_id` przy wystawianiu FV krajowej, FV z odbiorcą oraz FV+KSeF
 (`FormOrdersController`, `IfirmaFormOrderKsefSubmissionService`). Pro-forma **nie**
 ustawia tego pola (ani `invoice_number`). W UI szczegółów zamówienia: „ID iFirma”
-pod numerem KSeF. Historyczne zamówienia bez ID dostaną je przy kolejnym kontakcie
+pod numerem faktury (z ikoną odświeżenia po ID). Historyczne zamówienia bez ID dostaną je przy kolejnym kontakcie
 z iFirma (wystawienie / faza KSeF) albo przy przyszłym backfillu.
