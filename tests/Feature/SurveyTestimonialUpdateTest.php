@@ -58,6 +58,46 @@ class SurveyTestimonialUpdateTest extends TestCase
         $this->assertTrue($testimonial->fresh()->is_published);
     }
 
+    public function test_publish_via_ajax_returns_json_without_redirect(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => false,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('surveys.testimonials.publish', $testimonial));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('testimonial.is_published', true);
+        $this->assertTrue($testimonial->fresh()->is_published);
+    }
+
+    public function test_feature_via_ajax_returns_json(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => false,
+            'display_order' => SurveyTestimonial::DISPLAY_ORDER_UNFEATURED,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('surveys.testimonials.feature', $testimonial));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('testimonial.is_featured', true);
+        $this->assertTrue($testimonial->fresh()->is_featured);
+    }
+
     public function test_quote_is_required_when_updating_testimonial(): void
     {
         $admin = User::factory()->create();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SurveyTestimonial;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -61,53 +62,78 @@ class SurveyTestimonialController extends Controller
         return $this->redirectToIndex($request)->with('success', 'Rekomendacja została zaktualizowana.');
     }
 
-    public function publish(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    public function publish(Request $request, SurveyTestimonial $testimonial): RedirectResponse|JsonResponse
     {
         if (! $testimonial->publish_consent) {
-            return $this->redirectToIndex($request)->with('error', 'Brak zgody uczestnika na publikację.');
+            return $this->respond(
+                $request,
+                $testimonial,
+                'Brak zgody uczestnika na publikację.',
+                success: false,
+            );
         }
 
         $testimonial->publish();
 
-        return $this->redirectToIndex($request)->with('success', 'Rekomendacja opublikowana na stronie głównej.');
+        return $this->respond(
+            $request,
+            $testimonial,
+            'Rekomendacja opublikowana na stronie głównej.',
+        );
     }
 
-    public function unpublish(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    public function unpublish(Request $request, SurveyTestimonial $testimonial): RedirectResponse|JsonResponse
     {
         $testimonial->unpublish();
 
-        return $this->redirectToIndex($request)->with('success', 'Rekomendacja zdjęta z publikacji.');
+        return $this->respond(
+            $request,
+            $testimonial,
+            'Rekomendacja zdjęta z publikacji.',
+        );
     }
 
-    public function feature(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    public function feature(Request $request, SurveyTestimonial $testimonial): RedirectResponse|JsonResponse
     {
         if (! $testimonial->is_published || ! $testimonial->publish_consent) {
-            return $this->redirectToIndex($request)->with('error', 'Wyróżnić można tylko opublikowaną rekomendację.');
+            return $this->respond(
+                $request,
+                $testimonial,
+                'Wyróżnić można tylko opublikowaną rekomendację.',
+                success: false,
+            );
         }
 
         if (! $testimonial->is_featured
             && SurveyTestimonial::featuredCount() >= SurveyTestimonial::FEATURED_SOFT_LIMIT) {
-            return $this->redirectToIndex($request)->with(
-                'error',
+            return $this->respond(
+                $request,
+                $testimonial,
                 'Masz już '.SurveyTestimonial::FEATURED_SOFT_LIMIT.' wyróżnionych rekomendacji. '
                 .'Usuń wyróżnienie z jednej z nich (filtr „Wyróżnione”), potem dodaj nową — '
-                .'krótka lista na górze działa lepiej marketingowo.'
+                .'krótka lista na górze działa lepiej marketingowo.',
+                success: false,
             );
         }
 
         $testimonial->feature();
 
-        return $this->redirectToIndex($request)->with(
-            'success',
-            'Rekomendacja wyróżniona — będzie wyświetlana na górze listy na pnedu.pl.'
+        return $this->respond(
+            $request,
+            $testimonial,
+            'Rekomendacja wyróżniona — będzie wyświetlana na górze listy na pnedu.pl.',
         );
     }
 
-    public function unfeature(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    public function unfeature(Request $request, SurveyTestimonial $testimonial): RedirectResponse|JsonResponse
     {
         $testimonial->unfeature();
 
-        return $this->redirectToIndex($request)->with('success', 'Usunięto wyróżnienie rekomendacji.');
+        return $this->respond(
+            $request,
+            $testimonial,
+            'Usunięto wyróżnienie rekomendacji.',
+        );
     }
 
     public function moveUp(Request $request, SurveyTestimonial $testimonial): RedirectResponse
@@ -135,26 +161,67 @@ class SurveyTestimonialController extends Controller
         return $this->redirectToIndex($request)->with('success', 'Rekomendacja usunięta.');
     }
 
+    private function respond(
+        Request $request,
+        SurveyTestimonial $testimonial,
+        string $message,
+        bool $success = true,
+    ): RedirectResponse|JsonResponse {
+        if ($request->expectsJson() || $request->ajax()) {
+            $testimonial->refresh();
+
+            return response()->json([
+                'success' => $success,
+                'message' => $message,
+                'testimonial' => [
+                    'id' => $testimonial->id,
+                    'is_published' => (bool) $testimonial->is_published,
+                    'is_featured' => (bool) $testimonial->is_featured,
+                    'publish_consent' => (bool) $testimonial->publish_consent,
+                ],
+                'featured_count' => SurveyTestimonial::featuredCount(),
+                'urls' => [
+                    'publish' => route('surveys.testimonials.publish', $testimonial),
+                    'unpublish' => route('surveys.testimonials.unpublish', $testimonial),
+                    'feature' => route('surveys.testimonials.feature', $testimonial),
+                    'unfeature' => route('surveys.testimonials.unfeature', $testimonial),
+                ],
+            ], $success ? 200 : 422);
+        }
+
+        return $success
+            ? $this->redirectToIndex($request)->with('success', $message)
+            : $this->redirectToIndex($request)->with('error', $message);
+    }
+
     /**
-     * Świadomy powrót na listę — nie używamy back(), bo poprzedni URL bywa API JSON
-     * (np. /certificates/pdf-generation-status-any z listy uczestników).
+     * Świadomy powrót na listę — zachowaj filtr i stronę paginacji (nie używamy back()).
      */
     private function redirectToIndex(Request $request): RedirectResponse
     {
         $filter = $request->string('filter')->toString();
-        if ($filter === '' && $request->headers->get('referer')) {
+        $page = $request->integer('page');
+
+        if ($request->headers->get('referer')) {
             $query = parse_url((string) $request->headers->get('referer'), PHP_URL_QUERY);
             if (is_string($query) && $query !== '') {
                 parse_str($query, $params);
-                if (isset($params['filter']) && is_string($params['filter'])) {
+                if ($filter === '' && isset($params['filter']) && is_string($params['filter'])) {
                     $filter = $params['filter'];
+                }
+                if ($page < 1 && isset($params['page'])) {
+                    $page = (int) $params['page'];
                 }
             }
         }
 
-        $params = in_array($filter, ['pending', 'published', 'featured'], true)
-            ? ['filter' => $filter]
-            : [];
+        $params = [];
+        if (in_array($filter, ['pending', 'published', 'featured'], true)) {
+            $params['filter'] = $filter;
+        }
+        if ($page > 1) {
+            $params['page'] = $page;
+        }
 
         return redirect()->route('surveys.testimonials.index', $params);
     }

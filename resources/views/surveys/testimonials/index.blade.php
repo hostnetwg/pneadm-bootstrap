@@ -9,8 +9,9 @@
             oraz Twojego zatwierdzenia. Możesz poprawić treść i dane autora (np. literówki) przed publikacją.
             <strong>Wyróżnione</strong> opinie są zawsze na górze na pnedu.pl (kolejność ↑↓) —
             poniżej pojawiają się najnowsze. Optymalnie 4–8 wyróżnień (limit {{ \App\Models\SurveyTestimonial::FEATURED_SOFT_LIMIT }}).
-            Obecnie wyróżnionych: <strong>{{ (int) ($featuredCount ?? 0) }}</strong>.
+            Obecnie wyróżnionych: <strong id="js-featured-count">{{ (int) ($featuredCount ?? 0) }}</strong>.
         </p>
+        <div id="js-testimonial-flash" class="d-none" role="alert"></div>
 
         <div class="mb-3 btn-group flex-wrap">
             <a href="{{ route('surveys.testimonials.index') }}" class="btn btn-sm {{ $filter === '' ? 'btn-primary' : 'btn-outline-primary' }}">Wszystkie</a>
@@ -59,7 +60,28 @@
                     </thead>
                     <tbody>
                         @forelse($testimonials as $t)
-                            <tr>
+                            @php
+                                $editPayloadJson = json_encode([
+                                    'updateUrl' => route('surveys.testimonials.update', $t),
+                                    'authorName' => $t->author_name,
+                                    'authorRole' => $t->author_role,
+                                    'authorCity' => $t->author_city,
+                                    'quote' => $t->quote,
+                                    'rating' => $t->rating,
+                                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+                            @endphp
+                            <tr class="js-testimonial-row"
+                                data-id="{{ $t->id }}"
+                                data-publish-consent="{{ $t->publish_consent ? '1' : '0' }}"
+                                data-is-published="{{ $t->is_published ? '1' : '0' }}"
+                                data-is-featured="{{ $t->is_featured ? '1' : '0' }}"
+                                data-publish-url="{{ route('surveys.testimonials.publish', $t) }}"
+                                data-unpublish-url="{{ route('surveys.testimonials.unpublish', $t) }}"
+                                data-feature-url="{{ route('surveys.testimonials.feature', $t) }}"
+                                data-unfeature-url="{{ route('surveys.testimonials.unfeature', $t) }}"
+                                data-author-name="{{ $t->author_name }}"
+                                data-delete-url="{{ route('surveys.testimonials.destroy', $t) }}"
+                                data-edit-payload="{{ $editPayloadJson }}">
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         @if($t->hasAvatar())
@@ -99,97 +121,28 @@
                                         <span class="badge bg-secondary">Nie</span>
                                     @endif
                                 </td>
-                                <td>
-                                    @if($t->is_published)
-                                        <span class="badge bg-primary">Opublikowana</span>
-                                    @else
-                                        <span class="badge bg-warning text-dark">Szkic</span>
-                                    @endif
-                                    @if($t->is_featured)
-                                        <span class="badge bg-warning text-dark ms-1" title="Na górze listy na pnedu.pl">
-                                            <i class="bi bi-star-fill"></i> Wyróżniona
-                                        </span>
-                                    @endif
-                                </td>
+                                <td class="js-testimonial-status"></td>
                                 @if($filter === 'featured')
                                     <td class="text-center text-nowrap">
                                         <form method="POST" action="{{ route('surveys.testimonials.move-up', $t) }}" class="d-inline">
                                             @csrf
                                             <input type="hidden" name="filter" value="featured">
+                                            @if(request()->integer('page') > 1)
+                                                <input type="hidden" name="page" value="{{ request()->integer('page') }}">
+                                            @endif
                                             <button type="submit" class="btn btn-sm btn-outline-secondary" title="Wyżej na homepage">↑</button>
                                         </form>
                                         <form method="POST" action="{{ route('surveys.testimonials.move-down', $t) }}" class="d-inline">
                                             @csrf
                                             <input type="hidden" name="filter" value="featured">
+                                            @if(request()->integer('page') > 1)
+                                                <input type="hidden" name="page" value="{{ request()->integer('page') }}">
+                                            @endif
                                             <button type="submit" class="btn btn-sm btn-outline-secondary" title="Niżej na homepage">↓</button>
                                         </form>
                                     </td>
                                 @endif
-                                <td class="text-end text-nowrap">
-                                    @php
-                                        $editPayloadJson = json_encode([
-                                            'updateUrl' => route('surveys.testimonials.update', $t),
-                                            'authorName' => $t->author_name,
-                                            'authorRole' => $t->author_role,
-                                            'authorCity' => $t->author_city,
-                                            'quote' => $t->quote,
-                                            'rating' => $t->rating,
-                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
-                                    @endphp
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-primary js-edit-testimonial"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#editTestimonialModal"
-                                            data-payload="{{ $editPayloadJson }}">
-                                        Edytuj
-                                    </button>
-                                    @if(!$t->is_published && $t->publish_consent)
-                                        <form method="POST" action="{{ route('surveys.testimonials.publish', $t) }}" class="d-inline">
-                                            @csrf
-                                            @if($filter !== '')
-                                                <input type="hidden" name="filter" value="{{ $filter }}">
-                                            @endif
-                                            <button type="submit" class="btn btn-sm btn-success">Publikuj</button>
-                                        </form>
-                                    @elseif($t->is_published)
-                                        @if($t->is_featured)
-                                            <form method="POST" action="{{ route('surveys.testimonials.unfeature', $t) }}" class="d-inline">
-                                                @csrf
-                                                @if($filter !== '')
-                                                    <input type="hidden" name="filter" value="{{ $filter }}">
-                                                @endif
-                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Usuń z góry listy na pnedu.pl">
-                                                    <i class="bi bi-star-fill"></i> Odznacz
-                                                </button>
-                                            </form>
-                                        @else
-                                            <form method="POST" action="{{ route('surveys.testimonials.feature', $t) }}" class="d-inline">
-                                                @csrf
-                                                @if($filter !== '')
-                                                    <input type="hidden" name="filter" value="{{ $filter }}">
-                                                @endif
-                                                <button type="submit" class="btn btn-sm btn-warning" title="Pokaż na górze na pnedu.pl">
-                                                    <i class="bi bi-star"></i> Wyróżnij
-                                                </button>
-                                            </form>
-                                        @endif
-                                        <form method="POST" action="{{ route('surveys.testimonials.unpublish', $t) }}" class="d-inline">
-                                            @csrf
-                                            @if($filter !== '')
-                                                <input type="hidden" name="filter" value="{{ $filter }}">
-                                            @endif
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Ukryj</button>
-                                        </form>
-                                    @endif
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-danger"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#deleteTestimonialModal"
-                                            data-delete-url="{{ route('surveys.testimonials.destroy', $t) }}"
-                                            data-author-name="{{ $t->author_name }}">
-                                        Usuń
-                                    </button>
-                                </td>
+                                <td class="text-end text-nowrap js-testimonial-actions"></td>
                             </tr>
                         @empty
                             <tr>
@@ -292,14 +245,148 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const flashEl = document.getElementById('js-testimonial-flash');
+            const featuredCountEl = document.getElementById('js-featured-count');
+
+            function showFlash(message, type) {
+                if (!flashEl) return;
+                flashEl.className = 'alert alert-' + (type === 'danger' ? 'danger' : 'success');
+                flashEl.textContent = message || '';
+                flashEl.classList.remove('d-none');
+            }
+
+            function renderRow(row) {
+                const published = row.getAttribute('data-is-published') === '1';
+                const featured = row.getAttribute('data-is-featured') === '1';
+                const consent = row.getAttribute('data-publish-consent') === '1';
+                const statusEl = row.querySelector('.js-testimonial-status');
+                const actionsEl = row.querySelector('.js-testimonial-actions');
+                if (!statusEl || !actionsEl) return;
+
+                let statusHtml = published
+                    ? '<span class="badge bg-primary">Opublikowana</span>'
+                    : '<span class="badge bg-warning text-dark">Szkic</span>';
+                if (featured) {
+                    statusHtml += ' <span class="badge bg-warning text-dark ms-1" title="Na górze listy na pnedu.pl"><i class="bi bi-star-fill"></i> Wyróżniona</span>';
+                }
+                statusEl.innerHTML = statusHtml;
+
+                const actions = document.createDocumentFragment();
+
+                function addBtn(className, label, attrs) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = className;
+                    b.innerHTML = label;
+                    Object.keys(attrs || {}).forEach(function (k) {
+                        b.setAttribute(k, attrs[k]);
+                    });
+                    actions.appendChild(b);
+                    actions.appendChild(document.createTextNode(' '));
+                }
+
+                addBtn('btn btn-sm btn-outline-primary js-edit-testimonial', 'Edytuj', {
+                    'data-bs-toggle': 'modal',
+                    'data-bs-target': '#editTestimonialModal',
+                });
+
+                if (!published && consent) {
+                    addBtn('btn btn-sm btn-success js-testimonial-ajax', 'Publikuj', { 'data-action': 'publish' });
+                } else if (published) {
+                    if (featured) {
+                        addBtn('btn btn-sm btn-outline-warning js-testimonial-ajax', '<i class="bi bi-star-fill"></i> Odznacz', {
+                            'data-action': 'unfeature',
+                            title: 'Usuń z góry listy na pnedu.pl',
+                        });
+                    } else {
+                        addBtn('btn btn-sm btn-warning js-testimonial-ajax', '<i class="bi bi-star"></i> Wyróżnij', {
+                            'data-action': 'feature',
+                            title: 'Pokaż na górze na pnedu.pl',
+                        });
+                    }
+                    addBtn('btn btn-sm btn-outline-secondary js-testimonial-ajax', 'Ukryj', { 'data-action': 'unpublish' });
+                }
+
+                addBtn('btn btn-sm btn-outline-danger', 'Usuń', {
+                    'data-bs-toggle': 'modal',
+                    'data-bs-target': '#deleteTestimonialModal',
+                    'data-delete-url': row.getAttribute('data-delete-url') || '',
+                    'data-author-name': row.getAttribute('data-author-name') || '',
+                });
+
+                actionsEl.replaceChildren(actions);
+            }
+
+            document.querySelectorAll('.js-testimonial-row').forEach(renderRow);
+
+            document.addEventListener('click', function (event) {
+                const btn = event.target.closest('.js-testimonial-ajax');
+                if (!btn) return;
+                const row = btn.closest('.js-testimonial-row');
+                if (!row) return;
+
+                const action = btn.getAttribute('data-action');
+                const urlMap = {
+                    publish: row.getAttribute('data-publish-url'),
+                    unpublish: row.getAttribute('data-unpublish-url'),
+                    feature: row.getAttribute('data-feature-url'),
+                    unfeature: row.getAttribute('data-unfeature-url'),
+                };
+                const url = urlMap[action];
+                if (!url) return;
+
+                btn.disabled = true;
+                fetch(url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { ok: res.ok, data: data };
+                        });
+                    })
+                    .then(function (result) {
+                        const data = result.data || {};
+                        showFlash(data.message || (result.ok ? 'Zapisano.' : 'Nie udało się zapisać.'), result.ok ? 'success' : 'danger');
+                        if (!result.ok || !data.success || !data.testimonial) {
+                            btn.disabled = false;
+                            return;
+                        }
+                        row.setAttribute('data-is-published', data.testimonial.is_published ? '1' : '0');
+                        row.setAttribute('data-is-featured', data.testimonial.is_featured ? '1' : '0');
+                        row.setAttribute('data-publish-consent', data.testimonial.publish_consent ? '1' : '0');
+                        if (data.urls) {
+                            if (data.urls.publish) row.setAttribute('data-publish-url', data.urls.publish);
+                            if (data.urls.unpublish) row.setAttribute('data-unpublish-url', data.urls.unpublish);
+                            if (data.urls.feature) row.setAttribute('data-feature-url', data.urls.feature);
+                            if (data.urls.unfeature) row.setAttribute('data-unfeature-url', data.urls.unfeature);
+                        }
+                        if (featuredCountEl && typeof data.featured_count === 'number') {
+                            featuredCountEl.textContent = String(data.featured_count);
+                        }
+                        renderRow(row);
+                    })
+                    .catch(function () {
+                        showFlash('Błąd połączenia — spróbuj ponownie.', 'danger');
+                        btn.disabled = false;
+                    });
+            });
+
             const editModal = document.getElementById('editTestimonialModal');
             if (editModal) {
                 editModal.addEventListener('show.bs.modal', function (event) {
                     const btn = event.relatedTarget;
                     if (!btn || !btn.classList.contains('js-edit-testimonial')) return;
+                    const row = btn.closest('.js-testimonial-row');
                     let payload = {};
                     try {
-                        payload = JSON.parse(btn.getAttribute('data-payload') || '{}');
+                        payload = JSON.parse((row && row.getAttribute('data-edit-payload')) || '{}');
                     } catch (e) {
                         payload = {};
                     }
