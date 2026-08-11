@@ -402,11 +402,33 @@ class FormOrderOperationalStatusService
      */
     public function countNeedsInvoiceByCourseIds(array $courseIds): array
     {
+        return $this->needsInvoiceStatsByCourseIds($courseIds)['counts'];
+    }
+
+    /**
+     * Najwyższe id ważnego zamówienia per kurs, w którym trzeba wystawić FV.
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array<int, int> course_id => form_orders.id
+     */
+    public function latestNeedsInvoiceOrderIdByCourseIds(array $courseIds): array
+    {
+        return $this->needsInvoiceStatsByCourseIds($courseIds)['latest_ids'];
+    }
+
+    /**
+     * Liczniki i najnowsze id zamówień wymagających FV (badge FV).
+     *
+     * @param  array<int, int>  $courseIds
+     * @return array{counts: array<int, int>, latest_ids: array<int, int>}
+     */
+    public function needsInvoiceStatsByCourseIds(array $courseIds): array
+    {
         if ($courseIds === []) {
-            return [];
+            return ['counts' => [], 'latest_ids' => []];
         }
 
-        return $this->courseOrdersBaseQuery($courseIds)
+        $rows = $this->courseOrdersBaseQuery($courseIds)
             ->whereNull('fo.cancelled_at')
             ->whereNull('fo.legacy_handled_at')
             ->whereNull('fo.invoice_exempt_at')
@@ -416,10 +438,22 @@ class FormOrderOperationalStatusService
                     ->orWhere('fo.invoice_number', '0');
             })
             ->groupBy('c.id')
-            ->select('c.id as course_id', DB::raw('COUNT(DISTINCT fo.id) as cnt'))
-            ->pluck('cnt', 'course_id')
-            ->map(fn ($cnt) => (int) $cnt)
-            ->all();
+            ->select(
+                'c.id as course_id',
+                DB::raw('COUNT(DISTINCT fo.id) as cnt'),
+                DB::raw('MAX(fo.id) as latest_id')
+            )
+            ->get();
+
+        $counts = [];
+        $latestIds = [];
+        foreach ($rows as $row) {
+            $courseId = (int) $row->course_id;
+            $counts[$courseId] = (int) $row->cnt;
+            $latestIds[$courseId] = (int) $row->latest_id;
+        }
+
+        return ['counts' => $counts, 'latest_ids' => $latestIds];
     }
 
     /**

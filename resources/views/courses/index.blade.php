@@ -558,7 +558,17 @@
                                 <span class="badge bg-secondary" title="Brak zamówień z niedodanym uczestnikiem">U 0</span>
                             @endif
                             <br>
-                            @if($ordersNeedingInvoice > 0)
+                            @if($ordersNeedingInvoice > 0 && !empty($course->latest_needs_invoice_order_id))
+                                <a href="{{ route('form-orders.show', [
+                                        $course->latest_needs_invoice_order_id,
+                                        'filter_no_invoice' => 1,
+                                        'course_id' => $course->id,
+                                    ]) }}"
+                                   class="badge bg-warning text-dark text-decoration-none"
+                                   title="Otwórz ostatnie zamówienie bez FV (#{{ $course->latest_needs_invoice_order_id }})">
+                                    FV {{ $ordersNeedingInvoice }}
+                                </a>
+                            @elseif($ordersNeedingInvoice > 0)
                                 <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'needs_invoice', 'course_id' => $course->id]) }}"
                                    class="badge bg-warning text-dark text-decoration-none"
                                    title="Zamówienia bez wystawionej faktury i bez oznaczenia bez FV">
