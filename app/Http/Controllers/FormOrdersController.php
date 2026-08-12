@@ -2035,6 +2035,7 @@ class FormOrdersController extends Controller
                 'ksef_status' => $result['ksef_status'] ?? null,
                 'changed' => $result['changed'] ?? false,
                 'ksef_cleared' => $result['ksef_cleared'] ?? false,
+                'metadata_cleared' => $result['metadata_cleared'] ?? false,
                 'email_sent' => $result['email_sent'] ?? false,
                 'emails_sent' => $result['emails_sent'] ?? [],
                 'email_errors' => $result['email_errors'] ?? [],

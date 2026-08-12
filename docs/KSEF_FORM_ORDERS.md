@@ -328,7 +328,9 @@ płatności w bramce; **bez** anulowanych (`cancelled_at`); **bez** FV odroczone
 **Synchronizacja KSeF / danych FV (2026-08):** ikona odświeżenia przy **Numerze faktury**,
 przy **ID iFirma** oraz przy polu Numer KSeF na `/form-orders/{id}` → `POST …/ifirma/sync-ksef`.
 Przycisk przy numerze FV wysyła `prefer_number_lookup=1` + aktualną wartość z inputa
-(nawet niespiętą „Zapisz”). Preferuje wyszukanie dokumentu po **`invoice_number`**
+(nawet niespiętą „Zapisz”). Gdy input numeru FV jest **pusty**, ten sam przycisk **czyści**
+w zamówieniu `invoice_number`, `ifirma_invoice_id` i `ksef_number` (oraz status KSeF) —
+np. po przeniesieniu FV do innego zamówienia. Preferuje wyszukanie dokumentu po **`invoice_number`**
 (lista iFirma, jak windykacja) — przydatne po ręcznym wystawieniu FV w panelu iFirma
 lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Ikona przy **ID iFirma**
 (oraz przy KSeF) synchronizuje po zapisanym `ifirma_invoice_id` (`prefer_number_lookup=0`)

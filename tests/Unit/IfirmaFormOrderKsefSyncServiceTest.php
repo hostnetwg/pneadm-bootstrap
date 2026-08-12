@@ -460,4 +460,59 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertTrue($order->ksef_email_pending);
         $this->assertTrue($result['ksef_email_pending']);
     }
+
+    public function test_prefer_number_lookup_with_empty_number_clears_local_invoice_metadata(): void
+    {
+        $order = Mockery::mock(FormOrder::class)->makePartial();
+        $order->forceFill([
+            'id' => 8565,
+            'invoice_number' => '87/8/2026',
+            'ifirma_invoice_id' => '123456',
+            'ksef_number' => '7392137630-20260805-ABCDEF000001-99',
+            'ksef_status' => 'sent',
+            'ksef_sent_at' => now(),
+            'ksef_error' => null,
+        ]);
+        $order->shouldReceive('save')->once()->andReturnTrue();
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldNotReceive('getInvoice');
+        $paymentStatus = Mockery::mock(IfirmaInvoicePaymentStatusService::class);
+        $paymentStatus->shouldNotReceive('fetchPaymentSnapshotForOrder');
+
+        $service = new IfirmaFormOrderKsefSyncService($api, $paymentStatus);
+        $result = $service->syncFromIfirmaInvoiceId($order, null, true);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['metadata_cleared']);
+        $this->assertTrue($result['changed']);
+        $this->assertNull($order->invoice_number);
+        $this->assertNull($order->ifirma_invoice_id);
+        $this->assertNull($order->ksef_number);
+        $this->assertNull($order->ksef_status);
+        $this->assertNull($order->ksef_sent_at);
+    }
+
+    public function test_prefer_number_lookup_with_empty_number_is_noop_when_nothing_to_clear(): void
+    {
+        $order = new FormOrder;
+        $order->forceFill([
+            'id' => 8565,
+            'invoice_number' => null,
+            'ifirma_invoice_id' => null,
+            'ksef_number' => null,
+        ]);
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldNotReceive('getInvoice');
+        $paymentStatus = Mockery::mock(IfirmaInvoicePaymentStatusService::class);
+        $paymentStatus->shouldNotReceive('fetchPaymentSnapshotForOrder');
+
+        $service = new IfirmaFormOrderKsefSyncService($api, $paymentStatus);
+        $result = $service->syncFromIfirmaInvoiceId($order, null, true);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['metadata_cleared']);
+        $this->assertFalse($result['changed']);
+    }
 }

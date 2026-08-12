@@ -42,6 +42,10 @@ class IfirmaFormOrderKsefSyncService
         ?string $invoiceNumberOverride = null,
         bool $preferNumberLookup = false
     ): array {
+        if ($preferNumberLookup && ($invoiceNumberOverride === null || trim($invoiceNumberOverride) === '')) {
+            return $this->clearInvoiceMetadataWhenNumberEmpty($order);
+        }
+
         $numberAtEntry = trim((string) ($order->invoice_number ?? ''));
         $numberChangedFromOverride = false;
         if ($invoiceNumberOverride !== null && $invoiceNumberOverride !== '') {
@@ -265,6 +269,65 @@ class IfirmaFormOrderKsefSyncService
             'email_errors' => $emailResult['email_errors'],
             'ksef_email_pending' => (bool) $order->ksef_email_pending,
         ], $datesPayload);
+    }
+
+    /**
+     * Odświeżenie przy pustym polu „Numer faktury” — usuwa lokalne powiązanie z dokumentem iFirma/KSeF
+     * (np. po przeniesieniu FV do innego zamówienia).
+     *
+     * @return array{
+     *     success: bool,
+     *     message: string,
+     *     ksef_number: null,
+     *     ifirma_invoice_id: null,
+     *     invoice_number: null,
+     *     invoice_issue_date?: string|null,
+     *     invoice_due_date?: string|null,
+     *     changed: bool,
+     *     ksef_cleared: bool,
+     *     metadata_cleared: bool,
+     *     ksef_email_pending?: bool
+     * }
+     */
+    private function clearInvoiceMetadataWhenNumberEmpty(FormOrder $order): array
+    {
+        $hadInvoiceNumber = trim((string) ($order->invoice_number ?? '')) !== '';
+        $hadIfirmaId = $order->hasIfirmaInvoiceId();
+        $hadKsef = $order->hasConfirmedKsef() || trim((string) ($order->ksef_number ?? '')) !== '';
+        $hadData = $hadInvoiceNumber || $hadIfirmaId || $hadKsef;
+
+        if ($hadData) {
+            $order->invoice_number = null;
+            $order->ifirma_invoice_id = null;
+            $order->ksef_number = null;
+            $order->ksef_status = null;
+            $order->ksef_sent_at = null;
+            $order->ksef_error = null;
+            $order->save();
+
+            Log::info('iFirma KSeF sync: cleared local invoice metadata (empty invoice number refresh)', [
+                'form_order_id' => $order->id,
+                'had_invoice_number' => $hadInvoiceNumber,
+                'had_ifirma_invoice_id' => $hadIfirmaId,
+                'had_ksef' => $hadKsef,
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'message' => $hadData
+                ? 'Wyczyszczono numer FV, ID iFirma i numer KSeF w tym zamówieniu.'
+                : 'Brak danych FV / ID iFirma / KSeF do wyczyszczenia.',
+            'ksef_number' => null,
+            'ifirma_invoice_id' => null,
+            'invoice_number' => null,
+            'invoice_issue_date' => $order->invoice_issue_date?->toDateString(),
+            'invoice_due_date' => $order->invoice_due_date?->toDateString(),
+            'changed' => $hadData,
+            'ksef_cleared' => $hadData,
+            'metadata_cleared' => $hadData,
+            'ksef_email_pending' => (bool) $order->ksef_email_pending,
+        ];
     }
 
     /**

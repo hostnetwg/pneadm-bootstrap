@@ -886,7 +886,7 @@ nowoczesna-edukacja.pl </div>
                                             <button type="button"
                                                     class="btn btn-outline-secondary"
                                                     id="syncIfirmaByInvoiceNumberBtn"
-                                                    title="Pobierz z iFirma: ID dokumentu, daty FV i numer KSeF na podstawie numeru faktury"
+                                                    title="Pobierz z iFirma: ID dokumentu, daty FV i numer KSeF na podstawie numeru faktury. Gdy pole numeru jest puste — wyczyść ID iFirma i numer KSeF w tym zamówieniu."
                                                     aria-label="Synchronizuj dane FV z iFirma po numerze faktury">
                                                 <i class="bi bi-arrow-repeat" id="syncIfirmaByInvoiceNumberIcon"></i>
                                             </button>
@@ -2505,12 +2505,39 @@ nowoczesna-edukacja.pl `;
         function applyIfirmaInvoiceIdDisplay(invoiceId) {
             const wrap = document.getElementById('ifirmaInvoiceIdDisplay');
             const valueEl = document.getElementById('ifirmaInvoiceIdValue');
-            if (!wrap || !valueEl || !invoiceId) {
+            if (!wrap || !valueEl) {
+                return;
+            }
+            if (!invoiceId) {
+                valueEl.textContent = '';
+                wrap.classList.add('d-none');
                 return;
             }
             valueEl.textContent = invoiceId;
             wrap.classList.remove('d-none');
             revealInvoiceDatesDisplay();
+        }
+
+        function clearInvoiceMetadataDisplays() {
+            const invoiceNumberInput = document.getElementById('invoice_number');
+            if (invoiceNumberInput) {
+                invoiceNumberInput.value = '';
+                invoiceNumberInput.classList.remove('border-success', 'bg-success', 'bg-opacity-10', 'is-valid');
+                invoiceNumberInput.style.borderWidth = '';
+                invoiceNumberInput.style.boxShadow = '';
+                invoiceNumberInput.style.backgroundColor = '';
+            }
+            clearIfirmaInvoiceIdDisplay();
+            applyKsefNumberDisplay(null);
+            const ksefDisplay = document.getElementById('ksefNumberDisplay');
+            if (ksefDisplay) {
+                ksefDisplay.classList.add('d-none');
+            }
+            refreshOperationalStatusPanel();
+        }
+
+        function clearIfirmaInvoiceIdDisplay() {
+            applyIfirmaInvoiceIdDisplay(null);
         }
 
         function formatInvoiceDateDisplay(isoDate) {
@@ -2558,17 +2585,6 @@ nowoczesna-edukacja.pl `;
                 return;
             }
 
-            if (preferNumber && !invoiceNumber) {
-                if (resultDiv) {
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-warning alert-dismissible fade show py-2 small mb-0" role="alert">
-                            <i class="bi bi-exclamation-triangle"></i> Wpisz numer faktury (np. 277/8/2026), potem kliknij odświeżanie.
-                            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Zamknij"></button>
-                        </div>`;
-                }
-                return;
-            }
-
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             const allSyncBtns = [
                 document.getElementById('syncIfirmaKsefBtn'),
@@ -2597,21 +2613,29 @@ nowoczesna-edukacja.pl `;
                 const data = await response.json();
 
                 if (data.success) {
-                    if (data.invoice_number) {
-                        applyInvoiceNumberFieldValue(data.invoice_number);
-                    }
-                    applyKsefNumberDisplay(data.ksef_number || null);
-                    if (data.ifirma_invoice_id) {
-                        applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
-                    }
-                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
-                    const ksefDisplay = document.getElementById('ksefNumberDisplay');
-                    if (ksefDisplay) {
-                        ksefDisplay.classList.remove('d-none');
+                    if (data.metadata_cleared) {
+                        clearInvoiceMetadataDisplays();
+                    } else {
+                        if (data.invoice_number) {
+                            applyInvoiceNumberFieldValue(data.invoice_number);
+                        }
+                        applyKsefNumberDisplay(data.ksef_number || null);
+                        if (data.ifirma_invoice_id) {
+                            applyIfirmaInvoiceIdDisplay(data.ifirma_invoice_id);
+                        }
+                        applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
+                        const ksefDisplay = document.getElementById('ksefNumberDisplay');
+                        if (ksefDisplay) {
+                            ksefDisplay.classList.remove('d-none');
+                        }
                     }
                     if (resultDiv) {
-                        const alertClass = data.ksef_cleared ? 'alert-info' : 'alert-success';
-                        const iconClass = data.ksef_cleared ? 'bi-info-circle' : 'bi-check-circle';
+                        const alertClass = data.metadata_cleared
+                            ? (data.changed ? 'alert-info' : 'alert-secondary')
+                            : (data.ksef_cleared ? 'alert-info' : 'alert-success');
+                        const iconClass = data.metadata_cleared
+                            ? 'bi-info-circle'
+                            : (data.ksef_cleared ? 'bi-info-circle' : 'bi-check-circle');
                         const datesLine = (data.invoice_issue_date || data.invoice_due_date)
                             ? `<br><span class="text-muted">Data FV:</span> ${formatInvoiceDateDisplay(data.invoice_issue_date)} · <span class="text-muted">Termin:</span> ${formatInvoiceDateDisplay(data.invoice_due_date)}`
                             : '';
