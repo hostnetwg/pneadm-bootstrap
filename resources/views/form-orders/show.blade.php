@@ -1442,10 +1442,13 @@ nowoczesna-edukacja.pl `;
             }
 
             let effectiveConfirmLabel = confirmButtonLabel || 'Mimo to kontynuuj';
-            if (notesNeeded && effectiveConfirmLabel === 'Mimo to wystaw fakturę') {
-                effectiveConfirmLabel = 'Zapoznałem się z uwagą - wystaw fakturę';
-            } else if (notesNeeded && effectiveConfirmLabel === 'Mimo to dodaj uczestnika') {
-                effectiveConfirmLabel = 'Zapoznałem się z uwagą - dodaj uczestnika';
+            if (notesNeeded) {
+                const labelContext = options.preActionContext || 'invoice';
+                if (labelContext === 'participant') {
+                    effectiveConfirmLabel = 'Zapoznałem się z uwagą - dodaj uczestnika';
+                } else {
+                    effectiveConfirmLabel = 'Zapoznałem się z uwagą - wystaw fakturę';
+                }
             }
 
             confirmBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + effectiveConfirmLabel;
