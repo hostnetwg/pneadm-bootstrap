@@ -15,6 +15,7 @@ use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Markdown;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
