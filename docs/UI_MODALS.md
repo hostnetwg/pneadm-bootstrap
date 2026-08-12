@@ -27,7 +27,7 @@ Zamiast tego **zawsze** stosuj **modal Bootstrap 5** (spójny z resztą panelu).
 
 ## Przykłady w kodzie
 
-- `resources/views/form-orders/show.blade.php` — anulowanie, przywracanie, „bez FV”, cofnięcie „bez FV”, usunięcie.
+- `resources/views/form-orders/show.blade.php` — anulowanie, przywracanie, „bez FV”, cofnięcie „bez FV”, usunięcie; **ostrzeżenie przed iFirma / PNEDU** (`#formOrderPreActionWarningModal`): bramka online bez statusu „Opłacone” i/lub uwagi zamawiającego (`invoice_notes`) — jeden modal, sekcje rozdzielone `<hr>` gdy oba warunki naraz; przy FV i dodaniu uczestnika osobne etykiety potwierdzenia („Zapoznałem się z uwagą …”).
 - `docs/deploy/2026-06-analytics-production-deploy.md` — przeliczanie agregatów (modal z zakresem dat).
 
 ## Spinner na przyciskach (długie operacje)

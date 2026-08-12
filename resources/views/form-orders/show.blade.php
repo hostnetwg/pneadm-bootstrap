@@ -46,6 +46,16 @@
             animation: invoice-notes-attention-pulse 1.1s ease-in-out infinite;
             box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.55);
         }
+        @keyframes invoice-notes-panel-glow {
+            0%, 100% { background-color: #fff; box-shadow: none; }
+            35%, 65% { background-color: #fff3cd; box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.35); }
+        }
+        .invoice-notes-panel--attention .card-body {
+            animation: invoice-notes-panel-glow 1.4s ease-in-out 2;
+        }
+        .invoice-notes-panel--attention .invoice-notes-customer-text {
+            font-weight: 600;
+        }
     </style>
 
     <div class="py-3">
@@ -707,7 +717,8 @@ nowoczesna-edukacja.pl </div>
                 <div class="col-md-6">
                     {{-- INFORMACJE O FAKTURZE — na górze prawej kolumny --}}
                     @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
-                        <div class="card mb-3">
+                        <div class="card mb-3 @if(filled(trim((string) $zamowienie->invoice_notes))) invoice-notes-panel--attention @endif"
+                             id="invoiceNotesInfoCard">
                             <div class="card-header bg-warning text-dark py-2">
                                 <h6 class="mb-0 d-flex align-items-center gap-2 flex-wrap">
                                     <span>
@@ -725,7 +736,8 @@ nowoczesna-edukacja.pl </div>
                             <div class="card-body py-2">
                                 @if($zamowienie->invoice_notes)
                                     <div class="mb-1">
-                                        <small class="text-danger" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
+                                        <small class="text-muted d-block mb-1">Uwagi zamawiającego (sprawdź przed wystawieniem FV):</small>
+                                        <small class="text-danger invoice-notes-customer-text" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
                                     </div>
                                 @endif
                                 @if($zamowienie->invoice_payment_delay)
@@ -1358,33 +1370,85 @@ nowoczesna-edukacja.pl `;
             document.addEventListener('keydown', unlockAudio, { once: true });
         })();
 
-        // Ostrzeżenie: płatność online nie „Opłacone” (w trakcie / anulowane / błąd) — przed PNEDU i iFirma
-        window.formOrderUnpaidOnlineWarning = {
-            needed: @json($zamowienie->shouldWarnUnpaidOnlineGateway()),
-            statusLabel: @json(\App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status)),
-            modeLabel: @json($zamowienie->paymentModeLabelWithGateway()),
+        // Ostrzeżenia przed akcją: bramka online (nie opłacone) i/lub uwagi zamawiającego do FV
+        window.formOrderPreActionWarnings = {
+            unpaidOnline: {
+                needed: @json($zamowienie->shouldWarnUnpaidOnlineGateway()),
+                statusLabel: @json(\App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status)),
+                modeLabel: @json($zamowienie->paymentModeLabelWithGateway()),
+            },
+            invoiceNotes: {
+                needed: @json(filled(trim((string) $zamowienie->invoice_notes))),
+                text: @json(trim((string) $zamowienie->invoice_notes)),
+            },
         };
 
-        function withUnpaidOnlinePaymentWarning(confirmButtonLabel, proceedFn) {
-            if (!window.formOrderUnpaidOnlineWarning || !window.formOrderUnpaidOnlineWarning.needed) {
+        function withFormOrderPreActionWarnings(confirmButtonLabel, proceedFn, options) {
+            options = options || {};
+            const warnInvoiceNotes = !!options.warnInvoiceNotes;
+            const cfg = window.formOrderPreActionWarnings || {};
+            const unpaidNeeded = !!(cfg.unpaidOnline && cfg.unpaidOnline.needed);
+            const notesNeeded = warnInvoiceNotes && !!(cfg.invoiceNotes && cfg.invoiceNotes.needed);
+
+            if (!unpaidNeeded && !notesNeeded) {
                 proceedFn();
                 return;
             }
-            const modalEl = document.getElementById('unpaidOnlinePaymentWarningModal');
-            const confirmBtn = document.getElementById('unpaidOnlinePaymentWarningConfirmBtn');
+
+            const modalEl = document.getElementById('formOrderPreActionWarningModal');
+            const confirmBtn = document.getElementById('formOrderPreActionWarningConfirmBtn');
+            const titleEl = document.getElementById('formOrderPreActionWarningTitle');
+            const unpaidSection = document.getElementById('preActionWarningUnpaidOnlineSection');
+            const notesSection = document.getElementById('preActionWarningInvoiceNotesSection');
+            const notesTextEl = document.getElementById('preActionWarningInvoiceNotesText');
+            const separatorEl = document.getElementById('preActionWarningSectionsSeparator');
             const statusEl = document.getElementById('unpaidOnlinePaymentWarningStatus');
             const modeEl = document.getElementById('unpaidOnlinePaymentWarningMode');
+
             if (!modalEl || !confirmBtn) {
                 proceedFn();
                 return;
             }
-            if (statusEl) {
-                statusEl.textContent = window.formOrderUnpaidOnlineWarning.statusLabel || '—';
+
+            if (unpaidSection) {
+                unpaidSection.classList.toggle('d-none', !unpaidNeeded);
             }
-            if (modeEl) {
-                modeEl.textContent = window.formOrderUnpaidOnlineWarning.modeLabel || 'Płatność online';
+            if (notesSection) {
+                notesSection.classList.toggle('d-none', !notesNeeded);
             }
-            confirmBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (confirmButtonLabel || 'Mimo to kontynuuj');
+            if (separatorEl) {
+                separatorEl.classList.toggle('d-none', !(unpaidNeeded && notesNeeded));
+            }
+            if (titleEl) {
+                const preActionContext = options.preActionContext || 'invoice';
+                if (unpaidNeeded && notesNeeded) {
+                    titleEl.textContent = preActionContext === 'participant'
+                        ? 'Uwaga przed dodaniem uczestnika'
+                        : 'Uwaga przed wystawieniem faktury';
+                } else if (notesNeeded) {
+                    titleEl.textContent = 'Uwagi zamawiającego do faktury';
+                } else {
+                    titleEl.textContent = 'Płatność online nie jest opłacona';
+                }
+            }
+            if (statusEl && cfg.unpaidOnline) {
+                statusEl.textContent = cfg.unpaidOnline.statusLabel || '—';
+            }
+            if (modeEl && cfg.unpaidOnline) {
+                modeEl.textContent = cfg.unpaidOnline.modeLabel || 'Płatność online';
+            }
+            if (notesTextEl && cfg.invoiceNotes) {
+                notesTextEl.textContent = cfg.invoiceNotes.text || '';
+            }
+
+            let effectiveConfirmLabel = confirmButtonLabel || 'Mimo to kontynuuj';
+            if (notesNeeded && effectiveConfirmLabel === 'Mimo to wystaw fakturę') {
+                effectiveConfirmLabel = 'Zapoznałem się z uwagą - wystaw fakturę';
+            } else if (notesNeeded && effectiveConfirmLabel === 'Mimo to dodaj uczestnika') {
+                effectiveConfirmLabel = 'Zapoznałem się z uwagą - dodaj uczestnika';
+            }
+
+            confirmBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + effectiveConfirmLabel;
             confirmBtn.onclick = function () {
                 const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
                 instance.hide();
@@ -1393,12 +1457,17 @@ nowoczesna-edukacja.pl `;
             (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
         }
 
+        /** @deprecated użyj withFormOrderPreActionWarnings — zachowane dla czytelności wywołań PNEDU */
+        function withUnpaidOnlinePaymentWarning(confirmButtonLabel, proceedFn) {
+            withFormOrderPreActionWarnings(confirmButtonLabel, proceedFn, { warnInvoiceNotes: false });
+        }
+
         function provisionPnedu(orderId, options) {
             options = options || {};
-            if (!options.skipUnpaidOnlineWarning) {
-                withUnpaidOnlinePaymentWarning('Mimo to dodaj uczestnika', function () {
-                    provisionPnedu(orderId, { skipUnpaidOnlineWarning: true });
-                });
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to dodaj uczestnika', function () {
+                    provisionPnedu(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true, preActionContext: 'participant' });
                 return;
             }
 
@@ -1511,10 +1580,10 @@ nowoczesna-edukacja.pl `;
         // Funkcja do wystawiania faktury pro forma w iFirma
         function createIfirmaProForma(orderId, options) {
             options = options || {};
-            if (!options.skipUnpaidOnlineWarning) {
-                withUnpaidOnlinePaymentWarning('Mimo to wystaw pro-formę', function () {
-                    createIfirmaProForma(orderId, { skipUnpaidOnlineWarning: true });
-                });
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to wystaw pro-formę', function () {
+                    createIfirmaProForma(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true });
                 return;
             }
 
@@ -1658,10 +1727,10 @@ nowoczesna-edukacja.pl `;
         // Funkcja sprawdzająca czy invoice_number jest wypełnione w bazie danych przed wystawieniem faktury
         function checkAndCreateInvoice(orderId, options) {
             options = options || {};
-            if (!options.skipUnpaidOnlineWarning) {
-                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę', function () {
-                    checkAndCreateInvoice(orderId, { skipUnpaidOnlineWarning: true });
-                });
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to wystaw fakturę', function () {
+                    checkAndCreateInvoice(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true });
                 return;
             }
 
@@ -1931,10 +2000,10 @@ nowoczesna-edukacja.pl `;
         // Funkcja sprawdzająca czy invoice_number jest wypełnione w bazie danych przed wystawieniem faktury z odbiorcą
         function checkAndCreateInvoiceWithReceiver(orderId, options) {
             options = options || {};
-            if (!options.skipUnpaidOnlineWarning) {
-                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę', function () {
-                    checkAndCreateInvoiceWithReceiver(orderId, { skipUnpaidOnlineWarning: true });
-                });
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to wystaw fakturę', function () {
+                    checkAndCreateInvoiceWithReceiver(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true });
                 return;
             }
 
@@ -2224,10 +2293,10 @@ nowoczesna-edukacja.pl `;
         // Funkcja sprawdzająca czy invoice_number jest wypełnione przed wystawieniem faktury z KSeF
         function checkAndCreateInvoiceWithKsef(orderId, options) {
             options = options || {};
-            if (!options.skipUnpaidOnlineWarning) {
-                withUnpaidOnlinePaymentWarning('Mimo to wystaw fakturę z KSeF', function () {
-                    checkAndCreateInvoiceWithKsef(orderId, { skipUnpaidOnlineWarning: true });
-                });
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to wystaw fakturę z KSeF', function () {
+                    checkAndCreateInvoiceWithKsef(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true });
                 return;
             }
 
@@ -3570,36 +3639,56 @@ nowoczesna-edukacja.pl `;
         </div>
     </div>
 
-    {{-- Ostrzeżenie: bramka online bez statusu Opłacone — przed PNEDU / iFirma --}}
-    <div class="modal fade" id="unpaidOnlinePaymentWarningModal" tabindex="-1" aria-labelledby="unpaidOnlinePaymentWarningModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+    {{-- Ostrzeżenie przed akcją: bramka online i/lub uwagi zamawiającego do FV --}}
+    <div class="modal fade" id="formOrderPreActionWarningModal" tabindex="-1" aria-labelledby="formOrderPreActionWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
-                    <h5 class="modal-title" id="unpaidOnlinePaymentWarningModalLabel">
-                        <i class="bi bi-exclamation-triangle"></i> Płatność online nie jest opłacona
+                    <h5 class="modal-title" id="formOrderPreActionWarningModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span id="formOrderPreActionWarningTitle">Uwaga</span>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-2">
-                        Zamówienie <strong>#{{ $zamowienie->id }}</strong> jest przez bramkę online, ale status płatności
-                        <strong>nie jest „Opłacone”</strong>.
-                    </p>
-                    <div class="border rounded p-2 bg-light small mb-3">
-                        <div><strong>Rozliczenie:</strong> <span id="unpaidOnlinePaymentWarningMode">{{ $zamowienie->paymentModeLabelWithGateway() }}</span></div>
-                        <div><strong>Status płatności:</strong> <span id="unpaidOnlinePaymentWarningStatus">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span></div>
+                    <div id="preActionWarningUnpaidOnlineSection">
+                        <h6 class="fw-semibold mb-2">
+                            <i class="bi bi-credit-card-2-front"></i> Płatność online
+                        </h6>
+                        <p class="mb-2 small">
+                            Zamówienie <strong>#{{ $zamowienie->id }}</strong> jest przez bramkę online, ale status płatności
+                            <strong>nie jest „Opłacone”</strong>.
+                        </p>
+                        <div class="border rounded p-2 bg-light small mb-2">
+                            <div><strong>Rozliczenie:</strong> <span id="unpaidOnlinePaymentWarningMode">{{ $zamowienie->paymentModeLabelWithGateway() }}</span></div>
+                            <div><strong>Status płatności:</strong> <span id="unpaidOnlinePaymentWarningStatus">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span></div>
+                        </div>
+                        <div class="alert alert-warning mb-0 small">
+                            <i class="bi bi-info-circle"></i>
+                            Wystawienie faktury przy statusie „w trakcie” / „Anulowane” / błędzie płatności
+                            może skutkować FV bez potwierdzonej wpłaty. Kontynuuj tylko świadomie.
+                        </div>
                     </div>
-                    <div class="alert alert-warning mb-0 small">
-                        <i class="bi bi-info-circle"></i>
-                        Dodanie uczestnika lub wystawienie faktury przy statusie „w trakcie” / „Anulowane” / błędzie płatności
-                        może skutkować dostępem lub FV bez potwierdzonej wpłaty. Kontynuuj tylko świadomie.
+
+                    <hr id="preActionWarningSectionsSeparator" class="my-3 d-none">
+
+                    <div id="preActionWarningInvoiceNotesSection">
+                        <h6 class="fw-semibold mb-2 text-danger">
+                            <i class="bi bi-chat-left-text-fill"></i> Uwagi zamawiającego do faktury
+                        </h6>
+                        <div class="border border-danger border-2 rounded p-3 bg-light mb-2">
+                            <pre id="preActionWarningInvoiceNotesText" class="mb-0 small text-danger" style="white-space: pre-wrap; font-family: inherit;">{{ trim((string) $zamowienie->invoice_notes) }}</pre>
+                        </div>
+                        <p class="small text-muted mb-0">
+                            Sprawdź treść uwag przed wystawieniem dokumentu w iFirma (np. odbiorca, JST, termin, inne wymagania).
+                        </p>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle"></i> Wróć
                     </button>
-                    <button type="button" class="btn btn-warning" id="unpaidOnlinePaymentWarningConfirmBtn">
+                    <button type="button" class="btn btn-warning" id="formOrderPreActionWarningConfirmBtn">
                         <i class="bi bi-exclamation-triangle"></i> Mimo to kontynuuj
                     </button>
                 </div>
