@@ -3165,7 +3165,7 @@ nowoczesna-edukacja.pl `;
                     }
                     if (label) {
                         label.textContent = hasToken
-                            ? 'Czy usunąć uczestnika ze szkolenia oraz token dostępowy?'
+                            ? 'Czy usunąć uczestnika ze szkolenia oraz unieważnić token dostępowy?'
                             : 'Czy usunąć uczestnika ze szkolenia?';
                     }
                 });
@@ -3978,7 +3978,7 @@ nowoczesna-edukacja.pl `;
                         <label class="form-check-label" for="resetPneduRemoveParticipantCheckbox"
                                id="resetPneduRemoveParticipantLabel">
                             @if($pneduResetHasCmToken)
-                                Czy usunąć uczestnika ze szkolenia oraz token dostępowy?
+                                Czy usunąć uczestnika ze szkolenia oraz unieważnić token dostępowy?
                             @else
                                 Czy usunąć uczestnika ze szkolenia?
                             @endif
