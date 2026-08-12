@@ -26,7 +26,7 @@ Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dl
 
 | Badge | Znaczenie | Link |
 |-------|-----------|------|
-| `U` | Ważne zamówienia, w których trzeba jeszcze dodać uczestnika do szkolenia | `/form-orders/{latestId}?filter_no_participant=1&course_id={courseId}` (najwyższe id z tego zbioru) |
+| `U` | Ważne zamówienia bez uczestnika na szkoleniu **lub** bez formalnego provision PNEDU (`pnedu_provisioned_at` puste) | `/form-orders/{latestId}?filter_no_participant=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 | `FV` | Ważne zamówienia bez klasycznego numeru FV (`invoice_number`) i bez oznaczenia „Bezpłatny dostęp - bez FV” | `/form-orders/{latestId}?filter_no_invoice=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 
 Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`. Licznik `FV` i filtr „bez wystawionej faktury” opierają się na `invoice_number` (źródło prawdy); samo `ifirma_invoice_id` bez numeru FV nadal trafia do kolejki (do uzupełnienia przez sync z iFirma).
@@ -122,10 +122,25 @@ Maile provision używają **`MAIL_SYSTEM_MAILER`** — przy wartości `log` traf
 
 ## Reset statusu PNEDU
 
-Admin / super_admin: przycisk **Resetuj status PNEDU** — czyści m.in. `pnedu_provisioned_at`, `pnedu_user_existed_before`, `pnedu_clickmeeting_*` oraz rekord `participant_live_access` powiązany z uczestnikiem zamówienia.
+Admin / super_admin: przycisk **Resetuj status PNEDU** — zawsze czyści `pnedu_provisioned_at`, `pnedu_user_existed_before`, pola `pnedu_clickmeeting_*`.
 
-**Nie usuwa** rekordu z tabeli `participants` ani konta `pnedu.users`.  
-Ponowne **Dodaj uczestnika do PNEDU** odnajduje uczestnika po `course_id` + e-mail, wiąże go z zamówieniem, ustawia `pnedu_provisioned_at` i ponawia kroki ClickMeeting + e-mail.
+**Checkbox (domyślnie zaznaczony):** „Czy usunąć uczestnika ze szkolenia?” — gdy jest zapisany token ClickMeeting: „…oraz token dostępowy?”.  
+Parametr API: `remove_participant` (domyślnie `true`).
+
+| Checkbox | Efekt |
+|----------|--------|
+| ✓ | Soft-delete rekordu `participants`, `participant_id` w `form_order_participants` → `NULL`, unieważnienie tokenu CM w API (`DELETE …/tokens`, best-effort), usunięcie lokalnego `participant_live_access` |
+| ☐ | Tylko reset pól PNEDU przy zamówieniu — uczestnik na liście szkolenia i token CM **bez zmian** |
+
+**Nie usuwa** konta `pnedu.users`. E-mail może nadal widnieć w historii zaproszeń ClickMeeting (brak API do usunięcia z listy „Zaproszenia” w panelu CM).
+
+**Activity log:** wpis „Reset statusu PNEDU” z informacją o usunięciu uczestnika / tokenie.
+
+Ponowne **Dodaj uczestnika do PNEDU** tworzy lub odnajduje uczestnika po `course_id` + e-mail, ustawia `pnedu_provisioned_at` i ponawia kroki ClickMeeting + e-mail.
+
+### Badge **U** (filtr `filter_no_participant`, 2026-08)
+
+Liczy ważne zamówienia, gdzie **brak uczestnika na szkoleniu** **lub** `pnedu_provisioned_at IS NULL` (formalny provision PNEDU nie wykonany). Po resecie z usunięciem uczestnika zamówienie wraca do kolejki **U** na `/courses`.
 
 ## Ponowna wysyłka e-maila (krok 3)
 
@@ -184,6 +199,7 @@ sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
 sail test --filter=ParticipantLiveAccessServiceTest
 sail test --filter=FormOrderPneduProvisionRelinkTest
+sail test --filter=FormOrderPneduResetTest
 sail test --filter=FormOrderPneduAccessEmailResendTest
 sail test   # pełny suite — patrz docs/TESTING.md
 ```

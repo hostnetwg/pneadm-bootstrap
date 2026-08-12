@@ -478,7 +478,7 @@ class FormOrderOperationalStatusService
     }
 
     /**
-     * Filtr „Nieprzetworzone” — wymaga dodania uczestnika(ów) do szkolenia.
+     * Filtr „Nieprzetworzone” — brak uczestnika na szkoleniu lub brak formalnego provision PNEDU.
      */
     public function scopeNeedsAttention(Builder $query): Builder
     {
@@ -503,6 +503,15 @@ class FormOrderOperationalStatusService
                         ->whereNull('fop_unprov.deleted_at')
                         ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
                         ->whereRaw("NOT ({$provisioned})");
+                })->orWhere(function ($sub) use ($table) {
+                    $sub->whereNull("{$table}.pnedu_provisioned_at")
+                        ->whereExists(function ($emailSub) use ($table) {
+                            $emailSub->selectRaw('1')
+                                ->from('form_order_participants as fop_pnedu')
+                                ->whereColumn('fop_pnedu.form_order_id', "{$table}.id")
+                                ->whereNull('fop_pnedu.deleted_at')
+                                ->whereRaw("TRIM(fop_pnedu.participant_email) != ''");
+                        });
                 });
             });
     }

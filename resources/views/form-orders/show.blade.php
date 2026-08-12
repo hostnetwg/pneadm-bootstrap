@@ -3096,6 +3096,13 @@ nowoczesna-edukacja.pl `;
         // Funkcja do resetowania statusu PNEDU (tylko dla administratorów)
         function resetPneduStatus(orderId) {
             const button = document.getElementById('resetPneduConfirmBtn');
+            const errorEl = document.getElementById('resetPneduError');
+            const removeCheckbox = document.getElementById('resetPneduRemoveParticipantCheckbox');
+
+            if (errorEl) {
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
 
             button.disabled = true;
             button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
@@ -3104,30 +3111,66 @@ nowoczesna-edukacja.pl `;
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
+                },
+                body: JSON.stringify({
+                    remove_participant: !!(removeCheckbox && removeCheckbox.checked),
+                }),
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data.success) {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('resetPneduModal'));
                     if (modal) {
                         modal.hide();
                     }
                     location.reload();
-                } else {
-                    alert('Błąd: ' + data.error);
-                    button.disabled = false;
-                    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
+                    return;
                 }
+
+                const message = data.error || 'Nie udało się zresetować statusu PNEDU.';
+                if (errorEl) {
+                    errorEl.textContent = message;
+                    errorEl.classList.remove('d-none');
+                }
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Wystąpił błąd podczas resetowania statusu PNEDU.');
+                if (errorEl) {
+                    errorEl.textContent = 'Wystąpił błąd podczas resetowania statusu PNEDU.';
+                    errorEl.classList.remove('d-none');
+                }
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
             });
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const resetPneduModal = document.getElementById('resetPneduModal');
+            if (resetPneduModal) {
+                resetPneduModal.addEventListener('show.bs.modal', function () {
+                    const errorEl = document.getElementById('resetPneduError');
+                    const checkbox = document.getElementById('resetPneduRemoveParticipantCheckbox');
+                    const label = document.getElementById('resetPneduRemoveParticipantLabel');
+                    const hasToken = resetPneduModal.dataset.hasCmToken === '1';
+                    if (errorEl) {
+                        errorEl.classList.add('d-none');
+                        errorEl.textContent = '';
+                    }
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                    if (label) {
+                        label.textContent = hasToken
+                            ? 'Czy usunąć uczestnika ze szkolenia oraz token dostępowy?'
+                            : 'Czy usunąć uczestnika ze szkolenia?';
+                    }
+                });
+            }
+        });
 
         // Wstaw ID szkolenia do filtra (klik w „ID szkolenia (courses): …”)
         function fillCourseIdFilter(courseId) {
@@ -3897,7 +3940,12 @@ nowoczesna-edukacja.pl `;
     </div>
 
     {{-- Modal potwierdzenia resetowania statusu PNEDU --}}
-    <div class="modal fade" id="resetPneduModal" tabindex="-1" aria-labelledby="resetPneduModalLabel" aria-hidden="true">
+    @php
+        $pneduResetLiveAccess = $zamowienie->primaryParticipant?->participant?->liveAccess;
+        $pneduResetHasCmToken = filled(trim((string) ($pneduResetLiveAccess?->token ?? '')));
+    @endphp
+    <div class="modal fade" id="resetPneduModal" tabindex="-1" aria-labelledby="resetPneduModalLabel" aria-hidden="true"
+         data-has-cm-token="{{ $pneduResetHasCmToken ? '1' : '0' }}">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
@@ -3921,11 +3969,22 @@ nowoczesna-edukacja.pl `;
                     </div>
                     <div class="alert alert-warning mt-3 mb-0">
                         <i class="bi bi-info-circle"></i>
-                        <strong>Uwaga:</strong> Resetowanie czyści status przy zamówieniu (i token live),
-                        ale nie usuwa uczestnika z listy szkolenia.
-                        Ponowne „Dodaj uczestnika do PNEDU” odtworzy powiązanie i status
-                        (ClickMeeting / e-mail) na podstawie istniejącego rekordu.
+                        <strong>Uwaga:</strong> Reset zawsze czyści status PNEDU przy zamówieniu (data provision, kroki ClickMeeting w panelu).
+                        Opcjonalnie możesz też usunąć uczestnika z listy szkolenia i unieważnić token dostępowy ClickMeeting.
                     </div>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" value="1"
+                               id="resetPneduRemoveParticipantCheckbox" checked>
+                        <label class="form-check-label" for="resetPneduRemoveParticipantCheckbox"
+                               id="resetPneduRemoveParticipantLabel">
+                            @if($pneduResetHasCmToken)
+                                Czy usunąć uczestnika ze szkolenia oraz token dostępowy?
+                            @else
+                                Czy usunąć uczestnika ze szkolenia?
+                            @endif
+                        </label>
+                    </div>
+                    <div id="resetPneduError" class="alert alert-danger py-2 small mt-2 mb-0 d-none" role="alert"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">

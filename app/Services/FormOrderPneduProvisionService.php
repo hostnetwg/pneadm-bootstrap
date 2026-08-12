@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
 use App\Models\FormOrder;
@@ -14,10 +15,10 @@ use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Markdown;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -718,5 +719,112 @@ class FormOrderPneduProvisionService
         $liveAccessService->syncFormOrderClickMeetingSnapshot($formOrderId, $result);
 
         return $result;
+    }
+
+    /**
+     * Cofa status PNEDU przy zamówieniu; opcjonalnie usuwa uczestnika ze szkolenia i unieważnia token CM.
+     *
+     * @return array{
+     *     success: bool,
+     *     error?: string,
+     *     message?: string,
+     *     http_code: int,
+     *     warnings?: list<string>,
+     *     removed_participant?: bool,
+     *     token_invalidated?: bool
+     * }
+     */
+    public function resetStatus(FormOrder $order, bool $removeParticipant): array
+    {
+        $warnings = [];
+        $removedParticipant = false;
+        $tokenInvalidated = false;
+
+        $order->loadMissing('primaryParticipant.participant.liveAccess', 'course');
+
+        $fop = $order->primaryParticipant;
+        $participantId = $fop?->participant_id;
+
+        if ($removeParticipant && $participantId) {
+            $participant = Participant::query()->find($participantId);
+            if ($participant) {
+                $course = $order->course ?? Course::query()->find($participant->course_id);
+                $hasToken = filled(trim((string) ($participant->liveAccess?->token ?? '')));
+
+                if ($hasToken && $course) {
+                    $invalidateResult = app(ParticipantLiveAccessService::class)
+                        ->invalidateClickMeetingToken($participant, $course);
+                    if ($invalidateResult['success'] ?? false) {
+                        $tokenInvalidated = true;
+                    } else {
+                        $warnings[] = (string) ($invalidateResult['detail']
+                            ?? 'Nie udało się unieważnić tokenu ClickMeeting w API.');
+                    }
+                }
+
+                app(ParticipantLiveAccessService::class)->deleteForParticipant((int) $participant->id);
+                $participant->delete();
+                $removedParticipant = true;
+
+                if ($fop) {
+                    $fop->participant_id = null;
+                    $fop->save();
+                }
+            }
+        }
+
+        $order->pnedu_provisioned_at = null;
+        $order->pnedu_user_existed_before = null;
+        if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_status')) {
+            $order->pnedu_clickmeeting_status = null;
+        }
+        if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_synced_at')) {
+            $order->pnedu_clickmeeting_synced_at = null;
+        }
+        if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_message')) {
+            $order->pnedu_clickmeeting_message = null;
+        }
+
+        if (! $order->save()) {
+            return [
+                'success' => false,
+                'error' => 'Nie udało się zresetować statusu PNEDU.',
+                'http_code' => 500,
+            ];
+        }
+
+        $message = $removedParticipant
+            ? 'Status PNEDU został zresetowany. Uczestnik usunięty z listy szkolenia.'
+            : 'Status PNEDU został zresetowany. Zamówienie może być ponownie dodane do PNEDU.';
+        if ($tokenInvalidated) {
+            $message .= ' Token dostępowy ClickMeeting został unieważniony.';
+        }
+
+        ActivityLog::logCustom(
+            'Reset statusu PNEDU',
+            "Reset statusu PNEDU dla zamówienia #{$order->id}"
+            .($removedParticipant ? ' (usunięto uczestnika ze szkolenia)' : ' (bez usuwania uczestnika)')
+            .($tokenInvalidated ? ', unieważniono token CM' : '')
+            .($warnings !== [] ? '. Ostrzeżenia: '.implode(' ', $warnings) : ''),
+            [
+                'model_type' => FormOrder::class,
+                'model_id' => $order->id,
+                'model_name' => "Zamówienie #{$order->id}",
+                'new_values' => [
+                    'remove_participant' => $removeParticipant,
+                    'removed_participant' => $removedParticipant,
+                    'token_invalidated' => $tokenInvalidated,
+                ],
+            ]
+        );
+
+        return [
+            'success' => true,
+            'message' => $message,
+            'http_code' => 200,
+            'warnings' => $warnings,
+            'removed_participant' => $removedParticipant,
+            'token_invalidated' => $tokenInvalidated,
+        ];
     }
 }

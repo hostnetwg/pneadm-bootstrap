@@ -1582,36 +1582,26 @@ class FormOrdersController extends Controller
                 ], 404);
             }
 
-            $participantId = $zamowienie->primaryParticipant?->participant_id;
-            if ($participantId) {
-                app(\App\Services\ParticipantLiveAccessService::class)->deleteForParticipant((int) $participantId);
-            }
+            $removeParticipant = $request->boolean('remove_participant', true);
 
-            $zamowienie->pnedu_provisioned_at = null;
-            $zamowienie->pnedu_user_existed_before = null;
-            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_status')) {
-                $zamowienie->pnedu_clickmeeting_status = null;
-            }
-            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_synced_at')) {
-                $zamowienie->pnedu_clickmeeting_synced_at = null;
-            }
-            if (Schema::connection('mysql')->hasColumn('form_orders', 'pnedu_clickmeeting_message')) {
-                $zamowienie->pnedu_clickmeeting_message = null;
-            }
-            $updated = $zamowienie->save();
+            $result = app(FormOrderPneduProvisionService::class)
+                ->resetStatus($zamowienie, $removeParticipant);
 
-            if ($updated) {
+            if (! ($result['success'] ?? false)) {
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Status PNEDU został zresetowany. Zamówienie może być ponownie dodane do PNEDU.',
-                    'reset_at' => now()->format('d.m.Y H:i'),
-                ]);
+                    'success' => false,
+                    'error' => $result['error'] ?? 'Nie udało się zresetować statusu PNEDU.',
+                ], $result['http_code'] ?? 500);
             }
 
             return response()->json([
-                'success' => false,
-                'error' => 'Nie udało się zresetować statusu PNEDU.',
-            ], 500);
+                'success' => true,
+                'message' => $result['message'] ?? 'Status PNEDU został zresetowany.',
+                'reset_at' => now()->format('d.m.Y H:i'),
+                'warnings' => $result['warnings'] ?? [],
+                'removed_participant' => $result['removed_participant'] ?? false,
+                'token_invalidated' => $result['token_invalidated'] ?? false,
+            ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,

@@ -53,4 +53,15 @@ class FormOrderOperationalStatusServiceSqlTest extends TestCase
         $this->assertStringContainsString('invoice_number', $sql);
         $this->assertStringNotContainsString('ifirma_invoice_id', $sql);
     }
+
+    public function test_scope_needs_attention_sql_includes_pnedu_provisioned_at(): void
+    {
+        $service = new FormOrderOperationalStatusService;
+        $query = \App\Models\FormOrder::query();
+        $service->scopeNeedsAttention($query);
+        $sql = $query->toSql();
+
+        $this->assertStringContainsString('pnedu_provisioned_at', $sql);
+        $this->assertStringContainsString('form_order_participants', $sql);
+    }
 }
