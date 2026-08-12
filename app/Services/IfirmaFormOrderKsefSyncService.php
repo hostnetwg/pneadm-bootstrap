@@ -294,7 +294,9 @@ class IfirmaFormOrderKsefSyncService
         $hadInvoiceNumber = trim((string) ($order->invoice_number ?? '')) !== '';
         $hadIfirmaId = $order->hasIfirmaInvoiceId();
         $hadKsef = $order->hasConfirmedKsef() || trim((string) ($order->ksef_number ?? '')) !== '';
-        $hadData = $hadInvoiceNumber || $hadIfirmaId || $hadKsef;
+        $hadIssueDate = $order->invoice_issue_date !== null;
+        $hadDueDate = $order->invoice_due_date !== null;
+        $hadData = $hadInvoiceNumber || $hadIfirmaId || $hadKsef || $hadIssueDate || $hadDueDate;
 
         if ($hadData) {
             $order->invoice_number = null;
@@ -303,6 +305,8 @@ class IfirmaFormOrderKsefSyncService
             $order->ksef_status = null;
             $order->ksef_sent_at = null;
             $order->ksef_error = null;
+            $order->invoice_issue_date = null;
+            $order->invoice_due_date = null;
             $order->save();
 
             Log::info('iFirma KSeF sync: cleared local invoice metadata (empty invoice number refresh)', [
@@ -310,19 +314,21 @@ class IfirmaFormOrderKsefSyncService
                 'had_invoice_number' => $hadInvoiceNumber,
                 'had_ifirma_invoice_id' => $hadIfirmaId,
                 'had_ksef' => $hadKsef,
+                'had_invoice_issue_date' => $hadIssueDate,
+                'had_invoice_due_date' => $hadDueDate,
             ]);
         }
 
         return [
             'success' => true,
             'message' => $hadData
-                ? 'Wyczyszczono numer FV, ID iFirma i numer KSeF w tym zamówieniu.'
+                ? 'Wyczyszczono numer FV, daty FV, ID iFirma i numer KSeF w tym zamówieniu.'
                 : 'Brak danych FV / ID iFirma / KSeF do wyczyszczenia.',
             'ksef_number' => null,
             'ifirma_invoice_id' => null,
             'invoice_number' => null,
-            'invoice_issue_date' => $order->invoice_issue_date?->toDateString(),
-            'invoice_due_date' => $order->invoice_due_date?->toDateString(),
+            'invoice_issue_date' => null,
+            'invoice_due_date' => null,
             'changed' => $hadData,
             'ksef_cleared' => $hadData,
             'metadata_cleared' => $hadData,

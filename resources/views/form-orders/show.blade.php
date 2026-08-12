@@ -2529,6 +2529,7 @@ nowoczesna-edukacja.pl `;
             }
             clearIfirmaInvoiceIdDisplay();
             applyKsefNumberDisplay(null);
+            applyInvoiceDatesDisplay(null, null);
             const ksefDisplay = document.getElementById('ksefNumberDisplay');
             if (ksefDisplay) {
                 ksefDisplay.classList.add('d-none');
@@ -2561,6 +2562,7 @@ nowoczesna-edukacja.pl `;
         function applyInvoiceDatesDisplay(issueDate, dueDate) {
             const issueEl = document.getElementById('invoiceIssueDateValue');
             const dueEl = document.getElementById('invoiceDueDateValue');
+            const wrap = document.getElementById('invoiceDatesDisplay');
             if (issueEl && issueDate !== undefined) {
                 issueEl.textContent = formatInvoiceDateDisplay(issueDate);
             }
@@ -2569,6 +2571,8 @@ nowoczesna-edukacja.pl `;
             }
             if (issueDate || dueDate) {
                 revealInvoiceDatesDisplay();
+            } else if (wrap && issueDate !== undefined && dueDate !== undefined) {
+                wrap.classList.add('d-none');
             }
         }
 

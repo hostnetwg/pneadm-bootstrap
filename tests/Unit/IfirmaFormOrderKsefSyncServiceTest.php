@@ -472,6 +472,8 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
             'ksef_status' => 'sent',
             'ksef_sent_at' => now(),
             'ksef_error' => null,
+            'invoice_issue_date' => '2026-08-12',
+            'invoice_due_date' => '2026-08-26',
         ]);
         $order->shouldReceive('save')->once()->andReturnTrue();
 
@@ -491,6 +493,10 @@ class IfirmaFormOrderKsefSyncServiceTest extends TestCase
         $this->assertNull($order->ksef_number);
         $this->assertNull($order->ksef_status);
         $this->assertNull($order->ksef_sent_at);
+        $this->assertNull($order->invoice_issue_date);
+        $this->assertNull($order->invoice_due_date);
+        $this->assertNull($result['invoice_issue_date']);
+        $this->assertNull($result['invoice_due_date']);
     }
 
     public function test_prefer_number_lookup_with_empty_number_is_noop_when_nothing_to_clear(): void
