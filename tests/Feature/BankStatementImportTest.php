@@ -1311,4 +1311,259 @@ class BankStatementImportTest extends TestCase
         $ignoredTab->assertSee('Ignorowane (0)', false);
         $ignoredTab->assertDontSee('MELEMENTS', false);
     }
+
+    public function test_accept_split_package_allocates_two_invoices_locally(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Szkolenie A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '357/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Szkolenie B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '511/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('s', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 730,
+            'currency' => 'PLN',
+            'description' => 'Faktura Vat nr 357/8/2026, 511/8/2026',
+            'fingerprint' => str_repeat('t', 64),
+            'is_incoming' => true,
+        ]);
+
+        $matchA = BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderA->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:357/8/2026', 'multi_invoice_sum_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+        $matchB = BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:511/8/2026', 'multi_invoice_sum_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $response = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.accept-package', [$import, $tx])
+        );
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $matchA->refresh();
+        $matchB->refresh();
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $matchA->status);
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $matchB->status);
+        $this->assertEquals(365.0, (float) $matchA->allocated_amount);
+        $this->assertEquals(365.0, (float) $matchB->allocated_amount);
+        $this->assertNotNull($matchA->debt_case_id);
+        $this->assertNotNull($matchB->debt_case_id);
+        $this->assertNotSame($matchA->debt_case_id, $matchB->debt_case_id);
+
+        $tx->load('matches');
+        $this->assertTrue($tx->isFullyAllocated());
+        $this->assertEquals(0.0, $tx->remainingAllocatableAmount());
+    }
+
+    public function test_accept_split_package_can_register_ifirma_payments(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Szkolenie A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '357/9/2026',
+            'ifirma_invoice_id' => '111',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Szkolenie B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '511/9/2026',
+            'ifirma_invoice_id' => '222',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('w', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 730,
+            'currency' => 'PLN',
+            'description' => 'Faktura Vat nr 357/9/2026, 511/9/2026',
+            'fingerprint' => str_repeat('x', 64),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderA->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:357/9/2026', 'multi_invoice_sum_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:511/9/2026', 'multi_invoice_sum_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $this->mock(\App\Services\IfirmaInvoicePaymentRegistrationService::class, function ($mock) {
+            $mock->shouldReceive('registerFromAcceptedBankMatch')
+                ->twice()
+                ->andReturn([
+                    'success' => true,
+                    'message' => 'Zarejestrowano wpłatę w iFirma (test).',
+                    'status' => 'oplacone',
+                ]);
+        });
+
+        $this->partialMock(\App\Services\DebtCaseAutoCloseService::class, function ($mock) {
+            $mock->shouldReceive('closeIfFullyPaid')->andReturn(false);
+        });
+
+        $response = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.accept-package', [$import, $tx]),
+            ['register_ifirma_payment' => '1']
+        );
+        $response->assertRedirect();
+        $response->assertSessionHas('success', function (string $value): bool {
+            return str_contains($value, 'Zarejestrowano wpłaty w iFirma: 2/2');
+        });
+
+        $this->assertSame(2, $tx->fresh()->acceptedMatches()->count());
+    }
+
+    public function test_manual_second_link_uses_remaining_amount(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Szkolenie A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '901/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Szkolenie B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '902/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $caseB = DebtCase::create([
+            'form_order_id' => $orderB->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '902/8/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_test.csv',
+            'file_hash' => str_repeat('u', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+        ]);
+
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 730,
+            'currency' => 'PLN',
+            'description' => 'Przelew zbiorczy 901 i 902',
+            'fingerprint' => str_repeat('v', 64),
+            'is_incoming' => true,
+        ]);
+
+        $first = BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderA->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_MEDIUM,
+            'match_reasons' => ['invoice_number:901/8/2026', 'amount_mismatch'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $this->actingAs($user)->post(
+            route('accounting.bank-imports.matches.accept', [$import, $first])
+        )->assertRedirect();
+
+        $first->refresh();
+        $this->assertSame(BankTransactionMatch::STATUS_ACCEPTED, $first->status);
+        $this->assertEquals(365.0, (float) $first->allocated_amount);
+
+        $tx->load('matches');
+        $this->assertEquals(365.0, $tx->remainingAllocatableAmount());
+
+        $second = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.link-case', [$import, $tx]),
+            ['debt_case_id' => $caseB->id]
+        );
+        $second->assertRedirect();
+        $second->assertSessionHas('success');
+
+        $tx->load('matches');
+        $this->assertCount(2, $tx->acceptedMatches());
+        $this->assertTrue($tx->isFullyAllocated());
+        $this->assertDatabaseHas('bank_transaction_matches', [
+            'bank_transaction_id' => $tx->id,
+            'debt_case_id' => $caseB->id,
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'allocated_amount' => 365.00,
+        ]);
+    }
 }

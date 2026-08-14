@@ -48,7 +48,11 @@ class BankTransactionUnlinkService
         }
 
         $debtCase = $match->debtCase;
-        $amount = round((float) $transaction->amount, 2);
+        $amount = round((float) (
+            $match->allocated_amount !== null
+                ? $match->allocated_amount
+                : $transaction->amount
+        ), 2);
         $paymentDate = $transaction->operation_date?->format('Y-m-d');
 
         $ifirmaResult = [

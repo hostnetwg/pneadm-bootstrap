@@ -778,11 +778,21 @@
                                             </thead>
                                             <tbody>
                                                 @foreach($bankPayments as $payment)
-                                                    @php $tx = $payment->transaction; @endphp
+                                                    @php
+                                                        $tx = $payment->transaction;
+                                                        $allocated = $payment->allocated_amount !== null
+                                                            ? (float) $payment->allocated_amount
+                                                            : (float) ($tx?->amount ?? 0);
+                                                        $transferAmount = (float) ($tx?->amount ?? 0);
+                                                        $isSplitPart = $tx && abs($allocated - $transferAmount) > 0.01;
+                                                    @endphp
                                                     <tr>
                                                         <td class="small">{{ $tx?->operation_date?->format('Y-m-d') ?? '—' }}</td>
                                                         <td class="text-end fw-semibold text-nowrap">
-                                                            {{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency : '—' }}
+                                                            {{ number_format($allocated, 2, ',', ' ') }} {{ $tx?->currency ?? 'PLN' }}
+                                                            @if($isSplitPart)
+                                                                <div class="small text-muted fw-normal">z przelewu {{ number_format($transferAmount, 2, ',', ' ') }}</div>
+                                                            @endif
                                                         </td>
                                                         <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
                                                         <td class="small">
@@ -790,16 +800,29 @@
                                                             <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
                                                         </td>
                                                         <td class="text-end text-nowrap">
+                                                            <form method="POST"
+                                                                  action="{{ route('accounting.collections.bank-matches.register-ifirma', [$case, $payment]) }}"
+                                                                  class="d-inline"
+                                                                  data-loading-submit
+                                                                  data-loading-text="Rejestruję…">
+                                                                @csrf
+                                                                <button type="submit"
+                                                                        class="btn btn-sm btn-outline-success"
+                                                                        data-loading-text="Rejestruję…"
+                                                                        title="Zarejestruj wpłatę w iFirma (alokacja {{ number_format($allocated, 2, ',', ' ') }})">
+                                                                    Wpłata iFirma
+                                                                </button>
+                                                            </form>
                                                             <button type="button"
                                                                     class="btn btn-sm btn-outline-danger"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#bankPaymentUnlinkModal"
                                                                     data-unlink-url="{{ route('accounting.collections.bank-matches.unlink', [$case, $payment]) }}"
-                                                                    data-unlink-summary="{{ $tx ? number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency.' · '.($tx->operation_date?->format('Y-m-d') ?? '—') : 'przelew #'.$payment->id }}">
+                                                                    data-unlink-summary="{{ number_format($allocated, 2, ',', ' ').' '.($tx?->currency ?? 'PLN').' · '.($tx?->operation_date?->format('Y-m-d') ?? '—') }}">
                                                                 Cofnij
                                                             </button>
                                                             @if($tx)
-                                                                <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', $tx->bank_statement_import_id) }}">Import</a>
+                                                                <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', ['bankImport' => $tx->bank_statement_import_id, 'filter' => 'accepted']) }}">Import</a>
                                                             @endif
                                                         </td>
                                                     </tr>

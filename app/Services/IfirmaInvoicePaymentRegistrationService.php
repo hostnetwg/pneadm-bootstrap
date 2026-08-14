@@ -50,14 +50,18 @@ class IfirmaInvoicePaymentRegistrationService
             ];
         }
 
-        $amount = round((float) $transaction->amount, 2);
+        $amount = round((float) (
+            $match->allocated_amount !== null
+                ? $match->allocated_amount
+                : $transaction->amount
+        ), 2);
         $expected = round((float) ($order->product_price ?? $debtCase->amount_gross ?? 0), 2);
 
         if ($expected <= 0 || abs($amount - $expected) > self::AMOUNT_EPSILON) {
             return [
                 'success' => false,
                 'message' => sprintf(
-                    'Rejestracja w iFirma tylko przy zgodnej kwocie (przelew %s ≠ FV/zamówienie %s).',
+                    'Rejestracja w iFirma tylko przy zgodnej kwocie (alokacja/przelew %s ≠ FV/zamówienie %s).',
                     number_format($amount, 2, ',', ' '),
                     number_format($expected, 2, ',', ' ')
                 ),

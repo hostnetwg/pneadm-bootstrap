@@ -864,20 +864,24 @@ class AccountingController extends Controller
 
         return response()->json([
             'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount) {
-                $amountMatches = abs((float) $candidate->amount - $caseAmount) <= 0.01;
-                $blockingMatch = $candidate->relationLoaded('matches')
-                    ? $candidate->matches->first(fn (BankTransactionMatch $match) => in_array($match->status, [
-                        BankTransactionMatch::STATUS_ACCEPTED,
-                        BankTransactionMatch::STATUS_IGNORED,
-                    ], true))
-                    : $candidate->matches()
-                        ->whereIn('status', [
-                            BankTransactionMatch::STATUS_ACCEPTED,
-                            BankTransactionMatch::STATUS_IGNORED,
-                        ])
-                        ->orderByDesc('id')
-                        ->first();
-                $isLinkable = $blockingMatch === null;
+                $candidate->loadMissing('matches');
+                $remaining = $candidate->remainingAllocatableAmount();
+                $amountMatches = abs($remaining - $caseAmount) <= 0.01
+                    || abs((float) $candidate->amount - $caseAmount) <= 0.01;
+                $ignored = $candidate->isIgnored();
+                $alreadyLinkedToThisCase = $candidate->acceptedMatches()->contains(
+                    fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
+                );
+                $blockingMatch = $ignored
+                    ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_IGNORED)
+                    : ($alreadyLinkedToThisCase
+                        ? $candidate->acceptedMatches()->first(
+                            fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
+                        )
+                        : null);
+                $isLinkable = ! $ignored
+                    && ! $alreadyLinkedToThisCase
+                    && $remaining > 0.01;
                 $summary = sprintf(
                     '#%d · %s · %s %s',
                     $candidate->id,
@@ -885,12 +889,20 @@ class AccountingController extends Controller
                     number_format((float) $candidate->amount, 2, ',', ' '),
                     $candidate->currency
                 );
+                if ($candidate->acceptedMatches()->isNotEmpty()) {
+                    $summary .= sprintf(
+                        ' · wolne %s',
+                        number_format($remaining, 2, ',', ' ')
+                    );
+                }
 
                 return [
                     'id' => $candidate->id,
                     'operation_date' => $candidate->operation_date?->format('Y-m-d'),
                     'amount' => (float) $candidate->amount,
                     'amount_formatted' => number_format((float) $candidate->amount, 2, ',', ' '),
+                    'remaining_amount' => $remaining,
+                    'remaining_formatted' => number_format($remaining, 2, ',', ' '),
                     'currency' => $candidate->currency,
                     'amount_matches' => $amountMatches,
                     'account_label' => $candidate->account_label,
@@ -1012,6 +1024,56 @@ class AccountingController extends Controller
         return $redirect;
     }
 
+    public function collectionsBankTransactionRegisterIfirma(
+        Request $request,
+        DebtCase $debtCase,
+        BankTransactionMatch $match,
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
+    ) {
+        if ((int) $match->debt_case_id !== (int) $debtCase->id) {
+            abort(404);
+        }
+
+        if ($match->status !== BankTransactionMatch::STATUS_ACCEPTED) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('warning', 'Wpłatę w iFirma można rejestrować tylko dla zaakceptowanego powiązania z wyciągu.');
+        }
+
+        try {
+            $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                $match,
+                $request->user()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('warning', 'Wpłata w iFirma nie przeszła: '.$e->getMessage());
+        }
+
+        if ($paymentResult['success'] ?? false) {
+            $message = $paymentResult['message'] ?? 'Zarejestrowano wpłatę w iFirma.';
+            if ($autoClose->closeIfFullyPaid(
+                $debtCase->fresh() ?? $debtCase,
+                $request->user(),
+                $paymentResult['status'] ?? null
+            )) {
+                $message .= ' Sprawę zamknięto automatycznie.';
+            }
+
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->with('success', $message);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with('warning', 'Wpłata w iFirma nie przeszła: '.($paymentResult['message'] ?? 'nieznany błąd'));
+    }
+
     private function bankTransferCandidates(
         string $search,
         ?float $amount,
@@ -1028,15 +1090,23 @@ class AccountingController extends Controller
             ->with(['import', 'matches'])
             ->where('is_incoming', true)
             ->when($unlinkedOnly, function ($query) {
-                $query->whereDoesntHave('matches', function ($matchQuery) {
-                    $matchQuery->whereIn('status', [
-                        BankTransactionMatch::STATUS_ACCEPTED,
-                        BankTransactionMatch::STATUS_IGNORED,
-                    ]);
-                });
+                $query->withRemainingAllocatable();
             })
             ->when($amount !== null, function ($query) use ($amount) {
-                $query->whereBetween('amount', [$amount - 0.01, $amount + 0.01]);
+                $query->where(function ($inner) use ($amount) {
+                    $inner->whereBetween('amount', [$amount - 0.01, $amount + 0.01])
+                        ->orWhereRaw(
+                            '(
+                                bank_transactions.amount - (
+                                    SELECT COALESCE(SUM(COALESCE(allocated_amount, bank_transactions.amount)), 0)
+                                    FROM bank_transaction_matches
+                                    WHERE bank_transaction_matches.bank_transaction_id = bank_transactions.id
+                                      AND bank_transaction_matches.status = ?
+                                )
+                            ) BETWEEN ? AND ?',
+                            [BankTransactionMatch::STATUS_ACCEPTED, $amount - 0.01, $amount + 0.01]
+                        );
+                });
             })
             ->when($notBeforeDate !== null && $notBeforeDate !== '', function ($query) use ($notBeforeDate) {
                 $query->whereDate('operation_date', '>=', $notBeforeDate);

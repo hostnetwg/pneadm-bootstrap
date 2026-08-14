@@ -326,4 +326,51 @@ class BankTransactionMatcherTest extends TestCase
         );
         $this->assertContains('amount_match', $suggestions[0]['match_reasons']);
     }
+
+    public function test_multi_invoice_sum_match_boosts_package_when_title_has_two_invoices(): void
+    {
+        $orderA = FormOrder::create([
+            'product_name' => 'Szkolenie A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '357/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Szkolenie B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '511/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $tx = new BankTransaction([
+            'operation_date' => '2026-08-08',
+            'amount' => 730,
+            'currency' => 'PLN',
+            'description' => 'Faktura Vat nr 357/8/2026, 511/8/2026 PRZELEW',
+            'is_incoming' => true,
+            'fingerprint' => 'test-fp-split-package',
+        ]);
+
+        $suggestions = (new BankTransactionMatcher)->suggest($tx);
+        $orderIds = collect($suggestions)->pluck('form_order_id')->all();
+
+        $this->assertContains($orderA->id, $orderIds);
+        $this->assertContains($orderB->id, $orderIds);
+
+        foreach ($suggestions as $suggestion) {
+            if (! in_array($suggestion['form_order_id'], [$orderA->id, $orderB->id], true)) {
+                continue;
+            }
+            $this->assertSame(BankTransactionMatch::CONFIDENCE_HIGH, $suggestion['confidence']);
+            $this->assertContains('multi_invoice_sum_match', $suggestion['match_reasons']);
+            $this->assertContains('amount_match', $suggestion['match_reasons']);
+            $this->assertNotContains('amount_mismatch', $suggestion['match_reasons']);
+        }
+    }
 }

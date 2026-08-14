@@ -595,6 +595,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/{debtCase}/bank-transactions/search', [AccountingController::class, 'collectionsBankTransactionSearch'])->name('bank-transactions.search');
             Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');
             Route::post('/{debtCase}/bank-matches/{match}/unlink', [AccountingController::class, 'collectionsBankTransactionUnlink'])->name('bank-matches.unlink');
+            Route::post('/{debtCase}/bank-matches/{match}/register-ifirma', [AccountingController::class, 'collectionsBankTransactionRegisterIfirma'])->name('bank-matches.register-ifirma');
         });
         Route::prefix('bank-imports')->name('bank-imports.')->group(function () {
             Route::get('/', [BankStatementImportController::class, 'index'])->name('index');
@@ -608,6 +609,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');
             Route::post('/{bankImport}/matches/{match}/register-ifirma-payment', [BankStatementImportController::class, 'registerIfirmaPayment'])->name('matches.register-ifirma-payment');
             Route::post('/{bankImport}/matches/{match}/accept', [BankStatementImportController::class, 'accept'])->name('matches.accept');
+            Route::post('/{bankImport}/transactions/{transaction}/accept-package', [BankStatementImportController::class, 'acceptPackage'])->name('transactions.accept-package');
             Route::post('/{bankImport}/matches/{match}/reject', [BankStatementImportController::class, 'reject'])->name('matches.reject');
             Route::post('/{bankImport}/matches/{match}/unlink', [BankStatementImportController::class, 'unlink'])->name('matches.unlink');
             Route::post('/{bankImport}/matches/{match}/ignore', [BankStatementImportController::class, 'ignoreMatch'])->name('matches.ignore');

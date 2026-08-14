@@ -32,12 +32,14 @@ class BankTransactionMatch extends Model
         'confidence',
         'match_reasons',
         'status',
+        'allocated_amount',
         'accepted_by',
         'accepted_at',
     ];
 
     protected $casts = [
         'match_reasons' => 'array',
+        'allocated_amount' => 'decimal:2',
         'accepted_at' => 'datetime',
     ];
 
@@ -63,7 +65,7 @@ class BankTransactionMatch extends Model
 
     public function confidenceLabel(): string
     {
-        return match ($this->confidence) {
+        return match ($this->effectiveConfidence()) {
             self::CONFIDENCE_HIGH => 'Wysoka',
             self::CONFIDENCE_MEDIUM => 'Średnia',
             self::CONFIDENCE_LOW => 'Niska',
@@ -73,12 +75,32 @@ class BankTransactionMatch extends Model
 
     public function confidenceBadgeClass(): string
     {
-        return match ($this->confidence) {
+        return match ($this->effectiveConfidence()) {
             self::CONFIDENCE_HIGH => 'text-bg-success',
             self::CONFIDENCE_MEDIUM => 'text-bg-warning',
             self::CONFIDENCE_LOW => 'text-bg-secondary',
             default => 'text-bg-light border',
         };
+    }
+
+    /**
+     * Pewność do UI: podział z alokacją = FV / pakiet multi-FV traktuj jak High
+     * (ręczne linki miały hardcodowane Low mimo zgodnej alokacji).
+     */
+    public function effectiveConfidence(): string
+    {
+        $reasons = $this->match_reasons ?? [];
+        if (in_array('multi_invoice_sum_match', $reasons, true)) {
+            return self::CONFIDENCE_HIGH;
+        }
+        if (
+            in_array('split_allocation', $reasons, true)
+            && in_array('amount_match', $reasons, true)
+        ) {
+            return self::CONFIDENCE_HIGH;
+        }
+
+        return (string) $this->confidence;
     }
 
     public function statusLabel(): string
@@ -100,10 +122,11 @@ class BankTransactionMatch extends Model
     public function reasonLabels(): array
     {
         $labels = [];
+        $reasons = array_map('strval', $this->match_reasons ?? []);
+        $isSplit = in_array('split_allocation', $reasons, true)
+            || in_array('multi_invoice_sum_match', $reasons, true);
 
-        foreach ($this->match_reasons ?? [] as $reason) {
-            $reason = (string) $reason;
-
+        foreach ($reasons as $reason) {
             if (str_starts_with($reason, 'invoice_number:')) {
                 $labels[] = 'Numer FV z tytułu przelewu: '.substr($reason, strlen('invoice_number:'));
 
@@ -151,11 +174,17 @@ class BankTransactionMatch extends Model
             }
 
             $labels[] = match ($reason) {
-                'amount_match' => 'Kwota przelewu = kwota FV/zamówienia',
-                'amount_mismatch' => 'Kwota przelewu różni się od kwoty FV/zamówienia',
+                'amount_match' => $isSplit
+                    ? 'Alokowana kwota z przelewu = kwota FV/zamówienia'
+                    : 'Kwota przelewu = kwota FV/zamówienia',
+                'amount_mismatch' => $isSplit
+                    ? 'Alokowana kwota różni się od kwoty FV/zamówienia'
+                    : 'Kwota przelewu różni się od kwoty FV/zamówienia',
+                'multi_invoice_sum_match' => 'Suma kwot kilku FV z tytułu ≈ kwota przelewu (podział)',
                 'existing_debt_case' => 'Istnieje aktywna sprawa windykacyjna dla tego zamówienia',
                 'multiple_candidates' => 'Więcej niż jeden kandydat — zweryfikuj ręcznie',
                 'manual_case_link' => 'Ręczne powiązanie przelewu ze sprawą windykacyjną',
+                'split_allocation' => 'Część kwoty przelewu przypisana do tej FV (podział)',
                 self::REASON_GATEWAY_PAYOUT_PAYNOW => 'Wypłata rozliczeniowa bramki PayNow (mElements) — poza windykacją FV',
                 self::REASON_MANUAL_IGNORE => 'Ręcznie zignorowane',
                 'party_name_mismatch' => 'Nadawca z wyciągu nie pasuje do nabywcy/odbiorcy zamówienia — możliwy błędny numer FV w tytule',

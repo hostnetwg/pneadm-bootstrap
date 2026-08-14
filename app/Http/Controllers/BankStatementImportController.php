@@ -28,10 +28,14 @@ class BankStatementImportController extends Controller
             ->withCount([
                 'transactions as pending_review_count' => function ($q) {
                     $q->where('is_incoming', true)
-                        ->whereDoesntHave('matches', fn ($m) => $m->whereIn('status', [
-                            BankTransactionMatch::STATUS_ACCEPTED,
-                            BankTransactionMatch::STATUS_IGNORED,
-                        ]));
+                        ->withRemainingAllocatable()
+                        ->where(function ($inner) {
+                            $inner->whereDoesntHave('matches')
+                                ->orWhereHas('matches', fn ($m) => $m->where(
+                                    'status',
+                                    BankTransactionMatch::STATUS_SUGGESTED
+                                ));
+                        });
                 },
             ])
             ->latest('id')
@@ -125,15 +129,11 @@ class BankStatementImportController extends Controller
             ->latest('id');
 
         if ($filter === 'unmatched') {
-            $transactionsQuery->whereDoesntHave('matches', function ($q) {
-                $q->whereIn('status', [
-                    BankTransactionMatch::STATUS_ACCEPTED,
-                    BankTransactionMatch::STATUS_IGNORED,
-                ]);
-            })->where(function ($q) {
-                $q->whereDoesntHave('matches')
-                    ->orWhereHas('matches', fn ($m) => $m->where('status', BankTransactionMatch::STATUS_SUGGESTED));
-            });
+            $transactionsQuery->withRemainingAllocatable()
+                ->where(function ($q) {
+                    $q->whereDoesntHave('matches')
+                        ->orWhereHas('matches', fn ($m) => $m->where('status', BankTransactionMatch::STATUS_SUGGESTED));
+                });
         } elseif ($filter === 'unlinked') {
             $transactionsQuery->whereDoesntHave('matches', function ($q) {
                 $q->whereIn('status', [
@@ -171,10 +171,11 @@ class BankStatementImportController extends Controller
         $counts = [
             'unmatched' => $bankImport->transactions()
                 ->where('is_incoming', true)
-                ->whereDoesntHave('matches', fn ($q) => $q->whereIn('status', [
-                    BankTransactionMatch::STATUS_ACCEPTED,
-                    BankTransactionMatch::STATUS_IGNORED,
-                ]))
+                ->withRemainingAllocatable()
+                ->where(function ($q) {
+                    $q->whereDoesntHave('matches')
+                        ->orWhereHas('matches', fn ($m) => $m->where('status', BankTransactionMatch::STATUS_SUGGESTED));
+                })
                 ->count(),
             'unlinked' => $bankImport->transactions()
                 ->where('is_incoming', true)
@@ -316,6 +317,105 @@ class BankStatementImportController extends Controller
             $bankImport,
             $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
         );
+    }
+
+    public function acceptPackage(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransaction $transaction,
+        BankStatementImportService $importService,
+        IfirmaInvoicePaymentRegistrationService $paymentRegistration,
+        DebtCaseAutoCloseService $autoClose
+    ) {
+        if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
+            abort(404);
+        }
+
+        try {
+            $accepted = $importService->acceptSuggestedSplitPackage(
+                $transaction,
+                $request->user()?->id
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['match' => $e->getMessage()]);
+        }
+
+        $caseIds = collect($accepted)
+            ->pluck('debt_case_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $message = sprintf(
+            'Zaakceptowano pakiet podziału: %d powiązań%s.',
+            count($accepted),
+            $caseIds !== [] ? ' (sprawy: #'.implode(', #', $caseIds).')' : ''
+        );
+
+        if (! $request->boolean('register_ifirma_payment')) {
+            return $this->redirectAfterReview(
+                $request,
+                $bankImport,
+                $message.' Status iFirma nie został zmieniony (akceptacja tylko lokalna).'
+            );
+        }
+
+        $ifirmaOk = 0;
+        $ifirmaFail = [];
+        foreach ($accepted as $match) {
+            try {
+                $paymentResult = $paymentRegistration->registerFromAcceptedBankMatch(
+                    $match,
+                    $request->user()
+                );
+            } catch (\Throwable $e) {
+                report($e);
+                $ifirmaFail[] = sprintf(
+                    'sprawa #%s: %s',
+                    $match->debt_case_id ?: '—',
+                    $e->getMessage()
+                );
+
+                continue;
+            }
+
+            if ($paymentResult['success'] ?? false) {
+                $ifirmaOk++;
+                $message .= $this->appendAutoCloseMessage(
+                    $autoClose,
+                    $match,
+                    $request->user(),
+                    $paymentResult['status'] ?? null
+                );
+            } else {
+                $ifirmaFail[] = sprintf(
+                    'sprawa #%s: %s',
+                    $match->debt_case_id ?: '—',
+                    $paymentResult['message'] ?? 'nieznany błąd'
+                );
+            }
+        }
+
+        if ($ifirmaOk > 0) {
+            $message .= sprintf(' Zarejestrowano wpłaty w iFirma: %d/%d.', $ifirmaOk, count($accepted));
+        }
+
+        $redirect = $this->redirectAfterReview($request, $bankImport, $message);
+
+        if ($ifirmaFail !== []) {
+            $redirect->with(
+                'warning',
+                'Część wpłat w iFirma nie przeszła (akceptacja lokalna OK): '.implode(' | ', $ifirmaFail)
+            );
+        } elseif ($ifirmaOk === 0) {
+            $redirect->with(
+                'warning',
+                'Akceptacja lokalna OK, ale żadna wpłata w iFirma nie została zarejestrowana.'
+            );
+        }
+
+        return $redirect;
     }
 
     public function registerIfirmaPayment(

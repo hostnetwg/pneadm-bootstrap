@@ -177,7 +177,24 @@
                                 @forelse($transactions as $tx)
                                     @php
                                         $suggested = $tx->matches->where('status', \App\Models\BankTransactionMatch::STATUS_SUGGESTED);
-                                        $accepted = $tx->matches->firstWhere('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED);
+                                        $acceptedMatches = $tx->acceptedMatches();
+                                        $accepted = $acceptedMatches->first();
+                                        $remainingAmount = $tx->remainingAllocatableAmount();
+                                        $canAddSplit = $tx->canAcceptAdditionalLink();
+                                        $packageSuggested = $suggested
+                                            ->filter(
+                                                fn ($m) => in_array('multi_invoice_sum_match', $m->match_reasons ?? [], true)
+                                            )
+                                            ->sortBy(fn ($m) => [
+                                                (string) ($m->formOrder?->invoice_number ?? ''),
+                                                (int) $m->id,
+                                            ])
+                                            ->values();
+                                        $packageSum = round((float) $packageSuggested->sum(
+                                            fn ($m) => (float) ($m->formOrder?->product_price
+                                                ?? $m->debtCase?->amount_gross
+                                                ?? 0)
+                                        ), 2);
                                         $best = $accepted ?: $suggested->sortBy(fn ($m) => match ($m->confidence) {
                                             'high' => 0, 'medium' => 1, default => 2,
                                         })->first();
@@ -215,6 +232,7 @@
                                                 'id' => $tx->id,
                                                 'date' => $tx->operation_date?->format('Y-m-d') ?? '—',
                                                 'amount' => number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency,
+                                                'remaining' => number_format($remainingAmount, 2, ',', ' ').' '.$tx->currency,
                                                 'category' => $tx->category ?: '—',
                                                 'account' => $tx->account_label ?: '—',
                                                 'counterparty' => $tx->counterparty_account ?: ($descParts['counterparty_account'] ?: '—'),
@@ -235,6 +253,81 @@
                                                 'debt_case_url' => $best->debt_case_id
                                                     ? route('accounting.collections.show', $best->debt_case_id)
                                                     : null,
+                                                'allocated_amount' => $best->allocated_amount !== null
+                                                    ? number_format((float) $best->allocated_amount, 2, ',', ' ').' '.$tx->currency
+                                                    : null,
+                                            ] : null,
+                                            'allocations' => $acceptedMatches->map(function ($m) use ($tx, $import) {
+                                                return [
+                                                    'match_id' => $m->id,
+                                                    'debt_case_id' => $m->debt_case_id,
+                                                    'debt_case_url' => $m->debt_case_id
+                                                        ? route('accounting.collections.show', $m->debt_case_id)
+                                                        : null,
+                                                    'form_order_id' => $m->form_order_id,
+                                                    'form_order_url' => $m->form_order_id
+                                                        ? route('form-orders.show', $m->form_order_id)
+                                                        : null,
+                                                    'invoice' => $m->formOrder?->invoice_number
+                                                        ?: ($m->debtCase?->invoice_number ?: '—'),
+                                                    'allocated' => number_format(
+                                                        (float) ($m->allocated_amount ?? $tx->amount),
+                                                        2,
+                                                        ',',
+                                                        ' '
+                                                    ).' '.$tx->currency,
+                                                    'unlink_url' => route('accounting.bank-imports.matches.unlink', [$import, $m]),
+                                                    'register_ifirma_url' => route(
+                                                        'accounting.bank-imports.matches.register-ifirma-payment',
+                                                        [$import, $m]
+                                                    ),
+                                                    'ifirma_status_url' => route(
+                                                        'accounting.bank-imports.matches.ifirma-status',
+                                                        [$import, $m]
+                                                    ),
+                                                    'match' => [
+                                                        'status' => $m->statusLabel(),
+                                                        'confidence' => $m->confidenceLabel(),
+                                                        'confidence_class' => $m->confidenceBadgeClass(),
+                                                        'reasons' => $m->reasonLabels(),
+                                                        'reason_codes' => array_values($m->match_reasons ?? []),
+                                                        'debt_case_id' => $m->debt_case_id,
+                                                        'debt_case_url' => $m->debt_case_id
+                                                            ? route('accounting.collections.show', $m->debt_case_id)
+                                                            : null,
+                                                    ],
+                                                ];
+                                            })->values()->all(),
+                                            'remaining' => [
+                                                'amount' => $remainingAmount,
+                                                'formatted' => number_format($remainingAmount, 2, ',', ' ').' '.$tx->currency,
+                                                'can_add' => $canAddSplit,
+                                            ],
+                                            'package' => $packageSuggested->count() >= 2 ? [
+                                                'count' => $packageSuggested->count(),
+                                                'accept_url' => route('accounting.bank-imports.transactions.accept-package', [$import, $tx]),
+                                                'sum_formatted' => number_format($packageSum, 2, ',', ' ').' '.$tx->currency,
+                                                'transfer_formatted' => number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency,
+                                                'items' => $packageSuggested->map(function ($m) use ($tx) {
+                                                    $fo = $m->formOrder;
+                                                    $amt = (float) ($fo?->product_price ?? $m->debtCase?->amount_gross ?? 0);
+
+                                                    return [
+                                                        'match_id' => $m->id,
+                                                        'form_order_id' => $m->form_order_id,
+                                                        'form_order_url' => $m->form_order_id
+                                                            ? route('form-orders.show', $m->form_order_id)
+                                                            : null,
+                                                        'debt_case_id' => $m->debt_case_id,
+                                                        'debt_case_url' => $m->debt_case_id
+                                                            ? route('accounting.collections.show', $m->debt_case_id)
+                                                            : null,
+                                                        'invoice' => $fo?->invoice_number
+                                                            ?: ($m->debtCase?->invoice_number ?: '—'),
+                                                        'amount' => number_format($amt, 2, ',', ' ').' '.$tx->currency,
+                                                        'accept_url' => route('accounting.bank-imports.matches.accept', [$import, $m]),
+                                                    ];
+                                                })->values()->all(),
                                             ] : null,
                                             'order' => $order ? [
                                                 'id' => $order->id,
@@ -269,7 +362,7 @@
                                                     : '—',
                                             ] : null,
                                         ];
-                                        $suggestBest = ($suggested->isNotEmpty() && ! $accepted)
+                                        $suggestBest = ($suggested->isNotEmpty() && $canAddSplit)
                                             ? $suggested->sortBy(fn ($m) => match ($m->confidence) {
                                                 'high' => 0, 'medium' => 1, default => 2,
                                             })->first()
@@ -285,17 +378,22 @@
                                                     data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
                                                     data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
                                                     data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) }}"
-                                                    @if($suggestBest)
+                                                    @if($packageSuggested->count() >= 2 && $canAddSplit)
+                                                        data-can-act="package"
+                                                        data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
+                                                    @elseif($suggestBest)
                                                         data-can-act="match"
                                                         data-accept-url="{{ route('accounting.bank-imports.matches.accept', [$import, $suggestBest]) }}"
                                                         data-ifirma-status-url="{{ route('accounting.bank-imports.matches.ifirma-status', [$import, $suggestBest]) }}"
                                                         data-reject-url="{{ route('accounting.bank-imports.matches.reject', [$import, $suggestBest]) }}"
                                                         data-ignore-url="{{ route('accounting.bank-imports.matches.ignore', [$import, $suggestBest]) }}"
-                                                        @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true)) data-amount-mismatch="1" @endif
-                                                    @elseif(! $accepted)
+                                                        @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true) || $acceptedMatches->isNotEmpty())
+                                                            data-amount-mismatch="1"
+                                                        @endif
+                                                    @elseif($canAddSplit)
                                                         data-can-act="ignore-tx"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
-                                                    @else
+                                                    @elseif($acceptedMatches->isNotEmpty())
                                                         data-can-act="accepted"
                                                         data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $accepted]) }}"
                                                         data-register-ifirma-url="{{ route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $accepted]) }}"
@@ -311,63 +409,136 @@
                                         </td>
                                         <td>
                                             <div class="small text-break" style="max-width: 42rem;">{{ \Illuminate\Support\Str::limit($tx->description, 220) }}</div>
-                                            @if($accepted)
+                                            @if($acceptedMatches->isNotEmpty())
                                                 <div class="mt-1">
-                                                    <span class="badge text-bg-success">Zaakceptowane</span>
-                                                    @if($accepted->debtCase)
-                                                        <a href="{{ route('accounting.collections.show', $accepted->debtCase) }}">Sprawa #{{ $accepted->debt_case_id }}</a>
+                                                    <span class="badge text-bg-success">
+                                                        Zaakceptowane{{ $acceptedMatches->count() > 1 ? ' ('.$acceptedMatches->count().')' : '' }}
+                                                    </span>
+                                                    @if($remainingAmount > 0.01)
+                                                        <span class="badge text-bg-warning">Wolne {{ number_format($remainingAmount, 2, ',', ' ') }} {{ $tx->currency }}</span>
                                                     @endif
-                                                    @if($accepted->form_order_id)
-                                                        <span class="text-muted">·</span>
-                                                        <a href="{{ route('form-orders.show', $accepted->form_order_id) }}">Zam. #{{ $accepted->form_order_id }}</a>
-                                                    @endif
+                                                    <ul class="mb-0 ps-3 small">
+                                                        @foreach($acceptedMatches as $acc)
+                                                            <li>
+                                                                @if($acc->allocated_amount !== null)
+                                                                    {{ number_format((float) $acc->allocated_amount, 2, ',', ' ') }} {{ $tx->currency }}
+                                                                    <span class="text-muted">→</span>
+                                                                @endif
+                                                                @if($acc->debt_case_id)
+                                                                    <a href="{{ route('accounting.collections.show', $acc->debt_case_id) }}">Sprawa #{{ $acc->debt_case_id }}</a>
+                                                                @endif
+                                                                @if($acc->form_order_id)
+                                                                    <span class="text-muted">·</span>
+                                                                    <a href="{{ route('form-orders.show', $acc->form_order_id) }}">Zam. #{{ $acc->form_order_id }}</a>
+                                                                    @if($acc->formOrder?->invoice_number)
+                                                                        <span class="text-muted">({{ $acc->formOrder->invoice_number }})</span>
+                                                                    @endif
+                                                                @endif
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
                                                 </div>
-                                            @elseif($best)
-                                                <div class="mt-1 d-flex flex-wrap align-items-center gap-2">
-                                                    <span class="badge {{ $best->confidenceBadgeClass() }}">{{ $best->confidenceLabel() }}</span>
-                                                    @if($best->form_order_id)
-                                                        <a href="{{ route('form-orders.show', $best->form_order_id) }}">Zam. #{{ $best->form_order_id }}</a>
-                                                        @if($best->formOrder?->invoice_number)
-                                                            <span class="text-muted">FV w systemie: {{ $best->formOrder->invoice_number }}</span>
-                                                        @endif
-                                                    @endif
-                                                    @if($best->debt_case_id)
-                                                        <a href="{{ route('accounting.collections.show', $best->debt_case_id) }}">Sprawa #{{ $best->debt_case_id }}</a>
-                                                    @elseif($best->form_order_id)
-                                                        <span class="badge text-bg-light border">Utworzy sprawę przy akceptacji</span>
-                                                    @endif
-                                                    @if($suggested->count() > 1)
-                                                        <span class="badge text-bg-warning">Do ręcznej weryfikacji ({{ $suggested->count() }})</span>
-                                                    @endif
-                                                </div>
-                                                @if(count($best->reasonLabels()))
-                                                    <div class="mt-1 small">
-                                                        <span class="text-muted">Podstawa dopasowania:</span>
-                                                        <ul class="mb-0 ps-3">
-                                                            @foreach($best->reasonLabels() as $reasonLabel)
-                                                                <li>{{ $reasonLabel }}</li>
-                                                            @endforeach
-                                                        </ul>
+                                            @endif
+                                            @if($suggestBest)
+                                                @if($packageSuggested->count() >= 2)
+                                                    <div class="mt-1">
+                                                        <span class="badge text-bg-info">Pakiet podziału ({{ $packageSuggested->count() }} FV)</span>
+                                                        <span class="badge text-bg-light border">
+                                                            Suma {{ number_format($packageSum, 2, ',', ' ') }} = przelew {{ number_format((float) $tx->amount, 2, ',', ' ') }} {{ $tx->currency }}
+                                                        </span>
                                                     </div>
+                                                    <ul class="mb-0 mt-1 ps-3 small">
+                                                        @foreach($packageSuggested as $pkgMatch)
+                                                            @php
+                                                                $pkgOrder = $pkgMatch->formOrder;
+                                                                $pkgAmt = (float) ($pkgOrder?->product_price ?? $pkgMatch->debtCase?->amount_gross ?? 0);
+                                                            @endphp
+                                                            <li>
+                                                                <span class="fw-semibold">{{ $pkgOrder?->invoice_number ?: ($pkgMatch->debtCase?->invoice_number ?: 'FV —') }}</span>
+                                                                <span class="text-muted">·</span>
+                                                                {{ number_format($pkgAmt, 2, ',', ' ') }} {{ $tx->currency }}
+                                                                @if($pkgMatch->form_order_id)
+                                                                    <span class="text-muted">·</span>
+                                                                    <a href="{{ route('form-orders.show', $pkgMatch->form_order_id) }}">Zam. #{{ $pkgMatch->form_order_id }}</a>
+                                                                @endif
+                                                                @if($pkgMatch->debt_case_id)
+                                                                    <span class="text-muted">·</span>
+                                                                    <a href="{{ route('accounting.collections.show', $pkgMatch->debt_case_id) }}">Sprawa #{{ $pkgMatch->debt_case_id }}</a>
+                                                                @else
+                                                                    <span class="badge text-bg-light border">utworzy sprawę</span>
+                                                                @endif
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                    <div class="mt-1 small text-muted">
+                                                        Podstawa: suma kwot FV z tytułu ≈ kwota przelewu (podział).
+                                                    </div>
+                                                @else
+                                                    <div class="mt-1 d-flex flex-wrap align-items-center gap-2">
+                                                        <span class="badge {{ $suggestBest->confidenceBadgeClass() }}">{{ $suggestBest->confidenceLabel() }}</span>
+                                                        @if($suggestBest->form_order_id)
+                                                            <a href="{{ route('form-orders.show', $suggestBest->form_order_id) }}">Zam. #{{ $suggestBest->form_order_id }}</a>
+                                                            @if($suggestBest->formOrder?->invoice_number)
+                                                                <span class="text-muted">FV w systemie: {{ $suggestBest->formOrder->invoice_number }}</span>
+                                                            @endif
+                                                        @endif
+                                                        @if($suggestBest->debt_case_id)
+                                                            <a href="{{ route('accounting.collections.show', $suggestBest->debt_case_id) }}">Sprawa #{{ $suggestBest->debt_case_id }}</a>
+                                                        @elseif($suggestBest->form_order_id)
+                                                            <span class="badge text-bg-light border">Utworzy sprawę przy akceptacji</span>
+                                                        @endif
+                                                        @if($suggested->count() > 1)
+                                                            <span class="badge text-bg-warning">Do ręcznej weryfikacji ({{ $suggested->count() }})</span>
+                                                        @endif
+                                                    </div>
+                                                    @if(count($suggestBest->reasonLabels()))
+                                                        <div class="mt-1 small">
+                                                            <span class="text-muted">Podstawa dopasowania:</span>
+                                                            <ul class="mb-0 ps-3">
+                                                                @foreach($suggestBest->reasonLabels() as $reasonLabel)
+                                                                    <li>{{ $reasonLabel }}</li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
                                                 @endif
-                                            @else
+                                            @elseif($acceptedMatches->isEmpty())
                                                 <div class="mt-1 small text-muted">Brak sugestii</div>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="d-flex flex-wrap gap-1">
-                                                @if($suggestBest)
+                                                @if($packageSuggested->count() >= 2 && $canAddSplit)
+                                                    <form method="POST"
+                                                          action="{{ route('accounting.bank-imports.transactions.accept-package', [$import, $tx]) }}"
+                                                          class="bank-import-package-form"
+                                                          data-loading-submit
+                                                          data-loading-text="Akceptuję pakiet…"
+                                                          data-package-count="{{ $packageSuggested->count() }}">
+                                                        @csrf
+                                                        <input type="hidden" name="filter" value="{{ $filter }}">
+                                                        <input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">
+                                                        <button type="submit" class="btn btn-sm btn-primary" data-loading-text="Akceptuję pakiet…">
+                                                            Akceptuj pakiet ({{ $packageSuggested->count() }})
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                                @if($suggestBest && $packageSuggested->count() < 2)
                                                     <form method="POST"
                                                           action="{{ route('accounting.bank-imports.matches.accept', [$import, $suggestBest]) }}"
                                                           class="bank-import-accept-form"
                                                           data-loading-submit
                                                           data-loading-text="Akceptuję…"
-                                                          @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true)) data-amount-mismatch="1" @endif>
+                                                          @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true) || $acceptedMatches->isNotEmpty())
+                                                              data-amount-mismatch="1"
+                                                          @endif>
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">
                                                         <input type="hidden" name="ifirma_already_paid" value="0" class="bank-import-ifirma-already-paid">
-                                                        <button type="submit" class="btn btn-sm btn-success" data-loading-text="Akceptuję…">Akceptuj</button>
+                                                        <button type="submit" class="btn btn-sm btn-success" data-loading-text="Akceptuję…">
+                                                            {{ $acceptedMatches->isNotEmpty() ? 'Dodaj do podziału' : 'Akceptuj' }}
+                                                        </button>
                                                     </form>
                                                     <form method="POST" action="{{ route('accounting.bank-imports.matches.reject', [$import, $suggestBest]) }}" data-loading-submit data-loading-text="Odrzucam…">
                                                         @csrf
@@ -379,21 +550,52 @@
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
                                                     </form>
-                                                @elseif(! $accepted)
+                                                @elseif($suggestBest && $packageSuggested->count() >= 2)
+                                                    {{-- Pakiet: główna akcja to „Akceptuj pakiet”; pojedyncze FV w podglądzie --}}
+                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
+                                                        @csrf
+                                                        <input type="hidden" name="filter" value="{{ $filter }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
+                                                    </form>
+                                                @elseif($canAddSplit)
                                                     <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj transakcję</button>
                                                     </form>
-                                                @else
-                                                    <button type="button"
-                                                            class="btn btn-sm btn-outline-danger"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#bankImportUnlinkModal"
-                                                            data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $accepted]) }}"
-                                                            data-unlink-summary="{{ number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency.' · '.($tx->operation_date?->format('Y-m-d') ?? '—') }}{{ $accepted->debt_case_id ? ' · sprawa #'.$accepted->debt_case_id : '' }}">
-                                                        Cofnij przypisanie
-                                                    </button>
+                                                @elseif($acceptedMatches->isNotEmpty())
+                                                    @foreach($acceptedMatches as $acc)
+                                                        <form method="POST"
+                                                              action="{{ route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $acc]) }}"
+                                                              class="d-inline"
+                                                              data-loading-submit
+                                                              data-loading-text="Rejestruję…">
+                                                            @csrf
+                                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                                            <button type="submit"
+                                                                    class="btn btn-sm btn-outline-success"
+                                                                    data-loading-text="Rejestruję…"
+                                                                    title="Zarejestruj wpłatę w iFirma dla tej alokacji{{ $acc->formOrder?->invoice_number ? ' (FV '.$acc->formOrder->invoice_number.')' : ($acc->debt_case_id ? ' (sprawa #'.$acc->debt_case_id.')' : '') }}">
+                                                                @php
+                                                                    $ifirmaBtnSuffix = '';
+                                                                    if ($acceptedMatches->count() > 1) {
+                                                                        $ifirmaBtnSuffix = $acc->formOrder?->invoice_number
+                                                                            ? ' · FV '.$acc->formOrder->invoice_number
+                                                                            : ($acc->debt_case_id ? ' · sprawa #'.$acc->debt_case_id : '');
+                                                                    }
+                                                                @endphp
+                                                                Wpłata iFirma{{ $ifirmaBtnSuffix }}
+                                                            </button>
+                                                        </form>
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#bankImportUnlinkModal"
+                                                                data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $acc]) }}"
+                                                                data-unlink-summary="{{ number_format((float) ($acc->allocated_amount ?? $tx->amount), 2, ',', ' ').' '.$tx->currency.' · '.($tx->operation_date?->format('Y-m-d') ?? '—') }}{{ $acc->debt_case_id ? ' · sprawa #'.$acc->debt_case_id : '' }}{{ $acc->formOrder?->invoice_number ? ' · FV '.$acc->formOrder->invoice_number : '' }}">
+                                                            Cofnij{{ $acceptedMatches->count() > 1 ? ' #'.$acc->debt_case_id : ' przypisanie' }}
+                                                        </button>
+                                                    @endforeach
                                                 @endif
                                             </div>
                                         </td>
@@ -461,6 +663,7 @@
                                 <dl class="row small mb-0" id="bankTxPreviewTransfer">
                                     <dt class="col-sm-4 text-muted">Data</dt><dd class="col-sm-8" data-field="date">—</dd>
                                     <dt class="col-sm-4 text-muted">Kwota</dt><dd class="col-sm-8 fw-semibold" data-field="amount">—</dd>
+                                    <dt class="col-sm-4 text-muted">Wolne</dt><dd class="col-sm-8" data-field="remaining">—</dd>
                                     <dt class="col-sm-4 text-muted">Kategoria</dt><dd class="col-sm-8" data-field="category">—</dd>
                                     <dt class="col-sm-4 text-muted">Rachunek PNE</dt><dd class="col-sm-8" data-field="account">—</dd>
                                     <dt class="col-sm-4 text-muted">Rachunek nadawcy</dt><dd class="col-sm-8" data-field="counterparty">—</dd>
@@ -670,20 +873,52 @@
                     <div class="alert alert-warning mb-3" role="alert">
                         Kwota z wyciągu różni się od kwoty wskazanej faktury/zamówienia.
                     </div>
-                    <p class="mb-2">Po akceptacji:</p>
+                    <p class="mb-2">Po akceptacji lokalnej:</p>
                     <ul class="mb-3">
-                        <li>przelew zostanie powiązany <strong>tylko z jedną</strong> fakturą/sprawą,</li>
-                        <li>inne sugestie dla tego przelewu zostaną odrzucone,</li>
-                        <li>przelew zniknie z kolejki „Do przeglądu” / Medium / High,</li>
-                        <li>nie da się potem łatwo podpiąć tego samego przelewu do kolejnych FV (np. przy jednym przelewie za kilka faktur).</li>
+                        <li>do tej FV/sprawy zostanie przypisana <strong>kwota FV</strong> (albo wolna reszta przelewu),</li>
+                        <li>pozostała kwota przelewu zostaje wolna — możesz dodać kolejne FV (podział),</li>
+                        <li>inne sugestie <strong>tej samej</strong> FV zostaną odrzucone; sugestie innych FV zostają,</li>
+                        <li>przy różnicy kwoty <strong>nie</strong> rejestrujemy wpłaty w iFirma (MVP podziału).</li>
                     </ul>
                     <p class="mb-0 small text-muted">
-                        Przy różnicy kwoty <strong>nie</strong> rejestrujemy wpłaty w iFirma. Jeśli w tytule widać kilka numerów FV albo kwota jest sumą kilku faktur — lepiej najpierw wyjaśnić, zamiast akceptować.
+                        Gdy w tytule widać kilka numerów FV i ich suma ≈ przelew — użyj <strong>Akceptuj pakiet</strong>
+                        (lokalnie albo z wpłatami w iFirma).
                     </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
                     <button type="button" class="btn btn-warning" id="bankImportAcceptWarnConfirmBtn" data-loading-text="Akceptuję…">Akceptuj tylko lokalnie</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankImportAcceptPackageModal" tabindex="-1" aria-labelledby="bankImportAcceptPackageModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header text-bg-primary">
+                    <h5 class="modal-title" id="bankImportAcceptPackageModalLabel">Akceptacja pakietu podziału</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">
+                        Suma kwot FV z tytułu zgadza się z kwotą przelewu.
+                        Zostanie lokalnie powiązanych <strong id="bankImportAcceptPackageCount">kilka</strong> faktur/spraw
+                        (po kwocie każdej FV) — lista FV jest widoczna w wierszu / podglądzie przelewu.
+                    </p>
+                    <p class="mb-3">
+                        Możesz od razu <strong>zarejestrować wpłatę w iFirma dla każdej FV</strong> (po alokowanej kwocie)
+                        i odświeżyć status spraw — albo zaakceptować pakiet tylko lokalnie.
+                    </p>
+                    <div class="alert alert-light border small mb-0" role="alert">
+                        Rejestracja w iFirma działa dla faktur krajowych. Przy błędzie jednej FV pozostałe lokalne powiązania zostają —
+                        komunikat ostrzeże, które wpłaty nie przeszły.
+                    </div>
+                </div>
+                <div class="modal-footer flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <button type="button" class="btn btn-outline-primary" id="bankImportAcceptPackageLocalBtn" data-loading-text="Akceptuję…">Tylko lokalnie</button>
+                    <button type="button" class="btn btn-primary" id="bankImportAcceptPackageIfirmaBtn" data-loading-text="Rejestruję wpłaty…">Pakiet + wpłaty w iFirma</button>
                 </div>
             </div>
         </div>
@@ -749,7 +984,8 @@
             font-weight: 600;
         }
         #bankImportAcceptWarnModal,
-        #bankImportAcceptIfirmaModal {
+        #bankImportAcceptIfirmaModal,
+        #bankImportAcceptPackageModal {
             z-index: 1065;
         }
         .bank-manual-peek-btn.is-active {
@@ -774,13 +1010,92 @@
             var acceptWarnModal = acceptWarnModalEl ? bootstrap.Modal.getOrCreateInstance(acceptWarnModalEl) : null;
             var acceptIfirmaModalEl = document.getElementById('bankImportAcceptIfirmaModal');
             var acceptIfirmaModal = acceptIfirmaModalEl ? bootstrap.Modal.getOrCreateInstance(acceptIfirmaModalEl) : null;
+            var acceptPackageModalEl = document.getElementById('bankImportAcceptPackageModal');
+            var acceptPackageModal = acceptPackageModalEl ? bootstrap.Modal.getOrCreateInstance(acceptPackageModalEl) : null;
             var pendingAcceptForm = null;
+            var pendingPackageForm = null;
 
             function setRegisterIfirma(form, value) {
                 var input = form.querySelector('.bank-import-register-ifirma');
                 if (input) {
                     input.value = value ? '1' : '0';
                 }
+            }
+
+            function submitPackageForm(form, triggerBtn, withIfirma) {
+                setRegisterIfirma(form, !!withIfirma);
+                form.setAttribute('data-package-confirmed', '1');
+                if (window.PneButtonLoading && window.PneButtonLoading.setButtonLoading) {
+                    if (triggerBtn) {
+                        window.PneButtonLoading.setButtonLoading(
+                            triggerBtn,
+                            true,
+                            triggerBtn.getAttribute('data-loading-text') || 'Akceptuję pakiet…'
+                        );
+                    }
+                    var formBtn = form.querySelector('button[type="submit"]');
+                    if (formBtn) {
+                        window.PneButtonLoading.setButtonLoading(
+                            formBtn,
+                            true,
+                            formBtn.getAttribute('data-loading-text') || 'Akceptuję pakiet…'
+                        );
+                    }
+                }
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            }
+
+            document.querySelectorAll('.bank-import-package-form').forEach(function (form) {
+                form.addEventListener('submit', function (e) {
+                    if (form.getAttribute('data-package-confirmed') === '1') {
+                        form.removeAttribute('data-package-confirmed');
+                        return;
+                    }
+                    e.preventDefault();
+                    pendingPackageForm = form;
+                    var countEl = document.getElementById('bankImportAcceptPackageCount');
+                    if (countEl) {
+                        countEl.textContent = form.getAttribute('data-package-count') || 'kilka';
+                    }
+                    setRegisterIfirma(form, false);
+                    if (acceptPackageModal) {
+                        acceptPackageModal.show();
+                    }
+                });
+            });
+
+            var packageLocalBtn = document.getElementById('bankImportAcceptPackageLocalBtn');
+            if (packageLocalBtn) {
+                packageLocalBtn.addEventListener('click', function () {
+                    if (!pendingPackageForm) {
+                        return;
+                    }
+                    var form = pendingPackageForm;
+                    pendingPackageForm = null;
+                    if (acceptPackageModal) {
+                        acceptPackageModal.hide();
+                    }
+                    submitPackageForm(form, packageLocalBtn, false);
+                });
+            }
+
+            var packageIfirmaBtn = document.getElementById('bankImportAcceptPackageIfirmaBtn');
+            if (packageIfirmaBtn) {
+                packageIfirmaBtn.addEventListener('click', function () {
+                    if (!pendingPackageForm) {
+                        return;
+                    }
+                    var form = pendingPackageForm;
+                    pendingPackageForm = null;
+                    if (acceptPackageModal) {
+                        acceptPackageModal.hide();
+                    }
+                    submitPackageForm(form, packageIfirmaBtn, true);
+                });
             }
 
             function setIfirmaAlreadyPaid(form, value) {
@@ -820,6 +1135,7 @@
                         }
                         return;
                     }
+                    // Pojedyncza FV z pakietu: alokacja = kwota FV → ten sam wybór lokalnie / iFirma
                     setRegisterIfirma(form, false);
                     setIfirmaAlreadyPaid(form, false);
                     if (acceptIfirmaModal) {
@@ -1085,6 +1401,12 @@
                     .forEach(function (el) {
                         el.classList.remove('bank-match-ok', 'bank-match-warn', 'bank-match-ok-label', 'bank-match-warn-label');
                     });
+                modal.querySelectorAll('#bankTxPreviewTransfer [data-field="description"], #bankTxPreviewTransfer [data-field="invoice_from_title"]')
+                    .forEach(function (el) {
+                        if (el.querySelector('mark')) {
+                            el.textContent = el.textContent || '';
+                        }
+                    });
             }
 
             function highlightField(root, field, kind) {
@@ -1136,38 +1458,41 @@
                 }
             }
 
-            function applyMatchHighlights(modal, reasonCodes, txData) {
+            function normalizeInvoiceHint(value) {
+                var raw = String(value || '').trim();
+                if (!raw || raw === '—') return null;
+                var primary = raw.split(/\s*[·|]\s*|\s+-\s+/)[0].trim();
+                return primary || null;
+            }
+
+            /**
+             * Podświetlenia zgodności przelew ↔ zamówienie.
+             * options.orderInvoice — FV z prawej kolumny (gdy brak invoice_number: w reasons).
+             */
+            function applyMatchHighlights(modal, reasonCodes, txData, options) {
                 clearMatchHighlights(modal);
                 if (!reasonCodes || !reasonCodes.length) return;
 
+                options = options || {};
                 var txRoot = document.getElementById('bankTxPreviewTransfer');
                 var orderRoot = document.getElementById('bankTxPreviewOrder');
                 var codes = reasonCodes.map(String);
+                var isSplit = codes.indexOf('split_allocation') !== -1
+                    || codes.indexOf('multi_invoice_sum_match') !== -1;
                 var rawFragments = [];
                 var rawKind = 'ok';
+                var invoiceNumbers = [];
+
+                var hasAmountMismatch = codes.indexOf('amount_mismatch') !== -1;
+                var hasAmountMatch = codes.indexOf('amount_match') !== -1;
 
                 codes.forEach(function (code) {
-                    if (code === 'amount_match') {
-                        highlightField(txRoot, 'amount', 'ok');
-                        highlightField(orderRoot, 'amount', 'ok');
-                        if (txData && txData.amount) {
-                            // np. "365,00 PLN" → spróbuj też "365,00"
-                            var amountCore = String(txData.amount).replace(/\s*PLN\s*$/i, '').trim();
-                            rawFragments.push(amountCore);
-                            rawFragments.push(amountCore.replace(/\s/g, ''));
-                        }
-                        return;
-                    }
-                    if (code === 'amount_mismatch') {
-                        highlightField(txRoot, 'amount', 'warn');
-                        highlightField(orderRoot, 'amount', 'warn');
-                        rawKind = 'warn';
+                    if (code === 'amount_match' || code === 'amount_mismatch') {
+                        // Kwoty obsługujemy po pętli (jedna logika: 1:1 vs podział).
                         return;
                     }
                     if (code.indexOf('invoice_number:') === 0 || code.indexOf('debt_case_invoice_number:') === 0) {
-                        highlightField(txRoot, 'invoice_from_title', 'ok');
-                        highlightField(orderRoot, 'invoice', 'ok');
-                        rawFragments.push(code.split(':').slice(1).join(':'));
+                        invoiceNumbers.push(code.split(':').slice(1).join(':'));
                         return;
                     }
                     if (code.indexOf('ksef_number:') === 0) {
@@ -1217,6 +1542,58 @@
                     }
                 });
 
+                // Kwoty:
+                // - 1:1 + amount_match → zielone obie strony (przelew = FV)
+                // - podział / pakiet multi-FV → zielona tylko kwota FV (730 ≠ 365 — nie podświetlaj przelewu)
+                // - amount_mismatch → ostrzeżenie na kwocie FV (przy podziale nie na pełnym przelewie)
+                if (hasAmountMismatch) {
+                    highlightField(orderRoot, 'amount', 'warn');
+                    if (! isSplit) {
+                        highlightField(txRoot, 'amount', 'warn');
+                    }
+                    rawKind = 'warn';
+                } else if (hasAmountMatch || isSplit) {
+                    highlightField(orderRoot, 'amount', 'ok');
+                    if (! isSplit && hasAmountMatch) {
+                        highlightField(txRoot, 'amount', 'ok');
+                        if (txData && txData.amount) {
+                            var amountCore = String(txData.amount).replace(/\s*PLN\s*$/i, '').trim();
+                            rawFragments.push(amountCore);
+                            rawFragments.push(amountCore.replace(/\s/g, ''));
+                        }
+                    }
+                }
+
+                var orderInvoice = normalizeInvoiceHint(options.orderInvoice);
+                var hasInvoiceMismatch = codes.some(function (c) {
+                    return c.indexOf('invoice_number_mismatch:') === 0;
+                });
+                if (orderInvoice && !hasInvoiceMismatch) {
+                    var hasOrderInvoice = invoiceNumbers.some(function (n) {
+                        return String(n).replace(/\s+/g, '').toLowerCase()
+                            === orderInvoice.replace(/\s+/g, '').toLowerCase();
+                    });
+                    if (!hasOrderInvoice) {
+                        invoiceNumbers.push(orderInvoice);
+                    }
+                }
+
+                invoiceNumbers = invoiceNumbers
+                    .map(normalizeInvoiceHint)
+                    .filter(Boolean);
+
+                if (invoiceNumbers.length && !hasInvoiceMismatch) {
+                    highlightField(txRoot, 'invoice_from_title', 'ok');
+                    highlightField(orderRoot, 'invoice', 'ok');
+                    var invoiceFromTitleEl = txRoot
+                        ? txRoot.querySelector('[data-field="invoice_from_title"]')
+                        : null;
+                    highlightFragmentsInText(invoiceFromTitleEl, invoiceNumbers, 'ok');
+                    invoiceNumbers.forEach(function (n) {
+                        rawFragments.push(n);
+                    });
+                }
+
                 var descEl = txRoot ? txRoot.querySelector('[data-field="description"]') : null;
                 highlightFragmentsInText(descEl, rawFragments, rawKind);
             }
@@ -1232,6 +1609,7 @@
             var originalOrderSnapshot = null;
             var peekedOrderId = null;
             var peekedLinkContext = null;
+            var activeAllocationContext = null;
             var previewButtons = function () {
                 return Array.prototype.slice.call(document.querySelectorAll('.bank-tx-preview-btn'));
             };
@@ -1372,11 +1750,18 @@
                 if (match && match.debt_case_url) {
                     links.push('<a class="btn btn-sm btn-outline-secondary" href="' + esc(match.debt_case_url) + '" target="_blank" rel="noopener">Otwórz sprawę #' + esc(match.debt_case_id) + '</a>');
                 }
-                var ifirmaStatusUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-ifirma-status-url') || '') : '';
-                if (ifirmaStatusUrl && currentPreviewBtn && currentPreviewBtn.getAttribute('data-can-act') === 'match') {
+                var ifirmaStatusUrl = (activeAllocationContext && activeAllocationContext.ifirma_status_url)
+                    ? activeAllocationContext.ifirma_status_url
+                    : (currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-ifirma-status-url') || '') : '');
+                if (ifirmaStatusUrl && (
+                    (currentPreviewBtn && currentPreviewBtn.getAttribute('data-can-act') === 'match')
+                    || (activeAllocationContext && activeAllocationContext.ifirma_status_url)
+                )) {
                     links.push('<button type="button" class="btn btn-sm btn-outline-success" id="bankTxPreviewIfirmaStatusBtn">Sprawdź status z iFirma</button>');
                 }
-                var registerIfirmaUrl = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-register-ifirma-url') || '') : '';
+                var registerIfirmaUrl = (activeAllocationContext && activeAllocationContext.register_ifirma_url)
+                    ? activeAllocationContext.register_ifirma_url
+                    : (currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-register-ifirma-url') || '') : '');
                 if (registerIfirmaUrl) {
                     links.push('<form method="POST" action="' + esc(registerIfirmaUrl) + '" class="d-inline" data-loading-submit data-loading-text="Rejestruję…">'
                         + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
@@ -1393,7 +1778,9 @@
                     });
                 }
 
-                applyMatchHighlights(modalEl, match ? match.reason_codes : [], snapshot.txData || {});
+                applyMatchHighlights(modalEl, match ? match.reason_codes : [], snapshot.txData || {}, {
+                    orderInvoice: order && order.invoice ? order.invoice : null
+                });
                 setClearPeekBtnVisible(false);
             }
 
@@ -1603,13 +1990,26 @@
                     unlinkBtn.classList.add('d-none');
                 }
 
-                if (canAct === 'match') {
+                if (canAct === 'package') {
+                    acceptForm.classList.add('d-none');
+                    rejectForm.classList.add('d-none');
+                    ignoreForm.classList.remove('d-none');
+                    ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
+                    acceptForm.removeAttribute('data-amount-mismatch');
+                    acceptForm.removeAttribute('data-split-package');
+                    acceptForm.removeAttribute('data-accept-confirmed');
+                    setRegisterIfirma(acceptForm, false);
+                    setIfirmaAlreadyPaid(acceptForm, false);
+                    ignoreBtn.textContent = 'Ignoruj transakcję';
+                    setManualLinkPanelVisible(true);
+                } else if (canAct === 'match') {
                     acceptForm.classList.remove('d-none');
                     rejectForm.classList.remove('d-none');
                     ignoreForm.classList.remove('d-none');
                     acceptForm.setAttribute('action', btn.getAttribute('data-accept-url') || '');
                     rejectForm.setAttribute('action', btn.getAttribute('data-reject-url') || '');
                     ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
+                    acceptForm.removeAttribute('data-split-package');
                     if (btn.getAttribute('data-amount-mismatch') === '1') {
                         acceptForm.setAttribute('data-amount-mismatch', '1');
                     } else {
@@ -1626,6 +2026,7 @@
                     ignoreForm.classList.remove('d-none');
                     ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
                     acceptForm.removeAttribute('data-amount-mismatch');
+                    acceptForm.removeAttribute('data-split-package');
                     acceptForm.removeAttribute('data-accept-confirmed');
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
@@ -1636,19 +2037,21 @@
                     rejectForm.classList.add('d-none');
                     ignoreForm.classList.add('d-none');
                     acceptForm.removeAttribute('data-amount-mismatch');
+                    acceptForm.removeAttribute('data-split-package');
                     acceptForm.removeAttribute('data-accept-confirmed');
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
-                    setManualLinkPanelVisible(false);
+                    var previewAccepted = {};
+                    try { previewAccepted = JSON.parse(btn.getAttribute('data-preview') || '{}'); } catch (e) {}
+                    var canAddMore = previewAccepted.remaining && previewAccepted.remaining.can_add;
+                    setManualLinkPanelVisible(!!canAddMore);
                     if (unlinkBtn) {
                         unlinkBtn.classList.remove('d-none');
                         unlinkBtn.setAttribute('data-unlink-url', btn.getAttribute('data-unlink-url') || '');
-                        var preview = {};
-                        try { preview = JSON.parse(btn.getAttribute('data-preview') || '{}'); } catch (e) {}
-                        var summary = ((preview.tx && preview.tx.amount) ? preview.tx.amount : '')
-                            + ((preview.tx && preview.tx.date) ? ' · ' + preview.tx.date : '');
-                        if (preview.match && preview.match.debt_case_id) {
-                            summary += ' · sprawa #' + preview.match.debt_case_id;
+                        var summary = ((previewAccepted.tx && previewAccepted.tx.amount) ? previewAccepted.tx.amount : '')
+                            + ((previewAccepted.tx && previewAccepted.tx.date) ? ' · ' + previewAccepted.tx.date : '');
+                        if (previewAccepted.match && previewAccepted.match.debt_case_id) {
+                            summary += ' · sprawa #' + previewAccepted.match.debt_case_id;
                         }
                         unlinkBtn.setAttribute('data-unlink-summary', summary || ('przelew #' + (btn.getAttribute('data-tx-id') || '')));
                     }
@@ -1657,6 +2060,7 @@
                     rejectForm.classList.add('d-none');
                     ignoreForm.classList.add('d-none');
                     acceptForm.removeAttribute('data-amount-mismatch');
+                    acceptForm.removeAttribute('data-split-package');
                     acceptForm.removeAttribute('data-accept-confirmed');
                     setRegisterIfirma(acceptForm, false);
                     setIfirmaAlreadyPaid(acceptForm, false);
@@ -1693,13 +2097,222 @@
                 clearMatchHighlights(modalEl);
                 fillDl(document.getElementById('bankTxPreviewTransfer'), preview.tx || {});
 
+                var allocationsBox = document.getElementById('bankTxPreviewAllocations');
+                if (!allocationsBox) {
+                    var transferRoot = document.getElementById('bankTxPreviewTransfer');
+                    if (transferRoot && transferRoot.parentElement) {
+                        allocationsBox = document.createElement('div');
+                        allocationsBox.id = 'bankTxPreviewAllocations';
+                        allocationsBox.className = 'mt-3 small';
+                        transferRoot.parentElement.appendChild(allocationsBox);
+                    }
+                }
+                if (allocationsBox) {
+                    var allocHtml = '';
+                    var allocations = preview.allocations || [];
+                    if (allocations.length) {
+                        allocHtml += '<div class="fw-semibold mb-1">Przypisane części</div>';
+                        allocHtml += '<div class="small text-muted mb-1">Kliknij numer FV, aby zobaczyć zamówienie po prawej i zarejestrować wpłatę w iFirma.</div>';
+                        allocHtml += '<ul class="mb-2 ps-3" id="bankTxPreviewAllocationsList">';
+                        allocations.forEach(function (row, idx) {
+                            var invoiceLabel = row.invoice || '—';
+                            var invoiceBtn = row.form_order_id
+                                ? ('<button type="button" class="btn btn-link btn-sm p-0 align-baseline bank-allocation-select-btn"'
+                                    + ' data-allocation-index="' + idx + '"'
+                                    + ' title="Pokaż zamówienie i rejestrację iFirma">'
+                                    + esc(invoiceLabel)
+                                    + '</button>')
+                                : ('<span class="text-muted">(' + esc(invoiceLabel) + ')</span>');
+                            allocHtml += '<li class="bank-allocation-row" data-allocation-index="' + idx + '">'
+                                + esc(row.allocated || '') + ' → '
+                                + (row.debt_case_url
+                                    ? ('<a href="' + esc(row.debt_case_url) + '" target="_blank" rel="noopener">Sprawa #' + esc(String(row.debt_case_id)) + '</a>')
+                                    : '—')
+                                + ' (' + invoiceBtn + ')'
+                                + '</li>';
+                        });
+                        allocHtml += '</ul>';
+                    }
+                    if (preview.package && preview.package.items && preview.package.items.length) {
+                        allocHtml += '<div class="fw-semibold mb-1">Pakiet do akceptacji (' + esc(String(preview.package.count)) + ' FV)</div>';
+                        allocHtml += '<div class="small text-muted mb-1">Suma '
+                            + esc(preview.package.sum_formatted || '') + ' = przelew '
+                            + esc(preview.package.transfer_formatted || '') + '</div>';
+                        allocHtml += '<ul class="mb-2 ps-3">';
+                        preview.package.items.forEach(function (item) {
+                            allocHtml += '<li><span class="fw-semibold">' + esc(item.invoice || '—') + '</span>'
+                                + ' · ' + esc(item.amount || '')
+                                + (item.form_order_url
+                                    ? (' · <a href="' + esc(item.form_order_url) + '" target="_blank" rel="noopener">Zam. #' + esc(String(item.form_order_id)) + '</a>')
+                                    : '')
+                                + (item.debt_case_url
+                                    ? (' · <a href="' + esc(item.debt_case_url) + '" target="_blank" rel="noopener">Sprawa #' + esc(String(item.debt_case_id)) + '</a>')
+                                    : ' · <span class="text-muted">utworzy sprawę</span>')
+                                + '</li>';
+                        });
+                        allocHtml += '</ul>';
+                    }
+                    if (preview.package && preview.package.accept_url) {
+                        var filterInput = document.querySelector('input[name="filter"]');
+                        var filterVal = filterInput ? filterInput.value : '';
+                        allocHtml += '<form method="POST" action="' + esc(preview.package.accept_url) + '" class="d-inline bank-import-package-form" data-loading-submit data-loading-text="Akceptuję pakiet…" data-package-count="' + esc(String(preview.package.count)) + '">'
+                            + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
+                            + '<input type="hidden" name="filter" value="' + esc(filterVal) + '">'
+                            + '<input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">'
+                            + '<button type="submit" class="btn btn-sm btn-primary">Akceptuj pakiet (' + esc(String(preview.package.count)) + ')</button>'
+                            + '</form>';
+                    }
+                    allocationsBox.innerHTML = allocHtml;
+                    allocationsBox.querySelectorAll('.bank-import-package-form').forEach(function (form) {
+                        form.addEventListener('submit', function (e) {
+                            if (form.getAttribute('data-package-confirmed') === '1') {
+                                form.removeAttribute('data-package-confirmed');
+                                return;
+                            }
+                            e.preventDefault();
+                            pendingPackageForm = form;
+                            var countEl = document.getElementById('bankImportAcceptPackageCount');
+                            if (countEl) {
+                                countEl.textContent = form.getAttribute('data-package-count') || 'kilka';
+                            }
+                            setRegisterIfirma(form, false);
+                            if (acceptPackageModal) {
+                                acceptPackageModal.show();
+                            }
+                        });
+                    });
+                    allocationsBox.querySelectorAll('.bank-allocation-select-btn').forEach(function (allocBtn) {
+                        allocBtn.addEventListener('click', function () {
+                            var idx = Number(allocBtn.getAttribute('data-allocation-index') || '-1');
+                            var row = allocations[idx];
+                            if (!row || !row.form_order_id) {
+                                return;
+                            }
+                            selectAcceptedAllocation(row, allocBtn);
+                        });
+                    });
+                }
+
                 var lookupResults = document.getElementById('bankTxManualLookupResults');
                 var lookupStatus = document.getElementById('bankTxManualLookupStatus');
                 if (lookupResults) lookupResults.innerHTML = '';
                 if (lookupStatus) lookupStatus.textContent = '';
 
+                activeAllocationContext = null;
+                if ((preview.allocations || []).length && preview.allocations[0].form_order_id) {
+                    activeAllocationContext = {
+                        register_ifirma_url: preview.allocations[0].register_ifirma_url || '',
+                        ifirma_status_url: preview.allocations[0].ifirma_status_url || '',
+                        match_id: preview.allocations[0].match_id || null,
+                    };
+                    if (currentPreviewBtn) {
+                        if (preview.allocations[0].register_ifirma_url) {
+                            currentPreviewBtn.setAttribute('data-register-ifirma-url', preview.allocations[0].register_ifirma_url);
+                        }
+                        if (preview.allocations[0].ifirma_status_url) {
+                            currentPreviewBtn.setAttribute('data-ifirma-status-url', preview.allocations[0].ifirma_status_url);
+                        }
+                    }
+                }
+
                 renderOrderPanelFromSnapshot(originalOrderSnapshot, false);
                 syncActionForms(btn);
+                highlightActiveAllocation(0);
+            }
+
+            function highlightActiveAllocation(index) {
+                var list = document.getElementById('bankTxPreviewAllocationsList');
+                if (!list) return;
+                list.querySelectorAll('.bank-allocation-row').forEach(function (li) {
+                    var active = Number(li.getAttribute('data-allocation-index')) === Number(index);
+                    li.classList.toggle('fw-semibold', active);
+                    var btn = li.querySelector('.bank-allocation-select-btn');
+                    if (btn) {
+                        btn.classList.toggle('link-success', active);
+                        btn.classList.toggle('fw-bold', active);
+                    }
+                });
+            }
+
+            async function selectAcceptedAllocation(row, triggerBtn) {
+                if (!row || !row.form_order_id) {
+                    return;
+                }
+                if (triggerBtn) {
+                    triggerBtn.disabled = true;
+                }
+                try {
+                    var params = new URLSearchParams();
+                    params.set('form_order_id', String(row.form_order_id));
+                    var response = await fetch(lookupOrderPreviewUrl + '?' + params.toString(), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    var payload = await response.json();
+                    if (!response.ok || !payload.order) {
+                        throw new Error((payload && payload.message) ? payload.message : 'Nie udało się wczytać zamówienia.');
+                    }
+
+                    activeAllocationContext = {
+                        register_ifirma_url: row.register_ifirma_url || '',
+                        ifirma_status_url: row.ifirma_status_url || '',
+                        match_id: row.match_id || null,
+                    };
+                    if (currentPreviewBtn) {
+                        if (row.register_ifirma_url) {
+                            currentPreviewBtn.setAttribute('data-register-ifirma-url', row.register_ifirma_url);
+                        } else {
+                            currentPreviewBtn.removeAttribute('data-register-ifirma-url');
+                        }
+                        if (row.ifirma_status_url) {
+                            currentPreviewBtn.setAttribute('data-ifirma-status-url', row.ifirma_status_url);
+                        }
+                    }
+
+                    var txId = currentPreviewBtn ? (currentPreviewBtn.getAttribute('data-tx-id') || '') : '';
+                    var txData = originalOrderSnapshot ? (originalOrderSnapshot.txData || {}) : {};
+                    renderOrderPanelFromSnapshot({
+                        order: payload.order,
+                        match: row.match || null,
+                        txId: txId,
+                        txData: txData
+                    }, false);
+
+                    var unlinkBtn = document.getElementById('bankTxPreviewUnlinkBtn');
+                    if (unlinkBtn && row.unlink_url) {
+                        unlinkBtn.classList.remove('d-none');
+                        unlinkBtn.setAttribute('data-unlink-url', row.unlink_url);
+                        var summary = (txData.amount || '') + (txData.date ? ' · ' + txData.date : '');
+                        if (row.debt_case_id) {
+                            summary += ' · sprawa #' + row.debt_case_id;
+                        }
+                        if (row.invoice) {
+                            summary += ' · FV ' + row.invoice;
+                        }
+                        unlinkBtn.setAttribute('data-unlink-summary', summary || ('match #' + (row.match_id || '')));
+                    }
+
+                    var allocations = [];
+                    try {
+                        var preview = JSON.parse(currentPreviewBtn.getAttribute('data-preview') || '{}');
+                        allocations = preview.allocations || [];
+                    } catch (e) {}
+                    var idx = allocations.findIndex(function (a) { return Number(a.match_id) === Number(row.match_id); });
+                    highlightActiveAllocation(idx >= 0 ? idx : 0);
+                    setClearPeekBtnVisible(false);
+                } catch (e) {
+                    var box = document.getElementById('bankTxPreviewAllocations');
+                    if (box) {
+                        var err = document.createElement('div');
+                        err.className = 'text-danger small mt-1';
+                        err.textContent = e.message || 'Nie udało się przełączyć alokacji.';
+                        box.appendChild(err);
+                        setTimeout(function () { err.remove(); }, 4000);
+                    }
+                } finally {
+                    if (triggerBtn) {
+                        triggerBtn.disabled = false;
+                    }
+                }
             }
 
             modalEl.addEventListener('show.bs.modal', function (event) {

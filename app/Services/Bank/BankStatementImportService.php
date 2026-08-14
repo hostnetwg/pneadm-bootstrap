@@ -242,7 +242,7 @@ class BankStatementImportService
         $userId = $userId ?? Auth::id();
 
         return DB::transaction(function () use ($match, $userId, $acceptedViaIfirmaPaid) {
-            $match->loadMissing(['transaction', 'formOrder', 'debtCase']);
+            $match->loadMissing(['transaction.matches', 'formOrder', 'debtCase']);
 
             $debtCase = $match->debtCase;
             $formOrder = $match->formOrder;
@@ -271,19 +271,78 @@ class BankStatementImportService
             }
 
             $transaction = $match->transaction;
-            $amount = number_format((float) $transaction->amount, 2, ',', ' ');
+            if (! $transaction) {
+                throw new InvalidArgumentException('Brak transakcji bankowej dla tego dopasowania.');
+            }
+
+            $transaction->loadMissing('matches');
+
+            if ($transaction->isIgnored()) {
+                throw new InvalidArgumentException('Ten przelew jest zignorowany — najpierw cofnij ignorowanie.');
+            }
+
+            $formOrderId = (int) ($match->form_order_id ?: $debtCase->form_order_id);
+            $duplicateAccepted = $transaction->acceptedMatches()->contains(
+                function (BankTransactionMatch $existing) use ($debtCase, $formOrderId) {
+                    if ((int) $existing->debt_case_id === (int) $debtCase->id) {
+                        return true;
+                    }
+
+                    return $formOrderId > 0 && (int) $existing->form_order_id === $formOrderId;
+                }
+            );
+            if ($duplicateAccepted) {
+                throw new InvalidArgumentException(
+                    'Ten przelew jest już powiązany z tą sprawą/zamówieniem.'
+                );
+            }
+
+            $remaining = $transaction->remainingAllocatableAmount();
+            if ($remaining <= BankTransactionMatcher::AMOUNT_EPSILON) {
+                throw new InvalidArgumentException(
+                    'Brak wolnej kwoty do podziału na tym przelewie (całość już przypisana).'
+                );
+            }
+
+            $allocatedAmount = $this->resolveAllocatedAmount($transaction, $debtCase, $formOrder);
+            if ($allocatedAmount <= BankTransactionMatcher::AMOUNT_EPSILON) {
+                throw new InvalidArgumentException('Nie udało się wyliczyć kwoty alokacji dla tego powiązania.');
+            }
+            if ($allocatedAmount - $remaining > BankTransactionMatcher::AMOUNT_EPSILON) {
+                throw new InvalidArgumentException(sprintf(
+                    'Kwota alokacji (%s) przekracza wolne %s PLN na przelewie.',
+                    number_format($allocatedAmount, 2, ',', ' '),
+                    number_format($remaining, 2, ',', ' ')
+                ));
+            }
+
+            $transferAmount = number_format((float) $transaction->amount, 2, ',', ' ');
+            $allocatedFormatted = number_format($allocatedAmount, 2, ',', ' ');
             $date = $transaction->operation_date?->format('Y-m-d') ?? '—';
             $invoice = $debtCase->invoice_number
                 ?: ($formOrder?->invoice_number ?? '—');
 
-            $note = sprintf(
-                'Zaakceptowano wpłatę z wyciągu mBank: %s %s z dnia %s (FV %s). Transakcja #%d.',
-                $amount,
-                $transaction->currency,
-                $date,
-                $invoice,
-                $transaction->id
-            );
+            $isSplit = abs($allocatedAmount - (float) $transaction->amount) > BankTransactionMatcher::AMOUNT_EPSILON
+                || $transaction->acceptedMatches()->isNotEmpty();
+
+            $note = $isSplit
+                ? sprintf(
+                    'Zaakceptowano część wpłaty z wyciągu mBank: %s z %s %s z dnia %s (FV %s). Transakcja #%d.',
+                    $allocatedFormatted,
+                    $transferAmount,
+                    $transaction->currency,
+                    $date,
+                    $invoice,
+                    $transaction->id
+                )
+                : sprintf(
+                    'Zaakceptowano wpłatę z wyciągu mBank: %s %s z dnia %s (FV %s). Transakcja #%d.',
+                    $transferAmount,
+                    $transaction->currency,
+                    $date,
+                    $invoice,
+                    $transaction->id
+                );
             if ($acceptedViaIfirmaPaid) {
                 $note .= ' iFirma przed akceptacją wskazywała fakturę jako opłaconą — nie rejestrowano nowej wpłaty w iFirma.';
             }
@@ -300,22 +359,126 @@ class BankStatementImportService
                 'assigned_to_id' => $userId ?: $debtCase->assigned_to_id,
             ])->save();
 
+            // Odrzuć tylko konkurencyjne sugestie tej samej FV/sprawy; inne zostają pod podział.
             BankTransactionMatch::query()
                 ->where('bank_transaction_id', $match->bank_transaction_id)
                 ->where('id', '!=', $match->id)
                 ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+                ->where(function ($query) use ($debtCase, $formOrderId) {
+                    $query->where('debt_case_id', $debtCase->id);
+                    if ($formOrderId > 0) {
+                        $query->orWhere('form_order_id', $formOrderId);
+                    }
+                })
                 ->update(['status' => BankTransactionMatch::STATUS_REJECTED]);
+
+            $reasons = array_values(array_unique(array_filter([
+                ...($match->match_reasons ?? []),
+                $isSplit ? 'split_allocation' : null,
+            ])));
+
+            $invoiceAmount = round((float) (
+                $debtCase->amount_gross
+                ?? $formOrder?->product_price
+                ?? $debtCase->formOrder?->product_price
+                ?? 0
+            ), 2);
+            $allocationMatchesInvoice = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+                && abs($allocatedAmount - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON;
+
+            if ($isSplit && $allocationMatchesInvoice) {
+                $reasons = array_values(array_filter(
+                    $reasons,
+                    fn ($reason) => $reason !== 'amount_mismatch'
+                ));
+                if (! in_array('amount_match', $reasons, true)) {
+                    $reasons[] = 'amount_match';
+                }
+            }
+
+            $confidence = $match->confidence;
+            if (in_array('multi_invoice_sum_match', $reasons, true)
+                || ($isSplit && $allocationMatchesInvoice)) {
+                $confidence = BankTransactionMatch::CONFIDENCE_HIGH;
+            }
 
             $match->update([
                 'debt_case_id' => $debtCase->id,
                 'form_order_id' => $match->form_order_id ?: $debtCase->form_order_id,
                 'status' => BankTransactionMatch::STATUS_ACCEPTED,
+                'allocated_amount' => $allocatedAmount,
+                'match_reasons' => $reasons,
+                'confidence' => $confidence,
                 'accepted_by' => $userId,
                 'accepted_at' => now(),
             ]);
 
+            $transaction->unsetRelation('matches');
+            $transaction->load('matches');
+            if ($transaction->isFullyAllocated()) {
+                BankTransactionMatch::query()
+                    ->where('bank_transaction_id', $transaction->id)
+                    ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+                    ->update(['status' => BankTransactionMatch::STATUS_REJECTED]);
+            }
+
             return $match->fresh(['transaction', 'debtCase', 'formOrder']);
         });
+    }
+
+    /**
+     * Akceptacja lokalna pakietu sugestii (suma FV ≈ przelew) — bez rejestracji w iFirma.
+     *
+     * @return list<BankTransactionMatch>
+     */
+    public function acceptSuggestedSplitPackage(BankTransaction $transaction, ?int $userId = null): array
+    {
+        $transaction->loadMissing('matches');
+        $package = $transaction->matches
+            ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+            ->filter(fn (BankTransactionMatch $match) => in_array(
+                'multi_invoice_sum_match',
+                $match->match_reasons ?? [],
+                true
+            ))
+            ->sortBy('id')
+            ->values();
+
+        if ($package->count() < 2) {
+            throw new InvalidArgumentException(
+                'Brak pakietu sugestii do podziału (wymagane co najmniej 2 FV z sumą ≈ kwota przelewu).'
+            );
+        }
+
+        $accepted = [];
+        foreach ($package as $match) {
+            $accepted[] = $this->acceptMatch($match, $userId, false);
+        }
+
+        return $accepted;
+    }
+
+    /**
+     * Kwota z przelewu przypisywana do jednej FV/sprawy (podział lub całość).
+     */
+    private function resolveAllocatedAmount(
+        BankTransaction $transaction,
+        DebtCase $debtCase,
+        ?FormOrder $formOrder
+    ): float {
+        $remaining = $transaction->remainingAllocatableAmount();
+        $invoiceAmount = round((float) (
+            $debtCase->amount_gross
+            ?? $formOrder?->product_price
+            ?? $debtCase->formOrder?->product_price
+            ?? 0
+        ), 2);
+
+        if ($invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON) {
+            return round(min($invoiceAmount, $remaining), 2);
+        }
+
+        return round($remaining, 2);
     }
 
     public function rejectMatch(BankTransactionMatch $match): BankTransactionMatch
@@ -337,27 +500,46 @@ class BankStatementImportService
             throw new InvalidArgumentException('Można powiązać tylko wpływy (przelewy przychodzące).');
         }
 
-        if ($transaction->matches()
-            ->whereIn('status', [
-                BankTransactionMatch::STATUS_ACCEPTED,
-                BankTransactionMatch::STATUS_IGNORED,
-            ])
-            ->exists()) {
-            throw new InvalidArgumentException('Ten przelew jest już zaakceptowany albo zignorowany.');
+        $transaction->loadMissing('matches');
+
+        if ($transaction->isIgnored()) {
+            throw new InvalidArgumentException('Ten przelew jest zignorowany.');
+        }
+
+        if (! $transaction->canAcceptAdditionalLink()) {
+            throw new InvalidArgumentException(
+                'Brak wolnej kwoty do podziału na tym przelewie (całość już przypisana).'
+            );
+        }
+
+        if ($transaction->acceptedMatches()->contains(
+            fn (BankTransactionMatch $existing) => (int) $existing->debt_case_id === (int) $debtCase->id
+        )) {
+            throw new InvalidArgumentException('Ten przelew jest już powiązany z tą sprawą.');
         }
 
         $debtCase->loadMissing('formOrder');
         $userId = $userId ?? Auth::id();
 
-        $amountMatches = abs(
-            round((float) $transaction->amount, 2)
-            - round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2)
-        ) <= 0.01;
+        $invoiceAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
+        $remaining = $transaction->remainingAllocatableAmount();
+        $allocated = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+            ? min($invoiceAmount, $remaining)
+            : $remaining;
+        $isSplit = $transaction->acceptedMatches()->isNotEmpty()
+            || abs((float) $transaction->amount - $allocated) > BankTransactionMatcher::AMOUNT_EPSILON;
+        $amountMatches = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+            && abs($allocated - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON;
 
-        $reasons = [
+        $reasons = array_values(array_filter([
             'manual_case_link',
+            $isSplit ? 'split_allocation' : null,
             $amountMatches ? 'amount_match' : 'amount_mismatch',
-        ];
+        ]));
+
+        $confidence = $amountMatches
+            ? BankTransactionMatch::CONFIDENCE_HIGH
+            : BankTransactionMatch::CONFIDENCE_LOW;
 
         $match = BankTransactionMatch::query()
             ->where('bank_transaction_id', $transaction->id)
@@ -367,7 +549,7 @@ class BankStatementImportService
         if ($match) {
             $match->forceFill([
                 'form_order_id' => $debtCase->form_order_id,
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'confidence' => $confidence,
                 'match_reasons' => $reasons,
                 'status' => BankTransactionMatch::STATUS_SUGGESTED,
             ])->save();
@@ -376,7 +558,7 @@ class BankStatementImportService
                 'bank_transaction_id' => $transaction->id,
                 'debt_case_id' => $debtCase->id,
                 'form_order_id' => $debtCase->form_order_id,
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'confidence' => $confidence,
                 'match_reasons' => $reasons,
                 'status' => BankTransactionMatch::STATUS_SUGGESTED,
             ]);
@@ -398,13 +580,22 @@ class BankStatementImportService
             throw new InvalidArgumentException('Można powiązać tylko wpływy (przelewy przychodzące).');
         }
 
-        if ($transaction->matches()
-            ->whereIn('status', [
-                BankTransactionMatch::STATUS_ACCEPTED,
-                BankTransactionMatch::STATUS_IGNORED,
-            ])
-            ->exists()) {
-            throw new InvalidArgumentException('Ten przelew jest już zaakceptowany albo zignorowany.');
+        $transaction->loadMissing('matches');
+
+        if ($transaction->isIgnored()) {
+            throw new InvalidArgumentException('Ten przelew jest zignorowany.');
+        }
+
+        if (! $transaction->canAcceptAdditionalLink()) {
+            throw new InvalidArgumentException(
+                'Brak wolnej kwoty do podziału na tym przelewie (całość już przypisana).'
+            );
+        }
+
+        if ($transaction->acceptedMatches()->contains(
+            fn (BankTransactionMatch $existing) => (int) $existing->form_order_id === (int) $order->id
+        )) {
+            throw new InvalidArgumentException('Ten przelew jest już powiązany z tym zamówieniem.');
         }
 
         $activeCase = DebtCase::query()
@@ -418,15 +609,25 @@ class BankStatementImportService
         }
 
         $userId = $userId ?? Auth::id();
-        $amountMatches = abs(
-            round((float) $transaction->amount, 2)
-            - round((float) ($order->product_price ?? 0), 2)
-        ) <= 0.01;
+        $invoiceAmount = round((float) ($order->product_price ?? 0), 2);
+        $remaining = $transaction->remainingAllocatableAmount();
+        $allocated = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+            ? min($invoiceAmount, $remaining)
+            : $remaining;
+        $isSplit = $transaction->acceptedMatches()->isNotEmpty()
+            || abs((float) $transaction->amount - $allocated) > BankTransactionMatcher::AMOUNT_EPSILON;
+        $amountMatches = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+            && abs($allocated - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON;
 
-        $reasons = [
+        $reasons = array_values(array_filter([
             'manual_case_link',
+            $isSplit ? 'split_allocation' : null,
             $amountMatches ? 'amount_match' : 'amount_mismatch',
-        ];
+        ]));
+
+        $confidence = $amountMatches
+            ? BankTransactionMatch::CONFIDENCE_HIGH
+            : BankTransactionMatch::CONFIDENCE_LOW;
 
         $match = BankTransactionMatch::query()
             ->where('bank_transaction_id', $transaction->id)
@@ -436,7 +637,7 @@ class BankStatementImportService
 
         if ($match) {
             $match->forceFill([
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'confidence' => $confidence,
                 'match_reasons' => $reasons,
                 'status' => BankTransactionMatch::STATUS_SUGGESTED,
             ])->save();
@@ -445,7 +646,7 @@ class BankStatementImportService
                 'bank_transaction_id' => $transaction->id,
                 'form_order_id' => $order->id,
                 'debt_case_id' => null,
-                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'confidence' => $confidence,
                 'match_reasons' => $reasons,
                 'status' => BankTransactionMatch::STATUS_SUGGESTED,
             ]);

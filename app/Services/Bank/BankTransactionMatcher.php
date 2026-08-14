@@ -373,6 +373,8 @@ class BankTransactionMatcher
             $candidates[$key]['match_reasons'] = $reasons;
         }
 
+        $candidates = $this->applyMultiInvoiceSumMatch($candidates, $amount);
+
         $list = array_values($candidates);
         $list = $this->applyKsefPriorityRules($list, $extracted);
         usort($list, fn (array $a, array $b) => $b['score'] <=> $a['score']);
@@ -389,6 +391,66 @@ class BankTransactionMatcher
 
             return $item;
         }, $list);
+    }
+
+    /**
+     * Gdy w tytule są ≥2 numery FV i suma kwot zamówień ≈ przelew → High + multi_invoice_sum_match.
+     *
+     * @param  array<string, array{form_order_id: ?int, debt_case_id: ?int, confidence: string, match_reasons: list<string>, score: int}>  $candidates
+     * @return array<string, array{form_order_id: ?int, debt_case_id: ?int, confidence: string, match_reasons: list<string>, score: int}>
+     */
+    private function applyMultiInvoiceSumMatch(array $candidates, float $transferAmount): array
+    {
+        $packageKeys = [];
+        $sum = 0.0;
+
+        foreach ($candidates as $key => $candidate) {
+            $fromTitleInvoice = false;
+            foreach ($candidate['match_reasons'] ?? [] as $reason) {
+                $reason = (string) $reason;
+                if (str_starts_with($reason, 'invoice_number:')
+                    || str_starts_with($reason, 'debt_case_invoice_number:')) {
+                    $fromTitleInvoice = true;
+                    break;
+                }
+            }
+
+            if (! $fromTitleInvoice || empty($candidate['form_order_id'])) {
+                continue;
+            }
+
+            $order = $this->findOrderById((int) $candidate['form_order_id']);
+            if (! $order) {
+                continue;
+            }
+
+            $packageKeys[] = $key;
+            $sum += (float) $order->product_price;
+        }
+
+        $packageKeys = array_values(array_unique($packageKeys));
+        if (count($packageKeys) < 2 || ! $this->amountsMatch($sum, $transferAmount)) {
+            return $candidates;
+        }
+
+        foreach ($packageKeys as $key) {
+            $reasons = array_values(array_filter(
+                $candidates[$key]['match_reasons'] ?? [],
+                fn ($reason) => $reason !== 'amount_mismatch'
+            ));
+            if (! in_array('multi_invoice_sum_match', $reasons, true)) {
+                $reasons[] = 'multi_invoice_sum_match';
+            }
+            // Przy podziale: zgodność dotyczy alokacji FV (nie pełnej kwoty przelewu).
+            if (! in_array('amount_match', $reasons, true)) {
+                $reasons[] = 'amount_match';
+            }
+            $candidates[$key]['match_reasons'] = $reasons;
+            $candidates[$key]['confidence'] = BankTransactionMatch::CONFIDENCE_HIGH;
+            $candidates[$key]['score'] = max((int) ($candidates[$key]['score'] ?? 0), 95);
+        }
+
+        return $candidates;
     }
 
     /**
