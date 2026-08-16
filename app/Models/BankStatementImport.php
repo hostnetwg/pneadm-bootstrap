@@ -82,6 +82,23 @@ class BankStatementImport extends Model
         return $this->pendingReviewCount() === 0;
     }
 
+    /**
+     * Brak zaakceptowanych powiązań na transakcjach tego importu (można bezpiecznie usunąć).
+     */
+    public function canBeDeleted(): bool
+    {
+        if (! $this->transactions()->exists()) {
+            return true;
+        }
+
+        return ! $this->transactions()
+            ->whereHas('matches', fn ($q) => $q->where(
+                'status',
+                BankTransactionMatch::STATUS_ACCEPTED
+            ))
+            ->exists();
+    }
+
     public function reviewProgressLabel(): string
     {
         if ((int) $this->rows_incoming === 0) {

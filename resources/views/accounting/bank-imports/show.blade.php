@@ -2,7 +2,17 @@
     <x-slot name="header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h2 class="fw-semibold fs-4 text-dark mb-0">Import #{{ $import->id }}</h2>
-            <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Lista importów</a>
+            <div class="d-flex flex-wrap gap-2">
+                @if($import->canBeDeleted())
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#bankImportDeleteFromShowModal">
+                        Usuń import
+                    </button>
+                @endif
+                <a href="{{ route('accounting.bank-imports.index') }}" class="btn btn-sm btn-outline-secondary">Lista importów</a>
+            </div>
         </div>
     </x-slot>
 
@@ -308,7 +318,7 @@
                                                 'accept_url' => route('accounting.bank-imports.transactions.accept-package', [$import, $tx]),
                                                 'sum_formatted' => number_format($packageSum, 2, ',', ' ').' '.$tx->currency,
                                                 'transfer_formatted' => number_format((float) $tx->amount, 2, ',', ' ').' '.$tx->currency,
-                                                'items' => $packageSuggested->map(function ($m) use ($tx) {
+                                                'items' => $packageSuggested->map(function ($m) use ($tx, $import) {
                                                     $fo = $m->formOrder;
                                                     $amt = (float) ($fo?->product_price ?? $m->debtCase?->amount_gross ?? 0);
 
@@ -377,7 +387,7 @@
                                                     data-tx-id="{{ $tx->id }}"
                                                     data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
                                                     data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
-                                                    data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) }}"
+                                                    data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}"
                                                     @if($packageSuggested->count() >= 2 && $canAddSplit)
                                                         data-can-act="package"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
@@ -2456,4 +2466,32 @@
             }
         });
     </script>
+
+    @if($import->canBeDeleted())
+        <div class="modal fade" id="bankImportDeleteFromShowModal" tabindex="-1" aria-labelledby="bankImportDeleteFromShowModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger" id="bankImportDeleteFromShowModalLabel">Usunąć ten import?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Import #{{ $import->id }} · {{ $import->original_filename }}</p>
+                        <div class="alert alert-warning mb-0 small">
+                            Usunięcie kasuje przelewy i sugestie z tego wgrania.
+                            Dozwolone tylko bez zaakceptowanych powiązań ze sprawami.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                        <form method="POST" action="{{ route('accounting.bank-imports.destroy', $import) }}" data-loading-submit data-loading-text="Usuwam…">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger" data-loading-text="Usuwam…">Usuń import</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-app-layout>

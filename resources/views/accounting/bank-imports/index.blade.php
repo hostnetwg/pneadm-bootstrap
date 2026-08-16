@@ -195,7 +195,19 @@
                                         <td class="small">{{ $import->uploader?->name ?? '—' }}</td>
                                         <td class="small">{{ $import->created_at?->format('Y-m-d H:i') }}</td>
                                         <td class="text-end">
-                                            <a href="{{ route('accounting.bank-imports.show', $import) }}" class="btn btn-sm btn-outline-primary">Podgląd</a>
+                                            <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                                                <a href="{{ route('accounting.bank-imports.show', $import) }}" class="btn btn-sm btn-outline-primary">Podgląd</a>
+                                                @if($import->canBeDeleted())
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#bankImportDeleteModal"
+                                                            data-delete-url="{{ route('accounting.bank-imports.destroy', $import) }}"
+                                                            data-delete-summary="Import #{{ $import->id }} · {{ $import->original_filename }} · wpływy {{ $import->rows_incoming }}/{{ $import->rows_total }}">
+                                                        Usuń
+                                                    </button>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
@@ -214,14 +226,52 @@
         </div>
     </div>
 
+    <div class="modal fade" id="bankImportDeleteModal" tabindex="-1" aria-labelledby="bankImportDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger" id="bankImportDeleteModalLabel">Usunąć import wyciągu?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2" id="bankImportDeleteSummary"></p>
+                    <div class="alert alert-warning mb-0 small">
+                        Usunięcie kasuje rekord importu oraz powiązane przelewy i sugestie z tego wgrania.
+                        Dozwolone tylko gdy <strong>nie ma zaakceptowanych powiązań</strong> ze sprawami.
+                        Pusty import (same duplikaty) można usunąć zawsze.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
+                    <form method="POST" id="bankImportDeleteForm" data-loading-submit data-loading-text="Usuwam…">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger" data-loading-text="Usuwam…">Usuń import</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            if (!window.bootstrap || !bootstrap.Tooltip) {
-                return;
+            if (window.bootstrap && bootstrap.Tooltip) {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                    bootstrap.Tooltip.getOrCreateInstance(el);
+                });
             }
-            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-                bootstrap.Tooltip.getOrCreateInstance(el);
-            });
+
+            var deleteModal = document.getElementById('bankImportDeleteModal');
+            if (deleteModal) {
+                deleteModal.addEventListener('show.bs.modal', function (event) {
+                    var btn = event.relatedTarget;
+                    if (!btn) return;
+                    var form = document.getElementById('bankImportDeleteForm');
+                    var summary = document.getElementById('bankImportDeleteSummary');
+                    if (form) form.setAttribute('action', btn.getAttribute('data-delete-url') || '');
+                    if (summary) summary.textContent = btn.getAttribute('data-delete-summary') || '';
+                });
+            }
         });
     </script>
 </x-app-layout>

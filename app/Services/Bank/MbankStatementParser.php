@@ -84,7 +84,7 @@ class MbankStatementParser
                 continue;
             }
 
-            $description = trim((string) ($cols[1] ?? ''));
+            $description = $this->sanitizeUtf8(trim((string) ($cols[1] ?? '')));
             $accountLabel = $this->nullableTrim($cols[2] ?? null);
             $category = $this->nullableTrim($cols[3] ?? null);
             $amountRaw = trim((string) ($cols[4] ?? ''));
@@ -282,8 +282,25 @@ class MbankStatementParser
             return null;
         }
 
-        $trimmed = trim((string) $value);
+        $trimmed = trim($this->sanitizeUtf8((string) $value));
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * CSV mBank bywa mieszanym kodowaniem — invalid UTF-8 psuje json_encode / regex /u w UI.
+     */
+    private function sanitizeUtf8(string $value): string
+    {
+        if ($value === '' || mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        if (is_string($converted) && $converted !== '') {
+            return $converted;
+        }
+
+        return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value) ?? $value;
     }
 }

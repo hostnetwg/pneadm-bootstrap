@@ -112,6 +112,22 @@ class BankStatementImportController extends Controller
             ));
     }
 
+    public function destroy(BankStatementImport $bankImport, BankStatementImportService $importService)
+    {
+        try {
+            $id = $bankImport->id;
+            $importService->deleteImport($bankImport);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('accounting.bank-imports.index')
+                ->with('warning', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('accounting.bank-imports.index')
+            ->with('success', sprintf('Usunięto import #%d (bez zaakceptowanych powiązań).', $id));
+    }
+
     public function show(Request $request, BankStatementImport $bankImport, BankStatementImportService $importService)
     {
         $filter = $request->string('filter')->toString() ?: 'unmatched';

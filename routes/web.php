@@ -604,6 +604,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/lookup-order-preview', [BankStatementImportController::class, 'lookupOrderPreview'])->name('lookup-order-preview');
             Route::post('/lookup-ifirma-status', [BankStatementImportController::class, 'lookupIfirmaStatus'])->name('lookup-ifirma-status');
             Route::get('/{bankImport}', [BankStatementImportController::class, 'show'])->name('show');
+            Route::delete('/{bankImport}', [BankStatementImportController::class, 'destroy'])->name('destroy');
             Route::post('/{bankImport}/rematch', [BankStatementImportController::class, 'rematch'])->name('rematch');
             Route::post('/{bankImport}/ignore-paynow-payouts', [BankStatementImportController::class, 'ignorePayNowGatewayPayouts'])->name('ignore-paynow-payouts');
             Route::post('/{bankImport}/matches/{match}/ifirma-status', [BankStatementImportController::class, 'ifirmaStatus'])->name('matches.ifirma-status');

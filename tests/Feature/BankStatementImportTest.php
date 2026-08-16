@@ -1566,4 +1566,187 @@ class BankStatementImportTest extends TestCase
             'allocated_amount' => 365.00,
         ]);
     }
+
+    public function test_show_page_renders_when_package_suggestions_present(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Pakiet A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '357/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Pakiet B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '511/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'package_show.csv',
+            'stored_path' => 'bank-statements/package_show.csv',
+            'file_hash' => hash('sha256', 'package-show'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'period_from' => '2026-08-14',
+            'period_to' => '2026-08-16',
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+            'rows_matched' => 1,
+            'rows_duplicate' => 0,
+        ]);
+
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-14',
+            'amount' => 730,
+            'currency' => 'PLN',
+            'description' => 'Fa 357/8/2026 Fa 511/8/2026 PRZELEW',
+            'fingerprint' => hash('sha256', 'package-show-tx'),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderA->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:357/8/2026', 'multi_invoice_sum_match', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:511/8/2026', 'multi_invoice_sum_match', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('accounting.bank-imports.show', $import))
+            ->assertOk()
+            ->assertSee('Pakiet podziału', false);
+    }
+
+    public function test_reupload_of_same_file_does_not_create_empty_import(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $fixture = file_get_contents(base_path('tests/fixtures/bank/mbank_sample.csv'));
+        $this->assertNotFalse($fixture);
+        $file = UploadedFile::fake()->createWithContent('lista_operacji_dup.csv', $fixture);
+
+        $first = $this->actingAs($user)->post(route('accounting.bank-imports.store'), [
+            'csv_file' => $file,
+        ]);
+        $first->assertRedirect();
+        $this->assertSame(1, BankStatementImport::count());
+        $importId = BankStatementImport::first()->id;
+
+        $secondFile = UploadedFile::fake()->createWithContent('lista_operacji_dup.csv', $fixture);
+        $second = $this->actingAs($user)->from(route('accounting.bank-imports.index'))->post(route('accounting.bank-imports.store'), [
+            'csv_file' => $secondFile,
+        ]);
+        $second->assertRedirect(route('accounting.bank-imports.index'));
+        $second->assertSessionHasErrors('csv_file');
+        $this->assertSame(1, BankStatementImport::count());
+        $this->assertSame($importId, BankStatementImport::first()->id);
+    }
+
+    public function test_can_delete_import_without_accepted_links_but_not_with_accepted(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $empty = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'empty.csv',
+            'stored_path' => null,
+            'file_hash' => hash('sha256', 'empty'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 28,
+            'rows_incoming' => 0,
+            'rows_matched' => 0,
+            'rows_duplicate' => 28,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('accounting.bank-imports.destroy', $empty))
+            ->assertRedirect(route('accounting.bank-imports.index'))
+            ->assertSessionHas('success');
+        $this->assertDatabaseMissing('bank_statement_imports', ['id' => $empty->id]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Usuwanie',
+            'product_price' => 100,
+            'order_date' => now()->subDays(3),
+            'invoice_number' => '9/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 100,
+            'invoice_number' => '9/8/2026',
+            'assigned_to_id' => $user->id,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'accepted.csv',
+            'file_hash' => hash('sha256', 'accepted'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+            'rows_matched' => 1,
+            'rows_duplicate' => 0,
+        ]);
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-14',
+            'amount' => 100,
+            'currency' => 'PLN',
+            'description' => 'Fa 9/8/2026',
+            'fingerprint' => hash('sha256', 'accepted-tx'),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['manual_case_link', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'allocated_amount' => 100,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('accounting.bank-imports.destroy', $import))
+            ->assertRedirect(route('accounting.bank-imports.index'))
+            ->assertSessionHas('warning');
+        $this->assertDatabaseHas('bank_statement_imports', ['id' => $import->id]);
+    }
 }

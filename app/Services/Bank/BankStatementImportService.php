@@ -14,6 +14,7 @@ use App\Services\IfirmaInvoicePaymentStatusService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
 class BankStatementImportService
@@ -114,6 +115,29 @@ class BankStatementImportService
             $matched += $this->flushTransactionChunk($pendingInserts);
         }
 
+        // Samych duplikatów nie zostawiamy jako pusty rekord importu (jak #12 po ponownym wgraniu).
+        if ($incoming === 0 && $duplicates > 0) {
+            $previous = BankStatementImport::query()
+                ->where('file_hash', $hash)
+                ->where('id', '!=', $import->id)
+                ->latest('id')
+                ->first();
+
+            if ($storedPath) {
+                Storage::disk('local')->delete($storedPath);
+            }
+            $import->delete();
+
+            throw new InvalidArgumentException(
+                $previous
+                    ? sprintf(
+                        'Ten plik był już wgrany (import #%d). Wszystkie operacje są już w bazie — nie utworzono pustego importu.',
+                        $previous->id
+                    )
+                    : 'Wszystkie operacje z pliku są już w bazie (duplikaty). Nie utworzono pustego importu.'
+            );
+        }
+
         $import->update([
             'rows_incoming' => $incoming,
             'rows_matched' => $matched,
@@ -121,6 +145,39 @@ class BankStatementImportService
         ]);
 
         return $import->fresh();
+    }
+
+    /**
+     * Czy wolno usunąć import: brak zaakceptowanych powiązań na transakcjach tego importu.
+     */
+    public function canDeleteImport(BankStatementImport $import): bool
+    {
+        if ((int) $import->transactions()->count() === 0) {
+            return true;
+        }
+
+        return ! $import->transactions()
+            ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_ACCEPTED))
+            ->exists();
+    }
+
+    /**
+     * Usuwa rekord importu (+ kaskadowo transakcje/sugestie) oraz plik CSV, gdy nie ma accepted.
+     */
+    public function deleteImport(BankStatementImport $import): void
+    {
+        if (! $this->canDeleteImport($import)) {
+            throw new InvalidArgumentException(
+                'Nie można usunąć importu: są zaakceptowane powiązania przelewów ze sprawami. Najpierw cofnij przypisania.'
+            );
+        }
+
+        $path = $import->stored_path;
+        $import->delete();
+
+        if ($path) {
+            Storage::disk('local')->delete($path);
+        }
     }
 
     /**
