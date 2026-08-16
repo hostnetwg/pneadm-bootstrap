@@ -669,6 +669,20 @@
                                 @if(($bankPayments ?? collect())->isNotEmpty())
                                     <span class="badge text-bg-secondary">{{ $bankPayments->count() }}</span>
                                 @endif
+                                @if(($bankInvoiceTarget ?? 0) > 0)
+                                    @php
+                                        $covPaid = (float) ($bankAllocatedSum ?? 0);
+                                        $covTarget = (float) $bankInvoiceTarget;
+                                        $covLeft = $bankRemainingOnCase;
+                                    @endphp
+                                    @if($covLeft !== null && $covLeft <= 0.01)
+                                        <span class="badge text-bg-success">Pokryte {{ number_format($covPaid, 2, ',', ' ') }} / {{ number_format($covTarget, 2, ',', ' ') }} PLN</span>
+                                    @elseif($covPaid > 0.01)
+                                        <span class="badge text-bg-warning text-dark">Wpłacono {{ number_format($covPaid, 2, ',', ' ') }} / {{ number_format($covTarget, 2, ',', ' ') }} · brakuje {{ number_format((float) $covLeft, 2, ',', ' ') }} PLN</span>
+                                    @else
+                                        <span class="badge text-bg-light border">FV {{ number_format($covTarget, 2, ',', ' ') }} PLN</span>
+                                    @endif
+                                @endif
                             </div>
                             <a href="{{ route('accounting.bank-imports.index') }}"
                                class="btn btn-sm btn-outline-secondary"
@@ -708,6 +722,9 @@
                                                name="bank_amount"
                                                class="form-control form-control-sm"
                                                value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
+                                        @if(($bankRemainingOnCase ?? null) !== null && (float) $bankRemainingOnCase > 0.01 && (float) ($bankAllocatedSum ?? 0) > 0.01)
+                                            <div class="form-text">Domyślnie: brakująca kwota FV</div>
+                                        @endif
                                     </div>
                                     <div class="col-6 col-lg-4 d-flex gap-2">
                                         <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">

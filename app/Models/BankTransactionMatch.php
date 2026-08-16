@@ -175,10 +175,10 @@ class BankTransactionMatch extends Model
 
             $labels[] = match ($reason) {
                 'amount_match' => $isSplit
-                    ? 'Alokowana kwota z przelewu = kwota FV/zamówienia'
-                    : 'Kwota przelewu = kwota FV/zamówienia',
+                    ? 'Alokowana kwota z przelewu zgodna z FV lub brakującą kwotą FV'
+                    : 'Kwota przelewu zgodna z FV lub brakującą kwotą FV',
                 'amount_mismatch' => $isSplit
-                    ? 'Alokowana kwota różni się od kwoty FV/zamówienia'
+                    ? 'Alokowana kwota różni się od pełnej kwoty FV/zamówienia (wpłata częściowa / podział)'
                     : 'Kwota przelewu różni się od kwoty FV/zamówienia',
                 'multi_invoice_sum_match' => 'Suma kwot kilku FV z tytułu ≈ kwota przelewu (podział)',
                 'existing_debt_case' => 'Istnieje aktywna sprawa windykacyjna dla tego zamówienia',

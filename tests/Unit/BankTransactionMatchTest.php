@@ -41,7 +41,7 @@ class BankTransactionMatchTest extends TestCase
 
         $labels = $match->reasonLabels();
 
-        $this->assertContains('Alokowana kwota z przelewu = kwota FV/zamówienia', $labels);
+        $this->assertContains('Alokowana kwota z przelewu zgodna z FV lub brakującą kwotą FV', $labels);
         $this->assertNotContains('Kwota przelewu = kwota FV/zamówienia', $labels);
     }
 }

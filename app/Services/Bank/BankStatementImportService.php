@@ -363,6 +363,12 @@ class BankStatementImportService
 
             $allocatedAmount = $this->resolveAllocatedAmount($transaction, $debtCase, $formOrder);
             if ($allocatedAmount <= BankTransactionMatcher::AMOUNT_EPSILON) {
+                $remainingOnCase = $debtCase->remainingBankAllocatableAmount();
+                if ($remainingOnCase !== null && $remainingOnCase <= BankTransactionMatcher::AMOUNT_EPSILON) {
+                    throw new InvalidArgumentException(
+                        'Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu — nie można dodać kolejnego przelewu (nadpłata zablokowana).'
+                    );
+                }
                 throw new InvalidArgumentException('Nie udało się wyliczyć kwoty alokacji dla tego powiązania.');
             }
             if ($allocatedAmount - $remaining > BankTransactionMatcher::AMOUNT_EPSILON) {
@@ -372,6 +378,14 @@ class BankStatementImportService
                     number_format($remaining, 2, ',', ' ')
                 ));
             }
+
+            $caseRemainingBefore = $debtCase->remainingBankAllocatableAmount();
+            $invoiceAmount = round((float) (
+                $debtCase->amount_gross
+                ?? $formOrder?->product_price
+                ?? $debtCase->formOrder?->product_price
+                ?? 0
+            ), 2);
 
             $transferAmount = number_format((float) $transaction->amount, 2, ',', ' ');
             $allocatedFormatted = number_format($allocatedAmount, 2, ',', ' ');
@@ -434,16 +448,14 @@ class BankStatementImportService
                 $isSplit ? 'split_allocation' : null,
             ])));
 
-            $invoiceAmount = round((float) (
-                $debtCase->amount_gross
-                ?? $formOrder?->product_price
-                ?? $debtCase->formOrder?->product_price
-                ?? 0
-            ), 2);
             $allocationMatchesInvoice = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
                 && abs($allocatedAmount - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON;
+            $allocationMatchesRemainder = $caseRemainingBefore !== null
+                && $caseRemainingBefore > BankTransactionMatcher::AMOUNT_EPSILON
+                && abs($allocatedAmount - $caseRemainingBefore) <= BankTransactionMatcher::AMOUNT_EPSILON;
+            $allocationAmountOk = $allocationMatchesInvoice || $allocationMatchesRemainder;
 
-            if ($isSplit && $allocationMatchesInvoice) {
+            if ($allocationAmountOk) {
                 $reasons = array_values(array_filter(
                     $reasons,
                     fn ($reason) => $reason !== 'amount_mismatch'
@@ -451,11 +463,15 @@ class BankStatementImportService
                 if (! in_array('amount_match', $reasons, true)) {
                     $reasons[] = 'amount_match';
                 }
+            } elseif ($invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+                && abs($allocatedAmount - $invoiceAmount) > BankTransactionMatcher::AMOUNT_EPSILON
+                && ! in_array('amount_mismatch', $reasons, true)) {
+                $reasons[] = 'amount_mismatch';
             }
 
             $confidence = $match->confidence;
             if (in_array('multi_invoice_sum_match', $reasons, true)
-                || ($isSplit && $allocationMatchesInvoice)) {
+                || $allocationAmountOk) {
                 $confidence = BankTransactionMatch::CONFIDENCE_HIGH;
             }
 
@@ -523,7 +539,7 @@ class BankStatementImportService
         DebtCase $debtCase,
         ?FormOrder $formOrder
     ): float {
-        $remaining = $transaction->remainingAllocatableAmount();
+        $remainingOnTransfer = $transaction->remainingAllocatableAmount();
         $invoiceAmount = round((float) (
             $debtCase->amount_gross
             ?? $formOrder?->product_price
@@ -531,11 +547,20 @@ class BankStatementImportService
             ?? 0
         ), 2);
 
-        if ($invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON) {
-            return round(min($invoiceAmount, $remaining), 2);
+        if ($invoiceAmount <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            return round($remainingOnTransfer, 2);
         }
 
-        return round($remaining, 2);
+        $remainingOnCase = $debtCase->remainingBankAllocatableAmount();
+        if ($remainingOnCase === null) {
+            return round(min($invoiceAmount, $remainingOnTransfer), 2);
+        }
+
+        if ($remainingOnCase <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            return 0.0;
+        }
+
+        return round(min($remainingOnTransfer, $remainingOnCase), 2);
     }
 
     public function rejectMatch(BankTransactionMatch $match): BankTransactionMatch
@@ -576,17 +601,30 @@ class BankStatementImportService
         }
 
         $debtCase->loadMissing('formOrder');
+        $remainingOnCase = $debtCase->remainingBankAllocatableAmount();
+        if ($remainingOnCase !== null && $remainingOnCase <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            throw new InvalidArgumentException(
+                'Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu — nie można dodać kolejnego przelewu (nadpłata zablokowana).'
+            );
+        }
+
         $userId = $userId ?? Auth::id();
 
         $invoiceAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
         $remaining = $transaction->remainingAllocatableAmount();
-        $allocated = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
-            ? min($invoiceAmount, $remaining)
-            : $remaining;
+        $allocated = $this->resolveAllocatedAmount($transaction, $debtCase, $debtCase->formOrder);
+        if ($allocated <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            throw new InvalidArgumentException('Nie udało się wyliczyć kwoty alokacji dla tego powiązania.');
+        }
         $isSplit = $transaction->acceptedMatches()->isNotEmpty()
             || abs((float) $transaction->amount - $allocated) > BankTransactionMatcher::AMOUNT_EPSILON;
-        $amountMatches = $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
-            && abs($allocated - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON;
+        $amountMatches = (
+            $invoiceAmount > BankTransactionMatcher::AMOUNT_EPSILON
+            && abs($allocated - $invoiceAmount) <= BankTransactionMatcher::AMOUNT_EPSILON
+        ) || (
+            $remainingOnCase !== null
+            && abs($allocated - $remainingOnCase) <= BankTransactionMatcher::AMOUNT_EPSILON
+        );
 
         $reasons = array_values(array_filter([
             'manual_case_link',

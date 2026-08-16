@@ -571,7 +571,12 @@ class AccountingController extends Controller
         ]);
 
         $profile = $profileService->profileForOrder($debtCase->formOrder);
-        $defaultBankAmount = (float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0);
+        $invoiceTarget = $debtCase->invoiceTargetAmount();
+        $bankAllocatedSum = $debtCase->acceptedBankAllocatedSum();
+        $bankRemainingOnCase = $debtCase->remainingBankAllocatableAmount();
+        $defaultBankAmount = $bankRemainingOnCase !== null && $bankRemainingOnCase > 0
+            ? $bankRemainingOnCase
+            : ($invoiceTarget > 0 ? $invoiceTarget : 0.0);
         $bankTransferAmount = $defaultBankAmount > 0 ? round($defaultBankAmount, 2) : null;
 
         // Kolejność jak na liście (najnowsze pierwsze): poprzednia = nowsza (wyższe id), następna = starsza (niższe id).
@@ -649,6 +654,9 @@ class AccountingController extends Controller
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
             'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
             'bankPayments' => $debtCase->bankTransactionMatches,
+            'bankInvoiceTarget' => $invoiceTarget,
+            'bankAllocatedSum' => $bankAllocatedSum,
+            'bankRemainingOnCase' => $bankRemainingOnCase,
             'bankTransferSearch' => '',
             'bankTransferAmount' => $bankTransferAmount,
             'bankAfterOrderDate' => true,
@@ -860,14 +868,22 @@ class AccountingController extends Controller
             : null;
 
         $caseAmount = round((float) ($debtCase->amount_gross ?? $debtCase->formOrder?->product_price ?? 0), 2);
+        $caseRemaining = $debtCase->remainingBankAllocatableAmount();
         $candidates = $this->bankTransferCandidates($search, $amount, $notBefore, $unlinkedOnly, $exactSearch);
 
         return response()->json([
-            'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount) {
+            'case_remaining' => $caseRemaining,
+            'case_remaining_formatted' => $caseRemaining !== null
+                ? number_format($caseRemaining, 2, ',', ' ')
+                : null,
+            'candidates' => $candidates->map(function (BankTransaction $candidate) use ($debtCase, $caseAmount, $caseRemaining) {
                 $candidate->loadMissing('matches');
                 $remaining = $candidate->remainingAllocatableAmount();
-                $amountMatches = abs($remaining - $caseAmount) <= 0.01
-                    || abs((float) $candidate->amount - $caseAmount) <= 0.01;
+                $compareAmount = $caseRemaining !== null && $caseRemaining > 0.01
+                    ? $caseRemaining
+                    : $caseAmount;
+                $amountMatches = abs($remaining - $compareAmount) <= 0.01
+                    || abs((float) $candidate->amount - $compareAmount) <= 0.01;
                 $ignored = $candidate->isIgnored();
                 $alreadyLinkedToThisCase = $candidate->acceptedMatches()->contains(
                     fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
@@ -879,9 +895,11 @@ class AccountingController extends Controller
                             fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
                         )
                         : null);
+                $caseHasRoom = $caseRemaining === null || $caseRemaining > 0.01;
                 $isLinkable = ! $ignored
                     && ! $alreadyLinkedToThisCase
-                    && $remaining > 0.01;
+                    && $remaining > 0.01
+                    && $caseHasRoom;
                 $summary = sprintf(
                     '#%d · %s · %s %s',
                     $candidate->id,

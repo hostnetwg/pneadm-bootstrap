@@ -57,11 +57,19 @@ class IfirmaInvoicePaymentRegistrationService
         ), 2);
         $expected = round((float) ($order->product_price ?? $debtCase->amount_gross ?? 0), 2);
 
-        if ($expected <= 0 || abs($amount - $expected) > self::AMOUNT_EPSILON) {
+        if ($amount <= self::AMOUNT_EPSILON) {
+            return [
+                'success' => false,
+                'message' => 'Brak dodatniej kwoty alokacji do rejestracji wpłaty w iFirma.',
+            ];
+        }
+
+        // MVP: dozwolone wpłaty częściowe (A). Nadpłata względem kwoty FV — zablokowana.
+        if ($expected > 0 && $amount - self::AMOUNT_EPSILON > $expected) {
             return [
                 'success' => false,
                 'message' => sprintf(
-                    'Rejestracja w iFirma tylko przy zgodnej kwocie (alokacja/przelew %s ≠ FV/zamówienie %s).',
+                    'Kwota alokacji (%s) przekracza kwotę FV/zamówienia (%s) — nadpłata zablokowana.',
                     number_format($amount, 2, ',', ' '),
                     number_format($expected, 2, ',', ' ')
                 ),

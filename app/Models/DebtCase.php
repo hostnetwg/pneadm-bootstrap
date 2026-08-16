@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Bank\BankTransactionMatcher;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -113,6 +114,58 @@ class DebtCase extends Model
     public function bankTransactionMatches(): HasMany
     {
         return $this->hasMany(BankTransactionMatch::class);
+    }
+
+    /**
+     * Docelowa kwota FV/zamówienia dla pokrycia wpłatami z wyciągu.
+     */
+    public function invoiceTargetAmount(): float
+    {
+        $this->loadMissing('formOrder');
+
+        return round((float) ($this->amount_gross ?? $this->formOrder?->product_price ?? 0), 2);
+    }
+
+    /**
+     * Suma zaakceptowanych alokacji z wyciągu na tę sprawę.
+     */
+    public function acceptedBankAllocatedSum(): float
+    {
+        $matches = $this->relationLoaded('bankTransactionMatches')
+            ? $this->bankTransactionMatches->where('status', BankTransactionMatch::STATUS_ACCEPTED)
+            : $this->bankTransactionMatches()
+                ->where('status', BankTransactionMatch::STATUS_ACCEPTED)
+                ->with('transaction')
+                ->get();
+
+        return round((float) $matches->sum(function (BankTransactionMatch $match) {
+            if ($match->allocated_amount !== null) {
+                return (float) $match->allocated_amount;
+            }
+
+            return (float) ($match->transaction?->amount ?? 0);
+        }), 2);
+    }
+
+    /**
+     * Ile jeszcze można dopisać z wyciągu do tej FV/sprawy (0 = pełne pokrycie).
+     * Gdy brak kwoty FV — null (bez limitu po stronie sprawy).
+     */
+    public function remainingBankAllocatableAmount(): ?float
+    {
+        $target = $this->invoiceTargetAmount();
+        if ($target <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            return null;
+        }
+
+        return round(max(0, $target - $this->acceptedBankAllocatedSum()), 2);
+    }
+
+    public function isFullyCoveredByBankPayments(): bool
+    {
+        $remaining = $this->remainingBankAllocatableAmount();
+
+        return $remaining !== null && $remaining <= BankTransactionMatcher::AMOUNT_EPSILON;
     }
 
     public function invoicePdfUploadedBy(): BelongsTo

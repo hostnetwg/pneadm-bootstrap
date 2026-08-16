@@ -1749,4 +1749,83 @@ class BankStatementImportTest extends TestCase
             ->assertSessionHas('warning');
         $this->assertDatabaseHas('bank_statement_imports', ['id' => $import->id]);
     }
+
+    public function test_two_transfers_can_cover_one_case_but_overpayment_is_blocked(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie składkowe',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '553/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'invoice_number' => '553/8/2026',
+            'amount_gross' => 365,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'partials.csv',
+            'file_hash' => hash('sha256', 'partials-cover'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $tx1 = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-12',
+            'amount' => 255.50,
+            'currency' => 'PLN',
+            'description' => '553/8/2026 pierwsza rata',
+            'fingerprint' => hash('sha256', 'partial-tx-1'),
+            'is_incoming' => true,
+        ]);
+        $tx2 = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-13',
+            'amount' => 109.50,
+            'currency' => 'PLN',
+            'description' => '553/8/2026 dopłata',
+            'fingerprint' => hash('sha256', 'partial-tx-2'),
+            'is_incoming' => true,
+        ]);
+        $txOver = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-14',
+            'amount' => 50,
+            'currency' => 'PLN',
+            'description' => '553/8/2026 nadpłata',
+            'fingerprint' => hash('sha256', 'partial-tx-over'),
+            'is_incoming' => true,
+        ]);
+
+        $service = app(\App\Services\Bank\BankStatementImportService::class);
+        $first = $service->manuallyLinkTransactionToDebtCase($tx1, $case, $user->id);
+        $this->assertEquals(255.50, (float) $first->allocated_amount);
+        $case->refresh();
+        $this->assertEquals(109.50, (float) $case->remainingBankAllocatableAmount());
+
+        $second = $service->manuallyLinkTransactionToDebtCase($tx2, $case, $user->id);
+        $this->assertEquals(109.50, (float) $second->allocated_amount);
+        $case->unsetRelation('bankTransactionMatches');
+        $case->refresh();
+        $this->assertTrue($case->isFullyCoveredByBankPayments());
+        $this->assertEquals(0.0, (float) $case->remainingBankAllocatableAmount());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('w pełni pokryta');
+        $service->manuallyLinkTransactionToDebtCase($txOver, $case, $user->id);
+    }
 }
