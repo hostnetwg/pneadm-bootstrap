@@ -305,6 +305,24 @@ class FormOrderOperationalStatusTest extends TestCase
         $this->assertTrue(FormOrder::new()->whereKey($order->id)->exists());
     }
 
+    public function test_invoice_line_quantity_uses_participant_count(): void
+    {
+        $courseId = $this->createCourse();
+        $order = $this->createOrderWithParticipant($courseId, ['product_price' => 600]);
+
+        FormOrderParticipant::create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Nowak',
+            'participant_email' => 'anna@example.test',
+            'is_primary' => false,
+        ]);
+
+        $order = $order->fresh(['participants']);
+        $this->assertSame(2, $order->invoiceLineQuantity());
+        $this->assertSame(300.0, $order->invoiceUnitPrice());
+    }
+
     public function test_cancel_order_endpoint_sets_cancelled_at(): void
     {
         $user = User::factory()->create([

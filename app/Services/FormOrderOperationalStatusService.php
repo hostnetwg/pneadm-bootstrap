@@ -672,7 +672,6 @@ class FormOrderOperationalStatusService
         return $order->participants()
             ->whereNull('deleted_at')
             ->whereRaw("TRIM(participant_email) != ''")
-            ->orderByDesc('is_primary')
             ->orderBy('id')
             ->get();
     }

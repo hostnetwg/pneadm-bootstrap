@@ -55,7 +55,7 @@ Stałe `access_type` (API ClickMeeting):
 
 | Kolumna | Opis |
 |---------|------|
-| `pnedu_clickmeeting_status` | `success`, `failed`, `skipped_not_clickmeeting`, `skipped_missing_event_id` |
+| `pnedu_clickmeeting_status` | `success`, `failed`, `token_missing`, `skipped_not_clickmeeting`, `skipped_missing_event_id` |
 | `pnedu_clickmeeting_synced_at` | Ostatnia próba integracji |
 | `pnedu_clickmeeting_message` | Szczegóły dla panelu |
 
@@ -122,21 +122,27 @@ Maile provision używają **`MAIL_SYSTEM_MAILER`** — przy wartości `log` traf
 
 ## Reset statusu PNEDU
 
-Admin / super_admin: przycisk **Resetuj status PNEDU** — zawsze czyści `pnedu_provisioned_at`, `pnedu_user_existed_before`, pola `pnedu_clickmeeting_*`.
+Admin / super_admin:
+
+- **Per uczestnik** — **Wycofaj dostęp PNEDU** na karcie (`form_order_participant_id`).
+- **Wycofaj dostęp PNEDU wszystkim** — gdy ≥2 osoby mają PNEDU (`reset_all=true`).
+- Bez parametru — legacy: uczestnik główny.
+
+Zawsze czyści `pnedu_provisioned_at`, `pnedu_user_existed_before`, pola `pnedu_clickmeeting_*` na zamówieniu.
 
 **Checkbox (domyślnie zaznaczony):** „Czy usunąć uczestnika ze szkolenia?” — gdy jest zapisany token ClickMeeting: „…oraz token dostępowy?”.  
 Parametr API: `remove_participant` (domyślnie `true`).
 
-| Checkbox | Efekt |
+| Checkbox | Efekt (dla wskazanej osoby / każdej przy „wszyscy”) |
 |----------|--------|
 | ✓ | Soft-delete rekordu `participants`, `participant_id` w `form_order_participants` → `NULL`, unieważnienie tokenu CM w API (`DELETE …/tokens`, best-effort), usunięcie lokalnego `participant_live_access` |
 | ☐ | Tylko reset pól PNEDU przy zamówieniu — uczestnik na liście szkolenia i token CM **bez zmian** |
 
 **Nie usuwa** konta `pnedu.users`. E-mail może nadal widnieć w historii zaproszeń ClickMeeting (brak API do usunięcia z listy „Zaproszenia” w panelu CM).
 
-**Activity log:** wpis „Reset statusu PNEDU” z informacją o usunięciu uczestnika / tokenie.
+**Activity log:** wpis „Reset statusu PNEDU” z `form_order_participant_id` oraz informacją o usunięciu uczestnika / tokenie.
 
-Ponowne **Dodaj uczestnika do PNEDU** tworzy lub odnajduje uczestnika po `course_id` + e-mail, ustawia `pnedu_provisioned_at` i ponawia kroki ClickMeeting + e-mail.
+Ponowne **Dodaj uczestnika do PNEDU** tworzy lub odnajduje uczestnika po `course_id` + e-mail, ustawia `pnedu_provisioned_at` (gdy wszyscy gotowi) i ponawia kroki ClickMeeting + e-mail.
 
 ### Badge **U** (filtr `filter_no_participant`, 2026-08)
 
@@ -144,12 +150,13 @@ Liczy ważne zamówienia, gdzie **brak uczestnika na szkoleniu** **lub** `pnedu_
 
 ## Ponowna wysyłka e-maila (krok 3)
 
-Na `/form-orders/{id}` przy przyznanym PNEDU: przycisk **Prześlij dostęp ponownie** (obok resetu).
+Na `/form-orders/{id}` przy **każdej** karcie provisionowanego uczestnika: **Prześlij dostęp ponownie**.
 
-1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny).
+1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny) dla **wskazanej** osoby.
 2. **Anuluj** / **Skopiuj treść** / **Wyślij**.
-3. Endpoints: `GET …/pnedu/access-email-preview`, `POST …/pnedu/resend-access-email`.
-4. Przy „nowe konto” świeży token resetu hasła powstaje dopiero przy **Wyślij** (w podglądzie placeholder).  
+3. Endpoints: `GET …/pnedu/access-email-preview?form_order_participant_id=…`, `POST …/pnedu/resend-access-email` (body: `form_order_participant_id`).
+4. Bez parametru — zachowanie legacy (uczestnik główny).
+5. Przy „nowe konto” świeży token resetu hasła powstaje dopiero przy **Wyślij** (w podglądzie placeholder).  
    Ponowna wysyłka **unieważnia** poprzedni link ustawienia hasła (Laravel: jeden aktywny token na e-mail).
 
 ## Ważność linku „ustaw hasło”

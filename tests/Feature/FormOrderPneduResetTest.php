@@ -114,6 +114,86 @@ class FormOrderPneduResetTest extends TestCase
         $this->assertNotNull(Participant::withTrashed()->find($participant->id));
     }
 
+    public function test_reset_specific_participant_leaves_other_intact(): void
+    {
+        $courseId = (int) DB::table('courses')->insertGetId([
+            'title' => 'Kurs reset multi',
+            'description' => 'Test',
+            'start_date' => now()->addDay(),
+            'end_date' => now()->addDays(2),
+            'is_paid' => 1,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => 1,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $p1 = Participant::query()->create([
+            'course_id' => $courseId,
+            'first_name' => 'Anna',
+            'last_name' => 'Pierwsza',
+            'email' => 'anna.reset.multi@example.test',
+            'order' => 1,
+        ]);
+        $p2 = Participant::query()->create([
+            'course_id' => $courseId,
+            'first_name' => 'Bartek',
+            'last_name' => 'Drugi',
+            'email' => 'bartek.reset.multi@example.test',
+            'order' => 2,
+        ]);
+
+        $order = FormOrder::query()->create([
+            'product_id' => $courseId,
+            'product_name' => 'Kurs reset multi',
+            'orderer_email' => 'buyer.reset.multi@example.test',
+            'pnedu_provisioned_at' => now(),
+            'pnedu_user_existed_before' => true,
+        ]);
+
+        $fop1 = FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Pierwsza',
+            'participant_email' => 'anna.reset.multi@example.test',
+            'participant_id' => $p1->id,
+            'is_primary' => true,
+        ]);
+        $fop2 = FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Bartek',
+            'participant_lastname' => 'Drugi',
+            'participant_email' => 'bartek.reset.multi@example.test',
+            'participant_id' => $p2->id,
+            'is_primary' => false,
+        ]);
+
+        $response = $this->actingAs($this->admin())->postJson(
+            route('form-orders.pnedu.reset', $order->id),
+            [
+                'remove_participant' => true,
+                'form_order_participant_id' => $fop2->id,
+            ]
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('removed_participant', true)
+            ->assertJsonPath('form_order_participant_id', $fop2->id);
+
+        $order->refresh();
+        $fop1->refresh();
+        $fop2->refresh();
+
+        $this->assertNull($order->pnedu_provisioned_at);
+        $this->assertSame($p1->id, $fop1->participant_id);
+        $this->assertNotNull(Participant::query()->find($p1->id));
+        $this->assertNull($fop2->participant_id);
+        $this->assertNull(Participant::query()->find($p2->id));
+    }
+
     public function test_filter_no_participant_includes_order_with_null_pnedu_provisioned_at(): void
     {
         $user = User::factory()->create([

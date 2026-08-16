@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Course;
 use App\Models\CoursePriceVariant;
 use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
 use App\Models\Instructor;
 use App\Models\Participant;
 use App\Models\PneduUser;
@@ -26,9 +27,48 @@ use Throwable;
 class FormOrderPneduProvisionService
 {
     /**
+     * Czy krok 2 (ClickMeeting) liczy się jako pełny sukces w pasku X/3.
+     * Pominięcie „inna platforma” = OK; błąd rejestracji / brak tokenu / brak event ID = nie-OK.
+     */
+    public static function isClickMeetingStepOk(
+        ?string $status,
+        ?string $token = null,
+        ?int $accessType = null,
+        bool $hasWarning = false
+    ): bool {
+        if ($hasWarning) {
+            return false;
+        }
+
+        $status = $status !== null ? trim($status) : '';
+
+        if ($status === 'skipped_not_clickmeeting') {
+            return true;
+        }
+
+        if (in_array($status, ['failed', 'token_missing', 'skipped_missing_event_id'], true)) {
+            return false;
+        }
+
+        if ($status === 'success') {
+            if ($accessType === \App\Services\ClickMeetingService::ACCESS_TYPE_TOKEN
+                && ! filled(trim((string) $token))) {
+                return false;
+            }
+
+            return true;
+        }
+
+        // Brak statusu / nieznany — nie uznajemy za pełny sukces (operator widzi szczegóły).
+        return false;
+    }
+
+    /**
+     * Provision jednego uczestnika zamówienia (domyślnie główny; opcjonalnie po ID wiersza).
+     *
      * @return array{success: bool, error?: string, message?: string, http_code: int, email_warning?: string, clickmeeting_warning?: string}
      */
-    public function provision(int $formOrderId, bool $addParticipantToSendy = false): array
+    public function provision(int $formOrderId, bool $addParticipantToSendy = false, ?int $formOrderParticipantId = null): array
     {
         $emailWarning = null;
         $clickMeetingWarning = null;
@@ -37,20 +77,11 @@ class FormOrderPneduProvisionService
         try {
             $afterCommit = null;
 
-            $payload = DB::connection('mysql')->transaction(function () use ($formOrderId, &$afterCommit) {
-                $order = FormOrder::with('primaryParticipant')->lockForUpdate()->find($formOrderId);
+            $payload = DB::connection('mysql')->transaction(function () use ($formOrderId, $formOrderParticipantId, &$afterCommit) {
+                $order = FormOrder::with(['primaryParticipant', 'participants'])->lockForUpdate()->find($formOrderId);
 
                 if (! $order) {
                     return ['success' => false, 'error' => 'Zamówienie nie zostało znalezione.', 'http_code' => 404];
-                }
-
-                if ($order->pnedu_provisioned_at !== null) {
-                    return [
-                        'success' => false,
-                        'error' => 'Dostęp PNEDU został już przyznany dla tego zamówienia.',
-                        'http_code' => 400,
-                        'sent_at' => $order->pnedu_provisioned_at->timezone('Europe/Warsaw')->format('d.m.Y H:i'),
-                    ];
                 }
 
                 $course = Course::query()->with(['instructor', 'onlineDetails'])->find($order->product_id);
@@ -58,14 +89,33 @@ class FormOrderPneduProvisionService
                     return ['success' => false, 'error' => 'Nie znaleziono szkolenia (kursu) dla product_id tego zamówienia.', 'http_code' => 400];
                 }
 
-                $p = $order->primaryParticipant;
-                $emailRaw = $p ? trim((string) ($p->participant_email ?? '')) : '';
+                $p = $this->resolveFormOrderParticipant($order, $formOrderParticipantId);
+                if (! $p) {
+                    return [
+                        'success' => false,
+                        'error' => $formOrderParticipantId
+                            ? 'Nie znaleziono wskazanego uczestnika w tym zamówieniu.'
+                            : 'Brak uczestnika w zamówieniu (form_order_participants).',
+                        'http_code' => 400,
+                    ];
+                }
+
+                $ops = app(FormOrderOperationalStatusService::class);
+                if ($ops->isParticipantProvisioned($p, (int) $course->id)) {
+                    return [
+                        'success' => false,
+                        'error' => 'Ten uczestnik ma już dostęp PNEDU do szkolenia.',
+                        'http_code' => 400,
+                    ];
+                }
+
+                $emailRaw = trim((string) ($p->participant_email ?? ''));
                 $email = strtolower($emailRaw);
-                $firstName = $p ? trim((string) ($p->participant_firstname ?? '')) : '';
-                $lastName = $p ? trim((string) ($p->participant_lastname ?? '')) : '';
+                $firstName = trim((string) ($p->participant_firstname ?? ''));
+                $lastName = trim((string) ($p->participant_lastname ?? ''));
 
                 if ($email === '' || ! str_contains($email, '@')) {
-                    return ['success' => false, 'error' => 'Brak prawidłowego e-maila uczestnika (form_order_participants, główny uczestnik).', 'http_code' => 400];
+                    return ['success' => false, 'error' => 'Brak prawidłowego e-maila uczestnika (form_order_participants).', 'http_code' => 400];
                 }
 
                 if ($firstName === '' || $lastName === '') {
@@ -82,7 +132,7 @@ class FormOrderPneduProvisionService
                 $reusedParticipant = $existingParticipant !== null;
 
                 if ($reusedParticipant) {
-                    // Po „Resetuj status PNEDU” uczestnik zostaje na liście szkolenia —
+                    // Po „Wycofaj dostęp PNEDU” bez usunięcia uczestnik zostaje na liście szkolenia —
                     // ponowne dodanie odtwarza powiązanie i status, bez duplikatu w participants.
                     $courseParticipant = $existingParticipant;
                 } else {
@@ -120,8 +170,8 @@ class FormOrderPneduProvisionService
                     $p->save();
                 }
 
-                $order->pnedu_provisioned_at = now();
-                $order->pnedu_user_existed_before = $userExisted;
+                $order->load('participants');
+                $this->syncOrderPneduProvisionedFlag($order, (int) $course->id, $userExisted);
                 if (! $order->save()) {
                     return ['success' => false, 'error' => 'Nie udało się zapisać statusu PNEDU przy zamówieniu.', 'http_code' => 500];
                 }
@@ -132,6 +182,7 @@ class FormOrderPneduProvisionService
                     'last_name' => $lastName,
                     'user_existed' => $userExisted,
                     'participant_id' => (int) $courseParticipant->id,
+                    'form_order_participant_id' => (int) $p->id,
                     'course_title' => (string) $course->title,
                     'course_id' => (int) $course->id,
                     'platform' => trim((string) optional($course->onlineDetails)->platform),
@@ -141,15 +192,20 @@ class FormOrderPneduProvisionService
                     'reused_participant' => $reusedParticipant,
                 ];
 
+                $provisionedAtLabel = $order->pnedu_provisioned_at
+                    ? $order->pnedu_provisioned_at->timezone('Europe/Warsaw')->format('d.m.Y H:i')
+                    : now()->timezone('Europe/Warsaw')->format('d.m.Y H:i');
+
                 return [
                     'success' => true,
                     'message' => $reusedParticipant
                         ? 'Status PNEDU odtworzony — powiązano istniejącego uczestnika szkolenia. Wysłano wiadomość e-mail.'
                         : 'Uczestnik dodany, konto PNEDU obsłużone. Wysłano wiadomość e-mail do uczestnika.',
                     'http_code' => 200,
-                    'provisioned_at' => $order->pnedu_provisioned_at->timezone('Europe/Warsaw')->format('d.m.Y H:i'),
+                    'provisioned_at' => $provisionedAtLabel,
                     'user_existed' => $userExisted,
                     'reused_participant' => $reusedParticipant,
+                    'form_order_participant_id' => (int) $p->id,
                 ];
             });
 
@@ -168,6 +224,8 @@ class FormOrderPneduProvisionService
                     'success' => true,
                     'message' => 'Uczestnik i konto PNEDU zapisane. Uwaga: nie znaleziono rekordu użytkownika w bazie PNEDU do wysyłki e-maila.',
                     'email_warning' => 'Nie wysłano e-maila — brak użytkownika w bazie pnedu.',
+                    'ok_steps' => 1,
+                    'total_steps' => 3,
                 ]);
             }
 
@@ -176,14 +234,23 @@ class FormOrderPneduProvisionService
                 $clickMeetingWarning = $clickMeetingResult['warning'];
             }
 
-            $orderForSendy = FormOrder::query()->with('primaryParticipant', 'course')->find($formOrderId);
-            $includeParticipantInSendy = $orderForSendy
-                ? $this->shouldIncludeParticipantInSendy($orderForSendy, $addParticipantToSendy)
+            $orderForSendy = FormOrder::query()->with(['primaryParticipant', 'course', 'participants'])->find($formOrderId);
+            $fopForSendy = isset($afterCommit['form_order_participant_id'])
+                ? FormOrderParticipant::query()->find((int) $afterCommit['form_order_participant_id'])
+                : $orderForSendy?->primaryParticipant;
+            $includeParticipantInSendy = $orderForSendy && $fopForSendy
+                ? $this->shouldIncludeParticipantInSendy($orderForSendy, $addParticipantToSendy, $fopForSendy)
                 : true;
-            $sendyResult = app(FormOrderSendySyncService::class)->syncByFormOrderId(
-                $formOrderId,
-                $includeParticipantInSendy
-            );
+            $sendyResult = $orderForSendy && $fopForSendy
+                ? app(FormOrderSendySyncService::class)->syncOrderWithParticipant(
+                    $orderForSendy,
+                    $fopForSendy,
+                    $includeParticipantInSendy
+                )
+                : app(FormOrderSendySyncService::class)->syncByFormOrderId(
+                    $formOrderId,
+                    $includeParticipantInSendy
+                );
             if (($sendyResult['failed'] ?? 0) > 0) {
                 $sendyWarning = 'Uwaga: nie wszystkie kontakty zostały dodane do listy Sendy.';
                 Log::warning('FormOrderPneduProvisionService: problem sync Sendy', [
@@ -239,10 +306,45 @@ class FormOrderPneduProvisionService
                 $payload['sendy_warning'] = $sendyWarning;
             }
 
+            $orderFresh = FormOrder::query()->find($formOrderId);
+            $participantFresh = Participant::query()
+                ->with('liveAccess')
+                ->find($afterCommit['participant_id'] ?? 0);
+            $cmStatus = $participantFresh?->liveAccess?->status
+                ?? $orderFresh?->pnedu_clickmeeting_status;
+            $cmToken = $participantFresh?->liveAccess?->token;
+            $cmAccessType = $participantFresh?->liveAccess?->access_type !== null
+                ? (int) $participantFresh->liveAccess->access_type
+                : null;
+            $step2Ok = self::isClickMeetingStepOk(
+                $cmStatus,
+                $cmToken,
+                $cmAccessType,
+                $clickMeetingWarning !== null
+            );
+            $step3Ok = $emailWarning === null;
+            $okSteps = 1 + ($step2Ok ? 1 : 0) + ($step3Ok ? 1 : 0);
+
+            $payload['ok_steps'] = $okSteps;
+            $payload['total_steps'] = 3;
+            $payload['steps'] = [
+                'participant' => ['ok' => true],
+                'clickmeeting' => [
+                    'ok' => $step2Ok,
+                    'status' => $cmStatus,
+                    'message' => $participantFresh?->liveAccess?->message
+                        ?? $orderFresh?->pnedu_clickmeeting_message,
+                    'token' => $participantFresh?->liveAccess?->token,
+                ],
+                'email' => ['ok' => $step3Ok],
+            ];
+
             Log::info('FormOrderPneduProvisionService: sukces', [
                 'form_order_id' => $formOrderId,
                 'email' => $afterCommit['email'],
                 'user_existed' => $afterCommit['user_existed'],
+                'form_order_participant_id' => $afterCommit['form_order_participant_id'] ?? null,
+                'ok_steps' => $okSteps,
             ]);
 
             return $payload;
@@ -262,15 +364,115 @@ class FormOrderPneduProvisionService
     }
 
     /**
+     * Provision wszystkich nieobsłużonych uczestników zamówienia.
+     *
+     * @param  array<int, bool>  $addToSendyByFopId  mapa form_order_participant_id => czy dodać do Sendy
+     * @return array{success: bool, error?: string, message?: string, http_code: int, provisioned?: int, failed?: int, results?: list<array>}
+     */
+    public function provisionAll(int $formOrderId, bool $addParticipantToSendy = false, array $addToSendyByFopId = []): array
+    {
+        $order = FormOrder::with('participants')->find($formOrderId);
+        if (! $order) {
+            return ['success' => false, 'error' => 'Zamówienie nie zostało znalezione.', 'http_code' => 404];
+        }
+
+        $courseId = app(FormOrderOperationalStatusService::class)->resolveCourseId($order);
+        if ($courseId === null) {
+            return ['success' => false, 'error' => 'Nie znaleziono szkolenia dla tego zamówienia.', 'http_code' => 400];
+        }
+
+        $ops = app(FormOrderOperationalStatusService::class);
+        $targets = $ops->activeOrderParticipants($order)
+            ->filter(fn (FormOrderParticipant $fop) => ! $ops->isParticipantProvisioned($fop, $courseId))
+            ->values();
+
+        if ($targets->isEmpty()) {
+            return [
+                'success' => false,
+                'error' => 'Wszyscy uczestnicy mają już dostęp PNEDU.',
+                'http_code' => 400,
+            ];
+        }
+
+        $results = [];
+        $ok = 0;
+        $failed = 0;
+        foreach ($targets as $fop) {
+            $fopId = (int) $fop->id;
+            $sendyForThis = array_key_exists($fopId, $addToSendyByFopId)
+                ? (bool) $addToSendyByFopId[$fopId]
+                : $addParticipantToSendy;
+            $result = $this->provision($formOrderId, $sendyForThis, $fopId);
+            $results[] = [
+                'form_order_participant_id' => $fopId,
+                'email' => $fop->participant_email,
+                'success' => (bool) ($result['success'] ?? false),
+                'error' => $result['error'] ?? null,
+                'message' => $result['message'] ?? null,
+            ];
+            if ($result['success'] ?? false) {
+                $ok++;
+            } else {
+                $failed++;
+            }
+        }
+
+        return [
+            'success' => $ok > 0,
+            'message' => $failed === 0
+                ? "Dodano wszystkich uczestników do PNEDU ({$ok})."
+                : "Dodano {$ok} z ".($ok + $failed).' uczestników. Nieudane: '.$failed.'.',
+            'http_code' => $ok > 0 ? 200 : 400,
+            'provisioned' => $ok,
+            'failed' => $failed,
+            'results' => $results,
+            'error' => $ok === 0 ? 'Nie udało się dodać żadnego uczestnika.' : null,
+        ];
+    }
+
+    private function resolveFormOrderParticipant(FormOrder $order, ?int $formOrderParticipantId): ?FormOrderParticipant
+    {
+        if ($formOrderParticipantId) {
+            return FormOrderParticipant::query()
+                ->where('form_order_id', $order->id)
+                ->where('id', $formOrderParticipantId)
+                ->whereNull('deleted_at')
+                ->first();
+        }
+
+        return $order->primaryParticipant
+            ?? $order->participants->first(fn (FormOrderParticipant $p) => $p->deleted_at === null);
+    }
+
+    private function syncOrderPneduProvisionedFlag(FormOrder $order, int $courseId, bool $lastUserExisted): void
+    {
+        $ops = app(FormOrderOperationalStatusService::class);
+        $active = $ops->activeOrderParticipants($order);
+        $allDone = $active->isNotEmpty()
+            && $active->every(fn (FormOrderParticipant $fop) => $ops->isParticipantProvisioned($fop, $courseId));
+
+        if ($allDone) {
+            $order->pnedu_provisioned_at = $order->pnedu_provisioned_at ?? now();
+            $order->pnedu_user_existed_before = $lastUserExisted;
+        } else {
+            $order->pnedu_provisioned_at = null;
+        }
+    }
+
+    /**
      * Podgląd e-maila z kroku 3 provisionu (bez wysyłki).
      *
-     * @return array{success: bool, error?: string, http_code: int, to?: string, subject?: string, body?: string, body_html?: string, variant?: string, variant_label?: string}
+     * @return array{success: bool, error?: string, http_code: int, to?: string, subject?: string, body?: string, body_html?: string, variant?: string, variant_label?: string, participant_name?: string, form_order_participant_id?: int}
      */
-    public function previewProvisionAccessEmail(int $formOrderId): array
+    public function previewProvisionAccessEmail(int $formOrderId, ?int $formOrderParticipantId = null): array
     {
         try {
-            // Bez odczytu pnedu.users — podgląd nie może wisieć na drugim połączeniu DB.
-            $resolved = $this->resolveProvisionAccessEmailContext($formOrderId, requirePneduUser: false);
+            // Bez wymogu konta pnedu — podgląd nie może wisieć na drugim połączeniu DB.
+            $resolved = $this->resolveProvisionAccessEmailContext(
+                $formOrderId,
+                requirePneduUser: false,
+                formOrderParticipantId: $formOrderParticipantId
+            );
             if (! ($resolved['success'] ?? false)) {
                 return $resolved;
             }
@@ -292,10 +494,13 @@ class FormOrderPneduProvisionService
                 'variant_label' => $resolved['is_new_account']
                     ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
                     : 'E-mail informacyjny (konto już istniało)',
+                'participant_name' => $resolved['participant_name'] ?? null,
+                'form_order_participant_id' => $resolved['form_order_participant_id'] ?? null,
             ];
         } catch (Throwable $e) {
             Log::error('FormOrderPneduProvisionService: błąd podglądu e-maila dostępu', [
                 'form_order_id' => $formOrderId,
+                'form_order_participant_id' => $formOrderParticipantId,
                 'exception' => $e->getMessage(),
             ]);
 
@@ -312,9 +517,13 @@ class FormOrderPneduProvisionService
      *
      * @return array{success: bool, error?: string, message?: string, http_code: int}
      */
-    public function resendProvisionAccessEmail(int $formOrderId): array
+    public function resendProvisionAccessEmail(int $formOrderId, ?int $formOrderParticipantId = null): array
     {
-        $resolved = $this->resolveProvisionAccessEmailContext($formOrderId);
+        $resolved = $this->resolveProvisionAccessEmailContext(
+            $formOrderId,
+            requirePneduUser: true,
+            formOrderParticipantId: $formOrderParticipantId
+        );
         if (! ($resolved['success'] ?? false)) {
             return $resolved;
         }
@@ -328,6 +537,7 @@ class FormOrderPneduProvisionService
 
             Log::info('FormOrderPneduProvisionService: ponowna wysyłka e-maila dostępu', [
                 'form_order_id' => $formOrderId,
+                'form_order_participant_id' => $resolved['form_order_participant_id'] ?? null,
                 'email' => $resolved['email'],
                 'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
             ]);
@@ -339,10 +549,12 @@ class FormOrderPneduProvisionService
                     ? 'Wysłano e-mail z linkiem do ustawienia hasła.'
                     : 'Wysłano e-mail informacyjny na adres uczestnika.',
                 'to' => $resolved['email'],
+                'participant_name' => $resolved['participant_name'] ?? null,
             ];
         } catch (Throwable $e) {
             Log::error('FormOrderPneduProvisionService: błąd ponownej wysyłki e-maila', [
                 'form_order_id' => $formOrderId,
+                'form_order_participant_id' => $formOrderParticipantId,
                 'exception' => $e->getMessage(),
             ]);
 
@@ -365,33 +577,34 @@ class FormOrderPneduProvisionService
      *     instructor_line?: ?string,
      *     start_date_line?: ?string,
      *     live_access?: PneduProvisionLiveAccessContext,
-     *     is_new_account?: bool
+     *     is_new_account?: bool,
+     *     participant_name?: string,
+     *     form_order_participant_id?: int
      * }
      */
-    private function resolveProvisionAccessEmailContext(int $formOrderId, bool $requirePneduUser = true): array
-    {
-        $order = FormOrder::with(['primaryParticipant.participant.liveAccess', 'course.instructor', 'course.onlineDetails'])
-            ->find($formOrderId);
+    private function resolveProvisionAccessEmailContext(
+        int $formOrderId,
+        bool $requirePneduUser = true,
+        ?int $formOrderParticipantId = null
+    ): array {
+        $order = FormOrder::with([
+            'primaryParticipant.participant.liveAccess',
+            'participants.participant.liveAccess',
+            'course.instructor',
+            'course.onlineDetails',
+        ])->find($formOrderId);
 
         if (! $order) {
             return ['success' => false, 'error' => 'Zamówienie nie zostało znalezione.', 'http_code' => 404];
         }
 
-        if ($order->pnedu_provisioned_at === null) {
+        $p = $this->resolveFormOrderParticipant($order, $formOrderParticipantId);
+        if (! $p) {
             return [
                 'success' => false,
-                'error' => 'Najpierw przyznaj dostęp PNEDU — e-mail z dostępem dotyczy już provisionowanego zamówienia.',
-                'http_code' => 400,
-            ];
-        }
-
-        $p = $order->primaryParticipant;
-        $emailRaw = $p ? trim((string) ($p->participant_email ?? '')) : '';
-        $email = strtolower($emailRaw);
-        if ($email === '' || ! str_contains($email, '@')) {
-            return [
-                'success' => false,
-                'error' => 'Brak prawidłowego e-maila uczestnika.',
+                'error' => $formOrderParticipantId
+                    ? 'Nie znaleziono wskazanego uczestnika w tym zamówieniu.'
+                    : 'Brak uczestnika w zamówieniu (form_order_participants).',
                 'http_code' => 400,
             ];
         }
@@ -401,6 +614,31 @@ class FormOrderPneduProvisionService
             return [
                 'success' => false,
                 'error' => 'Nie znaleziono szkolenia dla tego zamówienia.',
+                'http_code' => 400,
+            ];
+        }
+
+        $ops = app(FormOrderOperationalStatusService::class);
+        $isThisProvisioned = $ops->isParticipantProvisioned($p, (int) $course->id);
+        $allowLegacyPrimary = $order->pnedu_provisioned_at !== null
+            && ($formOrderParticipantId === null || (bool) $p->is_primary);
+
+        if (! $isThisProvisioned && ! $allowLegacyPrimary) {
+            return [
+                'success' => false,
+                'error' => $order->pnedu_provisioned_at === null
+                    ? 'Najpierw przyznaj dostęp PNEDU temu uczestnikowi — e-mail z dostępem dotyczy już provisionowanej osoby.'
+                    : 'Ten uczestnik nie ma jeszcze dostępu PNEDU do szkolenia.',
+                'http_code' => 400,
+            ];
+        }
+
+        $emailRaw = trim((string) ($p->participant_email ?? ''));
+        $email = strtolower($emailRaw);
+        if ($email === '' || ! str_contains($email, '@')) {
+            return [
+                'success' => false,
+                'error' => 'Brak prawidłowego e-maila uczestnika.',
                 'http_code' => 400,
             ];
         }
@@ -417,12 +655,14 @@ class FormOrderPneduProvisionService
             }
         }
 
-        $participant = $p?->participant;
+        $participant = $p->participant;
         $clickMeetingResult = $this->clickMeetingResultFromLiveAccess($participant?->liveAccess);
         $liveAccess = app(PneduProvisionEmailContextBuilder::class)->build($course, $clickMeetingResult);
 
-        // true = przy provision utworzono nowe konto → mail z ustawieniem hasła
-        $isNewAccount = $order->pnedu_user_existed_before === false;
+        $participantName = trim((string) ($p->full_name ?? ''));
+        if ($participantName === '') {
+            $participantName = trim($p->participant_firstname.' '.$p->participant_lastname);
+        }
 
         return [
             'success' => true,
@@ -433,8 +673,32 @@ class FormOrderPneduProvisionService
             'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
             'start_date_line' => $this->startDateLineForProvisionEmail($course),
             'live_access' => $liveAccess,
-            'is_new_account' => $isNewAccount,
+            // Podgląd: bez odczytu pnedu.users (snapshot zamówienia). Wysyłka: + last_login_at.
+            'is_new_account' => $this->resolveIsNewAccountForResend($order, $pneduUser),
+            'participant_name' => $participantName !== '' ? $participantName : $email,
+            'form_order_participant_id' => (int) $p->id,
         ];
+    }
+
+    /**
+     * Wariant maila przy ponownej wysyłce: kto już logował się → info; snapshot zamówienia / brak logowania → hasło.
+     */
+    private function resolveIsNewAccountForResend(FormOrder $order, ?PneduUser $pneduUser): bool
+    {
+        if ($pneduUser && $pneduUser->last_login_at !== null) {
+            return false;
+        }
+
+        if ($order->pnedu_user_existed_before === true) {
+            return false;
+        }
+
+        if ($order->pnedu_user_existed_before === false) {
+            return true;
+        }
+
+        // Brak snapshotu przy wysyłce bez logowania → link do hasła.
+        return $pneduUser !== null;
     }
 
     private function mailNotifiableStub(string $email): object
@@ -567,9 +831,13 @@ class FormOrderPneduProvisionService
         return trim(preg_replace("/[ \t]+/u", ' ', $raw) ?? $raw);
     }
 
-    private function shouldIncludeParticipantInSendy(FormOrder $order, bool $addParticipantToSendy): bool
-    {
-        $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? '')));
+    private function shouldIncludeParticipantInSendy(
+        FormOrder $order,
+        bool $addParticipantToSendy,
+        ?FormOrderParticipant $fop = null
+    ): bool {
+        $fop = $fop ?? $order->primaryParticipant;
+        $participantEmail = strtolower(trim((string) ($fop?->participant_email ?? $order->display_participant_email ?? '')));
         $ordererEmail = strtolower(trim((string) ($order->orderer_email ?? '')));
 
         if ($participantEmail === '' || $ordererEmail === '') {
@@ -723,7 +991,8 @@ class FormOrderPneduProvisionService
     }
 
     /**
-     * Cofa status PNEDU przy zamówieniu; opcjonalnie usuwa uczestnika ze szkolenia i unieważnia token CM.
+     * Cofa status PNEDU dla wskazanego uczestnika (domyślnie główny — kompatybilność).
+     * Zawsze czyści flagi PNEDU na zamówieniu; opcjonalnie soft-delete uczestnika szkolenia.
      *
      * @return array{
      *     success: bool,
@@ -732,20 +1001,39 @@ class FormOrderPneduProvisionService
      *     http_code: int,
      *     warnings?: list<string>,
      *     removed_participant?: bool,
-     *     token_invalidated?: bool
+     *     token_invalidated?: bool,
+     *     form_order_participant_id?: int|null
      * }
      */
-    public function resetStatus(FormOrder $order, bool $removeParticipant): array
-    {
+    public function resetStatus(
+        FormOrder $order,
+        bool $removeParticipant,
+        ?int $formOrderParticipantId = null
+    ): array {
         $warnings = [];
         $removedParticipant = false;
         $tokenInvalidated = false;
 
-        $order->loadMissing('primaryParticipant.participant.liveAccess', 'course');
+        $order->loadMissing(['participants.participant.liveAccess', 'primaryParticipant.participant.liveAccess', 'course']);
 
-        $fop = $order->primaryParticipant;
-        $participantId = $fop?->participant_id;
+        $fop = $this->resolveFormOrderParticipant($order, $formOrderParticipantId);
+        if (! $fop) {
+            return [
+                'success' => false,
+                'error' => $formOrderParticipantId
+                    ? 'Nie znaleziono wskazanego uczestnika w tym zamówieniu.'
+                    : 'Brak uczestnika w zamówieniu.',
+                'http_code' => 400,
+            ];
+        }
 
+        $participantName = trim((string) ($fop->full_name ?? ''));
+        if ($participantName === '') {
+            $participantName = trim($fop->participant_firstname.' '.$fop->participant_lastname);
+        }
+        $participantEmail = trim((string) ($fop->participant_email ?? ''));
+
+        $participantId = $fop->participant_id;
         if ($removeParticipant && $participantId) {
             $participant = Participant::query()->find($participantId);
             if ($participant) {
@@ -767,10 +1055,8 @@ class FormOrderPneduProvisionService
                 $participant->delete();
                 $removedParticipant = true;
 
-                if ($fop) {
-                    $fop->participant_id = null;
-                    $fop->save();
-                }
+                $fop->participant_id = null;
+                $fop->save();
             }
         }
 
@@ -794,16 +1080,17 @@ class FormOrderPneduProvisionService
             ];
         }
 
+        $who = $participantName !== '' ? $participantName : ($participantEmail !== '' ? $participantEmail : '#'.$fop->id);
         $message = $removedParticipant
-            ? 'Status PNEDU został zresetowany. Uczestnik usunięty z listy szkolenia.'
-            : 'Status PNEDU został zresetowany. Zamówienie może być ponownie dodane do PNEDU.';
+            ? "Status PNEDU zresetowany dla: {$who}. Uczestnik usunięty z listy szkolenia."
+            : "Status PNEDU zresetowany dla: {$who}. Można ponownie dodać do PNEDU.";
         if ($tokenInvalidated) {
             $message .= ' Token dostępowy ClickMeeting został unieważniony.';
         }
 
         ActivityLog::logCustom(
             'Reset statusu PNEDU',
-            "Reset statusu PNEDU dla zamówienia #{$order->id}"
+            "Reset statusu PNEDU dla zamówienia #{$order->id}, uczestnik FOP #{$fop->id} ({$who})"
             .($removedParticipant ? ' (usunięto uczestnika ze szkolenia)' : ' (bez usuwania uczestnika)')
             .($tokenInvalidated ? ', unieważniono token CM' : '')
             .($warnings !== [] ? '. Ostrzeżenia: '.implode(' ', $warnings) : ''),
@@ -812,6 +1099,7 @@ class FormOrderPneduProvisionService
                 'model_id' => $order->id,
                 'model_name' => "Zamówienie #{$order->id}",
                 'new_values' => [
+                    'form_order_participant_id' => (int) $fop->id,
                     'remove_participant' => $removeParticipant,
                     'removed_participant' => $removedParticipant,
                     'token_invalidated' => $tokenInvalidated,
@@ -826,6 +1114,73 @@ class FormOrderPneduProvisionService
             'warnings' => $warnings,
             'removed_participant' => $removedParticipant,
             'token_invalidated' => $tokenInvalidated,
+            'form_order_participant_id' => (int) $fop->id,
+        ];
+    }
+
+    /**
+     * Reset PNEDU dla wszystkich provisionowanych uczestników zamówienia.
+     *
+     * @return array{
+     *     success: bool,
+     *     error?: string,
+     *     message?: string,
+     *     http_code: int,
+     *     reset?: int,
+     *     failed?: int,
+     *     results?: list<array>
+     * }
+     */
+    public function resetStatusAll(FormOrder $order, bool $removeParticipant): array
+    {
+        $order->loadMissing(['participants.participant.liveAccess', 'course']);
+        $courseId = app(FormOrderOperationalStatusService::class)->resolveCourseId($order);
+        $ops = app(FormOrderOperationalStatusService::class);
+
+        $targets = $ops->activeOrderParticipants($order)->filter(function (FormOrderParticipant $fop) use ($ops, $courseId) {
+            if ($courseId) {
+                return $ops->isParticipantProvisioned($fop, $courseId);
+            }
+
+            return $fop->participant_id !== null;
+        })->values();
+
+        if ($targets->isEmpty()) {
+            // Legacy: flaga zamówienia bez powiązań — wyczyść flagi jak dotychczasowy reset primary.
+            return $this->resetStatus($order, $removeParticipant, null);
+        }
+
+        $results = [];
+        $ok = 0;
+        $failed = 0;
+        foreach ($targets as $fop) {
+            $result = $this->resetStatus($order->fresh(['participants.participant.liveAccess', 'course']), $removeParticipant, (int) $fop->id);
+            $results[] = [
+                'form_order_participant_id' => (int) $fop->id,
+                'success' => (bool) ($result['success'] ?? false),
+                'error' => $result['error'] ?? null,
+                'message' => $result['message'] ?? null,
+            ];
+            if ($result['success'] ?? false) {
+                $ok++;
+            } else {
+                $failed++;
+            }
+        }
+
+        return [
+            'success' => $ok > 0,
+            'message' => $failed === 0
+                ? "Zresetowano status PNEDU dla wszystkich uczestników ({$ok})."
+                : "Zresetowano {$ok} z ".($ok + $failed).'. Nieudane: '.$failed.'.',
+            'http_code' => $ok > 0 ? 200 : 400,
+            'reset' => $ok,
+            'failed' => $failed,
+            'results' => $results,
+            'error' => $ok === 0 ? 'Nie udało się zresetować żadnego uczestnika.' : null,
+            'warnings' => [],
+            'removed_participant' => $removeParticipant,
+            'token_invalidated' => false,
         ];
     }
 }

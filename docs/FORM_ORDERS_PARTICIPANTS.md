@@ -2,34 +2,50 @@
 
 ## Źródło danych
 
-- Imię, nazwisko i e-mail uczestnika są w tabeli **`form_order_participants`** (wiersz z **`is_primary = 1`**).
-- Kolumn **`participant_name`** i **`participant_email`** w **`form_orders` nie ma** (usunięte migracją `2026_03_23_000001_drop_participant_name_email_from_form_orders_table`).
+- Imię, nazwisko i e-mail uczestników są w tabeli **`form_order_participants`**.
+- Pierwszy wiersz ma **`is_primary = 1`** (główny — używany m.in. przy wznowieniu checkoutu / kompatybilności).
+- Kolumn **`participant_name`** i **`participant_email`** w **`form_orders` nie ma**.
+- **`form_orders.product_price`** = kwota **całkowita** (cena jednostkowa szkolenia × liczba uczestników). Bez rabatu grupowego w v1 (miejsce w `OrderFormParticipantService::totalPrice()`).
 
-## Kod (adm / pnedu)
+## Publiczny formularz (pnedu)
 
-- **`FormOrder::display_participant_name`** / **`display_participant_email`** — czytają wyłącznie głównego uczestnika z `form_order_participants`.
-- Zapis uczestnika: **`FormOrdersController`**, **`FormOrderParticipant`**, formularz **`pnedu`** (`CourseController` + `FormOrderParticipant::syncFromFormOrder`).
+- Legacy + V2: przycisk **Dodaj kolejnego uczestnika** (tylko szkoła/firma; osoba prywatna = max 1).
+- Limit: `config/order_form.php` → `max_participants` (domyślnie **50**, env `ORDER_FORM_MAX_PARTICIPANTS`).
+- Unikalność e-maila na szkoleniu i w ramach zamówienia — walidacja + ostrzeżenie live (`GET /courses/{id}/participant-email-availability`).
+- Zapis: `OrderFormParticipantService::sync()` → `FormOrderParticipant::syncManyFromFormOrder()`.
 
-## Migracja bazy
+### Edycja po złożeniu
 
-```bash
-sail artisan migrate
-```
+| Tryb płatności | Edycja listy / ilości |
+|----------------|------------------------|
+| **Online (bramka)** | **Zablokowana** od razu po utworzeniu zamówienia (także awaiting / cancelled) |
+| **Odroczona FV** | Do wystawienia faktury (`invoice_number`) / `status_completed` |
 
-Rollback kolumn (np. na stagingu): `sail artisan migrate:rollback --step=1` (przywraca `participant_name` / `participant_email`).
+## Panel ADM (`/form-orders/{id}`)
 
-## Provision PNEDU (Dodaj tylko do PNEDU)
+- Lista kart uczestników z kopiowaniem danych.
+- **Dodaj uczestnika do PNEDU** przy każdej osobie + **Dodaj wszystkich naraz**.
+- Po provisionie: **bez przeładowania strony** — soft-refresh kart; status **zwijany** (`PNEDU OK · 3/3`). Po pełnym sukcesie ~2 s rozwinięty, potem zwija; przy problemie w kroku (np. CM) **zostaje rozwinięty** (ręczne zwinięcie możliwe). Krok 2 nie-OK także przy braku tokenu / nieudanym zapisie CM.
+- Checkbox **Dodaj uczestnika do listy e-mailowej (Sendy)** — **per osoba** (widoczny tylko gdy e-mail ≠ zamawiający); przy „wszystkich naraz” respektowane są zaznaczenia z każdej karty.
+- **Prześlij dostęp ponownie** — **per osoba** (na karcie provisionowanego uczestnika); podgląd/wysyłka z `form_order_participant_id`.
+- Provision: `FormOrderPneduProvisionService::provision(..., $formOrderParticipantId)` / `provisionAll(..., $addToSendyByFopId)`.
+- `pnedu_provisioned_at` ustawiane dopiero gdy **wszyscy** mają dostęp.
+- **Wycofaj dostęp PNEDU** — **per osoba** (karta) + **Wycofaj dostęp PNEDU wszystkim** gdy ≥2 provisionowanych.
 
-Pełny opis flow (participants → ClickMeeting → e-mail, tokeny, linki live): **[FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md)**.
+## Faktura iFirma
 
-## Status operacyjny na karcie zamówienia
+- Jedna pozycja: `Ilosc` = liczba uczestników, `CenaJednostkowa` = `invoiceUnitPrice()` (total / N).
+- Uwagi FV: `UCZESTNIK:` / `UCZESTNICY:` z listy.
 
-Po wystawieniu FV przez iFirma (AJAX) panel **Status operacyjny** na `/form-orders/{id}` odświeża się bez przeładowania strony (`GET form-orders/{id}/operational-status`). Dzięki temu znika m.in. ostrzeżenie „Uczestnik dodany…, ale faktura nie została wystawiona.” zaraz po pojawieniu się numeru FV w polu.
+## Kod
 
-## Wyszukiwarka FV / KSeF na liście
+| Obszar | Pliki |
+|--------|--------|
+| pnedu sync / cena | `OrderFormParticipantService`, `FormOrderParticipant`, `CourseController` |
+| UI formularza | `order-form-participants*.blade.php`, `order-form.blade.php`, `order-form-v2.blade.php` |
+| ADM | `form-orders/partials/participants-cards.blade.php`, `FormOrderPneduProvisionService` |
+| Helpers FV | `FormOrder::invoiceLineQuantity()`, `invoiceUnitPrice()` |
 
-Osobny formularz na `/form-orders` (`invoice_search`) szuka w `invoice_number` i `ksef_number` wśród **wszystkich** zamówień — bez kolejki „Do obsługi” i bez filtra „Przetwarzanie” (nawet gdy w URL jest `filter=handling` / `quick=handling`).
+## Provision PNEDU
 
-## Stare skrypty zewnętrzne
-
-Jeśli masz PHP/SQL poza tymi repozytoriami, które jeszcze odwołują się do `form_orders.participant_*`, zaktualizuj je do **`form_order_participants`**.
+Pełny opis: **[FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md)**.

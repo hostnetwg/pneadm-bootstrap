@@ -882,6 +882,30 @@ class FormOrder extends Model
     }
 
     /**
+     * Liczba sztuk na FV iFirma = liczba uczestników zamówienia (min. 1).
+     */
+    public function invoiceLineQuantity(): int
+    {
+        $count = (int) $this->participants()->count();
+
+        return max(1, $count);
+    }
+
+    /**
+     * Cena jednostkowa na FV: product_price jest kwotą całkowitą (cena × liczba osób).
+     */
+    public function invoiceUnitPrice(): float
+    {
+        $qty = $this->invoiceLineQuantity();
+        $total = round((float) ($this->product_price ?? 0), 2);
+        if ($qty <= 1) {
+            return $total;
+        }
+
+        return round($total / $qty, 2);
+    }
+
+    /**
      * Accessor - główny uczestnik (z nowej tabeli)
      */
     public function primaryParticipant()

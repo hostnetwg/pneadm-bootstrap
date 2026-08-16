@@ -367,6 +367,10 @@
                             $hasInvoice = $zamowienie->has_invoice;
                             $isDuplicate = isset($duplicateInfo[$zamowienie->id]) && $duplicateInfo[$zamowienie->id]['is_duplicate'];
                             $duplicateCount = $isDuplicate ? $duplicateInfo[$zamowienie->id]['count'] : 0;
+                            $listParticipants = $zamowienie->relationLoaded('participants')
+                                ? $zamowienie->participants->sortBy('id')->values()
+                                : $zamowienie->participants()->orderBy('id')->get();
+                            $listParticipants = $listParticipants->filter(fn ($p) => trim((string) ($p->participant_email ?? '')) !== '' || trim((string) ($p->full_name ?? '')) !== '');
                             $participantEmailSame = $zamowienie->display_participant_email && $zamowienie->orderer_email && strcasecmp($zamowienie->display_participant_email, $zamowienie->orderer_email) === 0;
                             $isOnlineGateway = $zamowienie->payment_mode === \App\Models\FormOrder::PAYMENT_MODE_ONLINE_GATEWAY;
                         @endphp
@@ -577,28 +581,55 @@
                                         <div class="p-3">
                                             <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <h6 class="text-dark fw-bold mb-0">
-                                                    <i class="bi bi-person"></i> UCZESTNIK
+                                                    <i class="bi bi-{{ $listParticipants->count() > 1 ? 'people' : 'person' }}"></i>
+                                                    UCZESTNIK{{ $listParticipants->count() > 1 ? 'CY' : '' }}
+                                                    @if($listParticipants->count() > 1)
+                                                        <span class="badge bg-secondary">{{ $listParticipants->count() }}</span>
+                                                    @endif
                                                 </h6>
                                                 <div class="d-flex flex-wrap gap-2 justify-content-end">
                                                     <button type="button" class="btn btn-outline-info btn-sm" onclick="copyUczestnik_{{ $zamowienie->id }}(this)">
-                                                        <i class="bi bi-clipboard"></i> Uczestnik
+                                                        <i class="bi bi-clipboard"></i> Uczestnik{{ $listParticipants->count() > 1 ? 'ów' : '' }}
                                                     </button>
-                                                    @if($zamowienie->display_participant_email)
+                                                    @if($listParticipants->contains(fn ($p) => trim((string) ($p->participant_email ?? '')) !== ''))
                                                         <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika_{{ $zamowienie->id }}(this)">
-                                                            <i class="bi bi-clipboard"></i> Email uczestnika
+                                                            <i class="bi bi-clipboard"></i> Email{{ $listParticipants->count() > 1 ? 'e' : '' }}
                                                         </button>
                                                     @endif
                                                 </div>
                                             </div>
                                             <div class="text-dark">
-                                                <div class="fw-semibold">{{ $zamowienie->display_participant_name ?: '—' }}</div>
-                                                @if($zamowienie->display_participant_email)
-                                                    <a href="mailto:{{ $zamowienie->display_participant_email }}" 
-                                                       class="text-primary text-decoration-none @if($participantEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                                       @if($participantEmailSame) title="Ten sam email co do faktury" @endif>
-                                                        {{ $zamowienie->display_participant_email }}
-                                                    </a>
-                                                @endif
+                                                @forelse($listParticipants as $p)
+                                                    @php
+                                                        $pName = trim((string) $p->full_name) ?: '—';
+                                                        $pEmail = trim((string) ($p->participant_email ?? ''));
+                                                        $pEmailSame = $pEmail !== '' && $zamowienie->orderer_email && strcasecmp($pEmail, $zamowienie->orderer_email) === 0;
+                                                    @endphp
+                                                    <div class="{{ $loop->last ? '' : 'mb-2 pb-2 border-bottom' }}">
+                                                        <div class="fw-semibold">
+                                                            @if($listParticipants->count() > 1)
+                                                                <span class="text-muted small me-1">{{ $loop->iteration }}.</span>
+                                                            @endif
+                                                            {{ $pName }}
+                                                        </div>
+                                                        @if($pEmail !== '')
+                                                            <a href="mailto:{{ $pEmail }}"
+                                                               class="text-primary text-decoration-none @if($pEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                                               @if($pEmailSame) title="Ten sam email co do faktury" @endif>
+                                                                {{ $pEmail }}
+                                                            </a>
+                                                        @endif
+                                                    </div>
+                                                @empty
+                                                    <div class="fw-semibold">{{ $zamowienie->display_participant_name ?: '—' }}</div>
+                                                    @if($zamowienie->display_participant_email)
+                                                        <a href="mailto:{{ $zamowienie->display_participant_email }}"
+                                                           class="text-primary text-decoration-none @if($participantEmailSame) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                                           @if($participantEmailSame) title="Ten sam email co do faktury" @endif>
+                                                            {{ $zamowienie->display_participant_email }}
+                                                        </a>
+                                                    @endif
+                                                @endforelse
                                             </div>
                                         </div>
 
@@ -970,12 +1001,34 @@ nowoczesna-edukacja.pl `;
             }
 
             function copyUczestnik_{{ $zamowienie->id }}(button) {
-                const uczestnik = '{{ $zamowienie->display_participant_name ?? '' }}';
+                @php
+                    $copyNames = ($zamowienie->relationLoaded('participants')
+                        ? $zamowienie->participants->sortBy('id')
+                        : collect())
+                        ->map(fn ($p) => trim((string) $p->full_name))
+                        ->filter()
+                        ->values();
+                    if ($copyNames->isEmpty()) {
+                        $copyNames = collect([trim((string) ($zamowienie->display_participant_name ?? ''))])->filter();
+                    }
+                @endphp
+                const uczestnik = @js($copyNames->implode("\n"));
                 copyToClipboard(uczestnik, button);
             }
 
             function copyEmailUczestnika_{{ $zamowienie->id }}(button) {
-                const email = '{{ $zamowienie->display_participant_email ?? '' }}';
+                @php
+                    $copyEmails = ($zamowienie->relationLoaded('participants')
+                        ? $zamowienie->participants->sortBy('id')
+                        : collect())
+                        ->map(fn ($p) => trim((string) ($p->participant_email ?? '')))
+                        ->filter()
+                        ->values();
+                    if ($copyEmails->isEmpty() && $zamowienie->display_participant_email) {
+                        $copyEmails = collect([(string) $zamowienie->display_participant_email]);
+                    }
+                @endphp
+                const email = @js($copyEmails->implode("\n"));
                 copyToClipboard(email, button);
             }
 

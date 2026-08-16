@@ -138,6 +138,108 @@ class FormOrderPneduAccessEmailResendTest extends TestCase
         );
     }
 
+    public function test_preview_and_resend_specific_participant(): void
+    {
+        if (! Schema::connection('pnedu')->hasTable('users')) {
+            $this->markTestSkipped('Brak tabeli users w połączeniu pnedu.');
+        }
+
+        Notification::fake();
+
+        $admin = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $courseId = (int) DB::table('courses')->insertGetId([
+            'title' => 'Kurs multi resend',
+            'description' => 'Test',
+            'start_date' => now()->addDay(),
+            'end_date' => now()->addDays(2),
+            'is_paid' => 1,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => 1,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $order = FormOrder::query()->create([
+            'product_id' => $courseId,
+            'product_name' => 'Kurs multi resend',
+            'status_completed' => 0,
+            'orderer_email' => 'buyer@example.test',
+            'pnedu_provisioned_at' => now(),
+            'pnedu_user_existed_before' => true,
+        ]);
+
+        $primary = FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Pierwsza',
+            'participant_email' => 'anna.pierwsza@example.test',
+            'is_primary' => true,
+        ]);
+
+        $second = FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Bartek',
+            'participant_lastname' => 'Drugi',
+            'participant_email' => 'bartek.drugi@example.test',
+            'is_primary' => false,
+        ]);
+
+        $participantId = (int) DB::table('participants')->insertGetId([
+            'course_id' => $courseId,
+            'first_name' => 'Bartek',
+            'last_name' => 'Drugi',
+            'email' => 'bartek.drugi@example.test',
+            'order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $second->participant_id = $participantId;
+        $second->save();
+
+        PneduUser::query()->updateOrCreate(
+            ['email' => 'bartek.drugi@example.test'],
+            [
+                'first_name' => 'Bartek',
+                'last_name' => 'Drugi',
+                'email_unique_slot' => PneduUser::buildEmailUniqueSlot('bartek.drugi@example.test', null),
+                'password' => Hash::make('secret-password-123'),
+                'email_verified_at' => now(),
+            ]
+        );
+
+        $preview = $this->actingAs($admin)->getJson(
+            route('form-orders.pnedu.access-email-preview', [
+                'id' => $order->id,
+                'form_order_participant_id' => $second->id,
+            ])
+        );
+
+        $preview->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('to', 'bartek.drugi@example.test')
+            ->assertJsonPath('form_order_participant_id', $second->id);
+
+        $send = $this->actingAs($admin)->postJson(
+            route('form-orders.pnedu.resend-access-email', $order->id),
+            ['form_order_participant_id' => $second->id]
+        );
+
+        $send->assertOk()->assertJsonPath('success', true);
+
+        Notification::assertSentTo(
+            PneduUser::query()->where('email', 'bartek.drugi@example.test')->first(),
+            PneduFormOrderProvisionedExistingUser::class
+        );
+        Notification::assertSentTimes(PneduFormOrderProvisionedExistingUser::class, 1);
+        $this->assertNotNull($primary->id);
+    }
+
     public function test_preview_requires_provisioned_order(): void
     {
         $admin = User::factory()->create([

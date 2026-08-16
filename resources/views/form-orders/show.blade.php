@@ -378,217 +378,7 @@ nowoczesna-edukacja.pl </div>
                         </div>
                     </div>
 
-                    {{-- UCZESTNIK - kompaktowe --}}
-                    <div class="card mb-3">
-                        <div class="card-header bg-success text-white py-2">
-                            <h6 class="mb-0">
-                                <i class="bi bi-person"></i> UCZESTNIK
-                            </h6>
-                        </div>
-                        <div class="card-body py-2">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <strong>{{ $zamowienie->display_participant_name ?: '—' }}</strong>
-                                <button type="button" class="btn btn-outline-success btn-sm" onclick="copyUczestnikData()">
-                                    <i class="bi bi-clipboard"></i> Uczestnik
-                                </button>
-                            </div>
-                            @if($zamowienie->display_participant_email)
-                                @php
-                                    $participantEmailDiffersFromOrderer = ! empty($zamowienie->orderer_email)
-                                        && strtolower(trim((string) $zamowienie->display_participant_email)) !== strtolower(trim((string) $zamowienie->orderer_email));
-                                @endphp
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small>
-                                        <i class="bi bi-envelope"></i> 
-                                        <a href="mailto:{{ $zamowienie->display_participant_email }}" 
-                                           class="text-decoration-none @if(!$participantEmailDiffersFromOrderer) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if(!$participantEmailDiffersFromOrderer) title="Ten sam email co do faktury" @endif>
-                                            {{ $zamowienie->display_participant_email }}
-                                        </a>
-                                    </small>
-                                    <button type="button" class="btn btn-outline-info btn-sm" onclick="copyEmailUczestnika()">
-                                        <i class="bi bi-clipboard"></i> Email uczestnika
-                                    </button>
-                                </div>
-                                @if($participantEmailDiffersFromOrderer && ! $zamowienie->pnedu_provisioned_at)
-                                    <div class="form-check mt-2 small">
-                                        <input class="form-check-input" type="checkbox" value="1" id="addParticipantToSendyCheckbox">
-                                        <label class="form-check-label" for="addParticipantToSendyCheckbox">
-                                            Dodaj uczestnika do listy e-mailowej
-                                        </label>
-                                    </div>
-                                @endif
-                            @endif
-
-                            {{-- PNEDU + PUBLIGO: obok siebie gdy są efektywne ID Publigo (zamówienie lub course.id_old), inaczej PNEDU na całą szerokość --}}
-                            @php
-                                $hasPubligoIds = $zamowienie->hasEffectivePubligoIds();
-                                $publigoAlreadySent = (int) $zamowienie->publigo_sent === 1;
-                            @endphp
-                            <div class="mt-2">
-                                @if($zamowienie->pnedu_provisioned_at)
-                                    <div class="alert alert-success mb-2">
-                                        <i class="bi bi-check-circle"></i>
-                                        <strong>Dostęp PNEDU został przyznany.</strong>
-                                        <small class="d-block text-muted mt-1">
-                                            Data: {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}
-                                            @if($zamowienie->pnedu_user_existed_before === true)
-                                                — konto na pnedu.pl już istniało (ten sam e-mail).
-                                            @elseif($zamowienie->pnedu_user_existed_before === false)
-                                                — utworzono nowe konto na pnedu.pl.
-                                            @endif
-                                        </small>
-                                        <div class="mt-2 p-2 rounded border bg-white small">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <div>
-                                                    <strong>Krok 1: Uczestnik w szkoleniu</strong>
-                                                    <div class="text-muted">Dodano rekord do tabeli participants.</div>
-                                                    <div class="text-muted">
-                                                        @if($zamowienie->pnedu_user_existed_before === true)
-                                                            Konto PNEDU: już istniało.
-                                                        @elseif($zamowienie->pnedu_user_existed_before === false)
-                                                            Konto PNEDU: utworzone.
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <span class="badge bg-success">Wykonano</span>
-                                            </div>
-
-                                            @php
-                                                $cmStatus = $zamowienie->pnedu_clickmeeting_status;
-                                                $cmBadgeClass = match($cmStatus) {
-                                                    'success' => 'bg-success',
-                                                    'failed' => 'bg-danger',
-                                                    'skipped_missing_event_id' => 'bg-warning text-dark',
-                                                    'skipped_not_clickmeeting' => 'bg-secondary',
-                                                    default => 'bg-secondary',
-                                                };
-                                                $cmLabel = match($cmStatus) {
-                                                    'success' => 'Dodano',
-                                                    'failed' => 'Błąd',
-                                                    'skipped_missing_event_id' => 'Pominięto (brak ID)',
-                                                    'skipped_not_clickmeeting' => 'Pominięto (inna platforma)',
-                                                    default => 'Brak informacji',
-                                                };
-                                                $cmDetail = !empty($zamowienie->pnedu_clickmeeting_message)
-                                                    ? $zamowienie->pnedu_clickmeeting_message
-                                                    : 'Status kroku ClickMeeting będzie widoczny po wykonaniu akcji w nowej wersji procesu.';
-                                            @endphp
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <div>
-                                                    <strong>Krok 2: ClickMeeting</strong>
-                                                    @if($zamowienie->pnedu_clickmeeting_synced_at)
-                                                        <div class="text-muted">Ostatnia próba: {{ $zamowienie->pnedu_clickmeeting_synced_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</div>
-                                                    @endif
-                                                    <div class="text-muted">{{ $cmDetail }}</div>
-                                                    @php
-                                                        $pneduLiveAccess = $zamowienie->primaryParticipant?->participant?->liveAccess;
-                                                    @endphp
-                                                    @if(!empty($pneduLiveAccess?->token))
-                                                        <div class="mt-1">
-                                                            <span class="text-muted">Token dostępu:</span>
-                                                            <code class="user-select-all">{{ e($pneduLiveAccess->token) }}</code>
-                                                            <span class="text-muted">(przypisany do e-maila uczestnika)</span>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                                <span class="badge {{ $cmBadgeClass }}">{{ $cmLabel }}</span>
-                                            </div>
-
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <strong>Krok 3: E-mail do uczestnika</strong>
-                                                    <div class="text-muted">
-                                                        @if($zamowienie->pnedu_user_existed_before === true)
-                                                            Wysłano e-mail informacyjny na adres uczestnika.
-                                                        @elseif($zamowienie->pnedu_user_existed_before === false)
-                                                            Wysłano e-mail z linkiem do ustawienia hasła.
-                                                        @else
-                                                            Wysłano wiadomość e-mail do uczestnika.
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <span class="badge bg-success">Wykonano</span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-2 d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                                            <button type="button" class="btn btn-sm btn-outline-primary"
-                                                    id="resendPneduAccessBtn"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#resendPneduAccessModal"
-                                                    data-preview-url="{{ route('form-orders.pnedu.access-email-preview', $zamowienie->id) }}"
-                                                    data-send-url="{{ route('form-orders.pnedu.resend-access-email', $zamowienie->id) }}">
-                                                <i class="bi bi-envelope"></i> Prześlij dostęp ponownie
-                                            </button>
-                                            @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
-                                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#resetPneduModal">
-                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU
-                                                </button>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endif
-
-                                @if($publigoAlreadySent)
-                                    <div class="alert alert-success mb-2">
-                                        <i class="bi bi-check-circle"></i>
-                                        <strong>Zamówienie zostało wysłane do Publigo</strong>
-                                        <small class="d-block text-muted mt-1">
-                                            Data wysłania: {{ $zamowienie->publigo_sent_at ? $zamowienie->publigo_sent_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') : 'Nieznana' }}
-                                        </small>
-                                        @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('super_admin'))
-                                            <div class="mt-2">
-                                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#resetPubligoModal">
-                                                    <i class="bi bi-arrow-clockwise"></i> Resetuj status Publigo
-                                                </button>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                @if($hasPubligoIds)
-                                    <div class="row g-2">
-                                        <div class="col-md-6">
-                                            @if($publigoAlreadySent)
-                                                <button type="button"
-                                                        class="btn btn-primary w-100"
-                                                        disabled
-                                                        title="Zamówienie zostało już wysłane do Publigo">
-                                                    <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
-                                                </button>
-                                            @else
-                                                <button type="button" class="btn btn-primary w-100" id="publigoOrderBtn" onclick="createPubligoOrder({{ $zamowienie->id }})">
-                                                    <i class="bi bi-plus-circle"></i> Dodaj zamówienie przez PUBLIGO
-                                                </button>
-                                            @endif
-                                        </div>
-                                        <div class="col-md-6">
-                                            @unless($zamowienie->pnedu_provisioned_at)
-                                                <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
-                                                    <i class="bi bi-plus-circle"></i> Dodaj uczestnika do PNEDU
-                                                </button>
-                                            @else
-                                                <div class="d-flex align-items-center justify-content-center text-success small py-2 px-2 border border-success rounded bg-light h-100">
-                                                    <i class="bi bi-check-lg me-1"></i> PNEDU — wykonano
-                                                </div>
-                                            @endunless
-                                        </div>
-                                    </div>
-                                    <div id="publigoResult" class="mt-2"></div>
-                                @elseif(! $zamowienie->pnedu_provisioned_at)
-                                    <button type="button" class="btn btn-warning w-100 js-pnedu-provision-btn" id="pneduOrderBtn" onclick="provisionPnedu({{ $zamowienie->id }})">
-                                        <i class="bi bi-plus-circle"></i> Dodaj uczestnika do PNEDU
-                                    </button>
-                                @endif
-
-                                <div id="pneduResult" class="mt-2"></div>
-                            </div>
-                        </div>
-                    </div>
+                    @include('form-orders.partials.participants-cards', ['zamowienie' => $zamowienie])
 
                     {{-- Buttons iFirma --}}
                     <div class="mb-3 d-flex flex-column gap-2">
@@ -972,7 +762,6 @@ nowoczesna-edukacja.pl </div>
                                         // imion — przy 2 wierszach w bazie zawsze "UCZESTNICY:", nawet gdy
                                         // drugi ma jeszcze puste dane (wcześniej filter() dawał count=1 → błędnie UCZESTNIK).
                                         $invoiceParticipantModels = $zamowienie->participants()
-                                            ->orderByDesc('is_primary')
                                             ->orderBy('id')
                                             ->get();
                                         $invoiceParticipantRowsCount = $invoiceParticipantModels->count();
@@ -1465,17 +1254,127 @@ nowoczesna-edukacja.pl `;
             withFormOrderPreActionWarnings(confirmButtonLabel, proceedFn, { warnInvoiceNotes: false });
         }
 
+        function copyTextToClipboard(text, successMsg) {
+            const value = text == null ? '' : String(text);
+            navigator.clipboard.writeText(value).then(function () {
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('success');
+                }
+                // krótki toast przez alert Bootstrap jeśli dostępny — bez natywnego alert()
+                const resultDiv = document.getElementById('pneduResult');
+                if (resultDiv) {
+                    resultDiv.innerHTML = `<div class="alert alert-success py-1 px-2 small mb-0">${successMsg || 'Skopiowano'}</div>`;
+                    setTimeout(function () { if (resultDiv.querySelector('.alert-success')) resultDiv.innerHTML = ''; }, 1500);
+                }
+            }).catch(function () {});
+        }
+
+        function softRefreshParticipantsCards(expandFopId) {
+            const root = document.getElementById('formOrderParticipantsRoot');
+            if (!root) {
+                return Promise.reject(new Error('Brak kontenera uczestników'));
+            }
+            const baseUrl = root.getAttribute('data-participants-partial-url');
+            if (!baseUrl) {
+                return Promise.reject(new Error('Brak URL partial'));
+            }
+            const scrollY = window.scrollY;
+            const url = expandFopId
+                ? (baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'expand_fop_id=' + encodeURIComponent(expandFopId))
+                : baseUrl;
+            return fetch(url, {
+                headers: {
+                    'Accept': 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            }).then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Nie udało się odświeżyć listy uczestników');
+                }
+                return res.text();
+            }).then(function (html) {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = html.trim();
+                const next = wrap.querySelector('#formOrderParticipantsRoot') || wrap.firstElementChild;
+                if (!next) {
+                    throw new Error('Pusta odpowiedź partial');
+                }
+                root.replaceWith(next);
+                window.scrollTo(0, scrollY);
+                initPneduStatusWidgets({ autoCollapseFopId: expandFopId || null, autoCollapseMs: 2200 });
+            });
+        }
+
+        function setPneduStatusExpanded(widget, expanded) {
+            if (!widget) return;
+            const details = widget.querySelector('.js-pnedu-status-details');
+            const chevronDown = widget.querySelector('.js-pnedu-status-chevron');
+            const chevronUp = widget.querySelector('.js-pnedu-status-chevron-up');
+            widget.dataset.expanded = expanded ? '1' : '0';
+            if (details) {
+                details.classList.toggle('d-none', !expanded);
+            }
+            if (chevronDown) {
+                chevronDown.classList.toggle('d-none', expanded);
+            }
+            if (chevronUp) {
+                chevronUp.classList.toggle('d-none', !expanded);
+            }
+        }
+
+        function initPneduStatusWidgets(options) {
+            options = options || {};
+            document.querySelectorAll('.js-pnedu-status').forEach(function (widget) {
+                const toggle = widget.querySelector('.js-pnedu-status-toggle');
+                if (toggle && !toggle.dataset.bound) {
+                    toggle.dataset.bound = '1';
+                    toggle.addEventListener('click', function () {
+                        const expanded = widget.dataset.expanded === '1';
+                        setPneduStatusExpanded(widget, !expanded);
+                    });
+                }
+                setPneduStatusExpanded(widget, widget.dataset.expanded === '1');
+            });
+
+            const autoId = options.autoCollapseFopId;
+            if (autoId) {
+                const widget = document.querySelector('.js-pnedu-status[data-fop-id="' + autoId + '"]');
+                if (widget) {
+                    setPneduStatusExpanded(widget, true);
+                    const card = document.querySelector('[data-fop-card="' + autoId + '"]');
+                    if (card) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    const ok = parseInt(widget.getAttribute('data-ok-steps') || '0', 10);
+                    const total = parseInt(widget.getAttribute('data-total-steps') || '3', 10);
+                    // Pełny sukces (3/3): po chwili zwiń. Problem w kroku: zostaw rozwinięte (ręczne zwinięcie OK).
+                    if (ok >= total) {
+                        setTimeout(function () {
+                            setPneduStatusExpanded(widget, false);
+                        }, options.autoCollapseMs || 2200);
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initPneduStatusWidgets();
+        });
+
         function provisionPnedu(orderId, options) {
             options = options || {};
             if (!options.skipPreActionWarnings) {
                 withFormOrderPreActionWarnings('Mimo to dodaj uczestnika', function () {
-                    provisionPnedu(orderId, { skipPreActionWarnings: true });
+                    provisionPnedu(orderId, Object.assign({}, options, { skipPreActionWarnings: true }));
                 }, { warnInvoiceNotes: true, preActionContext: 'participant' });
                 return;
             }
 
+            const fopId = options.formOrderParticipantId || null;
             const buttons = document.querySelectorAll('.js-pnedu-provision-btn');
-            const resultDiv = document.getElementById('pneduResult');
+            const resultDiv = (fopId && document.getElementById('pneduResult_' + fopId))
+                || document.getElementById('pneduResult');
             buttons.forEach((btn) => {
                 btn.disabled = true;
                 if (!btn.dataset.pneduOriginalHtml) {
@@ -1483,13 +1382,38 @@ nowoczesna-edukacja.pl `;
                 }
                 btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
             });
-            if (resultDiv) {
-                resultDiv.innerHTML = '';
+            document.querySelectorAll('.js-pnedu-card-result').forEach((el) => {
+                if (el !== resultDiv) {
+                    el.innerHTML = '';
+                }
+            });
+            const globalResult = document.getElementById('pneduResult');
+            if (globalResult && globalResult !== resultDiv) {
+                globalResult.innerHTML = '';
             }
-            const addParticipantCheckbox = document.getElementById('addParticipantToSendyCheckbox');
+            if (resultDiv) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-info py-2 mb-0 small" role="status">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <strong>Trwa przyznawanie dostępu PNEDU…</strong>
+                        </div>
+                        <ol class="mb-0 ps-3">
+                            <li>Uczestnik w szkoleniu + konto pnedu.pl</li>
+                            <li>ClickMeeting (jeśli skonfigurowane)</li>
+                            <li>E-mail z dostępem do uczestnika</li>
+                        </ol>
+                    </div>`;
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
             const payload = {
-                add_participant_to_sendy: !!(addParticipantCheckbox && addParticipantCheckbox.checked),
+                add_participant_to_sendy: false,
             };
+            if (fopId) {
+                payload.form_order_participant_id = fopId;
+                const sendyCb = document.getElementById('addToSendy_' + fopId);
+                payload.add_participant_to_sendy = !!(sendyCb && sendyCb.checked);
+            }
             fetch(`/form-orders/${orderId}/pnedu/provision`, {
                 method: 'POST',
                 headers: {
@@ -1501,53 +1425,193 @@ nowoczesna-edukacja.pl `;
             })
                 .then((response) => response.json().then((data) => ({ ok: response.ok, status: response.status, data })))
                 .then(({ ok, data }) => {
-                    if (!resultDiv) {
-                        return;
-                    }
                     if (data.success) {
                         if (typeof window.formOrderPlayUiSound === 'function') {
                             window.formOrderPlayUiSound('success');
                         }
-                        resultDiv.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <i class="bi bi-check-circle"></i>
-                            <strong>Sukces.</strong> ${data.message || ''}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>`;
-                        window.location.reload();
+                        const okSteps = data.ok_steps != null ? data.ok_steps : 3;
+                        const totalSteps = data.total_steps != null ? data.total_steps : 3;
+                        if (resultDiv) {
+                            resultDiv.innerHTML = `
+                            <div class="alert alert-success fade show mb-0 py-2 small" role="status">
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Sukces.</strong> ${okSteps}/${totalSteps} kroków OK — aktualizuję kartę…
+                            </div>`;
+                        }
+                        softRefreshParticipantsCards(fopId || data.form_order_participant_id || null)
+                            .catch(function () {
+                                if (resultDiv) {
+                                    resultDiv.innerHTML = `
+                                    <div class="alert alert-warning mb-0 small">
+                                        Provision OK, ale nie odświeżono karty. <button type="button" class="btn btn-sm btn-outline-secondary ms-1" onclick="location.reload()">Odśwież stronę</button>
+                                    </div>`;
+                                }
+                                buttons.forEach((btn) => {
+                                    btn.disabled = false;
+                                    if (btn.dataset.pneduOriginalHtml) {
+                                        btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                                    }
+                                });
+                            });
                         return;
                     }
                     if (typeof window.formOrderPlayUiSound === 'function') {
                         window.formOrderPlayUiSound('error');
                     }
                     const extra = data.sent_at ? ` (wcześniej: ${data.sent_at})` : '';
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">
                             <i class="bi bi-exclamation-triangle"></i>
                             <strong>Błąd:</strong> ${data.error || 'Nieznany błąd'}${extra}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>`;
-                })
-                .catch(() => {
-                    if (typeof window.formOrderPlayUiSound === 'function') {
-                        window.formOrderPlayUiSound('error');
                     }
-                    if (resultDiv) {
-                        resultDiv.innerHTML = `
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>Błąd połączenia</strong> z serwerem.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>`;
-                    }
-                })
-                .finally(() => {
                     buttons.forEach((btn) => {
                         btn.disabled = false;
                         if (btn.dataset.pneduOriginalHtml) {
                             btn.innerHTML = btn.dataset.pneduOriginalHtml;
                         }
                     });
+                })
+                .catch(() => {
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
+                    buttons.forEach((btn) => {
+                        btn.disabled = false;
+                        if (btn.dataset.pneduOriginalHtml) {
+                            btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                        }
+                    });
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> Nie udało się połączyć z serwerem.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                    }
+                });
+        }
+
+        function provisionPneduAll(orderId, options) {
+            options = options || {};
+            if (!options.skipPreActionWarnings) {
+                withFormOrderPreActionWarnings('Mimo to dodaj wszystkich', function () {
+                    provisionPneduAll(orderId, { skipPreActionWarnings: true });
+                }, { warnInvoiceNotes: true, preActionContext: 'participant' });
+                return;
+            }
+
+            const buttons = document.querySelectorAll('.js-pnedu-provision-btn');
+            const resultDiv = document.getElementById('pneduResultAll')
+                || document.getElementById('pneduResult');
+            buttons.forEach((btn) => {
+                btn.disabled = true;
+                if (!btn.dataset.pneduOriginalHtml) {
+                    btn.dataset.pneduOriginalHtml = btn.innerHTML;
+                }
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            });
+            document.querySelectorAll('.js-pnedu-card-result').forEach((el) => {
+                if (el !== resultDiv) {
+                    el.innerHTML = '';
+                }
+            });
+            if (resultDiv) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-info py-2 mb-0 small" role="status">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <strong>Trwa dodawanie wszystkich uczestników do PNEDU…</strong>
+                        </div>
+                        <div class="text-muted">Dla każdej osoby: uczestnik + konto → ClickMeeting → e-mail.</div>
+                    </div>`;
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            const sendyByFopId = {};
+            document.querySelectorAll('.js-add-to-sendy').forEach((cb) => {
+                const fopId = cb.getAttribute('data-fop-id');
+                if (fopId) {
+                    sendyByFopId[fopId] = !!cb.checked;
+                }
+            });
+            const payload = {
+                add_participant_to_sendy: false,
+                add_participant_to_sendy_by_fop_id: sendyByFopId,
+            };
+            fetch(`/form-orders/${orderId}/pnedu/provision-all`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(payload),
+            })
+                .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+                .then(({ data }) => {
+                    if (data.success) {
+                        if (typeof window.formOrderPlayUiSound === 'function') {
+                            window.formOrderPlayUiSound('success');
+                        }
+                        if (resultDiv) {
+                            resultDiv.innerHTML = `
+                            <div class="alert alert-success fade show mb-0 py-2 small" role="status">
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Sukces.</strong> ${data.message || ''} — aktualizuję karty…
+                            </div>`;
+                        }
+                        softRefreshParticipantsCards(null).catch(function () {
+                            if (resultDiv) {
+                                resultDiv.innerHTML = `
+                                <div class="alert alert-warning mb-0 small">
+                                    Provision OK, ale nie odświeżono kart. <button type="button" class="btn btn-sm btn-outline-secondary ms-1" onclick="location.reload()">Odśwież stronę</button>
+                                </div>`;
+                            }
+                            buttons.forEach((btn) => {
+                                btn.disabled = false;
+                                if (btn.dataset.pneduOriginalHtml) {
+                                    btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                                }
+                            });
+                        });
+                        return;
+                    }
+                    if (typeof window.formOrderPlayUiSound === 'function') {
+                        window.formOrderPlayUiSound('error');
+                    }
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> ${data.error || data.message || 'Nieznany błąd'}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                    }
+                    buttons.forEach((btn) => {
+                        btn.disabled = false;
+                        if (btn.dataset.pneduOriginalHtml) {
+                            btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                        }
+                    });
+                })
+                .catch(() => {
+                    buttons.forEach((btn) => {
+                        btn.disabled = false;
+                        if (btn.dataset.pneduOriginalHtml) {
+                            btn.innerHTML = btn.dataset.pneduOriginalHtml;
+                        }
+                    });
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Błąd:</strong> Nie udało się połączyć z serwerem.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>`;
+                    }
                 });
         }
 
@@ -3093,8 +3157,9 @@ nowoczesna-edukacja.pl `;
             });
         }
 
-        // Funkcja do resetowania statusu PNEDU (tylko dla administratorów)
+        // Funkcja do resetowania statusu PNEDU (tylko dla administratorów) — per osoba / wszyscy
         function resetPneduStatus(orderId) {
+            const modalEl = document.getElementById('resetPneduModal');
             const button = document.getElementById('resetPneduConfirmBtn');
             const errorEl = document.getElementById('resetPneduError');
             const removeCheckbox = document.getElementById('resetPneduRemoveParticipantCheckbox');
@@ -3107,6 +3172,15 @@ nowoczesna-edukacja.pl `;
             button.disabled = true;
             button.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetowanie...';
 
+            const payload = {
+                remove_participant: !!(removeCheckbox && removeCheckbox.checked),
+            };
+            if (modalEl && modalEl.dataset.resetAll === '1') {
+                payload.reset_all = true;
+            } else if (modalEl && modalEl.dataset.formOrderParticipantId) {
+                payload.form_order_participant_id = Number(modalEl.dataset.formOrderParticipantId);
+            }
+
             fetch(`/form-orders/${orderId}/pnedu/reset`, {
                 method: 'POST',
                 headers: {
@@ -3114,9 +3188,7 @@ nowoczesna-edukacja.pl `;
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({
-                    remove_participant: !!(removeCheckbox && removeCheckbox.checked),
-                }),
+                body: JSON.stringify(payload),
             })
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
@@ -3129,33 +3201,56 @@ nowoczesna-edukacja.pl `;
                     return;
                 }
 
-                const message = data.error || 'Nie udało się zresetować statusu PNEDU.';
+                const message = data.error || 'Nie udało się wycofać dostępu PNEDU.';
                 if (errorEl) {
                     errorEl.textContent = message;
                     errorEl.classList.remove('d-none');
                 }
                 button.disabled = false;
-                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
+                button.innerHTML = modalEl && modalEl.dataset.resetAll === '1'
+                    ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim'
+                    : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
             })
             .catch(error => {
                 console.error('Error:', error);
                 if (errorEl) {
-                    errorEl.textContent = 'Wystąpił błąd podczas resetowania statusu PNEDU.';
+                    errorEl.textContent = 'Wystąpił błąd podczas wycofywania dostępu PNEDU.';
                     errorEl.classList.remove('d-none');
                 }
                 button.disabled = false;
-                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU';
+                button.innerHTML = modalEl && modalEl.dataset.resetAll === '1'
+                    ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim'
+                    : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
             });
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             const resetPneduModal = document.getElementById('resetPneduModal');
             if (resetPneduModal) {
-                resetPneduModal.addEventListener('show.bs.modal', function () {
+                resetPneduModal.addEventListener('show.bs.modal', function (event) {
+                    const trigger = event.relatedTarget && event.relatedTarget.classList.contains('js-reset-pnedu-btn')
+                        ? event.relatedTarget
+                        : null;
                     const errorEl = document.getElementById('resetPneduError');
                     const checkbox = document.getElementById('resetPneduRemoveParticipantCheckbox');
                     const label = document.getElementById('resetPneduRemoveParticipantLabel');
-                    const hasToken = resetPneduModal.dataset.hasCmToken === '1';
+                    const nameEl = document.getElementById('resetPneduParticipantName');
+                    const emailEl = document.getElementById('resetPneduParticipantEmail');
+                    const emailRow = document.getElementById('resetPneduEmailRow');
+                    const introEl = document.getElementById('resetPneduIntro');
+                    const titleEl = document.getElementById('resetPneduModalLabel');
+                    const confirmBtn = document.getElementById('resetPneduConfirmBtn');
+
+                    const resetAll = trigger ? trigger.getAttribute('data-reset-all') === '1' : false;
+                    const fopId = trigger ? (trigger.getAttribute('data-form-order-participant-id') || '') : '';
+                    const name = trigger ? (trigger.getAttribute('data-participant-name') || '—') : '—';
+                    const email = trigger ? (trigger.getAttribute('data-participant-email') || '') : '';
+                    const hasToken = trigger ? trigger.getAttribute('data-has-cm-token') === '1' : false;
+
+                    resetPneduModal.dataset.resetAll = resetAll ? '1' : '0';
+                    resetPneduModal.dataset.formOrderParticipantId = fopId;
+                    resetPneduModal.dataset.hasCmToken = hasToken ? '1' : '0';
+
                     if (errorEl) {
                         errorEl.classList.add('d-none');
                         errorEl.textContent = '';
@@ -3163,10 +3258,39 @@ nowoczesna-edukacja.pl `;
                     if (checkbox) {
                         checkbox.checked = true;
                     }
+                    if (nameEl) {
+                        nameEl.textContent = name;
+                    }
+                    if (emailEl) {
+                        emailEl.textContent = email || '—';
+                    }
+                    if (emailRow) {
+                        emailRow.classList.toggle('d-none', resetAll || email === '');
+                    }
+                    if (introEl) {
+                        introEl.innerHTML = resetAll
+                            ? 'Czy na pewno chcesz wycofać dostęp PNEDU dla <strong>wszystkich</strong> provisionowanych uczestników zamówienia <strong>#' + {{ $zamowienie->id }} + '</strong>?'
+                            : 'Czy na pewno chcesz wycofać dostęp PNEDU dla wybranego uczestnika w zamówieniu <strong>#' + {{ $zamowienie->id }} + '</strong>?';
+                    }
+                    if (titleEl) {
+                        titleEl.innerHTML = resetAll
+                            ? '<i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp PNEDU wszystkim'
+                            : '<i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp PNEDU — ' + name;
+                    }
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = resetAll
+                            ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim'
+                            : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
+                    }
                     if (label) {
-                        label.textContent = hasToken
-                            ? 'Czy usunąć uczestnika ze szkolenia oraz unieważnić token dostępowy?'
-                            : 'Czy usunąć uczestnika ze szkolenia?';
+                        if (resetAll) {
+                            label.textContent = 'Czy usunąć wszystkich wskazanych uczestników ze szkolenia (i unieważnić tokeny CM, jeśli są)?';
+                        } else {
+                            label.textContent = hasToken
+                                ? 'Czy usunąć uczestnika ze szkolenia oraz unieważnić token dostępowy?'
+                                : 'Czy usunąć uczestnika ze szkolenia?';
+                        }
                     }
                 });
             }
@@ -3939,37 +4063,36 @@ nowoczesna-edukacja.pl `;
         </div>
     </div>
 
-    {{-- Modal potwierdzenia resetowania statusu PNEDU --}}
-    @php
-        $pneduResetLiveAccess = $zamowienie->primaryParticipant?->participant?->liveAccess;
-        $pneduResetHasCmToken = filled(trim((string) ($pneduResetLiveAccess?->token ?? '')));
-    @endphp
+    {{-- Modal potwierdzenia resetowania statusu PNEDU (per uczestnik / wszyscy) --}}
     <div class="modal fade" id="resetPneduModal" tabindex="-1" aria-labelledby="resetPneduModalLabel" aria-hidden="true"
-         data-has-cm-token="{{ $pneduResetHasCmToken ? '1' : '0' }}">
+         data-has-cm-token="0"
+         data-reset-all="0"
+         data-form-order-participant-id="">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
                     <h5 class="modal-title" id="resetPneduModalLabel">
-                        <i class="bi bi-exclamation-triangle"></i> Resetowanie statusu PNEDU
+                        <i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp PNEDU
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Czy na pewno chcesz zresetować status PNEDU dla zamówienia <strong>#{{ $zamowienie->id }}</strong>?</p>
+                    <p id="resetPneduIntro">Czy na pewno chcesz wycofać dostęp PNEDU?</p>
                     <div class="bg-light p-3 rounded">
-                        <h6 class="mb-2">Szczegóły zamówienia:</h6>
+                        <h6 class="mb-2">Szczegóły:</h6>
                         <ul class="mb-0">
-                            <li><strong>Uczestnik:</strong> {{ $zamowienie->display_participant_name }}</li>
-                            <li><strong>Email:</strong> {{ $zamowienie->display_participant_email }}</li>
+                            <li><strong>Zamówienie:</strong> #{{ $zamowienie->id }}</li>
+                            <li><strong>Uczestnik:</strong> <span id="resetPneduParticipantName">—</span></li>
+                            <li id="resetPneduEmailRow"><strong>Email:</strong> <span id="resetPneduParticipantEmail">—</span></li>
                             <li><strong>Szkolenie:</strong> {{ $zamowienie->display_product_name }}</li>
                             @if($zamowienie->pnedu_provisioned_at)
-                                <li><strong>Data przyznania dostępu PNEDU:</strong> {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
+                                <li><strong>Data przyznania dostępu PNEDU (zamówienie):</strong> {{ $zamowienie->pnedu_provisioned_at->setTimezone('Europe/Warsaw')->format('d.m.Y H:i') }}</li>
                             @endif
                         </ul>
                     </div>
                     <div class="alert alert-warning mt-3 mb-0">
                         <i class="bi bi-info-circle"></i>
-                        <strong>Uwaga:</strong> Reset zawsze czyści status PNEDU przy zamówieniu (data provision, kroki ClickMeeting w panelu).
+                        <strong>Uwaga:</strong> Reset czyści status PNEDU przy zamówieniu (data provision, kroki ClickMeeting w panelu).
                         Opcjonalnie możesz też usunąć uczestnika z listy szkolenia i unieważnić token dostępowy ClickMeeting.
                     </div>
                     <div class="form-check mt-3">
@@ -3977,11 +4100,7 @@ nowoczesna-edukacja.pl `;
                                id="resetPneduRemoveParticipantCheckbox" checked>
                         <label class="form-check-label" for="resetPneduRemoveParticipantCheckbox"
                                id="resetPneduRemoveParticipantLabel">
-                            @if($pneduResetHasCmToken)
-                                Czy usunąć uczestnika ze szkolenia oraz unieważnić token dostępowy?
-                            @else
-                                Czy usunąć uczestnika ze szkolenia?
-                            @endif
+                            Czy usunąć uczestnika ze szkolenia?
                         </label>
                     </div>
                     <div id="resetPneduError" class="alert alert-danger py-2 small mt-2 mb-0 d-none" role="alert"></div>
@@ -3991,7 +4110,7 @@ nowoczesna-edukacja.pl `;
                         <i class="bi bi-x-circle"></i> Anuluj
                     </button>
                     <button type="button" class="btn btn-warning" id="resetPneduConfirmBtn" onclick="resetPneduStatus({{ $zamowienie->id }})">
-                        <i class="bi bi-arrow-clockwise"></i> Resetuj status PNEDU
+                        <i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU
                     </button>
                 </div>
             </div>
@@ -4166,11 +4285,10 @@ nowoczesna-edukacja.pl `;
     </div>
 
     <script>
-        // Prześlij dostęp — musi być PO HTML modala (#resendPneduAccessModal)
+        // Prześlij dostęp — musi być PO HTML modala (#resendPneduAccessModal); per uczestnik
         (function () {
             const modalEl = document.getElementById('resendPneduAccessModal');
-            const openBtn = document.getElementById('resendPneduAccessBtn');
-            if (!modalEl || !openBtn) return;
+            if (!modalEl) return;
 
             const loadingEl = document.getElementById('resendPneduAccessLoading');
             const errorEl = document.getElementById('resendPneduAccessError');
@@ -4184,7 +4302,9 @@ nowoczesna-edukacja.pl `;
             const hintEl = document.getElementById('resendPneduAccessHint');
             const copyBtn = document.getElementById('resendPneduAccessCopyBtn');
             const sendBtn = document.getElementById('resendPneduAccessSendBtn');
+            const titleEl = document.getElementById('resendPneduAccessModalLabel');
             let lastBodyHtml = '';
+            let activeTrigger = null;
 
             function csrfToken() {
                 return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -4245,9 +4365,23 @@ nowoczesna-edukacja.pl `;
                 await copyText(htmlPayload);
             }
 
-            modalEl.addEventListener('show.bs.modal', async function () {
+            modalEl.addEventListener('show.bs.modal', async function (event) {
+                activeTrigger = event.relatedTarget && event.relatedTarget.classList.contains('js-resend-pnedu-access-btn')
+                    ? event.relatedTarget
+                    : document.querySelector('.js-resend-pnedu-access-btn');
+                if (!activeTrigger) {
+                    return;
+                }
+
                 resetUi();
-                const previewUrl = openBtn.getAttribute('data-preview-url');
+                const participantName = activeTrigger.getAttribute('data-participant-name') || '';
+                if (titleEl) {
+                    titleEl.innerHTML = participantName
+                        ? '<i class="bi bi-envelope"></i> Prześlij dostęp ponownie — ' + participantName
+                        : '<i class="bi bi-envelope"></i> Prześlij dostęp ponownie — Krok 3: E-mail do uczestnika';
+                }
+
+                const previewUrl = activeTrigger.getAttribute('data-preview-url');
                 const controller = new AbortController();
                 const timeoutId = setTimeout(function () { controller.abort(); }, 15000);
                 try {
@@ -4282,9 +4416,11 @@ nowoczesna-edukacja.pl `;
                             bodyFrameEl.srcdoc = '<pre style="font-family:system-ui,sans-serif;padding:1rem;white-space:pre-wrap;margin:0;">' + esc + '</pre>';
                         }
                     }
-                    variantEl.textContent = data.variant_label
-                        ? ('Krok 3: E-mail do uczestnika — ' + data.variant_label)
-                        : 'Krok 3: E-mail do uczestnika';
+                    const nameLabel = data.participant_name || participantName;
+                    variantEl.textContent = (nameLabel ? (nameLabel + ' — ') : '')
+                        + (data.variant_label
+                            ? ('Krok 3: E-mail do uczestnika — ' + data.variant_label)
+                            : 'Krok 3: E-mail do uczestnika');
                     hintEl.textContent = data.variant === 'new_user'
                         ? 'Przy wysyłce zostanie wygenerowany świeży link do ustawienia hasła (w podglądzie jest placeholder).'
                         : 'Zostanie wysłany ten sam typ wiadomości co przy pierwotnym przyznaniu dostępu.';
@@ -4315,13 +4451,21 @@ nowoczesna-edukacja.pl `;
             });
 
             sendBtn.addEventListener('click', async function () {
-                const sendUrl = openBtn.getAttribute('data-send-url');
+                if (!activeTrigger) {
+                    return;
+                }
+                const sendUrl = activeTrigger.getAttribute('data-send-url');
+                const fopId = activeTrigger.getAttribute('data-form-order-participant-id');
                 sendBtn.disabled = true;
                 copyBtn.disabled = true;
                 sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wysyłanie…';
                 errorEl.classList.add('d-none');
                 successEl.classList.add('d-none');
                 try {
+                    const payload = {};
+                    if (fopId) {
+                        payload.form_order_participant_id = Number(fopId);
+                    }
                     const res = await fetch(sendUrl, {
                         method: 'POST',
                         headers: {
@@ -4330,7 +4474,7 @@ nowoczesna-edukacja.pl `;
                             'X-CSRF-TOKEN': csrfToken(),
                             'X-Requested-With': 'XMLHttpRequest',
                         },
-                        body: JSON.stringify({}),
+                        body: JSON.stringify(payload),
                     });
                     const data = await res.json().catch(function () { return {}; });
                     if (!res.ok || !data.success) {

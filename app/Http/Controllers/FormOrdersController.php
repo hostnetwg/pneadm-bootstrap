@@ -797,7 +797,16 @@ class FormOrdersController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $zamowienie = FormOrder::with(['marketingCampaign.sourceType', 'primaryParticipant.participant.liveAccess', 'participants', 'onlinePaymentOrders', 'course.instructor', 'coursePriceVariant', 'cancelledByUser', 'activeDebtCases'])->find($id);
+        $zamowienie = FormOrder::with([
+            'marketingCampaign.sourceType',
+            'primaryParticipant.participant.liveAccess',
+            'participants.participant.liveAccess',
+            'onlinePaymentOrders',
+            'course.instructor',
+            'coursePriceVariant',
+            'cancelledByUser',
+            'activeDebtCases',
+        ])->find($id);
 
         if (! $zamowienie) {
             abort(404, 'Zamówienie nie zostało znalezione.');
@@ -1372,12 +1381,42 @@ class FormOrdersController extends Controller
 
     /**
      * Dodaje uczestnika w pneadm, konto (lub powiązanie) w pnedu.users oraz wysyła e-mail do uczestnika.
+     * Opcjonalnie: form_order_participant_id — konkretny wiersz (domyślnie główny).
      */
     public function provisionPneduAccess(Request $request, int $id)
     {
+        $fopId = $request->input('form_order_participant_id');
+        $fopId = $fopId !== null && $fopId !== '' ? (int) $fopId : null;
+
         $result = app(FormOrderPneduProvisionService::class)->provision(
             $id,
-            $request->boolean('add_participant_to_sendy')
+            $request->boolean('add_participant_to_sendy'),
+            $fopId
+        );
+
+        $http = (int) ($result['http_code'] ?? 500);
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Dodaje wszystkich nieobsłużonych uczestników zamówienia do PNEDU.
+     */
+    public function provisionPneduAccessAll(Request $request, int $id)
+    {
+        $sendyByFopId = [];
+        $rawMap = $request->input('add_participant_to_sendy_by_fop_id', []);
+        if (is_array($rawMap)) {
+            foreach ($rawMap as $fopId => $flag) {
+                $sendyByFopId[(int) $fopId] = filter_var($flag, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        $result = app(FormOrderPneduProvisionService::class)->provisionAll(
+            $id,
+            $request->boolean('add_participant_to_sendy'),
+            $sendyByFopId
         );
 
         $http = (int) ($result['http_code'] ?? 500);
@@ -1396,7 +1435,10 @@ class FormOrdersController extends Controller
             $request->session()->save();
         }
 
-        $result = app(FormOrderPneduProvisionService::class)->previewProvisionAccessEmail($id);
+        $result = app(FormOrderPneduProvisionService::class)->previewProvisionAccessEmail(
+            $id,
+            $this->optionalFormOrderParticipantId($request)
+        );
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
 
@@ -1412,11 +1454,24 @@ class FormOrdersController extends Controller
             $request->session()->save();
         }
 
-        $result = app(FormOrderPneduProvisionService::class)->resendProvisionAccessEmail($id);
+        $result = app(FormOrderPneduProvisionService::class)->resendProvisionAccessEmail(
+            $id,
+            $this->optionalFormOrderParticipantId($request)
+        );
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
 
         return response()->json($result, $http);
+    }
+
+    private function optionalFormOrderParticipantId(Request $request): ?int
+    {
+        $raw = $request->input('form_order_participant_id');
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        return (int) $raw;
     }
 
     /**
@@ -1561,7 +1616,8 @@ class FormOrdersController extends Controller
     }
 
     /**
-     * Resetuje status PNEDU dla zamówienia (tylko dla administratorów)
+     * Resetuje status PNEDU dla zamówienia (tylko dla administratorów).
+     * Opcjonalnie: form_order_participant_id (jedna osoba) lub reset_all=true (wszyscy provisionowani).
      */
     public function resetPneduStatus(Request $request, $id)
     {
@@ -1573,7 +1629,8 @@ class FormOrdersController extends Controller
         }
 
         try {
-            $zamowienie = FormOrder::with('primaryParticipant')->find($id);
+            $zamowienie = FormOrder::with(['participants.participant.liveAccess', 'primaryParticipant.participant.liveAccess', 'course'])
+                ->find($id);
 
             if (! $zamowienie) {
                 return response()->json([
@@ -1583,9 +1640,13 @@ class FormOrdersController extends Controller
             }
 
             $removeParticipant = $request->boolean('remove_participant', true);
+            $resetAll = $request->boolean('reset_all', false);
+            $fopId = $this->optionalFormOrderParticipantId($request);
 
-            $result = app(FormOrderPneduProvisionService::class)
-                ->resetStatus($zamowienie, $removeParticipant);
+            $service = app(FormOrderPneduProvisionService::class);
+            $result = $resetAll
+                ? $service->resetStatusAll($zamowienie, $removeParticipant)
+                : $service->resetStatus($zamowienie, $removeParticipant, $fopId);
 
             if (! ($result['success'] ?? false)) {
                 return response()->json([
@@ -1601,6 +1662,9 @@ class FormOrdersController extends Controller
                 'warnings' => $result['warnings'] ?? [],
                 'removed_participant' => $result['removed_participant'] ?? false,
                 'token_invalidated' => $result['token_invalidated'] ?? false,
+                'form_order_participant_id' => $result['form_order_participant_id'] ?? null,
+                'reset' => $result['reset'] ?? null,
+                'failed' => $result['failed'] ?? null,
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -1696,8 +1760,8 @@ class FormOrdersController extends Controller
             // Zgodnie z dokumentacją API iFirma - próba z różnymi wariantami nazw pól
             $pozycja = [
                 'NazwaPelna' => $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name),
-                'Ilosc' => 1.0,
-                'CenaJednostkowa' => round((float) $zamowienie->product_price, 2),
+                'Ilosc' => (float) $zamowienie->invoiceLineQuantity(),
+                'CenaJednostkowa' => $zamowienie->invoiceUnitPrice(),
                 'Jednostka' => 'sztuk',
                 'StawkaVat' => 0.23,
                 'TypStawkiVat' => 'PRC',
@@ -1933,6 +1997,33 @@ class FormOrdersController extends Controller
     /**
      * HTML panelu statusu operacyjnego (show) — do odświeżenia AJAX po wystawieniu FV bez przeładowania strony.
      */
+    /**
+     * Partial HTML listy kart uczestników (soft-refresh po provision PNEDU bez reloadu strony).
+     */
+    public function participantsCardsPartial(Request $request, int $id)
+    {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
+        $zamowienie = FormOrder::with([
+            'primaryParticipant.participant.liveAccess',
+            'participants.participant.liveAccess',
+            'course',
+        ])->find($id);
+
+        if (! $zamowienie) {
+            return response('Zamówienie nie zostało znalezione.', 404);
+        }
+
+        $expandFopId = $request->integer('expand_fop_id') ?: null;
+
+        return view('form-orders.partials.participants-cards', [
+            'zamowienie' => $zamowienie,
+            'expandFopId' => $expandFopId,
+        ]);
+    }
+
     public function operationalStatusPartial(int $id)
     {
         $zamowienie = FormOrder::query()->findOrFail($id);
@@ -2163,7 +2254,7 @@ class FormOrdersController extends Controller
             // 6. Jednostka
             // 7. TypStawkiVat (na końcu!)
 
-            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+            $cenaJednostkowa = $zamowienie->invoiceUnitPrice();
 
             $pozycja = [];
 
@@ -2179,7 +2270,7 @@ class FormOrdersController extends Controller
             }
 
             // Pozostałe pola w dokładnej kolejności jak w działającym kodzie
-            $pozycja['Ilosc'] = (float) 1.0;
+            $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
             $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
             $pozycja['Jednostka'] = 'sztuk';
@@ -2530,8 +2621,8 @@ class FormOrdersController extends Controller
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
             $vatExempt = config('services.ifirma.vat_exempt', false);
 
-            // Przygotowanie pozycji faktury
-            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+            // Przygotowanie pozycji faktury (Ilosc = liczba uczestników, CenaJednostkowa = cena za osobę)
+            $cenaJednostkowa = $zamowienie->invoiceUnitPrice();
 
             $pozycja = [];
 
@@ -2547,7 +2638,7 @@ class FormOrdersController extends Controller
             }
 
             // Pozostałe pola
-            $pozycja['Ilosc'] = (float) 1.0;
+            $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
             $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
             $pozycja['Jednostka'] = 'sztuk';
@@ -2940,8 +3031,8 @@ class FormOrdersController extends Controller
             $isLumpSum = config('services.ifirma.is_lump_sum', false);
             $vatExempt = config('services.ifirma.vat_exempt', false);
 
-            // Przygotowanie pozycji faktury
-            $cenaJednostkowa = (float) round((float) $zamowienie->product_price, 2);
+            // Przygotowanie pozycji faktury (Ilosc = liczba uczestników, CenaJednostkowa = cena za osobę)
+            $cenaJednostkowa = $zamowienie->invoiceUnitPrice();
 
             $pozycja = [];
 
@@ -2957,7 +3048,7 @@ class FormOrdersController extends Controller
             }
 
             // Pozostałe pola
-            $pozycja['Ilosc'] = (float) 1.0;
+            $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
             $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
             $pozycja['Jednostka'] = 'sztuk';

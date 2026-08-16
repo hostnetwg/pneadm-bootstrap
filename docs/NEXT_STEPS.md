@@ -1,7 +1,19 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-11  
+Data utworzenia/aktualizacji: 2026-08-16  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-16) — wielu uczestników: podsumowanie, PDF, lista ADM
+
+- Podsumowanie zamówienia + PDF: lista wszystkich uczestników; nagłówek PDF „ZAMÓWIENIE nr {id}”.
+- Lista `/form-orders`: wszyscy uczestnicy; szczegóły: kolejność dodania; ciemniejszy przycisk „Dodaj wszystkich naraz”.
+
+## Ostatnio (2026-08-16) — wielu uczestników na jednym zamówieniu
+
+- Formularz legacy + V2: dodawanie uczestników (szkoła/firma, limit 50), przeliczanie kwoty, blokada tego samego e-maila.
+- Online: brak edycji listy po bramce; odroczona FV: edycja do wystawienia FV.
+- ADM: karty uczestników + provision per osoba / wszystkich; iFirma `Ilosc` = N.
+- Kanon: `docs/FORM_ORDERS_PARTICIPANTS.md`.
 
 ## Ostatnio (2026-08-11) — link „ustaw hasło” ważny 2 miesiące
 

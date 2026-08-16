@@ -320,7 +320,11 @@ class ParticipantLiveAccessService
         ];
 
         if ($warning !== null) {
+            // Token wymagany, ale niepobrany (np. wydarzenie zakończone) — krok 2 = niepełny.
+            $payload['status'] = 'token_missing';
+            $payload['detail'] = trim($detail.' '.$warning);
             $payload['warning'] = $warning;
+            $payload['success'] = false;
         }
 
         return $payload;

@@ -228,6 +228,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/publigo/create', [FormOrdersController::class, 'createPubligoOrder'])->name('publigo.create');
             Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
             Route::post('/{id}/pnedu/provision', [FormOrdersController::class, 'provisionPneduAccess'])->name('pnedu.provision');
+            Route::post('/{id}/pnedu/provision-all', [FormOrdersController::class, 'provisionPneduAccessAll'])->name('pnedu.provision-all');
             Route::get('/{id}/pnedu/access-email-preview', [FormOrdersController::class, 'previewPneduAccessEmail'])->name('pnedu.access-email-preview');
             Route::post('/{id}/pnedu/resend-access-email', [FormOrdersController::class, 'resendPneduAccessEmail'])->name('pnedu.resend-access-email');
             Route::post('/{id}/cancel', [FormOrdersController::class, 'cancelOrder'])->name('cancel');
@@ -236,6 +237,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/invoice-exempt/clear', [FormOrdersController::class, 'clearInvoiceExempt'])->name('invoice-exempt.clear');
             Route::post('/{id}/pnedu/extend-access', [FormOrdersController::class, 'extendPneduAccess'])->name('pnedu.extend-access');
             Route::post('/{id}/pnedu/reset', [FormOrdersController::class, 'resetPneduStatus'])->name('pnedu.reset');
+            Route::get('/{id}/participants-cards', [FormOrdersController::class, 'participantsCardsPartial'])->name('participants-cards');
             Route::get('/{id}/operational-status', [FormOrdersController::class, 'operationalStatusPartial'])->name('operational-status');
             Route::get('/{id}/ifirma/check-invoice', [FormOrdersController::class, 'checkInvoiceStatus'])->name('ifirma.check-invoice');
             Route::post('/{id}/ifirma/proforma', [FormOrdersController::class, 'createIfirmaProForma'])->name('ifirma.proforma');

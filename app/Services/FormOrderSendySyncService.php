@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FormOrder;
+use App\Models\FormOrderParticipant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -95,26 +96,87 @@ class FormOrderSendySyncService
     }
 
     /**
-     * @return Collection<int,array{
-     *   name:string,
-     *   email:string,
-     *   sername:string,
-     *   data:string,
-     *   id_szkolenia:int|string
-     * }>
+     * Sync Sendy: zamawiający + opcjonalnie wskazany uczestnik (nie zawsze primary).
+     *
+     * @return array{attempted:int, success:int, failed:int, errors:array<int,string>}
      */
-    public function contactsForOrder(FormOrder $order, bool $includeParticipant = true): Collection
-    {
+    public function syncOrderWithParticipant(
+        FormOrder $order,
+        FormOrderParticipant $fop,
+        bool $includeParticipant = true
+    ): array {
+        $listId = trim((string) config('sendy.lists.paid_participants'));
+        if ($listId === '') {
+            return [
+                'attempted' => 0,
+                'success' => 0,
+                'failed' => 1,
+                'errors' => ['Brak konfiguracji SENDY_PAID_TRAININGS_LIST_ID.'],
+            ];
+        }
+
+        $order->loadMissing('course');
+        $contacts = $this->contactsForOrderAndParticipant($order, $fop, $includeParticipant);
+        $results = [
+            'attempted' => $contacts->count(),
+            'success' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ];
+
+        /** @var SendyService $sendy */
+        $sendy = app(SendyService::class);
+
+        foreach ($contacts as $contact) {
+            $ok = $sendy->subscribe($contact['email'], $listId, [
+                'name' => $contact['name'],
+                'Sername' => $contact['sername'],
+                'data' => $contact['data'],
+                'id_szkolenia' => (string) $contact['id_szkolenia'],
+            ]);
+
+            if ($ok) {
+                $results['success']++;
+                continue;
+            }
+
+            $results['failed']++;
+            $results['errors'][] = sprintf(
+                'Nie udało się dodać kontaktu %s (zamówienie #%d).',
+                $contact['email'],
+                (int) $order->id
+            );
+        }
+
+        if ($results['failed'] > 0) {
+            Log::warning('FormOrderSendySyncService: częściowy/pełny błąd sync do Sendy (per uczestnik)', [
+                'form_order_id' => $order->id,
+                'form_order_participant_id' => $fop->id,
+                'result' => $results,
+            ]);
+        }
+
+        return $results;
+    }
+
+    /**
+     * @return Collection<int,array{name:string, email:string, sername:string, data:string, id_szkolenia:int|string}>
+     */
+    public function contactsForOrderAndParticipant(
+        FormOrder $order,
+        FormOrderParticipant $fop,
+        bool $includeParticipant = true
+    ): Collection {
         $courseId = $this->resolveCourseId($order);
         $courseDate = $order->course?->start_date?->format('Y-m-d') ?? '';
         $contacts = collect();
 
-        $participantEmail = strtolower(trim((string) ($order->display_participant_email ?? '')));
+        $participantEmail = strtolower(trim((string) ($fop->participant_email ?? '')));
         if ($includeParticipant && $participantEmail !== '' && str_contains($participantEmail, '@')) {
             $contacts->push([
-                'name' => trim((string) ($order->primaryParticipant?->participant_firstname ?? '')),
+                'name' => trim((string) ($fop->participant_firstname ?? '')),
                 'email' => $participantEmail,
-                'sername' => trim((string) ($order->primaryParticipant?->participant_lastname ?? '')),
+                'sername' => trim((string) ($fop->participant_lastname ?? '')),
                 'data' => $courseDate,
                 'id_szkolenia' => $courseId,
             ]);
@@ -138,6 +200,34 @@ class FormOrderSendySyncService
             ->filter(fn (array $row) => $row['email'] !== '')
             ->unique(fn (array $row) => $row['email'].'|'.$row['id_szkolenia'])
             ->values();
+    }
+
+    /**
+     * @return Collection<int,array{
+     *   name:string,
+     *   email:string,
+     *   sername:string,
+     *   data:string,
+     *   id_szkolenia:int|string
+     * }>
+     */
+    public function contactsForOrder(FormOrder $order, bool $includeParticipant = true): Collection
+    {
+        $order->loadMissing('primaryParticipant');
+        $primary = $order->primaryParticipant;
+        if ($primary) {
+            return $this->contactsForOrderAndParticipant($order, $primary, $includeParticipant);
+        }
+
+        return $this->contactsForOrderAndParticipant(
+            $order,
+            new FormOrderParticipant([
+                'participant_firstname' => '',
+                'participant_lastname' => '',
+                'participant_email' => '',
+            ]),
+            false
+        );
     }
 
     /**
