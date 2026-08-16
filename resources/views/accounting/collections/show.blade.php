@@ -690,7 +690,7 @@
                         </div>
                         <div id="caseBankPaymentsCollapse" class="collapse">
                             <div class="card-body border-bottom">
-                                <form id="bankTransferSearchForm" class="row g-2 align-items-end">
+                                <form id="bankTransferSearchForm" class="row g-2 align-items-start">
                                     <div class="col-12 col-lg-5">
                                         <label for="bank_search" class="form-label small mb-1">Szukaj przelewu</label>
                                         <div class="input-group input-group-sm">
@@ -714,23 +714,31 @@
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
-                                        <label for="bank_amount" class="form-label small mb-1">Kwota</label>
+                                        <label for="bank_amount" class="form-label small mb-1">
+                                            Kwota
+                                            @if(($bankRemainingOnCase ?? null) !== null && (float) $bankRemainingOnCase > 0.01 && (float) ($bankAllocatedSum ?? 0) > 0.01)
+                                                <span class="text-muted fw-normal">(brakująca FV)</span>
+                                            @endif
+                                        </label>
                                         <input type="number"
                                                step="0.01"
                                                min="0"
                                                id="bank_amount"
                                                name="bank_amount"
                                                class="form-control form-control-sm"
-                                               value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}">
-                                        @if(($bankRemainingOnCase ?? null) !== null && (float) $bankRemainingOnCase > 0.01 && (float) ($bankAllocatedSum ?? 0) > 0.01)
-                                            <div class="form-text">Domyślnie: brakująca kwota FV</div>
-                                        @endif
+                                               value="{{ $bankTransferAmount !== null ? number_format((float) $bankTransferAmount, 2, '.', '') : '' }}"
+                                               @if(($bankRemainingOnCase ?? null) !== null && (float) $bankRemainingOnCase > 0.01 && (float) ($bankAllocatedSum ?? 0) > 0.01)
+                                                   title="Domyślnie: brakująca kwota FV"
+                                               @endif>
                                     </div>
-                                    <div class="col-6 col-lg-4 d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">
-                                            <i class="bi bi-search"></i> Szukaj przelewu
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="bankTransferSearchResetBtn">Reset</button>
+                                    <div class="col-6 col-lg-4">
+                                        <label class="form-label small mb-1 d-none d-lg-block user-select-none" aria-hidden="true">&nbsp;</label>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="submit" class="btn btn-primary btn-sm" id="bankTransferSearchBtn">
+                                                <i class="bi bi-search"></i> Szukaj przelewu
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="bankTransferSearchResetBtn">Reset</button>
+                                        </div>
                                     </div>
                                     <div class="col-12">
                                         <div class="form-check">
