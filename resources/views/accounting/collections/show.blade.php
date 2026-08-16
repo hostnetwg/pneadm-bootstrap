@@ -821,8 +821,17 @@
                                                                     data-unlink-summary="{{ number_format($allocated, 2, ',', ' ').' '.($tx?->currency ?? 'PLN').' · '.($tx?->operation_date?->format('Y-m-d') ?? '—') }}">
                                                                 Cofnij
                                                             </button>
-                                                            @if($tx)
-                                                                <a class="btn btn-sm btn-outline-primary" href="{{ route('accounting.bank-imports.show', ['bankImport' => $tx->bank_statement_import_id, 'filter' => 'accepted']) }}">Import</a>
+                                                            @if($tx && $tx->bank_statement_import_id)
+                                                                <a class="btn btn-sm btn-outline-primary"
+                                                                   href="{{ route('accounting.bank-imports.show', [
+                                                                       'bankImport' => $tx->bank_statement_import_id,
+                                                                       'filter' => 'accepted',
+                                                                       'preview' => $tx->id,
+                                                                       'match' => $payment->id,
+                                                                   ]) }}"
+                                                                   title="Otwórz ten przelew w szczegółach importu wyciągu (podgląd dwukolumnowy)">
+                                                                    Podgląd przelewu
+                                                                </a>
                                                             @endif
                                                         </td>
                                                     </tr>

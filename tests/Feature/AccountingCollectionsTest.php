@@ -1596,6 +1596,10 @@ class AccountingCollectionsTest extends TestCase
         $show->assertSee('Wpłata iFirma', false);
         $show->assertSee('365,00', false);
         $show->assertSee('z przelewu 730,00', false);
+        $show->assertSee('Podgląd przelewu', false);
+        $show->assertSee('preview='.$tx->id, false);
+        $show->assertSee('match='.$match->id, false);
+        $show->assertSee('/accounting/bank-imports/'.$import->id, false);
 
         $this->mock(\App\Services\IfirmaInvoicePaymentRegistrationService::class, function ($mock) {
             $mock->shouldReceive('registerFromAcceptedBankMatch')

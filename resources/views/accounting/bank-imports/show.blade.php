@@ -2458,10 +2458,36 @@
             }
 
             var autoPreviewId = new URLSearchParams(window.location.search).get('preview');
+            var autoMatchId = new URLSearchParams(window.location.search).get('match');
             if (autoPreviewId) {
                 var autoBtn = document.querySelector('.bank-tx-preview-btn[data-tx-id="' + autoPreviewId + '"]');
                 if (autoBtn) {
-                    bootstrap.Modal.getOrCreateInstance(modalEl).show(autoBtn);
+                    var openPreviewModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    if (autoMatchId) {
+                        modalEl.addEventListener('shown.bs.modal', function onAutoPreviewShown() {
+                            modalEl.removeEventListener('shown.bs.modal', onAutoPreviewShown);
+                            try {
+                                var previewData = JSON.parse(autoBtn.getAttribute('data-preview') || '{}');
+                                var allocations = previewData.allocations || [];
+                                var target = allocations.find(function (row) {
+                                    return String(row.match_id) === String(autoMatchId);
+                                });
+                                if (target && target.form_order_id) {
+                                    selectAcceptedAllocation(target, null);
+                                    var list = document.getElementById('bankTxPreviewAllocationsList');
+                                    if (list) {
+                                        list.querySelectorAll('.bank-allocation-select-btn').forEach(function (btn) {
+                                            var idx = Number(btn.getAttribute('data-allocation-index') || '-1');
+                                            if (allocations[idx] && String(allocations[idx].match_id) === String(autoMatchId)) {
+                                                btn.classList.add('fw-semibold');
+                                            }
+                                        });
+                                    }
+                                }
+                            } catch (e) {}
+                        });
+                    }
+                    openPreviewModal.show(autoBtn);
                 }
             }
         });

@@ -144,6 +144,8 @@ class BankStatementImportController extends Controller
             ->latest('operation_date')
             ->latest('id');
 
+        $previewId = $request->integer('preview');
+
         if ($filter === 'unmatched') {
             $transactionsQuery->withRemainingAllocatable()
                 ->where(function ($q) {
@@ -180,6 +182,15 @@ class BankStatementImportController extends Controller
                             ->orWhereJsonDoesntContain('match_reasons', BankTransactionMatch::REASON_GATEWAY_PAYOUT_PAYNOW);
                     });
             });
+        }
+
+        // Deep-link ze sprawy: ?preview={txId} — ten przelew na początku listy, żeby modal się otworzył.
+        if ($previewId > 0
+            && $bankImport->transactions()->whereKey($previewId)->where('is_incoming', true)->exists()) {
+            $transactionsQuery->reorder()
+                ->orderByRaw('CASE WHEN bank_transactions.id = ? THEN 0 ELSE 1 END', [$previewId])
+                ->orderByDesc('operation_date')
+                ->orderByDesc('id');
         }
 
         $transactions = $transactionsQuery->paginate(50)->withQueryString();
