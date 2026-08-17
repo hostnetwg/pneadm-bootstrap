@@ -17,7 +17,7 @@ class IfirmaFormOrderKsefSubmissionService
         ?string $invoiceNumber,
         Request $request
     ): JsonResponse {
-        $invoiceNumber = trim((string) ($invoiceNumber ?: $zamowienie->invoice_number ?: $invoiceId));
+        $invoiceNumber = $this->resolveHumanInvoiceNumber($invoiceNumber, $zamowienie, $invoiceId);
         $sendEmail = filter_var($request->input('send_email', false), FILTER_VALIDATE_BOOLEAN);
 
         if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== (string) $invoiceId) {
@@ -213,6 +213,26 @@ class IfirmaFormOrderKsefSubmissionService
             'email_errors' => $emailErrors,
             'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
         ]);
+    }
+
+    /**
+     * Klasyczny PelnyNumer — nigdy Identyfikator iFirma.
+     */
+    private function resolveHumanInvoiceNumber(
+        ?string $invoiceNumber,
+        FormOrder $zamowienie,
+        string $invoiceId
+    ): string {
+        foreach ([$invoiceNumber, $zamowienie->invoice_number] as $candidate) {
+            $trimmed = trim((string) $candidate);
+            if ($trimmed === '' || $trimmed === $invoiceId || preg_match('/^\d+$/', $trimmed) === 1) {
+                continue;
+            }
+
+            return $trimmed;
+        }
+
+        return '';
     }
 
     /**

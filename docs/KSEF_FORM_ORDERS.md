@@ -308,9 +308,13 @@ flaga wraca do `false`. Przy błędzie / częściowej wysyłce flaga zostaje (mo
 dogonić przez **Odśwież KSeF**).
 
 **UI / API (2026-07):** przycisk czerwony wywołuje endpoint w **dwóch fazach**
-(`phase=create` → zapis `invoice_number` w zamówieniu i odświeżenie pola w
-formularzu, potem `phase=ksef` → KSeF + polling). Przy timeoutie KSeF numer
-faktury iFirma pozostaje zapisany (`partial_success` / `invoice_created` w JSON).
+(`phase=create` → zapis **klasycznego** `invoice_number` = `PelnyNumer` (np. `56/8/2026`)
+oraz `ifirma_invoice_id` = `Identyfikator`, potem odświeżenie pól w formularzu;
+`phase=ksef` → KSeF + polling). **Nigdy** nie zapisujemy ID iFirma w `invoice_number`
+(ani w inpucie „Numer faktury”) — na ID i KSeF są osobne pola. Gdy GET faktury nie
+zwróci jeszcze `PelnyNumer`, numer FV zostaje pusty (ID i daty i tak się zapisują);
+uzupełnienie: **Odśwież** przy ID iFirma. Przy timeoutie KSeF ID i (jeśli był)
+numer FV pozostają (`partial_success` / `invoice_created` w JSON).
 Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
 
 **Filtr nawigacji „Tylko z NIP bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
@@ -334,8 +338,9 @@ np. po przeniesieniu FV do innego zamówienia. Preferuje wyszukanie dokumentu po
 (lista iFirma, jak windykacja) — przydatne po ręcznym wystawieniu FV w panelu iFirma
 lub gdy stare `ifirma_invoice_id` wskazuje usunięty dokument. Ikona przy **ID iFirma**
 (oraz przy KSeF) synchronizuje po zapisanym `ifirma_invoice_id` (`prefer_number_lookup=0`)
-— uzupełnia brakujący `invoice_number` z `PelnyNumer`, **daty FV** oraz **NumerKSeF**.
-Ręcznie wpisanego `invoice_number` **nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
+— uzupełnia brakujący `invoice_number` z `PelnyNumer` **oraz zamienia omyłkowe ID iFirma**
+(same cyfry w polu numeru FV) na `PelnyNumer`; **daty FV** oraz **NumerKSeF**.
+Ręcznie wpisanego `invoice_number` (np. `56/8/2026` albo własny prefiks) **nie nadpisuje**. Gdy w iFirma **brak** `NumerKSeF`, lokalny numer KSeF **nie jest
 czyszczony** (wcześniej sync kasował ręczny wpis). Gdy sync uzyska NumerKSeF i
 `ksef_email_pending=true`, wysyła FV mailem przez iFirma (te same adresy co czerwony
 przycisk; ~400 ms między adresami; bez agresywnego retry). Po pełnym sukcesie
@@ -474,7 +479,7 @@ Obok klasycznego numeru i KSeF zapisujemy wewnętrzny ID dokumentu iFirma:
 
 | Kolumna | Źródło iFirma | Uwagi |
 |---------|---------------|--------|
-| `invoice_number` | `PelnyNumer` | Numer widoczny dla klienta / księgowości |
+| `invoice_number` | `PelnyNumer` | Numer widoczny dla klienta / księgowości (format `N/M/YYYY`). **Nigdy** `Identyfikator` iFirma. |
 | `ksef_number` (+ `ksef_status`, `ksef_sent_at`, …) | NumerKSeF | Po akceptacji w KSeF |
 | `ksef_email_pending` | — (panel) | Intencja: wyślij FV mailem po NumerKSeF; migracja `2026_08_10_101120_add_ksef_email_pending_to_form_orders_table.php` |
 | `ifirma_invoice_id` | `Identyfikator` / FakturaId | Migracja `2026_07_31_160000_add_ifirma_invoice_id_to_form_orders_table.php`; klucz do API `fakturakraj/{id}` |

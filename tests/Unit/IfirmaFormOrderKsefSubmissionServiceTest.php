@@ -149,4 +149,46 @@ class IfirmaFormOrderKsefSubmissionServiceTest extends TestCase
         $this->assertSame(504, $response->getStatusCode());
         $this->assertFalse($order->ksef_email_pending);
     }
+
+    public function test_does_not_use_ifirma_id_as_invoice_number_in_payload(): void
+    {
+        $order = Mockery::mock(FormOrder::class)->makePartial();
+        $order->forceFill([
+            'id' => 504,
+            'ifirma_invoice_id' => '999001',
+            'invoice_number' => '999001',
+            'orderer_email' => 'd@example.test',
+            'ksef_email_pending' => false,
+            'ksef_status' => null,
+            'ksef_error' => null,
+            'ksef_sent_at' => null,
+            'ksef_number' => null,
+        ]);
+        $order->shouldReceive('isDirty')->andReturn(false);
+        $order->shouldReceive('save')->andReturnTrue();
+
+        $api = Mockery::mock(IfirmaApiService::class);
+        $api->shouldReceive('sendInvoiceToKsef')
+            ->once()
+            ->andReturn(['status' => 'success', 'data' => []]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->once()->andReturn(null);
+        $api->shouldReceive('waitForKsefInvoiceAccepted')
+            ->once()
+            ->andReturn([
+                'outcome' => 'timeout',
+                'numer_ksef' => null,
+                'rejection_message' => null,
+                'attempts' => 2,
+            ]);
+        $api->shouldNotReceive('sendInvoiceByEmail');
+
+        $request = Request::create('/test', 'POST', ['send_email' => false]);
+        $service = new IfirmaFormOrderKsefSubmissionService;
+        $response = $service->submit($order, $api, '999001', '999001', $request);
+
+        $payload = $response->getData(true);
+        $this->assertSame(504, $response->getStatusCode());
+        $this->assertSame('999001', $payload['invoice_id']);
+        $this->assertSame('', $payload['invoice_number']);
+    }
 }

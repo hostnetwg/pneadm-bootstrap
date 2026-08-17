@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-16  
+Data utworzenia/aktualizacji: 2026-08-17  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-17) — numer FV ≠ ID iFirma
+
+Przy wystawianiu FV przez API iFirma pole `invoice_number` / input „Numer faktury” zapisuje wyłącznie `PelnyNumer` (np. `56/8/2026`). ID dokumentu idzie do `ifirma_invoice_id`, numer KSeF do `ksef_number`. Odśwież przy ID iFirma zamienia omyłkowe ID w polu numeru na `PelnyNumer`. Kanon: `docs/KSEF_FORM_ORDERS.md`.
 
 ## Ostatnio (2026-08-16) — wielu uczestników: podsumowanie, PDF, lista ADM
 

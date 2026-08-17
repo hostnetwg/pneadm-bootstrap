@@ -2500,8 +2500,12 @@ nowoczesna-edukacja.pl `;
                 });
         }
 
+        function looksLikeIfirmaDocumentId(value) {
+            return typeof value === 'string' && /^\d+$/.test(value.trim());
+        }
+
         function applyInvoiceNumberFieldValue(invoiceNumber) {
-            if (!invoiceNumber) {
+            if (!invoiceNumber || looksLikeIfirmaDocumentId(String(invoiceNumber))) {
                 return;
             }
             const invoiceNumberInput = document.getElementById('invoice_number');

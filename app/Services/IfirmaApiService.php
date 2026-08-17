@@ -738,6 +738,47 @@ class IfirmaApiService
         return mb_strtolower($number);
     }
 
+    /**
+     * Wewnętrzny Identyfikator dokumentu iFirma (same cyfry) — nie mylić z PelnyNumer.
+     */
+    public function looksLikeIfirmaDocumentId(string $value): bool
+    {
+        return (bool) preg_match('/^\d+$/', trim($value));
+    }
+
+    /**
+     * Puste / „0” / omyłkowo wstawione ID iFirma w polu numeru FV.
+     */
+    public function isMissingOrIfirmaDocumentId(?string $value): bool
+    {
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' || $trimmed === '0' || $this->looksLikeIfirmaDocumentId($trimmed);
+    }
+
+    /**
+     * Klasyczny numer FV z payloadu GET faktury (PelnyNumer), nigdy Identyfikator iFirma.
+     */
+    public function extractPelnyNumerFromInvoicePayload(mixed $payload): ?string
+    {
+        $unwrapped = $this->unwrapInvoicePayload($payload);
+        $raw = $unwrapped['PelnyNumer'] ?? null;
+        if ($raw === null && isset($unwrapped['response']) && is_array($unwrapped['response'])) {
+            $raw = $unwrapped['response']['PelnyNumer'] ?? null;
+        }
+
+        if (! is_scalar($raw)) {
+            return null;
+        }
+
+        $number = trim((string) $raw);
+        if ($number === '' || $this->looksLikeIfirmaDocumentId($number)) {
+            return null;
+        }
+
+        return $number;
+    }
+
     private function isAssocArray(array $array): bool
     {
         if ($array === []) {

@@ -1853,12 +1853,7 @@ class FormOrdersController extends Controller
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
 
-                            // Pełny numer faktury jest w polu "PelnyNumer"
-                            if (isset($fullInvoiceData['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['PelnyNumer'];
-                            } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
-                            }
+                            $invoiceNumber = $ifirmaService->extractPelnyNumerFromInvoicePayload($fullInvoiceData);
                         }
 
                         Log::info('iFirma Pro Forma - szczegóły pobrane', [
@@ -1871,8 +1866,6 @@ class FormOrdersController extends Controller
                             'invoice_id' => $invoiceId,
                             'error' => $e->getMessage(),
                         ]);
-                        // Jeśli nie udało się pobrać, użyj Identyfikatora jako fallback
-                        $invoiceNumber = $invoiceId;
                     }
                 }
 
@@ -2363,11 +2356,7 @@ class FormOrdersController extends Controller
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
 
-                            if (isset($fullInvoiceData['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['PelnyNumer'];
-                            } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
-                            }
+                            $invoiceNumber = $ifirmaService->extractPelnyNumerFromInvoicePayload($fullInvoiceData);
                         }
 
                         Log::info('iFirma Invoice - szczegóły pobrane', [
@@ -2380,7 +2369,6 @@ class FormOrdersController extends Controller
                             'invoice_id' => $invoiceId,
                             'error' => $e->getMessage(),
                         ]);
-                        $invoiceNumber = $invoiceId;
                     }
                 }
 
@@ -2389,8 +2377,8 @@ class FormOrdersController extends Controller
                 if (! empty($invoiceNumber)) {
                     $oldInvoiceNumber = $zamowienie->invoice_number;
 
-                    // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
-                    if (empty($oldInvoiceNumber) || $force) {
+                    // Aktualizuj numer faktury (nadpisz jeśli force=true, puste albo omyłkowe ID iFirma)
+                    if ($ifirmaService->isMissingOrIfirmaDocumentId($oldInvoiceNumber) || $force) {
                         // Analityka (ADR-005): numer ustawiony przez iFirma → invoice_path_type=ifirma.
                         \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
                             \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
@@ -2433,6 +2421,9 @@ class FormOrdersController extends Controller
                 } elseif (! empty($invoiceId)) {
                     if (empty($zamowienie->ifirma_invoice_id)) {
                         $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    }
+                    if ($ifirmaService->looksLikeIfirmaDocumentId((string) ($zamowienie->invoice_number ?? ''))) {
+                        $zamowienie->invoice_number = null;
                     }
                     $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                     $zamowienie->save();
@@ -2733,11 +2724,7 @@ class FormOrdersController extends Controller
                         if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                             $fullInvoiceData = $invoiceDetails['data'];
 
-                            if (isset($fullInvoiceData['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['PelnyNumer'];
-                            } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
-                                $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
-                            }
+                            $invoiceNumber = $ifirmaService->extractPelnyNumerFromInvoicePayload($fullInvoiceData);
                         }
 
                         Log::info('iFirma Invoice With Receiver - szczegóły pobrane', [
@@ -2750,7 +2737,6 @@ class FormOrdersController extends Controller
                             'invoice_id' => $invoiceId,
                             'error' => $e->getMessage(),
                         ]);
-                        $invoiceNumber = $invoiceId;
                     }
                 }
 
@@ -2758,8 +2744,8 @@ class FormOrdersController extends Controller
                 if (! empty($invoiceNumber)) {
                     $oldInvoiceNumber = $zamowienie->invoice_number;
 
-                    // Aktualizuj numer faktury (nadpisz jeśli force=true lub jeśli było puste)
-                    if (empty($oldInvoiceNumber) || $force) {
+                    // Aktualizuj numer faktury (nadpisz jeśli force=true, puste albo omyłkowe ID iFirma)
+                    if ($ifirmaService->isMissingOrIfirmaDocumentId($oldInvoiceNumber) || $force) {
                         // Analityka (ADR-005): numer ustawiony przez iFirma → invoice_path_type=ifirma.
                         \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
                             \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
@@ -2802,6 +2788,9 @@ class FormOrdersController extends Controller
                 } elseif (! empty($invoiceId)) {
                     if (empty($zamowienie->ifirma_invoice_id)) {
                         $zamowienie->ifirma_invoice_id = (string) $invoiceId;
+                    }
+                    if ($ifirmaService->looksLikeIfirmaDocumentId((string) ($zamowienie->invoice_number ?? ''))) {
+                        $zamowienie->invoice_number = null;
                     }
                     $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
                     $zamowienie->save();
@@ -3147,11 +3136,7 @@ class FormOrdersController extends Controller
                 $invoiceDetails = $ifirmaService->getInvoice($invoiceId);
                 if ($invoiceDetails['status'] === 'success' && isset($invoiceDetails['data'])) {
                     $fullInvoiceData = $invoiceDetails['data'];
-                    if (isset($fullInvoiceData['PelnyNumer'])) {
-                        $invoiceNumber = $fullInvoiceData['PelnyNumer'];
-                    } elseif (isset($fullInvoiceData['response']['PelnyNumer'])) {
-                        $invoiceNumber = $fullInvoiceData['response']['PelnyNumer'];
-                    }
+                    $invoiceNumber = $ifirmaService->extractPelnyNumerFromInvoicePayload($fullInvoiceData);
                 }
             } catch (Exception $e) {
                 Log::warning('Nie udało się pobrać pełnego numeru faktury', [
@@ -3160,17 +3145,26 @@ class FormOrdersController extends Controller
                 ]);
             }
 
-            // Aktualizacja numeru faktury w bazie
+            // Aktualizacja numeru faktury w bazie — invoice_number = PelnyNumer, nigdy Identyfikator iFirma.
             // Analityka (ADR-005): numer ustawiony przez iFirma (KSeF) → invoice_path_type=ifirma.
-            \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
-                \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
-            );
-            $zamowienie->invoice_number = $invoiceNumber ?: $invoiceId;
+            $oldInvoiceNumber = $zamowienie->invoice_number;
+            if ($invoiceNumber !== null && $invoiceNumber !== ''
+                && ($ifirmaService->isMissingOrIfirmaDocumentId($oldInvoiceNumber) || $force)) {
+                \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
+                    \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_IFIRMA
+                );
+                $zamowienie->invoice_number = $invoiceNumber;
+            } elseif ($ifirmaService->looksLikeIfirmaDocumentId((string) ($oldInvoiceNumber ?? ''))) {
+                $zamowienie->invoice_number = null;
+            }
             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
             $this->applyInvoiceDocumentDatesFromPayload($zamowienie, $invoiceData, $fullInvoiceData);
             $zamowienie->save();
 
-            $resolvedInvoiceNumber = (string) ($invoiceNumber ?: $invoiceId);
+            $resolvedInvoiceNumber = $invoiceNumber
+                ?? (! $ifirmaService->isMissingOrIfirmaDocumentId($zamowienie->invoice_number)
+                    ? (string) $zamowienie->invoice_number
+                    : null);
 
             if ($phase === 'create') {
                 return response()->json(array_merge([

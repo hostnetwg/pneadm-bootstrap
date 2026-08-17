@@ -176,9 +176,12 @@ class IfirmaFormOrderKsefSyncService
             $changed = true;
         }
 
-        if ($numberAtEntry === '' && trim((string) ($order->invoice_number ?? '')) === '' && $pelnyNumer !== null) {
-            $order->invoice_number = $pelnyNumer;
-            $changed = true;
+        if ($pelnyNumer !== null) {
+            $currentNumber = trim((string) ($order->invoice_number ?? ''));
+            if ($currentNumber === '' || preg_match('/^\d+$/', $currentNumber) === 1) {
+                $order->invoice_number = $pelnyNumer;
+                $changed = true;
+            }
         }
 
         if ($ksefNumber !== null && $ksefNumber !== '') {
