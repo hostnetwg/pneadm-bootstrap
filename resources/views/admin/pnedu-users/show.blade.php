@@ -192,7 +192,9 @@
                                     Użyj po kontakcie z użytkownikiem (np. telefon) i ustaleniu poprawnego adresu.
                                     Użytkownik powinien też poprawić e-mail w profilu na pnedu.pl — wtedy flaga znika automatycznie.
                                 </p>
-                                <form method="post" action="{{ route('admin.pnedu-users.clear-undeliverable', ['pnedu_user' => $user->getKey()]) }}">
+                                <form method="post"
+                                      id="pnedu-clear-undeliverable-form"
+                                      action="{{ route('admin.pnedu-users.clear-undeliverable', ['pnedu_user' => $user->getKey()]) }}">
                                     @csrf
                                     <div class="form-check mb-3">
                                         <input class="form-check-input" type="checkbox" name="confirm_clear_undeliverable" id="confirm_clear_undeliverable" value="1" required>
@@ -203,11 +205,39 @@
                                     @error('confirm_clear_undeliverable')
                                         <div class="text-danger small mb-2">{{ $message }}</div>
                                     @enderror
-                                    <button type="submit" class="btn btn-outline-danger btn-sm"
-                                            onclick="return confirm('Wyczyścić flagę niedostarczalności e-mail?');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">
                                         <i class="bi bi-envelope-check me-1"></i> Wyczyść flagę bounce
                                     </button>
                                 </form>
+
+                                <div class="modal fade" id="pneduClearUndeliverableModal" tabindex="-1" aria-labelledby="pneduClearUndeliverableModalLabel" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-danger text-white">
+                                                <h2 class="modal-title fs-5" id="pneduClearUndeliverableModalLabel">
+                                                    <i class="bi bi-envelope-exclamation me-1"></i>
+                                                    Wyczyszczenie flagi bounce
+                                                </h2>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="mb-2">Wyczyścić flagę niedostarczalności e-mail dla <strong>{{ $user->email }}</strong>?</p>
+                                                <div class="alert alert-warning mb-0">
+                                                    Użyj tylko po kontakcie z użytkownikiem i ustaleniu, że adres jest poprawny.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                                <button type="submit"
+                                                        form="pnedu-clear-undeliverable-form"
+                                                        class="btn btn-danger"
+                                                        id="pneduClearUndeliverableConfirmBtn">
+                                                    Wyczyść flagę bounce
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         @endif
 
@@ -264,8 +294,7 @@
                             <form method="post"
                                   id="pnedu-user-set-password-form"
                                   action="{{ route('admin.pnedu-users.set-password', ['pnedu_user' => $user->getKey()]) }}"
-                                  class="row g-2 align-items-end"
-                                  onsubmit="return confirm('Nadpisać hasło tego użytkownika nowym hasłem z formularza?');">
+                                  class="row g-2 align-items-end">
                                 @csrf
                                 <div class="col-md-5">
                                     <label class="form-label small mb-0" for="pnedu_admin_set_password">Nowe hasło</label>
@@ -276,14 +305,40 @@
                                     <input type="password" name="password_confirmation" id="pnedu_admin_set_password_confirmation" class="form-control form-control-sm" required autocomplete="new-password">
                                 </div>
                                 <div class="col-md-2">
-                                    <button type="submit"
-                                            class="btn btn-warning btn-sm w-100"
-                                            formaction="{{ route('admin.pnedu-users.set-password', ['pnedu_user' => $user->getKey()]) }}"
-                                            formmethod="post">
+                                    <button type="submit" class="btn btn-warning btn-sm w-100">
                                         Zapisz hasło
                                     </button>
                                 </div>
                             </form>
+
+                            <div class="modal fade" id="pneduSetPasswordModal" tabindex="-1" aria-labelledby="pneduSetPasswordModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-warning text-dark">
+                                            <h2 class="modal-title fs-5" id="pneduSetPasswordModalLabel">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                Nadpisanie hasła
+                                            </h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-2">Nadpisać hasło tego użytkownika nowym hasłem z formularza?</p>
+                                            <div class="alert alert-warning mb-0">
+                                                Dotychczasowe hasło przestanie działać. Użyj tej akcji tylko gdy jest to uzasadnione procedurą.
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                            <button type="submit"
+                                                    form="pnedu-user-set-password-form"
+                                                    class="btn btn-warning"
+                                                    id="pneduSetPasswordConfirmBtn">
+                                                Nadpisz hasło
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             @error('password')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror
@@ -298,7 +353,9 @@
                                 @if($user->hasUndeliverableEmail())
                                     <div class="alert alert-warning small py-2">Adres ma flagę bounce — ręczna weryfikacja nie usuwa problemu dostarczalności.</div>
                                 @endif
-                                <form method="post" action="{{ route('admin.pnedu-users.verify-email', ['pnedu_user' => $user->getKey()]) }}">
+                                <form method="post"
+                                      id="pnedu-verify-email-form"
+                                      action="{{ route('admin.pnedu-users.verify-email', ['pnedu_user' => $user->getKey()]) }}">
                                     @csrf
                                     <div class="form-check mb-3">
                                         <input class="form-check-input" type="checkbox" name="confirm_verify" id="confirm_verify" value="1" required>
@@ -309,11 +366,39 @@
                                     @error('confirm_verify')
                                         <div class="text-danger small mb-2">{{ $message }}</div>
                                     @enderror
-                                    <button type="submit" class="btn btn-success btn-sm"
-                                            onclick="return confirm('Oznaczyć ten e-mail jako zweryfikowany?');">
+                                    <button type="submit" class="btn btn-success btn-sm">
                                         <i class="bi bi-check2-circle me-1"></i> Zweryfikuj e-mail
                                     </button>
                                 </form>
+
+                                <div class="modal fade" id="pneduVerifyEmailModal" tabindex="-1" aria-labelledby="pneduVerifyEmailModalLabel" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-success text-white">
+                                                <h2 class="modal-title fs-5" id="pneduVerifyEmailModalLabel">
+                                                    <i class="bi bi-check2-circle me-1"></i>
+                                                    Ręczna weryfikacja e-maila
+                                                </h2>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="mb-2">Oznaczyć adres <strong>{{ $user->email }}</strong> jako zweryfikowany?</p>
+                                                <div class="alert alert-warning mb-0">
+                                                    Użyj tylko po weryfikacji poza systemem. Ta akcja nie usuwa problemu bounce, jeśli flaga niedostarczalności jest aktywna.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                                <button type="submit"
+                                                        form="pnedu-verify-email-form"
+                                                        class="btn btn-success"
+                                                        id="pneduVerifyEmailConfirmBtn">
+                                                    Zweryfikuj e-mail
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             @endif
                         </div>
 
@@ -329,8 +414,8 @@
                                 @endif
                             </p>
                             <form method="post"
-                                  action="{{ route('admin.pnedu-users.destroy', ['pnedu_user' => $user->getKey()]) }}"
-                                  onsubmit="return confirm('Na pewno usunąć to konto pnedu.pl? Operacji nie cofniesz z tego panelu (wymagany dostęp do bazy / procedura odzyskiwania).');">
+                                  id="pnedu-user-destroy-form"
+                                  action="{{ route('admin.pnedu-users.destroy', ['pnedu_user' => $user->getKey()]) }}">
                                 @csrf
                                 @method('DELETE')
                                 <div class="form-check mb-3">
@@ -351,6 +436,39 @@
                                     <i class="bi bi-trash3 me-1"></i>Usuń konto
                                 </button>
                             </form>
+
+                            <div class="modal fade" id="pneduDestroyUserModal" tabindex="-1" aria-labelledby="pneduDestroyUserModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-danger text-white">
+                                            <h2 class="modal-title fs-5" id="pneduDestroyUserModalLabel">
+                                                <i class="bi bi-trash3 me-1"></i>
+                                                Usunięcie konta
+                                            </h2>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-2">Na pewno usunąć konto pnedu.pl <strong>{{ $user->email }}</strong> (ID {{ $user->id }})?</p>
+                                            <div class="alert alert-danger mb-0">
+                                                Operacji nie cofniesz z tego panelu (wymagany dostęp do bazy / procedura odzyskiwania).
+                                                Konto zostanie deaktywowane (soft delete) i nie będzie można się zalogować.
+                                                @if($hasPaidEnrollment)
+                                                    <span class="d-block mt-2 fw-semibold">To konto ma powiązane płatne szkolenie — rozważ kontakt telefoniczny przed usunięciem.</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                            <button type="submit"
+                                                    form="pnedu-user-destroy-form"
+                                                    class="btn btn-danger"
+                                                    id="pneduDestroyUserConfirmBtn">
+                                                Usuń konto
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -442,4 +560,38 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        (function () {
+            function bindConfirmSubmitModal(formId, modalId, confirmBtnId) {
+                const form = document.getElementById(formId);
+                const modalEl = document.getElementById(modalId);
+                const confirmBtn = document.getElementById(confirmBtnId);
+                if (!form || !modalEl || !confirmBtn || !window.bootstrap?.Modal) {
+                    return;
+                }
+
+                let confirmed = false;
+
+                form.addEventListener('submit', function (e) {
+                    if (confirmed) {
+                        return;
+                    }
+                    e.preventDefault();
+                    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                });
+
+                confirmBtn.addEventListener('click', function () {
+                    confirmed = true;
+                });
+            }
+
+            bindConfirmSubmitModal('pnedu-user-set-password-form', 'pneduSetPasswordModal', 'pneduSetPasswordConfirmBtn');
+            bindConfirmSubmitModal('pnedu-clear-undeliverable-form', 'pneduClearUndeliverableModal', 'pneduClearUndeliverableConfirmBtn');
+            bindConfirmSubmitModal('pnedu-verify-email-form', 'pneduVerifyEmailModal', 'pneduVerifyEmailConfirmBtn');
+            bindConfirmSubmitModal('pnedu-user-destroy-form', 'pneduDestroyUserModal', 'pneduDestroyUserConfirmBtn');
+        })();
+    </script>
+    @endpush
 </x-app-layout>
