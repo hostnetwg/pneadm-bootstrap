@@ -67,7 +67,7 @@
                         <small>
                             <i class="bi bi-envelope"></i>
                             <a href="mailto:{{ $email }}"
-                               class="text-decoration-none @if(! $emailDiffers) bg-warning bg-opacity-25 px-1 rounded @endif"
+                               class="fs-6 text-decoration-none @if(! $emailDiffers) bg-warning bg-opacity-25 px-1 rounded @endif"
                                @if(! $emailDiffers) title="Ten sam email co do faktury" @endif>
                                 {{ $email }}
                             </a>

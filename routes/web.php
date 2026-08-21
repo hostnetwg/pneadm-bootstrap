@@ -216,6 +216,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
                 ->name('gus-lookup');
             Route::post('/', [FormOrdersController::class, 'store'])->name('store');
             Route::get('/duplicates', [FormOrdersController::class, 'duplicates'])->name('duplicates');
+            Route::get('/{id}/pdf', [FormOrdersController::class, 'downloadPdf'])->whereNumber('id')->name('pdf');
             Route::get('/{id}', [FormOrdersController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [FormOrdersController::class, 'edit'])->name('edit');
             Route::put('/{id}', [FormOrdersController::class, 'update'])->name('update');

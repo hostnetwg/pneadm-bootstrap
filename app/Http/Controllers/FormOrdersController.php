@@ -11,6 +11,7 @@ use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaApiService;
 use App\Services\IfirmaFormOrderKsefSubmissionService;
 use App\Services\PubligoApiService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -866,6 +867,36 @@ class FormOrdersController extends Controller
             'duplicateSiblingsCount',
             'pneduOrderFormEditUrl'
         ));
+    }
+
+    /**
+     * PDF potwierdzenia zamówienia (jak po złożeniu na pnedu.pl).
+     */
+    public function downloadPdf(int $id)
+    {
+        $zamowienie = FormOrder::with([
+            'course',
+            'primaryParticipant',
+            'participants' => fn ($q) => $q->orderBy('id'),
+        ])->findOrFail($id);
+
+        $zamowienie->ensureIdent();
+
+        $brandPublicUrl = rtrim((string) config('mail.brand.public_url', config('services.pnedu_frontend_url', 'https://pnedu.pl')), '/');
+        $brandPublicLabel = (string) config('mail.brand.public_label', 'www.pnedu.pl');
+        $contactEmail = (string) config('mail.system.reply_to_address', 'kontakt@pnedu.pl');
+
+        $pdf = Pdf::loadView('form-orders.order-pdf', [
+            'order' => $zamowienie,
+            'course' => $zamowienie->course,
+            'brandPublicUrl' => $brandPublicUrl !== '' ? $brandPublicUrl : 'https://pnedu.pl',
+            'brandPublicLabel' => $brandPublicLabel !== '' ? $brandPublicLabel : 'www.pnedu.pl',
+            'contactEmail' => $contactEmail !== '' ? $contactEmail : 'kontakt@pnedu.pl',
+        ]);
+
+        $fileName = 'zamowienie-'.$zamowienie->ident.'.pdf';
+
+        return $pdf->download($fileName);
     }
 
     /**

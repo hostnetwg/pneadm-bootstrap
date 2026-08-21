@@ -7,11 +7,41 @@
     </x-slot>
 
     @php
-        $formOrderPaymentHighlightClass = match ($zamowienie->payment_mode) {
-            \App\Models\FormOrder::PAYMENT_MODE_ONLINE_GATEWAY => 'form-order-detail--online-gateway',
-            \App\Models\FormOrder::PAYMENT_MODE_DEFERRED_INVOICE => 'form-order-detail--deferred-invoice',
-            default => null,
-        };
+        $orderAdminClosedLabel = null;
+        $orderAdminClosedTitle = null;
+        $orderAdminClosedIcon = 'bi-x-circle';
+        $orderAdminClosedBadgeClass = 'bg-secondary';
+        if ($zamowienie->isCancelled()) {
+            $orderAdminClosedLabel = 'ANULOWANE';
+            $orderAdminClosedIcon = 'bi-x-circle';
+            $orderAdminClosedBadgeClass = 'bg-danger';
+            $orderAdminClosedTitle = 'Anulowano';
+            if ($zamowienie->cancelled_at) {
+                $orderAdminClosedTitle .= ' '.$zamowienie->cancelled_at->timezone(config('app.timezone'))->format('d.m.Y H:i');
+            }
+            if (filled($zamowienie->cancelled_reason)) {
+                $orderAdminClosedTitle .= ' — '.$zamowienie->cancelled_reason;
+            }
+        } elseif ($zamowienie->isLegacyHandled()) {
+            $orderAdminClosedLabel = 'ZAMKNIĘTE';
+            $orderAdminClosedIcon = 'bi-archive';
+            $orderAdminClosedBadgeClass = 'bg-secondary';
+            $orderAdminClosedTitle = 'Zamknięte';
+            if ($zamowienie->legacy_handled_at) {
+                $orderAdminClosedTitle .= ' '.$zamowienie->legacy_handled_at->timezone(config('app.timezone'))->format('d.m.Y H:i');
+            }
+            if (filled($zamowienie->legacy_handled_reason)) {
+                $orderAdminClosedTitle .= ' — '.$zamowienie->legacy_handled_reason;
+            }
+        }
+
+        $formOrderPaymentHighlightClass = $orderAdminClosedLabel
+            ? 'form-order-detail--admin-closed'
+            : match ($zamowienie->payment_mode) {
+                \App\Models\FormOrder::PAYMENT_MODE_ONLINE_GATEWAY => 'form-order-detail--online-gateway',
+                \App\Models\FormOrder::PAYMENT_MODE_DEFERRED_INVOICE => 'form-order-detail--deferred-invoice',
+                default => null,
+            };
     @endphp
 
     <style>
@@ -26,6 +56,12 @@
             border-left: 5px solid #e65100;
             background: linear-gradient(145deg, #fff8e1 0%, #ffe0b2 35%, #fff3e0 100%);
             box-shadow: 0 4px 14px rgba(230, 81, 0, 0.12);
+        }
+        /* Anulowane / zamknięte przez admina — szara paleta; czerwień zostaje tylko na badge ANULOWANE */
+        .form-order-detail--admin-closed {
+            border-left: 5px solid #6c757d;
+            background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 35%, #f1f3f5 100%);
+            box-shadow: 0 4px 14px rgba(73, 80, 87, 0.12);
         }
         /* Uwagi zamawiającego w bloku INFORMACJE O FAKTURZE */
         @keyframes invoice-notes-attention-pulse {
@@ -64,23 +100,30 @@
                 <div class="{{ $formOrderPaymentHighlightClass }} px-3 py-3 rounded-3">
             @endif
 
-            {{-- Breadcrumb --}}
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('form-orders.index') }}">Zamówienia</a>
-                    </li>
-                    <li class="breadcrumb-item active" aria-current="page">
-                        Zamówienie #{{ $zamowienie->id }}
-                    </li>
-                </ol>
-            </nav>
+            {{-- Numer zamówienia (lewo) + breadcrumb (prawo) --}}
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                <div>
+                    <h2 class="d-inline-block mb-0 @if($orderAdminClosedLabel) text-secondary @elseif($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
+                    @if($orderAdminClosedLabel)
+                        <span class="badge {{ $orderAdminClosedBadgeClass }} fs-6 ms-2 align-middle" title="{{ $orderAdminClosedTitle }}">
+                            <i class="bi {{ $orderAdminClosedIcon }}"></i> {{ $orderAdminClosedLabel }}
+                        </span>
+                    @endif
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0 justify-content-end">
+                        <li class="breadcrumb-item">
+                            <a href="{{ route('form-orders.index') }}">Zamówienia</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            Zamówienie #{{ $zamowienie->id }}
+                        </li>
+                    </ol>
+                </nav>
+            </div>
 
             {{-- Przyciski akcji --}}
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div>
-                    <h2 class="d-inline-block mb-0 @if($zamowienie->is_new) text-danger @elseif($zamowienie->status_completed == 1) text-secondary @else text-success @endif">Zamówienie #{{ $zamowienie->id }}</h2>
-                </div>
+            <div class="d-flex justify-content-end align-items-center mb-2">
                 <div class="d-flex align-items-center gap-3">
                     @php
                         $navFilterQuery = array_filter([
@@ -205,7 +248,7 @@
 
             {{-- SZKOLENIE - kompaktowe --}}
             <div class="card mb-3">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header {{ $orderAdminClosedLabel ? 'bg-secondary' : 'bg-primary' }} text-white py-3">
                     <h5 class="mb-0">
                         <i class="bi bi-calendar-event"></i>
                         @if($zamowienie->course)
@@ -237,89 +280,90 @@
                         @endif
                     </h5>
                     @php
-                        $submissionTitleShow = \App\Models\FormOrder::submissionSourceLabel($zamowienie->submission_source);
-                        if (filled($zamowienie->submission_source)) {
-                            $submissionTitleShow .= ' ('.$zamowienie->submission_source.')';
-                        }
-                        $submissionTitleShow .= ' — form_orders.submission_source';
+                        $headerHasCourseMeta = (bool) $zamowienie->course;
+                        $headerHasProductFallback = ! $headerHasCourseMeta && filled($zamowienie->product_id);
+                        $headerHasPubligoFallback = ! $headerHasCourseMeta && ! $headerHasProductFallback && filled($zamowienie->publigo_product_id);
+                        $headerHasPriceVariant = (bool) $zamowienie->coursePriceVariant;
+                        $headerHasOrphanPriceVariant = ! $headerHasPriceVariant && filled($zamowienie->course_price_variant_id);
+                        $headerHasMetaRow = $headerHasCourseMeta || $headerHasProductFallback || $headerHasPubligoFallback || $headerHasPriceVariant || $headerHasOrphanPriceVariant;
                     @endphp
-                    @if($zamowienie->course)
-                        @php
-                            $courseDateTime = $zamowienie->course->start_date
-                                ? $zamowienie->course->start_date->setTimezone(config('app.timezone', 'Europe/Warsaw'))->format('d.m.Y H:i')
-                                : 'brak daty';
-                            $courseInstructor = trim(($zamowienie->course->instructor->first_name ?? '').' '.($zamowienie->course->instructor->last_name ?? ''));
-                            $courseInstructor = $courseInstructor !== '' ? $courseInstructor : 'brak prowadzącego';
-                        @endphp
+                    @if($headerHasMetaRow)
                         <div class="small text-white-50 mt-2 mb-0">
-                            Data i godzina szkolenia: <span class="fw-semibold text-white">{{ $courseDateTime }}</span>
-                            <span class="ms-1">·</span> prowadzący: <span class="fw-semibold text-white">{{ $courseInstructor }}</span>
-                        </div>
-                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            ID szkolenia (courses):
-                            <button type="button"
-                                    class="btn btn-link btn-sm p-0 align-baseline fw-semibold text-white text-decoration-underline"
-                                    style="font-size: inherit; line-height: inherit;"
-                                    title="Wstaw {{ $zamowienie->course->id }} do filtra „ID szkolenia courses” (Poprzednie/Następne)"
-                                    onclick="fillCourseIdFilter({{ (int) $zamowienie->course->id }})">
-                                {{ $zamowienie->course->id }}
-                            </button>
-                            @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
-                                <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->course->id_old }}</span>
+                            @if($headerHasCourseMeta)
+                                @php
+                                    $courseDateTime = $zamowienie->course->start_date
+                                        ? $zamowienie->course->start_date->setTimezone(config('app.timezone', 'Europe/Warsaw'))->format('d.m.Y H:i')
+                                        : 'brak daty';
+                                    $courseInstructor = trim(($zamowienie->course->instructor->first_name ?? '').' '.($zamowienie->course->instructor->last_name ?? ''));
+                                    $courseInstructor = $courseInstructor !== '' ? $courseInstructor : 'brak prowadzącego';
+                                @endphp
+                                Data i godzina szkolenia: <span class="fw-semibold text-white">{{ $courseDateTime }}</span>
+                                <span class="ms-1">·</span> prowadzący: <span class="fw-semibold text-white">{{ $courseInstructor }}</span>
+                                <span class="ms-1">·</span> ID szkolenia (courses):
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 align-baseline fw-semibold text-white text-decoration-underline"
+                                        style="font-size: inherit; line-height: inherit;"
+                                        title="Wstaw {{ $zamowienie->course->id }} do filtra „ID szkolenia courses” (Poprzednie/Następne)"
+                                        onclick="fillCourseIdFilter({{ (int) $zamowienie->course->id }})">
+                                    {{ $zamowienie->course->id }}
+                                </button>
+                                @if($zamowienie->course->source_id_old === 'certgen_Publigo' && filled($zamowienie->course->id_old))
+                                    <span class="ms-1">·</span> Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->course->id_old }}</span>
+                                @endif
+                            @elseif($headerHasProductFallback)
+                                <span class="text-warning">Brak rekordu courses</span> dla <code class="text-white">product_id</code> =
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 align-baseline text-white text-decoration-underline"
+                                        style="font-size: inherit; line-height: inherit;"
+                                        title="Wstaw {{ $zamowienie->product_id }} do filtra „ID szkolenia courses”"
+                                        onclick="fillCourseIdFilter({{ (int) $zamowienie->product_id }})">
+                                    {{ $zamowienie->product_id }}
+                                </button>
+                            @elseif($headerHasPubligoFallback)
+                                Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->publigo_product_id }}</span>
+                                <span class="ms-1">(brak powiązania z courses)</span>
                             @endif
-                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
-                        </div>
-                    @elseif($zamowienie->product_id)
-                        <div class="small text-warning mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            <span>Brak rekordu courses</span> dla <code class="text-white">product_id</code> =
-                            <button type="button"
-                                    class="btn btn-link btn-sm p-0 align-baseline text-white text-decoration-underline"
-                                    style="font-size: inherit; line-height: inherit;"
-                                    title="Wstaw {{ $zamowienie->product_id }} do filtra „ID szkolenia courses”"
-                                    onclick="fillCourseIdFilter({{ (int) $zamowienie->product_id }})">
-                                {{ $zamowienie->product_id }}
-                            </button>
-                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
-                        </div>
-                    @elseif($zamowienie->publigo_product_id)
-                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            Publigo ID: <span class="fw-semibold text-white">{{ $zamowienie->publigo_product_id }}</span>
-                            <span class="ms-1">(brak powiązania z courses)</span>
-                            <span class="ms-1">·</span> zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
-                        </div>
-                    @else
-                        <div class="small text-white-50 mt-2 mb-0" title="{{ $submissionTitleShow }}">
-                            zapis: <span class="fw-semibold text-white">{{ \App\Models\FormOrder::submissionSourceShortLabel($zamowienie->submission_source) }}</span>
-                        </div>
-                    @endif
-                    @if($zamowienie->coursePriceVariant)
-                        @php
-                            $priceVariant = $zamowienie->coursePriceVariant;
-                            $variantLabel = filled($priceVariant->name) ? $priceVariant->name : 'Wariant #'.$priceVariant->id;
-                        @endphp
-                        <div class="small text-white-50 mt-2 mb-0">
-                            Wariant cenowy:
-                            <span class="fw-semibold text-white">{{ $variantLabel }}</span>
-                            <span class="text-white-50">(ID {{ $priceVariant->id }})</span>
-                            @if($priceVariant->trashed())
-                                <span class="badge bg-secondary ms-1">usunięty</span>
+                            @if($headerHasPriceVariant)
+                                @php
+                                    $priceVariant = $zamowienie->coursePriceVariant;
+                                    $variantLabel = filled($priceVariant->name) ? $priceVariant->name : 'Wariant #'.$priceVariant->id;
+                                @endphp
+                                @if($headerHasCourseMeta || $headerHasProductFallback || $headerHasPubligoFallback)
+                                    <span class="ms-1">·</span>
+                                @endif
+                                Wariant cenowy:
+                                <span class="fw-semibold text-white">{{ $variantLabel }}</span>
+                                <span class="text-white-50">(ID {{ $priceVariant->id }})</span>
+                                @if($priceVariant->trashed())
+                                    <span class="badge bg-secondary ms-1">usunięty</span>
+                                @endif
+                                <a href="{{ route('courses.price-variants.edit', ['courseId' => $priceVariant->course_id, 'id' => $priceVariant->id]) }}"
+                                   class="link-light link-underline-opacity-50 link-underline-opacity-100-hover ms-1"
+                                   target="_blank" rel="noopener">edycja wariantu</a>
+                            @elseif($headerHasOrphanPriceVariant)
+                                @if($headerHasCourseMeta || $headerHasProductFallback || $headerHasPubligoFallback)
+                                    <span class="ms-1">·</span>
+                                @endif
+                                <span class="text-warning">Wariant cenowy: zapisane ID {{ $zamowienie->course_price_variant_id }} — brak rekordu w bazie (np. twardo usunięty).</span>
                             @endif
-                            <a href="{{ route('courses.price-variants.edit', ['courseId' => $priceVariant->course_id, 'id' => $priceVariant->id]) }}"
-                               class="link-light link-underline-opacity-50 link-underline-opacity-100-hover ms-1"
-                               target="_blank" rel="noopener">edycja wariantu</a>
-                        </div>
-                    @elseif($zamowienie->course_price_variant_id)
-                        <div class="small text-warning mt-2 mb-0">
-                            Wariant cenowy: zapisane ID {{ $zamowienie->course_price_variant_id }} — brak rekordu w bazie (np. twardo usunięty).
                         </div>
                     @endif
                 </div>
-                @if($zamowienie->payment_mode)
-                    <div class="card-body py-2 border-top border-primary border-opacity-25 bg-white bg-opacity-75">
-                        <span class="text-muted small me-2">Rozliczenie:</span>
-                        <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6">{{ $zamowienie->paymentModeLabelWithGateway() }}</span>
-                        <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
-                        @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
+                @if($zamowienie->payment_mode || $orderAdminClosedLabel)
+                    <div class="card-body py-2 border-top {{ $orderAdminClosedLabel ? 'border-secondary' : 'border-primary' }} border-opacity-25 bg-white bg-opacity-75 d-flex flex-wrap align-items-center gap-2">
+                        <div>
+                            @if($zamowienie->payment_mode)
+                                <span class="text-muted small me-2">Rozliczenie:</span>
+                                <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6">{{ $zamowienie->paymentModeLabelWithGateway() }}</span>
+                                <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
+                                @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
+                            @endif
+                        </div>
+                        @if($orderAdminClosedLabel)
+                            <span class="badge {{ $orderAdminClosedBadgeClass }} fs-6 ms-auto" title="{{ $orderAdminClosedTitle }}">
+                                <i class="bi {{ $orderAdminClosedIcon }}"></i> {{ $orderAdminClosedLabel }}
+                            </span>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -328,6 +372,42 @@
             <div class="row">
                 {{-- Lewa kolumna: Dane do faktury, Uczestnik --}}
                 <div class="col-md-6">
+                    @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
+                        <div class="card mb-3 @if(filled(trim((string) $zamowienie->invoice_notes))) invoice-notes-panel--attention @endif"
+                             id="invoiceNotesInfoCard">
+                            <div class="card-header bg-warning text-dark py-2">
+                                <h6 class="mb-0 d-flex align-items-center gap-2 flex-wrap">
+                                    <span>
+                                        <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
+                                    </span>
+                                    @if(filled(trim((string) $zamowienie->invoice_notes)))
+                                        <span class="invoice-notes-attention-icon"
+                                              title="Zamawiający dodał uwagi do faktury"
+                                              aria-label="Zamawiający dodał uwagi do faktury">
+                                            <i class="bi bi-chat-left-text-fill" aria-hidden="true"></i>
+                                        </span>
+                                    @endif
+                                </h6>
+                            </div>
+                            <div class="card-body py-2">
+                                @if($zamowienie->invoice_notes)
+                                    <div class="mb-1">
+                                        <small class="text-muted d-block mb-1">Uwagi zamawiającego (sprawdź przed wystawieniem FV):</small>
+                                        <small class="text-danger invoice-notes-customer-text" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
+                                    </div>
+                                @endif
+                                @if($zamowienie->invoice_payment_delay)
+                                    <div class="mb-1">
+                                        <small class="text-danger">
+                                            <strong>Odroczenie:</strong>
+                                            <span class="badge bg-danger">{{ $zamowienie->invoice_payment_delay }} dni</span>
+                                        </small>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
                     {{-- DANE DO FAKTURY - kompaktowe --}}
                     <div class="card mb-3">
                         <div class="card-header bg-dark text-white py-2">
@@ -370,177 +450,200 @@ nowoczesna-edukacja.pl </div>
                                 @endif
                             </div>
 
-                            {{-- KSeF Podmiot3: edycja (AJAX) + podgląd efektywnych metadanych — w jednej karcie z danymi FV --}}
+                            {{-- KSeF Podmiot3: edycja (AJAX) w karcie DANE DO FAKTURY --}}
                             @include('form-orders.partials.ksef-additional-entity-inline', ['zamowienie' => $zamowienie])
-                            <div id="ksefSummaryReadonly">
-                                @include('form-orders.partials.ksef-additional-entity-show', ['zamowienie' => $zamowienie])
-                            </div>
                         </div>
                     </div>
 
                     @include('form-orders.partials.participants-cards', ['zamowienie' => $zamowienie])
 
-                    {{-- Buttons iFirma --}}
-                    <div class="mb-3 d-flex flex-column gap-2">
-                        {{-- Wspólny checkbox: prefiks SZKOLENIE (wszystkie ścieżki API iFirma) --}}
-                        <div class="form-check" style="font-size: 0.875rem;">
-                            <input class="form-check-input" type="checkbox" value="1"
-                                   id="ifirma_prefix_szkolenie_in_product_name" checked>
-                            <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
-                                Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
-                            </label>
-                        </div>
-
-                        {{-- Button Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF (czerwony) --}}
-                        <div class="w-100">
-                            <button type="button" class="btn w-100" id="ifirmaInvoiceWithKsefBtn"
-                                    style="background-color: #dc3545; border-color: #dc3545; color: white;"
-                                    onclick="checkAndCreateInvoiceWithKsef({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithKsef">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithKsef">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-danger mt-1">
-                                <i class="bi bi-exclamation-triangle-fill"></i>
-                                Pełny flow: <code>fakturakraj.json</code> + <code>sendInvoiceToKsef</code> + oczekiwanie na <strong>NumerKSeF</strong> (asynchroniczne przetwarzanie przez MF).
-                                Budowa nabywcy / odbiorcy (Podmiot3) jak przy „Wystaw Fakturę iFirma z Odbiorcą”.
-                                „Wyślij automatycznie na e-mail” wysyła fakturę <strong>dopiero</strong>, gdy iFirma zwróci
-                                nadany numer KSeF (przy błędzie wysyłki, odrzuceniu przez MF lub przekroczeniu czasu
-                                oczekiwania e-mail <strong>nie</strong> zostanie wysłany).
-                                <strong>Uwaga:</strong> faktura trafia do rządowego KSeF — używaj świadomie.
-                            </div>
-                        </div>
-
-                        {{-- Button Wystaw Fakturę iFirma --}}
-                        <div class="w-100">
-                            <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn"
-                                    onclick="checkAndCreateInvoice({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
-                                Ta ścieżka <strong>nigdy</strong> nie dołącza <code>PodmiotyDodatkowe</code>
-                                (Podmiot3), niezależnie od metadanych KSeF w zamówieniu.
-                                Do faktury z Podmiotem3 użyj „Wystaw Fakturę iFirma z Odbiorcą” (bez KSeF)
-                                lub czerwonego przycisku (z KSeF).
-                            </div>
-                        </div>
-
-                        {{-- Button Wystaw Fakturę iFirma z Odbiorcą --}}
-                        <div class="w-100">
-                            <button type="button" class="btn w-100" id="ifirmaInvoiceWithReceiverBtn"
-                                    style="background-color: #6f42c1; border-color: #6f42c1; color: white;"
-                                    onclick="checkAndCreateInvoiceWithReceiver({{ $zamowienie->id }})">
-                                <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithReceiver">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithReceiver">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturakraj.json</code>, bez wysyłki do KSeF.
-                                Domyślnie nabywca + odbiorca z pól <code>recipient_*</code>, jeśli podano
-                                co najmniej nazwę, kod i miejscowość; inaczej tylko nabywca.
-                                Gdy w sekcji KSeF – Podmiot3 ustawiono źródło <code>recipient</code>,
-                                stosowane są pełne metadane (rola, NIP, fail-fast).
-                            </div>
-                        </div>
-
-                        {{-- Button Wystaw PRO-FORMA iFirma (zielony) --}}
-                        <div class="w-100">
-                            <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
-                                <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
-                            </button>
-                            <div class="form-check mt-1" style="font-size: 0.875rem;">
-                                <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
-                                <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
-                                    <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
-                                    @if(!empty($zamowienie->orderer_email))
-                                        <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
-                                    @endif
-                                </label>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                <i class="bi bi-info-circle"></i>
-                                Endpoint <code>fakturaproformakraj.json</code>, bez wysyłki do KSeF.
-                                <strong>Nie wysyła</strong> bloku <code>PodmiotyDodatkowe</code> (Podmiot3) — publiczna dokumentacja iFirma
-                                nie potwierdza obsługi tego pola dla pro formy, a pro forma nie podlega KSeF.
-                            </div>
-                        </div>
-                    </div>
-                    <div id="ifirmaResult" class="mt-2"></div>
-                    
-                    @unless($zamowienie->hasEffectivePubligoIds())
-                        <div class="mb-3 mt-3">
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle"></i> 
-                                Brak danych produktu Publigo (ani w zamówieniu, ani w powiązanym szkoleniu) — zamówienie nie może być przesłane do Publigo
-                            </small>
-                        </div>
-                    @endunless
-                </div>
-
-                {{-- Prawa kolumna: Faktura - kompaktowe --}}
-                <div class="col-md-6">
-                    {{-- INFORMACJE O FAKTURZE — na górze prawej kolumny --}}
-                    @if($zamowienie->invoice_notes || $zamowienie->invoice_payment_delay)
-                        <div class="card mb-3 @if(filled(trim((string) $zamowienie->invoice_notes))) invoice-notes-panel--attention @endif"
-                             id="invoiceNotesInfoCard">
-                            <div class="card-header bg-warning text-dark py-2">
-                                <h6 class="mb-0 d-flex align-items-center gap-2 flex-wrap">
-                                    <span>
-                                        <i class="bi bi-receipt"></i> INFORMACJE O FAKTURZE
-                                    </span>
-                                    @if(filled(trim((string) $zamowienie->invoice_notes)))
-                                        <span class="invoice-notes-attention-icon"
-                                              title="Zamawiający dodał uwagi do faktury"
-                                              aria-label="Zamawiający dodał uwagi do faktury">
-                                            <i class="bi bi-chat-left-text-fill" aria-hidden="true"></i>
-                                        </span>
-                                    @endif
+                    @if($zamowienie->orderer_name || $zamowienie->orderer_phone || $zamowienie->orderer_email)
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white py-2">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-person"></i> ZAMAWIAJĄCY
                                 </h6>
                             </div>
                             <div class="card-body py-2">
-                                @if($zamowienie->invoice_notes)
-                                    <div class="mb-1">
-                                        <small class="text-muted d-block mb-1">Uwagi zamawiającego (sprawdź przed wystawieniem FV):</small>
-                                        <small class="text-danger invoice-notes-customer-text" style="white-space: pre-line;">{{ trim($zamowienie->invoice_notes) }}</small>
+                                @if($zamowienie->orderer_name || $zamowienie->orderer_phone)
+                                    <div class="mb-2">
+                                        <small>
+                                            <i class="bi bi-telephone"></i>
+                                            <strong>KONTAKT</strong>
+                                            @if($zamowienie->orderer_name)
+                                                <span class="text-muted"> - {{ $zamowienie->orderer_name }}</span>
+                                            @endif
+                                            @if($zamowienie->orderer_phone)
+                                                <br>
+                                                <span class="fs-5 fw-semibold">
+                                                    <strong>tel.</strong>
+                                                    <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
+                                                        @php
+                                                            $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
+                                                            if (strlen($phone) == 9) {
+                                                                echo '+48 ' . substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
+                                                            } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
+                                                                echo '+' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
+                                                            } elseif (strlen($phone) >= 10 && strlen($phone) <= 15) {
+                                                                $formatted = '+' . $phone;
+                                                                $formatted = preg_replace('/(\d{3})(?=\d)/', '$1 ', $formatted);
+                                                                echo $formatted;
+                                                            } else {
+                                                                echo $zamowienie->orderer_phone;
+                                                            }
+                                                        @endphp
+                                                    </a>
+                                                </span>
+                                            @endif
+                                        </small>
                                     </div>
                                 @endif
-                                @if($zamowienie->invoice_payment_delay)
+                                @if($zamowienie->orderer_email)
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small>
+                                            <strong>Fakturę przesłać na:</strong>
+                                            <br>
+                                            <a href="mailto:{{ $zamowienie->orderer_email }}"
+                                               class="fs-6 text-decoration-none @if($zamowienie->display_participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
+                                               @if($zamowienie->display_participant_email == $zamowienie->orderer_email) title="Ten sam email co uczestnika" @endif>
+                                                <i class="bi bi-envelope"></i> {{ $zamowienie->orderer_email }}
+                                            </a>
+                                        </small>
+                                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury()">
+                                            <i class="bi bi-clipboard"></i> Email faktury
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM)
+                        <div class="card mb-3">
+                            <div class="card-header bg-info text-white py-2">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-info-circle"></i> DODATKOWE INFORMACJE
+                                </h6>
+                            </div>
+                            <div class="card-body py-2">
+                                @if($zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM || filled($zamowienie->order_form_variant))
                                     <div class="mb-1">
-                                        <small class="text-danger">
-                                            <strong>Odroczenie:</strong>
-                                            <span class="badge bg-danger">{{ $zamowienie->invoice_payment_delay }} dni</span>
+                                        <small>
+                                            <strong>Wersja formularza:</strong>
+                                            <span class="badge bg-{{ $zamowienie->orderFormVariantBadgeClass() }} ms-1">
+                                                {{ $zamowienie->orderFormVariantAdminLabel() }}
+                                            </span>
+                                        </small>
+                                    </div>
+                                @endif
+                                @php
+                                    $orderDateFormatted = $zamowienie->formatOrderDateLocal();
+                                @endphp
+                                @if($orderDateFormatted)
+                                    <div class="mb-1">
+                                        <small>
+                                            <strong>Data zamówienia:</strong> {{ $orderDateFormatted }}
+                                        </small>
+                                    </div>
+                                @endif
+                                @if($zamowienie->ip_address)
+                                    <div class="mb-1">
+                                        <small>
+                                            <strong>IP:</strong> {{ $zamowienie->ip_address }}
                                         </small>
                                     </div>
                                 @endif
                             </div>
                         </div>
                     @endif
+                </div>
+
+                {{-- Prawa kolumna: Faktura - kompaktowe --}}
+                <div class="col-md-6">
+                    <div class="card mb-3" id="ifirmaIssueInvoiceCard">
+                        <div class="card-header bg-warning text-dark py-2">
+                            <h6 class="mb-0">
+                                <i class="bi bi-file-earmark-plus"></i> WYSTAW FAKTURĘ iFIRMA
+                            </h6>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="d-flex flex-column gap-2">
+                                <div class="form-check" style="font-size: 0.875rem;">
+                                    <input class="form-check-input" type="checkbox" value="1"
+                                           id="ifirma_prefix_szkolenie_in_product_name" checked>
+                                    <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
+                                        Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
+                                    </label>
+                                </div>
+
+                                <div class="w-100">
+                                    <button type="button" class="btn w-100" id="ifirmaInvoiceWithKsefBtn"
+                                            style="background-color: #dc3545; border-color: #dc3545; color: white;"
+                                            onclick="checkAndCreateInvoiceWithKsef({{ $zamowienie->id }})">
+                                        <i class="bi bi-file-earmark-check"></i> Wystaw Fakturę iFirma z Odbiorcą i prześlij do KSeF
+                                    </button>
+                                    <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                        <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithKsef">
+                                        <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithKsef">
+                                            <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                            @if(!empty($zamowienie->orderer_email))
+                                                <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                            @endif
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="w-100">
+                                    <button type="button" class="btn btn-primary w-100" id="ifirmaInvoiceBtn"
+                                            onclick="checkAndCreateInvoice({{ $zamowienie->id }})">
+                                        <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma
+                                    </button>
+                                    <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                        <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoice">
+                                        <label class="form-check-label text-muted" for="sendEmailCheckboxInvoice">
+                                            <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                            @if(!empty($zamowienie->orderer_email))
+                                                <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                            @endif
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="w-100">
+                                    <button type="button" class="btn w-100" id="ifirmaInvoiceWithReceiverBtn"
+                                            style="background-color: #6f42c1; border-color: #6f42c1; color: white;"
+                                            onclick="checkAndCreateInvoiceWithReceiver({{ $zamowienie->id }})">
+                                        <i class="bi bi-file-earmark-text"></i> Wystaw Fakturę iFirma z Odbiorcą
+                                    </button>
+                                    <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                        <input class="form-check-input" type="checkbox" id="sendEmailCheckboxInvoiceWithReceiver">
+                                        <label class="form-check-label text-muted" for="sendEmailCheckboxInvoiceWithReceiver">
+                                            <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                            @if(!empty($zamowienie->orderer_email))
+                                                <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                            @endif
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="w-100">
+                                    <button type="button" class="btn btn-success w-100" id="ifirmaProFormaBtn" onclick="createIfirmaProForma({{ $zamowienie->id }})">
+                                        <i class="bi bi-receipt"></i> Wystaw PRO-FORMA iFirma
+                                    </button>
+                                    <div class="form-check mt-1" style="font-size: 0.875rem;">
+                                        <input class="form-check-input" type="checkbox" id="sendEmailCheckboxProforma">
+                                        <label class="form-check-label text-muted" for="sendEmailCheckboxProforma">
+                                            <i class="bi bi-envelope"></i> Wyślij automatycznie na e-mail
+                                            @if(!empty($zamowienie->orderer_email))
+                                                <small>({{ strtolower($zamowienie->orderer_email) }}@if(!empty($zamowienie->display_participant_email) && strtolower($zamowienie->orderer_email) !== strtolower($zamowienie->display_participant_email)), {{ strtolower($zamowienie->display_participant_email) }}@endif)</small>
+                                            @endif
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="ifirmaResult" class="mt-2"></div>
+                        </div>
+                    </div>
 
                     <div class="card mb-3">
                         <div class="card-header bg-secondary text-white py-2">
@@ -598,58 +701,6 @@ nowoczesna-edukacja.pl </div>
                                     @endif
                                 @endif
                             </div>
-                            @if($zamowienie->orderer_email)
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>
-                                        <strong>Fakturę przesłać na:</strong>
-                                        <br>
-                                        <a href="mailto:{{ $zamowienie->orderer_email }}" 
-                                           class="text-decoration-none @if($zamowienie->display_participant_email == $zamowienie->orderer_email) bg-warning bg-opacity-25 px-1 rounded @endif"
-                                           @if($zamowienie->display_participant_email == $zamowienie->orderer_email) title="Ten sam email co uczestnika" @endif>
-                                            <i class="bi bi-envelope"></i> {{ $zamowienie->orderer_email }}
-                                        </a>
-                                    </small>
-                                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="copyEmailFaktury()">
-                                        <i class="bi bi-clipboard"></i> Email faktury
-                                    </button>
-                                </div>
-                            @endif
-                            @if($zamowienie->orderer_phone || $zamowienie->orderer_name)
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <small>
-                                        <i class="bi bi-telephone"></i> 
-                                        <strong>KONTAKT</strong>
-                                        @if($zamowienie->orderer_name)
-                                            <span class="text-muted"> - {{ $zamowienie->orderer_name }}</span>
-                                        @endif
-                                        @if($zamowienie->orderer_phone)
-                                            <br><strong>tel.</strong> 
-                                            <a href="tel:{{ $zamowienie->orderer_phone }}" class="text-decoration-none">
-                                                @php
-                                                    $phone = preg_replace('/[^0-9]/', '', $zamowienie->orderer_phone);
-                                                    if (strlen($phone) == 9) {
-                                                        // Polskie numery 9-cyfrowe
-                                                        echo '+48 ' . substr($phone, 0, 3) . ' ' . substr($phone, 3, 3) . ' ' . substr($phone, 6, 3);
-                                                    } elseif (strlen($phone) == 11 && substr($phone, 0, 2) == '48') {
-                                                        // Polskie numery z prefiksem 48
-                                                        echo '+' . substr($phone, 0, 2) . ' ' . substr($phone, 2, 3) . ' ' . substr($phone, 5, 3) . ' ' . substr($phone, 8, 3);
-                                                    } elseif (strlen($phone) >= 10 && strlen($phone) <= 15) {
-                                                        // Numery międzynarodowe - dodaj + i formatuj z odstępami
-                                                        $formatted = '+' . $phone;
-                                                        // Dodaj spacje co 3 cyfry od końca (ale zachowaj prefiks kraju)
-                                                        $formatted = preg_replace('/(\d{3})(?=\d)/', '$1 ', $formatted);
-                                                        echo $formatted;
-                                                    } else {
-                                                        // Fallback - wyświetl oryginalny numer
-                                                        echo $zamowienie->orderer_phone;
-                                                    }
-                                                @endphp
-                                            </a>
-                                        @endif
-                                    </small>
-                                </div>
-                            @endif
-                            
                             {{-- Formularz edycji - kompaktowy --}}
                             <form action="{{ route('form-orders.update', $zamowienie->id) }}" method="POST">
                                 @csrf
@@ -806,46 +857,6 @@ nowoczesna-edukacja.pl </div>
                                     </div>
                                 </div>
                             </div>
-
-                            {{-- DODATKOWE INFORMACJE - kompaktowe --}}
-                            @if($zamowienie->order_date || $zamowienie->ip_address || $zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM)
-                                <div class="card mt-3">
-                                    <div class="card-header bg-info text-white py-2">
-                                        <h6 class="mb-0">
-                                            <i class="bi bi-info-circle"></i> DODATKOWE INFORMACJE
-                                        </h6>
-                                    </div>
-                                    <div class="card-body py-2">
-                                        @if($zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM || filled($zamowienie->order_form_variant))
-                                            <div class="mb-1">
-                                                <small>
-                                                    <strong>Wersja formularza:</strong>
-                                                    <span class="badge bg-{{ $zamowienie->orderFormVariantBadgeClass() }} ms-1">
-                                                        {{ $zamowienie->orderFormVariantAdminLabel() }}
-                                                    </span>
-                                                </small>
-                                            </div>
-                                        @endif
-                                        @php
-                                            $orderDateFormatted = $zamowienie->formatOrderDateLocal();
-                                        @endphp
-                                        @if($orderDateFormatted)
-                                            <div class="mb-1">
-                                                <small>
-                                                    <strong>Data zamówienia:</strong> {{ $orderDateFormatted }}
-                                                </small>
-                                            </div>
-                                        @endif
-                                        @if($zamowienie->ip_address)
-                                            <div class="mb-1">
-                                                <small>
-                                                    <strong>IP:</strong> {{ $zamowienie->ip_address }}
-                                                </small>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
                         </div>
                     </div>
                 </div>
@@ -858,14 +869,20 @@ nowoczesna-edukacja.pl </div>
                             <strong><i class="bi bi-link-45deg"></i> Formularz zamówienia na PNEDU</strong>
                             <span class="text-muted small d-block">Wyślij dyrektorowi do uzupełnienia lub edycji (ident: <code>{{ $zamowienie->ident }}</code>)</span>
                         </div>
-                        <div class="input-group" style="max-width: 36rem;">
-                            <input type="text" class="form-control form-control-sm font-monospace" id="pnedu-order-form-edit-url" value="{{ $pneduOrderFormEditUrl }}" readonly>
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('pnedu-order-form-edit-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
-                                Kopiuj link
-                            </button>
-                            <a href="{{ $pneduOrderFormEditUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-box-arrow-up-right"></i> Otwórz
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div class="input-group" style="max-width: 36rem;">
+                                <input type="text" class="form-control form-control-sm font-monospace" id="pnedu-order-form-edit-url" value="{{ $pneduOrderFormEditUrl }}" readonly>
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                        onclick="navigator.clipboard.writeText(document.getElementById('pnedu-order-form-edit-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
+                                    Kopiuj link
+                                </button>
+                                <a href="{{ $pneduOrderFormEditUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-box-arrow-up-right"></i> Otwórz
+                                </a>
+                            </div>
+                            <a href="{{ route('form-orders.pdf', $zamowienie->id) }}"
+                               class="btn btn-outline-dark btn-sm">
+                                <i class="bi bi-file-pdf"></i> Pobierz PDF zamówienia
                             </a>
                         </div>
                     </div>
@@ -3647,7 +3664,6 @@ nowoczesna-edukacja.pl `;
             const saveUrl = formRoot.dataset.saveUrl;
             const statusBadge = document.getElementById('ksefSaveStatus');
             const errorsBox = document.getElementById('ksefValidationErrors');
-            const summaryRoot = document.getElementById('ksefSummaryReadonly');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             let saveTimer = null;
@@ -3761,9 +3777,6 @@ nowoczesna-edukacja.pl `;
                     .then(function (result) {
                         if (result.ok && result.data.success) {
                             setStatus('Zapisano', 'success');
-                            if (summaryRoot && result.data.summary_html) {
-                                summaryRoot.innerHTML = result.data.summary_html;
-                            }
                             window.setTimeout(function () {
                                 if (statusBadge && statusBadge.textContent === 'Zapisano') {
                                     setStatus('—', 'secondary');
