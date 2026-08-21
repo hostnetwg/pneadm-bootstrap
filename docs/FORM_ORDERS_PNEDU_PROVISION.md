@@ -29,6 +29,8 @@ Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dl
 | `U` | Ważne zamówienia bez uczestnika na szkoleniu **lub** bez formalnego provision PNEDU (`pnedu_provisioned_at` puste) | `/form-orders/{latestId}?filter_no_participant=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 | `FV` | Ważne zamówienia bez klasycznego numeru FV (`invoice_number`) i bez oznaczenia „Bezpłatny dostęp - bez FV” | `/form-orders/{latestId}?filter_no_invoice=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 
+**Wydajność (2026-08):** pierwszy HTML listy zawiera tylko niebieskie/zielone/żółte badge uczestników (`withCount`). Czerwone **U**, żółte **FV**, cała kolumna **Lejek** oraz badge rozliczenia szkoleń zamkniętych ładują się **po** renderze przez `GET /courses/index-stats?ids[]=…` (live, bez cache) — ten sam wzorzec co `/form-orders/index-stats`.
+
 Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`. Licznik `FV` i filtr „bez wystawionej faktury” opierają się na `invoice_number` (źródło prawdy); samo `ifirma_invoice_id` bez numeru FV nadal trafia do kolejki (do uzupełnienia przez sync z iFirma).
 
 ## ClickMeeting

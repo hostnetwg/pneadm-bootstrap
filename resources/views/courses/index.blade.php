@@ -414,36 +414,14 @@
                         <td class="align-middle">
                             @if($course->category === 'closed')
                                 <div class="text-center small fw-semibold text-uppercase text-primary mb-1">SZKOLENIE ZAMKNIĘTE</div>
-                                @if($course->is_paid && ($course->closed_billing_status ?? '') !== \App\Services\CourseFormOrderBillingService::STATUS_NOT_APPLICABLE)
-                                    @php
-                                        $bs = $course->closed_billing_status;
-                                        $bsClass = \App\Services\CourseFormOrderBillingService::statusBadgeClass($bs);
-                                        $bsLabel = \App\Services\CourseFormOrderBillingService::statusLabel($bs);
-                                    @endphp
-                                    <div class="text-center mb-1">
-                                        @if($bs === \App\Services\CourseFormOrderBillingService::STATUS_NO_ORDERS)
-                                            <a href="{{ route('form-orders.create', ['course_id' => $course->id]) }}"
-                                               class="badge {{ $bsClass }} fw-semibold text-decoration-none"
-                                               title="Dodaj zamówienie dla tego szkolenia">
-                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
-                                            </a>
-                                        @elseif($bs === \App\Services\CourseFormOrderBillingService::STATUS_NO_INVOICE && !empty($course->closed_billing_uninvoiced_order_id))
-                                            <a href="{{ route('form-orders.show', $course->closed_billing_uninvoiced_order_id) }}"
-                                               class="badge {{ $bsClass }} fw-semibold text-decoration-none"
-                                               title="Otwórz zamówienie bez wystawionej faktury (#{{ $course->closed_billing_uninvoiced_order_id }})">
-                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
-                                            </a>
-                                        @elseif($bs === \App\Services\CourseFormOrderBillingService::STATUS_COMPLETE && !empty($course->closed_billing_first_invoice_number))
-                                            <span class="badge {{ $bsClass }} fw-semibold"
-                                                  title="Faktura: {{ $course->closed_billing_first_invoice_number }}">
-                                                <i class="bi bi-receipt"></i> {{ $bsLabel }} <span class="opacity-75">·</span> {{ $course->closed_billing_first_invoice_number }}
-                                            </span>
-                                        @else
-                                            <span class="badge {{ $bsClass }} fw-semibold"
-                                                  title="Zamówienia: {{ $course->closed_billing_orders_total ?? 0 }}, z FV: {{ $course->closed_billing_orders_invoiced ?? 0 }}">
-                                                <i class="bi bi-receipt"></i> {{ $bsLabel }}
-                                            </span>
-                                        @endif
+                                @if($course->is_paid)
+                                    <div class="courses-index-stat-billing"
+                                         data-course-stat="billing"
+                                         data-course-id="{{ $course->id }}"
+                                         aria-busy="true">
+                                        <div class="text-center mb-1">
+                                            <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Ładowanie rozliczenia"></span>
+                                        </div>
                                     </div>
                                 @endif
                             @endif
@@ -534,86 +512,19 @@
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants_count }}</span><br>
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $course->participants_complete_count }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates_count }}</span><br>
-                            @php
-                                $ordersNeedingParticipants = (int) ($course->orders_needing_participants_count ?? 0);
-                                $ordersNeedingInvoice = (int) ($course->orders_needing_invoice_count ?? 0);
-                            @endphp
-                            @if($ordersNeedingParticipants > 0 && !empty($course->latest_needs_provisioning_order_id))
-                                <a href="{{ route('form-orders.show', [
-                                        $course->latest_needs_provisioning_order_id,
-                                        'filter_no_participant' => 1,
-                                        'course_id' => $course->id,
-                                    ]) }}"
-                                   class="badge bg-danger text-decoration-none"
-                                   title="Otwórz ostatnie zamówienie bez uczestnika (#{{ $course->latest_needs_provisioning_order_id }})">
-                                    U {{ $ordersNeedingParticipants }}
-                                </a>
-                            @elseif($ordersNeedingParticipants > 0)
-                                <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'new', 'course_id' => $course->id]) }}"
-                                   class="badge bg-danger text-decoration-none"
-                                   title="Zamówienia, w których trzeba dodać uczestnika do szkolenia">
-                                    U {{ $ordersNeedingParticipants }}
-                                </a>
-                            @else
-                                <span class="badge bg-secondary" title="Brak zamówień z niedodanym uczestnikiem">U 0</span>
-                            @endif
-                            <br>
-                            @if($ordersNeedingInvoice > 0 && !empty($course->latest_needs_invoice_order_id))
-                                <a href="{{ route('form-orders.show', [
-                                        $course->latest_needs_invoice_order_id,
-                                        'filter_no_invoice' => 1,
-                                        'course_id' => $course->id,
-                                    ]) }}"
-                                   class="badge bg-warning text-dark text-decoration-none"
-                                   title="Otwórz ostatnie zamówienie bez FV (#{{ $course->latest_needs_invoice_order_id }})">
-                                    FV {{ $ordersNeedingInvoice }}
-                                </a>
-                            @elseif($ordersNeedingInvoice > 0)
-                                <a href="{{ route('form-orders.index', ['quick' => 'all', 'filter' => 'needs_invoice', 'course_id' => $course->id]) }}"
-                                   class="badge bg-warning text-dark text-decoration-none"
-                                   title="Zamówienia bez wystawionej faktury i bez oznaczenia bez FV">
-                                    FV {{ $ordersNeedingInvoice }}
-                                </a>
-                            @else
-                                <span class="badge bg-secondary" title="Brak zamówień do wystawienia FV">FV 0</span>
-                            @endif
-                        </td>
-                        <td class="text-center align-middle small" style="line-height: 1.35;">
-                            @php
-                                $fs = $course->funnel_stats ?? null;
-                                $campaignCount = (int) ($fs['campaigns_count'] ?? 0);
-                            @endphp
-                            <div class="mb-1" title="Kampanie marketingowe przypisane do tego szkolenia (cała historia)">
-                                <a href="{{ route('marketing-campaigns.index', ['course_id' => $course->id]) }}"
-                                   class="badge text-bg-success text-decoration-none fw-bold px-2 py-1 {{ $campaignCount === 0 ? 'opacity-75' : '' }}">
-                                    <i class="bi bi-megaphone-fill"></i> {{ $campaignCount }}
-                                </a>
+                            <div class="courses-index-stat-operational d-inline-block"
+                                 data-course-stat="operational"
+                                 data-course-id="{{ $course->id }}"
+                                 aria-busy="true">
+                                <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Ładowanie U/FV"></span>
                             </div>
-                            @if($fs)
-                                <div title="Wejścia na opis szkolenia (pnedu.pl, unikalne/dzień, ostatnie {{ (int) $funnelStatsDays }} dni)">
-                                    <i class="bi bi-eye text-muted"></i> {{ number_format($fs['views_course_show'], 0, ',', ' ') }}
-                                </div>
-                                <div title="Wejścia na formularz (order-form + deferred-order, unikalne/dzień, ostatnie {{ (int) $funnelStatsDays }} dni)">
-                                    <i class="bi bi-ui-checks text-muted"></i> {{ number_format($fs['views_order_form'], 0, ',', ' ') }}
-                                </div>
-                                <div title="Złożone zamówienia — cała historia (bez anulowanych)">
-                                    <i class="bi bi-cart text-muted"></i> {{ number_format($fs['orders_submitted'], 0, ',', ' ') }}
-                                </div>
-                                <div title="Wystawiona faktura (invoice_number) — cała historia">
-                                    <i class="bi bi-receipt text-muted"></i> {{ number_format($fs['orders_invoiced'] ?? $fs['orders_paid'] ?? 0, 0, ',', ' ') }}
-                                </div>
-                                @if(($fs['cr_show_to_invoiced'] ?? null) !== null)
-                                    <div class="text-success fw-semibold" title="Konwersja: opis → faktura (ostatnie {{ (int) $funnelStatsDays }} dni)">
-                                        {{ number_format($fs['cr_show_to_invoiced'], 1, ',', ' ') }}%
-                                    </div>
-                                @elseif($fs['cr_show_to_order'] !== null)
-                                    <div class="text-primary fw-semibold" title="Konwersja: opis → zamówienie (ostatnie {{ (int) $funnelStatsDays }} dni)">
-                                        {{ number_format($fs['cr_show_to_order'], 1, ',', ' ') }}%
-                                    </div>
-                                @endif
-                            @else
-                                <span class="text-muted">—</span>
-                            @endif
+                        </td>
+                        <td class="text-center align-middle small courses-index-stat-funnel"
+                            style="line-height: 1.35;"
+                            data-course-stat="funnel"
+                            data-course-id="{{ $course->id }}"
+                            aria-busy="true">
+                            <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Ładowanie lejka"></span>
                         </td>
                         <td class="align-middle">
                             <div class="d-flex flex-column gap-1">
@@ -1908,6 +1819,65 @@
             setupVideoPlayerModal{{ $course->id }}();
             @endif
             @endforeach
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const ids = Array.from(document.querySelectorAll('[data-course-stat][data-course-id]'))
+                .map(function (el) { return parseInt(el.getAttribute('data-course-id'), 10); })
+                .filter(function (id, index, arr) { return id > 0 && arr.indexOf(id) === index; });
+
+            if (ids.length === 0) {
+                return;
+            }
+
+            const statsUrl = @json(route('courses.index-stats'));
+            const url = statsUrl + '?' + ids.map(function (id) { return 'ids[]=' + encodeURIComponent(id); }).join('&');
+
+            const markError = function () {
+                document.querySelectorAll('[data-course-stat][aria-busy="true"]').forEach(function (el) {
+                    el.innerHTML = '<span class="text-danger small">—</span>';
+                    el.removeAttribute('aria-busy');
+                });
+            };
+
+            fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('stats ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    const courses = data.courses || {};
+                    Object.keys(courses).forEach(function (courseId) {
+                        const row = courses[courseId] || {};
+                        const operational = document.querySelector('[data-course-stat="operational"][data-course-id="' + courseId + '"]');
+                        if (operational) {
+                            operational.innerHTML = row.operational_html || '';
+                            operational.removeAttribute('aria-busy');
+                        }
+                        const funnel = document.querySelector('[data-course-stat="funnel"][data-course-id="' + courseId + '"]');
+                        if (funnel) {
+                            funnel.innerHTML = row.funnel_html || '<span class="text-muted">—</span>';
+                            funnel.removeAttribute('aria-busy');
+                        }
+                        const billing = document.querySelector('[data-course-stat="billing"][data-course-id="' + courseId + '"]');
+                        if (billing) {
+                            billing.innerHTML = row.billing_html || '';
+                            billing.removeAttribute('aria-busy');
+                        }
+                    });
+
+                    document.querySelectorAll('[data-course-stat][aria-busy="true"]').forEach(function (el) {
+                        el.innerHTML = '<span class="text-muted small">—</span>';
+                        el.removeAttribute('aria-busy');
+                    });
+                })
+                .catch(markError);
         });
     </script>
     @if(auth()->user()?->isSuperAdmin())

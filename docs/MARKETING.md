@@ -130,7 +130,7 @@ Atrybucja na froncie: `pnedu/app/Services/MarketingAttributionService.php` — p
 | Z fakturą | `orders_invoiced` | `invoice_number` wypełnione (jak `FormOrder::scopeWithInvoice()`) |
 
 **Okna czasowe (ważne):**
-- **`/courses` (kolumna Lejek):** 🛒 i FV = **cała historia** szkolenia; wejścia i % CR = ostatnie `MARKETING_FUNNEL_STATS_DAYS` (domyślnie 30). Dzięki temu 🛒 jest zbliżone do „przetworzone + do obsługi”, a CR nie miesza okien (CR liczone z zamówień w tym samym okresie co widoki).
+- **`/courses` (kolumna Lejek):** 🛒 i FV = **cała historia** szkolenia; wejścia i % CR = ostatnie `MARKETING_FUNNEL_STATS_DAYS` (domyślnie 30). Dzięki temu 🛒 jest zbliżone do „przetworzone + do obsługi”, a CR nie miesza okien (CR liczone z zamówień w tym samym okresie co widoki). Dane Lejek (oraz U/FV / billing zamkniętych) **dociągane AJAX** po pierwszym HTML: `GET /courses/index-stats` — live, bez cache.
 - **`Marketing → Lejek konwersji`:** wszystkie etapy w wybranym okresie.
 
 Serwis: `App\Services\CourseFunnelStatsService` (`statsForCourses(..., ordersAllTime: true)` na liście szkoleń).  

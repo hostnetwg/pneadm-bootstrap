@@ -32,9 +32,6 @@ class CoursesController extends Controller
      */
     public function index(Request $request)
     {
-        // Zwiększenie limitu czasu dla dużych zbiorów danych
-        set_time_limit(120); // 2 minuty
-
         $query = Course::query();
 
         // Pobieranie listy instruktorów do widoku
@@ -221,84 +218,8 @@ class CoursesController extends Controller
             }]);
         }
 
-        // Liczba zamówień wymagających obsługi (brak FV i/lub uczestnika, nieanulowane).
-        $courseIdsOnPage = $courses->getCollection()->pluck('id')->all();
-
-        if (! empty($courseIdsOnPage)) {
-            $operational = app(\App\Services\FormOrderOperationalStatusService::class);
-            $needsProvisioningStats = $operational->needsProvisioningStatsByCourseIds($courseIdsOnPage);
-            $ordersNeedingParticipantsByCourseId = $needsProvisioningStats['counts'];
-            $latestNeedsProvisioningOrderIdByCourseId = $needsProvisioningStats['latest_ids'];
-            $needsInvoiceStats = $operational->needsInvoiceStatsByCourseIds($courseIdsOnPage);
-            $ordersNeedingInvoiceByCourseId = $needsInvoiceStats['counts'];
-            $latestNeedsInvoiceOrderIdByCourseId = $needsInvoiceStats['latest_ids'];
-
-            $closedPaidIds = $courses->getCollection()
-                ->filter(fn (Course $c) => $c->category === 'closed' && $c->is_paid)
-                ->pluck('id')
-                ->all();
-            $billingByCourseId = CourseFormOrderBillingService::billingSummaryByCourseIds($closedPaidIds);
-            $uninvoicedOrderIdByCourseId = CourseFormOrderBillingService::firstUninvoicedOrderIdByCourseIds($closedPaidIds);
-            $firstInvoiceNumberByCourseId = CourseFormOrderBillingService::firstInvoiceNumberByCourseIds($closedPaidIds);
-
-            $courses->getCollection()->transform(function ($course) use ($ordersNeedingParticipantsByCourseId, $latestNeedsProvisioningOrderIdByCourseId, $ordersNeedingInvoiceByCourseId, $latestNeedsInvoiceOrderIdByCourseId, $billingByCourseId, $uninvoicedOrderIdByCourseId, $firstInvoiceNumberByCourseId) {
-                $course->orders_needing_participants_count = (int) ($ordersNeedingParticipantsByCourseId[$course->id] ?? 0);
-                $course->latest_needs_provisioning_order_id = $latestNeedsProvisioningOrderIdByCourseId[$course->id] ?? null;
-                $course->orders_needing_invoice_count = (int) ($ordersNeedingInvoiceByCourseId[$course->id] ?? 0);
-                $course->latest_needs_invoice_order_id = $latestNeedsInvoiceOrderIdByCourseId[$course->id] ?? null;
-                $summary = $billingByCourseId[$course->id] ?? null;
-                $course->closed_billing_status = $summary['status'] ?? (
-                    ($course->category === 'closed' && $course->is_paid)
-                        ? CourseFormOrderBillingService::STATUS_NO_ORDERS
-                        : CourseFormOrderBillingService::STATUS_NOT_APPLICABLE
-                );
-                $course->closed_billing_orders_total = (int) ($summary['orders_total'] ?? 0);
-                $course->closed_billing_orders_invoiced = (int) ($summary['orders_invoiced'] ?? 0);
-                $course->closed_billing_uninvoiced_order_id = $uninvoicedOrderIdByCourseId[$course->id] ?? null;
-                $course->closed_billing_first_invoice_number = $firstInvoiceNumberByCourseId[$course->id] ?? null;
-
-                return $course;
-            });
-        } else {
-            $courses->getCollection()->transform(function ($course) {
-                $course->orders_needing_participants_count = 0;
-                $course->latest_needs_provisioning_order_id = null;
-                $course->orders_needing_invoice_count = 0;
-                $course->latest_needs_invoice_order_id = null;
-                $course->closed_billing_status = CourseFormOrderBillingService::STATUS_NOT_APPLICABLE;
-                $course->closed_billing_orders_total = 0;
-                $course->closed_billing_orders_invoiced = 0;
-                $course->closed_billing_uninvoiced_order_id = null;
-                $course->closed_billing_first_invoice_number = null;
-
-                return $course;
-            });
-        }
-
-        $funnelStatsService = app(CourseFunnelStatsService::class);
-        $funnelStatsDays = $funnelStatsService->defaultStatsDays();
-        $funnelStats = [];
-        if (! empty($courseIdsOnPage)) {
-            // 🛒/FV na liście szkoleń = cała historia; widoki i CR nadal z ostatnich N dni
-            $funnelStats = $funnelStatsService->statsForCourses($courseIdsOnPage, ordersAllTime: true);
-            $campaignCounts = $funnelStatsService->campaignCountsForCourses($courseIdsOnPage);
-            $courses->getCollection()->transform(function ($course) use ($funnelStats, $campaignCounts) {
-                $course->funnel_stats = array_merge($funnelStats[$course->id] ?? [
-                    'views_course_show' => 0,
-                    'views_order_form' => 0,
-                    'orders_submitted' => 0,
-                    'orders_invoiced' => 0,
-                    'orders_paid' => 0,
-                    'cr_show_to_order' => null,
-                    'cr_form_to_order' => null,
-                    'cr_show_to_invoiced' => null,
-                ], [
-                    'campaigns_count' => $campaignCounts[$course->id] ?? 0,
-                ]);
-
-                return $course;
-            });
-        }
+        // U / FV / Lejek / billing zamkniętych — AJAX GET /courses/index-stats (po pierwszym HTML).
+        $funnelStatsDays = app(CourseFunnelStatsService::class)->defaultStatsDays();
 
         $googleCalendarEnabled = (bool) config('services.google_calendar.enabled', false);
         $googleCalendarConfigured = app(GoogleCalendarClientFactory::class)->isConfigured();
@@ -315,6 +236,121 @@ class CoursesController extends Controller
             'googleCalendarSyncActive',
             'funnelStatsDays',
         ));
+    }
+
+    /**
+     * JSON HTML-ów dla kolumn U/FV, Lejek oraz badge rozliczenia zamkniętych (ładowane po liście).
+     * Live przy każdym wejściu — bez cache.
+     */
+    public function indexStats(Request $request)
+    {
+        set_time_limit(120);
+
+        $ids = $request->input('ids', []);
+        if (is_string($ids)) {
+            $ids = preg_split('/\s*,\s*/', $ids, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', (array) $ids),
+            fn (int $id) => $id > 0
+        )));
+
+        if (count($ids) > 1000) {
+            $ids = array_slice($ids, 0, 1000);
+        }
+
+        $funnelStatsService = app(CourseFunnelStatsService::class);
+        $funnelStatsDays = $funnelStatsService->defaultStatsDays();
+
+        if ($ids === []) {
+            return response()->json([
+                'funnel_stats_days' => $funnelStatsDays,
+                'courses' => (object) [],
+            ]);
+        }
+
+        $courses = Course::query()
+            ->whereIn('id', $ids)
+            ->get(['id', 'category', 'is_paid'])
+            ->keyBy('id');
+
+        $operational = app(\App\Services\FormOrderOperationalStatusService::class);
+        $needsProvisioningStats = $operational->needsProvisioningStatsByCourseIds($ids);
+        $needsInvoiceStats = $operational->needsInvoiceStatsByCourseIds($ids);
+
+        $closedPaidIds = $courses
+            ->filter(fn (Course $c) => $c->category === 'closed' && $c->is_paid)
+            ->pluck('id')
+            ->all();
+        $billingByCourseId = CourseFormOrderBillingService::billingSummaryByCourseIds($closedPaidIds);
+        $uninvoicedOrderIdByCourseId = CourseFormOrderBillingService::firstUninvoicedOrderIdByCourseIds($closedPaidIds);
+        $firstInvoiceNumberByCourseId = CourseFormOrderBillingService::firstInvoiceNumberByCourseIds($closedPaidIds);
+
+        $funnelStats = $funnelStatsService->statsForCourses($ids, ordersAllTime: true);
+        $campaignCounts = $funnelStatsService->campaignCountsForCourses($ids);
+
+        $payload = [];
+        foreach ($ids as $courseId) {
+            $course = $courses->get($courseId);
+            if (! $course) {
+                continue;
+            }
+
+            $ordersNeedingParticipants = (int) ($needsProvisioningStats['counts'][$courseId] ?? 0);
+            $latestNeedsProvisioningOrderId = $needsProvisioningStats['latest_ids'][$courseId] ?? null;
+            $ordersNeedingInvoice = (int) ($needsInvoiceStats['counts'][$courseId] ?? 0);
+            $latestNeedsInvoiceOrderId = $needsInvoiceStats['latest_ids'][$courseId] ?? null;
+
+            $summary = $billingByCourseId[$courseId] ?? null;
+            $closedBillingStatus = $summary['status'] ?? (
+                ($course->category === 'closed' && $course->is_paid)
+                    ? CourseFormOrderBillingService::STATUS_NO_ORDERS
+                    : CourseFormOrderBillingService::STATUS_NOT_APPLICABLE
+            );
+
+            $fs = array_merge($funnelStats[$courseId] ?? [
+                'views_course_show' => 0,
+                'views_order_form' => 0,
+                'orders_submitted' => 0,
+                'orders_invoiced' => 0,
+                'orders_paid' => 0,
+                'cr_show_to_order' => null,
+                'cr_form_to_order' => null,
+                'cr_show_to_invoiced' => null,
+            ], [
+                'campaigns_count' => $campaignCounts[$courseId] ?? 0,
+            ]);
+
+            $payload[$courseId] = [
+                'operational_html' => view('courses.partials.index-operational-badges', [
+                    'courseId' => $courseId,
+                    'ordersNeedingParticipants' => $ordersNeedingParticipants,
+                    'latestNeedsProvisioningOrderId' => $latestNeedsProvisioningOrderId,
+                    'ordersNeedingInvoice' => $ordersNeedingInvoice,
+                    'latestNeedsInvoiceOrderId' => $latestNeedsInvoiceOrderId,
+                ])->render(),
+                'funnel_html' => view('courses.partials.index-funnel-cell', [
+                    'courseId' => $courseId,
+                    'fs' => $fs,
+                    'funnelStatsDays' => $funnelStatsDays,
+                ])->render(),
+                'billing_html' => ($course->category === 'closed' && $course->is_paid)
+                    ? view('courses.partials.index-closed-billing-badge', [
+                        'courseId' => $courseId,
+                        'closedBillingStatus' => $closedBillingStatus,
+                        'closedBillingOrdersTotal' => (int) ($summary['orders_total'] ?? 0),
+                        'closedBillingOrdersInvoiced' => (int) ($summary['orders_invoiced'] ?? 0),
+                        'closedBillingUninvoicedOrderId' => $uninvoicedOrderIdByCourseId[$courseId] ?? null,
+                        'closedBillingFirstInvoiceNumber' => $firstInvoiceNumberByCourseId[$courseId] ?? null,
+                    ])->render()
+                    : '',
+            ];
+        }
+
+        return response()->json([
+            'funnel_stats_days' => $funnelStatsDays,
+            'courses' => $payload,
+        ]);
     }
 
     /**

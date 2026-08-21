@@ -340,6 +340,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/training-offers/{training_offer}/create-course', [CoursesController::class, 'createFromTrainingOffer'])
         ->name('training-offers.create-course');
     Route::get('/courses', [CoursesController::class, 'index'])->name('courses.index');
+    Route::get('/courses/index-stats', [CoursesController::class, 'indexStats'])->name('courses.index-stats');
     Route::resource('courses/series', \App\Http\Controllers\CourseSeriesController::class)->names([
         'index' => 'courses.series.index',
         'create' => 'courses.series.create',

@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-17  
+Data utworzenia/aktualizacji: 2026-08-21  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-08-21) — `/courses`: U / Lejek po załadowaniu strony
+
+Lista szkoleń renderuje się bez ciężkich agregacji `form_orders`. Czerwone U, żółte FV, kolumna Lejek i billing zamkniętych ładują się przez `GET /courses/index-stats` (live). Niebieskie/zielone badge uczestników zostają w pierwszym HTML. Kanon: `docs/FORM_ORDERS_PNEDU_PROVISION.md`, `docs/MARKETING.md`.
 
 ## Ostatnio (2026-08-17) — numer FV ≠ ID iFirma
 
