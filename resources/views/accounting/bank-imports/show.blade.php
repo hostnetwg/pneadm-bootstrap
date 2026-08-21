@@ -873,7 +873,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptWarnModal" tabindex="-1" aria-labelledby="bankImportAcceptWarnModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header text-bg-warning">
                     <h5 class="modal-title" id="bankImportAcceptWarnModalLabel">Uwaga: kwota przelewu ≠ kwota FV</h5>
@@ -904,7 +904,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptPackageModal" tabindex="-1" aria-labelledby="bankImportAcceptPackageModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header text-bg-primary">
                     <h5 class="modal-title" id="bankImportAcceptPackageModalLabel">Akceptacja pakietu podziału</h5>
@@ -935,7 +935,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptIfirmaModal" tabindex="-1" aria-labelledby="bankImportAcceptIfirmaModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header text-bg-success">
                     <h5 class="modal-title" id="bankImportAcceptIfirmaModalLabel">Akceptacja dopasowania</h5>
