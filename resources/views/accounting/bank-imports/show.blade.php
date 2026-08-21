@@ -1043,19 +1043,15 @@
         #bankImportAcceptPackageModal {
             z-index: 1065;
         }
-        /* Przyciski Akceptuj są w stopce podglądu (dół / prawo) — potwierdzenie tam, żeby kolejny klik był blisko. */
+        /* Pozycję ustawia JS względem klikniętego Akceptuj (nie róg viewportu). */
         .bank-import-accept-dialog {
             --bs-modal-width: min(32rem, calc(100vw - 2rem));
-            display: flex;
-            align-items: flex-end;
-            min-height: calc(100% - 0.75rem);
-            margin: 0.25rem 1.25rem 0.5rem auto;
+            margin: 0;
         }
-        @media (max-width: 575.98px) {
-            .bank-import-accept-dialog {
-                margin-left: 0.75rem;
-                margin-right: 0.75rem;
-            }
+        #bankImportAcceptWarnModal.fade .modal-dialog,
+        #bankImportAcceptIfirmaModal.fade .modal-dialog,
+        #bankImportAcceptPackageModal.fade .modal-dialog {
+            transform: none;
         }
         .bank-manual-peek-btn.is-active {
             color: #fff;
@@ -1083,6 +1079,84 @@
             var acceptPackageModal = acceptPackageModalEl ? bootstrap.Modal.getOrCreateInstance(acceptPackageModalEl) : null;
             var pendingAcceptForm = null;
             var pendingPackageForm = null;
+
+            function acceptDialogTriggerButton() {
+                var form = pendingAcceptForm || pendingPackageForm;
+                if (!form) {
+                    return null;
+                }
+                return form.querySelector('button[type="submit"]') || form.querySelector('button');
+            }
+
+            function positionAcceptDialog(modalEl) {
+                var dialog = modalEl ? modalEl.querySelector('.bank-import-accept-dialog') : null;
+                if (!dialog) {
+                    return;
+                }
+                dialog.style.position = 'absolute';
+                dialog.style.margin = '0';
+                dialog.style.minHeight = '0';
+                dialog.style.transform = 'none';
+
+                var pad = 8;
+                var width = dialog.offsetWidth || 512;
+                var height = dialog.offsetHeight || 280;
+                var left;
+                var top;
+                var trigger = acceptDialogTriggerButton();
+
+                if (trigger) {
+                    var rect = trigger.getBoundingClientRect();
+                    // Dolny-prawy róg okna = dolny-prawy róg Akceptuj → iFirma pod kursorem.
+                    left = rect.right - width;
+                    top = rect.bottom - height;
+                } else {
+                    left = (window.innerWidth - width) / 2;
+                    top = window.innerHeight - height - 24;
+                }
+
+                left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
+                top = Math.max(pad, Math.min(top, window.innerHeight - height - pad));
+                dialog.style.left = left + 'px';
+                dialog.style.top = top + 'px';
+            }
+
+            function resetAcceptDialogPosition(modalEl) {
+                var dialog = modalEl ? modalEl.querySelector('.bank-import-accept-dialog') : null;
+                if (!dialog) {
+                    return;
+                }
+                dialog.style.left = '';
+                dialog.style.top = '';
+                dialog.style.position = '';
+                dialog.style.margin = '';
+                dialog.style.minHeight = '';
+                dialog.style.transform = '';
+            }
+
+            [acceptWarnModalEl, acceptIfirmaModalEl, acceptPackageModalEl].forEach(function (el) {
+                if (!el) {
+                    return;
+                }
+                el.addEventListener('show.bs.modal', function () {
+                    window.requestAnimationFrame(function () {
+                        positionAcceptDialog(el);
+                    });
+                });
+                el.addEventListener('shown.bs.modal', function () {
+                    positionAcceptDialog(el);
+                });
+                el.addEventListener('hidden.bs.modal', function () {
+                    resetAcceptDialogPosition(el);
+                });
+            });
+            window.addEventListener('resize', function () {
+                [acceptWarnModalEl, acceptIfirmaModalEl, acceptPackageModalEl].forEach(function (el) {
+                    if (el && el.classList.contains('show')) {
+                        positionAcceptDialog(el);
+                    }
+                });
+            });
 
             function setRegisterIfirma(form, value) {
                 var input = form.querySelector('.bank-import-register-ifirma');
