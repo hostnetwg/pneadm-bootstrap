@@ -1312,6 +1312,87 @@ class BankStatementImportTest extends TestCase
         $ignoredTab->assertDontSee('MELEMENTS', false);
     }
 
+    public function test_preview_modal_shows_remaining_high_matches_to_accept(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $orderA = FormOrder::create([
+            'product_name' => 'Szkolenie A',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '101/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $orderB = FormOrder::create([
+            'product_name' => 'Szkolenie B',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '102/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_queue.csv',
+            'file_hash' => str_repeat('u', 64),
+            'source' => 'mbank',
+            'status' => 'parsed',
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $txA = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDay()->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'FV 101/8/2026',
+            'fingerprint' => str_repeat('v', 64),
+            'is_incoming' => true,
+        ]);
+        $txB = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => now()->subDays(2)->toDateString(),
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'FV 102/8/2026',
+            'fingerprint' => str_repeat('w', 64),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $txA->id,
+            'form_order_id' => $orderA->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:101/8/2026'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $txB->id,
+            'form_order_id' => $orderB->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number:102/8/2026'],
+            'status' => BankTransactionMatch::STATUS_SUGGESTED,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'high',
+        ]));
+
+        $show->assertOk();
+        $show->assertSee('Do akceptacji: 2 High', false);
+        $show->assertSee('id="bankTxPreviewRemainingBadge"', false);
+        $show->assertSee('id="bankTxPreviewPositionMeta"', false);
+        $show->assertSee('data-queue-filter-count="2"', false);
+        $show->assertSee('data-queue-unmatched="2"', false);
+    }
+
     public function test_accept_split_package_allocates_two_invoices_locally(): void
     {
         $user = User::factory()->create([

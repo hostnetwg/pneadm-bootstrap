@@ -658,11 +658,55 @@
         </div>
     </div>
 
-    <div class="modal fade" id="bankTxPreviewModal" tabindex="-1" aria-labelledby="bankTxPreviewModalLabel" aria-hidden="true">
+    <div class="modal fade" id="bankTxPreviewModal" tabindex="-1" aria-labelledby="bankTxPreviewModalLabel" aria-hidden="true"
+         data-queue-filter="{{ $filter }}"
+         data-queue-unmatched="{{ (int) ($counts['unmatched'] ?? 0) }}"
+         data-queue-filter-count="{{ (int) ($counts[$filter] ?? $transactions->total()) }}"
+         data-queue-page-count="{{ $transactions->count() }}"
+         data-queue-page="{{ $transactions->currentPage() }}"
+         data-queue-last-page="{{ $transactions->lastPage() }}"
+         data-queue-total="{{ $transactions->total() }}">
         <div class="modal-dialog modal-xl modal-dialog-scrollable bank-tx-preview-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="bankTxPreviewModalLabel">Podgląd dopasowania</h5>
+                    <div class="d-flex flex-column flex-md-row flex-wrap align-items-md-center gap-2 me-auto min-w-0">
+                        <h5 class="modal-title mb-0" id="bankTxPreviewModalLabel">Podgląd dopasowania</h5>
+                        <div class="d-flex flex-wrap align-items-center gap-2" id="bankTxPreviewQueueMeta">
+                            @php
+                                $queueFilterCount = (int) ($counts[$filter] ?? $transactions->total());
+                                $queueUnmatched = (int) ($counts['unmatched'] ?? 0);
+                                $queueActionable = in_array($filter, ['high', 'medium', 'low', 'unmatched', 'unlinked'], true);
+                                $queueFilterLabels = [
+                                    'high' => 'High',
+                                    'medium' => 'Medium',
+                                    'low' => 'Low',
+                                ];
+                                if ($queueUnmatched <= 0) {
+                                    $queueBadgeClass = 'badge text-bg-success';
+                                    $queueBadgeText = 'Przejrzany';
+                                    $queueHint = '';
+                                } elseif ($filter === 'unlinked') {
+                                    $queueBadgeClass = 'badge text-bg-warning text-dark';
+                                    $queueBadgeText = 'Bez powiązania: '.$queueFilterCount;
+                                    $queueHint = $queueUnmatched !== $queueFilterCount
+                                        ? 'łącznie do przeglądu: '.$queueUnmatched
+                                        : '';
+                                } elseif ($queueActionable && $filter !== 'unmatched') {
+                                    $queueBadgeClass = 'badge text-bg-warning text-dark';
+                                    $queueBadgeText = 'Do akceptacji: '.$queueFilterCount.' '.($queueFilterLabels[$filter] ?? $filter);
+                                    $queueHint = $queueUnmatched !== $queueFilterCount
+                                        ? 'łącznie do przeglądu: '.$queueUnmatched
+                                        : '';
+                                } else {
+                                    $queueBadgeClass = 'badge text-bg-warning text-dark';
+                                    $queueBadgeText = 'Do przeglądu: '.$queueUnmatched;
+                                    $queueHint = '';
+                                }
+                            @endphp
+                            <span class="{{ $queueBadgeClass }}" id="bankTxPreviewRemainingBadge">{{ $queueBadgeText }}</span>
+                            <span class="small text-muted" id="bankTxPreviewRemainingHint">{{ $queueHint }}</span>
+                        </div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                 </div>
                 <div class="modal-body">
@@ -768,10 +812,11 @@
                     </div>
                 </div>
                 <div class="modal-footer flex-wrap gap-2 justify-content-between">
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
                         <button type="button" class="btn btn-outline-secondary" id="bankTxPreviewPrevBtn">
                             <i class="bi bi-chevron-left"></i> Poprzedni
                         </button>
+                        <span class="small text-muted" id="bankTxPreviewPositionMeta"></span>
                         <button type="button" class="btn btn-outline-secondary" id="bankTxPreviewNextBtn">
                             Następny <i class="bi bi-chevron-right"></i>
                         </button>
@@ -1623,6 +1668,75 @@
             var previewButtons = function () {
                 return Array.prototype.slice.call(document.querySelectorAll('.bank-tx-preview-btn'));
             };
+            var previewQueue = {
+                filter: modalEl.getAttribute('data-queue-filter') || '',
+                unmatched: Number(modalEl.getAttribute('data-queue-unmatched') || '0'),
+                filterCount: Number(modalEl.getAttribute('data-queue-filter-count') || '0'),
+                pageCount: Number(modalEl.getAttribute('data-queue-page-count') || '0'),
+                page: Number(modalEl.getAttribute('data-queue-page') || '1'),
+                lastPage: Number(modalEl.getAttribute('data-queue-last-page') || '1'),
+                total: Number(modalEl.getAttribute('data-queue-total') || '0')
+            };
+            var previewFilterLabels = {
+                high: 'High',
+                medium: 'Medium',
+                low: 'Low',
+                unmatched: 'do przeglądu',
+                unlinked: 'bez powiązania',
+                accepted: 'zaakceptowane',
+                paynow: 'PayNow',
+                ignored: 'ignorowane',
+                all: 'wpływów'
+            };
+
+            function updatePreviewQueueMeta() {
+                var buttons = previewButtons();
+                var idx = currentPreviewBtn ? buttons.indexOf(currentPreviewBtn) : -1;
+                var posEl = document.getElementById('bankTxPreviewPositionMeta');
+                if (posEl) {
+                    if (idx >= 0 && previewQueue.pageCount > 0) {
+                        var pos = (idx + 1) + ' z ' + previewQueue.pageCount;
+                        if (previewQueue.lastPage > 1) {
+                            pos += ' · strona ' + previewQueue.page + '/' + previewQueue.lastPage
+                                + ' (łącznie ' + previewQueue.total + ')';
+                        }
+                        posEl.textContent = pos;
+                    } else {
+                        posEl.textContent = '';
+                    }
+                }
+
+                var badge = document.getElementById('bankTxPreviewRemainingBadge');
+                var hint = document.getElementById('bankTxPreviewRemainingHint');
+                var filterKey = previewQueue.filter;
+                var actionable = ['high', 'medium', 'low', 'unmatched', 'unlinked'].indexOf(filterKey) !== -1;
+                var label = previewFilterLabels[filterKey] || filterKey;
+
+                if (badge) {
+                    if (previewQueue.unmatched <= 0) {
+                        badge.className = 'badge text-bg-success';
+                        badge.textContent = 'Przejrzany';
+                    } else if (filterKey === 'unlinked') {
+                        badge.className = 'badge text-bg-warning text-dark';
+                        badge.textContent = 'Bez powiązania: ' + previewQueue.filterCount;
+                    } else if (actionable && filterKey !== 'unmatched') {
+                        badge.className = 'badge text-bg-warning text-dark';
+                        badge.textContent = 'Do akceptacji: ' + previewQueue.filterCount + ' ' + label;
+                    } else {
+                        badge.className = 'badge text-bg-warning text-dark';
+                        badge.textContent = 'Do przeglądu: ' + previewQueue.unmatched;
+                    }
+                }
+                if (hint) {
+                    var showHint = actionable
+                        && filterKey !== 'unmatched'
+                        && previewQueue.unmatched > 0
+                        && previewQueue.unmatched !== previewQueue.filterCount;
+                    hint.textContent = showHint
+                        ? ('łącznie do przeglądu: ' + previewQueue.unmatched)
+                        : '';
+                }
+            }
 
             function setManualLinkPanelVisible(visible) {
                 var panel = document.getElementById('bankTxManualLinkPanel');
@@ -2081,6 +2195,7 @@
                 var nextNavBtn = document.getElementById('bankTxPreviewNextBtn');
                 prevBtn.disabled = idx <= 0;
                 nextNavBtn.disabled = idx < 0 || idx >= buttons.length - 1;
+                updatePreviewQueueMeta();
             }
 
             function loadPreviewFromButton(btn) {
