@@ -113,6 +113,63 @@ class ClickMeetingServiceTest extends TestCase
         );
     }
 
+    public function test_generate_autologin_hash_posts_to_clickmeeting(): void
+    {
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088701/room/autologin_hash' => Http::response([
+                'autologin_hash' => 'HASH123',
+            ], 200),
+        ]);
+
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+        ]);
+
+        $result = app(ClickMeetingService::class)->generateAutologinHash(
+            '10088701',
+            'dev@example.com',
+            'Dev Tester',
+            'listener',
+            'TOK99'
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('HASH123', $result['autologin_hash']);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.clickmeeting.com/v1/conferences/10088701/room/autologin_hash'
+                && $request['email'] === 'dev@example.com'
+                && $request['nickname'] === 'Dev Tester'
+                && $request['role'] === 'listener'
+                && $request['token'] === 'TOK99';
+        });
+    }
+
+    public function test_build_autologin_url_appends_query_param(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertSame(
+            'https://example.clickmeeting.com/room?l=ABC',
+            $service->buildAutologinUrl('https://example.clickmeeting.com/room', 'ABC')
+        );
+        $this->assertSame(
+            'https://embed.clickmeeting.com/embed_conference.html?r=123&l=ABC',
+            $service->buildAutologinUrl('https://embed.clickmeeting.com/embed_conference.html?r=123', 'ABC')
+        );
+    }
+
+    public function test_build_pin_embed_url_matches_official_script_target(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertSame(
+            'https://pnedu.clickmeeting.com/225723416?popup=off&lang=pl',
+            $service->buildPinEmbedUrl('https://pnedu.clickmeeting.com/testowy-webinar', '225723416')
+        );
+    }
+
     public function test_deactivate_tokens_sends_delete_with_token_list(): void
     {
         Http::fake([

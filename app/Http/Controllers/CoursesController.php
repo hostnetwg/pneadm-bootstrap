@@ -147,7 +147,7 @@ class CoursesController extends Controller
         $eagerLoads = [
             'instructor:id,first_name,last_name,title',
             'location:id,course_id,location_name,address,postal_code,post_office',
-            'onlineDetails:id,course_id,platform,meeting_link,clickmeeting_event_id',
+            'onlineDetails:id,course_id,platform,meeting_link,clickmeeting_event_id,clickmeeting_join_enabled,embed_on_pnedu',
         ];
 
         if (auth()->user()?->isSuperAdmin()) {
@@ -952,6 +952,7 @@ class CoursesController extends Controller
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
+            'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
             'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
             'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
@@ -1031,6 +1032,7 @@ class CoursesController extends Controller
 
             // ✅ Dla kursu online
             if ($request->type === 'online') {
+                $liveRoomFlags = $this->resolveLiveRoomFlags($request);
                 $onlineData = [
                     'course_id' => $course->id,
                     'platform' => $request->platform,
@@ -1039,6 +1041,8 @@ class CoursesController extends Controller
                     'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
                         ? trim((string) $request->clickmeeting_event_id)
                         : null,
+                    'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
+                    'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
                 ];
 
                 \Log::info('Dane kursu online:', $onlineData);
@@ -1157,6 +1161,7 @@ class CoursesController extends Controller
             'show_on_pnedu' => 'nullable|boolean',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
+            'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
             'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
             'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
@@ -1244,6 +1249,7 @@ class CoursesController extends Controller
 
         // ✅ Aktualizacja danych kursu online
         if ($request->type === 'online') {
+            $liveRoomFlags = $this->resolveLiveRoomFlags($request);
             CourseOnlineDetails::updateOrCreate(
                 ['course_id' => $course->id],
                 [
@@ -1253,6 +1259,8 @@ class CoursesController extends Controller
                     'clickmeeting_event_id' => $request->filled('clickmeeting_event_id')
                         ? trim((string) $request->clickmeeting_event_id)
                         : null,
+                    'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
+                    'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
                 ]
             );
 
@@ -1501,5 +1509,23 @@ class CoursesController extends Controller
         }
 
         return $imagePath;
+    }
+
+    /**
+     * Radio „Wejście do pokoju”: dokładnie jedna opcja → dwie wzajemnie wykluczające flagi w DB.
+     *
+     * @return array{clickmeeting_join_enabled: bool, embed_on_pnedu: bool}
+     */
+    private function resolveLiveRoomFlags(\Illuminate\Http\Request $request): array
+    {
+        $mode = (string) $request->input('live_room_mode', 'clickmeeting');
+        if (! in_array($mode, ['clickmeeting', 'embed_pnedu'], true)) {
+            $mode = 'clickmeeting';
+        }
+
+        return [
+            'clickmeeting_join_enabled' => $mode === 'clickmeeting',
+            'embed_on_pnedu' => $mode === 'embed_pnedu',
+        ];
     }
 }

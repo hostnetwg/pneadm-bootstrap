@@ -16,6 +16,13 @@ class CourseOnlineDetails extends Model
         'meeting_link',
         'meeting_password',
         'clickmeeting_event_id',
+        'clickmeeting_join_enabled',
+        'embed_on_pnedu',
+    ];
+
+    protected $casts = [
+        'clickmeeting_join_enabled' => 'boolean',
+        'embed_on_pnedu' => 'boolean',
     ];
 
     public function course()
@@ -23,4 +30,3 @@ class CourseOnlineDetails extends Model
         return $this->belongsTo(Course::class);
     }
 }
-

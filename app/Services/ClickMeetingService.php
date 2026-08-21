@@ -350,6 +350,167 @@ class ClickMeetingService
     }
 
     /**
+     * @return array{success: bool, error?: string, autologin_hash?: string}
+     */
+    public function generateAutologinHash(
+        string $eventId,
+        string $email,
+        string $nickname,
+        string $role = 'listener',
+        ?string $token = null,
+        ?string $password = null
+    ): array {
+        $config = $this->apiConfig();
+        if ($config === null) {
+            return [
+                'success' => false,
+                'error' => 'Brak konfiguracji ClickMeeting API token.',
+            ];
+        }
+
+        $email = strtolower(trim($email));
+        $nickname = trim($nickname);
+        if ($email === '' || ! str_contains($email, '@')) {
+            return [
+                'success' => false,
+                'error' => 'Brak prawidłowego adresu e-mail do auto-login.',
+            ];
+        }
+
+        if ($nickname === '') {
+            return [
+                'success' => false,
+                'error' => 'Brak nicku uczestnika do auto-login.',
+            ];
+        }
+
+        $payload = [
+            'email' => $email,
+            'nickname' => $nickname,
+            'role' => $role,
+        ];
+
+        $token = trim((string) $token);
+        if ($token !== '') {
+            $payload['token'] = $token;
+        }
+
+        $password = trim((string) $password);
+        if ($password !== '') {
+            $payload['password'] = $password;
+        }
+
+        try {
+            $response = Http::baseUrl($config['base_url'])
+                ->withHeaders(['X-Api-Key' => $config['api_key']])
+                ->asForm()
+                ->post('conferences/'.urlencode($eventId).'/room/autologin_hash', $payload);
+
+            if (! $response->successful()) {
+                return [
+                    'success' => false,
+                    'error' => 'ClickMeeting zwrócił HTTP '.$response->status().' przy generowaniu auto-login hash.',
+                ];
+            }
+
+            $hash = trim((string) $response->json('autologin_hash'));
+            if ($hash === '') {
+                return [
+                    'success' => false,
+                    'error' => 'ClickMeeting nie zwrócił autologin_hash.',
+                ];
+            }
+
+            return [
+                'success' => true,
+                'autologin_hash' => $hash,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('ClickMeetingService: generateAutologinHash exception', [
+                'event_id' => $eventId,
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Błąd komunikacji z ClickMeeting: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    public function buildAutologinUrl(string $roomUrl, string $autologinHash): string
+    {
+        return $this->appendUrlQueryParam(trim($roomUrl), 'l', trim($autologinHash));
+    }
+
+    public function extractEmbedRoomUrl(mixed $conference): ?string
+    {
+        if (! is_array($conference)) {
+            return null;
+        }
+
+        $embedUrl = trim((string) ($conference['embed_room_url'] ?? ''));
+
+        return $embedUrl !== '' ? $embedUrl : null;
+    }
+
+    /**
+     * Oficjalny embed_room_url to adres skryptu (application/javascript), nie HTML do iframe.
+     * Skrypt wstrzykuje iframe na {host}/{room_pin}?popup=off&lang=pl.
+     */
+    public function extractRoomPin(mixed $conference): ?string
+    {
+        if (! is_array($conference)) {
+            return null;
+        }
+
+        $pin = trim((string) ($conference['room_pin'] ?? ''));
+
+        return $pin !== '' ? $pin : null;
+    }
+
+    /**
+     * URL pokoju do bezpośredniego osadzenia w <iframe> (jak robi oficjalny skrypt CM).
+     */
+    public function buildPinEmbedUrl(string $roomUrl, string $roomPin, array $query = []): ?string
+    {
+        $roomUrl = trim($roomUrl);
+        $roomPin = trim($roomPin);
+        if ($roomUrl === '' || $roomPin === '') {
+            return null;
+        }
+
+        $parts = parse_url($roomUrl);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+
+        $base = $parts['scheme'].'://'.$parts['host'].'/'.$roomPin;
+        $query = array_merge([
+            'popup' => 'off',
+            'lang' => 'pl',
+        ], $query);
+
+        return $base.'?'.http_build_query($query);
+    }
+
+    public function appendUrlQueryParam(string $url, string $name, string $value): string
+    {
+        $url = trim($url);
+        $name = trim($name);
+        $value = trim($value);
+
+        if ($url === '' || $name === '' || $value === '') {
+            return $url;
+        }
+
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url.$separator.rawurlencode($name).'='.rawurlencode($value);
+    }
+
+    /**
      * Dezaktywuje wskazane tokeny dostępu (access_type = 3).
      *
      * @param  list<string>  $tokens

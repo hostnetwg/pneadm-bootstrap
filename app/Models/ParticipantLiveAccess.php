@@ -18,6 +18,7 @@ class ParticipantLiveAccess extends Model
         'access_type',
         'room_url',
         'token',
+        'embed_token_consumed_at',
         'status',
         'message',
         'synced_at',
@@ -26,6 +27,7 @@ class ParticipantLiveAccess extends Model
 
     protected $casts = [
         'access_type' => 'integer',
+        'embed_token_consumed_at' => 'datetime',
         'synced_at' => 'datetime',
         'expires_at' => 'datetime',
     ];

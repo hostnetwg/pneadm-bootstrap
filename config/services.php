@@ -45,6 +45,9 @@ return [
     'clickmeeting' => [
         'url' => env('CLICKMEETING_API_URL', 'https://api.clickmeeting.com/v1/'),
         'token' => env('CLICKMEETING_API_TOKEN'),
+        'poc_secret' => env('CLICKMEETING_POC_SECRET'),
+        'poc_room_id' => env('CLICKMEETING_POC_ROOM_ID'),
+        'poc_email' => env('CLICKMEETING_POC_EMAIL'),
     ],
 
     'ifirma' => [

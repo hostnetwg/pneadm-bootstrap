@@ -168,6 +168,40 @@
                         <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
                         <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
                         <small class="text-muted d-block">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
+                        @php
+                            $liveRoomMode = old('live_room_mode', 'clickmeeting');
+                        @endphp
+                        <div class="mt-2">
+                            <div class="form-label mb-1">Wejście do pokoju dla uczestnika</div>
+                            <div class="form-check">
+                                <input type="radio"
+                                       class="form-check-input"
+                                       name="live_room_mode"
+                                       id="live_room_mode_clickmeeting"
+                                       value="clickmeeting"
+                                       {{ $liveRoomMode === 'clickmeeting' ? 'checked' : '' }}>
+                                <label class="form-check-label" for="live_room_mode_clickmeeting">
+                                    Pokój na ClickMeeting
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="radio"
+                                       class="form-check-input"
+                                       name="live_room_mode"
+                                       id="live_room_mode_embed"
+                                       value="embed_pnedu"
+                                       {{ $liveRoomMode === 'embed_pnedu' ? 'checked' : '' }}>
+                                <label class="form-check-label" for="live_room_mode_embed">
+                                    Osadzony pokój na pnedu.pl
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Tylko jedna opcja: klasyczny ClickMeeting albo pokój osadzony na koncie.
+                            </div>
+                            @error('live_room_mode')
+                                <div class="text-danger small">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="sendy_suppression_list_id" class="form-label">ID listy na SENDY</label>

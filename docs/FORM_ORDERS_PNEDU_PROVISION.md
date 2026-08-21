@@ -1,6 +1,6 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-08-11 (ważność linku ustawienia hasła: 2 miesiące)  
+Data aktualizacji: 2026-08-21 (embed na pnedu: radio w kursie; maile nadal z linkiem CM)  
 
 
 Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
@@ -79,7 +79,14 @@ Migracje: `2026_04_09_000003_*`, `2026_07_13_210000_create_participant_live_acce
 
 ### Panel uczestnika (pnedu)
 
-Na `/dashboard/szkolenia` uczestnik widzi przycisk **Dołącz do spotkania na żywo** (przed startem i w trakcie), z licznikiem czasu oraz opcjonalnym hasłem — szczegóły: `pnedu/docs/DASHBOARD_LIVE_MEETING.md`.
+Na `/dashboard/szkolenia` (oraz pasku live na homepage) uczestnik widzi przycisk **Dołącz do spotkania na żywo** — wariant zależy od radio w edycji kursu:
+
+- **Pokój na ClickMeeting** — zewnętrzny URL CM (token z `participant_live_access`);
+- **Osadzony pokój na pnedu.pl** — wejście na `/dashboard/szkolenia/{participant}/transmisja` (iframe / na mobile redirect do CM).
+
+Szczegóły embed (tokeny, FS, anty-sharing, allowlista): **`pnedu/docs/DASHBOARD_LIVE_EMBED.md`**.
+
+**Maile z tego provisionu** (oraz „Wyślij link do live” na liście uczestników) **nadal zawierają bezpośredni link ClickMeeting** — radio nie zmienia CTA w e-mailu (decyzja 2026-08-21; ewentualna zmiana później).
 
 ### Link do spotkania w e-mailu
 
@@ -179,7 +186,7 @@ Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
 Gdy widoczny jest token (`CM: …`):
 
 - **Unieważnij token** — `DELETE` w API ClickMeeting (`…/conferences/{event_id}/tokens` + lista tokenów), potem czyszczenie lokalnego `participant_live_access.token`. Status CM OK zostaje; ponowne pobranie przez przycisk CM OK.
-- **Wyślij link do live** — e-mail systemowy z bezpośrednim linkiem do spotkania (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`).
+- **Wyślij link do live** — e-mail systemowy z **bezpośrednim** linkiem do spotkania ClickMeeting (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`). Nie zależy od radio „osadzony pokój”; embed jest tylko w UI pnedu — `pnedu/docs/DASHBOARD_LIVE_EMBED.md`.
 
 Routes:
 
@@ -219,5 +226,8 @@ W edycji kursu (`/courses/{id}/edit`):
 
 - **Platforma:** `clickmeeting` (małymi literami — wymagane przez provision)
 - **ID wydarzenia ClickMeeting:** `room_id` z panelu CM
+- **Wejście do pokoju dla uczestnika** (radio, dokładnie jedna opcja):
+  - **Pokój na ClickMeeting** (domyślnie) — przycisk zewnętrzny na pnedu
+  - **Osadzony pokój na pnedu.pl** — przycisk embed na pnedu (`embed_on_pnedu`); maile nadal z linkiem CM — zob. `pnedu/docs/DASHBOARD_LIVE_EMBED.md`
 - **Link do spotkania:** opcjonalny fallback / inne platformy
 - **Hasło do spotkania:** gdy wydarzenie na hasło

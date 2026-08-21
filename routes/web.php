@@ -647,6 +647,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
 require __DIR__.'/auth.php';
 
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/dev/clickmeeting-embed-poc', [\App\Http\Controllers\Dev\ClickMeetingEmbedPocController::class, 'show'])
+        ->name('dev.clickmeeting-embed-poc');
+}
+
 // Publiczny formularz uzupełniania danych (bez auth)
 Route::get('/uzupelnij-dane/{token}', [\App\Http\Controllers\DataCompletionFormController::class, 'show'])->name('data-completion.form');
 Route::post('/uzupelnij-dane/{token}', [\App\Http\Controllers\DataCompletionFormController::class, 'store'])->name('data-completion.form.store');
