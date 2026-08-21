@@ -365,14 +365,19 @@ class FormOrderOperationalStatusTest extends TestCase
 
         $before = $this->actingAs($user)->get(route('form-orders.operational-status', $order->id));
         $before->assertOk();
+        $before->assertSee('STATUS ZAMÓWIENIA', false);
+        $before->assertSee('Nieprzetworzone', false);
         $before->assertSee('Uczestnik dodany do szkolenia, ale faktura nie została wystawiona.', false);
         $before->assertSee('Do wystawienia FV', false);
+        $before->assertSee('Faktura nie wystawiona', false);
 
         $order->update(['invoice_number' => 'FV/99/2026']);
 
         $after = $this->actingAs($user)->get(route('form-orders.operational-status', $order->id));
         $after->assertOk();
         $after->assertDontSee('Uczestnik dodany do szkolenia, ale faktura nie została wystawiona.', false);
+        $after->assertDontSee('Nieprzetworzone', false);
         $after->assertSee('Przetworzone', false);
+        $after->assertSee('Faktura wystawiona', false);
     }
 }

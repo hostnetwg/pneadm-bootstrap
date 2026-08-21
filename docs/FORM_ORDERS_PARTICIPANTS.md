@@ -24,6 +24,7 @@
 ## Panel ADM (`/form-orders/{id}`)
 
 - Lista kart uczestników z kopiowaniem danych.
+- Karta **STATUS ZAMÓWIENIA** (prawa kolumna, nad „Wystaw fakturę iFirma”): checklista uczestników na szkoleniu (PNEDU) i faktury. Gdy brakuje któregoś kroku, a zamówienie **nie** jest anulowane ani zamknięte legacy — wyraźne **Nieprzetworzone**. Anulowane/zamknięte nie dostają tej flagi. Partial AJAX: `GET /form-orders/{id}/operational-status`.
 - Sekcja **Formularz zamówienia na PNEDU**: link edycji + **Pobierz PDF zamówienia** (`GET /form-orders/{id}/pdf`) — ten sam PDF co po złożeniu na pnedu.pl.
 - **Dodaj uczestnika do PNEDU** przy każdej osobie + **Dodaj wszystkich naraz**.
 - Po provisionie: **bez przeładowania strony** — soft-refresh kart; status **zwijany** (`PNEDU OK · 3/3`). Po pełnym sukcesie ~2 s rozwinięty, potem zwija; przy problemie w kroku (np. CM) **zostaje rozwinięty** (ręczne zwinięcie możliwe). Krok 2 nie-OK także przy braku tokenu / nieudanym zapisie CM.

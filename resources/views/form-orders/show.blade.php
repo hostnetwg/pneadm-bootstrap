@@ -558,8 +558,14 @@ nowoczesna-edukacja.pl </div>
                     @endif
                 </div>
 
-                {{-- Prawa kolumna: Faktura - kompaktowe --}}
+                {{-- Prawa kolumna: Status, Faktura --}}
                 <div class="col-md-6">
+                    <div id="operationalStatusPanel">
+                        @include('form-orders.partials.operational-status-panel', [
+                            'zamowienie' => $zamowienie,
+                        ])
+                    </div>
+
                     <div class="card mb-3" id="ifirmaIssueInvoiceCard">
                         <div class="card-header bg-warning text-dark py-2">
                             <h6 class="mb-0">
@@ -652,11 +658,6 @@ nowoczesna-edukacja.pl </div>
                             </h6>
                         </div>
                         <div class="card-body py-2">
-                            <div class="border-bottom pb-2 mb-3" id="operationalStatusPanel">
-                                @include('form-orders.partials.operational-status-panel', [
-                                    'zamowienie' => $zamowienie,
-                                ])
-                            </div>
                             <div class="border-bottom pb-2 mb-3">
                                 <div class="small text-muted fw-semibold mb-2">
                                     <i class="bi bi-exclamation-octagon"></i> Windykacja
