@@ -918,7 +918,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptWarnModal" tabindex="-1" aria-labelledby="bankImportAcceptWarnModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog bank-import-accept-dialog">
             <div class="modal-content">
                 <div class="modal-header text-bg-warning">
                     <h5 class="modal-title" id="bankImportAcceptWarnModalLabel">Uwaga: kwota przelewu ≠ kwota FV</h5>
@@ -949,7 +949,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptPackageModal" tabindex="-1" aria-labelledby="bankImportAcceptPackageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog bank-import-accept-dialog">
             <div class="modal-content">
                 <div class="modal-header text-bg-primary">
                     <h5 class="modal-title" id="bankImportAcceptPackageModalLabel">Akceptacja pakietu podziału</h5>
@@ -980,7 +980,7 @@
     </div>
 
     <div class="modal fade" id="bankImportAcceptIfirmaModal" tabindex="-1" aria-labelledby="bankImportAcceptIfirmaModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog bank-import-accept-dialog">
             <div class="modal-content">
                 <div class="modal-header text-bg-success">
                     <h5 class="modal-title" id="bankImportAcceptIfirmaModalLabel">Akceptacja dopasowania</h5>
@@ -1042,6 +1042,20 @@
         #bankImportAcceptIfirmaModal,
         #bankImportAcceptPackageModal {
             z-index: 1065;
+        }
+        /* Przyciski Akceptuj są w stopce podglądu (dół / prawo) — potwierdzenie tam, żeby kolejny klik był blisko. */
+        .bank-import-accept-dialog {
+            --bs-modal-width: min(32rem, calc(100vw - 2rem));
+            display: flex;
+            align-items: flex-end;
+            min-height: calc(100% - 0.75rem);
+            margin: 0.25rem 1.25rem 0.5rem auto;
+        }
+        @media (max-width: 575.98px) {
+            .bank-import-accept-dialog {
+                margin-left: 0.75rem;
+                margin-right: 0.75rem;
+            }
         }
         .bank-manual-peek-btn.is-active {
             color: #fff;
