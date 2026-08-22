@@ -108,7 +108,7 @@ class ParticipantLiveMeetingLinkNotification extends Notification
 
         if ($live->showSpamNote) {
             $note = $live->usesEmbeddedJoin
-                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie. Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie.'
                 : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniższy link działa niezależnie od zaproszenia systemowego ClickMeeting.';
 
             $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
@@ -127,6 +127,9 @@ class ParticipantLiveMeetingLinkNotification extends Notification
 
         if ($live->usesEmbeddedJoin && $live->directJoinUrl) {
             $url = e($live->directJoinUrl);
+            $parts[] = '<p style="margin:14px 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
+                .'Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                .'</p>';
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
                 .'Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting: '
                 .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'

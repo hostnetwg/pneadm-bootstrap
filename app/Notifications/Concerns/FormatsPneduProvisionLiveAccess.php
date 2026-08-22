@@ -21,7 +21,7 @@ trait FormatsPneduProvisionLiveAccess
 
         if ($liveAccess->showSpamNote) {
             $note = $liveAccess->usesEmbeddedJoin
-                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie. Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie.'
                 : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniżej przesyłamy bezpośredni link — możesz z niego skorzystać niezależnie od zaproszenia systemowego.';
 
             $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
@@ -42,6 +42,9 @@ trait FormatsPneduProvisionLiveAccess
 
         if ($liveAccess->usesEmbeddedJoin && $liveAccess->directJoinUrl) {
             $url = e($liveAccess->directJoinUrl);
+            $parts[] = '<p style="margin:14px 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
+                .'Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                .'</p>';
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
                 .'Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting: '
                 .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'
