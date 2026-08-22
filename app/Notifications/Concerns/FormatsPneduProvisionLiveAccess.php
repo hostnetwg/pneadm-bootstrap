@@ -9,6 +9,18 @@ trait FormatsPneduProvisionLiveAccess
 {
     protected function liveAccessSectionHtml(PneduProvisionLiveAccessContext $liveAccess): ?HtmlString
     {
+        $intro = $this->liveAccessSectionIntroHtml($liveAccess);
+        $links = $this->liveAccessSectionLinksHtml($liveAccess);
+
+        if ($intro === null && $links === null) {
+            return null;
+        }
+
+        return new HtmlString((string) $intro.(string) $links);
+    }
+
+    protected function liveAccessSectionIntroHtml(PneduProvisionLiveAccessContext $liveAccess): ?HtmlString
+    {
         if (! $liveAccess->showLiveSection) {
             return null;
         }
@@ -30,6 +42,17 @@ trait FormatsPneduProvisionLiveAccess
                 .e($note)
                 .'</p>';
         }
+
+        return new HtmlString(implode('', $parts));
+    }
+
+    protected function liveAccessSectionLinksHtml(PneduProvisionLiveAccessContext $liveAccess): ?HtmlString
+    {
+        if (! $liveAccess->showLiveSection) {
+            return null;
+        }
+
+        $parts = [];
 
         if ($liveAccess->joinUrl) {
             $effectiveJoinUrl = $liveAccess->requiresPasswordSetup && $liveAccess->passwordSetupUrl
@@ -73,6 +96,10 @@ trait FormatsPneduProvisionLiveAccess
         $parts[] = '<p style="margin:0 0 0 0;line-height:1.45;color:#6c757d;font-size:14px;">'
             .'Wejdź kilka minut przed rozpoczęciem. Podczas dołączania podaj imię oraz ten sam adres e-mail, którym jesteś zapisany/a na szkolenie.'
             .'</p>';
+
+        if ($parts === []) {
+            return null;
+        }
 
         return new HtmlString(implode('', $parts));
     }

@@ -55,4 +55,23 @@ trait FormatsPneduProvisionEmailDetails
 
         return new HtmlString('<p style="margin:'.$marginTop.' 0 0;line-height:1.45;">'.e($line).'</p>');
     }
+
+    protected function plainCourseTitleForSubject(string $courseTitle, int $maxLength = 80): string
+    {
+        $plain = trim(str_replace(
+            ['&nbsp;', "\xc2\xa0"],
+            ' ',
+            strip_tags(html_entity_decode($courseTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+        ));
+
+        if ($plain === '') {
+            return 'szkolenie';
+        }
+
+        if (mb_strlen($plain) <= $maxLength) {
+            return $plain;
+        }
+
+        return rtrim(mb_substr($plain, 0, max(1, $maxLength - 1))).'…';
+    }
 }

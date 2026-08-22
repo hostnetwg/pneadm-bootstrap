@@ -165,6 +165,11 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertSame('ses', $existing->mailer);
         $this->assertSame(['info@system.pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $existing->from);
         $this->assertContains(['kontakt@pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $existing->replyTo);
+        $this->assertSame('Dostęp do szkolenia: Kurs - zaloguj się.', $existing->subject);
+        $this->assertStringContainsString(
+            'email=jan%40example.com',
+            (string) $existing->actionUrl
+        );
 
         $newUser = (new PneduFormOrderProvisionedNewUser('token', 'Kurs'))
             ->toMail(new class
@@ -179,6 +184,7 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertSame(['info@system.pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $newUser->from);
         $this->assertContains(['kontakt@pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $newUser->replyTo);
         $this->assertSame('Ustaw hasło na pnedu.pl', $newUser->actionText);
+        $this->assertSame('Dostęp do szkolenia: Kurs - ustaw hasło.', $newUser->subject);
         $this->assertStringContainsString('/ustaw-haslo/token?email=', (string) $newUser->actionUrl);
 
         config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
@@ -210,6 +216,42 @@ class SystemMailConfigurationTest extends TestCase
             'transmisja',
             (string) $newUserWithEmbed->actionUrl
         );
+    }
+
+    public function test_existing_user_embed_mail_places_login_action_before_room_links(): void
+    {
+        $notifiable = new class
+        {
+            public function getEmailForPasswordReset(): string
+            {
+                return 'jan@example.com';
+            }
+        };
+
+        $mail = (new PneduFormOrderProvisionedExistingUser(
+            'TESTOWE SZKOLENIE 2',
+            'Prowadzący: Waldemar Grabowski',
+            'Data rozpoczęcia: 21.08.2026 15:00',
+            liveAccess: new PneduProvisionLiveAccessContext(
+                showLiveSection: true,
+                platformLabel: 'pnedu.pl / ClickMeeting',
+                joinUrl: 'https://pnedu.pl/dashboard/szkolenia/279317/transmisja?fullscreen=1',
+                directJoinUrl: 'https://pnedu.clickmeeting.com/testowy-webinar/PWJSMG',
+                showSpamNote: true,
+                showPostEventSection: true,
+                usesEmbeddedJoin: true,
+            )
+        ))->toMail($notifiable);
+
+        $this->assertSame('Zaloguj się na pnedu.pl', $mail->actionText);
+
+        $intro = implode("\n", array_map('strval', $mail->introLines));
+        $outro = implode("\n", array_map('strval', $mail->outroLines));
+
+        $this->assertStringContainsString('Najwygodniej wejść przez pnedu.pl', $intro);
+        $this->assertStringContainsString('/transmisja?fullscreen=1', $outro);
+        $this->assertStringContainsString('pnedu.clickmeeting.com', $outro);
+        $this->assertStringNotContainsString('/transmisja?fullscreen=1', $intro);
     }
 
     public function test_pnedu_frontend_reset_password_uses_system_mailer(): void

@@ -44,7 +44,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         $hasDate = $this->startDateLine !== null && $this->startDateLine !== '';
 
         $message = $this->configureSystemMail(new MailMessage)
-            ->subject('Platforma PNEDU — konto utworzone, ustaw hasło')
+            ->subject('Dostęp do szkolenia: '.$this->plainCourseTitleForSubject($this->courseTitle).' - ustaw hasło.')
             ->greeting('Witaj!')
             ->line('Założyliśmy dla Ciebie konto na platformie pnedu.pl w związku z zapisem na szkolenie.')
             ->line($this->courseTitleOnlyHtml(
