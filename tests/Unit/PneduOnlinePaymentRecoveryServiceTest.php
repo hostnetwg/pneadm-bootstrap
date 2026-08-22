@@ -32,4 +32,28 @@ class PneduOnlinePaymentRecoveryServiceTest extends TestCase
                 && $request->hasHeader('Authorization', 'Bearer secret-token');
         });
     }
+
+    public function test_gets_pnedu_internal_recovery_preview(): void
+    {
+        config([
+            'services.pnedu.internal_url' => 'http://pnedu-app',
+            'services.pnedu.internal_api_token' => 'secret-token',
+        ]);
+
+        Http::fake([
+            'http://pnedu-app/api/internal/form-orders/42/preview-online-payment-recovery' => Http::response([
+                'success' => true,
+                'to' => 'buyer@example.test',
+                'subject' => 'Przypomnienie o płatności',
+                'body_html' => '<p>Test</p>',
+            ], 200),
+        ]);
+
+        $result = app(PneduOnlinePaymentRecoveryService::class)->previewRecoveryEmail(42);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('buyer@example.test', $result['to']);
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && $request->url() === 'http://pnedu-app/api/internal/form-orders/42/preview-online-payment-recovery');
+    }
 }

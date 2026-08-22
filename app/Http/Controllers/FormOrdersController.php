@@ -1504,6 +1504,37 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Podgląd recovery e-mail płatności online (bez wysyłki) — pnedu internal API.
+     */
+    public function previewOnlinePaymentRecoveryEmail(Request $request, int $id)
+    {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
+        $order = FormOrder::find($id);
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Zamówienie nie zostało znalezione.',
+            ], 404);
+        }
+
+        if (! $order->isEligibleForOnlinePaymentRecoveryEmail()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'To zamówienie nie kwalifikuje się do recovery e-mail płatności online.',
+            ], 422);
+        }
+
+        $result = app(\App\Services\PneduOnlinePaymentRecoveryService::class)->previewRecoveryEmail($id);
+        $http = (int) ($result['http_code'] ?? (($result['success'] ?? false) ? 200 : 422));
+        unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
      * Ręczna wysyłka recovery e-mail płatności online (Etap 3 — wywołanie pnedu internal API).
      */
     public function sendOnlinePaymentRecoveryEmail(Request $request, int $id)

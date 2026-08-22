@@ -4160,22 +4160,52 @@ nowoczesna-edukacja.pl `;
         </div>
     </div>
 
-    {{-- Modal recovery e-mail płatności online --}}
+    {{-- Modal recovery e-mail płatności online (podgląd + wysyłka) --}}
     <div class="modal fade" id="sendOnlinePaymentRecoveryModal" tabindex="-1" aria-labelledby="sendOnlinePaymentRecoveryModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="sendOnlinePaymentRecoveryModalLabel"><i class="bi bi-envelope"></i> Wyślij mail recovery płatności</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-2">Klient otrzyma e-mail z linkiem <strong>Zapłać ponownie</strong> oraz opcją <strong>faktury z odroczonym terminem</strong>.</p>
-                    <p class="small text-muted mb-0">Wysyłka odbywa się z pnedu.pl (podpisane linki płatności). Można wysłać ponownie — np. gdy klient nie otrzymał pierwszej wiadomości.</p>
-                    <div id="sendOnlinePaymentRecoveryError" class="alert alert-danger d-none mt-3 mb-0" role="alert"></div>
+                    <div id="sendOnlinePaymentRecoveryLoading" class="text-muted small py-3 text-center">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Ładowanie podglądu wiadomości…
+                    </div>
+                    <div id="sendOnlinePaymentRecoveryError" class="alert alert-danger d-none" role="alert"></div>
+                    <div id="sendOnlinePaymentRecoverySuccess" class="alert alert-success d-none" role="alert"></div>
+                    <div id="sendOnlinePaymentRecoveryContent" class="d-none">
+                        <p class="small text-muted mb-2">Klient otrzyma e-mail z linkiem <strong>Zapłać ponownie</strong> oraz opcją <strong>faktury z odroczonym terminem</strong>. Wysyłka z pnedu.pl.</p>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1" for="sendOnlinePaymentRecoveryTo">Do</label>
+                            <input type="text" class="form-control form-control-sm" id="sendOnlinePaymentRecoveryTo" readonly>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1" for="sendOnlinePaymentRecoverySubject">Temat</label>
+                            <input type="text" class="form-control form-control-sm" id="sendOnlinePaymentRecoverySubject" readonly>
+                        </div>
+                        <div class="mb-0">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0" for="sendOnlinePaymentRecoveryBodyFrame">Treść (podgląd HTML)</label>
+                                <span class="small text-muted">„Skopiuj treść” = HTML (z formatowaniem)</span>
+                            </div>
+                            <iframe id="sendOnlinePaymentRecoveryBodyFrame"
+                                    title="Podgląd wiadomości e-mail recovery"
+                                    class="w-100 border rounded bg-white"
+                                    style="height: 28rem;"
+                                    sandbox=""></iframe>
+                            <textarea class="d-none" id="sendOnlinePaymentRecoveryBody" readonly aria-hidden="true"></textarea>
+                        </div>
+                        <p class="small text-muted mt-2 mb-0" id="sendOnlinePaymentRecoveryHint"></p>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
-                    <button type="button" class="btn btn-primary" id="confirmSendOnlinePaymentRecoveryBtn" data-order-id="{{ $zamowienie->id }}">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-outline-primary" id="sendOnlinePaymentRecoveryCopyBtn" disabled>
+                        <i class="bi bi-clipboard"></i> Skopiuj treść
+                    </button>
+                    <button type="button" class="btn btn-primary" id="confirmSendOnlinePaymentRecoveryBtn" data-order-id="{{ $zamowienie->id }}" disabled>
                         <i class="bi bi-send"></i> Wyślij
                     </button>
                 </div>
@@ -4507,16 +4537,131 @@ nowoczesna-edukacja.pl `;
         })();
 
         (function () {
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const modalEl = document.getElementById('sendOnlinePaymentRecoveryModal');
+            if (!modalEl) return;
 
-            document.getElementById('confirmSendOnlinePaymentRecoveryBtn')?.addEventListener('click', async function () {
-                const orderId = this.dataset.orderId;
-                const errorEl = document.getElementById('sendOnlinePaymentRecoveryError');
-                this.disabled = true;
-                if (errorEl) {
-                    errorEl.classList.add('d-none');
-                    errorEl.textContent = '';
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const orderId = document.getElementById('confirmSendOnlinePaymentRecoveryBtn')?.dataset.orderId;
+            const loadingEl = document.getElementById('sendOnlinePaymentRecoveryLoading');
+            const errorEl = document.getElementById('sendOnlinePaymentRecoveryError');
+            const successEl = document.getElementById('sendOnlinePaymentRecoverySuccess');
+            const contentEl = document.getElementById('sendOnlinePaymentRecoveryContent');
+            const toEl = document.getElementById('sendOnlinePaymentRecoveryTo');
+            const subjectEl = document.getElementById('sendOnlinePaymentRecoverySubject');
+            const bodyEl = document.getElementById('sendOnlinePaymentRecoveryBody');
+            const bodyFrameEl = document.getElementById('sendOnlinePaymentRecoveryBodyFrame');
+            const hintEl = document.getElementById('sendOnlinePaymentRecoveryHint');
+            const copyBtn = document.getElementById('sendOnlinePaymentRecoveryCopyBtn');
+            const sendBtn = document.getElementById('confirmSendOnlinePaymentRecoveryBtn');
+            let lastBodyHtml = '';
+
+            function resetUi() {
+                loadingEl?.classList.remove('d-none');
+                errorEl?.classList.add('d-none');
+                if (errorEl) errorEl.textContent = '';
+                successEl?.classList.add('d-none');
+                if (successEl) successEl.textContent = '';
+                contentEl?.classList.add('d-none');
+                if (copyBtn) copyBtn.disabled = true;
+                if (sendBtn) {
+                    sendBtn.disabled = true;
+                    sendBtn.innerHTML = '<i class="bi bi-send"></i> Wyślij';
                 }
+                if (toEl) toEl.value = '';
+                if (subjectEl) subjectEl.value = '';
+                if (bodyEl) bodyEl.value = '';
+                lastBodyHtml = '';
+                if (bodyFrameEl) {
+                    bodyFrameEl.removeAttribute('srcdoc');
+                    bodyFrameEl.src = 'about:blank';
+                }
+                if (hintEl) hintEl.textContent = '';
+            }
+
+            async function copyHtmlContent(html, plain) {
+                const htmlPayload = html || '';
+                const plainPayload = plain || htmlPayload.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                    try {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({
+                                'text/html': new Blob([htmlPayload], { type: 'text/html' }),
+                                'text/plain': new Blob([plainPayload], { type: 'text/plain' }),
+                            }),
+                        ]);
+                        return;
+                    } catch (e) {}
+                }
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(plainPayload || htmlPayload);
+                    return;
+                }
+                const ta = document.createElement('textarea');
+                ta.value = plainPayload || htmlPayload;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+            }
+
+            modalEl.addEventListener('show.bs.modal', async function () {
+                resetUi();
+                if (!orderId) {
+                    loadingEl?.classList.add('d-none');
+                    if (errorEl) {
+                        errorEl.textContent = 'Brak ID zamówienia.';
+                        errorEl.classList.remove('d-none');
+                    }
+                    return;
+                }
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/online-payment/recovery-email-preview`, {
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                    });
+                    const data = await res.json();
+                    loadingEl?.classList.add('d-none');
+                    if (!data.success) {
+                        if (errorEl) {
+                            errorEl.textContent = data.error || 'Nie udało się pobrać podglądu.';
+                            errorEl.classList.remove('d-none');
+                        }
+                        return;
+                    }
+                    if (toEl) toEl.value = data.to || '';
+                    if (subjectEl) subjectEl.value = data.subject || '';
+                    lastBodyHtml = data.body_html || '';
+                    if (bodyEl) bodyEl.value = data.body || '';
+                    if (bodyFrameEl) bodyFrameEl.srcdoc = lastBodyHtml;
+                    if (hintEl) hintEl.textContent = data.hint || '';
+                    contentEl?.classList.remove('d-none');
+                    if (copyBtn) copyBtn.disabled = !lastBodyHtml;
+                    if (sendBtn) sendBtn.disabled = false;
+                } catch (e) {
+                    loadingEl?.classList.add('d-none');
+                    if (errorEl) {
+                        errorEl.textContent = 'Błąd połączenia przy pobieraniu podglądu.';
+                        errorEl.classList.remove('d-none');
+                    }
+                }
+            });
+
+            copyBtn?.addEventListener('click', async function () {
+                try {
+                    await copyHtmlContent(lastBodyHtml, bodyEl?.value || '');
+                    const original = this.innerHTML;
+                    this.innerHTML = '<i class="bi bi-check2"></i> Skopiowano';
+                    setTimeout(() => { this.innerHTML = original; }, 1500);
+                } catch (e) {}
+            });
+
+            sendBtn?.addEventListener('click', async function () {
+                if (!orderId) return;
+                this.disabled = true;
+                if (copyBtn) copyBtn.disabled = true;
+                errorEl?.classList.add('d-none');
+                successEl?.classList.add('d-none');
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Wysyłanie…';
                 try {
                     const res = await fetch(`/form-orders/${orderId}/online-payment/send-recovery-email`, {
                         method: 'POST',
@@ -4527,23 +4672,34 @@ nowoczesna-edukacja.pl `;
                     });
                     const data = await res.json();
                     if (data.success) {
-                        window.location.reload();
+                        if (successEl) {
+                            successEl.textContent = 'Wiadomość została wysłana.';
+                            successEl.classList.remove('d-none');
+                        }
+                        setTimeout(() => { window.location.reload(); }, 700);
                         return;
                     }
-                    const message = data.error || 'Nie udało się wysłać recovery e-mail.';
                     if (errorEl) {
-                        errorEl.textContent = message;
+                        errorEl.textContent = data.error || 'Nie udało się wysłać recovery e-mail.';
                         errorEl.classList.remove('d-none');
                     }
+                    this.disabled = false;
+                    if (copyBtn) copyBtn.disabled = !lastBodyHtml;
+                    this.innerHTML = '<i class="bi bi-send"></i> Wyślij';
                 } catch (e) {
                     if (errorEl) {
                         errorEl.textContent = 'Błąd połączenia.';
                         errorEl.classList.remove('d-none');
                     }
-                } finally {
                     this.disabled = false;
+                    if (copyBtn) copyBtn.disabled = !lastBodyHtml;
+                    this.innerHTML = '<i class="bi bi-send"></i> Wyślij';
                 }
             });
+        })();
+
+        (function () {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             document.getElementById('confirmCancelOrderBtn')?.addEventListener('click', async function () {
                 const orderId = this.dataset.orderId;
