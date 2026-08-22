@@ -170,7 +170,12 @@ Na `/form-orders/{id}` przy **każdej** karcie provisionowanego uczestnika: **Pr
 
 ## Ważność linku „ustaw hasło”
 
-Link w mailu dla nowego konta to standardowy token resetu Laravel (`password_reset_tokens`).  
+Link w mailu dla **nowego konta** prowadzi na **pnedu.pl/ustaw-haslo/{token}** (ten sam token Laravel `password_reset_tokens` co reset).  
+Na formularzu jest copy **„Ustaw hasło”**, nie „Resetowanie hasła” — to ten sam ekran technicznie, inna treść.
+
+Stare maile z `/reset-password/{token}?email=…` nadal działają: jeśli użytkownik **nigdy się nie logował**, pnedu też pokazuje „Ustaw hasło”.  
+Klasyczny „Nie pamiętam hasła” (konto, na które już się logowano) zostaje przy „Resetowanie hasła”.
+
 Ważność: `PASSWORD_RESET_EXPIRE_MINUTES` w `.env` **pnedu** i **pneadm** (domyślnie **86400** = 60 dni ≈ **2 miesiące**).
 
 - Walidacja przy kliknięciu odbywa się na **pnedu.pl** (`config/auth.php` → `passwords.users.expire`).

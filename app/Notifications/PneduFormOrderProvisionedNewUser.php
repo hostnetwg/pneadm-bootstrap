@@ -33,7 +33,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $base = rtrim((string) config('services.pnedu_frontend_url'), '/');
-        $url = $base.'/reset-password/'.$this->token.'?email='.urlencode($notifiable->getEmailForPasswordReset());
+        $url = $base.'/ustaw-haslo/'.$this->token.'?email='.urlencode($notifiable->getEmailForPasswordReset());
         $liveAccess = $this->liveAccess ?? new PneduProvisionLiveAccessContext;
 
         $hasInstructor = $this->instructorLine !== null && $this->instructorLine !== '';

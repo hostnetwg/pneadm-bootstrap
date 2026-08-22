@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-08-21  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-08-21) — formularz „Ustaw hasło” zamiast „Resetowanie” po provision
+
+Nowe konto z „Dodaj uczestnika do PNEDU”: mail nadal mówi o ustawieniu hasła; link idzie na `pnedu.pl/ustaw-haslo/…`. Formularz i komunikat po zapisie nie używają słowa „resetowanie”. Stare linki `/reset-password/…` dla osób, które się jeszcze nie logowały, też pokazują „Ustaw hasło”. Deploy: **pnedu + pneadm** (`git pull`, cache widoków; bez migracji). Kanon: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
+
 ## Ostatnio (2026-08-21) — `/courses`: U / Lejek po załadowaniu strony
 
 Lista szkoleń renderuje się bez ciężkich agregacji `form_orders`. Czerwone U, żółte FV, kolumna Lejek i billing zamkniętych ładują się przez `GET /courses/index-stats` (live). Niebieskie/zielone badge uczestników zostają w pierwszym HTML. Kanon: `docs/FORM_ORDERS_PNEDU_PROVISION.md`, `docs/MARKETING.md`.

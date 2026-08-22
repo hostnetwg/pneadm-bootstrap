@@ -19,7 +19,6 @@ use Tests\TestCase;
 
 class SystemMailConfigurationTest extends TestCase
 {
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -178,6 +177,8 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertSame('ses', $newUser->mailer);
         $this->assertSame(['info@system.pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $newUser->from);
         $this->assertContains(['kontakt@pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $newUser->replyTo);
+        $this->assertSame('Ustaw hasło na pnedu.pl', $newUser->actionText);
+        $this->assertStringContainsString('/ustaw-haslo/token?email=', (string) $newUser->actionUrl);
     }
 
     public function test_pnedu_frontend_reset_password_uses_system_mailer(): void

@@ -63,7 +63,8 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
-| ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest` |
+| ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
+| Ustawienie hasła (nowe konto PNEDU) | **pnedu:** `sail test --filter=PasswordResetTest` |
 | ClickMeeting embed PoC (local) | `docs/DEV_CLICKMEETING_EMBED_POC.md`, `--filter=ClickMeetingEmbedPocTest` |
 | Osadzony pokój na pnedu (`embed_on_pnedu`) / radio live | migracje `2026_08_20_200210_*`, `2026_08_21_181500_*`, `2026_08_21_182800_*`; kanon: `pnedu/docs/DASHBOARD_LIVE_EMBED.md` |
 | KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest` |
