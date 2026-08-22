@@ -13,6 +13,7 @@ use App\Models\Participant;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
 use App\Notifications\PneduFrontendResetPassword;
+use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -179,6 +180,32 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertContains(['kontakt@pnedu.pl', 'Platforma Nowoczesnej Edukacji'], $newUser->replyTo);
         $this->assertSame('Ustaw hasło na pnedu.pl', $newUser->actionText);
         $this->assertStringContainsString('/ustaw-haslo/token?email=', (string) $newUser->actionUrl);
+
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+        $newUserWithEmbed = (new PneduFormOrderProvisionedNewUser(
+            'token',
+            'Kurs',
+            liveAccess: new PneduProvisionLiveAccessContext(
+                showLiveSection: true,
+                platformLabel: 'pnedu.pl / ClickMeeting',
+                joinUrl: 'https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1',
+                directJoinUrl: 'https://pnedu.clickmeeting.com/test/TOK',
+                showSpamNote: true,
+                showPostEventSection: false,
+                usesEmbeddedJoin: true,
+            )
+        ))->toMail(new class
+        {
+            public function getEmailForPasswordReset(): string
+            {
+                return 'jan@example.com';
+            }
+        });
+
+        $this->assertStringContainsString(
+            'redirect=%2Fdashboard%2Fszkolenia%2F123%2Ftransmisja%3Ffullscreen%3D1',
+            (string) $newUserWithEmbed->actionUrl
+        );
     }
 
     public function test_pnedu_frontend_reset_password_uses_system_mailer(): void

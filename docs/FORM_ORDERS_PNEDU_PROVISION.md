@@ -93,12 +93,14 @@ Szczegóły embed (tokeny, FS, anty-sharing, allowlista): **`pnedu/docs/DASHBOAR
 - zaznaczony **Link w e-mailu do osadzonego w PNEDU pokoju** → główny link w mailu prowadzi do `/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`, a niżej jest alternatywny bezpośredni link ClickMeeting;
 - odznaczony checkbox → treść jak dotychczas, czyli główny bezpośredni link ClickMeeting.
 
+Dla nowego konta (uczestnik nie miał jeszcze hasła na pnedu.pl) przycisk **Ustaw hasło na pnedu.pl** jest pokazany przed sekcją spotkania. Link ustawienia hasła dostaje parametr `redirect`; po poprawnym ustawieniu hasła pnedu automatycznie loguje użytkownika i przenosi go do pokoju osadzonego albo do `/dashboard/szkolenia`.
+
 ### Link do spotkania w e-mailu
 
 Builder: `App\Services\PneduProvisionEmailContextBuilder`
 
 - **ClickMeeting + sukces API:** `room_url` z API; przy `access_type = 3` link `{room_url}/{token}` (np. `https://pnedu.clickmeeting.com/wydarzenie-testowe/MCHK7N`)
-- **Embed w mailu włączony:** główny CTA = `PNEDU_FRONTEND_URL/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`; bezpośredni link CM zostaje jako alternatywa w treści.
+- **Embed w mailu włączony:** dla istniejącego konta główny CTA = `PNEDU_FRONTEND_URL/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`; dla nowego konta CTA = `/ustaw-haslo/{token}?email=…&redirect=/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`. Bezpośredni link CM zostaje jako alternatywa w treści.
 - **Fallback `room_url`:** `course_online_details.meeting_link` (gdy API nie zwróci URL)
 - **Hasło:** `course_online_details.meeting_password` (gdy ustawione lub `access_type = 2`)
 - **Inne platformy** (YouTube, Google Meet, Zoom…): `meeting_link` z kursu

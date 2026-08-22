@@ -30,10 +30,15 @@ trait FormatsPneduProvisionLiveAccess
         }
 
         if ($liveAccess->joinUrl) {
-            $url = e($liveAccess->joinUrl);
-            $label = $liveAccess->usesEmbeddedJoin
+            $effectiveJoinUrl = $liveAccess->requiresPasswordSetup && $liveAccess->passwordSetupUrl
+                ? $liveAccess->passwordSetupUrl
+                : $liveAccess->joinUrl;
+            $url = e($effectiveJoinUrl);
+            $label = $liveAccess->requiresPasswordSetup && $liveAccess->usesEmbeddedJoin
+                ? 'Link do ustawienia hasła i przejścia do pokoju w pnedu.pl:'
+                : ($liveAccess->usesEmbeddedJoin
                 ? 'Link do pokoju osadzonego w pnedu.pl:'
-                : 'Link do spotkania:';
+                : 'Link do spotkania:');
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
                 .'<span style="color:#6c757d;font-size:13px;font-weight:600;">'.$label.'</span><br>'
                 .'<a href="'.$url.'" style="color:#0d6efd;font-size:15px;font-weight:600;word-break:break-all;">'.$url.'</a>'
