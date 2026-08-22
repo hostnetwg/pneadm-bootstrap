@@ -3471,156 +3471,102 @@ nowoczesna-edukacja.pl `;
             });
         });
 
-        // Zapamiętywanie checkboxów iFirma w preferencjach użytkownika (per operator)
+        // Zapamiętywanie checkboxów iFirma w preferencjach użytkownika (per operator, baza users.preferences)
         function initializeEmailCheckboxes() {
-            console.log('Initializing email checkboxes...');
-            
-            const proformaCheckbox = document.getElementById('sendEmailCheckboxProforma');
-            const invoiceCheckbox = document.getElementById('sendEmailCheckboxInvoice');
+            const PARTICIPANT_REMARKS_KEY = 'ifirma_include_participant_in_remarks';
+
+            const sendEmailCheckboxConfig = [
+                { id: 'sendEmailCheckboxProforma', key: 'ifirma_send_email_proforma' },
+                { id: 'sendEmailCheckboxInvoice', key: 'ifirma_send_email_invoice' },
+                { id: 'sendEmailCheckboxInvoiceWithKsef', key: 'ifirma_send_email_invoice_with_ksef' },
+                { id: 'sendEmailCheckboxInvoiceWithReceiver', key: 'ifirma_send_email_invoice_with_receiver' },
+            ];
             const participantRemarksCheckbox = document.getElementById('ifirma_include_participant_in_remarks');
-            
-            // Sprawdź czy checkboxy istnieją
-            if (!proformaCheckbox && !invoiceCheckbox && !participantRemarksCheckbox) {
-                console.warn('iFirma preference checkboxes not found on page');
+
+            const sendEmailEntries = sendEmailCheckboxConfig
+                .map(function (entry) {
+                    return {
+                        key: entry.key,
+                        element: document.getElementById(entry.id),
+                    };
+                })
+                .filter(function (entry) { return entry.element; });
+
+            if (sendEmailEntries.length === 0 && !participantRemarksCheckbox) {
                 return;
             }
-            
-            console.log('Checkboxes found:', {
-                proforma: !!proformaCheckbox,
-                invoice: !!invoiceCheckbox,
-                participantRemarks: !!participantRemarksCheckbox,
-            });
 
             // Domyślnie zaznaczony — uzupełnij uwagi od razu (zanim dojdą preferencje z API)
             if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled && participantRemarksCheckbox.checked) {
                 applyParticipantInRemarks();
             }
-            
-            // Klucze preferencji
-            const PROFORMA_KEY = 'ifirma_send_email_proforma';
-            const INVOICE_KEY = 'ifirma_send_email_invoice';
-            const PARTICIPANT_REMARKS_KEY = 'ifirma_include_participant_in_remarks';
-            
-            // Funkcja do pobierania preferencji z serwera
+
             function loadPreferences() {
-                return new Promise((resolve) => {
-                    try {
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]');
-                        if (!csrfToken) {
-                            console.error('CSRF token not found');
-                            resolve({});
-                            return;
-                        }
-                        
-                        fetch('/api/user/preferences', {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            credentials: 'same-origin'
-                        })
-                        .then(response => {
-                            if (response.ok) {
-                                return response.json();
-                            } else {
-                                console.error('Failed to load preferences:', response.status, response.statusText);
-                                return { preferences: {} };
-                            }
-                        })
-                        .then(data => {
-                            console.log('Preferences loaded:', data);
-                            resolve(data.preferences || {});
-                        })
-                        .catch(error => {
-                            console.error('Error loading preferences:', error);
-                            resolve({});
-                        });
-                    } catch (error) {
-                        console.error('Error in loadPreferences:', error);
-                        resolve({});
-                    }
-                });
-            }
-            
-            // Funkcja do zapisywania preferencji na serwerze
-            function savePreference(key, value) {
-                try {
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                return new Promise(function (resolve) {
+                    var csrfToken = document.querySelector('meta[name="csrf-token"]');
                     if (!csrfToken) {
-                        console.error('CSRF token not found');
+                        resolve({});
                         return;
                     }
-                    
-                    console.log('Saving preference:', key, value);
-                    
+
                     fetch('/api/user/preferences', {
-                        method: 'POST',
+                        method: 'GET',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
-                            'X-Requested-With': 'XMLHttpRequest'
+                            'X-Requested-With': 'XMLHttpRequest',
                         },
                         credentials: 'same-origin',
-                        body: JSON.stringify({ key, value })
                     })
-                    .then(response => {
-                        if (response.ok) {
-                            console.log('Preference saved successfully');
-                        } else {
-                            console.error('Failed to save preference:', response.status, response.statusText);
-                            return response.json().then(data => {
-                                console.error('Error details:', data);
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error saving preference:', error);
-                    });
-                } catch (error) {
-                    console.error('Error in savePreference:', error);
-                }
+                        .then(function (response) {
+                            return response.ok ? response.json() : { preferences: {} };
+                        })
+                        .then(function (data) {
+                            resolve(data.preferences || {});
+                        })
+                        .catch(function () {
+                            resolve({});
+                        });
+                });
             }
-            
-            // Załaduj preferencje z serwera i ustaw checkboxy
-            loadPreferences().then(preferences => {
-                console.log('Setting checkbox states from preferences:', preferences);
-                
-                // Przywróć zapisany stan dla PRO-FORMA
-                if (proformaCheckbox) {
-                    if (preferences[PROFORMA_KEY] !== undefined) {
-                        proformaCheckbox.checked = preferences[PROFORMA_KEY];
-                        console.log('PRO-FORMA checkbox set to:', preferences[PROFORMA_KEY]);
-                    }
-                    
-                    // Zapisz stan przy każdej zmianie
-                    proformaCheckbox.addEventListener('change', function() {
-                        console.log('PRO-FORMA checkbox changed to:', this.checked);
-                        savePreference(PROFORMA_KEY, this.checked);
-                    });
-                }
-                
-                // Przywróć zapisany stan dla Faktury
-                if (invoiceCheckbox) {
-                    if (preferences[INVOICE_KEY] !== undefined) {
-                        invoiceCheckbox.checked = preferences[INVOICE_KEY];
-                        console.log('Invoice checkbox set to:', preferences[INVOICE_KEY]);
-                    }
-                    
-                    // Zapisz stan przy każdej zmianie
-                    invoiceCheckbox.addEventListener('change', function() {
-                        console.log('Invoice checkbox changed to:', this.checked);
-                        savePreference(INVOICE_KEY, this.checked);
-                    });
+
+            function savePreference(key, value) {
+                var csrfToken = document.querySelector('meta[name="csrf-token"]');
+                if (!csrfToken) {
+                    return;
                 }
 
-                // Checkbox „Dodaj w uwagach faktury UCZESTNIKÓW” — domyślnie zaznaczony
+                fetch('/api/user/preferences', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ key: key, value: value }),
+                }).catch(function () {});
+            }
+
+            loadPreferences().then(function (preferences) {
+                sendEmailEntries.forEach(function (entry) {
+                    if (preferences[entry.key] !== undefined) {
+                        entry.element.checked = !!preferences[entry.key];
+                    }
+
+                    entry.element.addEventListener('change', function () {
+                        savePreference(entry.key, this.checked);
+                    });
+                });
+
+                // Checkbox „Dodaj w uwagach faktury UCZESTNIKÓW” — domyślnie zaznaczony, potem ostatni stan admina
                 if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled) {
-                    const saved = preferences[PARTICIPANT_REMARKS_KEY];
-                    participantRemarksCheckbox.checked = saved === undefined ? true : !!saved;
+                    var savedParticipantRemarks = preferences[PARTICIPANT_REMARKS_KEY];
+                    participantRemarksCheckbox.checked = savedParticipantRemarks === undefined
+                        ? true
+                        : !!savedParticipantRemarks;
                     applyParticipantInRemarks();
 
                     participantRemarksCheckbox.addEventListener('change', function () {
@@ -3628,7 +3574,6 @@ nowoczesna-edukacja.pl `;
                         savePreference(PARTICIPANT_REMARKS_KEY, this.checked);
                     });
                 } else if (participantRemarksCheckbox) {
-                    // Brak uczestników — tylko synchronizuj pole uwag przy zmianie (bez zapisu preferencji)
                     participantRemarksCheckbox.addEventListener('change', applyParticipantInRemarks);
                 }
             });

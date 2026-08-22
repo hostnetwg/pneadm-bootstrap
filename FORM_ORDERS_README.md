@@ -197,9 +197,20 @@ Czerwony przycisk na stronie szczegółów zamówienia (`/form-orders/{id}`) umo
 
 ### Checkbox "Wyślij automatycznie na e-mail"
 
-- Jeśli zaznaczony: faktura zostanie automatycznie wysłana na e-mail po przesłaniu do KSeF
-- E-mail zawiera numer KSeF w treści wiadomości
-- Adresy e-mail są wyświetlane w nawiasach obok checkboxa
+- Dotyczy czterech osobnych przycisków wystawiania faktury (KSeF, zwykła, z odbiorcą, PRO-FORMA).
+- **Każdy checkbox pamięta własny stan** per operator w `users.preferences`:
+  - `ifirma_send_email_invoice_with_ksef`
+  - `ifirma_send_email_invoice`
+  - `ifirma_send_email_invoice_with_receiver`
+  - `ifirma_send_email_proforma`
+- Przy pierwszym użyciu (brak zapisanej preferencji dla danego przycisku) checkbox startuje odznaczony.
+- Jeśli zaznaczony: faktura zostanie automatycznie wysłana na e-mail po wystawieniu (w wariancie KSeF — po przesłaniu do KSeF).
+- E-mail zawiera numer KSeF w treści wiadomości (wariant KSeF).
+- Adresy e-mail są wyświetlane w nawiasach obok checkboxa.
+
+### Checkbox "Dodaj w uwagach faktury UCZESTNIKÓW"
+
+- Domyślnie **zaznaczony** przy pierwszym wejściu; ostatni stan zapamiętywany per operator (`ifirma_include_participant_in_remarks`).
 
 ### Flow działania
 
