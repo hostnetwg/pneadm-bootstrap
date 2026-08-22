@@ -12,6 +12,7 @@ use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\PaymentDisplayOption;
 use App\Models\TrainingOffer;
+use App\Services\ClickMeetingService;
 use App\Services\CourseFormOrderBillingService;
 use App\Services\CourseFunnelStatsService;
 use App\Services\CourseGoogleCalendarSyncService;
@@ -1097,6 +1098,8 @@ class CoursesController extends Controller
             DB::commit();
             \Log::info('Transakcja zatwierdzona');
 
+            $clickMeetingThankYouWarning = $this->syncClickMeetingThankYouPage($course, $request);
+
             if ($saveAction === 'stay_editing') {
                 $redirect = $this->redirectToCourseEdit($course->id)
                     ->with('success', 'Szkolenie zostało dodane. Możesz kontynuować edycję.');
@@ -1105,9 +1108,7 @@ class CoursesController extends Controller
                     ->with('success', 'Szkolenie zostało dodane!');
             }
 
-            if (! empty($imageUploadWarning)) {
-                $redirect = $redirect->with('warning', $imageUploadWarning);
-            }
+            $redirect = $this->appendCourseSaveWarnings($redirect, $imageUploadWarning, $clickMeetingThankYouWarning);
 
             return $redirect;
 
@@ -1319,6 +1320,8 @@ class CoursesController extends Controller
             CourseLocation::where('course_id', $course->id)->delete();
         }
 
+        $clickMeetingThankYouWarning = $this->syncClickMeetingThankYouPage($course, $request);
+
         // Zachowaj parametry filtrów przekazane z formularza
         $queryParams = $this->extractFilterQueryParamsFromRequest($request);
 
@@ -1329,11 +1332,7 @@ class CoursesController extends Controller
             $redirect = redirect()->route('courses.index', $queryParams)->with('success', 'Szkolenie zaktualizowane!');
         }
 
-        if (! empty($imageUploadWarning)) {
-            $redirect = $redirect->with('warning', $imageUploadWarning);
-        }
-
-        return $redirect;
+        return $this->appendCourseSaveWarnings($redirect, $imageUploadWarning, $clickMeetingThankYouWarning);
     }
 
     /* --------importFromPubligo------------ */
@@ -1580,5 +1579,56 @@ class CoursesController extends Controller
             'embed_email_link_enabled' => $mode === 'embed_pnedu'
                 && $request->boolean('embed_email_link_enabled'),
         ];
+    }
+
+    private function syncClickMeetingThankYouPage(Course $course, Request $request): ?string
+    {
+        if ($request->type !== 'online' || (string) ($request->platform ?? '') !== 'clickmeeting') {
+            return null;
+        }
+
+        $eventId = $request->filled('clickmeeting_event_id')
+            ? trim((string) $request->clickmeeting_event_id)
+            : '';
+
+        if ($eventId === '') {
+            return null;
+        }
+
+        /** @var ClickMeetingService $clickMeeting */
+        $clickMeeting = app(ClickMeetingService::class);
+        $thankYouUrl = $clickMeeting->buildPostTrainingThankYouUrl((int) $course->id);
+        $result = $clickMeeting->updateThankYouPageUrl($eventId, $thankYouUrl);
+
+        if ($result['success'] ?? false) {
+            return null;
+        }
+
+        Log::warning('CoursesController: ClickMeeting thank you page sync failed', [
+            'course_id' => $course->id,
+            'event_id' => $eventId,
+            'thank_you_page_url' => $thankYouUrl,
+            'error' => $result['error'] ?? 'unknown',
+        ]);
+
+        return 'Szkolenie zapisano, ale nie udało się ustawić strony podziękowania w ClickMeeting: '
+            .($result['error'] ?? 'nieznany błąd API.');
+    }
+
+    private function appendCourseSaveWarnings(
+        RedirectResponse $redirect,
+        ?string $imageUploadWarning,
+        ?string $clickMeetingThankYouWarning
+    ): RedirectResponse {
+        $warnings = array_values(array_filter([
+            $imageUploadWarning,
+            $clickMeetingThankYouWarning,
+        ]));
+
+        if ($warnings === []) {
+            return $redirect;
+        }
+
+        return $redirect->with('warning', implode(' ', $warnings));
     }
 }

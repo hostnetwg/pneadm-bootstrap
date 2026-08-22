@@ -23,35 +23,42 @@ class ParticipantLiveMeetingLinkNotificationTest extends TestCase
 
         $notification = new ParticipantLiveMeetingLinkNotification(
             courseTitle: 'Szkolenie testowe Live',
+            participantEmail: 'anna@example.com',
             participantFirstName: 'Anna',
             instructorLine: 'Prowadzący: Jan Kowalski',
-            scheduleLine: 'Termin: 20.07.2026 10:00–12:00',
+            scheduleLine: 'Data rozpoczęcia: 20.07.2026 10:00 (2 godz.)',
             liveAccess: $live,
             dashboardSzkoleniaUrl: 'http://edu.localhost:8081/dashboard/szkolenia',
         );
 
         $mail = $notification->toMail(new AnonymousNotifiable);
 
-        $this->assertSame('Spotkanie na żywo — Szkolenie testowe Live', $mail->subject);
-        $rendered = implode("\n", array_map(
+        $this->assertSame('Dostęp do szkolenia: Szkolenie testowe Live - spotkanie na żywo.', $mail->subject);
+        $intro = implode("\n", array_map(
             fn ($line) => is_object($line) && method_exists($line, '__toString') ? (string) $line : (string) $line,
             $mail->introLines
         ));
+        $outro = implode("\n", array_map(
+            fn ($line) => is_object($line) && method_exists($line, '__toString') ? (string) $line : (string) $line,
+            $mail->outroLines
+        ));
+        $body = $intro."\n".$outro;
 
-        $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $rendered);
-        $this->assertStringContainsString('TOK99', $rendered);
-        $this->assertStringContainsString('haslo123', $rendered);
-        $this->assertStringContainsString('przypisany do Twojego adresu e-mail', $rendered);
-        $this->assertStringContainsString('Twoje szkolenia', $rendered);
-        $this->assertStringContainsString('SPAM', $rendered);
+        $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $body);
+        $this->assertStringContainsString('TOK99', $body);
+        $this->assertStringContainsString('haslo123', $body);
+        $this->assertStringContainsString('jednorazowy', $body);
+        $this->assertStringContainsString('Twoje szkolenia', $body);
+        $this->assertStringContainsString('SPAM', $body);
 
-        $this->assertNotEmpty($mail->actionUrl);
-        $this->assertSame('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $mail->actionUrl);
         $this->assertSame('Dołącz do spotkania na żywo', $mail->actionText);
+        $this->assertSame('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $mail->actionUrl);
     }
 
-    public function test_mail_contains_embedded_link_and_direct_clickmeeting_fallback(): void
+    public function test_mail_contains_embedded_link_login_action_and_direct_clickmeeting_fallback(): void
     {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
         $live = new PneduProvisionLiveAccessContext(
             showLiveSection: true,
             platformLabel: 'pnedu.pl / ClickMeeting',
@@ -65,6 +72,7 @@ class ParticipantLiveMeetingLinkNotificationTest extends TestCase
 
         $notification = new ParticipantLiveMeetingLinkNotification(
             courseTitle: 'Szkolenie testowe Live',
+            participantEmail: 'anna@example.com',
             participantFirstName: 'Anna',
             instructorLine: null,
             scheduleLine: null,
@@ -73,16 +81,24 @@ class ParticipantLiveMeetingLinkNotificationTest extends TestCase
         );
 
         $mail = $notification->toMail(new AnonymousNotifiable);
-        $rendered = implode("\n", array_map(
+        $intro = implode("\n", array_map(
             fn ($line) => is_object($line) && method_exists($line, '__toString') ? (string) $line : (string) $line,
             $mail->introLines
         ));
+        $outro = implode("\n", array_map(
+            fn ($line) => is_object($line) && method_exists($line, '__toString') ? (string) $line : (string) $line,
+            $mail->outroLines
+        ));
 
-        $this->assertStringContainsString('Link do pokoju osadzonego w pnedu.pl', $rendered);
-        $this->assertStringContainsString('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $rendered);
-        $this->assertStringContainsString('Jeśli wejście przez pnedu.pl nie zadziała, skorzystaj z bezpośredniego linku do ClickMeeting', $rendered);
-        $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $rendered);
-        $this->assertStringNotContainsString('Token dostępu', $rendered);
-        $this->assertSame('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $mail->actionUrl);
+        $this->assertStringContainsString('Najwygodniej wejść przez pnedu.pl', $intro);
+        $this->assertStringContainsString('Link do pokoju osadzonego w pnedu.pl', $outro);
+        $this->assertStringContainsString('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $outro);
+        $this->assertStringContainsString('Jeśli wejście przez pnedu.pl nie zadziała, skorzystaj z bezpośredniego linku do ClickMeeting', $outro);
+        $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $outro);
+        $this->assertStringNotContainsString('Token dostępu', $outro);
+        $this->assertStringNotContainsString('/transmisja?fullscreen=1', $intro);
+
+        $this->assertSame('Zaloguj się na pnedu.pl', $mail->actionText);
+        $this->assertStringContainsString('email=anna%40example.com', (string) $mail->actionUrl);
     }
 }

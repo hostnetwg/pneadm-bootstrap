@@ -1099,19 +1099,25 @@
                             @else
                                 do wszystkich uczestników z adresem e-mail (wspólny link bez tokenu)
                             @endif
-                            (kwalifikuje się: <strong>{{ (int) ($courseLiveMeetingEligibleCount ?? 0) }}</strong>).
+                            .
+                        </p>
+                        <p class="mb-3 small text-muted" id="bulk_email_live_meeting_counts">
+                            Kwalifikujących się: <strong>{{ (int) ($courseLiveMeetingEligibleCount ?? 0) }}</strong>,
+                            bez wcześniejszej wysyłki: <strong>{{ (int) ($courseLiveMeetingUnsentCount ?? 0) }}</strong>.
                         </p>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="bulk_email_live_meeting_mode" id="bulk_email_live_meeting_mode_unsent" value="unsent" checked>
-                            <label class="form-check-label" for="bulk_email_live_meeting_mode_unsent">Wyślij tylko do tych, do których jeszcze nie wysłano</label>
+                            <label class="form-check-label" for="bulk_email_live_meeting_mode_unsent">
+                                Wyślij tylko do tych, do których jeszcze nie wysłano
+                                (<span id="bulk_email_live_meeting_unsent_count">{{ (int) ($courseLiveMeetingUnsentCount ?? 0) }}</span>)
+                            </label>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="bulk_email_live_meeting_mode" id="bulk_email_live_meeting_mode_resend" value="resend_all">
-                            <label class="form-check-label" for="bulk_email_live_meeting_mode_resend">Wyślij ponownie do wszystkich kwalifikujących się</label>
-                        </div>
-                        <div class="alert alert-info mb-0 small">
-                            Wysyłka odbywa się w tle (kolejka). Wymaga działającego workera:
-                            <code>sail artisan queue:work</code>
+                            <label class="form-check-label" for="bulk_email_live_meeting_mode_resend">
+                                Wyślij ponownie do wszystkich kwalifikujących się
+                                (<span id="bulk_email_live_meeting_all_count">{{ (int) ($courseLiveMeetingEligibleCount ?? 0) }}</span>)
+                            </label>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1121,7 +1127,7 @@
                         <form action="{{ route('participants.send-live-meeting-links-bulk', $course) }}" method="POST" class="d-inline" data-loading-submit>
                             @csrf
                             <input type="hidden" name="mode" id="bulk_email_live_meeting_mode_input" value="unsent">
-                            <button type="submit" class="btn btn-success" @disabled(($courseLiveMeetingEligibleCount ?? 0) < 1)>
+                            <button type="submit" class="btn btn-success" id="bulk_email_live_meeting_submit_btn" @disabled((int) ($courseLiveMeetingUnsentCount ?? 0) < 1)>
                                 <i class="fas fa-paper-plane me-1"></i> Wyślij
                             </button>
                         </form>
@@ -1256,6 +1262,24 @@
             bind('bulk_email_single_mode', 'bulk_email_single_mode_input');
             bind('bulk_email_course_access_mode', 'bulk_email_course_access_mode_input');
             bind('bulk_email_live_meeting_mode', 'bulk_email_live_meeting_mode_input');
+
+            (function wireLiveMeetingBulkSubmit() {
+                var eligible = {{ (int) ($courseLiveMeetingEligibleCount ?? 0) }};
+                var unsent = {{ (int) ($courseLiveMeetingUnsentCount ?? 0) }};
+                var submitBtn = document.getElementById('bulk_email_live_meeting_submit_btn');
+                var hidden = document.getElementById('bulk_email_live_meeting_mode_input');
+                if (!submitBtn || !hidden) return;
+
+                function updateSubmitState() {
+                    var mode = hidden.value || 'unsent';
+                    submitBtn.disabled = (mode === 'unsent' ? unsent : eligible) < 1;
+                }
+
+                document.querySelectorAll('input[name="bulk_email_live_meeting_mode"]').forEach(function(radio) {
+                    radio.addEventListener('change', updateSubmitState);
+                });
+                updateSubmitState();
+            })();
             bind('bulk_expiry_reminder_mode', 'bulk_expiry_reminder_mode_input');
         })();
 

@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Mail\Concerns\UsesSystemMailSettings;
 use App\Models\Course;
 use App\Models\Participant;
+use App\Support\CourseAccessEmailSchedule;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -35,14 +36,7 @@ class CourseAccessMail extends Mailable
         $participantFirstName = trim((string) $this->participant->first_name) ?: 'Uczestniku';
         $courseTitle = $this->course->plainTitle();
 
-        $courseDateLong = null;
-        if ($this->course->start_date) {
-            $courseDateLong = $this->course->start_date
-                ->copy()
-                ->setTimezone('Europe/Warsaw')
-                ->locale('pl')
-                ->translatedFormat('j F Y \\r.');
-        }
+        $courseDateLong = CourseAccessEmailSchedule::sentenceFragment($this->course);
 
         $hasLimitedAccess = $this->participant->hasLimitedAccess();
         $accessExpired = $hasLimitedAccess ? $this->participant->hasExpiredAccess() : false;

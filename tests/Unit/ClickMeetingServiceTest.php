@@ -207,4 +207,49 @@ class ClickMeetingServiceTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Brak tokenów', (string) ($result['error'] ?? ''));
     }
+
+    public function test_build_post_training_thank_you_url_uses_pnedu_frontend_base(): void
+    {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
+        $url = app(ClickMeetingService::class)->buildPostTrainingThankYouUrl(563);
+
+        $this->assertSame('https://pnedu.pl/po-szkoleniu?course=563', $url);
+    }
+
+    public function test_update_thank_you_page_url_puts_settings_to_clickmeeting(): void
+    {
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10166300' => Http::response(['status' => 'ok'], 200),
+        ]);
+
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+        ]);
+
+        $thankYouUrl = 'https://pnedu.pl/po-szkoleniu?course=563';
+        $result = app(ClickMeetingService::class)->updateThankYouPageUrl('10166300', $thankYouUrl);
+
+        $this->assertTrue($result['success']);
+
+        Http::assertSent(function ($request) use ($thankYouUrl) {
+            return $request->method() === 'PUT'
+                && $request->url() === 'https://api.clickmeeting.com/v1/conferences/10166300'
+                && data_get($request->data(), 'settings.thank_you_page_url') === $thankYouUrl;
+        });
+    }
+
+    public function test_update_thank_you_page_url_requires_api_token(): void
+    {
+        config(['services.clickmeeting.token' => '']);
+
+        $result = app(ClickMeetingService::class)->updateThankYouPageUrl(
+            '10166300',
+            'https://pnedu.pl/po-szkoleniu?course=563'
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Brak konfiguracji', (string) ($result['error'] ?? ''));
+    }
 }

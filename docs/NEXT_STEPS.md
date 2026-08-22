@@ -1,7 +1,15 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-21  
+Data utworzenia/aktualizacji: 2026-08-22  
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Strategia produktowa — platform-first
+
+Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-08-22) — termin w mailach dostępu
+
+Maile provision, live, nagrania: data/godzina startu + czas trwania w nawiasie (bez daty/godziny zakończenia). Helper: `App\Support\CourseAccessEmailSchedule`.
 
 ## Ostatnio (2026-08-21) — formularz „Ustaw hasło” zamiast „Resetowanie” po provision
 

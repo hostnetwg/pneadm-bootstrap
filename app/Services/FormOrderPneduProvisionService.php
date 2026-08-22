@@ -12,6 +12,7 @@ use App\Models\Participant;
 use App\Models\PneduUser;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
+use App\Support\CourseAccessEmailSchedule;
 use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Markdown;
@@ -188,7 +189,7 @@ class FormOrderPneduProvisionService
                     'platform' => trim((string) optional($course->onlineDetails)->platform),
                     'clickmeeting_event_id' => trim((string) optional($course->onlineDetails)->clickmeeting_event_id),
                     'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
-                    'start_date_line' => $this->startDateLineForProvisionEmail($course),
+                    'start_date_line' => CourseAccessEmailSchedule::prefixedStartLine($course),
                     'reused_participant' => $reusedParticipant,
                 ];
 
@@ -694,7 +695,7 @@ class FormOrderPneduProvisionService
             'pnedu_user' => $pneduUser,
             'course_title' => (string) $course->title,
             'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
-            'start_date_line' => $this->startDateLineForProvisionEmail($course),
+            'start_date_line' => CourseAccessEmailSchedule::prefixedStartLine($course),
             'live_access' => $liveAccess,
             // Podgląd i wysyłka: wariant z bieżącego stanu konta pnedu (gdy dostępne).
             'is_new_account' => $this->resolveIsNewAccountForResend($order, $pneduUser),
@@ -951,30 +952,6 @@ class FormOrderPneduProvisionService
         };
 
         return $label.': '.$instructor->full_title_name;
-    }
-
-    /**
-     * Data rozpoczęcia — tylko gdy szkolenie nie jest uznane za zakończone (end_date w przeszłości).
-     * Po zakończeniu na żywo (np. samo nagranie) daty nie pokazujemy.
-     */
-    private function startDateLineForProvisionEmail(Course $course): ?string
-    {
-        if (! $course->start_date) {
-            return null;
-        }
-
-        if ($course->end_date && $course->end_date->isPast()) {
-            return null;
-        }
-
-        // Bez end_date: jeśli start już minął, nie pokazujemy terminu (np. dostęp tylko do nagrania po szkoleniu).
-        if (! $course->end_date && $course->start_date->isPast()) {
-            return null;
-        }
-
-        $formatted = $course->start_date->copy()->timezone(config('app.timezone'))->format('d.m.Y G:i');
-
-        return 'Data rozpoczęcia: '.$formatted;
     }
 
     /**

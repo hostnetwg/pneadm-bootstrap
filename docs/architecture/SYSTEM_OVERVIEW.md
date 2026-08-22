@@ -114,6 +114,7 @@ Najważniejsze miejsca w kodzie:
 - `app/Services/FormOrderPneduProvisionService.php`.
 - `app/Services/ParticipantLiveAccessService.php`.
 
+Strategia produktowa (uczestnik przez pnedu.pl, CM jako fallback): [strategy/PNEDU_PLATFORM_FIRST.md](../strategy/PNEDU_PLATFORM_FIRST.md).  
 Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
 
 ## Bazy Danych I Relacje

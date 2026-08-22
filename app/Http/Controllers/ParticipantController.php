@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Jobs\SendAccessExpiryReminderEmailJob;
 use App\Jobs\SendCertificateLinkEmailJob;
 use App\Jobs\SendCourseAccessEmailJob;
-use App\Jobs\SendLiveMeetingLinkEmailJob;
 use App\Models\Certificate;
 use App\Models\CertificateEmailLog;
 use App\Models\Course;
@@ -797,7 +796,10 @@ class ParticipantController extends Controller
             ? $liveMeetingMailService->courseRequiresAccessToken($course)
             : false;
         $courseLiveMeetingEligibleCount = $courseLiveMeetingEmailAvailable
-            ? $liveMeetingMailService->eligibleParticipantsCount($course)
+            ? $liveMeetingMailService->eligibleParticipantsCount($course, 'resend_all')
+            : 0;
+        $courseLiveMeetingUnsentCount = $courseLiveMeetingEmailAvailable
+            ? $liveMeetingMailService->eligibleParticipantsCount($course, 'unsent')
             : 0;
 
         return view('participants.index', compact(
@@ -829,6 +831,7 @@ class ParticipantController extends Controller
             'courseLiveMeetingEmailAvailable',
             'courseLiveMeetingRequiresToken',
             'courseLiveMeetingEligibleCount',
+            'courseLiveMeetingUnsentCount',
         ));
     }
 
@@ -1139,38 +1142,52 @@ class ParticipantController extends Controller
         if ($participants->isEmpty()) {
             return redirect()->route('participants.index', $course)->with(
                 'info',
-                $mailService->courseRequiresAccessToken($course)
-                    ? 'Brak uczestników z tokenem ClickMeeting spełniających warunki wysyłki.'
-                    : 'Brak uczestników z adresem e-mail spełniających warunki wysyłki.'
+                $mode === 'unsent'
+                    ? 'Brak uczestników kwalifikujących się do wysyłki, do których jeszcze nie wysłano linku live.'
+                    : ($mailService->courseRequiresAccessToken($course)
+                        ? 'Brak uczestników z tokenem ClickMeeting spełniających warunki wysyłki.'
+                        : 'Brak uczestników z adresem e-mail spełniających warunki wysyłki.')
             );
         }
 
         $createdBy = Auth::id();
-        $jobs = [];
-        $logIds = [];
+        $course->loadMissing(['onlineDetails', 'instructor']);
+        $sent = 0;
+        $failed = 0;
+        $firstError = null;
 
         foreach ($participants as $participant) {
-            $log = CertificateEmailLog::create([
-                'course_id' => $course->id,
-                'participant_id' => $participant->id,
-                'type' => CertificateEmailLog::TYPE_LIVE_MEETING_LINK,
-                'status' => CertificateEmailLog::STATUS_QUEUED,
-                'created_by' => $createdBy,
-                'queued_at' => now(),
-            ]);
-            $logIds[] = $log->id;
-            $jobs[] = new SendLiveMeetingLinkEmailJob($course->id, $participant->id, $log->id);
+            $result = $mailService->sendToParticipant(
+                $course,
+                $participant->loadMissing('liveAccess'),
+                createdBy: $createdBy
+            );
+
+            if ($result['success'] ?? false) {
+                $sent++;
+            } else {
+                $failed++;
+                $firstError ??= (string) ($result['error'] ?? 'Nie udało się wysłać e-maila.');
+            }
         }
 
-        $batch = Bus::batch($jobs)
-            ->name($this->emailBatchName($course, CertificateEmailLog::TYPE_LIVE_MEETING_LINK))
-            ->dispatch();
+        if ($sent === 0) {
+            return redirect()->route('participants.index', $course)->with(
+                'error',
+                'Nie wysłano żadnego e-maila z linkiem live.'.($firstError ? ' '.$firstError : '')
+            );
+        }
 
-        CertificateEmailLog::whereIn('id', $logIds)->update(['batch_id' => $batch->id]);
+        if ($failed > 0) {
+            return redirect()->route('participants.index', $course)->with(
+                'success',
+                "Wysłano {$sent} e-maili z linkiem do spotkania na żywo. Nie udało się wysłać {$failed}.".($firstError ? ' Przykładowy błąd: '.$firstError : '')
+            );
+        }
 
         return redirect()->route('participants.index', $course)->with(
             'success',
-            "Zlecono wysyłkę {$participants->count()} e-maili z linkiem do spotkania na żywo. Wysyłka odbywa się w tle."
+            "Wysłano {$sent} e-maili z linkiem do spotkania na żywo."
         );
     }
 

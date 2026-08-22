@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\FormatsPneduProvisionEmailDetails;
+use App\Notifications\Concerns\FormatsPneduProvisionLiveAccess;
 use App\Notifications\Concerns\UsesSystemMailSettings;
 use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Bus\Queueable;
@@ -13,11 +14,13 @@ use Illuminate\Support\HtmlString;
 class ParticipantLiveMeetingLinkNotification extends Notification
 {
     use FormatsPneduProvisionEmailDetails;
+    use FormatsPneduProvisionLiveAccess;
     use Queueable;
     use UsesSystemMailSettings;
 
     public function __construct(
         protected string $courseTitle,
+        protected string $participantEmail,
         protected string $participantFirstName,
         protected ?string $instructorLine,
         protected ?string $scheduleLine,
@@ -34,13 +37,18 @@ class ParticipantLiveMeetingLinkNotification extends Notification
     {
         $firstName = trim($this->participantFirstName);
         $greeting = $firstName !== '' ? 'Witaj, '.$firstName.'!' : 'Witaj!';
+        $base = rtrim((string) config('services.pnedu_frontend_url'), '/');
+        $loginUrl = $base.'/login?'.http_build_query([
+            'email' => $this->participantEmail,
+        ]);
+        $loginAfterEmbedNote = $this->usesEmbeddedJoinWithLiveSection();
 
         $message = $this->configureSystemMail(new MailMessage)
-            ->subject('Spotkanie na żywo — '.$this->plainCourseTitle())
+            ->subject('Dostęp do szkolenia: '.$this->plainCourseTitleForSubject($this->courseTitle).' - spotkanie na żywo.')
             ->greeting($greeting)
-            ->line($this->liveAccess->usesEmbeddedJoin
-                ? 'Przesyłamy link do udziału w szkoleniu na żywo przez pnedu.pl.'
-                : 'Przesyłamy bezpośredni link do udziału w szkoleniu na żywo.')
+            ->line($loginAfterEmbedNote
+                ? 'Zbliża się szkolenie na żywo — najwygodniej dołączysz przez pnedu.pl (zalecamy zalogować się przed startem).'
+                : 'Przesyłamy link do udziału w szkoleniu na żywo.')
             ->line($this->courseTitleOnlyHtml(
                 $this->courseTitle,
                 ($this->instructorLine || $this->scheduleLine) ? null : '1em'
@@ -62,96 +70,44 @@ class ParticipantLiveMeetingLinkNotification extends Notification
             $message->line($html);
         }
 
-        if ($html = $this->liveMeetingSectionHtml()) {
-            $message->line($html);
-        }
-
-        $message->line(new HtmlString(
-            '<p style="margin:18px 0 8px 0;line-height:1.45;">'
-            .'<strong style="font-size:16px;">Twoje konto na pnedu.pl</strong>'
-            .'</p>'
-            .'<p style="margin:0 0 0 0;line-height:1.45;">'
-            .'Ten sam link znajdziesz także po zalogowaniu: zakładka <strong>Twoje szkolenia</strong> — przycisk dołączenia do spotkania (przed startem i w trakcie szkolenia).'
-            .'</p>'
-        ));
-
-        if ($this->liveAccess->joinUrl) {
-            $message->action('Dołącz do spotkania na żywo', $this->liveAccess->joinUrl);
+        if ($loginAfterEmbedNote) {
+            if ($html = $this->liveAccessSectionIntroHtml($this->liveAccess)) {
+                $message->line($html);
+            }
+            $message->action('Zaloguj się na pnedu.pl', $loginUrl);
+            if ($html = $this->liveAccessSectionLinksHtml($this->liveAccess)) {
+                $message->line($html);
+            }
+        } else {
+            if ($html = $this->liveAccessSectionHtml($this->liveAccess)) {
+                $message->line($html);
+            }
+            if ($this->liveAccess->joinUrl) {
+                $message->action('Dołącz do spotkania na żywo', $this->liveAccess->joinUrl);
+            }
         }
 
         return $message
+            ->line(new HtmlString(
+                '<p style="margin:18px 0 8px 0;line-height:1.45;">'
+                .'<strong style="font-size:16px;">Twoje konto na pnedu.pl</strong>'
+                .'</p>'
+                .'<p style="margin:0 0 0 0;line-height:1.45;">'
+                .'Ten sam link znajdziesz także po zalogowaniu w zakładce <strong>Twoje szkolenia</strong> — przycisk dołączenia aktywuje się ok. 2 godziny przed startem i działa w trakcie szkolenia.'
+                .'</p>'
+            ))
             ->line(new HtmlString(
                 '<p style="margin:16px 0 0 0;line-height:1.45;">'
                 .'<a href="'.e($this->dashboardSzkoleniaUrl).'" style="color:#0d6efd;">Przejdź do listy szkoleń na pnedu.pl</a>'
                 .'</p>'
             ))
+            ->line('Jeśli nie pamiętasz hasła, na stronie logowania użyj opcji przypomnienia / resetu hasła.')
             ->line('Jeśli nie zapisywałeś/aś się na to szkolenie, skontaktuj się z biurem.');
     }
 
-    private function plainCourseTitle(): string
+    private function usesEmbeddedJoinWithLiveSection(): bool
     {
-        return trim(str_replace(['&nbsp;', "\xc2\xa0"], ' ', strip_tags(html_entity_decode($this->courseTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'))));
-    }
-
-    private function liveMeetingSectionHtml(): ?HtmlString
-    {
-        $live = $this->liveAccess;
-        if (! $live->showLiveSection || ! $live->joinUrl) {
-            return null;
-        }
-
-        $parts = [];
-        $platformLabel = e($live->platformLabel ?? 'Spotkanie online');
-        $parts[] = '<p style="margin:18px 0 8px 0;line-height:1.45;">'
-            .'<strong style="font-size:16px;">Spotkanie na żywo ('.$platformLabel.')</strong>'
-            .'</p>';
-
-        if ($live->showSpamNote) {
-            $note = $live->usesEmbeddedJoin
-                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie.'
-                : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniższy link działa niezależnie od zaproszenia systemowego ClickMeeting.';
-
-            $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .e($note)
-                .'</p>';
-        }
-
-        $url = e($live->joinUrl);
-        $label = $live->usesEmbeddedJoin
-            ? 'Link do pokoju osadzonego w pnedu.pl:'
-            : 'Link do spotkania:';
-        $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
-            .'<span style="color:#6c757d;font-size:13px;font-weight:600;">'.$label.'</span><br>'
-            .'<a href="'.$url.'" style="color:#0d6efd;font-size:15px;font-weight:600;word-break:break-all;">'.$url.'</a>'
-            .'</p>';
-
-        if ($live->usesEmbeddedJoin && $live->directJoinUrl) {
-            $url = e($live->directJoinUrl);
-            $parts[] = '<p style="margin:14px 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .'Jeśli wejście przez pnedu.pl nie zadziała, skorzystaj z bezpośredniego linku do ClickMeeting:<br>'
-                .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'
-                .'</p>';
-        }
-
-        if (! $live->usesEmbeddedJoin && $live->token) {
-            $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
-                .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Token dostępu:</span> '
-                .'<span style="font-size:16px;font-weight:600;">'.e($live->token).'</span> '
-                .'<span style="color:#6c757d;font-size:13px;">(przypisany do Twojego adresu e-mail)</span>'
-                .'</p>';
-        }
-
-        if ($live->hasPassword()) {
-            $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
-                .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Hasło do spotkania:</span> '
-                .'<span style="font-size:16px;font-weight:600;">'.e($live->password).'</span>'
-                .'</p>';
-        }
-
-        $parts[] = '<p style="margin:0 0 0 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-            .'Wejdź kilka minut przed rozpoczęciem. Podczas dołączania podaj imię oraz ten sam adres e-mail, którym jesteś zapisany/a na szkolenie.'
-            .'</p>';
-
-        return new HtmlString(implode('', $parts));
+        return $this->liveAccess->showLiveSection
+            && $this->liveAccess->usesEmbeddedJoin;
     }
 }

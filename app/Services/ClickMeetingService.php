@@ -585,4 +585,86 @@ class ClickMeetingService
             ];
         }
     }
+
+    public function buildPostTrainingThankYouUrl(int $courseId): string
+    {
+        $base = rtrim((string) config('services.pnedu_frontend_url', 'https://pnedu.pl'), '/');
+
+        return $base.'/po-szkoleniu?course='.rawurlencode((string) $courseId);
+    }
+
+    /**
+     * Ustawia URL strony podziękowania po spotkaniu (Follow-up w ustawieniach wydarzenia CM).
+     *
+     * @return array{success: bool, error?: string, status_code?: int}
+     */
+    public function updateThankYouPageUrl(string $eventId, string $thankYouPageUrl): array
+    {
+        $config = $this->apiConfig();
+        if ($config === null) {
+            return [
+                'success' => false,
+                'error' => 'Brak konfiguracji ClickMeeting API token.',
+            ];
+        }
+
+        $eventId = trim($eventId);
+        $thankYouPageUrl = trim($thankYouPageUrl);
+
+        if ($eventId === '' || ! preg_match('/^\d{1,20}$/', $eventId)) {
+            return [
+                'success' => false,
+                'error' => 'Nieprawidłowe ID wydarzenia ClickMeeting.',
+            ];
+        }
+
+        if ($thankYouPageUrl === '' || ! filter_var($thankYouPageUrl, FILTER_VALIDATE_URL)) {
+            return [
+                'success' => false,
+                'error' => 'Nieprawidłowy adres strony podziękowania.',
+            ];
+        }
+
+        try {
+            $response = Http::baseUrl($config['base_url'])
+                ->withHeaders(['X-Api-Key' => $config['api_key']])
+                ->asForm()
+                ->put('conferences/'.urlencode($eventId), [
+                    'settings' => [
+                        'thank_you_page_url' => $thankYouPageUrl,
+                    ],
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('ClickMeetingService: updateThankYouPageUrl failed', [
+                    'event_id' => $eventId,
+                    'thank_you_page_url' => $thankYouPageUrl,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => 'ClickMeeting zwrócił HTTP '.$response->status().' przy ustawianiu strony podziękowania.',
+                    'status_code' => $response->status(),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'status_code' => $response->status(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('ClickMeetingService: updateThankYouPageUrl exception', [
+                'event_id' => $eventId,
+                'thank_you_page_url' => $thankYouPageUrl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Błąd komunikacji z ClickMeeting: '.$e->getMessage(),
+            ];
+        }
+    }
 }

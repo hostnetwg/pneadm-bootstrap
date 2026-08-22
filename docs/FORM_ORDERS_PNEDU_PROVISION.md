@@ -1,7 +1,8 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-08-21 (embed na pnedu: radio w kursie; maile nadal z linkiem CM)  
+Data aktualizacji: 2026-08-22 (strategia platform-first; termin w mailach: start + czas trwania)
 
+**Strategia produktowa:** uczestnik ma przechodzić przez **pnedu.pl**, a nie tylko przez ClickMeeting — [strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md).
 
 Runbook deploy: [deploy/2026-07-participant-live-access-and-tests.md](./deploy/2026-07-participant-live-access-and-tests.md)
 
@@ -42,6 +43,7 @@ Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie z
 - Dodanie uczestnika: `POST .../conferences/{event_id}/invitation/email/pl` (fallback: `POST .../registration`)
 - Pobranie tokenu (gdy `access_type = 3`): `POST .../conferences/{event_id}/token` + fallback `GET .../tokens`
 - Dane wydarzenia: `GET .../conferences/{event_id}` → `room_url`, `access_type`
+- **Strona podziękowania po spotkaniu:** przy zapisie kursu online (platforma ClickMeeting + `clickmeeting_event_id`) adm wywołuje `PUT .../conferences/{event_id}` z `settings.thank_you_page_url` = `{PNEDU_FRONTEND_URL}/po-szkoleniu?course={course_id}`. Błąd API nie blokuje zapisu kursu — ostrzeżenie w flashu. Szczegóły strony na pnedu: `pnedu/docs/DASHBOARD_LIVE_EMBED.md`.
 
 Stałe `access_type` (API ClickMeeting):
 
@@ -199,13 +201,13 @@ Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
 Gdy widoczny jest token (`CM: …`):
 
 - **Unieważnij token** — `DELETE` w API ClickMeeting (`…/conferences/{event_id}/tokens` + lista tokenów), potem czyszczenie lokalnego `participant_live_access.token`. Status CM OK zostaje; ponowne pobranie przez przycisk CM OK.
-- **Wyślij link do live** — e-mail systemowy z **bezpośrednim** linkiem do spotkania ClickMeeting (Notification `ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`). Nie zależy od radio „osadzony pokój”; embed jest tylko w UI pnedu — `pnedu/docs/DASHBOARD_LIVE_EMBED.md`.
+- **Wyślij link do live** — e-mail systemowy (`ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`). Temat: `Dostęp do szkolenia: {tytuł} - spotkanie na żywo.` Przy embed (checkbox linku w mailu): notka → **Zaloguj się** (`/login?email=…`) → linki embed + fallback CM; bez embed: sekcja live + przycisk **Dołącz do spotkania na żywo**. Szczegóły: `pnedu/docs/DASHBOARD_LIVE_EMBED.md`.
 
 Routes:
 
 - `POST /courses/{course}/participants/{participant}/invalidate-live-access-token`
 - `POST /courses/{course}/participants/{participant}/send-live-meeting-link`
-- `POST /courses/{course}/participants/send-live-meeting-links-bulk` — zbiorcza wysyłka (tryby `unsent` / `resend_all`)
+- `POST /courses/{course}/participants/send-live-meeting-links-bulk` — zbiorcza wysyłka synchroniczna (tryby `unsent` / `resend_all`)
   - pokój z tokenami (`access_type = 3`): tylko uczestnicy z tokenem
   - pokój bez tokenu: wszyscy z e-mailem, wspólny `room_url` / `meeting_link`
   - kolejka: `SendLiveMeetingLinkEmailJob`, log `certificate_email_logs.type = live_meeting_link`

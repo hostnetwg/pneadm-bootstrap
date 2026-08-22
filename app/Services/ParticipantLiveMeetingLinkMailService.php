@@ -8,6 +8,7 @@ use App\Models\Participant;
 use App\Models\ParticipantLiveAccess;
 use App\Notifications\ParticipantLiveMeetingLinkNotification;
 use App\Services\Mail\SystemMailDiagnostics;
+use App\Support\CourseAccessEmailSchedule;
 use App\Support\PneduProvisionLiveAccessContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -160,7 +161,7 @@ class ParticipantLiveMeetingLinkMailService
             }
         }
 
-        $scheduleLine = $this->formatCourseScheduleLine($course);
+        $scheduleLine = CourseAccessEmailSchedule::prefixedStartLine($course, hideWhenPast: false);
         $dashboardUrl = rtrim((string) config('services.pnedu_frontend_url', 'http://localhost:8081'), '/').'/dashboard/szkolenia';
 
         if ($log === null) {
@@ -194,6 +195,7 @@ class ParticipantLiveMeetingLinkMailService
         try {
             Notification::route('mail', $email)->notify(new ParticipantLiveMeetingLinkNotification(
                 courseTitle: (string) $course->title,
+                participantEmail: $email,
                 participantFirstName: (string) ($participant->first_name ?? ''),
                 instructorLine: $instructorLine,
                 scheduleLine: $scheduleLine,
@@ -309,27 +311,6 @@ class ParticipantLiveMeetingLinkMailService
             'token' => null,
             'access_type' => $accessType !== null ? (int) $accessType : null,
         ];
-    }
-
-    private function formatCourseScheduleLine(Course $course): ?string
-    {
-        if (! $course->start_date) {
-            return null;
-        }
-
-        $tz = (string) config('app.timezone', 'Europe/Warsaw');
-        $start = $course->start_date->copy()->timezone($tz)->format('d.m.Y G:i');
-
-        if ($course->end_date) {
-            $end = $course->end_date->copy()->timezone($tz);
-            if ($course->start_date->copy()->timezone($tz)->isSameDay($end)) {
-                return 'Termin: '.$start.'–'.$end->format('G:i');
-            }
-
-            return 'Termin: '.$start.' – '.$end->format('d.m.Y G:i');
-        }
-
-        return 'Termin: '.$start;
     }
 
     /**
