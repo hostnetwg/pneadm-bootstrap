@@ -203,7 +203,11 @@ class SystemMailConfigurationTest extends TestCase
         });
 
         $this->assertStringContainsString(
-            'redirect=%2Fdashboard%2Fszkolenia%2F123%2Ftransmisja%3Ffullscreen%3D1',
+            'redirect=%2Fdashboard%2Fszkolenia',
+            (string) $newUserWithEmbed->actionUrl
+        );
+        $this->assertStringNotContainsString(
+            'transmisja',
             (string) $newUserWithEmbed->actionUrl
         );
     }

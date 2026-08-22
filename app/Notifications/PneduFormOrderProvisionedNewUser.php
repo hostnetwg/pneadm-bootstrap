@@ -36,8 +36,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         $liveAccess = $this->liveAccess ?? new PneduProvisionLiveAccessContext;
         $url = $this->passwordSetupUrl(
             $base,
-            $notifiable->getEmailForPasswordReset(),
-            $liveAccess->usesEmbeddedJoin ? $liveAccess->joinUrl : null
+            $notifiable->getEmailForPasswordReset()
         );
         $liveAccess = $this->withPasswordSetupGate($liveAccess, $url);
 
@@ -69,7 +68,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         }
 
         $message
-            ->line('Aby wejść do szkolenia, najpierw ustaw hasło do konta — kliknij przycisk poniżej. Link jest ważny przez 2 miesiące.')
+            ->line('Po ustawieniu hasła zobaczysz swoje szkolenia na pnedu.pl — przycisk dołączenia do spotkania na żywo aktywuje się 2 godziny przed startem.')
             ->action('Ustaw hasło na pnedu.pl', $url);
 
         if ($html = $this->liveAccessSectionHtml($liveAccess)) {
@@ -87,35 +86,14 @@ class PneduFormOrderProvisionedNewUser extends Notification
             ->line('Jeśli to nie Ty zapisałeś się na szkolenie, zignoruj tę wiadomość lub skontaktuj się z biurem.');
     }
 
-    private function passwordSetupUrl(string $base, string $email, ?string $redirectUrl): string
+    private function passwordSetupUrl(string $base, string $email): string
     {
-        $query = ['email' => $email];
-        $redirectPath = $this->relativePneduRedirect($base, $redirectUrl);
-        if ($redirectPath !== null) {
-            $query['redirect'] = $redirectPath;
-        }
+        $query = [
+            'email' => $email,
+            'redirect' => '/dashboard/szkolenia',
+        ];
 
         return $base.'/ustaw-haslo/'.$this->token.'?'.http_build_query($query);
-    }
-
-    private function relativePneduRedirect(string $base, ?string $redirectUrl): ?string
-    {
-        $redirectUrl = trim((string) $redirectUrl);
-        if ($redirectUrl === '') {
-            return '/dashboard/szkolenia';
-        }
-
-        if (str_starts_with($redirectUrl, '/')) {
-            return str_starts_with($redirectUrl, '//') ? '/dashboard/szkolenia' : $redirectUrl;
-        }
-
-        if (! str_starts_with($redirectUrl, $base.'/')) {
-            return '/dashboard/szkolenia';
-        }
-
-        $relative = substr($redirectUrl, strlen($base));
-
-        return $relative !== '' ? $relative : '/dashboard/szkolenia';
     }
 
     private function withPasswordSetupGate(

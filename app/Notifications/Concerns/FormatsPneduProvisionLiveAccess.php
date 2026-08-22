@@ -20,9 +20,11 @@ trait FormatsPneduProvisionLiveAccess
             .'</p>';
 
         if ($liveAccess->showSpamNote) {
-            $note = $liveAccess->usesEmbeddedJoin
+            $note = $liveAccess->requiresPasswordSetup
+                ? 'Po ustawieniu hasła zobaczysz szkolenie na swoim koncie — do spotkania na żywo dołączysz z listy szkoleń, gdy zbliży się termin (przycisk aktywny 2 h przed startem).'
+                : ($liveAccess->usesEmbeddedJoin
                 ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie.'
-                : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniżej przesyłamy bezpośredni link — możesz z niego skorzystać niezależnie od zaproszenia systemowego.';
+                : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniżej przesyłamy bezpośredni link — możesz z niego skorzystać niezależnie od zaproszenia systemowego.');
 
             $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
                 .e($note)
@@ -35,7 +37,7 @@ trait FormatsPneduProvisionLiveAccess
                 : $liveAccess->joinUrl;
             $url = e($effectiveJoinUrl);
             $label = $liveAccess->requiresPasswordSetup && $liveAccess->usesEmbeddedJoin
-                ? 'Link do ustawienia hasła i przejścia do pokoju w pnedu.pl:'
+                ? 'Link do ustawienia hasła (potem zobaczysz swoje szkolenia na pnedu.pl):'
                 : ($liveAccess->usesEmbeddedJoin
                 ? 'Link do pokoju osadzonego w pnedu.pl:'
                 : 'Link do spotkania:');
