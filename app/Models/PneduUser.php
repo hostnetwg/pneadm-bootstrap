@@ -110,4 +110,41 @@ class PneduUser extends Model implements CanResetPasswordContract, HasLocalePref
     {
         $this->notify(new \App\Notifications\PneduFrontendVerifyEmail($verificationUrl));
     }
+
+    /**
+     * Czy przy ponownej wysyłce dostępu wysłać mail „ustaw hasło” (true) vs informacyjny (false).
+     *
+     * Decyzja na podstawie bieżącego stanu konta w pnedu, nie snapshotu z momentu provisionu.
+     */
+    public function needsProvisionPasswordSetupEmail(?FormOrder $order = null): bool
+    {
+        if ($this->last_login_at !== null || (int) ($this->login_count ?? 0) > 0) {
+            return false;
+        }
+
+        if ($this->passwordWasChangedAfterCreation()) {
+            return false;
+        }
+
+        if ($order?->pnedu_provisioned_at !== null && $this->created_at !== null) {
+            if ($this->created_at->lt($order->pnedu_provisioned_at->copy()->subMinute())) {
+                return false;
+            }
+        }
+
+        if ($order?->pnedu_user_existed_before === true) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function passwordWasChangedAfterCreation(): bool
+    {
+        if ($this->created_at === null || $this->updated_at === null) {
+            return false;
+        }
+
+        return $this->updated_at->gt($this->created_at->copy()->addSeconds(15));
+    }
 }

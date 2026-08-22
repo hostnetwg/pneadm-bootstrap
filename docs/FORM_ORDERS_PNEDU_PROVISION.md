@@ -167,7 +167,7 @@ Liczy ważne zamówienia, gdzie **brak uczestnika na szkoleniu** **lub** `pnedu_
 
 Na `/form-orders/{id}` przy **każdej** karcie provisionowanego uczestnika: **Prześlij dostęp ponownie**.
 
-1. Modal z podglądem treści (jak krok 3: nowe konto → link ustawienia hasła; istniejące → mail informacyjny) dla **wskazanej** osoby.
+1. Modal z podglądem treści (jak krok 3: konto bez hasła → link ustawienia hasła; konto aktywne → mail informacyjny) dla **wskazanej** osoby. Wariant zależy od **bieżącego** stanu konta w pnedu (`last_login_at`, `login_count`, czy hasło zostało ustawione), nie tylko od snapshotu `pnedu_user_existed_before` z momentu provisionu.
 2. **Anuluj** / **Skopiuj treść** / **Wyślij**.
 3. Endpoints: `GET …/pnedu/access-email-preview?form_order_participant_id=…`, `POST …/pnedu/resend-access-email` (body: `form_order_participant_id`).
 4. Bez parametru — zachowanie legacy (uczestnik główny).

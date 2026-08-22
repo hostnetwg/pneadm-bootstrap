@@ -138,6 +138,75 @@ class FormOrderPneduAccessEmailResendTest extends TestCase
         );
     }
 
+    public function test_resend_after_login_uses_existing_user_email_even_when_order_snapshot_new(): void
+    {
+        if (! Schema::connection('pnedu')->hasTable('users')) {
+            $this->markTestSkipped('Brak tabeli users w połączeniu pnedu.');
+        }
+
+        Notification::fake();
+
+        $admin = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = $this->createProvisionedOrder(false);
+
+        PneduUser::query()->where('email', 'new.resend@example.test')->update([
+            'last_login_at' => now(),
+            'login_count' => 1,
+        ]);
+
+        $preview = $this->actingAs($admin)->getJson(
+            route('form-orders.pnedu.access-email-preview', $order->id)
+        );
+        $preview->assertOk()->assertJsonPath('variant', 'existing_user');
+
+        $send = $this->actingAs($admin)->postJson(
+            route('form-orders.pnedu.resend-access-email', $order->id)
+        );
+        $send->assertOk()->assertJsonPath('success', true);
+
+        Notification::assertSentTo(
+            PneduUser::query()->where('email', 'new.resend@example.test')->first(),
+            PneduFormOrderProvisionedExistingUser::class
+        );
+    }
+
+    public function test_resend_after_password_setup_without_login_uses_existing_user_email(): void
+    {
+        if (! Schema::connection('pnedu')->hasTable('users')) {
+            $this->markTestSkipped('Brak tabeli users w połączeniu pnedu.');
+        }
+
+        Notification::fake();
+
+        $admin = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+        $order = $this->createProvisionedOrder(false);
+
+        $pneduUser = PneduUser::query()->where('email', 'new.resend@example.test')->first();
+        $pneduUser->forceFill([
+            'updated_at' => now()->addMinute(),
+        ])->save();
+
+        $preview = $this->actingAs($admin)->getJson(
+            route('form-orders.pnedu.access-email-preview', $order->id)
+        );
+        $preview->assertOk()->assertJsonPath('variant', 'existing_user');
+
+        $this->actingAs($admin)->postJson(
+            route('form-orders.pnedu.resend-access-email', $order->id)
+        )->assertOk();
+
+        Notification::assertSentTo(
+            $pneduUser->fresh(),
+            PneduFormOrderProvisionedExistingUser::class
+        );
+    }
+
     public function test_preview_and_resend_specific_participant(): void
     {
         if (! Schema::connection('pnedu')->hasTable('users')) {

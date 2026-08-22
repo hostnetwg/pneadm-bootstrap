@@ -496,8 +496,8 @@ class FormOrderPneduProvisionService
                 'body_html' => $this->mailMessageToHtml($mail),
                 'variant' => $resolved['is_new_account'] ? 'new_user' : 'existing_user',
                 'variant_label' => $resolved['is_new_account']
-                    ? 'E-mail z linkiem do ustawienia hasła (nowe konto)'
-                    : 'E-mail informacyjny (konto już istniało)',
+                    ? 'E-mail z linkiem do ustawienia hasła (konto bez hasła)'
+                    : 'E-mail informacyjny (konto aktywne)',
                 'participant_name' => $resolved['participant_name'] ?? null,
                 'form_order_participant_id' => $resolved['form_order_participant_id'] ?? null,
             ];
@@ -648,15 +648,30 @@ class FormOrderPneduProvisionService
         }
 
         $pneduUser = null;
-        if ($requirePneduUser) {
+        try {
             $pneduUser = PneduUser::query()->where('email', $email)->first();
-            if (! $pneduUser) {
+        } catch (Throwable $e) {
+            if ($requirePneduUser) {
+                Log::error('FormOrderPneduProvisionService: błąd odczytu użytkownika pnedu', [
+                    'form_order_id' => $formOrderId,
+                    'email' => $email,
+                    'exception' => $e->getMessage(),
+                ]);
+
                 return [
                     'success' => false,
-                    'error' => 'Brak konta użytkownika w bazie pnedu dla tego e-maila.',
-                    'http_code' => 400,
+                    'error' => 'Nie udało się odczytać konta użytkownika w bazie pnedu.',
+                    'http_code' => 500,
                 ];
             }
+        }
+
+        if ($requirePneduUser && ! $pneduUser) {
+            return [
+                'success' => false,
+                'error' => 'Brak konta użytkownika w bazie pnedu dla tego e-maila.',
+                'http_code' => 400,
+            ];
         }
 
         $participant = $p->participant;
@@ -681,7 +696,7 @@ class FormOrderPneduProvisionService
             'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
             'start_date_line' => $this->startDateLineForProvisionEmail($course),
             'live_access' => $liveAccess,
-            // Podgląd: bez odczytu pnedu.users (snapshot zamówienia). Wysyłka: + last_login_at.
+            // Podgląd i wysyłka: wariant z bieżącego stanu konta pnedu (gdy dostępne).
             'is_new_account' => $this->resolveIsNewAccountForResend($order, $pneduUser),
             'participant_name' => $participantName !== '' ? $participantName : $email,
             'form_order_participant_id' => (int) $p->id,
@@ -689,24 +704,19 @@ class FormOrderPneduProvisionService
     }
 
     /**
-     * Wariant maila przy ponownej wysyłce: kto już logował się → info; snapshot zamówienia / brak logowania → hasło.
+     * Wariant maila przy ponownej wysyłce — stan konta pnedu w chwili wysyłki / podglądu.
      */
     private function resolveIsNewAccountForResend(FormOrder $order, ?PneduUser $pneduUser): bool
     {
-        if ($pneduUser && $pneduUser->last_login_at !== null) {
-            return false;
+        if ($pneduUser !== null) {
+            return $pneduUser->needsProvisionPasswordSetupEmail($order);
         }
 
         if ($order->pnedu_user_existed_before === true) {
             return false;
         }
 
-        if ($order->pnedu_user_existed_before === false) {
-            return true;
-        }
-
-        // Brak snapshotu przy wysyłce bez logowania → link do hasła.
-        return $pneduUser !== null;
+        return true;
     }
 
     private function mailNotifiableStub(string $email): object
