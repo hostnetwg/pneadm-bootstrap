@@ -57,6 +57,59 @@ class PneduProvisionEmailContextBuilderTest extends TestCase
         $this->assertTrue($context->showSpamNote);
     }
 
+    public function test_builds_embedded_pnedu_link_with_direct_clickmeeting_fallback_when_enabled(): void
+    {
+        config(['services.pnedu_frontend_url' => 'https://pnedu.pl']);
+
+        $course = $this->makeOnlineCourse([
+            'start_date' => Carbon::now()->addDays(2),
+            'end_date' => Carbon::now()->addDays(2)->addHours(2),
+        ], [
+            'platform' => 'clickmeeting',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/wydarzenie-testowe',
+            'clickmeeting_event_id' => '10088701',
+            'embed_on_pnedu' => true,
+            'embed_email_link_enabled' => true,
+        ]);
+
+        $context = app(PneduProvisionEmailContextBuilder::class)->build($course, [
+            'status' => 'success',
+            'room_url' => 'https://pnedu.clickmeeting.com/wydarzenie-testowe',
+            'token' => 'MCHK7N',
+            'access_type' => ClickMeetingService::ACCESS_TYPE_TOKEN,
+        ], participantId: 123);
+
+        $this->assertTrue($context->showLiveSection);
+        $this->assertTrue($context->usesEmbeddedJoin);
+        $this->assertSame('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $context->joinUrl);
+        $this->assertSame('https://pnedu.clickmeeting.com/wydarzenie-testowe/MCHK7N', $context->directJoinUrl);
+    }
+
+    public function test_keeps_direct_clickmeeting_link_when_embedded_email_link_disabled(): void
+    {
+        $course = $this->makeOnlineCourse([
+            'start_date' => Carbon::now()->addDays(2),
+            'end_date' => Carbon::now()->addDays(2)->addHours(2),
+        ], [
+            'platform' => 'clickmeeting',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/wydarzenie-testowe',
+            'clickmeeting_event_id' => '10088701',
+            'embed_on_pnedu' => true,
+            'embed_email_link_enabled' => false,
+        ]);
+
+        $context = app(PneduProvisionEmailContextBuilder::class)->build($course, [
+            'status' => 'success',
+            'room_url' => 'https://pnedu.clickmeeting.com/wydarzenie-testowe',
+            'token' => 'MCHK7N',
+            'access_type' => ClickMeetingService::ACCESS_TYPE_TOKEN,
+        ], participantId: 123);
+
+        $this->assertFalse($context->usesEmbeddedJoin);
+        $this->assertSame('https://pnedu.clickmeeting.com/wydarzenie-testowe/MCHK7N', $context->joinUrl);
+        $this->assertNull($context->directJoinUrl);
+    }
+
     public function test_skips_clickmeeting_section_when_integration_failed(): void
     {
         $course = $this->makeOnlineCourse([

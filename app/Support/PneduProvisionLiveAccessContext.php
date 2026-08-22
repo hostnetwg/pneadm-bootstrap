@@ -12,6 +12,8 @@ readonly class PneduProvisionLiveAccessContext
         public ?string $password = null,
         public bool $showSpamNote = false,
         public bool $showPostEventSection = true,
+        public ?string $directJoinUrl = null,
+        public bool $usesEmbeddedJoin = false,
     ) {}
 
     public function hasPassword(): bool

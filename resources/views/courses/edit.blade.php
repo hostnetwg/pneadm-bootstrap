@@ -202,6 +202,10 @@
                                     ? 'embed_pnedu'
                                     : 'clickmeeting';
                             }
+                            $embedEmailLinkEnabled = old(
+                                'embed_email_link_enabled',
+                                $course->onlineDetails->embed_email_link_enabled ?? true
+                            );
                         @endphp
                         <div class="mt-2">
                             <div class="form-label mb-1">Wejście do pokoju dla uczestnika</div>
@@ -229,6 +233,21 @@
                             </div>
                             <div class="form-text">
                                 Tylko jedna opcja: klasyczny ClickMeeting albo pokój osadzony na koncie (na telefonie embed i tak otworzy CM z auto-login).
+                            </div>
+                            <div class="form-check mt-2" id="embed-email-link-wrapper">
+                                <input type="hidden" name="embed_email_link_enabled" value="0">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       name="embed_email_link_enabled"
+                                       id="embed_email_link_enabled"
+                                       value="1"
+                                       {{ $embedEmailLinkEnabled ? 'checked' : '' }}>
+                                <label class="form-check-label" for="embed_email_link_enabled">
+                                    Link w e-mailu do osadzonego w PNEDU pokoju
+                                </label>
+                                <div class="form-text">
+                                    Gdy włączone, e-maile „Dodaj uczestnika do PNEDU” i „Wyślij link do live” prowadzą głównie do pokoju w pnedu.pl, z alternatywnym linkiem bezpośrednim do ClickMeeting.
+                                </div>
                             </div>
                             @error('live_room_mode')
                                 <div class="text-danger small">{{ $message }}</div>
@@ -549,6 +568,13 @@
 </x-app-layout>
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[name="live_room_mode"]').forEach(function (input) {
+        input.addEventListener('change', toggleEmbedEmailLinkOption);
+    });
+    toggleEmbedEmailLinkOption();
+});
+
 function toggleCourseFields() {
     const type = document.getElementById('type').value;
     const online = type === 'online';
@@ -558,6 +584,17 @@ function toggleCourseFields() {
     if (cm) {
         cm.style.display = online ? 'block' : 'none';
     }
+    toggleEmbedEmailLinkOption();
+}
+
+function toggleEmbedEmailLinkOption() {
+    const wrapper = document.getElementById('embed-email-link-wrapper');
+    const embedRadio = document.getElementById('live_room_mode_embed');
+    if (! wrapper || ! embedRadio) {
+        return;
+    }
+
+    wrapper.style.display = embedRadio.checked ? 'block' : 'none';
 }
 
 // Funkcje edytora HTML

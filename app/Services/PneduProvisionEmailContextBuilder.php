@@ -17,7 +17,11 @@ class PneduProvisionEmailContextBuilder
      *   status?: string
      * }|null  $clickMeetingResult
      */
-    public function build(Course $course, ?array $clickMeetingResult = null): PneduProvisionLiveAccessContext
+    public function build(
+        Course $course,
+        ?array $clickMeetingResult = null,
+        ?int $participantId = null
+    ): PneduProvisionLiveAccessContext
     {
         $course->loadMissing('onlineDetails');
 
@@ -42,10 +46,12 @@ class PneduProvisionEmailContextBuilder
             }
 
             $liveAccess = $this->buildClickMeetingLiveAccess(
+                $course,
                 $clickMeetingResult,
                 $meetingLink,
                 $meetingPassword,
-                $showPostEventSection
+                $showPostEventSection,
+                $participantId
             );
 
             if ($liveAccess !== null) {
@@ -103,10 +109,12 @@ class PneduProvisionEmailContextBuilder
      * }|null  $clickMeetingResult
      */
     private function buildClickMeetingLiveAccess(
+        Course $course,
         ?array $clickMeetingResult,
         string $meetingLinkFallback,
         string $meetingPassword,
-        bool $showPostEventSection
+        bool $showPostEventSection,
+        ?int $participantId = null
     ): ?PneduProvisionLiveAccessContext {
         $roomUrl = trim((string) ($clickMeetingResult['room_url'] ?? ''));
         if ($roomUrl === '') {
@@ -126,7 +134,11 @@ class PneduProvisionEmailContextBuilder
             return null;
         }
 
-        $joinUrl = app(ClickMeetingService::class)->buildJoinUrl($roomUrl, $token !== '' ? $token : null);
+        $directJoinUrl = app(ClickMeetingService::class)->buildJoinUrl($roomUrl, $token !== '' ? $token : null);
+        $usesEmbeddedJoin = $this->shouldUseEmbeddedEmailLink($course, $participantId);
+        $joinUrl = $usesEmbeddedJoin
+            ? $this->buildEmbeddedTransmissionUrl((int) $participantId)
+            : $directJoinUrl;
 
         $password = null;
         if ($accessType === ClickMeetingService::ACCESS_TYPE_PASSWORD || $meetingPassword !== '') {
@@ -135,13 +147,33 @@ class PneduProvisionEmailContextBuilder
 
         return new PneduProvisionLiveAccessContext(
             showLiveSection: true,
-            platformLabel: 'ClickMeeting',
+            platformLabel: $usesEmbeddedJoin ? 'pnedu.pl / ClickMeeting' : 'ClickMeeting',
             joinUrl: $joinUrl,
+            directJoinUrl: $usesEmbeddedJoin ? $directJoinUrl : null,
             token: $token !== '' ? $token : null,
             password: $password,
             showSpamNote: true,
             showPostEventSection: $showPostEventSection,
+            usesEmbeddedJoin: $usesEmbeddedJoin,
         );
+    }
+
+    private function shouldUseEmbeddedEmailLink(Course $course, ?int $participantId): bool
+    {
+        if ((int) ($participantId ?? 0) <= 0) {
+            return false;
+        }
+
+        $online = $course->onlineDetails;
+
+        return (bool) ($online?->embed_on_pnedu ?? false)
+            && (bool) ($online?->embed_email_link_enabled ?? true);
+    }
+
+    private function buildEmbeddedTransmissionUrl(int $participantId): string
+    {
+        return rtrim((string) config('services.pnedu_frontend_url', 'http://localhost:8081'), '/')
+            .'/dashboard/szkolenia/'.$participantId.'/transmisja?fullscreen=1';
     }
 
     private function platformLabel(string $platform): string

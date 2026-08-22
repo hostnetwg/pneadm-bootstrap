@@ -88,13 +88,17 @@ Na `/dashboard/szkolenia` (oraz pasku live na homepage) uczestnik widzi przycisk
 
 Szczegóły embed (tokeny, FS, anty-sharing, allowlista): **`pnedu/docs/DASHBOARD_LIVE_EMBED.md`**.
 
-**Maile z tego provisionu** (oraz „Wyślij link do live” na liście uczestników) **nadal zawierają bezpośredni link ClickMeeting** — radio nie zmienia CTA w e-mailu (decyzja 2026-08-21; ewentualna zmiana później).
+**Maile z tego provisionu** (oraz „Wyślij link do live” na liście uczestników) zależą od dodatkowego checkboxa widocznego przy trybie embed:
+
+- zaznaczony **Link w e-mailu do osadzonego w PNEDU pokoju** → główny link w mailu prowadzi do `/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`, a niżej jest alternatywny bezpośredni link ClickMeeting;
+- odznaczony checkbox → treść jak dotychczas, czyli główny bezpośredni link ClickMeeting.
 
 ### Link do spotkania w e-mailu
 
 Builder: `App\Services\PneduProvisionEmailContextBuilder`
 
 - **ClickMeeting + sukces API:** `room_url` z API; przy `access_type = 3` link `{room_url}/{token}` (np. `https://pnedu.clickmeeting.com/wydarzenie-testowe/MCHK7N`)
+- **Embed w mailu włączony:** główny CTA = `PNEDU_FRONTEND_URL/dashboard/szkolenia/{participant}/transmisja?fullscreen=1`; bezpośredni link CM zostaje jako alternatywa w treści.
 - **Fallback `room_url`:** `course_online_details.meeting_link` (gdy API nie zwróci URL)
 - **Hasło:** `course_online_details.meeting_password` (gdy ustawione lub `access_type = 2`)
 - **Inne platformy** (YouTube, Google Meet, Zoom…): `meeting_link` z kursu
@@ -235,6 +239,7 @@ W edycji kursu (`/courses/{id}/edit`):
 - **ID wydarzenia ClickMeeting:** `room_id` z panelu CM
 - **Wejście do pokoju dla uczestnika** (radio, dokładnie jedna opcja):
   - **Pokój na ClickMeeting** (domyślnie) — przycisk zewnętrzny na pnedu
-  - **Osadzony pokój na pnedu.pl** — przycisk embed na pnedu (`embed_on_pnedu`); maile nadal z linkiem CM — zob. `pnedu/docs/DASHBOARD_LIVE_EMBED.md`
+  - **Osadzony pokój na pnedu.pl** — przycisk embed na pnedu (`embed_on_pnedu`); dodatkowy checkbox decyduje, czy maile też mają prowadzić głównie do embed — zob. `pnedu/docs/DASHBOARD_LIVE_EMBED.md`
+- **Link w e-mailu do osadzonego w PNEDU pokoju:** domyślnie zaznaczony przy opcji embed; odznaczenie przywraca dotychczasowe maile z bezpośrednim linkiem CM.
 - **Link do spotkania:** opcjonalny fallback / inne platformy
 - **Hasło do spotkania:** gdy wydarzenie na hasło

@@ -38,7 +38,9 @@ class ParticipantLiveMeetingLinkNotification extends Notification
         $message = $this->configureSystemMail(new MailMessage)
             ->subject('Spotkanie na żywo — '.$this->plainCourseTitle())
             ->greeting($greeting)
-            ->line('Przesyłamy bezpośredni link do udziału w szkoleniu na żywo.')
+            ->line($this->liveAccess->usesEmbeddedJoin
+                ? 'Przesyłamy link do udziału w szkoleniu na żywo przez pnedu.pl.'
+                : 'Przesyłamy bezpośredni link do udziału w szkoleniu na żywo.')
             ->line($this->courseTitleOnlyHtml(
                 $this->courseTitle,
                 ($this->instructorLine || $this->scheduleLine) ? null : '1em'
@@ -105,19 +107,33 @@ class ParticipantLiveMeetingLinkNotification extends Notification
             .'</p>';
 
         if ($live->showSpamNote) {
+            $note = $live->usesEmbeddedJoin
+                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie. Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniższy link działa niezależnie od zaproszenia systemowego ClickMeeting.';
+
             $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. '
-                .'Poniższy link działa niezależnie od zaproszenia systemowego ClickMeeting.'
+                .e($note)
                 .'</p>';
         }
 
         $url = e($live->joinUrl);
+        $label = $live->usesEmbeddedJoin
+            ? 'Link do pokoju osadzonego w pnedu.pl:'
+            : 'Link do spotkania:';
         $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
-            .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Link do spotkania:</span><br>'
+            .'<span style="color:#6c757d;font-size:13px;font-weight:600;">'.$label.'</span><br>'
             .'<a href="'.$url.'" style="color:#0d6efd;font-size:15px;font-weight:600;word-break:break-all;">'.$url.'</a>'
             .'</p>';
 
-        if ($live->token) {
+        if ($live->usesEmbeddedJoin && $live->directJoinUrl) {
+            $url = e($live->directJoinUrl);
+            $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
+                .'Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting: '
+                .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'
+                .'</p>';
+        }
+
+        if (! $live->usesEmbeddedJoin && $live->token) {
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
                 .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Token dostępu:</span> '
                 .'<span style="font-size:16px;font-weight:600;">'.e($live->token).'</span> '

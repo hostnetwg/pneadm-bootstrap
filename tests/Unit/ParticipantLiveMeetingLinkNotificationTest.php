@@ -49,4 +49,40 @@ class ParticipantLiveMeetingLinkNotificationTest extends TestCase
         $this->assertSame('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $mail->actionUrl);
         $this->assertSame('Dołącz do spotkania na żywo', $mail->actionText);
     }
+
+    public function test_mail_contains_embedded_link_and_direct_clickmeeting_fallback(): void
+    {
+        $live = new PneduProvisionLiveAccessContext(
+            showLiveSection: true,
+            platformLabel: 'pnedu.pl / ClickMeeting',
+            joinUrl: 'https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1',
+            directJoinUrl: 'https://pnedu.clickmeeting.com/wydarzenie/TOK99',
+            token: 'TOK99',
+            showSpamNote: true,
+            showPostEventSection: false,
+            usesEmbeddedJoin: true,
+        );
+
+        $notification = new ParticipantLiveMeetingLinkNotification(
+            courseTitle: 'Szkolenie testowe Live',
+            participantFirstName: 'Anna',
+            instructorLine: null,
+            scheduleLine: null,
+            liveAccess: $live,
+            dashboardSzkoleniaUrl: 'https://pnedu.pl/dashboard/szkolenia',
+        );
+
+        $mail = $notification->toMail(new AnonymousNotifiable);
+        $rendered = implode("\n", array_map(
+            fn ($line) => is_object($line) && method_exists($line, '__toString') ? (string) $line : (string) $line,
+            $mail->introLines
+        ));
+
+        $this->assertStringContainsString('Link do pokoju osadzonego w pnedu.pl', $rendered);
+        $this->assertStringContainsString('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $rendered);
+        $this->assertStringContainsString('Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting', $rendered);
+        $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $rendered);
+        $this->assertStringNotContainsString('Token dostępu', $rendered);
+        $this->assertSame('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $mail->actionUrl);
+    }
 }

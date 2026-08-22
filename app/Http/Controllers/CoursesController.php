@@ -989,6 +989,7 @@ class CoursesController extends Controller
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
+            'embed_email_link_enabled' => 'sometimes|boolean',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
             'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
             'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
@@ -997,7 +998,13 @@ class CoursesController extends Controller
         $saveAction = $validated['save_action'];
         $copyImageFromOffer = $request->boolean('copy_image_from_offer');
         $sourceOfferId = $validated['training_offer_id'] ?? null;
-        unset($validated['save_action'], $validated['image'], $validated['copy_image_from_offer']);
+        unset(
+            $validated['save_action'],
+            $validated['image'],
+            $validated['copy_image_from_offer'],
+            $validated['live_room_mode'],
+            $validated['embed_email_link_enabled'],
+        );
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -1079,6 +1086,7 @@ class CoursesController extends Controller
                         : null,
                     'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
                     'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
+                    'embed_email_link_enabled' => $liveRoomFlags['embed_email_link_enabled'],
                 ];
 
                 \Log::info('Dane kursu online:', $onlineData);
@@ -1198,6 +1206,7 @@ class CoursesController extends Controller
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
+            'embed_email_link_enabled' => 'sometimes|boolean',
             'sendy_suppression_list_id' => 'nullable|string|max:255',
             'post_end_access_duration_value' => 'nullable|integer|min:1|max:999',
             'post_end_access_duration_unit' => 'nullable|in:days,weeks,months,years',
@@ -1205,7 +1214,12 @@ class CoursesController extends Controller
         ]);
 
         $saveAction = $validated['save_action'];
-        unset($validated['save_action'], $validated['image']);
+        unset(
+            $validated['save_action'],
+            $validated['image'],
+            $validated['live_room_mode'],
+            $validated['embed_email_link_enabled'],
+        );
 
         $validated['certificate_format'] = $validated['certificate_format'] ?? '{nr}/{course_id}/{year}/PNE'; //
         $validated['sendy_suppression_list_id'] = ! empty(trim((string) ($validated['sendy_suppression_list_id'] ?? '')))
@@ -1297,6 +1311,7 @@ class CoursesController extends Controller
                         : null,
                     'clickmeeting_join_enabled' => $liveRoomFlags['clickmeeting_join_enabled'],
                     'embed_on_pnedu' => $liveRoomFlags['embed_on_pnedu'],
+                    'embed_email_link_enabled' => $liveRoomFlags['embed_email_link_enabled'],
                 ]
             );
 
@@ -1550,7 +1565,7 @@ class CoursesController extends Controller
     /**
      * Radio „Wejście do pokoju”: dokładnie jedna opcja → dwie wzajemnie wykluczające flagi w DB.
      *
-     * @return array{clickmeeting_join_enabled: bool, embed_on_pnedu: bool}
+     * @return array{clickmeeting_join_enabled: bool, embed_on_pnedu: bool, embed_email_link_enabled: bool}
      */
     private function resolveLiveRoomFlags(\Illuminate\Http\Request $request): array
     {
@@ -1562,6 +1577,8 @@ class CoursesController extends Controller
         return [
             'clickmeeting_join_enabled' => $mode === 'clickmeeting',
             'embed_on_pnedu' => $mode === 'embed_pnedu',
+            'embed_email_link_enabled' => $mode === 'embed_pnedu'
+                && $request->boolean('embed_email_link_enabled'),
         ];
     }
 }

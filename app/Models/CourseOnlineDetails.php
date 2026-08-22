@@ -18,11 +18,13 @@ class CourseOnlineDetails extends Model
         'clickmeeting_event_id',
         'clickmeeting_join_enabled',
         'embed_on_pnedu',
+        'embed_email_link_enabled',
     ];
 
     protected $casts = [
         'clickmeeting_join_enabled' => 'boolean',
         'embed_on_pnedu' => 'boolean',
+        'embed_email_link_enabled' => 'boolean',
     ];
 
     public function course()

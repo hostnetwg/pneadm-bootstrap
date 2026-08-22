@@ -173,6 +173,8 @@ class ParticipantLiveMeetingLinkMailService
                 'queued_at' => now(),
                 'meta' => [
                     'join_url' => $liveContext->joinUrl,
+                    'direct_join_url' => $liveContext->directJoinUrl,
+                    'uses_embedded_join' => $liveContext->usesEmbeddedJoin,
                     'platform' => $liveContext->platformLabel,
                     'has_token' => filled($liveContext->token),
                 ],
@@ -181,6 +183,8 @@ class ParticipantLiveMeetingLinkMailService
             $log->update([
                 'meta' => array_merge($log->meta ?? [], [
                     'join_url' => $liveContext->joinUrl,
+                    'direct_join_url' => $liveContext->directJoinUrl,
+                    'uses_embedded_join' => $liveContext->usesEmbeddedJoin,
                     'platform' => $liveContext->platformLabel,
                     'has_token' => filled($liveContext->token),
                 ]),
@@ -242,7 +246,8 @@ class ParticipantLiveMeetingLinkMailService
 
             $context = $this->emailContextBuilder->build(
                 $course,
-                $this->liveAccessService->toEmailClickMeetingPayload($liveAccess)
+                $this->liveAccessService->toEmailClickMeetingPayload($liveAccess),
+                (int) $participant->id
             );
 
             return ($context->showLiveSection && $context->joinUrl) ? $context : null;
@@ -252,7 +257,8 @@ class ParticipantLiveMeetingLinkMailService
         if ($liveAccess !== null && $liveAccess->isSuccessful()) {
             $context = $this->emailContextBuilder->build(
                 $course,
-                $this->liveAccessService->toEmailClickMeetingPayload($liveAccess)
+                $this->liveAccessService->toEmailClickMeetingPayload($liveAccess),
+                (int) $participant->id
             );
             if ($context->showLiveSection && $context->joinUrl) {
                 return $context;
@@ -264,7 +270,7 @@ class ParticipantLiveMeetingLinkMailService
             return null;
         }
 
-        $context = $this->emailContextBuilder->build($course, $sharedPayload);
+        $context = $this->emailContextBuilder->build($course, $sharedPayload, (int) $participant->id);
 
         return ($context->showLiveSection && $context->joinUrl) ? $context : null;
     }

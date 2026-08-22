@@ -20,21 +20,35 @@ trait FormatsPneduProvisionLiveAccess
             .'</p>';
 
         if ($liveAccess->showSpamNote) {
+            $note = $liveAccess->usesEmbeddedJoin
+                ? 'Najwygodniej wejść przez pnedu.pl — pokój otworzy się na Twoim koncie. Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
+                : 'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. Poniżej przesyłamy bezpośredni link — możesz z niego skorzystać niezależnie od zaproszenia systemowego.';
+
             $parts[] = '<p style="margin:0 0 10px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .'Osobne zaproszenie od ClickMeeting mogło trafić do folderu SPAM lub Oferty. '
-                .'Poniżej przesyłamy bezpośredni link — możesz z niego skorzystać niezależnie od zaproszenia systemowego.'
+                .e($note)
                 .'</p>';
         }
 
         if ($liveAccess->joinUrl) {
             $url = e($liveAccess->joinUrl);
+            $label = $liveAccess->usesEmbeddedJoin
+                ? 'Link do pokoju osadzonego w pnedu.pl:'
+                : 'Link do spotkania:';
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
-                .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Link do spotkania:</span><br>'
+                .'<span style="color:#6c757d;font-size:13px;font-weight:600;">'.$label.'</span><br>'
                 .'<a href="'.$url.'" style="color:#0d6efd;font-size:15px;font-weight:600;word-break:break-all;">'.$url.'</a>'
                 .'</p>';
         }
 
-        if ($liveAccess->token) {
+        if ($liveAccess->usesEmbeddedJoin && $liveAccess->directJoinUrl) {
+            $url = e($liveAccess->directJoinUrl);
+            $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
+                .'Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting: '
+                .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'
+                .'</p>';
+        }
+
+        if (! $liveAccess->usesEmbeddedJoin && $liveAccess->token) {
             $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;">'
                 .'<span style="color:#6c757d;font-size:13px;font-weight:600;">Token dostępu:</span> '
                 .'<span style="font-size:16px;font-weight:600;">'.e($liveAccess->token).'</span> '

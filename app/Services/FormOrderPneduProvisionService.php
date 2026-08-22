@@ -261,7 +261,11 @@ class FormOrderPneduProvisionService
 
             $course = Course::query()->with('onlineDetails')->find($afterCommit['course_id']);
             $liveAccess = $course
-                ? app(PneduProvisionEmailContextBuilder::class)->build($course, $clickMeetingResult)
+                ? app(PneduProvisionEmailContextBuilder::class)->build(
+                    $course,
+                    $clickMeetingResult,
+                    (int) ($afterCommit['participant_id'] ?? 0)
+                )
                 : new PneduProvisionLiveAccessContext;
 
             try {
@@ -657,7 +661,11 @@ class FormOrderPneduProvisionService
 
         $participant = $p->participant;
         $clickMeetingResult = $this->clickMeetingResultFromLiveAccess($participant?->liveAccess);
-        $liveAccess = app(PneduProvisionEmailContextBuilder::class)->build($course, $clickMeetingResult);
+        $liveAccess = app(PneduProvisionEmailContextBuilder::class)->build(
+            $course,
+            $clickMeetingResult,
+            $participant?->id
+        );
 
         $participantName = trim((string) ($p->full_name ?? ''));
         if ($participantName === '') {
