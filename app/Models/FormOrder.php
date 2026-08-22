@@ -230,6 +230,7 @@ class FormOrder extends Model
         'legacy_handled_by',
         'payment_mode',
         'payment_status',
+        'online_payment_recovery_sent_at',
         'submission_source',
         'order_form_variant',
 
@@ -284,6 +285,7 @@ class FormOrder extends Model
         'legacy_handled_at' => 'datetime',
         'status_completed' => 'integer',
         'cancelled_at' => 'datetime',
+        'online_payment_recovery_sent_at' => 'datetime',
         'updated_manually_at' => 'datetime',
         'ksef_sent_at' => 'datetime',
         'ksef_email_pending' => 'boolean',
@@ -974,6 +976,34 @@ class FormOrder extends Model
     {
         return $this->payment_mode === self::PAYMENT_MODE_ONLINE_GATEWAY
             && $this->payment_status !== self::PAYMENT_STATUS_PAID;
+    }
+
+    /**
+     * Czy można wysłać recovery e-mail płatności online (Etap 3).
+     */
+    public function isEligibleForOnlinePaymentRecoveryEmail(): bool
+    {
+        if ($this->payment_mode !== self::PAYMENT_MODE_ONLINE_GATEWAY) {
+            return false;
+        }
+
+        if ($this->cancelled_at !== null) {
+            return false;
+        }
+
+        if ($this->payment_status === self::PAYMENT_STATUS_PAID) {
+            return false;
+        }
+
+        if (trim((string) ($this->invoice_number ?? '')) !== '') {
+            return false;
+        }
+
+        if ($this->status_completed) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

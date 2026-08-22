@@ -232,6 +232,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/pnedu/provision-all', [FormOrdersController::class, 'provisionPneduAccessAll'])->name('pnedu.provision-all');
             Route::get('/{id}/pnedu/access-email-preview', [FormOrdersController::class, 'previewPneduAccessEmail'])->name('pnedu.access-email-preview');
             Route::post('/{id}/pnedu/resend-access-email', [FormOrdersController::class, 'resendPneduAccessEmail'])->name('pnedu.resend-access-email');
+            Route::post('/{id}/online-payment/send-recovery-email', [FormOrdersController::class, 'sendOnlinePaymentRecoveryEmail'])->name('online-payment.send-recovery-email');
             Route::post('/{id}/cancel', [FormOrdersController::class, 'cancelOrder'])->name('cancel');
             Route::post('/{id}/restore', [FormOrdersController::class, 'restoreOrder'])->name('restore');
             Route::post('/{id}/invoice-exempt', [FormOrdersController::class, 'markInvoiceExempt'])->name('invoice-exempt');

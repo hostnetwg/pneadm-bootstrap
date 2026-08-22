@@ -358,6 +358,21 @@
                                 <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
                                 @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
                             @endif
+                            @if($zamowienie->isEligibleForOnlinePaymentRecoveryEmail())
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary ms-2"
+                                        id="sendOnlinePaymentRecoveryBtn"
+                                        data-order-id="{{ $zamowienie->id }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#sendOnlinePaymentRecoveryModal">
+                                    <i class="bi bi-envelope"></i> Wyślij mail recovery płatności
+                                </button>
+                                @if($zamowienie->online_payment_recovery_sent_at)
+                                    <span class="text-muted small ms-1" title="Ostatnia wysyłka recovery e-mail">
+                                        (recovery: {{ $zamowienie->online_payment_recovery_sent_at->timezone('Europe/Warsaw')->format('d.m.Y H:i') }})
+                                    </span>
+                                @endif
+                            @endif
                         </div>
                         @if($orderAdminClosedLabel)
                             <span class="badge {{ $orderAdminClosedBadgeClass }} fs-6 ms-auto" title="{{ $orderAdminClosedTitle }}">
@@ -4139,6 +4154,29 @@ nowoczesna-edukacja.pl `;
         </div>
     </div>
 
+    {{-- Modal recovery e-mail płatności online --}}
+    <div class="modal fade" id="sendOnlinePaymentRecoveryModal" tabindex="-1" aria-labelledby="sendOnlinePaymentRecoveryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="sendOnlinePaymentRecoveryModalLabel"><i class="bi bi-envelope"></i> Wyślij mail recovery płatności</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Klient otrzyma e-mail z linkiem <strong>Zapłać ponownie</strong> oraz opcją <strong>faktury z odroczonym terminem</strong>.</p>
+                    <p class="small text-muted mb-0">Wysyłka odbywa się z pnedu.pl (podpisane linki płatności). Można wysłać ponownie — np. gdy klient nie otrzymał pierwszej wiadomości.</p>
+                    <div id="sendOnlinePaymentRecoveryError" class="alert alert-danger d-none mt-3 mb-0" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-primary" id="confirmSendOnlinePaymentRecoveryBtn" data-order-id="{{ $zamowienie->id }}">
+                        <i class="bi bi-send"></i> Wyślij
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal anulowania zamówienia --}}
     <div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -4464,6 +4502,42 @@ nowoczesna-edukacja.pl `;
 
         (function () {
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            document.getElementById('confirmSendOnlinePaymentRecoveryBtn')?.addEventListener('click', async function () {
+                const orderId = this.dataset.orderId;
+                const errorEl = document.getElementById('sendOnlinePaymentRecoveryError');
+                this.disabled = true;
+                if (errorEl) {
+                    errorEl.classList.add('d-none');
+                    errorEl.textContent = '';
+                }
+                try {
+                    const res = await fetch(`/form-orders/${orderId}/online-payment/send-recovery-email`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                        return;
+                    }
+                    const message = data.error || 'Nie udało się wysłać recovery e-mail.';
+                    if (errorEl) {
+                        errorEl.textContent = message;
+                        errorEl.classList.remove('d-none');
+                    }
+                } catch (e) {
+                    if (errorEl) {
+                        errorEl.textContent = 'Błąd połączenia.';
+                        errorEl.classList.remove('d-none');
+                    }
+                } finally {
+                    this.disabled = false;
+                }
+            });
 
             document.getElementById('confirmCancelOrderBtn')?.addEventListener('click', async function () {
                 const orderId = this.dataset.orderId;
