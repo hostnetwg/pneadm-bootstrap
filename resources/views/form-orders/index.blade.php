@@ -130,6 +130,12 @@
                             Formularz: tylko archiwalne (minęła data i godzina zakończenia szkolenia)
                         </span>
                     @endif
+                    @if($abandonedOnlineFilter ?? false)
+                        <span class="badge bg-danger text-white">
+                            <i class="bi bi-credit-card-2-front"></i>
+                            Formularz: porzucona płatność online
+                        </span>
+                    @endif
                     @if(($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
                         @if(empty($dateRangeError))
                         <span class="badge bg-dark text-white">
@@ -274,12 +280,18 @@
                                         <i class="bi bi-archive"></i> Tylko archiwalne (po terminie szkolenia)
                                     </label>
                                 </div>
+                                <div class="form-check mt-2" title="Płatność online nieopłacona: failed/cancelled od razu, albo awaiting_payment ≥ 60 min od ostatniej aktywności. Bez FV, bez cancelled_at.">
+                                    <input class="form-check-input" type="checkbox" id="abandoned_online" name="abandoned_online" value="1" {{ ($abandonedOnlineFilter ?? false) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="abandoned_online">
+                                        <i class="bi bi-credit-card-2-front"></i> Tylko porzucona płatność online
+                                    </label>
+                                </div>
                             </div>
                             <div class="col-12 col-md-3 d-flex align-items-end gap-2 flex-wrap">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-search"></i> Szukaj
                                 </button>
-                                @if($search || ($invoiceSearch ?? '') !== '' || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
+                                @if($search || ($invoiceSearch ?? '') !== '' || ($orderIdFilter ?? '') !== '' || ($courseIdFilter ?? '') !== '' || ($settlementFilter ?? '') !== '' || ($opoStatusFilter ?? '') !== '' || ($abandonedOnlineFilter ?? false) || ($placementFilter ?? '') !== '' || ($filter ?? '') !== '' || ($archivalOnly ?? false) || ($dateFromFilter ?? '') !== '' || ($dateToFilter ?? '') !== '')
                                     <a href="{{ route('form-orders.index') }}" class="btn btn-outline-secondary" title="Wyczyść formularz i wróć do domyślnej kolejki „Do obsługi (aktywne)”">
                                         <i class="bi bi-x-circle"></i> Wyczyść
                                     </a>
@@ -388,6 +400,12 @@
                                                 <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1" title="Status płatności / zamówienia">
                                                     {{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}
                                                 </span>
+                                                @if($zamowienie->isAbandonedUnpaidOnline())
+                                                    <span class="badge bg-danger fs-6 ms-1"
+                                                          title="Porzucona płatność online: failed/cancelled albo awaiting ≥ {{ (int) config('form_orders.online_abandonment_minutes', 60) }} min od ostatniej aktywności">
+                                                        <i class="bi bi-credit-card-2-front"></i> PORZUCONA PŁATNOŚĆ
+                                                    </span>
+                                                @endif
                                                 @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
                                             @elseif($zamowienie->submission_source === \App\Models\FormOrder::SUBMISSION_SOURCE_PNEDU_ORDER_FORM)
                                                 @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
@@ -905,6 +923,9 @@
                                         }
                                         if (($opoStatusFilter ?? '') !== '') {
                                             $paginationQuery['opo_status'] = $opoStatusFilter;
+                                        }
+                                        if ($abandonedOnlineFilter ?? false) {
+                                            $paginationQuery['abandoned_online'] = 1;
                                         }
                                         if (($placementFilter ?? '') !== '') {
                                             $paginationQuery['placement'] = $placementFilter;

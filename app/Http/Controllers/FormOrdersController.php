@@ -213,6 +213,12 @@ class FormOrdersController extends Controller
             });
         }
 
+        // Porzucona płatność online (Etap 4) — niezależnie od opo_status; AND z pozostałymi filtrami.
+        $abandonedOnlineFilter = $request->boolean('abandoned_online');
+        if ($abandonedOnlineFilter) {
+            $query->abandonedUnpaidOnline();
+        }
+
         $placementFilterRaw = (string) $request->get('placement', '');
         $allowedPlacementFilters = ['dashboard_sidebar', 'other'];
         $placementFilter = in_array($placementFilterRaw, $allowedPlacementFilters, true) ? $placementFilterRaw : '';
@@ -305,6 +311,7 @@ class FormOrdersController extends Controller
             'archivalOnly',
             'settlementFilter',
             'opoStatusFilter',
+            'abandonedOnlineFilter',
             'placementFilter',
             'dateFromFilter',
             'dateToFilter',
@@ -368,6 +375,7 @@ class FormOrdersController extends Controller
             || $request->filled('course_id')
             || $request->filled('settlement')
             || $request->filled('opo_status')
+            || $request->boolean('abandoned_online')
             || $request->filled('placement')
             || $filter !== ''
             || $request->boolean('archival')

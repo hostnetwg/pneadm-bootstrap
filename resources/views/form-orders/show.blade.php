@@ -357,6 +357,12 @@
                                 <span class="badge bg-{{ $zamowienie->paymentModeBadgeClass() }} fs-6">{{ $zamowienie->paymentModeLabelWithGateway() }}</span>
                                 <span class="badge bg-{{ $zamowienie->paymentStatusBadgeClass() }} fs-6 ms-1">{{ \App\Models\FormOrder::paymentStatusLabel($zamowienie->payment_status) }}</span>
                                 @include('form-orders.partials.order-form-variant-badge', ['zamowienie' => $zamowienie])
+                                @if($zamowienie->isAbandonedUnpaidOnline())
+                                    <span class="badge bg-danger fs-6 ms-1"
+                                          title="Porzucona płatność online (failed/cancelled lub awaiting ≥ {{ (int) config('form_orders.online_abandonment_minutes', 60) }} min)">
+                                        <i class="bi bi-credit-card-2-front"></i> Porzucona płatność
+                                    </span>
+                                @endif
                             @endif
                             @if($zamowienie->isEligibleForOnlinePaymentRecoveryEmail())
                                 <button type="button"

@@ -1007,6 +1007,25 @@ class FormOrder extends Model
     }
 
     /**
+     * Porzucona płatność online (Etap 4) — failed/cancelled lub awaiting ≥ N min.
+     */
+    public function isAbandonedUnpaidOnline(?\Carbon\Carbon $now = null): bool
+    {
+        return app(\App\Services\FormOrderOnlineAbandonmentService::class)
+            ->isAbandonedUnpaidOnline($this, $now);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\FormOrder>
+     */
+    public function scopeAbandonedUnpaidOnline($query, ?\Carbon\Carbon $now = null)
+    {
+        return app(\App\Services\FormOrderOnlineAbandonmentService::class)
+            ->scopeAbandonedUnpaidOnline($query, $now);
+    }
+
+    /**
      * Płatność online przez PayU ze statusem „opłacone” – najwyższy priorytet przy wyborze zamówienia w grupie duplikatów.
      */
     public function isPayuPaidOnlineOrder(): bool
