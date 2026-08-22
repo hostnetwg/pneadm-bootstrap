@@ -236,7 +236,7 @@ class ClickMeetingServiceTest extends TestCase
         Http::assertSent(function ($request) use ($thankYouUrl) {
             return $request->method() === 'PUT'
                 && $request->url() === 'https://api.clickmeeting.com/v1/conferences/10166300'
-                && data_get($request->data(), 'settings.thank_you_page_url') === $thankYouUrl;
+                && data_get($request->data(), 'settings[thank_you_page_url]') === $thankYouUrl;
         });
     }
 

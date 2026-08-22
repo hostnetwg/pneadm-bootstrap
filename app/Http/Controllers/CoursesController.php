@@ -1583,7 +1583,7 @@ class CoursesController extends Controller
 
     private function syncClickMeetingThankYouPage(Course $course, Request $request): ?string
     {
-        if ($request->type !== 'online' || (string) ($request->platform ?? '') !== 'clickmeeting') {
+        if ($request->type !== 'online' || ! $this->isClickMeetingPlatform($request->platform)) {
             return null;
         }
 
@@ -1630,5 +1630,10 @@ class CoursesController extends Controller
         }
 
         return $redirect->with('warning', implode(' ', $warnings));
+    }
+
+    private function isClickMeetingPlatform(mixed $platform): bool
+    {
+        return str_contains(strtolower(trim((string) $platform)), 'clickmeeting');
     }
 }

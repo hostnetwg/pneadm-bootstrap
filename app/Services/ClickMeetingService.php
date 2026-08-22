@@ -630,9 +630,7 @@ class ClickMeetingService
                 ->withHeaders(['X-Api-Key' => $config['api_key']])
                 ->asForm()
                 ->put('conferences/'.urlencode($eventId), [
-                    'settings' => [
-                        'thank_you_page_url' => $thankYouPageUrl,
-                    ],
+                    'settings[thank_you_page_url]' => $thankYouPageUrl,
                 ]);
 
             if (! $response->successful()) {
