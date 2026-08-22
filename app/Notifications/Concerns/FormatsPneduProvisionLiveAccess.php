@@ -43,10 +43,7 @@ trait FormatsPneduProvisionLiveAccess
         if ($liveAccess->usesEmbeddedJoin && $liveAccess->directJoinUrl) {
             $url = e($liveAccess->directJoinUrl);
             $parts[] = '<p style="margin:14px 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .'Gdyby wejście przez pnedu.pl nie zadziałało, niżej podajemy też bezpośredni link do ClickMeeting.'
-                .'</p>';
-            $parts[] = '<p style="margin:0 0 8px 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-                .'Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting: '
+                .'Jeśli wejście przez pnedu.pl nie zadziała, skorzystaj z bezpośredniego linku do ClickMeeting:<br>'
                 .'<a href="'.$url.'" style="color:#0d6efd;word-break:break-all;">'.$url.'</a>'
                 .'</p>';
         }
@@ -67,7 +64,7 @@ trait FormatsPneduProvisionLiveAccess
         }
 
         $parts[] = '<p style="margin:0 0 0 0;line-height:1.45;color:#6c757d;font-size:14px;">'
-            .'Wejdź kilka minut przed rozpoczęciem. Przy dołączaniu podaj imię oraz ten sam adres e-mail, którym jesteś zapisany/a na szkolenie.'
+            .'Wejdź kilka minut przed rozpoczęciem. Podczas dołączania podaj imię oraz ten sam adres e-mail, którym jesteś zapisany/a na szkolenie.'
             .'</p>';
 
         return new HtmlString(implode('', $parts));

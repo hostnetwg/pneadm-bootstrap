@@ -80,7 +80,7 @@ class ParticipantLiveMeetingLinkNotificationTest extends TestCase
 
         $this->assertStringContainsString('Link do pokoju osadzonego w pnedu.pl', $rendered);
         $this->assertStringContainsString('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $rendered);
-        $this->assertStringContainsString('Alternatywnie możesz wejść na spotkanie bezpośrednio w ClickMeeting', $rendered);
+        $this->assertStringContainsString('Jeśli wejście przez pnedu.pl nie zadziała, skorzystaj z bezpośredniego linku do ClickMeeting', $rendered);
         $this->assertStringContainsString('https://pnedu.clickmeeting.com/wydarzenie/TOK99', $rendered);
         $this->assertStringNotContainsString('Token dostępu', $rendered);
         $this->assertSame('https://pnedu.pl/dashboard/szkolenia/123/transmisja?fullscreen=1', $mail->actionUrl);
