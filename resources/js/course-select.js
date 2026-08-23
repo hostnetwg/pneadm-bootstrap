@@ -39,6 +39,18 @@ function statusBadgeHtml(status) {
     }
 }
 
+function normalizeCourseSearchItems(data) {
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+    if (data && Array.isArray(data.items)) {
+        return data.items;
+    }
+
+    return [];
+}
+
 /**
  * Inicjalizuje TomSelect na <select> wyboru szkolenia z wyszukiwaniem AJAX.
  *
@@ -83,9 +95,17 @@ export function initCourseSelect(selectId, options) {
             const url = options.searchUrl
                 + '?q=' + encodeURIComponent(query || '')
                 + '&include_archived=' + (includeArchived ? '1' : '0');
-            fetch(url, { headers: { Accept: 'application/json' } })
-                .then((r) => r.json())
-                .then((data) => callback(data.items || []))
+            fetch(url, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            })
+                .then((r) => {
+                    if (!r.ok) {
+                        throw new Error('Course search HTTP ' + r.status);
+                    }
+                    return r.json();
+                })
+                .then((data) => callback(normalizeCourseSearchItems(data)))
                 .catch(() => callback());
         },
         render: {
@@ -179,3 +199,32 @@ export function initCourseSelect(selectId, options) {
 }
 
 window.initCourseSelect = initCourseSelect;
+window.normalizeCourseSearchItems = normalizeCourseSearchItems;
+
+/**
+ * Czeka na initCourseSelect z bundla Vite (moduł ładuje się defer).
+ */
+export function waitForCourseSelectInit(maxWaitMs = 4000) {
+    return new Promise((resolve) => {
+        if (typeof window.initCourseSelect === 'function') {
+            resolve(window.initCourseSelect);
+            return;
+        }
+
+        const started = Date.now();
+        const timer = window.setInterval(() => {
+            if (typeof window.initCourseSelect === 'function') {
+                window.clearInterval(timer);
+                resolve(window.initCourseSelect);
+                return;
+            }
+
+            if (Date.now() - started >= maxWaitMs) {
+                window.clearInterval(timer);
+                resolve(null);
+            }
+        }, 50);
+    });
+}
+
+window.waitForCourseSelectInit = waitForCourseSelectInit;

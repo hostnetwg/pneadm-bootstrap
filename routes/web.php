@@ -310,6 +310,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         ->name('marketing-campaigns.')
         ->group(function () {
             Route::get('/', [MarketingCampaignController::class, 'index'])->name('index');
+            Route::get('/courses/search', [OnlineCourseLessonController::class, 'searchLinkableCourses'])
+                ->name('courses.search');
             Route::get('/create', [MarketingCampaignController::class, 'create'])->name('create');
             Route::post('/', [MarketingCampaignController::class, 'store'])->name('store');
             Route::get('/{marketingCampaign}/duplicate', [MarketingCampaignController::class, 'duplicate'])
