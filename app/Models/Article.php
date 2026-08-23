@@ -37,6 +37,7 @@ class Article extends Model
     protected $casts = [
         'published_at' => 'datetime',
         'comments_enabled' => 'boolean',
+        'view_count' => 'integer',
     ];
 
     protected static function booted(): void
@@ -245,5 +246,10 @@ class Article extends Model
         }
 
         return Str::limit($this->plainText($this->content_html), 160);
+    }
+
+    public function formattedViewCount(): string
+    {
+        return number_format((int) $this->view_count, 0, ',', ' ');
     }
 }

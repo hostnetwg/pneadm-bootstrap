@@ -86,6 +86,12 @@
                                 <dt>Data publikacji</dt>
                                 <dd>{{ $article->published_at?->format('Y-m-d H:i') ?? 'Brak' }}</dd>
 
+                                <dt>Wyświetlenia</dt>
+                                <dd>
+                                    {{ $article->formattedViewCount() }}
+                                    <span class="text-muted small">(publiczny blog, max. raz na sesję)</span>
+                                </dd>
+
                                 <dt>Autor</dt>
                                 <dd>{{ $article->author?->name ?? 'Brak' }}</dd>
 

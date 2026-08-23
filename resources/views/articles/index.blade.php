@@ -25,6 +25,7 @@
                 <h5 class="mb-2">Zarządzanie blogiem pnedu.pl</h5>
                 <p class="mb-2">
                     Opublikowane artykuły pojawią się na publicznej stronie <code>/blog</code>.
+                    Kolumna <strong>Wyświetlenia</strong> liczy wejścia na publiczny artykuł (max. raz na sesję odwiedzającego).
                     Komentarze są przewidziane jako następny etap i obecnie nie mają publicznego formularza.
                     <a href="{{ route('articles.example-preview') }}">Zobacz przykładowy podgląd artykułu.</a>
                 </p>
@@ -87,6 +88,7 @@
                                 <th>Tytuł</th>
                                 <th>Status</th>
                                 <th>Publikacja</th>
+                                <th class="text-end" title="Wejścia na publiczny artykuł (max. raz na sesję)">Wyśw.</th>
                                 <th>Dodał</th>
                                 <th>Komentarze</th>
                                 <th class="text-end">Akcje</th>
@@ -138,6 +140,11 @@
                                             <span class="text-muted">Brak</span>
                                         @endif
                                     </td>
+                                    <td class="text-end text-nowrap">
+                                        <span title="{{ $article->formattedViewCount() }} wyświetleń">
+                                            {{ $article->formattedViewCount() }}
+                                        </span>
+                                    </td>
                                     <td>{{ $article->author?->name ?? 'Brak' }}</td>
                                     <td>
                                         <span class="badge {{ $article->comments_enabled ? 'bg-primary' : 'bg-light text-dark' }}">
@@ -159,7 +166,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ $canReorder ? 7 : 6 }}" class="text-center text-muted py-4">
+                                    <td colspan="{{ $canReorder ? 8 : 7 }}" class="text-center text-muted py-4">
                                         Brak artykułów. Dodaj pierwszy wpis, aby przygotować blog pnedu.pl.
                                         <div class="mt-3">
                                             <a href="{{ route('articles.example-preview') }}" class="btn btn-outline-secondary btn-sm">
