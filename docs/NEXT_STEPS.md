@@ -9,9 +9,15 @@ Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)*
 
 ## Ostatnio (2026-08-23) — Artykuły / blog pnedu.pl
 
-Wdrożono lokalnie moduł `Artykuły` w panelu `pneadm`: CRUD dostępny dla każdego zalogowanego użytkownika, menu nad `Księgowość`, statusy `draft`/`published`, SEO, grafika główna i pole `comments_enabled` pod przyszłe komentarze. Publiczny `pnedu` czyta opublikowane artykuły z bazy `pneadm` na `/blog` i `/blog/{slug}`; sitemap ma dynamiczne wpisy artykułów. Kanon: `docs/ARTICLES.md` oraz `pnedu/docs/BLOG_ARTICLES.md`.
+Wdrożono moduł `Artykuły` w panelu `pneadm`: CRUD, kolejność (`sort_order`), licznik wyświetleń (`view_count`, zgodny z analityką), SEO pól meta. Publiczny `pnedu`: `/blog`, schema `BlogPosting`, sitemap dynamiczna, `llms.txt`, udostępnianie. **SEO po audycie 2026-08-23:** naprawa sitemap 500, meta kursów (540/548, Akademia Dyrektora), schema `Course`, checklista GSC.
 
-Następny etap: komentarze z moderacją w `pneadm`, publicznym formularzem w `pnedu`, honeypotem, rate limitingiem i opcjonalnym Turnstile/reCAPTCHA.
+Kanon:
+- `docs/ARTICLES.md` — panel admin, workflow redakcyjny, wytyczne SEO artykułów
+- `pnedu/docs/BLOG_ARTICLES.md` — front publiczny
+- `pnedu/SEO.md` — wytyczne SEO serwisu
+- `pnedu/docs/GSC_CHECKLIST.md` — Search Console
+
+Następny etap treści: komentarze z moderacją; strony-filarowe SEO; TTFB; plan 90 dni (2 artykuły/tydzień).
 
 ## Ostatnio (2026-08-22) — termin w mailach dostępu
 
