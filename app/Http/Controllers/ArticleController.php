@@ -19,7 +19,7 @@ class ArticleController extends Controller
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status', 'all');
 
-        $articles = Article::query()
+        $query = Article::query()
             ->with('author')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($q) use ($search): void {
