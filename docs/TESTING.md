@@ -72,7 +72,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Lejek na `/courses` | `--filter=CourseFunnelStatsServiceTest`, `--filter=CoursesIndexStatsTest` |
 | Ankiety | **Brak** dedykowanych testów (import CSV, PDF, bramka). Smoke ręczny: import, PDF, `pnedu.pl/ankieta/{token}` → `/rekomendacja` → `/dziekujemy`; ponowne wejście (anon: cookie / nieanon: ten sam e-mail) → „już wypełniona”. Kanon: [SURVEYS.md](./SURVEYS.md). |
-| Artykuły / blog | Brak dedykowanych testów automatycznych. Smoke ręczny: `pneadm` → `Artykuły` → dodaj szkic, opublikuj z datą `published_at`, sprawdź `/blog` i `/blog/{slug}` w `pnedu`, sprawdź sitemapę; wejdź na artykuł 2× w tej samej sesji (licznik +1), w incognito +1; kolumna „Wyśw.” w panelu. Kanon: [ARTICLES.md](./ARTICLES.md). |
+| Artykuły / blog | Brak dedykowanych testów automatycznych. Smoke ręczny: `pneadm` → `Artykuły` → dodaj szkic, opublikuj z datą `published_at`, sprawdź `/blog` i `/blog/{slug}` w `pnedu`, sprawdź sitemapę; wejdź na artykuł 2× w tej samej sesji analitycznej (licznik +1), w incognito +1; wyłącz analitykę w panelu → licznik stoi; kolumna „Wyśw.” w panelu. Testy: `--filter=ArticlePageViewTrackerTest`. Kanon: [ARTICLES.md](./ARTICLES.md). |
 | Pełny suite | `sail test` |
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).

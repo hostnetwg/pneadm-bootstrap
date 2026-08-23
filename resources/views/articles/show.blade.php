@@ -89,7 +89,7 @@
                                 <dt>Wyświetlenia</dt>
                                 <dd>
                                     {{ $article->formattedViewCount() }}
-                                    <span class="text-muted small">(publiczny blog, max. raz na sesję)</span>
+                                    <span class="text-muted small">(publiczny blog, zgodnie z ustawieniami analityki)</span>
                                 </dd>
 
                                 <dt>Autor</dt>

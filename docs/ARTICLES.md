@@ -17,7 +17,7 @@ Moduł `Artykuły` w panelu `pneadm` służy do zarządzania wpisami publikowany
 - Menu główne `Artykuły` w panelu, nad menu `Księgowość`.
 - CRUD artykułów dla każdego zalogowanego użytkownika panelu.
 - **Kolejność na blogu:** kolumna `sort_order` (0 = góra listy). Przeciąganie wierszy na liście artykułów (bez filtrów). Nowy artykuł trafia na górę.
-- **Wyświetlenia:** kolumna `view_count` — licznik wejść na publiczny artykuł (`/blog/{slug}`), max. raz na sesję odwiedzającego. Widoczna w liście artykułów i podglądzie w panelu.
+- **Wyświetlenia:** kolumna `view_count` — licznik wejść na publiczny artykuł (`/blog/{slug}`). Zliczanie respektuje ustawienia analityki z panelu (`Analityka → Ustawienia`): wyłączenie, tryb, sampling, opt-out cookie `pne_skip_analytics`, boty. Max. raz na sesję analityczną (`pne_analytics_sid`). Widoczna w liście artykułów i podglądzie w panelu.
 - Statyczna podstrona `articles.example-preview` z przykładowym podglądem układu artykułu.
 - Statusy:
   - `draft` - szkic niewidoczny publicznie.
@@ -34,7 +34,7 @@ Moduł `Artykuły` w panelu `pneadm` służy do zarządzania wpisami publikowany
 
 - `/blog` — lista opublikowanych artykułów (kolejność: `sort_order`, potem data publikacji).
 - `/blog/{slug}` — szczegóły artykułu.
-- **Wyświetlenia:** przy każdym wejściu na artykuł inkrementowany jest `view_count` (max. raz na sesję PHP).
+- **Wyświetlenia:** przy każdym kwalifikującym się wejściu na artykuł inkrementowany jest `view_count` (reguły jak w `Analityka → Ustawienia`, max. raz na sesję `pne_analytics_sid`).
 - **Liczniki „nowe” przy menu Blog:** czerwona plakietka z liczbą artykułów opublikowanych po ostatniej wizycie użytkownika na blogu (stan w `localStorage` przeglądarki — znika po wejściu na `/blog` lub artykuł).
 - Sitemap zawiera dynamiczne adresy opublikowanych artykułów.
 

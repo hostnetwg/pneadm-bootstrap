@@ -25,7 +25,7 @@
                 <h5 class="mb-2">Zarządzanie blogiem pnedu.pl</h5>
                 <p class="mb-2">
                     Opublikowane artykuły pojawią się na publicznej stronie <code>/blog</code>.
-                    Kolumna <strong>Wyświetlenia</strong> liczy wejścia na publiczny artykuł (max. raz na sesję odwiedzającego).
+                    Kolumna <strong>Wyświetlenia</strong> liczy wejścia zgodnie z ustawieniami analityki (panel → Analityka → Ustawienia): wyłączenie, tryb, sampling, opt-out i boty — max. raz na sesję analityczną odwiedzającego.
                     Komentarze są przewidziane jako następny etap i obecnie nie mają publicznego formularza.
                     <a href="{{ route('articles.example-preview') }}">Zobacz przykładowy podgląd artykułu.</a>
                 </p>

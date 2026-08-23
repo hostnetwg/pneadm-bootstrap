@@ -8,6 +8,7 @@ enum AnalyticsEventName: string
     case CampaignRedirectResolved = 'campaign_redirect_resolved';
     case UtmCaptured = 'utm_captured';
     case CourseDescriptionViewed = 'course_description_viewed';
+    case ArticleViewed = 'article_viewed';
     case OrderFormViewed = 'order_form_viewed';
     case OrderFormSubmitAttempted = 'order_form_submit_attempted';
     case OrderFormValidationFailed = 'order_form_validation_failed';
@@ -50,7 +51,8 @@ enum AnalyticsEventName: string
             self::CampaignShortLinkVisit,
             self::CampaignRedirectResolved,
             self::UtmCaptured => AnalyticsCategory::Campaign,
-            self::CourseDescriptionViewed => AnalyticsCategory::Landing,
+            self::CourseDescriptionViewed,
+            self::ArticleViewed => AnalyticsCategory::Landing,
             self::OrderFormViewed,
             self::OrderFormSubmitAttempted,
             self::OrderFormStarted,
