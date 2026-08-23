@@ -11,6 +11,7 @@ use App\Http\Controllers\Analytics\AnalyticsOrderFormFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsRevenueController;
 use App\Http\Controllers\Analytics\AnalyticsSalesFunnelController;
 use App\Http\Controllers\Analytics\AnalyticsSettingsController;
+use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
@@ -341,6 +342,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
 
     /**/
 
+    Route::get('/articles/example-preview', [ArticleController::class, 'examplePreview'])->name('articles.example-preview');
+    Route::post('articles/reorder', [ArticleController::class, 'reorder'])->name('articles.reorder');
+    Route::resource('articles', ArticleController::class);
     Route::resource('training-offers', TrainingOfferController::class);
     Route::get('/training-offers/{training_offer}/create-course', [CoursesController::class, 'createFromTrainingOffer'])
         ->name('training-offers.create-course');

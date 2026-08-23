@@ -1,11 +1,17 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-22  
+Data utworzenia/aktualizacji: 2026-08-23  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-08-23) — Artykuły / blog pnedu.pl
+
+Wdrożono lokalnie moduł `Artykuły` w panelu `pneadm`: CRUD dostępny dla każdego zalogowanego użytkownika, menu nad `Księgowość`, statusy `draft`/`published`, SEO, grafika główna i pole `comments_enabled` pod przyszłe komentarze. Publiczny `pnedu` czyta opublikowane artykuły z bazy `pneadm` na `/blog` i `/blog/{slug}`; sitemap ma dynamiczne wpisy artykułów. Kanon: `docs/ARTICLES.md` oraz `pnedu/docs/BLOG_ARTICLES.md`.
+
+Następny etap: komentarze z moderacją w `pneadm`, publicznym formularzem w `pnedu`, honeypotem, rate limitingiem i opcjonalnym Turnstile/reCAPTCHA.
 
 ## Ostatnio (2026-08-22) — termin w mailach dostępu
 

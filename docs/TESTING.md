@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-07-26
+Data aktualizacji: 2026-08-23
 
 ## Cel
 
@@ -72,6 +72,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Lejek na `/courses` | `--filter=CourseFunnelStatsServiceTest`, `--filter=CoursesIndexStatsTest` |
 | Ankiety | **Brak** dedykowanych testów (import CSV, PDF, bramka). Smoke ręczny: import, PDF, `pnedu.pl/ankieta/{token}` → `/rekomendacja` → `/dziekujemy`; ponowne wejście (anon: cookie / nieanon: ten sam e-mail) → „już wypełniona”. Kanon: [SURVEYS.md](./SURVEYS.md). |
+| Artykuły / blog | Brak dedykowanych testów automatycznych. Smoke ręczny: `pneadm` → `Artykuły` → dodaj szkic, opublikuj z datą `published_at`, sprawdź `/blog` i `/blog/{slug}` w `pnedu`, sprawdź sitemapę. Kanon: [ARTICLES.md](./ARTICLES.md). |
 | Pełny suite | `sail test` |
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).

@@ -392,6 +392,30 @@
         </li>
 
         <li class="border-top my-3"></li>
+
+        <!-- Artykuły -->
+        <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('articles.*') ? '' : 'collapsed' }}"
+                    data-bs-toggle="collapse" data-bs-target="#articles-collapse"
+                    aria-expanded="{{ request()->routeIs('articles.*') ? 'true' : 'false' }}">
+                <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                    <use xlink:href="#file-earmark-text"></use>
+                </svg>
+                Artykuły
+                <svg class="bi pe-none ms-auto" width="16" height="16">
+                    <use xlink:href="#chevron-right"></use>
+                </svg>
+            </button>
+            <div class="collapse {{ request()->routeIs('articles.*') ? 'show' : '' }}" id="articles-collapse" data-bs-parent="#menuAccordion">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                    <li>
+                        <a href="{{ route('articles.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('articles.*') ? 'active' : '' }}" onclick="event.stopPropagation();">
+                            Lista artykułów
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
         
         <!-- Księgowość -->
         <li class="mb-1">
