@@ -1342,7 +1342,16 @@ nowoczesna-edukacja.pl `;
                 root.replaceWith(next);
                 window.scrollTo(0, scrollY);
                 initPneduStatusWidgets({ autoCollapseFopId: expandFopId || null, autoCollapseMs: 2200 });
+                // STATUS ZAMÓWIENIA (0/1 → 1/1 itd.) — ten sam partial co po wystawieniu FV iFirma.
+                refreshOperationalStatusPanel();
             });
+        }
+
+        function resetPneduConfirmButtonLabel(modalEl) {
+            if (modalEl && modalEl.dataset.resetAll === '1') {
+                return '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim';
+            }
+            return '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
         }
 
         function setPneduStatusExpanded(widget, expanded) {
@@ -1748,9 +1757,6 @@ nowoczesna-edukacja.pl `;
                             <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
                                 <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
-                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
-                            </button>
                         </div>
                     `;
                     
@@ -2023,36 +2029,14 @@ nowoczesna-edukacja.pl `;
                             <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
                                 <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
-                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
-                            </button>
                         </div>
                     `;
                     
                     // Przechowanie danych do wyświetlenia szczegółów
                     window.ifirmaResponseData = data;
                     
-                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
-                    // Tylko dla Faktury krajowej (nie PRO-FORMA) - Faktura zapisuje się w invoice_number
-                    if (data.invoice_number) {
-                        applyInvoiceNumberFieldValue(data.invoice_number);
-                        
-                        // Zmień alert "ZAMÓWIENIE OCZEKUJE NA WYSTAWIENIE FAKTURY!" na zielony komunikat
-                        const orderStatusAlert = document.getElementById('orderStatusAlert');
-                        if (orderStatusAlert) {
-                            const orderId = {{ $zamowienie->id }};
-                            orderStatusAlert.innerHTML = `
-                                <small class="text-success fw-bold">
-                                    <i class="bi bi-check-circle"></i> Dla zamówienia #${orderId} została wystawiona faktura nr <strong>${data.invoice_number}</strong>
-                                </small>
-                            `;
-                        }
-                    }
-                    if (data.invoice_id) {
-                        applyIfirmaInvoiceIdDisplay(data.invoice_id);
-                    }
-                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
-                    
+                    // Numer FV, ID iFirma, daty, STATUS — bez przeładowania strony
+                    applyIssuedInvoiceUi(data, orderId);
                 } else {
                     if (typeof window.formOrderPlayUiSound === 'function') {
                         window.formOrderPlayUiSound('error');
@@ -2329,23 +2313,14 @@ nowoczesna-edukacja.pl `;
                             <button type="button" class="btn btn-outline-info btn-sm" onclick="showIfirmaDetails()">
                                 <i class="bi bi-info-circle"></i> Pokaż szczegóły odpowiedzi
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.location.reload()">
-                                <i class="bi bi-arrow-clockwise"></i> Odśwież stronę
-                            </button>
                         </div>
                     `;
                     
                     // Przechowanie danych do wyświetlenia szczegółów
                     window.ifirmaResponseData = data;
                     
-                    // Automatyczne wypełnienie pola "Numer faktury" jeśli jest dostępny
-                    if (data.invoice_number) {
-                        applyInvoiceNumberFieldValue(data.invoice_number);
-                    }
-                    if (data.invoice_id) {
-                        applyIfirmaInvoiceIdDisplay(data.invoice_id);
-                    }
-                    applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
+                    // Numer FV, ID iFirma, daty, STATUS — bez przeładowania strony
+                    applyIssuedInvoiceUi(data, orderId);
                 } else {
                     if (typeof window.formOrderPlayUiSound === 'function') {
                         window.formOrderPlayUiSound('error');
@@ -2539,11 +2514,67 @@ nowoczesna-edukacja.pl `;
                 });
         }
 
+        /**
+         * Po wystawieniu FV przez API iFirma — aktualizacja pól i STATUS ZAMÓWIENIA bez reloadu.
+         */
+        function applyIssuedInvoiceUi(data, orderId) {
+            data = data || {};
+            if (data.invoice_number) {
+                applyInvoiceNumberFieldValue(data.invoice_number, { skipStatusRefresh: true });
+                const orderStatusAlert = document.getElementById('orderStatusAlert');
+                if (orderStatusAlert && orderId) {
+                    orderStatusAlert.innerHTML = `
+                        <small class="text-success fw-bold">
+                            <i class="bi bi-check-circle"></i> Dla zamówienia #${orderId} została wystawiona faktura nr <strong>${data.invoice_number}</strong>
+                        </small>
+                    `;
+                }
+            }
+            const ifirmaId = data.invoice_id || data.ifirma_invoice_id || null;
+            if (ifirmaId) {
+                applyIfirmaInvoiceIdDisplay(ifirmaId);
+            }
+            applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
+            if (data.ksef_number) {
+                applyKsefNumberDisplay(data.ksef_number);
+            }
+            enableCreateDebtCaseButtonAfterInvoice();
+            refreshOperationalStatusPanel();
+        }
+
+        function enableCreateDebtCaseButtonAfterInvoice() {
+            let target = null;
+            document.querySelectorAll('button[disabled]').forEach(function (btn) {
+                const title = btn.getAttribute('title') || '';
+                const text = btn.textContent || '';
+                if (title.indexOf('Najpierw wystaw fakturę') !== -1
+                    || text.indexOf('Utwórz sprawę windykacyjną') !== -1) {
+                    target = btn;
+                }
+            });
+            if (!target) {
+                return;
+            }
+            const replacement = document.createElement('button');
+            replacement.type = 'button';
+            replacement.className = 'btn btn-sm btn-outline-danger';
+            replacement.setAttribute('data-bs-toggle', 'modal');
+            replacement.setAttribute('data-bs-target', '#createDebtCaseModal');
+            replacement.innerHTML = '<i class="bi bi-plus-circle"></i> Utwórz sprawę windykacyjną';
+            const parent = target.parentElement;
+            const hint = parent ? parent.querySelector('.small.text-muted.mt-1') : null;
+            target.replaceWith(replacement);
+            if (hint && (hint.textContent || '').indexOf('Najpierw wystaw fakturę') !== -1) {
+                hint.remove();
+            }
+        }
+
         function looksLikeIfirmaDocumentId(value) {
             return typeof value === 'string' && /^\d+$/.test(value.trim());
         }
 
-        function applyInvoiceNumberFieldValue(invoiceNumber) {
+        function applyInvoiceNumberFieldValue(invoiceNumber, options) {
+            options = options || {};
             if (!invoiceNumber || looksLikeIfirmaDocumentId(String(invoiceNumber))) {
                 return;
             }
@@ -2565,7 +2596,9 @@ nowoczesna-edukacja.pl `;
             }, 2000);
 
             revealInvoiceDatesDisplay();
-            refreshOperationalStatusPanel();
+            if (!options.skipStatusRefresh) {
+                refreshOperationalStatusPanel();
+            }
         }
 
         function renderIfirmaKsefProgress(stages) {
@@ -2830,16 +2863,7 @@ nowoczesna-edukacja.pl `;
         });
 
         function renderIfirmaKsefResult(data, force, resultDiv) {
-            if (data.invoice_number) {
-                applyInvoiceNumberFieldValue(data.invoice_number);
-            }
-            if (data.invoice_id) {
-                applyIfirmaInvoiceIdDisplay(data.invoice_id);
-            }
-            applyInvoiceDatesDisplay(data.invoice_issue_date, data.invoice_due_date);
-            if (data.success && data.ksef_number) {
-                applyKsefNumberDisplay(data.ksef_number);
-            }
+            applyIssuedInvoiceUi(data, {{ (int) $zamowienie->id }});
 
             window.ifirmaResponseData = data;
 
@@ -2992,11 +3016,7 @@ nowoczesna-edukacja.pl `;
                     return;
                 }
 
-                applyInvoiceNumberFieldValue(createData.invoice_number);
-                if (createData.invoice_id) {
-                    applyIfirmaInvoiceIdDisplay(createData.invoice_id);
-                }
-                applyInvoiceDatesDisplay(createData.invoice_issue_date, createData.invoice_due_date);
+                applyIssuedInvoiceUi(createData, orderId);
 
                 resultDiv.innerHTML = renderIfirmaKsefProgress([
                     { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
@@ -3240,7 +3260,14 @@ nowoczesna-edukacja.pl `;
                     if (modal) {
                         modal.hide();
                     }
-                    location.reload();
+                    softRefreshParticipantsCards(null)
+                        .then(function () {
+                            button.disabled = false;
+                            button.innerHTML = resetPneduConfirmButtonLabel(modalEl);
+                        })
+                        .catch(function () {
+                            location.reload();
+                        });
                     return;
                 }
 
@@ -3250,9 +3277,7 @@ nowoczesna-edukacja.pl `;
                     errorEl.classList.remove('d-none');
                 }
                 button.disabled = false;
-                button.innerHTML = modalEl && modalEl.dataset.resetAll === '1'
-                    ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim'
-                    : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
+                button.innerHTML = resetPneduConfirmButtonLabel(modalEl);
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -3261,9 +3286,7 @@ nowoczesna-edukacja.pl `;
                     errorEl.classList.remove('d-none');
                 }
                 button.disabled = false;
-                button.innerHTML = modalEl && modalEl.dataset.resetAll === '1'
-                    ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU wszystkim'
-                    : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp PNEDU';
+                button.innerHTML = resetPneduConfirmButtonLabel(modalEl);
             });
         }
 
