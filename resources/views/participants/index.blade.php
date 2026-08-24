@@ -315,7 +315,7 @@
                                         ?->timezone('Europe/Warsaw');
                                 @endphp
                                 <div class="mt-1">
-                                    <span class="badge bg-success"
+                                    <span class="badge bg-primary"
                                           title="Szkolenie przez osadzony ClickMeeting na pnedu.pl">
                                         <i class="bi bi-display me-1" aria-hidden="true"></i>
                                         CM pnedu
