@@ -202,9 +202,11 @@
                                     ? 'embed_pnedu'
                                     : 'clickmeeting';
                             }
-                            $embedEmailLinkEnabled = old(
+                            $embedEmailLinkEnabled = (bool) old(
                                 'embed_email_link_enabled',
-                                $course->onlineDetails->embed_email_link_enabled ?? true
+                                $liveRoomMode === 'embed_pnedu'
+                                    ? ($course->onlineDetails->embed_email_link_enabled ?? true)
+                                    : false
                             );
                         @endphp
                         <div class="mt-2">
@@ -590,11 +592,22 @@ function toggleCourseFields() {
 function toggleEmbedEmailLinkOption() {
     const wrapper = document.getElementById('embed-email-link-wrapper');
     const embedRadio = document.getElementById('live_room_mode_embed');
+    const checkbox = document.getElementById('embed_email_link_enabled');
     if (! wrapper || ! embedRadio) {
         return;
     }
 
-    wrapper.style.display = embedRadio.checked ? 'block' : 'none';
+    if (embedRadio.checked) {
+        wrapper.style.display = 'block';
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    } else {
+        wrapper.style.display = 'none';
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+    }
 }
 
 // Funkcje edytora HTML

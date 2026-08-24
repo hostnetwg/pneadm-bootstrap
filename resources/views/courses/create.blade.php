@@ -170,7 +170,10 @@
                         <small class="text-muted d-block">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
                         @php
                             $liveRoomMode = old('live_room_mode', 'clickmeeting');
-                            $embedEmailLinkEnabled = old('embed_email_link_enabled', true);
+                            $embedEmailLinkEnabled = (bool) old(
+                                'embed_email_link_enabled',
+                                $liveRoomMode === 'embed_pnedu'
+                            );
                         @endphp
                         <div class="mt-2">
                             <div class="form-label mb-1">Wejście do pokoju dla uczestnika</div>
@@ -458,11 +461,22 @@
         function toggleEmbedEmailLinkOption() {
             const wrapper = document.getElementById('embed-email-link-wrapper');
             const embedRadio = document.getElementById('live_room_mode_embed');
+            const checkbox = document.getElementById('embed_email_link_enabled');
             if (! wrapper || ! embedRadio) {
                 return;
             }
 
-            wrapper.style.display = embedRadio.checked ? 'block' : 'none';
+            if (embedRadio.checked) {
+                wrapper.style.display = 'block';
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            } else {
+                wrapper.style.display = 'none';
+                if (checkbox) {
+                    checkbox.checked = false;
+                }
+            }
         }
 
         // Funkcje edytora HTML
