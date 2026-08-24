@@ -242,4 +242,20 @@ class FormOrdersNavigationFilterCountTest extends TestCase
             ->assertJsonPath('filter_payment_gateway', true)
             ->assertJsonPath('filter_no_invoice', false);
     }
+
+    public function test_count_endpoint_does_not_overwrite_session_previous_url(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $previous = 'http://localhost/admin/pnedu-users/2218';
+        $this->actingAs($user);
+        session()->setPreviousUrl($previous);
+
+        $this->get(route('form-orders.navigation-filter-count'))->assertOk();
+
+        $this->assertSame($previous, session()->previousUrl());
+    }
 }

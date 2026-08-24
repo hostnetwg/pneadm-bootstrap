@@ -39,6 +39,7 @@
 - Jedna pozycja: `Ilosc` = liczba uczestników, `CenaJednostkowa` = `invoiceUnitPrice()` (total / N).
 - Uwagi FV: `UCZESTNIK:` / `UCZESTNICY:` z listy.
 - Po wystawieniu FV przez API (krajowa / z odbiorcą / z KSeF): **bez przeładowania strony** — `applyIssuedInvoiceUi()` uzupełnia numer FV, ID iFirma, daty, numer KSeF (gdy jest) oraz odświeża panel STATUS ZAMÓWIENIA. Przycisk „Odśwież stronę” usunięty z komunikatu sukcesu.
+- Licznik nawigacji (`GET /form-orders/navigation-filter-count`) jest AJAX (`X-Requested-With`) i **nie** może nadpisywać `url()->previous()` — inaczej `back()` (np. ustawienie hasła użytkownika pnedu) ląduje na surowym JSON-ie.
 
 ## Kod
 

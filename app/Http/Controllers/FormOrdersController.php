@@ -916,6 +916,10 @@ class FormOrdersController extends Controller
      */
     public function navigationFilterCount(Request $request)
     {
+        // Fetch z Accept: json bez X-Requested-With Laravel traktuje jak zwykły GET
+        // i zapisuje ten URL jako previous — potem back() (np. ustawianie hasła) ląduje na JSON-ie.
+        $request->headers->set('X-Requested-With', 'XMLHttpRequest');
+
         if ($request->hasSession()) {
             $request->session()->save();
         }

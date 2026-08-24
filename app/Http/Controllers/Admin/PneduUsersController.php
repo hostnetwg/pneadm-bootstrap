@@ -243,7 +243,11 @@ class PneduUsersController extends Controller
             ]
         );
 
-        return back()->with('success', 'Nowe hasło zostało zapisane.');
+        // Jawny redirect na kartę użytkownika — nie back(). GET /form-orders/navigation-filter-count
+        // (AJAX licznika na szczegółach zamówienia) potrafi nadpisać previous URL w sesji.
+        return redirect()
+            ->route('admin.pnedu-users.show', $pnedu_user)
+            ->with('success', 'Nowe hasło zostało zapisane.');
     }
 
     /**

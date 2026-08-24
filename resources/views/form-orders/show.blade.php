@@ -3468,7 +3468,10 @@ nowoczesna-edukacja.pl `;
             badge.classList.add('text-bg-secondary');
 
             fetch(url.toString(), {
-                headers: { 'Accept': 'application/json' },
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 credentials: 'same-origin',
             })
                 .then(function (response) {
