@@ -202,6 +202,7 @@ Gdy widoczny jest token (`CM: …`):
 
 - **Unieważnij token** — `DELETE` w API ClickMeeting (`…/conferences/{event_id}/tokens` + lista tokenów), potem czyszczenie lokalnego `participant_live_access.token`. Status CM OK zostaje; ponowne pobranie przez przycisk CM OK.
 - **Wyślij link do live** — e-mail systemowy (`ParticipantLiveMeetingLinkNotification`, log `certificate_email_logs.type = live_meeting_link`). Temat: `Dostęp do szkolenia: {tytuł} - spotkanie na żywo.` Przy embed (checkbox linku w mailu): notka → **Zaloguj się** (`/login?email=…`) → linki embed + fallback CM; bez embed: sekcja live + przycisk **Dołącz do spotkania na żywo**. Szczegóły: `pnedu/docs/DASHBOARD_LIVE_EMBED.md`.
+- **Embed pnedu (lista uczestników)** — gdy kurs ma tryb osadzonego pokoju, uczestnik z wejściem przez `/transmisja` dostaje badge **Embed pnedu** (kolumna zaświadczenia). Zapis: `participant_live_access.embed_first_entered_at` / `embed_last_entered_at` (pnedu przy GET `/transmisja`).
 
 Routes:
 

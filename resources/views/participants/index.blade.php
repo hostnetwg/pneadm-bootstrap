@@ -537,6 +537,31 @@
                                         </form>
                                     @endif
                                 @endif
+                                @if(($course->onlineDetails?->embed_on_pnedu ?? false) && $participant->liveAccess?->hasEnteredEmbedOnPnedu())
+                                    @php
+                                        $embedLastEnteredAt = $participant->liveAccess->embed_last_entered_at
+                                            ?->timezone('Europe/Warsaw');
+                                        $embedFirstEnteredAt = $participant->liveAccess->embed_first_entered_at
+                                            ?->timezone('Europe/Warsaw');
+                                    @endphp
+                                    <div class="mt-1">
+                                        <span class="badge bg-success"
+                                              title="Uczestnik wszedł przez osadzony pokój pnedu.pl{{ $embedLastEnteredAt ? ' — ostatnio: '.$embedLastEnteredAt->format('d.m.Y H:i') : '' }}">
+                                            <i class="bi bi-display me-1" aria-hidden="true"></i>
+                                            Embed pnedu
+                                        </span>
+                                        @if($embedLastEnteredAt)
+                                            <span class="small text-muted ms-1" title="Ostatnie wejście przez /transmisja">
+                                                {{ $embedLastEnteredAt->format('d.m.Y H:i') }}
+                                            </span>
+                                        @endif
+                                        @if($embedFirstEnteredAt && $embedLastEnteredAt && ! $embedFirstEnteredAt->equalTo($embedLastEnteredAt))
+                                            <span class="small text-muted d-block" title="Pierwsze wejście przez osadzony pokój">
+                                                Pierwsze: {{ $embedFirstEnteredAt->format('d.m.Y H:i') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
                                 @if($participantCanSendLiveLink)
                                     <form id="sendLiveMeetingLinkForm{{ $participant->id }}"
                                           action="{{ route('participants.send-live-meeting-link', [$course, $participant]) }}"
