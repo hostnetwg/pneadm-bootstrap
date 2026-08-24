@@ -20,6 +20,19 @@ PHP na prod (hosting współdzielony):
 /opt/alt/php82/usr/bin/php
 ```
 
+## Laravel Sail — tylko dev (WSL/Docker)
+
+**Na produkcji nie używamy `sail`.** Sail uruchamia komendy w kontenerze Docker — działa wyłącznie lokalnie (WSL2 + Laravel Sail).
+
+| Środowisko | Artisan / Composer / testy | Przykład |
+|------------|----------------------------|----------|
+| **Dev (lokalnie)** | `./vendor/bin/sail` lub alias `sail` | `sail artisan migrate` |
+| **Prod (SeoHost)** | `/opt/alt/php82/usr/bin/php artisan …` | `/opt/alt/php82/usr/bin/php artisan migrate --force` |
+
+Na prod **nigdy:** `sail artisan …`, `sail composer …`, `sail npm …`.
+
+Runbooki deploy, cron i kolejka: zawsze pełna ścieżka PHP powyżej (lub `php artisan …` jeśli `php` w PATH wskazuje na 8.2).
+
 ## Typowy deploy
 
 ```bash
