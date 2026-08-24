@@ -32,7 +32,7 @@ Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dl
 
 **Wydajność (2026-08):** pierwszy HTML listy zawiera tylko niebieskie/zielone/żółte badge uczestników (`withCount`). Czerwone **U**, żółte **FV**, cała kolumna **Lejek** oraz badge rozliczenia szkoleń zamkniętych ładują się **po** renderze przez `GET /courses/index-stats?ids[]=…` (live, bez cache) — ten sam wzorzec co `/form-orders/index-stats`.
 
-**Tryb spotkania live (kolumna U, szkolenia online):** ikona nad licznikami uczestników — zielony `bi-broadcast` = bezpośredni ClickMeeting (`clickmeeting_join_enabled`), niebieski `bi-display` = osadzony pokój na pnedu.pl (`embed_on_pnedu`). Tooltip na nagłówku **U** i na ikonie.
+**Tryb spotkania live (kolumna C, na dole, szkolenia online):** ikona — zielony `bi-broadcast` = bezpośredni ClickMeeting (`clickmeeting_join_enabled`), niebieski `bi-display` = osadzony pokój na pnedu.pl (`embed_on_pnedu`). Tooltip na nagłówku **C** i na ikonie.
 
 Zamówienie może jednocześnie zwiększać oba liczniki, dopóki nie zostanie zamknięty zarówno dostęp uczestnika, jak i rozliczenie. Anulowane zamówienia (`cancelled_at`) oraz zamówienia zamknięte legacy (`legacy_handled_at`) nie są liczone w tych badge. Oznaczenie `invoice_exempt_at` zamyka tylko etap faktury; jeśli uczestnik nie został dodany, zamówienie nadal może widnieć w liczniku `U`. Licznik `FV` i filtr „bez wystawionej faktury” opierają się na `invoice_number` (źródło prawdy); samo `ifirma_invoice_id` bez numeru FV nadal trafia do kolejki (do uzupełnienia przez sync z iFirma).
 

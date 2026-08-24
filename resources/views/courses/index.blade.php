@@ -251,8 +251,8 @@
                         <th style="width: 10%;">Rodzaj</th>
                         <th style="width: 18%;">Lokalizacja / Dostęp</th>
                         <th style="width: 10%;">Instruktor</th>
-                        <th class="text-center" style="width: 3%;" title="Check lista">C</th>
-                        <th class="text-center" style="width: 5%;" title="Uczestnicy. Ikona trybu spotkania live (tylko online): zielony = ClickMeeting, niebieski = osadzony pokój na pnedu.pl">U</th>
+                        <th class="text-center" style="width: 3%;" title="Check lista. Ikona trybu spotkania live (online, na dole): zielony = ClickMeeting, niebieski = osadzony pokój na pnedu.pl">C</th>
+                        <th class="text-center" style="width: 5%;" title="Uczestnicy">U</th>
                         @php
                             $lejekHeaderTooltip = '<div class="text-start">'
                                 .'<div class="fw-semibold mb-1">Kolumna Lejek</div>'
@@ -506,24 +506,24 @@
                                        title="{{ e($course->notatki) }}"
                                        style="font-size: 1.2em; cursor: help;"></i>
                                 @endif
+                                @if($course->type === 'online' && $course->onlineDetails)
+                                    @php
+                                        $embedOnPnedu = (bool) ($course->onlineDetails->embed_on_pnedu ?? false);
+                                        $clickmeetingJoin = (bool) ($course->onlineDetails->clickmeeting_join_enabled ?? false);
+                                    @endphp
+                                    @if($embedOnPnedu)
+                                        <i class="bi bi-display text-primary"
+                                           style="font-size: 1.2em;"
+                                           title="Spotkanie na żywo: osadzony pokój ClickMeeting na pnedu.pl"></i>
+                                    @elseif($clickmeetingJoin)
+                                        <i class="bi bi-broadcast text-success"
+                                           style="font-size: 1.2em;"
+                                           title="Spotkanie na żywo: bezpośredni pokój ClickMeeting"></i>
+                                    @endif
+                                @endif
                             </div>
                         </td>
                         <td class="text-center align-middle">
-                            @if($course->type === 'online' && $course->onlineDetails)
-                                @php
-                                    $embedOnPnedu = (bool) ($course->onlineDetails->embed_on_pnedu ?? false);
-                                    $clickmeetingJoin = (bool) ($course->onlineDetails->clickmeeting_join_enabled ?? false);
-                                @endphp
-                                @if($embedOnPnedu)
-                                    <i class="bi bi-display text-primary d-block mb-1"
-                                       style="font-size: 1.2em;"
-                                       title="Spotkanie na żywo: osadzony pokój ClickMeeting na pnedu.pl"></i>
-                                @elseif($clickmeetingJoin)
-                                    <i class="bi bi-broadcast text-success d-block mb-1"
-                                       style="font-size: 1.2em;"
-                                       title="Spotkanie na żywo: bezpośredni pokój ClickMeeting"></i>
-                                @endif
-                            @endif
                             <span class="badge bg-info" title="Liczba uczestników">{{ $course->participants_count }}</span><br>
                             <span class="badge bg-success text-white" title="Liczba uczestników z kompletnymi danymi (Nazwisko, Imię, Data urodzenia, Miejsce urodzenia)">{{ $course->participants_complete_count }}</span><br>
                             <span class="badge bg-warning" title="Liczba wygenerowanych zaświadczeń">{{ $course->certificates_count }}</span><br>
