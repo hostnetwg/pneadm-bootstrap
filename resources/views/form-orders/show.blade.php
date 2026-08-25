@@ -1308,6 +1308,35 @@ nowoczesna-edukacja.pl `;
             }).catch(function () {});
         }
 
+        function clearOrphanModalBackdrop() {
+            if (document.querySelector('.modal.show')) {
+                return;
+            }
+            document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+                el.remove();
+            });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        }
+
+        function hideBootstrapModal(modalEl) {
+            return new Promise(function (resolve) {
+                if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                    clearOrphanModalBackdrop();
+                    resolve();
+                    return;
+                }
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    clearOrphanModalBackdrop();
+                    resolve();
+                }, { once: true });
+                modal.hide();
+            });
+        }
+
         function softRefreshParticipantsCards(expandFopId) {
             const root = document.getElementById('formOrderParticipantsRoot');
             if (!root) {
@@ -3256,12 +3285,12 @@ nowoczesna-edukacja.pl `;
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
                 if (ok && data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('resetPneduModal'));
-                    if (modal) {
-                        modal.hide();
-                    }
-                    softRefreshParticipantsCards(null)
+                    hideBootstrapModal(modalEl)
                         .then(function () {
+                            return softRefreshParticipantsCards(null);
+                        })
+                        .then(function () {
+                            clearOrphanModalBackdrop();
                             button.disabled = false;
                             button.innerHTML = resetPneduConfirmButtonLabel(modalEl);
                         })
