@@ -136,7 +136,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 ## Import wyciągu mBank (MVP)
 
 - Menu: `Księgowość → Import wyciągu`.
-- Lista importów: nagłówki kolumn mają tooltipy Bootstrap (ID, plik, okres, wpływy/wszystkie, sugestie, duplikaty, **przegląd**, kto, kiedy, akcje).
+- Lista importów: kolumny **Wiersze** (wszystkie operacje w CSV), **Nowe wpływy** (zapisane wpływy bez duplikatów z wcześniejszych importów), **Sugestie**, **Duplikaty**, **Przegląd**; przy nagłówkach ikona ⓘ z tooltipem Bootstrap.
 - **Przegląd w tabeli:** kolumna pokazuje, czy wpływy z importu mają już decyzję operatora — `Przejrzany` (każdy wpływ accepted/ignored), `Do przeglądu: N` albo `Brak wpływów`. To nie jest status parsowania pliku („Sparsowany”).
 - **Luki dat (okresy wyciągów):** na liście importów alert z lukami między polami `#Za okres` ze wszystkich importów (nakładające się / stykające się okresy są łączone); zgłaszany jest też brak pokrycia od końca ostatniego okresu do dziś. Po nowym imporcie ostrzeżenie flash, jeśli luki istnieją. Serwis: `BankStatementCoverageService`.
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.

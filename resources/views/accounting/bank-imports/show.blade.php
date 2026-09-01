@@ -49,7 +49,7 @@
                             <span class="text-muted">Okres:</span>
                             {{ $import->period_from?->format('Y-m-d') ?? '—' }} → {{ $import->period_to?->format('Y-m-d') ?? '—' }}
                         </div>
-                        <div class="col-md-2"><span class="text-muted">Wpływy:</span> {{ $import->rows_incoming }}</div>
+                        <div class="col-md-2"><span class="text-muted">Nowe wpływy:</span> {{ $import->rows_incoming }}</div>
                         <div class="col-md-3">
                             <span class="text-muted">Przegląd:</span>
                             @if(($counts['unmatched'] ?? 0) === 0)

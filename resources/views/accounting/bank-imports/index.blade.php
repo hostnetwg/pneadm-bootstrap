@@ -84,81 +84,50 @@
             </div>
 
             <div class="card">
-                <div class="card-header fw-semibold">Ostatnie importy</div>
+                <div class="card-header fw-semibold">
+                    Ostatnie importy
+                    <span class="fw-normal text-muted small ms-1">— najedź na <i class="bi bi-info-circle" aria-hidden="true"></i> przy nagłówku, aby zobaczyć wyjaśnienie kolumny</span>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Unikalny numer rekordu importu w bazie (bank_statement_imports.id).">
-                                        ID
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Oryginalna nazwa wgranego pliku CSV z mBank (lista_operacji_*.csv). Kopia pliku jest też zapisana na serwerze.">
-                                        Plik
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Zakres dat operacji odczytany z wyciągu (period_from → period_to). Pokazuje, jaki okres obejmuje ten import.">
-                                        Okres
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Liczba nowo zapisanych wpływów (kwota &gt; 0) względem wszystkich wierszy z tego pliku: wpływy / wszystkie wiersze. Nie obejmuje operacji pominiętych jako duplikaty.">
-                                        Wpływy
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Ile wpływów z tego importu ma obecnie co najmniej jedną automatyczną sugestię dopasowania (status suggested). Ustawiane przy imporcie i aktualizowane po „Przelicz sugestie”. Nie oznacza jeszcze zaakceptowania.">
-                                        Sugestie
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Ile wierszy z pliku pominięto, bo taka sama operacja (data + kwota + znormalizowany opis) była już w bazie. Nie tworzymy drugiego przelewu — wcześniejsza akceptacja/ignorowanie zostaje.">
-                                        Duplikaty
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Postęp ręcznego przeglądu wpływów z tego importu. „Przejrzany” = każdy wpływ ma decyzję (zaakceptowany lub zignorowany). „Do przeglądu: N” = ile wpływów jeszcze czeka (sugestia lub bez powiązania). „Brak wpływów” = w pliku nie zapisano nowych wpływów (np. same duplikaty / wydatki).">
-                                        Przegląd
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Użytkownik panelu, który wgrał ten plik CSV.">
-                                        Kto
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Data i godzina utworzenia rekordu importu (kiedy plik został wgrany).">
-                                        Kiedy
-                                    </th>
-                                    <th scope="col"
-                                        class="text-nowrap"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Wejście do podglądu transakcji tego importu — kolejka dopasowań, akceptacja, ignorowanie, ręczne powiązanie.">
+                                    @php
+                                        $statHeaders = [
+                                            ['label' => 'ID', 'tip' => 'Unikalny numer rekordu importu w bazie.'],
+                                            ['label' => 'Plik', 'tip' => 'Oryginalna nazwa wgranego pliku CSV z mBank (lista_operacji_*.csv). Kopia pliku jest zapisana na serwerze.'],
+                                            ['label' => 'Okres', 'tip' => 'Zakres dat operacji odczytany z wyciągu (#Za okres). Pokazuje, jaki okres obejmuje ten import.'],
+                                            ['label' => 'Wiersze', 'tip' => 'Wszystkie operacje w pliku CSV — wpływy i wydatki. Liczone są też wiersze pominięte jako duplikaty (nie trafiły do bazy jako nowe rekordy).'],
+                                            ['label' => 'Nowe wpływy', 'tip' => 'Ile wpływów (kwota dodatnia) zapisano przy tym imporcie. Pomija operacje już obecne w bazie z wcześniejszych wyciągów — te trafiają do kolumny Duplikaty i nie są tu liczone.'],
+                                            ['label' => 'Sugestie', 'tip' => 'Ile nowych wpływów ma co najmniej jedną automatyczną sugestię dopasowania (FV, NIP, zamówienie itd.). Aktualizowane po „Przelicz sugestie”. To nie jest jeszcze akceptacja — decyzja należy do operatora.'],
+                                            ['label' => 'Duplikaty', 'tip' => 'Ile wierszy z pliku pominięto, bo taka sama operacja (data + kwota + znormalizowany opis) była już w bazie z wcześniejszego importu. Nie powstaje drugi przelew.'],
+                                            ['label' => 'Przegląd', 'tip' => 'Postęp ręcznej pracy przy wpływach z tego importu. „Do przeglądu: N” — wpływy bez decyzji (sugestia do akceptacji/odrzucenia, brak powiązania lub wolna kwota). „Przejrzany” — każdy wpływ zaakceptowany lub zignorowany. „Brak wpływów” — nie zapisano nowych wpływów (np. same duplikaty).'],
+                                            ['label' => 'Kto', 'tip' => 'Użytkownik panelu, który wgrał ten plik CSV.'],
+                                            ['label' => 'Kiedy', 'tip' => 'Data i godzina wgrania pliku.'],
+                                        ];
+                                    @endphp
+                                    @foreach($statHeaders as $header)
+                                        <th scope="col" class="text-nowrap">
+                                            {{ $header['label'] }}
+                                            <i class="bi bi-info-circle text-muted ms-1"
+                                               role="img"
+                                               aria-label="Wyjaśnienie: {{ $header['label'] }}"
+                                               tabindex="0"
+                                               data-bs-toggle="tooltip"
+                                               data-bs-placement="top"
+                                               data-bs-title="{{ $header['tip'] }}"></i>
+                                        </th>
+                                    @endforeach
+                                    <th scope="col" class="text-nowrap">
                                         <span class="visually-hidden">Akcje</span>
+                                        <i class="bi bi-info-circle text-muted"
+                                           role="img"
+                                           aria-label="Wyjaśnienie: Akcje"
+                                           tabindex="0"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           data-bs-title="Podgląd transakcji importu — kolejka dopasowań, akceptacja, ignorowanie, ręczne powiązanie ze sprawą. Usuń — tylko gdy brak zaakceptowanych powiązań."></i>
                                     </th>
                                 </tr>
                             </thead>
@@ -176,7 +145,14 @@
                                                 —
                                             @endif
                                         </td>
-                                        <td>{{ $import->rows_incoming }} / {{ $import->rows_total }}</td>
+                                        <td>{{ $import->rows_total }}</td>
+                                        <td>
+                                            @if((int) $import->rows_incoming > 0)
+                                                <span class="fw-semibold">{{ $import->rows_incoming }}</span>
+                                            @else
+                                                <span class="text-muted">0</span>
+                                            @endif
+                                        </td>
                                         <td>{{ $import->rows_matched }}</td>
                                         <td>{{ $import->rows_duplicate }}</td>
                                         <td>
@@ -203,7 +179,7 @@
                                                             data-bs-toggle="modal"
                                                             data-bs-target="#bankImportDeleteModal"
                                                             data-delete-url="{{ route('accounting.bank-imports.destroy', $import) }}"
-                                                            data-delete-summary="Import #{{ $import->id }} · {{ $import->original_filename }} · wpływy {{ $import->rows_incoming }}/{{ $import->rows_total }}">
+                                                            data-delete-summary="Import #{{ $import->id }} · {{ $import->original_filename }} · {{ $import->rows_incoming }} nowych wpływów · {{ $import->rows_total }} wierszy">
                                                         Usuń
                                                     </button>
                                                 @endif
@@ -212,7 +188,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="10" class="text-muted text-center py-4">Brak importów.</td>
+                                        <td colspan="11" class="text-muted text-center py-4">Brak importów.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -257,7 +233,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             if (window.bootstrap && bootstrap.Tooltip) {
                 document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-                    bootstrap.Tooltip.getOrCreateInstance(el);
+                    bootstrap.Tooltip.getOrCreateInstance(el, {
+                        trigger: 'hover focus',
+                        container: 'body',
+                    });
                 });
             }
 
