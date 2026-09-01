@@ -11,6 +11,7 @@ Przed każdą zmianą w integracji z iFirma (wystawianie FV, lista, wpłaty, KSe
 |---|---|
 | Start / historia zmian / limity | [https://api.ifirma.pl/](https://api.ifirma.pl/) |
 | Lista faktur (`GET faktury.json`) | [https://api.ifirma.pl/lista-faktur/](https://api.ifirma.pl/lista-faktur/) |
+| Miesiąc księgowy (`GET/PUT abonent/miesiacksiegowy.json`, klucz **abonent**) | [https://api.ifirma.pl/pobranie-i-zmiana-ustawionego-miesiaca-ksiegowego/](https://api.ifirma.pl/pobranie-i-zmiana-ustawionego-miesiaca-ksiegowego/) |
 | Rejestrowanie wpłat | [https://api.ifirma.pl/rejestrowanie-wplat-do-faktur/](https://api.ifirma.pl/rejestrowanie-wplat-do-faktur/) |
 | Dodatkowy podmiot na fakturze | [https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/) |
 
@@ -23,7 +24,8 @@ Przed każdą zmianą w integracji z iFirma (wystawianie FV, lista, wpłaty, KSe
 ## Kod w tym repo
 
 - Klient HTTP: `App\Services\IfirmaApiService`
+- **Miesiąc księgowy przed wystawieniem FV z adm:** `App\Services\IfirmaAccountingMonthSyncService` — wywoływany z `FormOrdersController` (pro forma, krajowa, z odbiorcą, +KSeF). Wymaga `IFIRMA_KEY_ABONENT` w `.env` (prod). API pozwala tylko na krok `NAST` / `POPRZ`; przy większej różnicy wykonywana jest pętla (max 24 miesiące).
 - Sync statusu płatności / windykacja: `App\Services\IfirmaInvoicePaymentStatusService` + `docs/WINDYKACJA.md`
 - KSeF / wystawianie: `docs/KSEF_FORM_ORDERS.md`
 
-Ostatnia weryfikacja treści docs przy etapie syncu dwukrokowego: 2026-08-08.
+Ostatnia weryfikacja treści docs przy etapie syncu miesiąca księgowego: 2026-09-01.

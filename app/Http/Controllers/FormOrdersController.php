@@ -8,6 +8,7 @@ use App\Models\OnlinePaymentOrder;
 use App\Services\FormOrderAccessExtensionService;
 use App\Services\FormOrderCancellationService;
 use App\Services\FormOrderPneduProvisionService;
+use App\Services\IfirmaAccountingMonthSyncService;
 use App\Services\IfirmaApiService;
 use App\Services\IfirmaFormOrderKsefSubmissionService;
 use App\Services\PubligoApiService;
@@ -1923,6 +1924,10 @@ class FormOrdersController extends Controller
                 'invoice_data_json' => json_encode($invoiceData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             ]);
 
+            if ($accountingMonthError = $this->syncIfirmaAccountingMonthBeforeIssue()) {
+                return $accountingMonthError;
+            }
+
             // Wystawienie faktury pro forma przez API iFirma
             $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createProFormaInvoice($invoiceData);
@@ -2429,6 +2434,10 @@ class FormOrdersController extends Controller
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
 
+            if ($accountingMonthError = $this->syncIfirmaAccountingMonthBeforeIssue()) {
+                return $accountingMonthError;
+            }
+
             // Wystawienie faktury przez API iFirma
             $ifirmaService = new IfirmaApiService;
             $result = $ifirmaService->createInvoice($invoiceData);
@@ -2783,6 +2792,10 @@ class FormOrdersController extends Controller
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
                 'json_preview' => json_encode($invoiceData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
             ]);
+
+            if ($accountingMonthError = $this->syncIfirmaAccountingMonthBeforeIssue()) {
+                return $accountingMonthError;
+            }
 
             // Wystawienie faktury przez API iFirma
             $ifirmaService = new IfirmaApiService;
@@ -3190,6 +3203,10 @@ class FormOrdersController extends Controller
                 'payment_delay_days' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie) ? null : $paymentDelay,
                 'ifirma_paid_invoice' => $this->ifirmaShouldMarkInvoiceAsPaid($zamowienie),
             ]);
+
+            if ($accountingMonthError = $this->syncIfirmaAccountingMonthBeforeIssue()) {
+                return $accountingMonthError;
+            }
 
             // KROK 1: Wystawienie faktury krajowej przez API iFirma
             $ifirmaService = new IfirmaApiService;
@@ -3894,6 +3911,25 @@ class FormOrdersController extends Controller
 
         $paymentDelay = ! empty($zamowienie->invoice_payment_delay) ? (int) $zamowienie->invoice_payment_delay : 14;
         $invoiceData['TerminPlatnosci'] = now()->addDays($paymentDelay)->format('Y-m-d');
+    }
+
+    /**
+     * Przed wystawieniem dokumentu w iFirma ustawia miesiąc księgowy zgodny z datą wystawienia (dziś).
+     * Wymaga klucza API abonent (IFIRMA_KEY_ABONENT).
+     */
+    private function syncIfirmaAccountingMonthBeforeIssue(): ?\Illuminate\Http\JsonResponse
+    {
+        $result = app(IfirmaAccountingMonthSyncService::class)->ensureMatchesDate(now());
+        if (($result['status'] ?? '') === 'success') {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'error' => $result['message'] ?? 'Nie udało się zsynchronizować miesiąca księgowego iFirma.',
+            'step' => 'accounting_month_sync',
+            'details' => $result,
+        ], 422);
     }
 
     /**

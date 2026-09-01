@@ -471,6 +471,172 @@ class IfirmaApiService
     }
 
     /**
+     * Pobiera ustawiony miesiąc i rok księgowy (GET abonent/miesiacksiegowy.json).
+     *
+     * @see https://api.ifirma.pl/pobranie-i-zmiana-ustawionego-miesiaca-ksiegowego/
+     *
+     * @return array{status: string, month?: int, year?: int, message?: string, data?: mixed}
+     */
+    public function getAccountingMonth(): array
+    {
+        if (empty($this->keys['abonent'])) {
+            return [
+                'status' => 'config_error',
+                'message' => 'Brak skonfigurowanego klucza autoryzacji abonent (IFIRMA_KEY_ABONENT).',
+            ];
+        }
+
+        $result = $this->get('abonent/miesiacksiegowy.json', 'abonent');
+        if (($result['status'] ?? null) !== 'success') {
+            return [
+                'status' => 'error',
+                'message' => $result['message'] ?? 'Nie udało się pobrać miesiąca księgowego z iFirma.',
+                'data' => $result['data'] ?? null,
+            ];
+        }
+
+        $response = $result['data']['response'] ?? $result['data'] ?? [];
+        $month = isset($response['MiesiacKsiegowy']) ? (int) $response['MiesiacKsiegowy'] : 0;
+        $year = isset($response['RokKsiegowy']) ? (int) $response['RokKsiegowy'] : 0;
+
+        if ($month < 1 || $month > 12 || $year < 1900) {
+            return [
+                'status' => 'error',
+                'message' => 'Nieprawidłowa odpowiedź iFirma dla miesiąca księgowego.',
+                'data' => $result['data'] ?? null,
+            ];
+        }
+
+        return [
+            'status' => 'success',
+            'month' => $month,
+            'year' => $year,
+            'data' => $result['data'] ?? null,
+        ];
+    }
+
+    /**
+     * Przesuwa miesiąc księgowy o jeden miesiąc do przodu (NAST) lub wstecz (POPRZ).
+     *
+     * @param  'NAST'|'POPRZ'  $direction
+     *
+     * @see https://api.ifirma.pl/pobranie-i-zmiana-ustawionego-miesiaca-ksiegowego/
+     *
+     * @return array{status: string, message?: string, data?: mixed}
+     */
+    public function changeAccountingMonth(string $direction, bool $carryFromPreviousYear = true): array
+    {
+        if (! in_array($direction, ['NAST', 'POPRZ'], true)) {
+            return [
+                'status' => 'error',
+                'message' => 'Nieprawidłowy kierunek zmiany miesiąca księgowego.',
+            ];
+        }
+
+        if (empty($this->keys['abonent'])) {
+            return [
+                'status' => 'config_error',
+                'message' => 'Brak skonfigurowanego klucza autoryzacji abonent (IFIRMA_KEY_ABONENT).',
+            ];
+        }
+
+        return $this->put('abonent/miesiacksiegowy.json', [
+            'MiesiacKsiegowy' => $direction,
+            'PrzeniesDaneZPoprzedniegoRoku' => $carryFromPreviousYear,
+        ], 'abonent');
+    }
+
+    /**
+     * Wykonuje żądanie PUT do API iFirma (HMAC jak przy POST).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{status: string, status_code?: int, message?: string, data?: mixed, raw_response?: string, parsed_data?: mixed}
+     */
+    public function put(string $endpoint, array $data, string $keyName = 'faktura'): array
+    {
+        try {
+            if (! str_ends_with($endpoint, '.json')) {
+                $endpoint .= '.json';
+            }
+            $fullUrl = $this->baseUrl.$this->apiEndpoint.'/'.$endpoint;
+            $requestContent = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+            if ($requestContent === false) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Nie udało się zakodować JSON dla PUT iFirma.',
+                ];
+            }
+            $requestContent = str_replace(["\r\n", "\r"], "\n", $requestContent);
+            $authHeader = $this->generateAuthHeader($fullUrl, $keyName, $requestContent);
+
+            Log::info('iFirma API Request (PUT)', [
+                'url' => $fullUrl,
+                'key_name' => $keyName,
+                'endpoint' => $endpoint,
+            ]);
+
+            $response = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authentication' => $authHeader,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->withBody($requestContent, 'application/json')
+                ->put($fullUrl);
+
+            $statusCode = $response->status();
+            $body = $response->body();
+            $jsonData = $response->successful() ? $response->json() : null;
+
+            $hasErrorInResponse = false;
+            $errorMessage = null;
+            if ($jsonData !== null && isset($jsonData['response'])) {
+                $apiResponse = $jsonData['response'];
+                if (isset($apiResponse['Kod']) && $apiResponse['Kod'] != 0 && $apiResponse['Kod'] != 200) {
+                    $hasErrorInResponse = true;
+                    $errorMessage = $apiResponse['Informacja'] ?? 'Błąd API iFirma';
+                } elseif (isset($apiResponse['Informacja']) &&
+                    (stripos($apiResponse['Informacja'], 'błąd') !== false ||
+                     stripos($apiResponse['Informacja'], 'niepoprawna') !== false ||
+                     stripos($apiResponse['Informacja'], 'nie można') !== false)) {
+                    $hasErrorInResponse = true;
+                    $errorMessage = $apiResponse['Informacja'];
+                }
+            }
+
+            if ($response->successful() && ! $hasErrorInResponse) {
+                return [
+                    'status' => 'success',
+                    'status_code' => $statusCode,
+                    'data' => $jsonData,
+                    'raw_response' => $body,
+                ];
+            }
+
+            return [
+                'status' => 'error',
+                'status_code' => $hasErrorInResponse ? ($jsonData['response']['Kod'] ?? $statusCode) : $statusCode,
+                'message' => $hasErrorInResponse
+                    ? $errorMessage
+                    : ($this->parseErrorMessage($body) ?: 'iFirma odrzuciła żądanie PUT (HTTP '.$statusCode.').'),
+                'raw_response' => $body,
+                'parsed_data' => $jsonData,
+            ];
+        } catch (Exception $e) {
+            Log::error('iFirma API PUT Exception', [
+                'message' => $e->getMessage(),
+                'endpoint' => $endpoint,
+            ]);
+
+            return [
+                'status' => 'exception',
+                'message' => $e->getMessage(),
+                'error_type' => get_class($e),
+            ];
+        }
+    }
+
+    /**
      * Wykonuje żądanie DELETE do API iFirma (HMAC jak przy POST).
      *
      * @param  array<string, mixed>  $data
