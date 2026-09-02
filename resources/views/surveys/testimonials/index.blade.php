@@ -377,12 +377,88 @@
             }
 
             const deleteModal = document.getElementById('deleteTestimonialModal');
+            let deleteTargetRowId = null;
             if (deleteModal) {
                 deleteModal.addEventListener('show.bs.modal', function (event) {
                     const btn = event.relatedTarget;
                     if (!btn) return;
+                    const row = btn.closest('.js-testimonial-row');
+                    deleteTargetRowId = row ? row.getAttribute('data-id') : null;
                     document.getElementById('deleteTestimonialForm').action = btn.getAttribute('data-delete-url') || '';
                     document.getElementById('deleteTestimonialAuthor').textContent = btn.getAttribute('data-author-name') || '';
+                });
+                deleteModal.addEventListener('hidden.bs.modal', function () {
+                    deleteTargetRowId = null;
+                });
+            }
+
+            const deleteForm = document.getElementById('deleteTestimonialForm');
+            if (deleteForm) {
+                deleteForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    const url = deleteForm.action;
+                    if (!url) return;
+
+                    const submitBtn = deleteForm.querySelector('button[type="submit"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
+                    fetch(url, {
+                        method: 'DELETE',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                    })
+                        .then(function (res) {
+                            return res.json().then(function (data) {
+                                return { ok: res.ok, data: data };
+                            });
+                        })
+                        .then(function (result) {
+                            const data = result.data || {};
+                            if (!result.ok || !data.success) {
+                                showFlash(data.message || 'Nie udało się usunąć rekomendacji.', 'danger');
+                                if (submitBtn) submitBtn.disabled = false;
+                                return;
+                            }
+
+                            if (deleteModal && typeof bootstrap !== 'undefined') {
+                                bootstrap.Modal.getOrCreateInstance(deleteModal).hide();
+                            }
+
+                            showFlash(data.message || 'Rekomendacja usunięta.', 'success');
+
+                            if (featuredCountEl && typeof data.featured_count === 'number') {
+                                featuredCountEl.textContent = String(data.featured_count);
+                            }
+
+                            const row = deleteTargetRowId
+                                ? document.querySelector('.js-testimonial-row[data-id="' + deleteTargetRowId + '"]')
+                                : null;
+                            if (row) {
+                                const tbody = row.closest('tbody');
+                                row.remove();
+                                if (tbody && tbody.querySelectorAll('.js-testimonial-row').length === 0) {
+                                    const pageUrl = new URL(window.location.href);
+                                    const page = parseInt(pageUrl.searchParams.get('page') || '1', 10);
+                                    if (page > 1) {
+                                        pageUrl.searchParams.set('page', String(page - 1));
+                                        window.location.href = pageUrl.toString();
+                                        return;
+                                    }
+                                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td></tr>';
+                                }
+                            }
+
+                            deleteTargetRowId = null;
+                            if (submitBtn) submitBtn.disabled = false;
+                        })
+                        .catch(function () {
+                            showFlash('Błąd połączenia — spróbuj ponownie.', 'danger');
+                            if (submitBtn) submitBtn.disabled = false;
+                        });
                 });
             }
 

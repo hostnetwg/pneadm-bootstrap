@@ -212,4 +212,26 @@ class SurveyTestimonialUpdateTest extends TestCase
         $this->assertFalse($fresh->is_featured);
         $this->assertSame(SurveyTestimonial::DISPLAY_ORDER_UNFEATURED, (int) $fresh->display_order);
     }
+
+    public function test_destroy_via_ajax_returns_json_and_deletes_testimonial(): void
+    {
+        $admin = User::factory()->create();
+        $testimonial = SurveyTestimonial::query()->create([
+            'author_name' => 'Anna Nowak',
+            'quote' => 'Opinia',
+            'publish_consent' => true,
+            'is_published' => true,
+            'is_featured' => true,
+            'display_order' => 10,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->deleteJson(route('surveys.testimonials.destroy', $testimonial));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Rekomendacja usunięta.')
+            ->assertJsonPath('featured_count', 0);
+        $this->assertDatabaseMissing('survey_testimonials', ['id' => $testimonial->id]);
+    }
 }

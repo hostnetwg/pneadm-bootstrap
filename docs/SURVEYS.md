@@ -126,7 +126,7 @@ Powiązanie z `survey_response_id` przez sesję.
 **Moderacja adm:** `Ankiety → Rekomendacje` → `/surveys/testimonials`  
 Publikacja na homepage dopiero po ręcznym „Publikuj” (mimo zgody z formularza).  
 Edycja: przycisk **Edytuj** — poprawa opinii, autora, stanowiska, miasta i oceny (literówki przed publikacją).  
-**Publikuj / Wyróżnij / Odznacz / Ukryj** działają przez AJAX (bez przeładowania — zostajesz na tej samej stronie paginacji).
+**Publikuj / Wyróżnij / Odznacz / Ukryj / Usuń** działają przez AJAX (bez przeładowania — zostajesz na tej samej stronie paginacji).
 
 **Wyróżnienie (pin):** przy opublikowanej rekomendacji **Wyróżnij** / **Odznacz**
 (`survey_testimonials.is_featured`). Wyróżnione są zawsze **pierwsze** na homepage,

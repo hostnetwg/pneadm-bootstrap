@@ -134,9 +134,17 @@ class SurveyTestimonialController extends Controller
         );
     }
 
-    public function destroy(Request $request, SurveyTestimonial $testimonial): RedirectResponse
+    public function destroy(Request $request, SurveyTestimonial $testimonial): RedirectResponse|JsonResponse
     {
         $testimonial->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Rekomendacja usunięta.',
+                'featured_count' => SurveyTestimonial::featuredCount(),
+            ]);
+        }
 
         return $this->redirectToIndex($request)->with('success', 'Rekomendacja usunięta.');
     }
