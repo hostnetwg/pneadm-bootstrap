@@ -263,10 +263,7 @@
                     actions.appendChild(document.createTextNode(' '));
                 }
 
-                addBtn('btn btn-sm btn-outline-primary js-edit-testimonial', 'Edytuj', {
-                    'data-bs-toggle': 'modal',
-                    'data-bs-target': '#editTestimonialModal',
-                });
+                addBtn('btn btn-sm btn-outline-primary js-edit-testimonial', 'Edytuj', {});
 
                 if (!published && consent) {
                     addBtn('btn btn-sm btn-success js-testimonial-ajax', 'Publikuj', { 'data-action': 'publish' });
@@ -285,41 +282,64 @@
                     addBtn('btn btn-sm btn-outline-secondary js-testimonial-ajax', 'Ukryj', { 'data-action': 'unpublish' });
                 }
 
-                addBtn('btn btn-sm btn-outline-danger', 'Usuń', {
-                    'data-bs-toggle': 'modal',
-                    'data-bs-target': '#deleteTestimonialModal',
-                    'data-delete-url': row.getAttribute('data-delete-url') || '',
-                    'data-author-name': row.getAttribute('data-author-name') || '',
-                });
+                addBtn('btn btn-sm btn-outline-danger js-delete-testimonial', 'Usuń', {});
 
                 actionsEl.replaceChildren(actions);
             }
 
             function clearOrphanModalBackdrop() {
-                if (document.querySelector('.modal.show')) {
-                    return;
-                }
                 document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
             }
 
+            function resetModalElement(modalEl) {
+                if (!modalEl) return;
+                modalEl.classList.remove('show');
+                modalEl.style.removeProperty('display');
+                modalEl.setAttribute('aria-hidden', 'true');
+                modalEl.removeAttribute('aria-modal');
+                modalEl.removeAttribute('role');
+            }
+
             function hideBootstrapModal(modalEl) {
                 return new Promise(function (resolve) {
                     if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
                         clearOrphanModalBackdrop();
+                        resetModalElement(modalEl);
+                        resolve();
+                        return;
+                    }
+                    if (!modalEl.classList.contains('show')) {
+                        clearOrphanModalBackdrop();
+                        resetModalElement(modalEl);
                         resolve();
                         return;
                     }
                     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     modalEl.addEventListener('hidden.bs.modal', function onHidden() {
-                        modalEl.removeEventListener('hidden.bs.modal', onHidden);
                         clearOrphanModalBackdrop();
+                        resetModalElement(modalEl);
                         resolve();
                     }, { once: true });
                     modal.hide();
                 });
+            }
+
+            function showBootstrapModal(modalEl) {
+                if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                    return null;
+                }
+                clearOrphanModalBackdrop();
+                resetModalElement(modalEl);
+                const existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) {
+                    existing.dispose();
+                }
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+                return modal;
             }
 
             function removeDeletedTestimonialRow(rowId) {
@@ -345,6 +365,72 @@
             }
 
             document.querySelectorAll('.js-testimonial-row').forEach(renderRow);
+
+            const editModal = document.getElementById('editTestimonialModal');
+            const deleteModal = document.getElementById('deleteTestimonialModal');
+            [editModal, deleteModal].forEach(function (modalEl) {
+                if (modalEl && modalEl.parentElement !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+            });
+
+            let deleteTargetRowId = null;
+
+            function openEditTestimonialModal(row) {
+                if (!row || !editModal) return;
+                let payload = {};
+                try {
+                    payload = JSON.parse(row.getAttribute('data-edit-payload') || '{}');
+                } catch (e) {
+                    payload = {};
+                }
+                document.getElementById('editTestimonialForm').action = payload.updateUrl || '';
+                document.getElementById('edit_quote').value = payload.quote || '';
+                document.getElementById('edit_author_name').value = payload.authorName || '';
+                document.getElementById('edit_author_role').value = payload.authorRole || '';
+                document.getElementById('edit_author_city').value = payload.authorCity || '';
+                document.getElementById('edit_rating').value = payload.rating != null ? String(payload.rating) : '';
+                showBootstrapModal(editModal);
+            }
+
+            function openDeleteTestimonialModal(row) {
+                if (!row || !deleteModal) return;
+                deleteTargetRowId = row.getAttribute('data-id');
+                document.getElementById('deleteTestimonialForm').action = row.getAttribute('data-delete-url') || '';
+                document.getElementById('deleteTestimonialAuthor').textContent = row.getAttribute('data-author-name') || '';
+                showBootstrapModal(deleteModal);
+            }
+
+            document.addEventListener('click', function (event) {
+                const editBtn = event.target.closest('.js-edit-testimonial');
+                if (editBtn) {
+                    event.preventDefault();
+                    openEditTestimonialModal(editBtn.closest('.js-testimonial-row'));
+                    return;
+                }
+
+                const deleteBtn = event.target.closest('.js-delete-testimonial');
+                if (deleteBtn) {
+                    event.preventDefault();
+                    openDeleteTestimonialModal(deleteBtn.closest('.js-testimonial-row'));
+                    return;
+                }
+            });
+
+            if (deleteModal) {
+                deleteModal.addEventListener('hidden.bs.modal', function () {
+                    deleteTargetRowId = null;
+                    clearOrphanModalBackdrop();
+                    resetModalElement(deleteModal);
+                });
+            }
+
+            if (editModal) {
+                editModal.addEventListener('hidden.bs.modal', function () {
+                    clearOrphanModalBackdrop();
+                    resetModalElement(editModal);
+                });
+            }
 
             document.addEventListener('click', function (event) {
                 const btn = event.target.closest('.js-testimonial-ajax');
@@ -404,43 +490,6 @@
                     });
             });
 
-            const editModal = document.getElementById('editTestimonialModal');
-            if (editModal) {
-                editModal.addEventListener('show.bs.modal', function (event) {
-                    const btn = event.relatedTarget;
-                    if (!btn || !btn.classList.contains('js-edit-testimonial')) return;
-                    const row = btn.closest('.js-testimonial-row');
-                    let payload = {};
-                    try {
-                        payload = JSON.parse((row && row.getAttribute('data-edit-payload')) || '{}');
-                    } catch (e) {
-                        payload = {};
-                    }
-                    document.getElementById('editTestimonialForm').action = payload.updateUrl || '';
-                    document.getElementById('edit_quote').value = payload.quote || '';
-                    document.getElementById('edit_author_name').value = payload.authorName || '';
-                    document.getElementById('edit_author_role').value = payload.authorRole || '';
-                    document.getElementById('edit_author_city').value = payload.authorCity || '';
-                    document.getElementById('edit_rating').value = payload.rating != null ? String(payload.rating) : '';
-                });
-            }
-
-            const deleteModal = document.getElementById('deleteTestimonialModal');
-            let deleteTargetRowId = null;
-            if (deleteModal) {
-                deleteModal.addEventListener('show.bs.modal', function (event) {
-                    const btn = event.relatedTarget;
-                    if (!btn) return;
-                    const row = btn.closest('.js-testimonial-row');
-                    deleteTargetRowId = row ? row.getAttribute('data-id') : null;
-                    document.getElementById('deleteTestimonialForm').action = btn.getAttribute('data-delete-url') || '';
-                    document.getElementById('deleteTestimonialAuthor').textContent = btn.getAttribute('data-author-name') || '';
-                });
-                deleteModal.addEventListener('hidden.bs.modal', function () {
-                    deleteTargetRowId = null;
-                });
-            }
-
             const deleteForm = document.getElementById('deleteTestimonialForm');
             if (deleteForm) {
                 deleteForm.addEventListener('submit', function (event) {
@@ -494,16 +543,13 @@
             }
 
             const shouldReopenEdit = @json($reopenEditTestimonial);
-            if (shouldReopenEdit && typeof bootstrap !== 'undefined') {
-                const reopen = document.getElementById('editTestimonialModal');
-                if (reopen) {
-                    document.getElementById('edit_quote').value = @json(old('quote'));
-                    document.getElementById('edit_author_name').value = @json(old('author_name'));
-                    document.getElementById('edit_author_role').value = @json(old('author_role'));
-                    document.getElementById('edit_author_city').value = @json(old('author_city'));
-                    document.getElementById('edit_rating').value = @json(old('rating'));
-                    bootstrap.Modal.getOrCreateInstance(reopen).show();
-                }
+            if (shouldReopenEdit && typeof bootstrap !== 'undefined' && editModal) {
+                document.getElementById('edit_quote').value = @json(old('quote'));
+                document.getElementById('edit_author_name').value = @json(old('author_name'));
+                document.getElementById('edit_author_role').value = @json(old('author_role'));
+                document.getElementById('edit_author_city').value = @json(old('author_city'));
+                document.getElementById('edit_rating').value = @json(old('rating'));
+                showBootstrapModal(editModal);
             }
         });
     </script>
