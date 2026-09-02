@@ -98,7 +98,7 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td style="max-width: 360px;">{{ Str::limit($t->quote, 180) }}</td>
+                                <td class="testimonial-quote-cell" style="min-width: 280px; max-width: 520px; white-space: pre-wrap; word-break: break-word;">{{ $t->quote }}</td>
                                 <td>{{ $t->rating ? $t->rating.'/5' : '—' }}</td>
                                 <td class="text-nowrap">
                                     @if($t->created_at)
@@ -295,6 +295,55 @@
                 actionsEl.replaceChildren(actions);
             }
 
+            function clearOrphanModalBackdrop() {
+                if (document.querySelector('.modal.show')) {
+                    return;
+                }
+                document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+
+            function hideBootstrapModal(modalEl) {
+                return new Promise(function (resolve) {
+                    if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                        clearOrphanModalBackdrop();
+                        resolve();
+                        return;
+                    }
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                        clearOrphanModalBackdrop();
+                        resolve();
+                    }, { once: true });
+                    modal.hide();
+                });
+            }
+
+            function removeDeletedTestimonialRow(rowId) {
+                const row = rowId
+                    ? document.querySelector('.js-testimonial-row[data-id="' + rowId + '"]')
+                    : null;
+                if (!row) return;
+
+                const tbody = row.closest('tbody');
+                row.remove();
+                if (!tbody || tbody.querySelectorAll('.js-testimonial-row').length > 0) {
+                    return;
+                }
+
+                const pageUrl = new URL(window.location.href);
+                const page = parseInt(pageUrl.searchParams.get('page') || '1', 10);
+                if (page > 1) {
+                    pageUrl.searchParams.set('page', String(page - 1));
+                    window.location.href = pageUrl.toString();
+                    return;
+                }
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td></tr>';
+            }
+
             document.querySelectorAll('.js-testimonial-row').forEach(renderRow);
 
             document.addEventListener('click', function (event) {
@@ -424,36 +473,18 @@
                                 return;
                             }
 
-                            if (deleteModal && typeof bootstrap !== 'undefined') {
-                                bootstrap.Modal.getOrCreateInstance(deleteModal).hide();
-                            }
+                            const rowId = deleteTargetRowId;
+                            hideBootstrapModal(deleteModal).then(function () {
+                                showFlash(data.message || 'Rekomendacja usunięta.', 'success');
 
-                            showFlash(data.message || 'Rekomendacja usunięta.', 'success');
-
-                            if (featuredCountEl && typeof data.featured_count === 'number') {
-                                featuredCountEl.textContent = String(data.featured_count);
-                            }
-
-                            const row = deleteTargetRowId
-                                ? document.querySelector('.js-testimonial-row[data-id="' + deleteTargetRowId + '"]')
-                                : null;
-                            if (row) {
-                                const tbody = row.closest('tbody');
-                                row.remove();
-                                if (tbody && tbody.querySelectorAll('.js-testimonial-row').length === 0) {
-                                    const pageUrl = new URL(window.location.href);
-                                    const page = parseInt(pageUrl.searchParams.get('page') || '1', 10);
-                                    if (page > 1) {
-                                        pageUrl.searchParams.set('page', String(page - 1));
-                                        window.location.href = pageUrl.toString();
-                                        return;
-                                    }
-                                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Brak rekomendacji w tym filtrze.</td></tr>';
+                                if (featuredCountEl && typeof data.featured_count === 'number') {
+                                    featuredCountEl.textContent = String(data.featured_count);
                                 }
-                            }
 
-                            deleteTargetRowId = null;
-                            if (submitBtn) submitBtn.disabled = false;
+                                removeDeletedTestimonialRow(rowId);
+                                deleteTargetRowId = null;
+                                if (submitBtn) submitBtn.disabled = false;
+                            });
                         })
                         .catch(function () {
                             showFlash('Błąd połączenia — spróbuj ponownie.', 'danger');
