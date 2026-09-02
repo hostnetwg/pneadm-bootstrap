@@ -434,6 +434,61 @@
                     <input type="checkbox" name="show_on_pnedu" value="1" class="form-check-input" id="show_on_pnedu" {{ old('show_on_pnedu', $sourceOffer ? '0' : '0') == '1' ? 'checked' : '' }}>
                     <label class="form-check-label" for="show_on_pnedu">Pokaż na stronie głównej pnedu.pl</label>
                 </div>
+
+                <div class="card border-warning mb-3">
+                    <div class="card-header bg-warning-subtle">
+                        <strong>Zapisy publiczne na pnedu.pl</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input type="hidden" name="registration_closed" value="0">
+                            <input type="checkbox"
+                                   name="registration_closed"
+                                   value="1"
+                                   class="form-check-input"
+                                   id="registration_closed"
+                                   {{ old('registration_closed') ? 'checked' : '' }}>
+                            <label class="form-check-label fw-semibold" for="registration_closed">
+                                Zamknij zapisy na tę edycję
+                            </label>
+                            <div class="form-text">
+                                Stara strona szkolenia zostaje dostępna, ale nowe wejścia na formularz zapisu zostaną skierowane na kolejną edycję.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="registration_successor_course_id" class="form-label">Następna edycja szkolenia</label>
+                            <select name="registration_successor_course_id"
+                                    id="registration_successor_course_id"
+                                    class="form-select @error('registration_successor_course_id') is-invalid @enderror">
+                                <option value="">— Brak przekierowania —</option>
+                                @foreach(($registrationSuccessorOptions ?? collect()) as $successor)
+                                    <option value="{{ $successor->id }}" {{ (string) old('registration_successor_course_id') === (string) $successor->id ? 'selected' : '' }}>
+                                        #{{ $successor->id }} — {{ $successor->start_date ? $successor->start_date->format('d.m.Y H:i') : 'bez daty' }} — {{ strip_tags($successor->title) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('registration_successor_course_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="form-text">
+                                Jeśli pole jest uzupełnione, formularz starej edycji przejdzie na tę edycję z informacją dla klienta.
+                            </div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label for="registration_closed_message" class="form-label">Komunikat na starej stronie</label>
+                            <textarea name="registration_closed_message"
+                                      id="registration_closed_message"
+                                      class="form-control @error('registration_closed_message') is-invalid @enderror"
+                                      rows="3"
+                                      placeholder="Na ten termin nie ma już wolnych miejsc.">{{ old('registration_closed_message') }}</textarea>
+                            @error('registration_closed_message')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="form-text">
+                                Opcjonalnie. Jeśli zostawisz puste, pnedu.pl pokaże domyślny komunikat.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <p class="text-muted small mb-3">Po pierwszym zapisie szkolenia link do podglądu strony oferty na pnedu.pl pojawi się na stronie edycji przy tym ustawieniu.</p>
 
                 <div class="d-flex flex-wrap gap-2">

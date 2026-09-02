@@ -59,6 +59,9 @@ class Course extends Model
         'id_old',
         'source_id_old',
         'show_on_pnedu',
+        'registration_closed_at',
+        'registration_successor_course_id',
+        'registration_closed_message',
         'sendy_suppression_list_id',
         'google_calendar_event_id',
         'google_calendar_html_link',
@@ -74,6 +77,8 @@ class Course extends Model
         'issue_date_certyficates' => 'date',
         'is_active' => 'boolean',
         'show_on_pnedu' => 'boolean',
+        'registration_closed_at' => 'datetime',
+        'registration_successor_course_id' => 'integer',
         'certificate_registration_open' => 'boolean',
         'certificate_registration_starts_at' => 'datetime',
         'certificate_registration_ends_at' => 'datetime',
@@ -170,6 +175,25 @@ class Course extends Model
     public function participants()
     {
         return $this->hasMany(Participant::class);
+    }
+
+    public function registrationSuccessor()
+    {
+        return $this->belongsTo(self::class, 'registration_successor_course_id');
+    }
+
+    public function hasClosedRegistration(): bool
+    {
+        return $this->registration_closed_at !== null;
+    }
+
+    public function registrationClosedMessage(): string
+    {
+        $message = trim((string) ($this->registration_closed_message ?? ''));
+
+        return $message !== ''
+            ? $message
+            : 'Na ten termin nie ma już wolnych miejsc.';
     }
 
     public function certificates()

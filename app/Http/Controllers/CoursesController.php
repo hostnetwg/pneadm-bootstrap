@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class CoursesController extends Controller
 {
@@ -945,7 +946,12 @@ class CoursesController extends Controller
 
         $sourceOffer = null;
 
-        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer'));
+        $registrationSuccessorOptions = Course::query()
+            ->orderByDesc('start_date')
+            ->limit(200)
+            ->get(['id', 'title', 'start_date']);
+
+        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer', 'registrationSuccessorOptions'));
     }
 
     /**
@@ -960,7 +966,12 @@ class CoursesController extends Controller
             ->get();
         $sourceOffer = $trainingOffer->loadMissing('instructor');
 
-        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer'));
+        $registrationSuccessorOptions = Course::query()
+            ->orderByDesc('start_date')
+            ->limit(200)
+            ->get(['id', 'title', 'start_date']);
+
+        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer', 'registrationSuccessorOptions'));
     }
 
     public function store(Request $request)
@@ -987,6 +998,9 @@ class CoursesController extends Controller
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
             'show_on_pnedu' => 'nullable|boolean',
+            'registration_closed' => 'nullable|boolean',
+            'registration_successor_course_id' => 'nullable|exists:courses,id',
+            'registration_closed_message' => 'nullable|string|max:1000',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
@@ -1033,6 +1047,8 @@ class CoursesController extends Controller
             // Dodanie is_active
             $validated['is_active'] = $request->has('is_active');
             $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
+            $validated['registration_closed_at'] = $request->boolean('registration_closed') ? now() : null;
+            unset($validated['registration_closed']);
 
             \Log::info('Przed utworzeniem kursu:', $validated);
 
@@ -1125,7 +1141,7 @@ class CoursesController extends Controller
 
     public function edit($id)
     {
-        $course = Course::with(['location', 'onlineDetails', 'participants', 'priceVariants'])->findOrFail($id);
+        $course = Course::with(['location', 'onlineDetails', 'participants', 'priceVariants', 'registrationSuccessor'])->findOrFail($id);
         $instructors = Instructor::all();
 
         // Pobranie listy aktywnych szablonów certyfikatów
@@ -1134,8 +1150,13 @@ class CoursesController extends Controller
             ->get();
 
         $closedBilling = $this->closedCourseBillingViewData($course);
+        $registrationSuccessorOptions = Course::query()
+            ->whereKeyNot($course->id)
+            ->orderByDesc('start_date')
+            ->limit(200)
+            ->get(['id', 'title', 'start_date']);
 
-        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates') + $closedBilling);
+        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates', 'registrationSuccessorOptions') + $closedBilling);
     }
 
     /**
@@ -1204,6 +1225,14 @@ class CoursesController extends Controller
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
             'show_on_pnedu' => 'nullable|boolean',
+            'registration_closed' => 'nullable|boolean',
+            'registration_successor_course_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('courses', 'id'),
+                Rule::notIn([(int) $course->id]),
+            ],
+            'registration_closed_message' => 'nullable|string|max:1000',
             'notatki' => 'nullable|string',
             'clickmeeting_event_id' => 'nullable|string|max:255',
             'live_room_mode' => 'nullable|in:clickmeeting,embed_pnedu',
@@ -1230,6 +1259,10 @@ class CoursesController extends Controller
         // ✅ Poprawna obsługa `is_active`
         $validated['is_active'] = $request->has('is_active');
         $validated['show_on_pnedu'] = $request->boolean('show_on_pnedu');
+        $validated['registration_closed_at'] = $request->boolean('registration_closed')
+            ? ($course->registration_closed_at ?? now())
+            : null;
+        unset($validated['registration_closed']);
         $validated['certificate_download_status'] = $request->input('certificate_download_status', 'in_preparation');
 
         // Rejestracja zaświadczenia: checkbox + daty; token generowany przy pierwszym włączeniu

@@ -7,6 +7,12 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
 
+## Ostatnio (2026-09-02) — ręczne zamknięcie zapisów na pełną edycję
+
+Panel `pneadm`: edycja szkolenia ma sekcję **Zapisy publiczne na pnedu.pl** — ręczne zamknięcie zapisów, wskazanie kolejnej edycji i opcjonalny komunikat. Publiczny `pnedu`: stara strona kursu zostaje dostępna z banerem, a formularze nowych zapisów kierują na następną edycję z informacją. Edycja istniejącego zamówienia nadal działa. Kanon: `docs/COURSE_REGISTRATION_CLOSURE.md`.
+
+Poza MVP: automatyczne zamykanie po limicie miejsc. Ustalona definicja zajętego miejsca na przyszłość: uczestnicy już dodani + aktywne zamówienia, bez starych porzuconych płatności online.
+
 ## Ostatnio (2026-08-23) — Artykuły / blog pnedu.pl
 
 Wdrożono moduł `Artykuły` w panelu `pneadm`: CRUD, kolejność (`sort_order`), licznik wyświetleń (`view_count`, zgodny z analityką), SEO pól meta. Publiczny `pnedu`: `/blog`, schema `BlogPosting`, sitemap dynamiczna, `llms.txt`, udostępnianie. **SEO po audycie 2026-08-23:** naprawa sitemap 500, meta kursów (540/548, Akademia Dyrektora), schema `Course`, checklista GSC.
