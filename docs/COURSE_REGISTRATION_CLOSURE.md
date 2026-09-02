@@ -9,8 +9,8 @@ Gdy konkretna edycja szkolenia ma już komplet miejsc, stare linki z e-maili, Fa
 - Decyzja o zamknięciu zapisów jest ręczna, ustawiana w panelu `pneadm` na edycji szkolenia.
 - Stara strona `/courses/{id}` w `pnedu` pozostaje dostępna i pokazuje komunikat o braku miejsc.
 - Przyciski zapisu na starej stronie kierują na wskazaną następną edycję.
-- Bezpośrednie wejścia na stare formularze (`/order-form`, `/deferred-order`, `/pay-online`) są przekierowywane na formularz następnej edycji z komunikatem.
-- POST nowych zapisów na zamkniętą edycję jest blokowany i kierowany na następną edycję.
+- Bezpośrednie wejścia na stare formularze (`/order-form`, `/deferred-order`, `/pay-online`) są przekierowywane na **stronę opisu** następnej edycji z komunikatem (nie od razu na formularz zapisu).
+- POST nowych zapisów na zamkniętą edycję jest blokowany i kierowany na stronę opisu następnej edycji.
 - Edycja istniejącego zamówienia pozostaje dozwolona, żeby klient mógł poprawić dane z wcześniej wysłanego linku.
 
 ## Pola w `courses`
