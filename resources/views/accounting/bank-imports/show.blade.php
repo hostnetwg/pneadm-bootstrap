@@ -171,7 +171,8 @@
                         $isActive = $filter === $key;
                         $isDeferredAlert = ($item['alert'] ?? false) === true;
                         if ($isDeferredAlert) {
-                            $btnClass = $isActive ? 'btn-danger' : 'btn-outline-danger';
+                            // Zawsze pełne czerwone tło + biały tekst, żeby wyróżnić kolejkę „Na potem”.
+                            $btnClass = 'btn-danger'.($isActive ? ' active' : '');
                         } else {
                             $btnClass = $isActive ? 'btn-primary' : 'btn-outline-secondary';
                         }
