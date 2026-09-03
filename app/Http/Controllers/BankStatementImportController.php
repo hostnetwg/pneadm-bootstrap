@@ -21,8 +21,13 @@ use Illuminate\Validation\ValidationException;
 
 class BankStatementImportController extends Controller
 {
-    public function index(BankStatementCoverageService $coverageService)
+    public function index(Request $request, BankStatementCoverageService $coverageService)
     {
+        $search = trim($request->string('q')->toString());
+        if (mb_strlen($search) > 128) {
+            $search = mb_substr($search, 0, 128);
+        }
+
         $imports = BankStatementImport::query()
             ->with('uploader')
             ->withCount([
@@ -30,12 +35,14 @@ class BankStatementImportController extends Controller
                     $q->pendingOperatorReview();
                 },
             ])
+            ->matchingSearch($search)
             ->latest('id')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         $coverageGaps = $coverageService->detectGaps();
 
-        return view('accounting.bank-imports.index', compact('imports', 'coverageGaps'));
+        return view('accounting.bank-imports.index', compact('imports', 'coverageGaps', 'search'));
     }
 
     public function store(
@@ -104,19 +111,23 @@ class BankStatementImportController extends Controller
             ));
     }
 
-    public function destroy(BankStatementImport $bankImport, BankStatementImportService $importService)
+    public function destroy(Request $request, BankStatementImport $bankImport, BankStatementImportService $importService)
     {
         try {
             $id = $bankImport->id;
             $importService->deleteImport($bankImport);
         } catch (\InvalidArgumentException $e) {
             return redirect()
-                ->route('accounting.bank-imports.index')
+                ->route('accounting.bank-imports.index', array_filter([
+                    'q' => trim((string) $request->input('q', '')) ?: null,
+                ]))
                 ->with('warning', $e->getMessage());
         }
 
         return redirect()
-            ->route('accounting.bank-imports.index')
+            ->route('accounting.bank-imports.index', array_filter([
+                'q' => trim((string) $request->input('q', '')) ?: null,
+            ]))
             ->with('success', sprintf('Usunięto import #%d (bez zaakceptowanych powiązań).', $id));
     }
 

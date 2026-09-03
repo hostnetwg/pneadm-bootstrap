@@ -113,7 +113,78 @@ class BankStatementImportTest extends TestCase
         $this->actingAs($user)
             ->get(route('accounting.bank-imports.index'))
             ->assertOk()
-            ->assertSee('Import wyciągu mBank', false);
+            ->assertSee('Import wyciągu mBank', false)
+            ->assertSee('id="bankImportsSearch"', false);
+    }
+
+    public function test_index_page_can_search_imports(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+            'name' => 'Operator Testowy',
+        ]);
+        $otherUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+            'name' => 'Inny Uploader',
+        ]);
+
+        $july = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'lista_operacji_lipiec.csv',
+            'file_hash' => hash('sha256', 'index-search-july'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'period_from' => '2026-07-01',
+            'period_to' => '2026-07-31',
+            'rows_total' => 10,
+            'rows_incoming' => 8,
+            'rows_matched' => 2,
+            'rows_duplicate' => 0,
+        ]);
+        BankStatementImport::create([
+            'uploaded_by' => $otherUser->id,
+            'original_filename' => 'lista_operacji_sierpien.csv',
+            'file_hash' => hash('sha256', 'index-search-august'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'period_from' => '2026-08-01',
+            'period_to' => '2026-08-31',
+            'rows_total' => 5,
+            'rows_incoming' => 4,
+            'rows_matched' => 1,
+            'rows_duplicate' => 0,
+        ]);
+
+        $byFile = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => 'lipiec',
+        ]));
+        $byFile->assertOk();
+        $byFile->assertSee('lista_operacji_lipiec.csv', false);
+        $byFile->assertDontSee('lista_operacji_sierpien.csv', false);
+        $byFile->assertSee('Wyniki dla „lipiec”', false);
+
+        $byId = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => '#'.$july->id,
+        ]));
+        $byId->assertOk();
+        $byId->assertSee('lista_operacji_lipiec.csv', false);
+        $byId->assertDontSee('lista_operacji_sierpien.csv', false);
+
+        $byPeriod = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => '2026-07',
+        ]));
+        $byPeriod->assertOk();
+        $byPeriod->assertSee('lista_operacji_lipiec.csv', false);
+        $byPeriod->assertDontSee('lista_operacji_sierpien.csv', false);
+
+        $byUploader = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => 'Inny Uploader',
+        ]));
+        $byUploader->assertOk();
+        $byUploader->assertSee('lista_operacji_sierpien.csv', false);
+        $byUploader->assertDontSee('lista_operacji_lipiec.csv', false);
     }
 
     public function test_index_shows_review_progress_and_coverage_gaps(): void

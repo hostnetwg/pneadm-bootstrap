@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class BankStatementImport extends Model
 {
@@ -105,5 +107,98 @@ class BankStatementImport extends Model
         }
 
         return 'Do przeglądu: '.$pending;
+    }
+
+    /**
+     * Szukaj importu po ID, nazwie pliku, okresie, dacie wgrania lub uploaderze.
+     *
+     * @param  Builder<BankStatementImport>  $query
+     * @return Builder<BankStatementImport>
+     */
+    public function scopeMatchingSearch(Builder $query, ?string $raw): Builder
+    {
+        $search = trim((string) $raw);
+        if ($search === '') {
+            return $query;
+        }
+
+        $like = '%'.addcslashes($search, '%_\\').'%';
+        $parsedDate = self::parseSearchDate($search);
+        $idCandidate = 0;
+        if (ctype_digit($search)) {
+            $idCandidate = (int) $search;
+        } elseif (preg_match('/^#(\d+)$/', $search, $matches) === 1) {
+            $idCandidate = (int) $matches[1];
+        }
+
+        return $query->where(function (Builder $inner) use ($like, $parsedDate, $idCandidate) {
+            $inner->where('original_filename', 'like', $like)
+                ->orWhere('notes', 'like', $like);
+
+            if ($idCandidate > 0) {
+                $inner->orWhere('id', $idCandidate);
+            }
+
+            if ($parsedDate !== null) {
+                $from = $parsedDate['from'];
+                $to = $parsedDate['to'];
+                $inner->orWhere(function (Builder $dates) use ($from, $to) {
+                    $dates->whereDate('period_from', '>=', $from)->whereDate('period_from', '<=', $to);
+                })->orWhere(function (Builder $dates) use ($from, $to) {
+                    $dates->whereDate('period_to', '>=', $from)->whereDate('period_to', '<=', $to);
+                })->orWhere(function (Builder $dates) use ($from, $to) {
+                    $dates->whereDate('created_at', '>=', $from)->whereDate('created_at', '<=', $to);
+                })->orWhere(function (Builder $period) use ($from, $to) {
+                    // Import obejmuje szukaną datę / miesiąc (okres nachodzi).
+                    $period->whereDate('period_from', '<=', $to)
+                        ->whereDate('period_to', '>=', $from);
+                });
+            }
+
+            $inner->orWhereHas('uploader', function (Builder $uploader) use ($like) {
+                $uploader->where('name', 'like', $like)
+                    ->orWhere('email', 'like', $like);
+            });
+        });
+    }
+
+    /**
+     * @return array{from: string, to: string}|null
+     */
+    private static function parseSearchDate(string $search): ?array
+    {
+        $trimmed = trim($search);
+
+        foreach (['Y-m', 'm.Y'] as $format) {
+            try {
+                $parsed = Carbon::createFromFormat('!'.$format, $trimmed);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($parsed && $parsed->format($format) === $trimmed) {
+                return [
+                    'from' => $parsed->copy()->startOfMonth()->toDateString(),
+                    'to' => $parsed->copy()->endOfMonth()->toDateString(),
+                ];
+            }
+        }
+
+        foreach (['Y-m-d', 'd.m.Y', 'd-m-Y', 'd/m/Y'] as $format) {
+            try {
+                $parsed = Carbon::createFromFormat('!'.$format, $trimmed);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($parsed && $parsed->format($format) === $trimmed) {
+                $day = $parsed->toDateString();
+
+                return [
+                    'from' => $day,
+                    'to' => $day,
+                ];
+            }
+        }
+
+        return null;
     }
 }

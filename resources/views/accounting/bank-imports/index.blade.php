@@ -88,6 +88,40 @@
                     Ostatnie importy
                     <span class="fw-normal text-muted small ms-1">— najedź na <i class="bi bi-info-circle" aria-hidden="true"></i> przy nagłówku, aby zobaczyć wyjaśnienie kolumny</span>
                 </div>
+                <div class="card-body border-bottom py-3">
+                    @php
+                        $search = $search ?? '';
+                    @endphp
+                    <form method="GET" action="{{ route('accounting.bank-imports.index') }}" class="mb-0">
+                        <label for="bankImportsSearch" class="form-label small mb-1">Szukaj importu</label>
+                        <div class="input-group input-group-sm" style="max-width: 36rem;">
+                            <input type="search"
+                                   id="bankImportsSearch"
+                                   name="q"
+                                   value="{{ $search }}"
+                                   class="form-control"
+                                   placeholder="ID, plik, okres, data wgrania, kto"
+                                   maxlength="128"
+                                   autocomplete="off">
+                            @if($search !== '')
+                                <a href="{{ route('accounting.bank-imports.index') }}"
+                                   class="btn btn-outline-secondary"
+                                   title="Wyczyść wyszukiwanie"
+                                   aria-label="Wyczyść wyszukiwanie">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                </a>
+                            @endif
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="bi bi-search"></i> Szukaj
+                            </button>
+                        </div>
+                        @if($search !== '')
+                            <div class="form-text mb-0">
+                                Wyniki dla „{{ $search }}”: {{ $imports->total() }}
+                            </div>
+                        @endif
+                    </form>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle">
@@ -188,7 +222,13 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="11" class="text-muted text-center py-4">Brak importów.</td>
+                                        <td colspan="11" class="text-muted text-center py-4">
+                                            @if(($search ?? '') !== '')
+                                                Brak importów dla frazy „{{ $search }}”.
+                                            @else
+                                                Brak importów.
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -222,6 +262,9 @@
                     <form method="POST" id="bankImportDeleteForm" data-loading-submit data-loading-text="Usuwam…">
                         @csrf
                         @method('DELETE')
+                        @if(($search ?? '') !== '')
+                            <input type="hidden" name="q" value="{{ $search }}">
+                        @endif
                         <button type="submit" class="btn btn-danger" data-loading-text="Usuwam…">Usuń import</button>
                     </form>
                 </div>
