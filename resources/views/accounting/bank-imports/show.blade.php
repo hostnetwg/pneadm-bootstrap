@@ -366,6 +366,36 @@
                                                 'allocated_amount' => $best->allocated_amount !== null
                                                     ? number_format((float) $best->allocated_amount, 2, ',', ' ').' '.$tx->currency
                                                     : null,
+                                                'case_fully_covered' => (function () use ($best) {
+                                                    $case = $best->debtCase;
+                                                    if (! $case && $best->form_order_id) {
+                                                        $case = \App\Models\DebtCase::query()
+                                                            ->active()
+                                                            ->where('form_order_id', $best->form_order_id)
+                                                            ->latest('id')
+                                                            ->first();
+                                                    }
+                                                    if (! $case) {
+                                                        return false;
+                                                    }
+
+                                                    return $case->isFullyCoveredByBankPayments();
+                                                })(),
+                                                'refund_debt_case_id' => (function () use ($best) {
+                                                    if ($best->debt_case_id) {
+                                                        return (int) $best->debt_case_id;
+                                                    }
+                                                    if (! $best->form_order_id) {
+                                                        return null;
+                                                    }
+                                                    $case = \App\Models\DebtCase::query()
+                                                        ->active()
+                                                        ->where('form_order_id', $best->form_order_id)
+                                                        ->latest('id')
+                                                        ->first();
+
+                                                    return $case?->id;
+                                                })(),
                                             ] : null,
                                             'allocations' => $acceptedMatches->map(function ($m) use ($tx, $import) {
                                                 return [
@@ -491,6 +521,7 @@
                                                     data-tx-id="{{ $tx->id }}"
                                                     data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
                                                     data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
+                                                    data-refund-url="{{ route('accounting.bank-imports.transactions.mark-refunded', [$import, $tx]) }}"
                                                     data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}"
                                                     @if($packageSuggested->count() >= 2 && $canAddSplit)
                                                         data-can-act="package"
@@ -1105,6 +1136,41 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
                         <button type="submit" class="btn btn-primary" id="bankImportManualLinkSubmit" data-loading-text="Powiązuję…">Powiąż lokalnie</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankImportRefundConfirmModal" tabindex="-1" aria-labelledby="bankImportRefundConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankImportRefundConfirmForm" data-loading-submit data-loading-text="Oznaczam…">
+                    @csrf
+                    <input type="hidden" name="debt_case_id" value="" id="bankImportRefundCaseId">
+                    <input type="hidden" name="filter" value="{{ $filter }}">
+                    <input type="hidden" name="preview" value="" id="bankImportRefundPreview">
+                    @if(($search ?? '') !== '')
+                        <input type="hidden" name="q" value="{{ $search }}">
+                    @endif
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bankImportRefundConfirmModalLabel">Oznacz jako zwrot / nadpłata</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2" id="bankImportRefundSummary">—</p>
+                        <div class="alert alert-info small mb-0">
+                            <ul class="mb-0 ps-3">
+                                <li>Przelew będzie widoczny przy sprawie jako <strong>Zwrócony / nadpłata</strong>.</li>
+                                <li><strong>Nie</strong> zwiększa pokrycia FV.</li>
+                                <li><strong>Nie</strong> rejestruje wpłaty w iFirma.</li>
+                                <li>Znika z kolejki „Do przeglądu” / „Na potem”.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-info" data-loading-text="Oznaczam…">Oznacz jako zwrot</button>
                     </div>
                 </form>
             </div>
@@ -2313,15 +2379,22 @@
                     var linkAttrs = ' data-case-id="' + esc(String(ctx.caseId || '')) + '"'
                         + ' data-order-id="' + esc(String(ctx.orderId || '')) + '"'
                         + ' data-summary="' + esc(String(ctx.summary || ('zam. #' + order.id))) + '"';
-                    peekLinks.push('<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
-                        + linkAttrs
-                        + ' data-register-ifirma="0">Powiąż lokalnie</button>');
-                    if (ctx.amountMatches) {
-                        peekLinks.push('<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
+                    if (ctx.kind === 'case' && ctx.caseFullyCovered && ctx.caseId) {
+                        reasonsEl.innerHTML = '<div class="text-info">Sprawa jest już w pełni pokryta — możesz oznaczyć ten przelew jako zwrot podwójnej wpłaty (bez wpływu na pokrycie FV, bez iFirma).</div>';
+                        peekLinks.push('<button type="button" class="btn btn-sm btn-outline-info bank-manual-refund-btn"'
                             + linkAttrs
-                            + ' data-register-ifirma="1">+ wpłata iFirma</button>');
+                            + '>Oznacz jako zwrot</button>');
                     } else {
-                        reasonsEl.innerHTML = '<div class="text-warning">Kwota różni się od przelewu — dostępne tylko powiązanie lokalne.</div>';
+                        peekLinks.push('<button type="button" class="btn btn-sm btn-outline-primary bank-manual-link-btn"'
+                            + linkAttrs
+                            + ' data-register-ifirma="0">Powiąż lokalnie</button>');
+                        if (ctx.amountMatches) {
+                            peekLinks.push('<button type="button" class="btn btn-sm btn-success bank-manual-link-btn"'
+                                + linkAttrs
+                                + ' data-register-ifirma="1">+ wpłata iFirma</button>');
+                        } else {
+                            reasonsEl.innerHTML = '<div class="text-warning">Kwota różni się od przelewu — dostępne tylko powiązanie lokalne.</div>';
+                        }
                     }
                     var peekOrderId = ctx.orderId || order.id;
                     if (peekOrderId || ctx.caseId) {
@@ -2367,6 +2440,20 @@
                 }
                 if (match && match.debt_case_url) {
                     links.push('<a class="btn btn-sm btn-outline-secondary" href="' + esc(match.debt_case_url) + '" target="_blank" rel="noopener">Otwórz sprawę #' + esc(match.debt_case_id) + '</a>');
+                }
+                if (match && match.case_fully_covered && match.refund_debt_case_id && currentPreviewBtn) {
+                    var canRefundTx = currentPreviewBtn.getAttribute('data-can-act') === 'match'
+                        || currentPreviewBtn.getAttribute('data-can-act') === 'ignore-tx'
+                        || currentPreviewBtn.getAttribute('data-can-act') === 'package';
+                    if (canRefundTx) {
+                        links.push('<button type="button" class="btn btn-sm btn-outline-info bank-manual-refund-btn"'
+                            + ' data-case-id="' + esc(String(match.refund_debt_case_id)) + '"'
+                            + ' data-summary="' + esc('Sprawa #' + match.refund_debt_case_id + (order && order.invoice && order.invoice !== '—' ? ' · FV ' + order.invoice : '')) + '"'
+                            + '>Oznacz jako zwrot</button>');
+                        if (!reasonsEl.innerHTML) {
+                            reasonsEl.innerHTML = '<div class="text-info">Sprawa jest już pokryta — zamiast akceptacji oznacz ten przelew jako zwrot/nadpłatę.</div>';
+                        }
+                    }
                 }
                 var ifirmaStatusUrl = (activeAllocationContext && activeAllocationContext.ifirma_status_url)
                     ? activeAllocationContext.ifirma_status_url
@@ -2451,6 +2538,7 @@
                             + ' data-item-url="' + esc(item.url || '') + '"'
                             + ' data-summary="' + esc(summary) + '"'
                             + ' data-amount-matches="' + (amountMatches ? '1' : '0') + '"'
+                            + ' data-case-fully-covered="' + (kind === 'case' && item.is_fully_covered ? '1' : '0') + '"'
                             + ' title="Podgląd w prawej kolumnie — potem powiąż"'
                             + ' aria-label="Podgląd zamówienia #' + esc(String(peekOrderId)) + '"'
                             + ' aria-pressed="' + (peekedOrderId && String(peekedOrderId) === String(peekOrderId) ? 'true' : 'false') + '">'
@@ -2463,7 +2551,9 @@
                         + '<div class="small flex-grow-1">'
                         + '<div class="fw-semibold">' + esc(summary) + '</div>'
                         + '<div class="text-muted">' + esc(meta) + '</div>'
-                        + (!amountMatches ? '<div class="text-warning">Kwota różni się od przelewu</div>' : '')
+                        + (kind === 'case' && item.is_fully_covered
+                            ? '<div class="text-info">Sprawa pokryta — dostępne „Oznacz jako zwrot”</div>'
+                            : (!amountMatches ? '<div class="text-warning">Kwota różni się od przelewu</div>' : ''))
                         + '</div></div></div>';
                 }
 
@@ -2500,7 +2590,8 @@
                         orderId: eyeBtn ? (eyeBtn.getAttribute('data-order-id') || '') : '',
                         itemUrl: eyeBtn ? (eyeBtn.getAttribute('data-item-url') || '') : '',
                         summary: eyeBtn ? (eyeBtn.getAttribute('data-summary') || '') : '',
-                        amountMatches: eyeBtn ? eyeBtn.getAttribute('data-amount-matches') === '1' : false
+                        amountMatches: eyeBtn ? eyeBtn.getAttribute('data-amount-matches') === '1' : false,
+                        caseFullyCovered: eyeBtn ? eyeBtn.getAttribute('data-case-fully-covered') === '1' : false
                     };
                     setActivePeekEye(orderId);
                     renderOrderPanelFromSnapshot({
@@ -3097,8 +3188,44 @@
                 if (btn) {
                     event.preventDefault();
                     openManualLinkConfirm(btn);
+                    return;
+                }
+                var refundBtn = event.target.closest('.bank-manual-refund-btn');
+                if (refundBtn) {
+                    event.preventDefault();
+                    openManualRefundConfirm(refundBtn);
                 }
             });
+
+            var refundConfirmModalEl = document.getElementById('bankImportRefundConfirmModal');
+            var refundConfirmForm = document.getElementById('bankImportRefundConfirmForm');
+            var refundCaseIdInput = document.getElementById('bankImportRefundCaseId');
+            var refundPreviewInput = document.getElementById('bankImportRefundPreview');
+            var refundSummaryEl = document.getElementById('bankImportRefundSummary');
+            var refundConfirmModal = refundConfirmModalEl && window.bootstrap
+                ? new window.bootstrap.Modal(refundConfirmModalEl)
+                : null;
+
+            function openManualRefundConfirm(btn) {
+                if (!btn || !currentPreviewBtn || !refundConfirmForm || !refundConfirmModal) return;
+                var caseId = btn.getAttribute('data-case-id') || '';
+                if (!caseId) return;
+                refundConfirmForm.setAttribute('action', currentPreviewBtn.getAttribute('data-refund-url') || '');
+                if (refundCaseIdInput) refundCaseIdInput.value = caseId;
+                if (refundPreviewInput) {
+                    var buttons = previewButtons();
+                    var idx = buttons.indexOf(currentPreviewBtn);
+                    var nextBtn = idx >= 0 && idx < buttons.length - 1 ? buttons[idx + 1] : null;
+                    refundPreviewInput.value = nextBtn ? (nextBtn.getAttribute('data-tx-id') || '') : '';
+                }
+                if (refundSummaryEl) {
+                    refundSummaryEl.textContent = 'Oznaczyć przelew #'
+                        + (currentPreviewBtn.getAttribute('data-tx-id') || '')
+                        + ' jako zwrot podwójnej wpłaty przy: '
+                        + (btn.getAttribute('data-summary') || ('sprawie #' + caseId));
+                }
+                refundConfirmModal.show();
+            }
 
             var clearPeekBtn = document.getElementById('bankTxPreviewClearOrderBtn');
             if (clearPeekBtn) {

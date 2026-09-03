@@ -631,6 +631,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{bankImport}/transactions/{transaction}/defer', [BankStatementImportController::class, 'deferTransaction'])->name('transactions.defer');
             Route::post('/{bankImport}/transactions/{transaction}/undefer', [BankStatementImportController::class, 'undeferTransaction'])->name('transactions.undefer');
             Route::post('/{bankImport}/transactions/{transaction}/link-case', [BankStatementImportController::class, 'linkTransactionToCase'])->name('transactions.link-case');
+            Route::post('/{bankImport}/transactions/{transaction}/mark-refunded', [BankStatementImportController::class, 'markTransactionRefunded'])->name('transactions.mark-refunded');
         });
 
         Route::middleware('super_admin')->prefix('instructor-invoices')->name('instructor-invoices.')->group(function () {

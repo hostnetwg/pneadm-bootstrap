@@ -2481,4 +2481,111 @@ class BankStatementImportTest extends TestCase
         $this->assertFalse($second->isRefunded());
         $this->assertGreaterThan(0.01, $second->remainingAllocatableAmount());
     }
+
+    public function test_bank_import_preview_can_mark_transfer_as_refunded_overpayment(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie zwrot z importu',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '900/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 365,
+            'invoice_number' => '900/8/2026',
+            'assigned_to_id' => $user->id,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'refund-import.csv',
+            'file_hash' => hash('sha256', 'refund-from-import'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $paid = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-20',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'Wpłata właściwa 900/8/2026',
+            'fingerprint' => hash('sha256', 'refund-import-paid'),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $paid->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['amount_match'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'allocated_amount' => 365,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $duplicate = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-28',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'Duplikat 900/8/2026 na potem',
+            'fingerprint' => hash('sha256', 'refund-import-dup'),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $duplicate->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number', BankTransactionMatch::REASON_MANUAL_DEFER],
+            'status' => BankTransactionMatch::STATUS_DEFERRED,
+        ]);
+
+        $preview = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'deferred',
+            'preview' => $duplicate->id,
+        ]));
+        $preview->assertOk();
+        $preview->assertSee('data-refund-url=', false);
+        $preview->assertSee('case_fully_covered', false);
+        $preview->assertSee('bankImportRefundConfirmModal', false);
+
+        $lookup = $this->actingAs($user)->getJson(route('accounting.bank-imports.lookup-cases', [
+            'q' => '900/8/2026',
+        ]));
+        $lookup->assertOk();
+        $foundCase = collect($lookup->json('cases'))->firstWhere('id', $case->id);
+        $this->assertNotNull($foundCase);
+        $this->assertTrue($foundCase['is_fully_covered']);
+
+        $mark = $this->actingAs($user)->post(
+            route('accounting.bank-imports.transactions.mark-refunded', [$import, $duplicate]),
+            [
+                'debt_case_id' => $case->id,
+                'filter' => 'deferred',
+            ]
+        );
+        $mark->assertRedirect(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'refunded',
+        ]));
+        $duplicate->refresh()->load('matches');
+        $this->assertTrue($duplicate->isRefunded());
+        $this->assertFalse($duplicate->isDeferred());
+    }
 }

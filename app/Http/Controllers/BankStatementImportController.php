@@ -883,6 +883,8 @@ class BankStatementImportController extends Controller
                     'recipient_name' => $order?->recipient_name,
                     'product_name' => $order?->product_name,
                     'url' => route('accounting.collections.show', $case),
+                    'is_fully_covered' => $case->isFullyCoveredByBankPayments(),
+                    'bank_remaining' => $case->remainingBankAllocatableAmount(),
                 ];
             })->values(),
             'orders' => $orders->map(function (FormOrder $order) use ($formatCourseDate) {
@@ -1103,6 +1105,57 @@ class BankStatementImportController extends Controller
             $bankImport,
             $message.' Status iFirma nie został zmieniony (powiązanie tylko lokalne).'
         );
+    }
+
+    public function markTransactionRefunded(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransaction $transaction,
+        BankStatementImportService $importService
+    ) {
+        if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'debt_case_id' => ['required', 'integer', 'exists:debt_cases,id'],
+        ]);
+
+        try {
+            $debtCase = DebtCase::query()->findOrFail($validated['debt_case_id']);
+            $importService->markTransactionAsRefundedOverpayment(
+                $transaction,
+                $debtCase,
+                $request->user()?->id
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->redirectAfterReviewModalAlert(
+                $request,
+                $bankImport,
+                $e->getMessage(),
+                (int) $transaction->id,
+                'warning'
+            );
+        }
+
+        $debtCaseId = (int) $validated['debt_case_id'];
+        $params = $this->reviewRedirectParams($request, $bankImport);
+        // Po oznaczeniu zwrotu przelew znika z deferred/unmatched — domyślnie pokaż zakładkę Zwroty.
+        if (! isset($params['filter']) || in_array($params['filter'], ['deferred', 'unmatched', 'unlinked', 'high', 'medium', 'low'], true)) {
+            $params['filter'] = 'refunded';
+        }
+        unset($params['preview']);
+
+        return redirect()
+            ->route('accounting.bank-imports.show', $params)
+            ->with(
+                'success',
+                sprintf(
+                    'Przelew #%d oznaczono jako zwrot podwójnej wpłaty przy sprawie #%d (bez pokrycia FV, bez iFirma).',
+                    $transaction->id,
+                    $debtCaseId
+                )
+            );
     }
 
     private function appendAutoCloseMessage(
