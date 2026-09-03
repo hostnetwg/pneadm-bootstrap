@@ -142,7 +142,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.
 - Tylko wpływy (`amount > 0`) idą do UI dopasowań; wydatki mogą być zapisane, ale nie są przeglądane w MVP.
 - Filtry przeglądu: `Do przeglądu`, `Bez powiązania`, `High`, `Medium`, `Low`, `Zaakceptowane`, **`Na potem`** (czerwona zakładka gdy > 0), `PayNow`, `Ignorowane`, `Wszystkie wpływy`.
-- **Na potem:** przycisk obok „Ignoruj” odkłada przelew poza aktywną kolejkę; nadal liczy się do „Do przeglądu” na liście importów. Z zakładki: **Przywróć do przeglądu** lub **Ignoruj**. Status match: `deferred`.
+- **Na potem:** przycisk obok „Ignoruj” odkłada przelew poza aktywną kolejkę; nadal liczy się do „Do przeglądu” na liście importów. Z zakładki „Na potem” można od razu **powiązać / akceptować** jak w kolejce (bez „Przywróć do przeglądu”); status match: `deferred`.
 - **Komunikaty w modalu podglądu:** błędy powiązania/akceptacji (np. FV już w pełni pokryta) wracają z `?preview=` i pokazywane są wewnątrz okna podglądu — bez zamykania okna i bez ukrytego flasha na stronie w tle.
 - **UX ładowania:** przyciski długich operacji (sync iFirma, import CSV, przeliczenie sugestii, akceptacje, powiązania) pokazują spinner Bootstrap (`data-loading-submit` / `window.PneButtonLoading`) — szczegóły w `docs/UI_MODALS.md`.
 - Przycisk **Ignoruj wypłaty PayNow** (modal Bootstrap): masowo oznacza wpływy rozpoznane pozytywnie jako rozliczenie bramki (`MELEMENTS` albo `WYPŁATA ŚRODKÓW` + `PON-…`). Trafiają do zakładki **PayNow** (powód `gateway_payout_paynow`), **nie** do ogólnego „Ignorowane”. **Nie** używa braku FV/KSeF — przelewy klientów bez numeru zostają w kolejce. Zaakceptowane nie są ruszane.

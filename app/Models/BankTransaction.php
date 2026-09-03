@@ -90,7 +90,7 @@ class BankTransaction extends Model
 
     public function remainingAllocatableAmount(): float
     {
-        if ($this->isIgnored() || $this->isDeferred()) {
+        if ($this->isIgnored()) {
             return 0.0;
         }
 
@@ -106,7 +106,6 @@ class BankTransaction extends Model
     {
         return $this->is_incoming
             && ! $this->isIgnored()
-            && ! $this->isDeferred()
             && $this->remainingAllocatableAmount() > BankTransactionMatcher::AMOUNT_EPSILON;
     }
 

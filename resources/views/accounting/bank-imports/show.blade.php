@@ -228,7 +228,15 @@
                             <tbody>
                                 @forelse($transactions as $tx)
                                     @php
+                                        $isDeferredTx = $tx->isDeferred();
                                         $suggested = $tx->matches->where('status', \App\Models\BankTransactionMatch::STATUS_SUGGESTED);
+                                        if ($isDeferredTx && $suggested->isEmpty()) {
+                                            // Odroczone sugestie z FV/sprawą traktuj jak aktywne (można od razu akceptować / powiązać).
+                                            $suggested = $tx->matches
+                                                ->where('status', \App\Models\BankTransactionMatch::STATUS_DEFERRED)
+                                                ->filter(fn ($m) => $m->form_order_id || $m->debt_case_id)
+                                                ->values();
+                                        }
                                         $acceptedMatches = $tx->acceptedMatches();
                                         $accepted = $acceptedMatches->first();
                                         $remainingAmount = $tx->remainingAllocatableAmount();
@@ -423,7 +431,6 @@
                                                 'high' => 0, 'medium' => 1, default => 2,
                                             })->first()
                                             : null;
-                                        $isDeferredTx = $tx->isDeferred();
                                     @endphp
                                     <tr>
                                         <td>
@@ -435,28 +442,30 @@
                                                     data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
                                                     data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
                                                     data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}"
-                                                    @if($isDeferredTx)
-                                                        data-can-act="deferred"
-                                                        data-undefer-url="{{ route('accounting.bank-imports.transactions.undefer', [$import, $tx]) }}"
-                                                        data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
-                                                    @elseif($packageSuggested->count() >= 2 && $canAddSplit)
+                                                    @if($packageSuggested->count() >= 2 && $canAddSplit)
                                                         data-can-act="package"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
-                                                        data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @unless($isDeferredTx)
+                                                            data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @endunless
                                                     @elseif($suggestBest)
                                                         data-can-act="match"
                                                         data-accept-url="{{ route('accounting.bank-imports.matches.accept', [$import, $suggestBest]) }}"
                                                         data-ifirma-status-url="{{ route('accounting.bank-imports.matches.ifirma-status', [$import, $suggestBest]) }}"
                                                         data-reject-url="{{ route('accounting.bank-imports.matches.reject', [$import, $suggestBest]) }}"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
-                                                        data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @unless($isDeferredTx)
+                                                            data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @endunless
                                                         @if(in_array('amount_mismatch', $suggestBest->match_reasons ?? [], true) || $acceptedMatches->isNotEmpty())
                                                             data-amount-mismatch="1"
                                                         @endif
                                                     @elseif($canAddSplit)
                                                         data-can-act="ignore-tx"
                                                         data-ignore-url="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}"
-                                                        data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @unless($isDeferredTx)
+                                                            data-defer-url="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}"
+                                                        @endunless
                                                     @elseif($acceptedMatches->isNotEmpty())
                                                         data-can-act="accepted"
                                                         data-unlink-url="{{ route('accounting.bank-imports.matches.unlink', [$import, $accepted]) }}"
@@ -576,18 +585,7 @@
                                         </td>
                                         <td>
                                             <div class="d-flex flex-wrap gap-1">
-                                                @if($isDeferredTx)
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.undefer', [$import, $tx]) }}" data-loading-submit data-loading-text="Przywracam…">
-                                                        @csrf
-                                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-primary" data-loading-text="Przywracam…">Przywróć do przeglądu</button>
-                                                    </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
-                                                        @csrf
-                                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
-                                                    </form>
-                                                @elseif($packageSuggested->count() >= 2 && $canAddSplit)
+                                                @if($packageSuggested->count() >= 2 && $canAddSplit)
                                                     <form method="POST"
                                                           action="{{ route('accounting.bank-imports.transactions.accept-package', [$import, $tx]) }}"
                                                           class="bank-import-package-form"
@@ -602,7 +600,7 @@
                                                         </button>
                                                     </form>
                                                 @endif
-                                                @if(! $isDeferredTx && $suggestBest && $packageSuggested->count() < 2)
+                                                @if($suggestBest && $packageSuggested->count() < 2)
                                                     <form method="POST"
                                                           action="{{ route('accounting.bank-imports.matches.accept', [$import, $suggestBest]) }}"
                                                           class="bank-import-accept-form"
@@ -629,35 +627,41 @@
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
                                                     </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
-                                                        @csrf
-                                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
-                                                    </form>
-                                                @elseif(! $isDeferredTx && $suggestBest && $packageSuggested->count() >= 2)
+                                                    @unless($isDeferredTx)
+                                                        <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
+                                                            @csrf
+                                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
+                                                        </form>
+                                                    @endunless
+                                                @elseif($suggestBest && $packageSuggested->count() >= 2)
                                                     {{-- Pakiet: główna akcja to „Akceptuj pakiet”; pojedyncze FV w podglądzie --}}
                                                     <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj</button>
                                                     </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
-                                                        @csrf
-                                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
-                                                    </form>
-                                                @elseif(! $isDeferredTx && $canAddSplit)
+                                                    @unless($isDeferredTx)
+                                                        <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
+                                                            @csrf
+                                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
+                                                        </form>
+                                                    @endunless
+                                                @elseif($canAddSplit)
                                                     <form method="POST" action="{{ route('accounting.bank-imports.transactions.ignore', [$import, $tx]) }}" data-loading-submit data-loading-text="Ignoruję…">
                                                         @csrf
                                                         <input type="hidden" name="filter" value="{{ $filter }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-loading-text="Ignoruję…">Ignoruj transakcję</button>
                                                     </form>
-                                                    <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
-                                                        @csrf
-                                                        <input type="hidden" name="filter" value="{{ $filter }}">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
-                                                    </form>
-                                                @elseif(! $isDeferredTx && $acceptedMatches->isNotEmpty())
+                                                    @unless($isDeferredTx)
+                                                        <form method="POST" action="{{ route('accounting.bank-imports.transactions.defer', [$import, $tx]) }}" data-loading-submit data-loading-text="Odkładam…">
+                                                            @csrf
+                                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" data-loading-text="Odkładam…">Na potem</button>
+                                                        </form>
+                                                    @endunless
+                                                @elseif($acceptedMatches->isNotEmpty())
                                                     @foreach($acceptedMatches as $acc)
                                                         <form method="POST"
                                                               action="{{ route('accounting.bank-imports.matches.register-ifirma-payment', [$import, $acc]) }}"
@@ -959,12 +963,6 @@
                             <input type="hidden" name="filter" value="{{ $filter }}">
                             <input type="hidden" name="preview" value="">
                             <button type="submit" class="btn btn-outline-danger" id="bankTxPreviewDeferBtn" data-loading-text="Odkładam…">Na potem</button>
-                        </form>
-                        <form method="POST" id="bankTxPreviewUndeferForm" class="d-none" data-loading-submit data-loading-text="Przywracam…">
-                            @csrf
-                            <input type="hidden" name="filter" value="{{ $filter }}">
-                            <input type="hidden" name="preview" value="">
-                            <button type="submit" class="btn btn-outline-primary" id="bankTxPreviewUndeferBtn" data-loading-text="Przywracam…">Przywróć do przeglądu</button>
                         </form>
                         <button type="button"
                                 class="btn btn-outline-danger d-none"
@@ -2489,7 +2487,7 @@
             })();
 
             function setFormPreviewTargets(nextTxId) {
-                ['bankTxPreviewAcceptForm', 'bankTxPreviewRejectForm', 'bankTxPreviewIgnoreForm', 'bankTxPreviewDeferForm', 'bankTxPreviewUndeferForm'].forEach(function (id) {
+                ['bankTxPreviewAcceptForm', 'bankTxPreviewRejectForm', 'bankTxPreviewIgnoreForm', 'bankTxPreviewDeferForm'].forEach(function (id) {
                     var form = document.getElementById(id);
                     if (!form) return;
                     var input = form.querySelector('input[name="preview"]');
@@ -2504,7 +2502,6 @@
                 var ignoreForm = document.getElementById('bankTxPreviewIgnoreForm');
                 var ignoreBtn = document.getElementById('bankTxPreviewIgnoreBtn');
                 var deferForm = document.getElementById('bankTxPreviewDeferForm');
-                var undeferForm = document.getElementById('bankTxPreviewUndeferForm');
                 var unlinkBtn = document.getElementById('bankTxPreviewUnlinkBtn');
                 var buttons = previewButtons();
                 var idx = buttons.indexOf(btn);
@@ -2517,7 +2514,6 @@
                     unlinkBtn.classList.add('d-none');
                 }
                 if (deferForm) deferForm.classList.add('d-none');
-                if (undeferForm) undeferForm.classList.add('d-none');
 
                 if (canAct === 'package') {
                     acceptForm.classList.add('d-none');
@@ -2525,8 +2521,11 @@
                     ignoreForm.classList.remove('d-none');
                     ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
                     if (deferForm) {
-                        deferForm.classList.remove('d-none');
-                        deferForm.setAttribute('action', btn.getAttribute('data-defer-url') || '');
+                        var packageDeferUrl = btn.getAttribute('data-defer-url') || '';
+                        if (packageDeferUrl) {
+                            deferForm.classList.remove('d-none');
+                            deferForm.setAttribute('action', packageDeferUrl);
+                        }
                     }
                     acceptForm.removeAttribute('data-amount-mismatch');
                     acceptForm.removeAttribute('data-split-package');
@@ -2543,8 +2542,11 @@
                     rejectForm.setAttribute('action', btn.getAttribute('data-reject-url') || '');
                     ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
                     if (deferForm) {
-                        deferForm.classList.remove('d-none');
-                        deferForm.setAttribute('action', btn.getAttribute('data-defer-url') || '');
+                        var matchDeferUrl = btn.getAttribute('data-defer-url') || '';
+                        if (matchDeferUrl) {
+                            deferForm.classList.remove('d-none');
+                            deferForm.setAttribute('action', matchDeferUrl);
+                        }
                     }
                     acceptForm.removeAttribute('data-split-package');
                     if (btn.getAttribute('data-amount-mismatch') === '1') {
@@ -2563,8 +2565,11 @@
                     ignoreForm.classList.remove('d-none');
                     ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
                     if (deferForm) {
-                        deferForm.classList.remove('d-none');
-                        deferForm.setAttribute('action', btn.getAttribute('data-defer-url') || '');
+                        var ignoreDeferUrl = btn.getAttribute('data-defer-url') || '';
+                        if (ignoreDeferUrl) {
+                            deferForm.classList.remove('d-none');
+                            deferForm.setAttribute('action', ignoreDeferUrl);
+                        }
                     }
                     acceptForm.removeAttribute('data-amount-mismatch');
                     acceptForm.removeAttribute('data-split-package');
@@ -2573,22 +2578,6 @@
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj transakcję';
                     setManualLinkPanelVisible(true);
-                } else if (canAct === 'deferred') {
-                    acceptForm.classList.add('d-none');
-                    rejectForm.classList.add('d-none');
-                    ignoreForm.classList.remove('d-none');
-                    ignoreForm.setAttribute('action', btn.getAttribute('data-ignore-url') || '');
-                    if (undeferForm) {
-                        undeferForm.classList.remove('d-none');
-                        undeferForm.setAttribute('action', btn.getAttribute('data-undefer-url') || '');
-                    }
-                    acceptForm.removeAttribute('data-amount-mismatch');
-                    acceptForm.removeAttribute('data-split-package');
-                    acceptForm.removeAttribute('data-accept-confirmed');
-                    setRegisterIfirma(acceptForm, false);
-                    setIfirmaAlreadyPaid(acceptForm, false);
-                    ignoreBtn.textContent = 'Ignoruj';
-                    setManualLinkPanelVisible(false);
                 } else if (canAct === 'accepted') {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');

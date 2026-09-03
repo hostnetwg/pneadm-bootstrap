@@ -345,7 +345,10 @@ class BankStatementImportService
             }
 
             if ($transaction->isDeferred()) {
-                throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
+                $this->undeferTransaction($transaction);
+                $transaction->unsetRelation('matches');
+                $transaction->load('matches');
+                $match->refresh();
             }
 
             $formOrderId = (int) ($match->form_order_id ?: $debtCase->form_order_id);
@@ -517,6 +520,13 @@ class BankStatementImportService
     public function acceptSuggestedSplitPackage(BankTransaction $transaction, ?int $userId = null): array
     {
         $transaction->loadMissing('matches');
+
+        if ($transaction->isDeferred()) {
+            $this->undeferTransaction($transaction);
+            $transaction->unsetRelation('matches');
+            $transaction->load('matches');
+        }
+
         $package = $transaction->matches
             ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
             ->filter(fn (BankTransactionMatch $match) => in_array(
@@ -599,7 +609,9 @@ class BankStatementImportService
         }
 
         if ($transaction->isDeferred()) {
-            throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
+            $this->undeferTransaction($transaction);
+            $transaction->unsetRelation('matches');
+            $transaction->load('matches');
         }
 
         if (! $transaction->canAcceptAdditionalLink()) {
@@ -696,7 +708,9 @@ class BankStatementImportService
         }
 
         if ($transaction->isDeferred()) {
-            throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
+            $this->undeferTransaction($transaction);
+            $transaction->unsetRelation('matches');
+            $transaction->load('matches');
         }
 
         if (! $transaction->canAcceptAdditionalLink()) {

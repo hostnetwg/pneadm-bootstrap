@@ -1952,7 +1952,9 @@ class BankStatementImportTest extends TestCase
         $deferredTab->assertOk();
         $deferredTab->assertSee('Na potem (1)', false);
         $deferredTab->assertSee('btn-danger', false);
-        $deferredTab->assertSee('Przywróć do przeglądu', false);
+        $deferredTab->assertDontSee('Przywróć do przeglądu', false);
+        $deferredTab->assertSee('Powiąż ręcznie ze sprawą lub zamówieniem', false);
+        $deferredTab->assertSee('Ignoruj transakcję', false);
 
         $unmatchedTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
             'bankImport' => $import,
@@ -1966,18 +1968,34 @@ class BankStatementImportTest extends TestCase
         $index->assertOk();
         $index->assertSee('Do przeglądu: 1', false);
 
-        $undefer = $this->actingAs($user)->post(route('accounting.bank-imports.transactions.undefer', [$import, $tx]), [
-            'filter' => 'deferred',
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie z deferred',
+            'product_price' => 220,
+            'order_date' => now()->subDays(2),
+            'invoice_number' => '901/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
         ]);
-        $undefer->assertRedirect();
-        $this->assertFalse($tx->fresh()->load('matches')->isDeferred());
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 220,
+            'invoice_number' => '901/8/2026',
+            'assigned_to_id' => $user->id,
+            'opened_at' => now(),
+        ]);
 
-        $afterUndefer = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
-            'bankImport' => $import,
-            'filter' => 'unmatched',
-        ]));
-        $afterUndefer->assertOk();
-        $afterUndefer->assertSee('Do przeglądu (1)', false);
+        $link = $this->actingAs($user)->post(route('accounting.bank-imports.transactions.link-case', [$import, $tx]), [
+            'debt_case_id' => $case->id,
+            'filter' => 'deferred',
+            'preview' => $tx->id,
+        ]);
+        $link->assertRedirect();
+        $this->assertFalse($tx->fresh()->load('matches')->isDeferred());
+        $this->assertTrue(
+            $tx->fresh()->matches()->where('status', BankTransactionMatch::STATUS_ACCEPTED)->exists()
+        );
     }
 
     public function test_link_error_for_fully_covered_case_shows_inside_preview_modal(): void
