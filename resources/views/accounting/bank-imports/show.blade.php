@@ -972,9 +972,10 @@
                             Szukaj po FV, KSeF, ID sprawy/zamówienia, NIP, nazwie, adresie/mieście nabywcy lub odbiorcy, e-mailu
                             albo notatkach zamówienia (w tym numerze anulowanej FV).
                             Wielkość liter nie ma znaczenia.
-                            Najpierw pokazujemy <strong>niezamknięte sprawy</strong>, potem zamówienia <strong>bez aktywnej sprawy</strong>
+                            Najpierw pokazujemy sprawy (otwarte przed zamkniętymi), potem zamówienia <strong>bez aktywnej sprawy</strong>
                             (np. gdy wpłatę oznaczono wcześniej tylko w iFirma).
-                            Kliknij <strong>oko</strong>, żeby zobaczyć dane w prawej kolumnie i dopiero stamtąd powiązać.
+                            Kliknij <strong>oko</strong>, żeby wczytać kandydata po prawej — potem <strong>Akceptuj</strong> w stopce
+                            albo <strong>Powiąż</strong> wiąże z tym zamówieniem (nie z opłaconą sugestią).
                         </p>
                         <div class="input-group input-group-sm mb-2" style="max-width: 36rem;">
                             <input type="text"
@@ -1351,8 +1352,21 @@
             var acceptPackageModalEl = document.getElementById('bankImportAcceptPackageModal');
             var acceptPackageModal = acceptPackageModalEl ? bootstrap.Modal.getOrCreateInstance(acceptPackageModalEl) : null;
             var pendingAcceptForm = null;
+            var pendingPeekLinkContext = null;
             var pendingPackageForm = null;
             var pendingAcceptTrigger = null;
+
+            function confirmPeekedCandidateLink(ctx, registerIfirma) {
+                if (!ctx) {
+                    return;
+                }
+                var peekLinkBtn = document.createElement('button');
+                peekLinkBtn.setAttribute('data-case-id', ctx.caseId || '');
+                peekLinkBtn.setAttribute('data-order-id', ctx.orderId || '');
+                peekLinkBtn.setAttribute('data-summary', ctx.summary || '');
+                peekLinkBtn.setAttribute('data-register-ifirma', registerIfirma ? '1' : '0');
+                openManualLinkConfirm(peekLinkBtn);
+            }
 
             function acceptDialogTriggerButton() {
                 if (pendingAcceptTrigger && document.body.contains(pendingAcceptTrigger)) {
@@ -1484,6 +1498,9 @@
                 el.addEventListener('hidden.bs.modal', function () {
                     resetAcceptDialogPosition(el);
                     pendingAcceptTrigger = null;
+                    if (el.id === 'bankImportAcceptIfirmaModal') {
+                        pendingPeekLinkContext = null;
+                    }
                 });
             });
             window.addEventListener('resize', function () {
@@ -1606,6 +1623,27 @@
                         return;
                     }
                     e.preventDefault();
+                    if (
+                        form.id === 'bankTxPreviewAcceptForm'
+                        && peekedLinkContext
+                        && peekedLinkContext.orderId
+                        && !(peekedLinkContext.kind === 'case' && peekedLinkContext.caseFullyCovered)
+                    ) {
+                        pendingPeekLinkContext = peekedLinkContext;
+                        pendingAcceptTrigger = e.submitter || form.querySelector('button[type="submit"]') || form.querySelector('button');
+                        if (!peekedLinkContext.amountMatches) {
+                            confirmPeekedCandidateLink(peekedLinkContext, false);
+                            pendingPeekLinkContext = null;
+                            return;
+                        }
+                        pendingAcceptForm = form;
+                        setRegisterIfirma(form, false);
+                        setIfirmaAlreadyPaid(form, false);
+                        if (acceptIfirmaModal) {
+                            acceptIfirmaModal.show();
+                        }
+                        return;
+                    }
                     pendingAcceptForm = form;
                     pendingAcceptTrigger = e.submitter || form.querySelector('button[type="submit"]') || form.querySelector('button');
                     if (form.getAttribute('data-amount-mismatch') === '1') {
@@ -1645,6 +1683,16 @@
             var acceptLocalOnlyBtn = document.getElementById('bankImportAcceptLocalOnlyBtn');
             if (acceptLocalOnlyBtn) {
                 acceptLocalOnlyBtn.addEventListener('click', function () {
+                    if (pendingPeekLinkContext) {
+                        var peekCtx = pendingPeekLinkContext;
+                        pendingPeekLinkContext = null;
+                        pendingAcceptForm = null;
+                        if (acceptIfirmaModal) {
+                            acceptIfirmaModal.hide();
+                        }
+                        confirmPeekedCandidateLink(peekCtx, false);
+                        return;
+                    }
                     if (!pendingAcceptForm) {
                         return;
                     }
@@ -1662,6 +1710,16 @@
             var acceptIfirmaConfirmBtn = document.getElementById('bankImportAcceptIfirmaConfirmBtn');
             if (acceptIfirmaConfirmBtn) {
                 acceptIfirmaConfirmBtn.addEventListener('click', function () {
+                    if (pendingPeekLinkContext) {
+                        var peekCtxIfirma = pendingPeekLinkContext;
+                        pendingPeekLinkContext = null;
+                        pendingAcceptForm = null;
+                        if (acceptIfirmaModal) {
+                            acceptIfirmaModal.hide();
+                        }
+                        confirmPeekedCandidateLink(peekCtxIfirma, true);
+                        return;
+                    }
                     if (!pendingAcceptForm) {
                         return;
                     }
@@ -2433,7 +2491,7 @@
                             + ' data-summary="' + esc('Sprawa #' + match.refund_debt_case_id + (order && order.invoice && order.invoice !== '—' ? ' · FV ' + order.invoice : '')) + '"'
                             + '>Oznacz jako zwrot</button>');
                         if (!reasonsEl.innerHTML) {
-                            reasonsEl.innerHTML = '<div class="text-info">Sprawa jest już pokryta — zamiast akceptacji oznacz ten przelew jako zwrot/nadpłatę.</div>';
+                            reasonsEl.innerHTML = '<div class="text-info">Sugestia dotyczy FV już pokrytej — możesz oznaczyć ten przelew jako zwrot albo wyszukać inne zamówienie i zaakceptować / powiązać.</div>';
                         }
                     }
                 }
@@ -2729,7 +2787,7 @@
                     setManualLinkPanelVisible(true);
                     showFooterRefund();
                 } else if (canAct === 'match') {
-                    acceptForm.classList.toggle('d-none', canRefundCovered);
+                    acceptForm.classList.remove('d-none');
                     rejectForm.classList.remove('d-none');
                     ignoreForm.classList.remove('d-none');
                     acceptForm.setAttribute('action', btn.getAttribute('data-accept-url') || '');
