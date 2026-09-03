@@ -885,18 +885,22 @@ class AccountingController extends Controller
                 $amountMatches = abs($remaining - $compareAmount) <= 0.01
                     || abs((float) $candidate->amount - $compareAmount) <= 0.01;
                 $ignored = $candidate->isIgnored();
+                $deferred = $candidate->isDeferred();
                 $alreadyLinkedToThisCase = $candidate->acceptedMatches()->contains(
                     fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
                 );
                 $blockingMatch = $ignored
                     ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_IGNORED)
-                    : ($alreadyLinkedToThisCase
-                        ? $candidate->acceptedMatches()->first(
-                            fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
-                        )
-                        : null);
+                    : ($deferred
+                        ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_DEFERRED)
+                        : ($alreadyLinkedToThisCase
+                            ? $candidate->acceptedMatches()->first(
+                                fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
+                            )
+                            : null));
                 $caseHasRoom = $caseRemaining === null || $caseRemaining > 0.01;
                 $isLinkable = ! $ignored
+                    && ! $deferred
                     && ! $alreadyLinkedToThisCase
                     && $remaining > 0.01
                     && $caseHasRoom;

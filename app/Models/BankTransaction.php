@@ -70,6 +70,13 @@ class BankTransaction extends Model
         );
     }
 
+    public function isDeferred(): bool
+    {
+        return $this->matches->contains(
+            fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_DEFERRED
+        );
+    }
+
     public function allocatedAcceptedSum(): float
     {
         return round((float) $this->acceptedMatches()->sum(function (BankTransactionMatch $match) {
@@ -83,7 +90,7 @@ class BankTransaction extends Model
 
     public function remainingAllocatableAmount(): float
     {
-        if ($this->isIgnored()) {
+        if ($this->isIgnored() || $this->isDeferred()) {
             return 0.0;
         }
 
@@ -99,11 +106,13 @@ class BankTransaction extends Model
     {
         return $this->is_incoming
             && ! $this->isIgnored()
+            && ! $this->isDeferred()
             && $this->remainingAllocatableAmount() > BankTransactionMatcher::AMOUNT_EPSILON;
     }
 
     /**
-     * Wpływy z wolną kwotą (nie zignorowane; bez akceptacji lub suma alokacji < kwota przelewu).
+     * Wpływy z wolną kwotą (nie zignorowane / nie „na potem”;
+     * bez akceptacji lub suma alokacji < kwota przelewu).
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>  $query
      * @return \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>
@@ -112,7 +121,10 @@ class BankTransaction extends Model
     {
         return $query
             ->whereDoesntHave('matches', function ($matchQuery) {
-                $matchQuery->where('status', BankTransactionMatch::STATUS_IGNORED);
+                $matchQuery->whereIn('status', [
+                    BankTransactionMatch::STATUS_IGNORED,
+                    BankTransactionMatch::STATUS_DEFERRED,
+                ]);
             })
             ->where(function ($inner) {
                 $inner->whereDoesntHave('matches', function ($matchQuery) {
@@ -126,6 +138,33 @@ class BankTransaction extends Model
                     ) < bank_transactions.amount - 0.009',
                     [BankTransactionMatch::STATUS_ACCEPTED]
                 );
+            });
+    }
+
+    /**
+     * Wpływy czekające na decyzję operatora: aktywna kolejka + odroczone „Na potem”.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>
+     */
+    public function scopePendingOperatorReview($query)
+    {
+        return $query
+            ->where('is_incoming', true)
+            ->where(function ($outer) {
+                $outer->where(function ($active) {
+                    $active->withRemainingAllocatable()
+                        ->where(function ($inner) {
+                            $inner->whereDoesntHave('matches')
+                                ->orWhereHas('matches', fn ($m) => $m->where(
+                                    'status',
+                                    BankTransactionMatch::STATUS_SUGGESTED
+                                ));
+                        });
+                })->orWhereHas('matches', fn ($m) => $m->where(
+                    'status',
+                    BankTransactionMatch::STATUS_DEFERRED
+                ));
             });
     }
 }

@@ -627,6 +627,8 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{bankImport}/matches/{match}/unlink', [BankStatementImportController::class, 'unlink'])->name('matches.unlink');
             Route::post('/{bankImport}/matches/{match}/ignore', [BankStatementImportController::class, 'ignoreMatch'])->name('matches.ignore');
             Route::post('/{bankImport}/transactions/{transaction}/ignore', [BankStatementImportController::class, 'ignoreTransaction'])->name('transactions.ignore');
+            Route::post('/{bankImport}/transactions/{transaction}/defer', [BankStatementImportController::class, 'deferTransaction'])->name('transactions.defer');
+            Route::post('/{bankImport}/transactions/{transaction}/undefer', [BankStatementImportController::class, 'undeferTransaction'])->name('transactions.undefer');
             Route::post('/{bankImport}/transactions/{transaction}/link-case', [BankStatementImportController::class, 'linkTransactionToCase'])->name('transactions.link-case');
         });
 

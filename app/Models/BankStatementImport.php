@@ -55,7 +55,7 @@ class BankStatementImport extends Model
     }
 
     /**
-     * Liczba wpływów bez decyzji operatora (brak accepted/ignored).
+     * Liczba wpływów bez finalnej decyzji operatora (aktywna kolejka + „Na potem”).
      * Wymaga withCount(`pending_review_count`) albo osobnego zapytania.
      */
     public function pendingReviewCount(): int
@@ -64,13 +64,7 @@ class BankStatementImport extends Model
             return (int) $this->pending_review_count;
         }
 
-        return (int) $this->transactions()
-            ->where('is_incoming', true)
-            ->whereDoesntHave('matches', fn ($q) => $q->whereIn('status', [
-                BankTransactionMatch::STATUS_ACCEPTED,
-                BankTransactionMatch::STATUS_IGNORED,
-            ]))
-            ->count();
+        return (int) $this->transactions()->pendingOperatorReview()->count();
     }
 
     public function isFullyReviewed(): bool

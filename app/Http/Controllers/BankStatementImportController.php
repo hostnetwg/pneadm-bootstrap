@@ -27,15 +27,7 @@ class BankStatementImportController extends Controller
             ->with('uploader')
             ->withCount([
                 'transactions as pending_review_count' => function ($q) {
-                    $q->where('is_incoming', true)
-                        ->withRemainingAllocatable()
-                        ->where(function ($inner) {
-                            $inner->whereDoesntHave('matches')
-                                ->orWhereHas('matches', fn ($m) => $m->where(
-                                    'status',
-                                    BankTransactionMatch::STATUS_SUGGESTED
-                                ));
-                        });
+                    $q->pendingOperatorReview();
                 },
             ])
             ->latest('id')
@@ -158,6 +150,7 @@ class BankStatementImportController extends Controller
                     BankTransactionMatch::STATUS_SUGGESTED,
                     BankTransactionMatch::STATUS_ACCEPTED,
                     BankTransactionMatch::STATUS_IGNORED,
+                    BankTransactionMatch::STATUS_DEFERRED,
                 ]);
             });
         } elseif (in_array($filter, ['high', 'medium', 'low'], true)) {
@@ -168,6 +161,10 @@ class BankStatementImportController extends Controller
         } elseif ($filter === 'accepted') {
             $transactionsQuery->whereHas('matches', function ($q) {
                 $q->where('status', BankTransactionMatch::STATUS_ACCEPTED);
+            });
+        } elseif ($filter === 'deferred') {
+            $transactionsQuery->whereHas('matches', function ($q) {
+                $q->where('status', BankTransactionMatch::STATUS_DEFERRED);
             });
         } elseif ($filter === 'paynow') {
             $transactionsQuery->whereHas('matches', function ($q) {
@@ -210,6 +207,7 @@ class BankStatementImportController extends Controller
                     BankTransactionMatch::STATUS_SUGGESTED,
                     BankTransactionMatch::STATUS_ACCEPTED,
                     BankTransactionMatch::STATUS_IGNORED,
+                    BankTransactionMatch::STATUS_DEFERRED,
                 ]))
                 ->count(),
             'high' => $this->countByConfidence($bankImport, BankTransactionMatch::CONFIDENCE_HIGH),
@@ -217,6 +215,10 @@ class BankStatementImportController extends Controller
             'low' => $this->countByConfidence($bankImport, BankTransactionMatch::CONFIDENCE_LOW),
             'accepted' => $bankImport->transactions()
                 ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_ACCEPTED))
+                ->count(),
+            'deferred' => $bankImport->transactions()
+                ->where('is_incoming', true)
+                ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_DEFERRED))
                 ->count(),
             'paynow' => $importService->countPayNowGatewayPayouts($bankImport),
             'ignored' => $bankImport->transactions()
@@ -230,6 +232,8 @@ class BankStatementImportController extends Controller
                 })
                 ->count(),
         ];
+
+        $counts['pending_review'] = ($counts['unmatched'] ?? 0) + ($counts['deferred'] ?? 0);
 
         return view('accounting.bank-imports.show', [
             'import' => $bankImport->load('uploader'),
@@ -626,6 +630,46 @@ class BankStatementImportController extends Controller
         $importService->ignoreTransaction($transaction);
 
         return $this->redirectAfterReview($request, $bankImport, 'Transakcja oznaczona jako ignorowana.');
+    }
+
+    public function deferTransaction(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransaction $transaction,
+        BankStatementImportService $importService
+    ) {
+        if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
+            abort(404);
+        }
+
+        try {
+            $importService->deferTransaction($transaction);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('accounting.bank-imports.show', array_filter([
+                    'bankImport' => $bankImport,
+                    'filter' => $request->input('filter') ?: null,
+                    'preview' => $request->input('preview') ?: null,
+                ]))
+                ->with('warning', $e->getMessage());
+        }
+
+        return $this->redirectAfterReview($request, $bankImport, 'Przelew oznaczony jako „Na potem”.');
+    }
+
+    public function undeferTransaction(
+        Request $request,
+        BankStatementImport $bankImport,
+        BankTransaction $transaction,
+        BankStatementImportService $importService
+    ) {
+        if ((int) $transaction->bank_statement_import_id !== (int) $bankImport->id) {
+            abort(404);
+        }
+
+        $importService->undeferTransaction($transaction);
+
+        return $this->redirectAfterReview($request, $bankImport, 'Przelew przywrócony do przeglądu.');
     }
 
     public function lookupDebtCases(Request $request)

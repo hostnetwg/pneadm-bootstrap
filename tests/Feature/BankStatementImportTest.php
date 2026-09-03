@@ -1909,4 +1909,74 @@ class BankStatementImportTest extends TestCase
         $this->expectExceptionMessage('w pełni pokryta');
         $service->manuallyLinkTransactionToDebtCase($txOver, $case, $user->id);
     }
+
+    public function test_user_can_defer_transaction_to_later_and_it_counts_in_pending_review(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'defer.csv',
+            'file_hash' => hash('sha256', 'defer-test'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 1,
+            'rows_incoming' => 1,
+            'rows_matched' => 0,
+            'rows_duplicate' => 0,
+        ]);
+
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-20',
+            'amount' => 220,
+            'currency' => 'PLN',
+            'description' => 'Przelew do odroczenia',
+            'fingerprint' => hash('sha256', 'defer-tx'),
+            'is_incoming' => true,
+        ]);
+
+        $defer = $this->actingAs($user)->post(route('accounting.bank-imports.transactions.defer', [$import, $tx]), [
+            'filter' => 'unmatched',
+        ]);
+        $defer->assertRedirect();
+        $this->assertTrue($tx->fresh()->load('matches')->isDeferred());
+
+        $deferredTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'deferred',
+        ]));
+        $deferredTab->assertOk();
+        $deferredTab->assertSee('Na potem (1)', false);
+        $deferredTab->assertSee('btn-danger', false);
+        $deferredTab->assertSee('Przywróć do przeglądu', false);
+
+        $unmatchedTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'unmatched',
+        ]));
+        $unmatchedTab->assertOk();
+        $unmatchedTab->assertSee('Do przeglądu (0)', false);
+        $unmatchedTab->assertSee('Do przeglądu: 1', false);
+
+        $index = $this->actingAs($user)->get(route('accounting.bank-imports.index'));
+        $index->assertOk();
+        $index->assertSee('Do przeglądu: 1', false);
+
+        $undefer = $this->actingAs($user)->post(route('accounting.bank-imports.transactions.undefer', [$import, $tx]), [
+            'filter' => 'deferred',
+        ]);
+        $undefer->assertRedirect();
+        $this->assertFalse($tx->fresh()->load('matches')->isDeferred());
+
+        $afterUndefer = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'unmatched',
+        ]));
+        $afterUndefer->assertOk();
+        $afterUndefer->assertSee('Do przeglądu (1)', false);
+    }
 }

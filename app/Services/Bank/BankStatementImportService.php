@@ -201,9 +201,15 @@ class BankStatementImportService
             ->orderBy('id')
             ->chunkById(200, function ($transactions) use (&$reviewed, &$withSuggestions) {
                 foreach ($transactions as $transaction) {
-                    if ($transaction->matches()
-                        ->where('status', BankTransactionMatch::STATUS_ACCEPTED)
-                        ->exists()) {
+                    $transaction->loadMissing('matches');
+
+                    if ($transaction->matches->contains(
+                        fn (BankTransactionMatch $match) => in_array($match->status, [
+                            BankTransactionMatch::STATUS_ACCEPTED,
+                            BankTransactionMatch::STATUS_IGNORED,
+                            BankTransactionMatch::STATUS_DEFERRED,
+                        ], true)
+                    )) {
                         continue;
                     }
 
@@ -336,6 +342,10 @@ class BankStatementImportService
 
             if ($transaction->isIgnored()) {
                 throw new InvalidArgumentException('Ten przelew jest zignorowany — najpierw cofnij ignorowanie.');
+            }
+
+            if ($transaction->isDeferred()) {
+                throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
             }
 
             $formOrderId = (int) ($match->form_order_id ?: $debtCase->form_order_id);
@@ -588,6 +598,10 @@ class BankStatementImportService
             throw new InvalidArgumentException('Ten przelew jest zignorowany.');
         }
 
+        if ($transaction->isDeferred()) {
+            throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
+        }
+
         if (! $transaction->canAcceptAdditionalLink()) {
             throw new InvalidArgumentException(
                 'Brak wolnej kwoty do podziału na tym przelewie (całość już przypisana).'
@@ -681,6 +695,10 @@ class BankStatementImportService
             throw new InvalidArgumentException('Ten przelew jest zignorowany.');
         }
 
+        if ($transaction->isDeferred()) {
+            throw new InvalidArgumentException('Ten przelew jest oznaczony „Na potem” — najpierw przywróć go do przeglądu.');
+        }
+
         if (! $transaction->canAcceptAdditionalLink()) {
             throw new InvalidArgumentException(
                 'Brak wolnej kwoty do podziału na tym przelewie (całość już przypisana).'
@@ -760,7 +778,10 @@ class BankStatementImportService
     public function ignoreTransaction(BankTransaction $transaction, array $reasons = [BankTransactionMatch::REASON_MANUAL_IGNORE]): void
     {
         $transaction->matches()
-            ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+            ->whereIn('status', [
+                BankTransactionMatch::STATUS_SUGGESTED,
+                BankTransactionMatch::STATUS_DEFERRED,
+            ])
             ->update(['status' => BankTransactionMatch::STATUS_IGNORED]);
 
         $hasIgnored = $transaction->matches()
@@ -773,6 +794,83 @@ class BankStatementImportService
                 'match_reasons' => array_values($reasons),
                 'status' => BankTransactionMatch::STATUS_IGNORED,
             ]);
+        }
+    }
+
+    /**
+     * Oznacza wpływ jako „Na potem” (poza aktywną kolejką, ale nadal do przeglądu na liście importów).
+     */
+    public function deferTransaction(BankTransaction $transaction, array $reasons = [BankTransactionMatch::REASON_MANUAL_DEFER]): void
+    {
+        $transaction->loadMissing('matches');
+
+        if ($transaction->isIgnored()) {
+            throw new InvalidArgumentException('Ten przelew jest zignorowany — nie można oznaczyć „Na potem”.');
+        }
+
+        if ($transaction->isDeferred()) {
+            return;
+        }
+
+        if ($transaction->acceptedMatches()->isNotEmpty() && ! $transaction->canAcceptAdditionalLink()) {
+            throw new InvalidArgumentException('Ten przelew jest już w pełni przypisany.');
+        }
+
+        $suggested = $transaction->matches()
+            ->where('status', BankTransactionMatch::STATUS_SUGGESTED)
+            ->get();
+
+        foreach ($suggested as $match) {
+            $matchReasons = array_values(array_unique(array_merge(
+                array_map('strval', $match->match_reasons ?? []),
+                array_map('strval', $reasons)
+            )));
+            $match->update([
+                'status' => BankTransactionMatch::STATUS_DEFERRED,
+                'match_reasons' => $matchReasons,
+            ]);
+        }
+
+        $hasDeferred = $transaction->matches()
+            ->where('status', BankTransactionMatch::STATUS_DEFERRED)
+            ->exists();
+
+        if (! $hasDeferred) {
+            $transaction->matches()->create([
+                'confidence' => BankTransactionMatch::CONFIDENCE_LOW,
+                'match_reasons' => array_values($reasons),
+                'status' => BankTransactionMatch::STATUS_DEFERRED,
+            ]);
+        }
+    }
+
+    /**
+     * Przywraca wpływ z „Na potem” do aktywnej kolejki przeglądu.
+     */
+    public function undeferTransaction(BankTransaction $transaction): void
+    {
+        $deferred = $transaction->matches()
+            ->where('status', BankTransactionMatch::STATUS_DEFERRED)
+            ->get();
+
+        if ($deferred->isEmpty()) {
+            return;
+        }
+
+        foreach ($deferred as $match) {
+            $hasTarget = $match->form_order_id || $match->debt_case_id;
+            if ($hasTarget) {
+                $reasons = array_values(array_filter(
+                    array_map('strval', $match->match_reasons ?? []),
+                    fn (string $reason) => $reason !== BankTransactionMatch::REASON_MANUAL_DEFER
+                ));
+                $match->update([
+                    'status' => BankTransactionMatch::STATUS_SUGGESTED,
+                    'match_reasons' => $reasons,
+                ]);
+            } else {
+                $match->delete();
+            }
         }
     }
 

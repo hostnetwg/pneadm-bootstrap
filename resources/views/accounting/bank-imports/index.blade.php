@@ -102,7 +102,7 @@
                                             ['label' => 'Nowe wpływy', 'tip' => 'Ile wpływów (kwota dodatnia) zapisano przy tym imporcie. Pomija operacje już obecne w bazie z wcześniejszych wyciągów — te trafiają do kolumny Duplikaty i nie są tu liczone.'],
                                             ['label' => 'Sugestie', 'tip' => 'Ile nowych wpływów ma co najmniej jedną automatyczną sugestię dopasowania (FV, NIP, zamówienie itd.). Aktualizowane po „Przelicz sugestie”. To nie jest jeszcze akceptacja — decyzja należy do operatora.'],
                                             ['label' => 'Duplikaty', 'tip' => 'Ile wierszy z pliku pominięto, bo taka sama operacja (data + kwota + znormalizowany opis) była już w bazie z wcześniejszego importu. Nie powstaje drugi przelew.'],
-                                            ['label' => 'Przegląd', 'tip' => 'Postęp ręcznej pracy przy wpływach z tego importu. „Do przeglądu: N” — wpływy bez decyzji (sugestia do akceptacji/odrzucenia, brak powiązania lub wolna kwota). „Przejrzany” — każdy wpływ zaakceptowany lub zignorowany. „Brak wpływów” — nie zapisano nowych wpływów (np. same duplikaty).'],
+                                            ['label' => 'Przegląd', 'tip' => 'Postęp ręcznej pracy przy wpływach z tego importu. „Do przeglądu: N” obejmuje aktywną kolejkę oraz przelewy „Na potem”. „Przejrzany” — każdy wpływ zaakceptowany lub zignorowany (bez odroczeń). „Brak wpływów” — nie zapisano nowych wpływów (np. same duplikaty).'],
                                             ['label' => 'Kto', 'tip' => 'Użytkownik panelu, który wgrał ten plik CSV.'],
                                             ['label' => 'Kiedy', 'tip' => 'Data i godzina wgrania pliku.'],
                                         ];

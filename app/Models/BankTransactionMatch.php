@@ -21,9 +21,13 @@ class BankTransactionMatch extends Model
 
     public const STATUS_IGNORED = 'ignored';
 
+    public const STATUS_DEFERRED = 'deferred';
+
     public const REASON_GATEWAY_PAYOUT_PAYNOW = 'gateway_payout_paynow';
 
     public const REASON_MANUAL_IGNORE = 'manual_ignore';
+
+    public const REASON_MANUAL_DEFER = 'manual_defer';
 
     protected $fillable = [
         'bank_transaction_id',
@@ -110,6 +114,7 @@ class BankTransactionMatch extends Model
             self::STATUS_ACCEPTED => 'Zaakceptowane',
             self::STATUS_REJECTED => 'Odrzucone',
             self::STATUS_IGNORED => 'Ignorowane',
+            self::STATUS_DEFERRED => 'Na potem',
             default => (string) $this->status,
         };
     }
@@ -187,6 +192,7 @@ class BankTransactionMatch extends Model
                 'split_allocation' => 'Część kwoty przelewu przypisana do tej FV (podział)',
                 self::REASON_GATEWAY_PAYOUT_PAYNOW => 'Wypłata rozliczeniowa bramki PayNow (mElements) — poza windykacją FV',
                 self::REASON_MANUAL_IGNORE => 'Ręcznie zignorowane',
+                self::REASON_MANUAL_DEFER => 'Odroczone do późniejszego przeglądu (Na potem)',
                 'party_name_mismatch' => 'Nadawca z wyciągu nie pasuje do nabywcy/odbiorcy zamówienia — możliwy błędny numer FV w tytule',
                 default => $reason,
             };
