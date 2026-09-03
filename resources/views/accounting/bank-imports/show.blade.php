@@ -308,6 +308,8 @@
                                         $best = $accepted ?: $suggested->sortBy(fn ($m) => match ($m->confidence) {
                                             'high' => 0, 'medium' => 1, default => 2,
                                         })->first();
+                                        $coverageCase = $best?->coverageDebtCase();
+                                        $caseFullyCovered = $coverageCase?->isFullyCoveredByBankPayments() ?? false;
                                         $order = $best?->formOrder;
                                         $course = $order?->course;
                                         $courseTitle = $course
@@ -366,36 +368,8 @@
                                                 'allocated_amount' => $best->allocated_amount !== null
                                                     ? number_format((float) $best->allocated_amount, 2, ',', ' ').' '.$tx->currency
                                                     : null,
-                                                'case_fully_covered' => (function () use ($best) {
-                                                    $case = $best->debtCase;
-                                                    if (! $case && $best->form_order_id) {
-                                                        $case = \App\Models\DebtCase::query()
-                                                            ->active()
-                                                            ->where('form_order_id', $best->form_order_id)
-                                                            ->latest('id')
-                                                            ->first();
-                                                    }
-                                                    if (! $case) {
-                                                        return false;
-                                                    }
-
-                                                    return $case->isFullyCoveredByBankPayments();
-                                                })(),
-                                                'refund_debt_case_id' => (function () use ($best) {
-                                                    if ($best->debt_case_id) {
-                                                        return (int) $best->debt_case_id;
-                                                    }
-                                                    if (! $best->form_order_id) {
-                                                        return null;
-                                                    }
-                                                    $case = \App\Models\DebtCase::query()
-                                                        ->active()
-                                                        ->where('form_order_id', $best->form_order_id)
-                                                        ->latest('id')
-                                                        ->first();
-
-                                                    return $case?->id;
-                                                })(),
+                                                'case_fully_covered' => $caseFullyCovered,
+                                                'refund_debt_case_id' => $coverageCase?->id,
                                             ] : null,
                                             'allocations' => $acceptedMatches->map(function ($m) use ($tx, $import) {
                                                 return [
@@ -522,6 +496,11 @@
                                                     data-tx-amount="{{ number_format((float) $tx->amount, 2, '.', '') }}"
                                                     data-link-url="{{ route('accounting.bank-imports.transactions.link-case', [$import, $tx]) }}"
                                                     data-refund-url="{{ route('accounting.bank-imports.transactions.mark-refunded', [$import, $tx]) }}"
+                                                    @if($caseFullyCovered && $coverageCase)
+                                                        data-case-fully-covered="1"
+                                                        data-refund-case-id="{{ $coverageCase->id }}"
+                                                        data-refund-summary="Sprawa #{{ $coverageCase->id }}{{ $order?->invoice_number ? ' · FV '.$order->invoice_number : '' }}"
+                                                    @endif
                                                     data-preview="{{ json_encode($preview, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}"
                                                     @if($packageSuggested->count() >= 2 && $canAddSplit)
                                                         data-can-act="package"
@@ -1061,6 +1040,9 @@
                             <input type="hidden" name="preview" value="">
                             <button type="submit" class="btn btn-outline-secondary" id="bankTxPreviewIgnoreBtn" data-loading-text="Ignoruję…">Ignoruj</button>
                         </form>
+                        <button type="button" class="btn btn-info d-none" id="bankTxPreviewRefundBtn">
+                            Oznacz jako zwrot
+                        </button>
                         <form method="POST" id="bankTxPreviewDeferForm" class="d-none" data-loading-submit data-loading-text="Odkładam…">
                             @csrf
                             <input type="hidden" name="filter" value="{{ $filter }}">
@@ -2690,6 +2672,7 @@
                 var ignoreBtn = document.getElementById('bankTxPreviewIgnoreBtn');
                 var deferForm = document.getElementById('bankTxPreviewDeferForm');
                 var unlinkBtn = document.getElementById('bankTxPreviewUnlinkBtn');
+                var refundBtn = document.getElementById('bankTxPreviewRefundBtn');
                 var buttons = previewButtons();
                 var idx = buttons.indexOf(btn);
                 var nextBtn = idx >= 0 && idx < buttons.length - 1 ? buttons[idx + 1] : null;
@@ -2701,6 +2684,29 @@
                     unlinkBtn.classList.add('d-none');
                 }
                 if (deferForm) deferForm.classList.add('d-none');
+                if (refundBtn) {
+                    refundBtn.classList.add('d-none');
+                    refundBtn.removeAttribute('data-case-id');
+                    refundBtn.removeAttribute('data-summary');
+                }
+
+                var previewPayload = {};
+                try { previewPayload = JSON.parse(btn.getAttribute('data-preview') || '{}'); } catch (e) {}
+                var refundCaseId = btn.getAttribute('data-refund-case-id')
+                    || (previewPayload.match && previewPayload.match.refund_debt_case_id
+                        ? String(previewPayload.match.refund_debt_case_id)
+                        : '');
+                var fullyCovered = btn.getAttribute('data-case-fully-covered') === '1'
+                    || !!(previewPayload.match && previewPayload.match.case_fully_covered);
+                var canRefundCovered = fullyCovered
+                    && refundCaseId !== ''
+                    && (canAct === 'match' || canAct === 'ignore-tx' || canAct === 'package');
+                function showFooterRefund() {
+                    if (!refundBtn || !canRefundCovered) return;
+                    refundBtn.classList.remove('d-none');
+                    refundBtn.setAttribute('data-case-id', refundCaseId);
+                    refundBtn.setAttribute('data-summary', btn.getAttribute('data-refund-summary') || '');
+                }
 
                 if (canAct === 'package') {
                     acceptForm.classList.add('d-none');
@@ -2721,8 +2727,9 @@
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj transakcję';
                     setManualLinkPanelVisible(true);
+                    showFooterRefund();
                 } else if (canAct === 'match') {
-                    acceptForm.classList.remove('d-none');
+                    acceptForm.classList.toggle('d-none', canRefundCovered);
                     rejectForm.classList.remove('d-none');
                     ignoreForm.classList.remove('d-none');
                     acceptForm.setAttribute('action', btn.getAttribute('data-accept-url') || '');
@@ -2746,6 +2753,7 @@
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj';
                     setManualLinkPanelVisible(true);
+                    showFooterRefund();
                 } else if (canAct === 'ignore-tx') {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');
@@ -2765,6 +2773,7 @@
                     setIfirmaAlreadyPaid(acceptForm, false);
                     ignoreBtn.textContent = 'Ignoruj transakcję';
                     setManualLinkPanelVisible(true);
+                    showFooterRefund();
                 } else if (canAct === 'accepted') {
                     acceptForm.classList.add('d-none');
                     rejectForm.classList.add('d-none');
@@ -3226,6 +3235,11 @@
                 }
                 refundConfirmModal.show();
             }
+
+            document.getElementById('bankTxPreviewRefundBtn')?.addEventListener('click', function (event) {
+                event.preventDefault();
+                openManualRefundConfirm(this);
+            });
 
             var clearPeekBtn = document.getElementById('bankTxPreviewClearOrderBtn');
             if (clearPeekBtn) {

@@ -2499,11 +2499,12 @@ class BankStatementImportTest extends TestCase
         ]);
         $case = DebtCase::create([
             'form_order_id' => $order->id,
-            'status' => DebtCase::STATUS_OPEN,
+            'status' => DebtCase::STATUS_CLOSED,
             'amount_gross' => 365,
             'invoice_number' => '900/8/2026',
             'assigned_to_id' => $user->id,
-            'opened_at' => now(),
+            'opened_at' => now()->subDays(5),
+            'closed_at' => now()->subDay(),
         ]);
 
         $import = BankStatementImport::create([
@@ -2562,6 +2563,9 @@ class BankStatementImportTest extends TestCase
         ]));
         $preview->assertOk();
         $preview->assertSee('data-refund-url=', false);
+        $preview->assertSee('id="bankTxPreviewRefundBtn"', false);
+        $preview->assertSee('data-case-fully-covered="1"', false);
+        $preview->assertSee('data-refund-case-id="'.$case->id.'"', false);
         $preview->assertSee('case_fully_covered', false);
         $preview->assertSee('bankImportRefundConfirmModal', false);
 

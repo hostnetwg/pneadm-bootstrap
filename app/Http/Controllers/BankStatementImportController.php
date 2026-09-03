@@ -160,7 +160,8 @@ class BankStatementImportController extends Controller
                 'matches' => fn ($q) => $q->with([
                     'formOrder.course.instructor',
                     'formOrder.primaryParticipant.participant',
-                    'debtCase',
+                    'debtCase.formOrder',
+                    'debtCase.bankTransactionMatches.transaction',
                 ])->latest('id'),
             ])
             ->where('is_incoming', true)
@@ -826,7 +827,6 @@ class BankStatementImportController extends Controller
         };
 
         $cases = DebtCase::query()
-            ->active()
             ->with(['formOrder.course'])
             ->where(function ($outer) use ($query, $applyOrderSearch, $exact) {
                 if ($exact) {
@@ -844,6 +844,7 @@ class BankStatementImportController extends Controller
                         ->orWhere('form_order_id', (int) $query);
                 }
             })
+            ->orderByRaw('CASE WHEN status = ? THEN 1 ELSE 0 END', [DebtCase::STATUS_CLOSED])
             ->latest('id')
             ->limit(12)
             ->get();

@@ -125,6 +125,38 @@ class BankTransactionMatch extends Model
     }
 
     /**
+     * Sprawa do oceny pokrycia / zwrotu: przypisana do matcha albo (także zamknięta) sprawa zamówienia.
+     */
+    public function coverageDebtCase(): ?DebtCase
+    {
+        if ($this->debt_case_id) {
+            $this->loadMissing('debtCase.formOrder');
+            if ($this->debtCase) {
+                return $this->debtCase;
+            }
+
+            return DebtCase::query()->with('formOrder')->find($this->debt_case_id);
+        }
+
+        if (! $this->form_order_id) {
+            return null;
+        }
+
+        $cases = DebtCase::query()
+            ->with('formOrder')
+            ->where('form_order_id', $this->form_order_id)
+            ->latest('id')
+            ->get();
+
+        if ($cases->isEmpty()) {
+            return null;
+        }
+
+        return $cases->first(fn (DebtCase $case) => $case->isFullyCoveredByBankPayments())
+            ?? $cases->first();
+    }
+
+    /**
      * Human-readable match basis for operators (Polish).
      *
      * @return list<string>
