@@ -2103,4 +2103,131 @@ class BankStatementImportTest extends TestCase
         $show->assertSee('Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu', false);
         $show->assertDontSee('<div class="alert alert-danger">', false);
     }
+
+    public function test_show_page_can_search_incoming_transfers(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie Kostrzyn',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '159/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Szkoła Podstawowa nr 2',
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'search.csv',
+            'file_hash' => hash('sha256', 'search-import'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $matching = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-25',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW WEWNĘTRZNY SZKOŁA PODSTAWOWA NR.2 KOSTRZYN NAD ODRĄ FRA 159/8/2026',
+            'fingerprint' => hash('sha256', 'search-tx-match'),
+            'is_incoming' => true,
+        ]);
+        $other = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-20',
+            'amount' => 990,
+            'currency' => 'PLN',
+            'description' => 'WYPŁATA ŚRODKÓW NR PON-123 MELEMENTS',
+            'fingerprint' => hash('sha256', 'search-tx-other'),
+            'is_incoming' => true,
+        ]);
+        $linkedOnly = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-21',
+            'amount' => 220,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW BEZ NUMERU FV W OPISIE',
+            'fingerprint' => hash('sha256', 'search-tx-linked'),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $matching->id,
+            'form_order_id' => $order->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+        ]);
+        $orderLinked = FormOrder::create([
+            'product_name' => 'Szkolenie bez numeru w opisie',
+            'product_price' => 220,
+            'order_date' => now()->subDays(8),
+            'invoice_number' => '777/9/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'buyer_name' => 'Gmina Testowa',
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $linkedOnly->id,
+            'form_order_id' => $orderLinked->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_MEDIUM,
+            'match_reasons' => ['manual'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+        ]);
+
+        $all = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'all',
+        ]));
+        $all->assertOk();
+        $all->assertSee('id="bankImportTxSearch"', false);
+        $all->assertSee('KOSTRZYN NAD ODRĄ', false);
+        $all->assertSee('WYPŁATA ŚRODKÓW NR PON-123', false);
+
+        $bySender = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'all',
+            'q' => 'KOSTRZYN',
+        ]));
+        $bySender->assertOk();
+        $bySender->assertSee('Wyniki dla „KOSTRZYN”', false);
+        $bySender->assertSee('KOSTRZYN NAD ODRĄ', false);
+        $bySender->assertDontSee('WYPŁATA ŚRODKÓW NR PON-123', false);
+
+        $byAmount = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'all',
+            'q' => '365,00',
+        ]));
+        $byAmount->assertOk();
+        $byAmount->assertSee('KOSTRZYN NAD ODRĄ', false);
+        $byAmount->assertDontSee('WYPŁATA ŚRODKÓW NR PON-123', false);
+
+        $byInvoice = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'all',
+            'q' => '777/9/2026',
+        ]));
+        $byInvoice->assertOk();
+        $byInvoice->assertSee('PRZELEW BEZ NUMERU FV W OPISIE', false);
+        $byInvoice->assertDontSee('KOSTRZYN NAD ODRĄ', false);
+        $byInvoice->assertDontSee('WYPŁATA ŚRODKÓW NR PON-123', false);
+
+        $byId = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'all',
+            'q' => '#'.$matching->id,
+        ]));
+        $byId->assertOk();
+        $byId->assertSee('KOSTRZYN NAD ODRĄ', false);
+        $byId->assertDontSee('WYPŁATA ŚRODKÓW NR PON-123', false);
+    }
 }

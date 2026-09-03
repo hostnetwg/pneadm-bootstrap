@@ -197,7 +197,11 @@
                             $btnClass = $isActive ? 'btn-primary' : 'btn-outline-secondary';
                         }
                     @endphp
-                    <a href="{{ route('accounting.bank-imports.show', ['bankImport' => $import, 'filter' => $key]) }}"
+                    <a href="{{ route('accounting.bank-imports.show', array_filter([
+                            'bankImport' => $import,
+                            'filter' => $key,
+                            'q' => ($search ?? '') !== '' ? $search : null,
+                        ])) }}"
                        class="btn btn-sm {{ $btnClass }}"
                        @if($item['title'])
                            data-bs-toggle="tooltip"
@@ -211,6 +215,43 @@
                     </a>
                 @endforeach
             </div>
+
+            @php
+                $search = $search ?? '';
+            @endphp
+            <form method="GET" action="{{ route('accounting.bank-imports.show', $import) }}" class="mb-3">
+                <input type="hidden" name="filter" value="{{ $filter }}">
+                <label for="bankImportTxSearch" class="form-label small mb-1">Szukaj przelewu</label>
+                <div class="input-group input-group-sm" style="max-width: 36rem;">
+                    <input type="search"
+                           id="bankImportTxSearch"
+                           name="q"
+                           value="{{ $search }}"
+                           class="form-control"
+                           placeholder="opis, nadawca, kwota, FV, data, #ID"
+                           maxlength="128"
+                           autocomplete="off">
+                    @if($search !== '')
+                        <a href="{{ route('accounting.bank-imports.show', ['bankImport' => $import, 'filter' => $filter]) }}"
+                           class="btn btn-outline-secondary"
+                           title="Wyczyść wyszukiwanie"
+                           aria-label="Wyczyść wyszukiwanie">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </a>
+                    @endif
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-search"></i> Szukaj
+                    </button>
+                </div>
+                @if($search !== '')
+                    <div class="form-text">
+                        Wyniki dla „{{ $search }}”: {{ $transactions->total() }}
+                        @if($filter !== 'all')
+                            w tej zakładce
+                        @endif
+                    </div>
+                @endif
+            </form>
 
             <div class="card">
                 <div class="card-body p-0">
@@ -700,7 +741,13 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">Brak transakcji dla tego filtra.</td>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            @if($search !== '')
+                                                Brak przelewów dla frazy „{{ $search }}”.
+                                            @else
+                                                Brak transakcji dla tego filtra.
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -1196,6 +1243,30 @@
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            var reviewSearchQuery = @json($search ?? '');
+            function reviewSearchHiddenHtml() {
+                var html = '<input type="hidden" name="filter" value="{{ $filter }}">';
+                if (reviewSearchQuery) {
+                    html += '<input type="hidden" name="q" value="' + String(reviewSearchQuery)
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;') + '">';
+                }
+                return html;
+            }
+            if (reviewSearchQuery) {
+                document.querySelectorAll('form').forEach(function (form) {
+                    if (!form.querySelector('input[name="filter"]') || form.querySelector('input[name="q"]')) {
+                        return;
+                    }
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'q';
+                    input.value = reviewSearchQuery;
+                    form.appendChild(input);
+                });
+            }
+
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
                 bootstrap.Tooltip.getOrCreateInstance(el);
             });
@@ -2287,7 +2358,7 @@
                 if (registerIfirmaUrl) {
                     links.push('<form method="POST" action="' + esc(registerIfirmaUrl) + '" class="d-inline" data-loading-submit data-loading-text="Rejestruję…">'
                         + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
-                        + '<input type="hidden" name="filter" value="{{ $filter }}">'
+                        + reviewSearchHiddenHtml()
                         + '<input type="hidden" name="preview" value="' + esc(txId || '') + '">'
                         + '<button type="submit" class="btn btn-sm btn-outline-success" data-loading-text="Rejestruję…">Zarejestruj wpłatę iFirma</button>'
                         + '</form>');
@@ -2733,11 +2804,9 @@
                         allocHtml += '</ul>';
                     }
                     if (preview.package && preview.package.accept_url) {
-                        var filterInput = document.querySelector('input[name="filter"]');
-                        var filterVal = filterInput ? filterInput.value : '';
                         allocHtml += '<form method="POST" action="' + esc(preview.package.accept_url) + '" class="d-inline bank-import-package-form" data-loading-submit data-loading-text="Akceptuję pakiet…" data-package-count="' + esc(String(preview.package.count)) + '">'
                             + '<input type="hidden" name="_token" value="' + esc(csrfToken) + '">'
-                            + '<input type="hidden" name="filter" value="' + esc(filterVal) + '">'
+                            + reviewSearchHiddenHtml()
                             + '<input type="hidden" name="register_ifirma_payment" value="0" class="bank-import-register-ifirma">'
                             + '<button type="submit" class="btn btn-sm btn-primary">Akceptuj pakiet (' + esc(String(preview.package.count)) + ')</button>'
                             + '</form>';

@@ -137,6 +137,10 @@ class BankStatementImportController extends Controller
             ->latest('id');
 
         $previewId = $request->integer('preview');
+        $search = trim($request->string('q')->toString());
+        if (mb_strlen($search) > 128) {
+            $search = mb_substr($search, 0, 128);
+        }
 
         if ($filter === 'unmatched') {
             $transactionsQuery->withRemainingAllocatable()
@@ -180,6 +184,8 @@ class BankStatementImportController extends Controller
                     });
             });
         }
+
+        $transactionsQuery->matchingSearch($search);
 
         // Deep-link ze sprawy: ?preview={txId} — ten przelew na początku listy, żeby modal się otworzył.
         if ($previewId > 0
@@ -239,6 +245,7 @@ class BankStatementImportController extends Controller
             'import' => $bankImport->load('uploader'),
             'transactions' => $transactions,
             'filter' => $filter,
+            'search' => $search,
             'counts' => $counts,
             'payNowIgnorableCount' => $importService->countIgnorablePayNowGatewayPayouts($bankImport),
         ]);
@@ -656,11 +663,7 @@ class BankStatementImportController extends Controller
             $importService->deferTransaction($transaction);
         } catch (\InvalidArgumentException $e) {
             return redirect()
-                ->route('accounting.bank-imports.show', array_filter([
-                    'bankImport' => $bankImport,
-                    'filter' => $request->input('filter') ?: null,
-                    'preview' => $request->input('preview') ?: null,
-                ]))
+                ->route('accounting.bank-imports.show', $this->reviewRedirectParams($request, $bankImport))
                 ->with('warning', $e->getMessage());
         }
 
@@ -1081,18 +1084,8 @@ class BankStatementImportController extends Controller
 
     private function redirectAfterReview(Request $request, BankStatementImport $import, string $message)
     {
-        $params = ['bankImport' => $import];
-        $filter = $request->input('filter');
-        if (is_string($filter) && $filter !== '') {
-            $params['filter'] = $filter;
-        }
-        $preview = $request->input('preview');
-        if ($preview !== null && $preview !== '') {
-            $params['preview'] = (int) $preview;
-        }
-
         return redirect()
-            ->route('accounting.bank-imports.show', $params)
+            ->route('accounting.bank-imports.show', $this->reviewRedirectParams($request, $import))
             ->with('success', $message);
     }
 
@@ -1106,14 +1099,8 @@ class BankStatementImportController extends Controller
         int $previewTransactionId,
         string $type = 'danger'
     ) {
-        $params = [
-            'bankImport' => $import,
-            'preview' => $previewTransactionId,
-        ];
-        $filter = $request->input('filter');
-        if (is_string($filter) && $filter !== '') {
-            $params['filter'] = $filter;
-        }
+        $params = $this->reviewRedirectParams($request, $import);
+        $params['preview'] = $previewTransactionId;
 
         return redirect()
             ->route('accounting.bank-imports.show', $params)
@@ -1121,6 +1108,28 @@ class BankStatementImportController extends Controller
                 'type' => in_array($type, ['danger', 'warning', 'success', 'info'], true) ? $type : 'danger',
                 'message' => $message,
             ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reviewRedirectParams(Request $request, BankStatementImport $import): array
+    {
+        $params = ['bankImport' => $import];
+        $filter = $request->input('filter');
+        if (is_string($filter) && $filter !== '') {
+            $params['filter'] = $filter;
+        }
+        $preview = $request->input('preview');
+        if ($preview !== null && $preview !== '') {
+            $params['preview'] = (int) $preview;
+        }
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $params['q'] = mb_substr($search, 0, 128);
+        }
+
+        return $params;
     }
 
     private function assertMatchBelongsToImport(BankStatementImport $import, BankTransactionMatch $match): void

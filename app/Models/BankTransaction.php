@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Services\Bank\BankTransactionMatcher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class BankTransaction extends Model
 {
@@ -165,5 +167,107 @@ class BankTransaction extends Model
                     BankTransactionMatch::STATUS_DEFERRED
                 ));
             });
+    }
+
+    /**
+     * Szukaj wpływu po opisie/nadawcy, kwocie, dacie, ID oraz powiązanej FV/sprawie.
+     *
+     * @param  Builder<BankTransaction>  $query
+     * @return Builder<BankTransaction>
+     */
+    public function scopeMatchingSearch(Builder $query, ?string $raw): Builder
+    {
+        $search = trim((string) $raw);
+        if ($search === '') {
+            return $query;
+        }
+
+        $like = '%'.addcslashes($search, '%_\\').'%';
+        $amount = self::parseSearchAmount($search);
+        $date = self::parseSearchDate($search);
+        $idCandidate = 0;
+        if (ctype_digit($search)) {
+            $idCandidate = (int) $search;
+        } elseif (preg_match('/^#(\d+)$/', $search, $matches) === 1) {
+            $idCandidate = (int) $matches[1];
+        }
+
+        return $query->where(function (Builder $inner) use ($like, $amount, $date, $idCandidate) {
+            $inner->where('description', 'like', $like)
+                ->orWhere('account_label', 'like', $like)
+                ->orWhere('category', 'like', $like)
+                ->orWhere('counterparty_account', 'like', $like);
+
+            if ($idCandidate > 0) {
+                $inner->orWhere('id', $idCandidate);
+            }
+
+            if ($amount !== null) {
+                $inner->orWhereBetween('amount', [$amount - 0.01, $amount + 0.01]);
+            }
+
+            if ($date !== null) {
+                $inner->orWhereDate('operation_date', $date);
+            }
+
+            $inner->orWhereHas('matches', function (Builder $matchQuery) use ($like, $idCandidate) {
+                $matchQuery->where(function (Builder $matchInner) use ($like, $idCandidate) {
+                    if ($idCandidate > 0) {
+                        $matchInner->where('form_order_id', $idCandidate)
+                            ->orWhere('debt_case_id', $idCandidate);
+                    }
+
+                    $matchInner->orWhereHas('formOrder', function (Builder $orderQuery) use ($like, $idCandidate) {
+                        $orderQuery->where(function (Builder $orderInner) use ($like, $idCandidate) {
+                            $orderInner->where('invoice_number', 'like', $like)
+                                ->orWhere('ksef_number', 'like', $like)
+                                ->orWhere('buyer_name', 'like', $like)
+                                ->orWhere('recipient_name', 'like', $like)
+                                ->orWhere('orderer_name', 'like', $like);
+                            if ($idCandidate > 0) {
+                                $orderInner->orWhere('id', $idCandidate);
+                            }
+                        });
+                    })->orWhereHas('debtCase', function (Builder $caseQuery) use ($like, $idCandidate) {
+                        $caseQuery->where(function (Builder $caseInner) use ($like, $idCandidate) {
+                            $caseInner->where('invoice_number', 'like', $like)
+                                ->orWhere('ksef_number', 'like', $like);
+                            if ($idCandidate > 0) {
+                                $caseInner->orWhere('id', $idCandidate);
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    private static function parseSearchAmount(string $search): ?float
+    {
+        $normalized = str_replace(["\u{00A0}", ' '], '', trim($search));
+        $normalized = preg_replace('/pln$/i', '', $normalized) ?? $normalized;
+        $normalized = str_replace(',', '.', $normalized);
+        if (preg_match('/^\d+(\.\d{1,2})?$/', $normalized) !== 1) {
+            return null;
+        }
+
+        return round((float) $normalized, 2);
+    }
+
+    private static function parseSearchDate(string $search): ?string
+    {
+        $trimmed = trim($search);
+        foreach (['Y-m-d', 'd.m.Y', 'd-m-Y', 'd/m/Y'] as $format) {
+            try {
+                $parsed = Carbon::createFromFormat('!'.$format, $trimmed);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($parsed && $parsed->format($format) === $trimmed) {
+                return $parsed->toDateString();
+            }
+        }
+
+        return null;
     }
 }
