@@ -288,7 +288,12 @@ class BankStatementImportController extends Controller
                 $request->boolean('ifirma_already_paid')
             );
         } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['match' => $e->getMessage()]);
+            return $this->redirectAfterReviewModalAlert(
+                $request,
+                $bankImport,
+                $e->getMessage(),
+                (int) $match->bank_transaction_id
+            );
         }
 
         $message = sprintf(
@@ -368,7 +373,12 @@ class BankStatementImportController extends Controller
                 $request->user()?->id
             );
         } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['match' => $e->getMessage()]);
+            return $this->redirectAfterReviewModalAlert(
+                $request,
+                $bankImport,
+                $e->getMessage(),
+                (int) $transaction->id
+            );
         }
 
         $caseIds = collect($accepted)
@@ -965,7 +975,12 @@ class BankStatementImportController extends Controller
         ]);
 
         if (empty($validated['debt_case_id']) && empty($validated['form_order_id'])) {
-            return back()->withErrors(['match' => 'Wybierz sprawę albo zamówienie do powiązania.']);
+            return $this->redirectAfterReviewModalAlert(
+                $request,
+                $bankImport,
+                'Wybierz sprawę albo zamówienie do powiązania.',
+                (int) $transaction->id
+            );
         }
 
         try {
@@ -996,7 +1011,12 @@ class BankStatementImportController extends Controller
                 );
             }
         } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['match' => $e->getMessage()]);
+            return $this->redirectAfterReviewModalAlert(
+                $request,
+                $bankImport,
+                $e->getMessage(),
+                (int) $transaction->id
+            );
         }
 
         if ($request->boolean('register_ifirma_payment')) {
@@ -1074,6 +1094,33 @@ class BankStatementImportController extends Controller
         return redirect()
             ->route('accounting.bank-imports.show', $params)
             ->with('success', $message);
+    }
+
+    /**
+     * Błąd / ostrzeżenie przy pracy w modalu: wróć do tego samego przelewu i pokaż komunikat w oknie podglądu.
+     */
+    private function redirectAfterReviewModalAlert(
+        Request $request,
+        BankStatementImport $import,
+        string $message,
+        int $previewTransactionId,
+        string $type = 'danger'
+    ) {
+        $params = [
+            'bankImport' => $import,
+            'preview' => $previewTransactionId,
+        ];
+        $filter = $request->input('filter');
+        if (is_string($filter) && $filter !== '') {
+            $params['filter'] = $filter;
+        }
+
+        return redirect()
+            ->route('accounting.bank-imports.show', $params)
+            ->with('modal_alert', [
+                'type' => in_array($type, ['danger', 'warning', 'success', 'info'], true) ? $type : 'danger',
+                'message' => $message,
+            ]);
     }
 
     private function assertMatchBelongsToImport(BankStatementImport $import, BankTransactionMatch $match): void

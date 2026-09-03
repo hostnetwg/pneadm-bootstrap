@@ -1979,4 +1979,110 @@ class BankStatementImportTest extends TestCase
         $afterUndefer->assertOk();
         $afterUndefer->assertSee('Do przeglądu (1)', false);
     }
+
+    public function test_link_error_for_fully_covered_case_shows_inside_preview_modal(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie pokryte',
+            'product_price' => 365,
+            'order_date' => now()->subDays(3),
+            'invoice_number' => '900/8/2026',
+            'invoice_payment_delay' => 14,
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 365,
+            'invoice_number' => '900/8/2026',
+            'assigned_to_id' => $user->id,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'covered.csv',
+            'file_hash' => hash('sha256', 'covered-modal'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+            'rows_matched' => 0,
+            'rows_duplicate' => 0,
+        ]);
+
+        $txPaid = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-20',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'FV 900/8/2026 juz oplacona',
+            'fingerprint' => hash('sha256', 'covered-tx-1'),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $txPaid->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['amount_match', 'manual_case_link'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'allocated_amount' => 365,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $txExtra = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-21',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'FV 900/8/2026 druga proba',
+            'fingerprint' => hash('sha256', 'covered-tx-2'),
+            'is_incoming' => true,
+        ]);
+
+        $response = $this->actingAs($user)->from(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'unmatched',
+            'preview' => $txExtra->id,
+        ]))->post(route('accounting.bank-imports.transactions.link-case', [$import, $txExtra]), [
+            'debt_case_id' => $case->id,
+            'filter' => 'unmatched',
+            'preview' => $txExtra->id,
+        ]);
+
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertNotNull($location);
+        $this->assertStringContainsString('bank-imports/'.$import->id, $location);
+        $this->assertStringContainsString('preview='.$txExtra->id, $location);
+        $this->assertStringContainsString('filter=unmatched', $location);
+        $response->assertSessionHas('modal_alert.message', 'Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu — nie można dodać kolejnego przelewu (nadpłata zablokowana).');
+
+        $show = $this->actingAs($user)
+            ->withSession([
+                'modal_alert' => [
+                    'type' => 'danger',
+                    'message' => 'Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu — nie można dodać kolejnego przelewu (nadpłata zablokowana).',
+                ],
+            ])
+            ->get(route('accounting.bank-imports.show', [
+                'bankImport' => $import,
+                'filter' => 'unmatched',
+                'preview' => $txExtra->id,
+            ]));
+
+        $show->assertOk();
+        $show->assertSee('id="bankTxPreviewFlash"', false);
+        $show->assertSee('data-flash-on-load="1"', false);
+        $show->assertSee('Ta sprawa/FV jest już w pełni pokryta wpłatami z wyciągu', false);
+        $show->assertDontSee('<div class="alert alert-danger">', false);
+    }
 }

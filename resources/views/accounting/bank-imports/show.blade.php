@@ -18,20 +18,40 @@
 
     <div class="py-3">
         <div class="container-fluid px-4">
+            @php
+                $pagePreviewId = (int) request()->query('preview');
+                $modalAlert = session('modal_alert');
+                if (! is_array($modalAlert) && $pagePreviewId > 0) {
+                    if (session('warning')) {
+                        $modalAlert = [
+                            'type' => 'warning',
+                            'message' => (string) session('warning'),
+                        ];
+                    } elseif ($errors->any()) {
+                        $modalAlert = [
+                            'type' => 'danger',
+                            'message' => (string) $errors->first(),
+                        ];
+                    }
+                }
+                $suppressPageFlashForModal = is_array($modalAlert)
+                    && $pagePreviewId > 0
+                    && filled($modalAlert['message'] ?? null);
+            @endphp
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ session('success') }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             @endif
-            @if(session('warning'))
+            @if(session('warning') && ! $suppressPageFlashForModal)
                 <div class="alert alert-warning alert-dismissible fade show" role="alert">
                     {{ session('warning') }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             @endif
 
-            @if($errors->any())
+            @if($errors->any() && ! $suppressPageFlashForModal)
                 <div class="alert alert-danger">
                     <ul class="mb-0">
                         @foreach($errors->all() as $error)
@@ -770,6 +790,34 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                 </div>
                 <div class="modal-body">
+                    @php
+                        $modalAlertType = is_array($modalAlert ?? null)
+                            ? (string) ($modalAlert['type'] ?? 'danger')
+                            : 'danger';
+                        $modalAlertMessage = is_array($modalAlert ?? null)
+                            ? (string) ($modalAlert['message'] ?? '')
+                            : '';
+                        $modalAlertClass = match ($modalAlertType) {
+                            'warning' => 'alert-warning',
+                            'success' => 'alert-success',
+                            'info' => 'alert-info',
+                            default => 'alert-danger',
+                        };
+                    @endphp
+                    <div id="bankTxPreviewFlash"
+                         class="alert {{ $modalAlertClass }} {{ $modalAlertMessage !== '' ? '' : 'd-none' }} mb-3"
+                         role="alert"
+                         @if($modalAlertMessage !== '')
+                             data-flash-on-load="1"
+                         @endif>
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div id="bankTxPreviewFlashText">{{ $modalAlertMessage }}</div>
+                            <button type="button"
+                                    class="btn-close"
+                                    id="bankTxPreviewFlashClose"
+                                    aria-label="Zamknij komunikat"></button>
+                        </div>
+                    </div>
                     <div class="row g-3">
                         <div class="col-lg-6">
                             <div class="border rounded h-100 p-3">
@@ -2390,8 +2438,41 @@
                 updatePreviewQueueMeta();
             }
 
+            function clearPreviewFlash() {
+                var flash = document.getElementById('bankTxPreviewFlash');
+                var flashText = document.getElementById('bankTxPreviewFlashText');
+                if (!flash) return;
+                flash.classList.add('d-none');
+                flash.removeAttribute('data-flash-on-load');
+                if (flashText) flashText.textContent = '';
+            }
+
+            function showPreviewFlash(message, type) {
+                var flash = document.getElementById('bankTxPreviewFlash');
+                var flashText = document.getElementById('bankTxPreviewFlashText');
+                if (!flash || !flashText || !message) return;
+                flash.className = 'alert mb-3 alert-' + ({
+                    warning: 'warning',
+                    success: 'success',
+                    info: 'info',
+                    danger: 'danger'
+                }[type] || 'danger');
+                flashText.textContent = message;
+                flash.classList.remove('d-none');
+            }
+
+            document.getElementById('bankTxPreviewFlashClose')?.addEventListener('click', function () {
+                clearPreviewFlash();
+            });
+
             function loadPreviewFromButton(btn) {
                 if (!btn) return;
+                // Komunikat z poprzedniej akcji zostaje tylko przy pierwszym auto-otwarciu tego przelewu.
+                if (!btn.getAttribute('data-keep-flash')) {
+                    clearPreviewFlash();
+                } else {
+                    btn.removeAttribute('data-keep-flash');
+                }
                 currentPreviewBtn = btn;
 
                 var preview;
@@ -2769,6 +2850,10 @@
             if (autoPreviewId) {
                 var autoBtn = document.querySelector('.bank-tx-preview-btn[data-tx-id="' + autoPreviewId + '"]');
                 if (autoBtn) {
+                    var flashEl = document.getElementById('bankTxPreviewFlash');
+                    if (flashEl && flashEl.getAttribute('data-flash-on-load') === '1') {
+                        autoBtn.setAttribute('data-keep-flash', '1');
+                    }
                     var openPreviewModal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     if (autoMatchId) {
                         modalEl.addEventListener('shown.bs.modal', function onAutoPreviewShown() {
