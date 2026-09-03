@@ -1167,15 +1167,22 @@
         #bankImportAcceptPackageModal {
             z-index: 1065;
         }
-        /* Pozycję ustawia JS względem klikniętego Akceptuj (nie róg viewportu). */
+        /* Pozycję ustawia JS: środek głównego przycisku potwierdzenia = środek klikniętego Akceptuj. */
         .bank-import-accept-dialog {
             --bs-modal-width: min(32rem, calc(100vw - 2rem));
-            margin: 0;
+            margin: 0 !important;
+            position: fixed;
         }
         #bankImportAcceptWarnModal.fade .modal-dialog,
         #bankImportAcceptIfirmaModal.fade .modal-dialog,
         #bankImportAcceptPackageModal.fade .modal-dialog {
-            transform: none;
+            transform: none !important;
+            transition: none !important;
+        }
+        #bankImportAcceptWarnModal.fade,
+        #bankImportAcceptIfirmaModal.fade,
+        #bankImportAcceptPackageModal.fade {
+            transition: none !important;
         }
         .bank-manual-peek-btn.is-active {
             color: #fff;
@@ -1203,8 +1210,12 @@
             var acceptPackageModal = acceptPackageModalEl ? bootstrap.Modal.getOrCreateInstance(acceptPackageModalEl) : null;
             var pendingAcceptForm = null;
             var pendingPackageForm = null;
+            var pendingAcceptTrigger = null;
 
             function acceptDialogTriggerButton() {
+                if (pendingAcceptTrigger && document.body.contains(pendingAcceptTrigger)) {
+                    return pendingAcceptTrigger;
+                }
                 var form = pendingAcceptForm || pendingPackageForm;
                 if (!form) {
                     return null;
@@ -1212,31 +1223,69 @@
                 return form.querySelector('button[type="submit"]') || form.querySelector('button');
             }
 
+            function acceptDialogConfirmButton(modalEl) {
+                if (!modalEl) {
+                    return null;
+                }
+                if (modalEl.id === 'bankImportAcceptIfirmaModal') {
+                    return document.getElementById('bankImportAcceptIfirmaConfirmBtn');
+                }
+                if (modalEl.id === 'bankImportAcceptPackageModal') {
+                    return document.getElementById('bankImportAcceptPackageIfirmaBtn');
+                }
+                if (modalEl.id === 'bankImportAcceptWarnModal') {
+                    return document.getElementById('bankImportAcceptWarnConfirmBtn');
+                }
+                return null;
+            }
+
+            /**
+             * Ustaw dialog tak, by środek głównego przycisku potwierdzenia
+             * (Akceptuj + wpłata iFirma / Pakiet + iFirma / Akceptuj tylko lokalnie)
+             * pokrywał się ze środkiem klikniętego „Akceptuj” — szybki drugi klik bez ruszania myszy.
+             */
             function positionAcceptDialog(modalEl) {
                 var dialog = modalEl ? modalEl.querySelector('.bank-import-accept-dialog') : null;
                 if (!dialog) {
                     return;
                 }
-                dialog.style.position = 'absolute';
+
+                dialog.style.position = 'fixed';
                 dialog.style.margin = '0';
                 dialog.style.minHeight = '0';
                 dialog.style.transform = 'none';
+                dialog.style.left = '0px';
+                dialog.style.top = '0px';
+
+                // Wymuś layout przy znanym miejscu, żeby zmierzyć prawdziwy rozmiar i pozycję przycisku.
+                void dialog.offsetWidth;
 
                 var pad = 8;
+                var trigger = acceptDialogTriggerButton();
+                var confirmBtn = acceptDialogConfirmButton(modalEl);
                 var width = dialog.offsetWidth || 512;
                 var height = dialog.offsetHeight || 280;
                 var left;
                 var top;
-                var trigger = acceptDialogTriggerButton();
 
-                if (trigger) {
+                if (trigger && confirmBtn) {
+                    var triggerRect = trigger.getBoundingClientRect();
+                    var confirmRect = confirmBtn.getBoundingClientRect();
+                    var triggerCx = triggerRect.left + (triggerRect.width / 2);
+                    var triggerCy = triggerRect.top + (triggerRect.height / 2);
+                    var confirmCx = confirmRect.left + (confirmRect.width / 2);
+                    var confirmCy = confirmRect.top + (confirmRect.height / 2);
+
+                    // dialog jest chwilowo w (0,0), więc confirmRect ≈ offset względem viewportu/dialogu
+                    left = triggerCx - confirmCx;
+                    top = triggerCy - confirmCy;
+                } else if (trigger) {
                     var rect = trigger.getBoundingClientRect();
-                    // Dolny-prawy róg okna = dolny-prawy róg Akceptuj → iFirma pod kursorem.
-                    left = rect.right - width;
-                    top = rect.bottom - height;
+                    left = rect.left + (rect.width / 2) - (width / 2);
+                    top = rect.top + (rect.height / 2) - (height / 2);
                 } else {
                     left = (window.innerWidth - width) / 2;
-                    top = window.innerHeight - height - 24;
+                    top = Math.max(pad, window.innerHeight - height - 24);
                 }
 
                 left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
@@ -1256,6 +1305,8 @@
                 dialog.style.margin = '';
                 dialog.style.minHeight = '';
                 dialog.style.transform = '';
+                dialog.style.visibility = '';
+                dialog.style.opacity = '';
             }
 
             [acceptWarnModalEl, acceptIfirmaModalEl, acceptPackageModalEl].forEach(function (el) {
@@ -1263,15 +1314,34 @@
                     return;
                 }
                 el.addEventListener('show.bs.modal', function () {
+                    var dialog = el.querySelector('.bank-import-accept-dialog');
+                    if (dialog) {
+                        // Ukryj do czasu dokładnego ułożenia — bez „skoku” z dołu do góry.
+                        dialog.style.visibility = 'hidden';
+                        dialog.style.opacity = '0';
+                    }
                     window.requestAnimationFrame(function () {
                         positionAcceptDialog(el);
+                        window.requestAnimationFrame(function () {
+                            positionAcceptDialog(el);
+                            if (dialog) {
+                                dialog.style.visibility = '';
+                                dialog.style.opacity = '';
+                            }
+                        });
                     });
                 });
                 el.addEventListener('shown.bs.modal', function () {
                     positionAcceptDialog(el);
+                    var dialog = el.querySelector('.bank-import-accept-dialog');
+                    if (dialog) {
+                        dialog.style.visibility = '';
+                        dialog.style.opacity = '';
+                    }
                 });
                 el.addEventListener('hidden.bs.modal', function () {
                     resetAcceptDialogPosition(el);
+                    pendingAcceptTrigger = null;
                 });
             });
             window.addEventListener('resize', function () {
@@ -1324,6 +1394,7 @@
                     }
                     e.preventDefault();
                     pendingPackageForm = form;
+                    pendingAcceptTrigger = e.submitter || form.querySelector('button[type="submit"]') || form.querySelector('button');
                     var countEl = document.getElementById('bankImportAcceptPackageCount');
                     if (countEl) {
                         countEl.textContent = form.getAttribute('data-package-count') || 'kilka';
@@ -1394,6 +1465,7 @@
                     }
                     e.preventDefault();
                     pendingAcceptForm = form;
+                    pendingAcceptTrigger = e.submitter || form.querySelector('button[type="submit"]') || form.querySelector('button');
                     if (form.getAttribute('data-amount-mismatch') === '1') {
                         setRegisterIfirma(form, false);
                         setIfirmaAlreadyPaid(form, false);
