@@ -40,9 +40,29 @@ class BankStatementImportController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $matchingTransactions = null;
+        if ($search !== '') {
+            $matchingTransactions = BankTransaction::query()
+                ->with([
+                    'import',
+                    'matches' => fn ($q) => $q->with(['formOrder', 'debtCase'])->latest('id'),
+                ])
+                ->where('is_incoming', true)
+                ->matchingSearch($search)
+                ->latest('operation_date')
+                ->latest('id')
+                ->paginate(25, ['*'], 'tx_page')
+                ->withQueryString();
+        }
+
         $coverageGaps = $coverageService->detectGaps();
 
-        return view('accounting.bank-imports.index', compact('imports', 'coverageGaps', 'search'));
+        return view('accounting.bank-imports.index', compact(
+            'imports',
+            'coverageGaps',
+            'search',
+            'matchingTransactions'
+        ));
     }
 
     public function store(

@@ -223,7 +223,14 @@ class BankTransaction extends Model
                                 ->orWhere('ksef_number', 'like', $like)
                                 ->orWhere('buyer_name', 'like', $like)
                                 ->orWhere('recipient_name', 'like', $like)
-                                ->orWhere('orderer_name', 'like', $like);
+                                ->orWhere('orderer_name', 'like', $like)
+                                ->orWhere('orderer_email', 'like', $like)
+                                ->orWhere('buyer_address', 'like', $like)
+                                ->orWhere('buyer_city', 'like', $like)
+                                ->orWhere('buyer_postal_code', 'like', $like)
+                                ->orWhere('recipient_address', 'like', $like)
+                                ->orWhere('recipient_city', 'like', $like)
+                                ->orWhere('recipient_postal_code', 'like', $like);
                             if ($idCandidate > 0) {
                                 $orderInner->orWhere('id', $idCandidate);
                             }

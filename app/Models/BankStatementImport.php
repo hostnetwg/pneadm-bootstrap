@@ -131,7 +131,7 @@ class BankStatementImport extends Model
             $idCandidate = (int) $matches[1];
         }
 
-        return $query->where(function (Builder $inner) use ($like, $parsedDate, $idCandidate) {
+        return $query->where(function (Builder $inner) use ($like, $parsedDate, $idCandidate, $search) {
             $inner->where('original_filename', 'like', $like)
                 ->orWhere('notes', 'like', $like);
 
@@ -158,6 +158,12 @@ class BankStatementImport extends Model
             $inner->orWhereHas('uploader', function (Builder $uploader) use ($like) {
                 $uploader->where('name', 'like', $like)
                     ->orWhere('email', 'like', $like);
+            });
+
+            // Przelewy ze wszystkich CSV: FV, opis, adres, kwota itd. (jak w podglądzie importu).
+            $inner->orWhereHas('transactions', function (Builder $txQuery) use ($search) {
+                $txQuery->where('is_incoming', true)
+                    ->matchingSearch($search);
             });
         });
     }

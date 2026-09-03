@@ -185,6 +185,51 @@ class BankStatementImportTest extends TestCase
         $byUploader->assertOk();
         $byUploader->assertSee('lista_operacji_sierpien.csv', false);
         $byUploader->assertDontSee('lista_operacji_lipiec.csv', false);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie FV cross-import',
+            'product_price' => 365,
+            'order_date' => now()->subDays(5),
+            'invoice_number' => '863/8/2026',
+            'buyer_address' => 'ul. Testowa 1',
+            'buyer_city' => 'Kostrzyn nad Odrą',
+            'buyer_postal_code' => '66-470',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $tx = BankTransaction::create([
+            'bank_statement_import_id' => $july->id,
+            'operation_date' => '2026-07-20',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'PRZELEW BEZ NUMERU FV W OPISIE CROSS',
+            'fingerprint' => hash('sha256', 'index-search-tx-fv'),
+            'is_incoming' => true,
+        ]);
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $tx->id,
+            'form_order_id' => $order->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+        ]);
+
+        $byInvoice = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => '863/8/2026',
+        ]));
+        $byInvoice->assertOk();
+        $byInvoice->assertSee('Znalezione przelewy', false);
+        $byInvoice->assertSee('PRZELEW BEZ NUMERU FV W OPISIE CROSS', false);
+        $byInvoice->assertSee('lista_operacji_lipiec.csv', false);
+        $byInvoice->assertDontSee('lista_operacji_sierpien.csv', false);
+        $byInvoice->assertSee('filter=all', false);
+        $byInvoice->assertSee('preview='.$tx->id, false);
+
+        $byCity = $this->actingAs($user)->get(route('accounting.bank-imports.index', [
+            'q' => 'Kostrzyn nad Odrą',
+        ]));
+        $byCity->assertOk();
+        $byCity->assertSee('PRZELEW BEZ NUMERU FV W OPISIE CROSS', false);
     }
 
     public function test_index_shows_review_progress_and_coverage_gaps(): void

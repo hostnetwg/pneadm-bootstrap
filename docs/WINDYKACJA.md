@@ -137,7 +137,7 @@ Przyszły etap może dyskretnie wymuszać płatność online przez ukrycie lub w
 
 - Menu: `Księgowość → Import wyciągu`.
 - Lista importów: kolumny **Wiersze** (wszystkie operacje w CSV), **Nowe wpływy** (zapisane wpływy bez duplikatów z wcześniejszych importów), **Sugestie**, **Duplikaty**, **Przegląd**; przy nagłówkach ikona ⓘ z tooltipem Bootstrap.
-- **Wyszukiwarka listy importów** (`?q=`): ID (`#24`), nazwa pliku, okres / data w okresie (`2026-07` / `2026-07-15`), data wgrania, kto (name/e-mail). Paginacja i usuwanie zachowują frazę.
+- **Wyszukiwarka listy importów** (`?q=`): ID (`#24`), nazwa pliku, okres / data w okresie (`2026-07` / `2026-07-15`), data wgrania, kto (name/e-mail). Dodatkowo te same kryteria co w podglądzie CSV — **przelewy ze wszystkich importów** (opis/nadawca, FV/KSeF, adres/miasto zamówienia, kwota, data, #ID); sekcja „Znalezione przelewy” + filtrowana lista importów. Link Podgląd otwiera import z `filter=all&q=…` (i opcjonalnie `preview=`). Paginacja (`page` / `tx_page`) i usuwanie zachowują frazę.
 - **Przegląd w tabeli:** kolumna pokazuje, czy wpływy z importu mają już decyzję operatora — `Przejrzany` (każdy wpływ accepted/ignored), `Do przeglądu: N` albo `Brak wpływów`. To nie jest status parsowania pliku („Sparsowany”).
 - **Luki dat (okresy wyciągów):** na liście importów alert z lukami między polami `#Za okres` ze wszystkich importów (nakładające się / stykające się okresy są łączone); zgłaszany jest też brak pokrycia od końca ostatniego okresu do dziś. Po nowym imporcie ostrzeżenie flash, jeśli luki istnieją. Serwis: `BankStatementCoverageService`.
 - Format: CSV mBank (`lista_operacji_*.csv`), UTF-8 BOM, `;`, preambuła do `#Data operacji;...`.

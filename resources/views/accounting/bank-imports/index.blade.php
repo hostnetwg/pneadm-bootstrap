@@ -93,14 +93,14 @@
                         $search = $search ?? '';
                     @endphp
                     <form method="GET" action="{{ route('accounting.bank-imports.index') }}" class="mb-0">
-                        <label for="bankImportsSearch" class="form-label small mb-1">Szukaj importu</label>
-                        <div class="input-group input-group-sm" style="max-width: 36rem;">
+                        <label for="bankImportsSearch" class="form-label small mb-1">Szukaj importu lub przelewu</label>
+                        <div class="input-group input-group-sm" style="max-width: 42rem;">
                             <input type="search"
                                    id="bankImportsSearch"
                                    name="q"
                                    value="{{ $search }}"
                                    class="form-control"
-                                   placeholder="ID, plik, okres, data wgrania, kto"
+                                   placeholder="FV, opis, adres, kwota, ID, plik, okres, kto…"
                                    maxlength="128"
                                    autocomplete="off">
                             @if($search !== '')
@@ -117,11 +117,102 @@
                         </div>
                         @if($search !== '')
                             <div class="form-text mb-0">
-                                Wyniki dla „{{ $search }}”: {{ $imports->total() }}
+                                Wyniki dla „{{ $search }}”:
+                                {{ $imports->total() }} {{ $imports->total() === 1 ? 'import' : 'importów' }}
+                                @if($matchingTransactions)
+                                    · {{ $matchingTransactions->total() }}
+                                    {{ $matchingTransactions->total() === 1 ? 'przelew' : 'przelewów' }}
+                                    (wszystkie CSV)
+                                @endif
                             </div>
                         @endif
                     </form>
                 </div>
+
+                @if($search !== '' && $matchingTransactions)
+                    <div class="border-bottom">
+                        <div class="px-3 pt-3 pb-2">
+                            <div class="fw-semibold small">Znalezione przelewy (wszystkie importy)</div>
+                            <p class="small text-muted mb-0">
+                                Te same kryteria co w podglądzie jednego CSV: opis/nadawca, FV/KSeF, adres/miasto zamówienia, kwota, data, #ID.
+                            </p>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Kwota</th>
+                                        <th>Opis / FV</th>
+                                        <th>Import</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($matchingTransactions as $tx)
+                                        @php
+                                            $bestMatch = $tx->acceptedMatch() ?: $tx->bestSuggestedMatch();
+                                            $invoice = $bestMatch?->formOrder?->invoice_number
+                                                ?: ($bestMatch?->debtCase?->invoice_number ?: null);
+                                        @endphp
+                                        <tr>
+                                            <td class="small text-nowrap">{{ $tx->operation_date?->format('Y-m-d') ?? '—' }}</td>
+                                            <td class="fw-semibold text-nowrap">
+                                                {{ number_format((float) $tx->amount, 2, ',', ' ') }} {{ $tx->currency }}
+                                            </td>
+                                            <td>
+                                                <div class="small text-break" style="max-width: 36rem;">
+                                                    {{ \Illuminate\Support\Str::limit((string) $tx->description, 180) }}
+                                                </div>
+                                                @if($invoice)
+                                                    <div class="small mt-1">
+                                                        <span class="badge text-bg-light border">FV {{ $invoice }}</span>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="small">
+                                                @if($tx->import)
+                                                    <a href="{{ route('accounting.bank-imports.show', [
+                                                        'bankImport' => $tx->import,
+                                                        'filter' => 'all',
+                                                        'q' => $search,
+                                                    ]) }}">#{{ $tx->import->id }}</a>
+                                                    <div class="text-muted">{{ \Illuminate\Support\Str::limit($tx->import->original_filename, 40) }}</div>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td class="text-end text-nowrap">
+                                                @if($tx->import)
+                                                    <a href="{{ route('accounting.bank-imports.show', [
+                                                        'bankImport' => $tx->import,
+                                                        'filter' => 'all',
+                                                        'q' => $search,
+                                                        'preview' => $tx->id,
+                                                    ]) }}"
+                                                       class="btn btn-sm btn-outline-primary"
+                                                       title="Podgląd przelewu w imporcie">
+                                                        <i class="bi bi-eye"></i> Podgląd
+                                                    </a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="text-muted text-center py-3">
+                                                Brak przelewów dla frazy „{{ $search }}”.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                        @if($matchingTransactions->hasPages())
+                            <div class="px-3 py-2 border-top">{{ $matchingTransactions->links() }}</div>
+                        @endif
+                    </div>
+                @endif
+
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle">
@@ -206,7 +297,11 @@
                                         <td class="small">{{ $import->created_at?->format('Y-m-d H:i') }}</td>
                                         <td class="text-end">
                                             <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
-                                                <a href="{{ route('accounting.bank-imports.show', $import) }}" class="btn btn-sm btn-outline-primary">Podgląd</a>
+                                                <a href="{{ route('accounting.bank-imports.show', array_filter([
+                                                        'bankImport' => $import,
+                                                        'filter' => ($search ?? '') !== '' ? 'all' : null,
+                                                        'q' => ($search ?? '') !== '' ? $search : null,
+                                                    ])) }}" class="btn btn-sm btn-outline-primary">Podgląd</a>
                                                 @if($import->canBeDeleted())
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-danger"
