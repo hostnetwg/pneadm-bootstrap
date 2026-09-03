@@ -1172,12 +1172,16 @@ class BankStatementImportController extends Controller
             'course_url' => $course?->id ? route('courses.show', $course->id) : null,
             'buyer_name' => $order->buyer_name ?: '—',
             'buyer_nip' => $order->buyer_nip ?: 'brak NIP',
+            'buyer_postal_code' => trim((string) ($order->buyer_postal_code ?? '')),
+            'buyer_city' => trim((string) ($order->buyer_city ?? '')),
             'buyer_address' => trim(implode(', ', array_filter([
                 $order->buyer_address,
                 trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')),
             ]))) ?: '—',
             'recipient_name' => $order->recipient_name ?: '—',
             'recipient_nip' => $order->recipient_nip ?: 'brak NIP',
+            'recipient_postal_code' => trim((string) ($order->recipient_postal_code ?? '')),
+            'recipient_city' => trim((string) ($order->recipient_city ?? '')),
             'recipient_address' => trim(implode(', ', array_filter([
                 $order->recipient_address,
                 trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')),

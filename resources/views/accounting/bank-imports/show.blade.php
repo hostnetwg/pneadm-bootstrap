@@ -395,12 +395,16 @@
                                                 'course_url' => $courseId ? route('courses.show', $courseId) : null,
                                                 'buyer_name' => $order->buyer_name ?: '—',
                                                 'buyer_nip' => $order->buyer_nip ?: 'brak NIP',
+                                                'buyer_postal_code' => trim((string) ($order->buyer_postal_code ?? '')),
+                                                'buyer_city' => trim((string) ($order->buyer_city ?? '')),
                                                 'buyer_address' => trim(implode(', ', array_filter([
                                                     $order->buyer_address,
                                                     trim(($order->buyer_postal_code ?? '').' '.($order->buyer_city ?? '')),
                                                 ]))) ?: '—',
                                                 'recipient_name' => $order->recipient_name ?: '—',
                                                 'recipient_nip' => $order->recipient_nip ?: 'brak NIP',
+                                                'recipient_postal_code' => trim((string) ($order->recipient_postal_code ?? '')),
+                                                'recipient_city' => trim((string) ($order->recipient_city ?? '')),
                                                 'recipient_address' => trim(implode(', ', array_filter([
                                                     $order->recipient_address,
                                                     trim(($order->recipient_postal_code ?? '').' '.($order->recipient_city ?? '')),
@@ -1664,12 +1668,13 @@
                     .forEach(function (el) {
                         el.classList.remove('bank-match-ok', 'bank-match-warn', 'bank-match-ok-label', 'bank-match-warn-label');
                     });
-                modal.querySelectorAll('#bankTxPreviewTransfer [data-field="description"], #bankTxPreviewTransfer [data-field="invoice_from_title"]')
-                    .forEach(function (el) {
-                        if (el.querySelector('mark')) {
-                            el.textContent = el.textContent || '';
-                        }
-                    });
+                modal.querySelectorAll(
+                    '#bankTxPreviewTransfer [data-field], #bankTxPreviewOrder [data-field="buyer_address"], #bankTxPreviewOrder [data-field="recipient_address"], #bankTxPreviewOrder [data-field="invoice"]'
+                ).forEach(function (el) {
+                    if (el.querySelector('mark')) {
+                        el.textContent = el.textContent || '';
+                    }
+                });
             }
 
             function highlightField(root, field, kind) {
@@ -1728,15 +1733,119 @@
                 return primary || null;
             }
 
+            function normalizePlaceToken(value) {
+                return String(value || '')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, '');
+            }
+
+            function extractPostalCodes(text) {
+                var matches = String(text || '').match(/\b\d{2}-\d{3}\b/g);
+                return matches ? matches : [];
+            }
+
+            /**
+             * Zielone podświetlenie kodu pocztowego / miejscowości wspólnych dla przelewu i nabywcy lub odbiorcy.
+             * Nie rusza pola „Opis surowy”, jeśli caller sam dokłada fragmenty do rawFragments.
+             */
+            function applyPostalCityHighlights(modal, txData, order, options) {
+                if (!modal || !txData || !order) return { postals: [], cities: [] };
+
+                options = options || {};
+                var touchDescription = options.touchDescription !== false;
+
+                var orderPostals = [order.buyer_postal_code, order.recipient_postal_code]
+                    .map(function (p) { return String(p || '').trim(); })
+                    .filter(function (p) { return /^\d{2}-\d{3}$/.test(p); });
+                var orderCities = [order.buyer_city, order.recipient_city]
+                    .map(function (c) { return String(c || '').trim(); })
+                    .filter(function (c) { return c !== '' && c !== '—'; });
+
+                if (!orderPostals.length && !orderCities.length) {
+                    return { postals: [], cities: [] };
+                }
+
+                var leftBlob = [
+                    txData.sender_estimate,
+                    txData.title_estimate,
+                    txData.description,
+                    txData.invoice_from_title
+                ].filter(Boolean).join(' | ');
+                var leftNorm = normalizePlaceToken(leftBlob);
+                var leftPostals = extractPostalCodes(leftBlob);
+
+                var matchedPostals = [];
+                leftPostals.forEach(function (lp) {
+                    if (orderPostals.indexOf(lp) === -1) return;
+                    if (matchedPostals.indexOf(lp) === -1) matchedPostals.push(lp);
+                });
+
+                var matchedCities = [];
+                orderCities.forEach(function (city) {
+                    var nCity = normalizePlaceToken(city);
+                    if (nCity.length < 3) return;
+                    if (leftNorm.indexOf(nCity) === -1) return;
+                    if (!matchedCities.some(function (c) {
+                        return normalizePlaceToken(c) === nCity;
+                    })) {
+                        matchedCities.push(city);
+                    }
+                });
+
+                if (!matchedPostals.length && !matchedCities.length) {
+                    return { postals: [], cities: [] };
+                }
+
+                var leftFragments = matchedPostals.concat(matchedCities);
+                var txRoot = document.getElementById('bankTxPreviewTransfer');
+                var orderRoot = document.getElementById('bankTxPreviewOrder');
+                if (txRoot) {
+                    highlightFragmentsInText(txRoot.querySelector('[data-field="sender_estimate"]'), leftFragments, 'ok');
+                    highlightFragmentsInText(txRoot.querySelector('[data-field="title_estimate"]'), leftFragments, 'ok');
+                    if (touchDescription) {
+                        highlightFragmentsInText(txRoot.querySelector('[data-field="description"]'), leftFragments, 'ok');
+                    }
+                }
+
+                function sideFragments(postalCode, city) {
+                    var frags = [];
+                    var code = String(postalCode || '').trim();
+                    var cityName = String(city || '').trim();
+                    if (code && matchedPostals.indexOf(code) !== -1) frags.push(code);
+                    if (cityName && matchedCities.some(function (c) {
+                        return normalizePlaceToken(c) === normalizePlaceToken(cityName);
+                    })) {
+                        frags.push(cityName);
+                    }
+                    return frags;
+                }
+
+                if (orderRoot) {
+                    var buyerFrags = sideFragments(order.buyer_postal_code, order.buyer_city);
+                    var recipientFrags = sideFragments(order.recipient_postal_code, order.recipient_city);
+                    if (buyerFrags.length) {
+                        highlightFragmentsInText(orderRoot.querySelector('[data-field="buyer_address"]'), buyerFrags, 'ok');
+                    }
+                    if (recipientFrags.length) {
+                        highlightFragmentsInText(orderRoot.querySelector('[data-field="recipient_address"]'), recipientFrags, 'ok');
+                    }
+                }
+
+                return { postals: matchedPostals, cities: matchedCities };
+            }
+
             /**
              * Podświetlenia zgodności przelew ↔ zamówienie.
              * options.orderInvoice — FV z prawej kolumny (gdy brak invoice_number: w reasons).
+             * options.order — pełny payload zamówienia (kod pocztowy / miasto).
              */
             function applyMatchHighlights(modal, reasonCodes, txData, options) {
                 clearMatchHighlights(modal);
-                if (!reasonCodes || !reasonCodes.length) return;
-
                 options = options || {};
+
+                if (reasonCodes && reasonCodes.length) {
                 var txRoot = document.getElementById('bankTxPreviewTransfer');
                 var orderRoot = document.getElementById('bankTxPreviewOrder');
                 var codes = reasonCodes.map(String);
@@ -1857,8 +1966,19 @@
                     });
                 }
 
+                var locationMatches = applyPostalCityHighlights(modal, txData, options.order || null, {
+                    touchDescription: false
+                });
+                (locationMatches.postals || []).forEach(function (p) { rawFragments.push(p); });
+                (locationMatches.cities || []).forEach(function (c) { rawFragments.push(c); });
+
                 var descEl = txRoot ? txRoot.querySelector('[data-field="description"]') : null;
                 highlightFragmentsInText(descEl, rawFragments, rawKind);
+                } else {
+                    applyPostalCityHighlights(modal, txData, options.order || null, {
+                        touchDescription: true
+                    });
+                }
             }
 
             var modalEl = document.getElementById('bankTxPreviewModal');
@@ -2111,7 +2231,8 @@
                 }
 
                 applyMatchHighlights(modalEl, match ? match.reason_codes : [], snapshot.txData || {}, {
-                    orderInvoice: order && order.invoice ? order.invoice : null
+                    orderInvoice: order && order.invoice ? order.invoice : null,
+                    order: order || null
                 });
                 setClearPeekBtnVisible(false);
             }
