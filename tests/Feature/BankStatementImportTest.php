@@ -2346,4 +2346,139 @@ class BankStatementImportTest extends TestCase
         $byId->assertSee('KOSTRZYN NAD ODRĄ', false);
         $byId->assertDontSee('WYPŁATA ŚRODKÓW NR PON-123', false);
     }
+
+    public function test_duplicate_transfer_can_be_marked_as_refunded_overpayment_on_covered_case(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'is_active' => 1,
+        ]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie podwójna wpłata',
+            'product_price' => 365,
+            'order_date' => now()->subDays(10),
+            'invoice_number' => '836/8/2026',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+        ]);
+        $case = DebtCase::create([
+            'form_order_id' => $order->id,
+            'status' => DebtCase::STATUS_OPEN,
+            'amount_gross' => 365,
+            'invoice_number' => '836/8/2026',
+            'assigned_to_id' => $user->id,
+            'opened_at' => now(),
+        ]);
+
+        $import = BankStatementImport::create([
+            'uploaded_by' => $user->id,
+            'original_filename' => 'dup.csv',
+            'file_hash' => hash('sha256', 'dup-refund'),
+            'source' => BankStatementImport::SOURCE_MBANK,
+            'status' => BankStatementImport::STATUS_PARSED,
+            'rows_total' => 2,
+            'rows_incoming' => 2,
+        ]);
+
+        $first = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-25',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'Pierwsza wpłata FV 836/8/2026',
+            'fingerprint' => hash('sha256', 'dup-first'),
+            'is_incoming' => true,
+        ]);
+        $second = BankTransaction::create([
+            'bank_statement_import_id' => $import->id,
+            'operation_date' => '2026-08-28',
+            'amount' => 365,
+            'currency' => 'PLN',
+            'description' => 'Druga wpłata FV 836/8/2026',
+            'fingerprint' => hash('sha256', 'dup-second'),
+            'is_incoming' => true,
+        ]);
+
+        BankTransactionMatch::create([
+            'bank_transaction_id' => $first->id,
+            'form_order_id' => $order->id,
+            'debt_case_id' => $case->id,
+            'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+            'match_reasons' => ['invoice_number', 'amount_match'],
+            'status' => BankTransactionMatch::STATUS_ACCEPTED,
+            'allocated_amount' => 365,
+            'accepted_by' => $user->id,
+            'accepted_at' => now(),
+        ]);
+
+        $this->assertTrue($case->fresh()->isFullyCoveredByBankPayments());
+
+        $blocked = $this->actingAs($user)->post(
+            route('accounting.collections.bank-transactions.link', [$case, $second])
+        );
+        $blocked->assertRedirect();
+        $blocked->assertSessionHasErrors('bank_transaction');
+
+        $search = $this->actingAs($user)->getJson(route('accounting.collections.bank-transactions.search', [
+            'debtCase' => $case,
+            'bank_search' => '836/8/2026',
+            'bank_unlinked_only' => '0',
+            'bank_after_order' => '0',
+        ]));
+        $search->assertOk();
+        $candidate = collect($search->json('candidates'))->firstWhere('id', $second->id);
+        $this->assertNotNull($candidate);
+        $this->assertFalse($candidate['is_linkable']);
+        $this->assertTrue($candidate['can_mark_refunded']);
+
+        $refund = $this->actingAs($user)->post(
+            route('accounting.collections.bank-transactions.mark-refunded', [$case, $second])
+        );
+        $refund->assertRedirect(route('accounting.collections.show', $case));
+        $refund->assertSessionHas('success');
+
+        $second->refresh()->load('matches');
+        $this->assertTrue($second->isRefunded());
+        $this->assertSame(0.0, $second->remainingAllocatableAmount());
+        $this->assertTrue($case->fresh()->isFullyCoveredByBankPayments());
+        $this->assertEquals(365.0, $case->fresh()->acceptedBankAllocatedSum());
+
+        $this->assertDatabaseHas('debt_case_actions', [
+            'debt_case_id' => $case->id,
+            'action_type' => DebtCaseAction::TYPE_BANK_REFUND,
+        ]);
+
+        $show = $this->actingAs($user)->get(route('accounting.collections.show', $case));
+        $show->assertOk();
+        $show->assertSee('Zwrócony / nadpłata', false);
+        $show->assertSee('Zwroty: 1', false);
+        $show->assertSee('Pokryte', false);
+
+        $refundedTab = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'refunded',
+        ]));
+        $refundedTab->assertOk();
+        $refundedTab->assertSee('Druga wpłata FV 836/8/2026', false);
+        $refundedTab->assertDontSee('Pierwsza wpłata FV 836/8/2026', false);
+
+        $unmatched = $this->actingAs($user)->get(route('accounting.bank-imports.show', [
+            'bankImport' => $import,
+            'filter' => 'unmatched',
+        ]));
+        $unmatched->assertOk();
+        $unmatched->assertDontSee('Druga wpłata FV 836/8/2026', false);
+
+        $refundMatch = $second->matches->firstWhere('status', BankTransactionMatch::STATUS_REFUNDED);
+        $this->assertNotNull($refundMatch);
+
+        $unlink = $this->actingAs($user)->post(
+            route('accounting.collections.bank-matches.unlink', [$case, $refundMatch])
+        );
+        $unlink->assertRedirect(route('accounting.collections.show', $case));
+        $second->refresh()->load('matches');
+        $this->assertFalse($second->isRefunded());
+        $this->assertGreaterThan(0.01, $second->remainingAllocatableAmount());
+    }
 }

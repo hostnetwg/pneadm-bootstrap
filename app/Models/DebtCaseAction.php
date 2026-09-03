@@ -42,6 +42,8 @@ class DebtCaseAction extends Model
 
     public const TYPE_BANK_UNMATCH = 'bank_unmatch';
 
+    public const TYPE_BANK_REFUND = 'bank_refund';
+
     protected $fillable = [
         'debt_case_id',
         'user_id',
@@ -94,6 +96,7 @@ class DebtCaseAction extends Model
             self::TYPE_CASE_OPENED => 'Otwarcie sprawy',
             self::TYPE_BANK_MATCH => 'Wpłata z wyciągu',
             self::TYPE_BANK_UNMATCH => 'Cofnięcie przypisania przelewu',
+            self::TYPE_BANK_REFUND => 'Zwrot / podwójna wpłata z wyciągu',
         ];
     }
 }

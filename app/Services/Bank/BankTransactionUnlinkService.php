@@ -38,9 +38,12 @@ class BankTransactionUnlinkService
         $match = $match->fresh(['transaction', 'debtCase.formOrder', 'formOrder']) ?? $match;
         $match->loadMissing(['transaction', 'debtCase.formOrder', 'formOrder']);
 
-        if ($match->status !== BankTransactionMatch::STATUS_ACCEPTED) {
-            throw new InvalidArgumentException('Można cofnąć tylko zaakceptowane powiązanie przelewu.');
+        if ($match->status !== BankTransactionMatch::STATUS_ACCEPTED
+            && $match->status !== BankTransactionMatch::STATUS_REFUNDED) {
+            throw new InvalidArgumentException('Można cofnąć tylko zaakceptowane powiązanie albo oznaczenie zwrotu/nadpłaty.');
         }
+
+        $isRefunded = $match->status === BankTransactionMatch::STATUS_REFUNDED;
 
         $transaction = $match->transaction;
         if (! $transaction) {
@@ -60,19 +63,21 @@ class BankTransactionUnlinkService
             'attempted' => false,
             'message' => 'Pominięto iFirma (brak sprawy).',
         ];
-        if ($debtCase) {
+        if ($debtCase && ! $isRefunded) {
             $ifirmaResult = $this->paymentRegistration->attemptRemovePaymentForDebtCase(
                 $debtCase,
                 $amount,
                 $paymentDate,
                 $user
             );
+        } elseif ($isRefunded) {
+            $ifirmaResult['message'] = 'Pominięto iFirma (oznaczenie zwrotu nie rejestrowało wpłaty).';
         }
 
         $caseReopened = false;
         $debtCaseId = $debtCase?->id;
 
-        DB::transaction(function () use ($match, $debtCase, $transaction, $user, $amount, $paymentDate, $ifirmaResult, &$caseReopened) {
+        DB::transaction(function () use ($match, $debtCase, $transaction, $user, $amount, $paymentDate, $ifirmaResult, $isRefunded, &$caseReopened) {
             $match->forceFill([
                 'status' => BankTransactionMatch::STATUS_REJECTED,
                 'accepted_by' => null,
@@ -86,24 +91,36 @@ class BankTransactionUnlinkService
             $debtCase = $debtCase->fresh() ?? $debtCase;
             $wasClosed = $debtCase->status === DebtCase::STATUS_CLOSED;
 
-            $noteParts = [
-                sprintf(
-                    'Cofnięto przypisanie przelewu z wyciągu: %s PLN%s (transakcja #%d, match #%d).',
-                    number_format($amount, 2, ',', ' '),
-                    $paymentDate ? ' z dnia '.$paymentDate : '',
-                    $transaction->id,
-                    $match->id
-                ),
-            ];
-            if ($ifirmaResult['attempted'] ?? false) {
-                $noteParts[] = ($ifirmaResult['success'] ?? false)
-                    ? 'Próba usunięcia wpłaty w iFirma: OK.'
-                    : 'Próba usunięcia wpłaty w iFirma nie powiodła się — wymagana ręczna korekta w iFirma.';
-            } elseif (($ifirmaResult['message'] ?? '') !== '') {
-                $noteParts[] = $ifirmaResult['message'];
-            }
-            if ($wasClosed) {
-                $noteParts[] = 'Sprawę otwarto ponownie.';
+            if ($isRefunded) {
+                $noteParts = [
+                    sprintf(
+                        'Cofnięto oznaczenie zwrotu/nadpłaty dla przelewu: %s PLN%s (transakcja #%d, match #%d). Przelew wraca do kolejki.',
+                        number_format((float) $transaction->amount, 2, ',', ' '),
+                        $paymentDate ? ' z dnia '.$paymentDate : '',
+                        $transaction->id,
+                        $match->id
+                    ),
+                ];
+            } else {
+                $noteParts = [
+                    sprintf(
+                        'Cofnięto przypisanie przelewu z wyciągu: %s PLN%s (transakcja #%d, match #%d).',
+                        number_format($amount, 2, ',', ' '),
+                        $paymentDate ? ' z dnia '.$paymentDate : '',
+                        $transaction->id,
+                        $match->id
+                    ),
+                ];
+                if ($ifirmaResult['attempted'] ?? false) {
+                    $noteParts[] = ($ifirmaResult['success'] ?? false)
+                        ? 'Próba usunięcia wpłaty w iFirma: OK.'
+                        : 'Próba usunięcia wpłaty w iFirma nie powiodła się — wymagana ręczna korekta w iFirma.';
+                } elseif (($ifirmaResult['message'] ?? '') !== '') {
+                    $noteParts[] = $ifirmaResult['message'];
+                }
+                if ($wasClosed) {
+                    $noteParts[] = 'Sprawę otwarto ponownie.';
+                }
             }
 
             $debtCase->actions()->create([
@@ -119,7 +136,7 @@ class BankTransactionUnlinkService
                 'assigned_to_id' => $user?->id ?: $debtCase->assigned_to_id,
             ];
 
-            if ($wasClosed) {
+            if ($wasClosed && ! $isRefunded) {
                 $updates['status'] = DebtCase::STATUS_OPEN;
                 $updates['closed_at'] = null;
                 $updates['closure_reason'] = null;
@@ -150,11 +167,17 @@ class BankTransactionUnlinkService
             }
         }
 
-        $message = sprintf(
-            'Cofnięto przypisanie przelewu #%d%s.',
-            $transaction->id,
-            $debtCaseId ? ' ze sprawy #'.$debtCaseId : ''
-        );
+        $message = $isRefunded
+            ? sprintf(
+                'Cofnięto oznaczenie zwrotu dla przelewu #%d%s.',
+                $transaction->id,
+                $debtCaseId ? ' przy sprawie #'.$debtCaseId : ''
+            )
+            : sprintf(
+                'Cofnięto przypisanie przelewu #%d%s.',
+                $transaction->id,
+                $debtCaseId ? ' ze sprawy #'.$debtCaseId : ''
+            );
         if ($caseReopened) {
             $message .= ' Sprawę otwarto ponownie.';
         }

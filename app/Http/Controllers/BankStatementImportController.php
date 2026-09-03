@@ -186,6 +186,7 @@ class BankStatementImportController extends Controller
                     BankTransactionMatch::STATUS_ACCEPTED,
                     BankTransactionMatch::STATUS_IGNORED,
                     BankTransactionMatch::STATUS_DEFERRED,
+                    BankTransactionMatch::STATUS_REFUNDED,
                 ]);
             });
         } elseif (in_array($filter, ['high', 'medium', 'low'], true)) {
@@ -200,6 +201,10 @@ class BankStatementImportController extends Controller
         } elseif ($filter === 'deferred') {
             $transactionsQuery->whereHas('matches', function ($q) {
                 $q->where('status', BankTransactionMatch::STATUS_DEFERRED);
+            });
+        } elseif ($filter === 'refunded') {
+            $transactionsQuery->whereHas('matches', function ($q) {
+                $q->where('status', BankTransactionMatch::STATUS_REFUNDED);
             });
         } elseif ($filter === 'paynow') {
             $transactionsQuery->whereHas('matches', function ($q) {
@@ -245,6 +250,7 @@ class BankStatementImportController extends Controller
                     BankTransactionMatch::STATUS_ACCEPTED,
                     BankTransactionMatch::STATUS_IGNORED,
                     BankTransactionMatch::STATUS_DEFERRED,
+                    BankTransactionMatch::STATUS_REFUNDED,
                 ]))
                 ->count(),
             'high' => $this->countByConfidence($bankImport, BankTransactionMatch::CONFIDENCE_HIGH),
@@ -256,6 +262,10 @@ class BankStatementImportController extends Controller
             'deferred' => $bankImport->transactions()
                 ->where('is_incoming', true)
                 ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_DEFERRED))
+                ->count(),
+            'refunded' => $bankImport->transactions()
+                ->where('is_incoming', true)
+                ->whereHas('matches', fn ($q) => $q->where('status', BankTransactionMatch::STATUS_REFUNDED))
                 ->count(),
             'paynow' => $importService->countPayNowGatewayPayouts($bankImport),
             'ignored' => $bankImport->transactions()

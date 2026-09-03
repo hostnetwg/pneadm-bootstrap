@@ -666,8 +666,15 @@
                             <div class="d-inline-flex align-items-center gap-2 user-select-none">
                                 <i class="bi bi-chevron-right case-bank-payments-chevron" aria-hidden="true"></i>
                                 <span>Wpłaty z wyciągu</span>
-                                @if(($bankPayments ?? collect())->isNotEmpty())
-                                    <span class="badge text-bg-secondary">{{ $bankPayments->count() }}</span>
+                                @php
+                                    $bankPaymentRows = ($bankPayments ?? collect())->count()
+                                        + ($bankRefunds ?? collect())->count();
+                                @endphp
+                                @if($bankPaymentRows > 0)
+                                    <span class="badge text-bg-secondary">{{ $bankPaymentRows }}</span>
+                                @endif
+                                @if(($bankRefunds ?? collect())->isNotEmpty())
+                                    <span class="badge text-bg-info">Zwroty: {{ $bankRefunds->count() }}</span>
                                 @endif
                                 @if(($bankInvoiceTarget ?? 0) > 0)
                                     @php
@@ -787,7 +794,7 @@
                                 </div>
                             </div>
                             <div class="card-body p-0">
-                                @if(($bankPayments ?? collect())->isEmpty())
+                                @if(($bankPayments ?? collect())->isEmpty() && ($bankRefunds ?? collect())->isEmpty())
                                     <div class="p-3 text-muted small">Brak zaakceptowanych wpłat z wyciągu bankowego dla tej sprawy.</div>
                                 @else
                                     <div class="table-responsive">
@@ -797,7 +804,7 @@
                                                     <th>Data operacji</th>
                                                     <th class="text-end">Kwota</th>
                                                     <th>Opis</th>
-                                                    <th>Zaakceptował</th>
+                                                    <th>Status / kto</th>
                                                     <th></th>
                                                 </tr>
                                             </thead>
@@ -821,7 +828,8 @@
                                                         </td>
                                                         <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
                                                         <td class="small">
-                                                            {{ $payment->acceptedBy?->name ?? '—' }}
+                                                            <span class="badge text-bg-success">Zaakceptowane</span>
+                                                            <div class="mt-1">{{ $payment->acceptedBy?->name ?? '—' }}</div>
                                                             <div class="text-muted">{{ $payment->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
                                                         </td>
                                                         <td class="text-end text-nowrap">
@@ -843,7 +851,8 @@
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#bankPaymentUnlinkModal"
                                                                     data-unlink-url="{{ route('accounting.collections.bank-matches.unlink', [$case, $payment]) }}"
-                                                                    data-unlink-summary="{{ number_format($allocated, 2, ',', ' ').' '.($tx?->currency ?? 'PLN').' · '.($tx?->operation_date?->format('Y-m-d') ?? '—') }}">
+                                                                    data-unlink-summary="{{ number_format($allocated, 2, ',', ' ').' '.($tx?->currency ?? 'PLN').' · '.($tx?->operation_date?->format('Y-m-d') ?? '—') }}"
+                                                                    data-unlink-mode="accepted">
                                                                 Cofnij
                                                             </button>
                                                             @if($tx && $tx->bank_statement_import_id)
@@ -855,6 +864,48 @@
                                                                        'match' => $payment->id,
                                                                    ]) }}"
                                                                    title="Otwórz ten przelew w szczegółach importu wyciągu (podgląd dwukolumnowy)">
+                                                                    Podgląd przelewu
+                                                                </a>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                                @foreach(($bankRefunds ?? collect()) as $refund)
+                                                    @php
+                                                        $tx = $refund->transaction;
+                                                        $transferAmount = (float) ($tx?->amount ?? 0);
+                                                    @endphp
+                                                    <tr class="table-info">
+                                                        <td class="small">{{ $tx?->operation_date?->format('Y-m-d') ?? '—' }}</td>
+                                                        <td class="text-end fw-semibold text-nowrap">
+                                                            {{ number_format($transferAmount, 2, ',', ' ') }} {{ $tx?->currency ?? 'PLN' }}
+                                                            <div class="small text-muted fw-normal">0,00 do pokrycia FV</div>
+                                                        </td>
+                                                        <td class="small text-break" style="max-width: 28rem;">{{ \Illuminate\Support\Str::limit($tx?->description ?? '—', 160) }}</td>
+                                                        <td class="small">
+                                                            <span class="badge text-bg-info">Zwrócony / nadpłata</span>
+                                                            <div class="mt-1">{{ $refund->acceptedBy?->name ?? '—' }}</div>
+                                                            <div class="text-muted">{{ $refund->accepted_at?->timezone(config('app.timezone'))->format('d.m.Y H:i') }}</div>
+                                                        </td>
+                                                        <td class="text-end text-nowrap">
+                                                            <button type="button"
+                                                                    class="btn btn-sm btn-outline-danger"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#bankPaymentUnlinkModal"
+                                                                    data-unlink-url="{{ route('accounting.collections.bank-matches.unlink', [$case, $refund]) }}"
+                                                                    data-unlink-summary="{{ number_format($transferAmount, 2, ',', ' ').' '.($tx?->currency ?? 'PLN').' · '.($tx?->operation_date?->format('Y-m-d') ?? '—').' · zwrot' }}"
+                                                                    data-unlink-mode="refunded">
+                                                                Cofnij zwrot
+                                                            </button>
+                                                            @if($tx && $tx->bank_statement_import_id)
+                                                                <a class="btn btn-sm btn-outline-primary"
+                                                                   href="{{ route('accounting.bank-imports.show', [
+                                                                       'bankImport' => $tx->bank_statement_import_id,
+                                                                       'filter' => 'refunded',
+                                                                       'preview' => $tx->id,
+                                                                       'match' => $refund->id,
+                                                                   ]) }}"
+                                                                   title="Otwórz ten przelew w szczegółach importu wyciągu">
                                                                     Podgląd przelewu
                                                                 </a>
                                                             @endif
@@ -1442,22 +1493,67 @@
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="mb-2">
+                        <p class="mb-2" id="bankPaymentUnlinkLead">
                             Odpiąć przelew od sprawy <strong>#{{ $case->id }}</strong>
                             (FV {{ $case->invoice_number ?: $order->invoice_number ?: '—' }})?
                         </p>
                         <div class="border rounded p-2 bg-light small mb-3" id="bankPaymentUnlinkSummary">—</div>
-                        <div class="alert alert-warning small mb-0">
+                        <div class="alert alert-warning small mb-0" id="bankPaymentUnlinkWarnAccepted">
                             <ul class="mb-0 ps-3">
                                 <li>Przelew wróci do kolejki nieprzypisanych wpływów.</li>
                                 <li>Jeśli sprawa jest zamknięta — zostanie <strong>otwarta ponownie</strong>.</li>
                                 <li>System <strong>spróbuje usunąć wpłatę w iFirma</strong>. Oficjalne API iFirma dokumentuje tylko dodawanie wpłat — gdy usunięcie się nie uda, popraw status ręcznie w panelu iFirma.</li>
                             </ul>
                         </div>
+                        <div class="alert alert-warning small mb-0 d-none" id="bankPaymentUnlinkWarnRefunded">
+                            <ul class="mb-0 ps-3">
+                                <li>Oznaczenie zwrotu/nadpłaty zostanie usunięte.</li>
+                                <li>Przelew wróci do kolejki przeglądu importu.</li>
+                                <li>Pokrycie FV i iFirma <strong>nie</strong> zmieniają się (zwrot i tak nie był rejestrowany).</li>
+                            </ul>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Wróć</button>
-                        <button type="submit" class="btn btn-danger" data-loading-text="Cofam…">Cofnij przypisanie</button>
+                        <button type="submit" class="btn btn-danger" id="bankPaymentUnlinkSubmit" data-loading-text="Cofam…">Cofnij przypisanie</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bankTransactionRefundConfirmModal" tabindex="-1" aria-labelledby="bankTransactionRefundConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="" id="bankTransactionRefundConfirmForm" data-loading-submit data-loading-text="Oznaczam…">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bankTransactionRefundConfirmModalLabel">Oznacz jako zwrot / nadpłata</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            Powiązać ten przelew ze sprawą
+                            <strong>#{{ $case->id }}</strong>
+                            jako <strong>zwrot podwójnej wpłaty</strong>
+                            (FV {{ $case->invoice_number ?: $order->invoice_number ?: '—' }})?
+                        </p>
+                        <div class="border rounded p-2 bg-light small mb-3">
+                            <div class="fw-semibold" id="bankTransactionRefundSummary">—</div>
+                            <div class="text-muted text-break" id="bankTransactionRefundDescription">—</div>
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <ul class="mb-0 ps-3">
+                                <li>Przelew będzie widoczny przy sprawie ze statusem <strong>Zwrócony / nadpłata</strong>.</li>
+                                <li><strong>Nie</strong> zwiększa pokrycia FV (nadal pokazuje Pokryte).</li>
+                                <li><strong>Nie</strong> rejestruje wpłaty w iFirma.</li>
+                                <li>Znika z kolejki „Do przeglądu” w imporcie wyciągu.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-info" data-loading-text="Oznaczam…">Oznacz jako zwrot</button>
                     </div>
                 </form>
             </div>
@@ -1879,6 +1975,11 @@
             var unlinkModalEl = document.getElementById('bankPaymentUnlinkModal');
             var unlinkForm = document.getElementById('bankPaymentUnlinkForm');
             var unlinkSummary = document.getElementById('bankPaymentUnlinkSummary');
+            var unlinkLead = document.getElementById('bankPaymentUnlinkLead');
+            var unlinkTitle = document.getElementById('bankPaymentUnlinkModalLabel');
+            var unlinkSubmit = document.getElementById('bankPaymentUnlinkSubmit');
+            var unlinkWarnAccepted = document.getElementById('bankPaymentUnlinkWarnAccepted');
+            var unlinkWarnRefunded = document.getElementById('bankPaymentUnlinkWarnRefunded');
             if (unlinkModalEl && unlinkForm) {
                 unlinkModalEl.addEventListener('show.bs.modal', function (event) {
                     var btn = event.relatedTarget;
@@ -1887,6 +1988,22 @@
                     if (unlinkSummary) {
                         unlinkSummary.textContent = btn.getAttribute('data-unlink-summary') || '—';
                     }
+                    var mode = btn.getAttribute('data-unlink-mode') || 'accepted';
+                    var isRefund = mode === 'refunded';
+                    if (unlinkTitle) {
+                        unlinkTitle.textContent = isRefund ? 'Cofnij oznaczenie zwrotu' : 'Cofnij przypisanie przelewu';
+                    }
+                    if (unlinkLead) {
+                        unlinkLead.innerHTML = isRefund
+                            ? ('Cofnąć oznaczenie zwrotu/nadpłaty przy sprawie <strong>#' + {{ (int) $case->id }} + '</strong>?')
+                            : ('Odpiąć przelew od sprawy <strong>#' + {{ (int) $case->id }} + '</strong>'
+                                + ' (FV {{ $case->invoice_number ?: $order->invoice_number ?: '—' }})?');
+                    }
+                    if (unlinkSubmit) {
+                        unlinkSubmit.textContent = isRefund ? 'Cofnij zwrot' : 'Cofnij przypisanie';
+                    }
+                    if (unlinkWarnAccepted) unlinkWarnAccepted.classList.toggle('d-none', isRefund);
+                    if (unlinkWarnRefunded) unlinkWarnRefunded.classList.toggle('d-none', !isRefund);
                 });
             }
 
@@ -2033,7 +2150,14 @@
 
                 var rows = candidates.map(function (c) {
                     var actionsHtml;
-                    if (c.is_linkable === false) {
+                    if (c.can_mark_refunded) {
+                        actionsHtml = '<div class="d-flex flex-column flex-md-row gap-1 justify-content-end">'
+                            + '<button type="button" class="btn btn-outline-info btn-sm bank-refund-confirm-btn"'
+                            + ' data-action="' + esc(c.refund_url) + '"'
+                            + ' data-summary="' + esc(c.summary) + '"'
+                            + ' data-description="' + esc(c.description_confirm) + '">Oznacz jako zwrot</button>'
+                            + '</div>';
+                    } else if (c.is_linkable === false) {
                         actionsHtml = '<span class="badge text-bg-secondary">'
                             + esc(c.link_status_label || 'Przypisany')
                             + '</span>';
@@ -2209,6 +2333,22 @@
                 submitBtn.className = registerIfirma ? 'btn btn-success' : 'btn btn-primary';
                 modal.show();
             });
+
+            var refundModalEl = document.getElementById('bankTransactionRefundConfirmModal');
+            var refundForm = document.getElementById('bankTransactionRefundConfirmForm');
+            var refundSummaryEl = document.getElementById('bankTransactionRefundSummary');
+            var refundDescriptionEl = document.getElementById('bankTransactionRefundDescription');
+            if (refundModalEl && refundForm && refundSummaryEl && refundDescriptionEl) {
+                var refundModal = new window.bootstrap.Modal(refundModalEl);
+                document.addEventListener('click', function (event) {
+                    var btn = event.target.closest('.bank-refund-confirm-btn');
+                    if (!btn) return;
+                    refundForm.setAttribute('action', btn.getAttribute('data-action') || '');
+                    refundSummaryEl.textContent = btn.getAttribute('data-summary') || '—';
+                    refundDescriptionEl.textContent = btn.getAttribute('data-description') || '—';
+                    refundModal.show();
+                });
+            }
         });
     </script>
 </x-app-layout>

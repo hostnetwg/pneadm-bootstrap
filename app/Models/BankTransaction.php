@@ -72,6 +72,13 @@ class BankTransaction extends Model
         );
     }
 
+    public function isRefunded(): bool
+    {
+        return $this->matches->contains(
+            fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_REFUNDED
+        );
+    }
+
     public function isDeferred(): bool
     {
         return $this->matches->contains(
@@ -92,7 +99,7 @@ class BankTransaction extends Model
 
     public function remainingAllocatableAmount(): float
     {
-        if ($this->isIgnored()) {
+        if ($this->isIgnored() || $this->isRefunded()) {
             return 0.0;
         }
 
@@ -108,11 +115,12 @@ class BankTransaction extends Model
     {
         return $this->is_incoming
             && ! $this->isIgnored()
+            && ! $this->isRefunded()
             && $this->remainingAllocatableAmount() > BankTransactionMatcher::AMOUNT_EPSILON;
     }
 
     /**
-     * Wpływy z wolną kwotą (nie zignorowane / nie „na potem”;
+     * Wpływy z wolną kwotą (nie zignorowane / nie „na potem” / nie zwrócone;
      * bez akceptacji lub suma alokacji < kwota przelewu).
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\BankTransaction>  $query
@@ -125,6 +133,7 @@ class BankTransaction extends Model
                 $matchQuery->whereIn('status', [
                     BankTransactionMatch::STATUS_IGNORED,
                     BankTransactionMatch::STATUS_DEFERRED,
+                    BankTransactionMatch::STATUS_REFUNDED,
                 ]);
             })
             ->where(function ($inner) {

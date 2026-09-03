@@ -564,8 +564,14 @@ class AccountingController extends Controller
             'assignedTo',
             'createdBy',
             'bankTransactionMatches' => function ($q) {
-                $q->where('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED)
+                $q->whereIn('status', [
+                    \App\Models\BankTransactionMatch::STATUS_ACCEPTED,
+                    \App\Models\BankTransactionMatch::STATUS_REFUNDED,
+                ])
                     ->with(['transaction', 'acceptedBy'])
+                    ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [
+                        \App\Models\BankTransactionMatch::STATUS_ACCEPTED,
+                    ])
                     ->latest('accepted_at');
             },
         ]);
@@ -574,6 +580,12 @@ class AccountingController extends Controller
         $invoiceTarget = $debtCase->invoiceTargetAmount();
         $bankAllocatedSum = $debtCase->acceptedBankAllocatedSum();
         $bankRemainingOnCase = $debtCase->remainingBankAllocatableAmount();
+        $bankPayments = $debtCase->bankTransactionMatches
+            ->where('status', \App\Models\BankTransactionMatch::STATUS_ACCEPTED)
+            ->values();
+        $bankRefunds = $debtCase->bankTransactionMatches
+            ->where('status', \App\Models\BankTransactionMatch::STATUS_REFUNDED)
+            ->values();
         $defaultBankAmount = $bankRemainingOnCase !== null && $bankRemainingOnCase > 0
             ? $bankRemainingOnCase
             : ($invoiceTarget > 0 ? $invoiceTarget : 0.0);
@@ -649,11 +661,13 @@ class AccountingController extends Controller
                     DebtCaseAction::TYPE_IFIRMA_SYNC,
                     DebtCaseAction::TYPE_BANK_MATCH,
                     DebtCaseAction::TYPE_BANK_UNMATCH,
+                    DebtCaseAction::TYPE_BANK_REFUND,
                 ])
                 ->all(),
             'contactTypeLabels' => DebtCaseContact::typeLabels(),
             'ifirmaPaymentStatusLabels' => IfirmaInvoicePaymentStatusService::statusLabels(),
-            'bankPayments' => $debtCase->bankTransactionMatches,
+            'bankPayments' => $bankPayments,
+            'bankRefunds' => $bankRefunds,
             'bankInvoiceTarget' => $invoiceTarget,
             'bankAllocatedSum' => $bankAllocatedSum,
             'bankRemainingOnCase' => $bankRemainingOnCase,
@@ -885,21 +899,36 @@ class AccountingController extends Controller
                 $amountMatches = abs($remaining - $compareAmount) <= 0.01
                     || abs((float) $candidate->amount - $compareAmount) <= 0.01;
                 $ignored = $candidate->isIgnored();
+                $refunded = $candidate->isRefunded();
                 $alreadyLinkedToThisCase = $candidate->acceptedMatches()->contains(
                     fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
                 );
+                $alreadyRefundedToThisCase = $candidate->matches->contains(
+                    fn (BankTransactionMatch $match) => $match->status === BankTransactionMatch::STATUS_REFUNDED
+                        && (int) $match->debt_case_id === (int) $debtCase->id
+                );
                 $blockingMatch = $ignored
                     ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_IGNORED)
-                    : ($alreadyLinkedToThisCase
-                        ? $candidate->acceptedMatches()->first(
-                            fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
-                        )
-                        : null);
+                    : ($refunded
+                        ? $candidate->matches->firstWhere('status', BankTransactionMatch::STATUS_REFUNDED)
+                        : ($alreadyLinkedToThisCase
+                            ? $candidate->acceptedMatches()->first(
+                                fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
+                            )
+                            : null));
                 $caseHasRoom = $caseRemaining === null || $caseRemaining > 0.01;
                 $isLinkable = ! $ignored
+                    && ! $refunded
                     && ! $alreadyLinkedToThisCase
                     && $remaining > 0.01
                     && $caseHasRoom;
+                $canMarkRefunded = ! $ignored
+                    && ! $refunded
+                    && ! $alreadyLinkedToThisCase
+                    && ! $alreadyRefundedToThisCase
+                    && $remaining > 0.01
+                    && $caseRemaining !== null
+                    && $caseRemaining <= 0.01;
                 $summary = sprintf(
                     '#%d · %s · %s %s',
                     $candidate->id,
@@ -931,13 +960,45 @@ class AccountingController extends Controller
                     'import_url' => route('accounting.bank-imports.show', $candidate->bank_statement_import_id),
                     'import_filename' => $candidate->import?->original_filename,
                     'link_url' => route('accounting.collections.bank-transactions.link', [$debtCase, $candidate]),
+                    'refund_url' => route('accounting.collections.bank-transactions.mark-refunded', [$debtCase, $candidate]),
                     'summary' => $summary,
                     'is_linkable' => $isLinkable,
+                    'can_mark_refunded' => $canMarkRefunded,
                     'link_status' => $blockingMatch?->status,
                     'link_status_label' => $blockingMatch?->statusLabel(),
                 ];
             })->values(),
         ]);
+    }
+
+    public function collectionsBankTransactionMarkRefunded(
+        Request $request,
+        DebtCase $debtCase,
+        BankTransaction $transaction,
+        BankStatementImportService $importService
+    ) {
+        try {
+            $importService->markTransactionAsRefundedOverpayment(
+                $transaction,
+                $debtCase,
+                Auth::id()
+            );
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('accounting.collections.show', $debtCase)
+                ->withErrors(['bank_transaction' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('accounting.collections.show', $debtCase)
+            ->with(
+                'success',
+                sprintf(
+                    'Przelew #%d oznaczono jako zwrot podwójnej wpłaty przy sprawie #%d (bez wpływu na pokrycie FV, bez iFirma).',
+                    $transaction->id,
+                    $debtCase->id
+                )
+            );
     }
 
     public function collectionsBankTransactionLink(

@@ -812,6 +812,96 @@ class BankStatementImportService
     }
 
     /**
+     * Oznacza wpływ jako zwrot podwójnej wpłaty przy sprawie już pokrytej.
+     * Nie zwiększa pokrycia FV i nie rejestruje wpłaty w iFirma.
+     */
+    public function markTransactionAsRefundedOverpayment(
+        BankTransaction $transaction,
+        DebtCase $debtCase,
+        ?int $userId = null
+    ): BankTransactionMatch {
+        $transaction->loadMissing('matches');
+        $debtCase->loadMissing('formOrder');
+
+        if (! $transaction->is_incoming) {
+            throw new InvalidArgumentException('Można oznaczyć tylko wpływ (przelew przychodzący).');
+        }
+
+        if ($transaction->isIgnored()) {
+            throw new InvalidArgumentException('Ten przelew jest zignorowany — najpierw cofnij ignorowanie.');
+        }
+
+        if ($transaction->isRefunded()) {
+            $existing = $transaction->matches->firstWhere('status', BankTransactionMatch::STATUS_REFUNDED);
+            if ($existing && (int) $existing->debt_case_id === (int) $debtCase->id) {
+                return $existing;
+            }
+
+            throw new InvalidArgumentException('Ten przelew jest już oznaczony jako zwrot/nadpłata przy innej sprawie.');
+        }
+
+        if ($transaction->acceptedMatches()->contains(
+            fn (BankTransactionMatch $match) => (int) $match->debt_case_id === (int) $debtCase->id
+        )) {
+            throw new InvalidArgumentException('Ten przelew jest już zaakceptowany przy tej sprawie jako wpłata pokrywająca FV.');
+        }
+
+        $freeAmount = $transaction->remainingAllocatableAmount();
+        if ($freeAmount <= BankTransactionMatcher::AMOUNT_EPSILON) {
+            throw new InvalidArgumentException('Ten przelew nie ma wolnej kwoty do oznaczenia jako zwrot.');
+        }
+
+        if (! $debtCase->isFullyCoveredByBankPayments()) {
+            throw new InvalidArgumentException(
+                'Sprawa nie jest jeszcze w pełni pokryta wpłatami z wyciągu — najpierw zaakceptuj właściwą wpłatę, potem oznacz duplikat jako zwrot.'
+            );
+        }
+
+        return DB::transaction(function () use ($transaction, $debtCase, $userId, $freeAmount) {
+            $this->undeferTransaction($transaction);
+
+            $transaction->matches()
+                ->whereIn('status', [
+                    BankTransactionMatch::STATUS_SUGGESTED,
+                    BankTransactionMatch::STATUS_DEFERRED,
+                ])
+                ->update(['status' => BankTransactionMatch::STATUS_REJECTED]);
+
+            $match = $transaction->matches()->create([
+                'form_order_id' => $debtCase->form_order_id,
+                'debt_case_id' => $debtCase->id,
+                'confidence' => BankTransactionMatch::CONFIDENCE_HIGH,
+                'match_reasons' => [
+                    BankTransactionMatch::REASON_DUPLICATE_OVERPAYMENT,
+                    'manual_case_link',
+                ],
+                'status' => BankTransactionMatch::STATUS_REFUNDED,
+                'allocated_amount' => 0,
+                'accepted_by' => $userId,
+                'accepted_at' => now(),
+            ]);
+
+            DebtCaseAction::query()->create([
+                'debt_case_id' => $debtCase->id,
+                'user_id' => $userId,
+                'action_type' => DebtCaseAction::TYPE_BANK_REFUND,
+                'channel' => 'bank',
+                'outcome' => 'refunded_overpayment',
+                'happened_at' => now(),
+                'note' => sprintf(
+                    'Oznaczono przelew #%d (%.2f %s, %s) jako zwrot podwójnej wpłaty — nie liczy się do pokrycia FV.',
+                    $transaction->id,
+                    $freeAmount,
+                    $transaction->currency,
+                    $transaction->operation_date?->format('Y-m-d') ?? '—'
+                ),
+            ]);
+
+            return $match->fresh(['transaction', 'debtCase', 'acceptedBy']) ?? $match;
+        });
+    }
+
+    /**
      * Oznacza wpływ jako „Na potem” (poza aktywną kolejką, ale nadal do przeglądu na liście importów).
      */
     public function deferTransaction(BankTransaction $transaction, array $reasons = [BankTransactionMatch::REASON_MANUAL_DEFER]): void
@@ -820,6 +910,10 @@ class BankStatementImportService
 
         if ($transaction->isIgnored()) {
             throw new InvalidArgumentException('Ten przelew jest zignorowany — nie można oznaczyć „Na potem”.');
+        }
+
+        if ($transaction->isRefunded()) {
+            throw new InvalidArgumentException('Ten przelew jest oznaczony jako zwrot/nadpłata — nie można oznaczyć „Na potem”.');
         }
 
         if ($transaction->isDeferred()) {

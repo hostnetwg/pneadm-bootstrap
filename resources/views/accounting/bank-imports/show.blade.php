@@ -156,6 +156,14 @@
                             'label' => 'Zaakceptowane ('.$counts['accepted'].')',
                             'title' => null,
                         ],
+                        'refunded' => [
+                            'label' => 'Zwroty ('.$counts['refunded'].')',
+                            'title' => '<div class="text-start"><strong>Zwroty / nadpłaty</strong><ul class="mb-0 ps-3 mt-1">'
+                                .'<li>podwójne wpłaty oznaczone jako zwrot przy sprawie</li>'
+                                .'<li>nie liczą się do pokrycia FV</li>'
+                                .'<li>bez rejestracji w iFirma</li>'
+                                .'</ul></div>',
+                        ],
                         'deferred' => [
                             'label' => 'Na potem ('.$counts['deferred'].')',
                             'title' => '<div class="text-start"><strong>Na potem</strong><ul class="mb-0 ps-3 mt-1">'
@@ -270,6 +278,7 @@
                                 @forelse($transactions as $tx)
                                     @php
                                         $isDeferredTx = $tx->isDeferred();
+                                        $refundedMatches = $tx->matches->where('status', \App\Models\BankTransactionMatch::STATUS_REFUNDED)->values();
                                         $suggested = $tx->matches->where('status', \App\Models\BankTransactionMatch::STATUS_SUGGESTED);
                                         if ($isDeferredTx && $suggested->isEmpty()) {
                                             // Odroczone sugestie z FV/sprawą traktuj jak aktywne (można od razu akceptować / powiązać).
@@ -526,6 +535,22 @@
                                             @if($isDeferredTx)
                                                 <div class="mt-1">
                                                     <span class="badge text-bg-danger">Na potem</span>
+                                                </div>
+                                            @elseif($refundedMatches->isNotEmpty())
+                                                <div class="mt-1">
+                                                    <span class="badge text-bg-info">Zwrócony / nadpłata</span>
+                                                    <ul class="mb-0 ps-3 small">
+                                                        @foreach($refundedMatches as $ref)
+                                                            <li>
+                                                                @if($ref->debt_case_id)
+                                                                    <a href="{{ route('accounting.collections.show', $ref->debt_case_id) }}">Sprawa #{{ $ref->debt_case_id }}</a>
+                                                                @endif
+                                                                @if($ref->formOrder?->invoice_number)
+                                                                    <span class="text-muted">· FV {{ $ref->formOrder->invoice_number }}</span>
+                                                                @endif
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
                                                 </div>
                                             @elseif($acceptedMatches->isNotEmpty())
                                                 <div class="mt-1">

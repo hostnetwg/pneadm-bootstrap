@@ -606,6 +606,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::delete('/{debtCase}/invoice-pdf', [AccountingController::class, 'collectionsInvoicePdfDestroy'])->name('invoice-pdf.destroy');
             Route::get('/{debtCase}/bank-transactions/search', [AccountingController::class, 'collectionsBankTransactionSearch'])->name('bank-transactions.search');
             Route::post('/{debtCase}/bank-transactions/{transaction}/link', [AccountingController::class, 'collectionsBankTransactionLink'])->name('bank-transactions.link');
+            Route::post('/{debtCase}/bank-transactions/{transaction}/mark-refunded', [AccountingController::class, 'collectionsBankTransactionMarkRefunded'])->name('bank-transactions.mark-refunded');
             Route::post('/{debtCase}/bank-matches/{match}/unlink', [AccountingController::class, 'collectionsBankTransactionUnlink'])->name('bank-matches.unlink');
             Route::post('/{debtCase}/bank-matches/{match}/register-ifirma', [AccountingController::class, 'collectionsBankTransactionRegisterIfirma'])->name('bank-matches.register-ifirma');
         });
