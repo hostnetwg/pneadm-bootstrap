@@ -551,7 +551,7 @@
                                 @foreach(($registrationSuccessorOptions ?? collect()) as $successor)
                                     <option value="{{ $successor->id }}"
                                         {{ (string) old('registration_successor_course_id', $course->registration_successor_course_id) === (string) $successor->id ? 'selected' : '' }}>
-                                        #{{ $successor->id }} — {{ $successor->start_date ? $successor->start_date->format('d.m.Y H:i') : 'bez daty' }} — {{ strip_tags($successor->title) }}
+                                        #{{ $successor->id }} — {{ $successor->start_date ? $successor->start_date->format('d.m.Y H:i') : 'bez daty' }} — {{ $successor->plainTitle() }}
                                     </option>
                                 @endforeach
                             </select>

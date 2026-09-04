@@ -10,7 +10,7 @@
     <select id="{{ $fieldId }}" name="{{ $fieldId }}" class="form-control @error($fieldId) is-invalid @enderror">
         @if($selectedCourse)
             <option value="{{ $selectedCourse->id }}" selected>
-                #{{ $selectedCourse->id }} · {{ strip_tags($selectedCourse->title) }}
+                #{{ $selectedCourse->id }} · {{ $selectedCourse->plainTitle() }}
                 @if($selectedCourse->start_date)
                     [{{ $selectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}]
                 @endif
@@ -47,7 +47,7 @@
         $coursePreselected = [
             'id' => $selectedCourse->id,
             'id_old' => $selectedCourse->id_old,
-            'title_text' => trim(strip_tags((string) $selectedCourse->title)),
+            'title_text' => $selectedCourse->plainTitle(''),
             'start_date' => $selectedCourse->start_date ? $selectedCourse->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
             'end_date' => $selectedCourse->end_date ? $selectedCourse->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
             'status' => $selectedCourse->getLifecycleStatus(),

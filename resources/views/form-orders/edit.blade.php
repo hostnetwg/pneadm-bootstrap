@@ -104,7 +104,7 @@
                                                 id="course_id" name="course_id" required>
                                             @if($editPreselectedCourse)
                                                 <option value="{{ $editPreselectedCourse->id }}" selected>
-                                                    #{{ $editPreselectedCourse->id }} · {{ strip_tags($editPreselectedCourse->title) }}
+                                                    #{{ $editPreselectedCourse->id }} · {{ $editPreselectedCourse->plainTitle() }}
                                                     @if($editPreselectedCourse->start_date) [{{ $editPreselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
                                                 </option>
                                             @endif
@@ -488,7 +488,7 @@
         $courseSelectPreselected = $editPreselectedCourse ? [
             'id' => $editPreselectedCourse->id,
             'id_old' => $editPreselectedCourse->id_old,
-            'title_text' => trim(strip_tags((string) $editPreselectedCourse->title)),
+            'title_text' => $editPreselectedCourse->plainTitle(''),
             'start_date' => $editPreselectedCourse->start_date ? $editPreselectedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
             'end_date' => $editPreselectedCourse->end_date ? $editPreselectedCourse->end_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') : null,
             'status' => $editPreselectedCourse->getLifecycleStatus(),

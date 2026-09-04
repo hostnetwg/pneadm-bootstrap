@@ -58,7 +58,7 @@
         $linkedCoursePreselected = [
             'id' => $linkedCourse->id,
             'id_old' => $linkedCourse->id_old,
-            'title_text' => trim(strip_tags((string) $linkedCourse->title)),
+            'title_text' => $linkedCourse->plainTitle(''),
             'start_date' => $linkedCourse->start_date ? $linkedCourse->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
             'end_date' => $linkedCourse->end_date ? $linkedCourse->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
             'status' => $linkedCourse->getLifecycleStatus(),

@@ -597,7 +597,7 @@ class FormOrdersController extends Controller
                     'id' => (int) $c->id,
                     'id_hash' => '#'.$c->id,
                     'id_old' => (string) ($c->id_old ?? ''),
-                    'title_text' => trim(strip_tags((string) $c->title)),
+                    'title_text' => $c->plainTitle(''),
                     'title_html' => (string) $c->title,
                     'start_date' => $c->start_date ? $c->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
                     'end_date' => $c->end_date ? $c->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,

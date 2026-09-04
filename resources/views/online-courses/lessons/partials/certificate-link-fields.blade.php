@@ -7,7 +7,7 @@
         <select id="linked_course_id" name="linked_course_id" class="form-control @error('linked_course_id') is-invalid @enderror">
             @if(!empty($linkedCourse))
                 <option value="{{ $linkedCourse->id }}" selected>
-                    #{{ $linkedCourse->id }} · {{ strip_tags($linkedCourse->title) }}
+                    #{{ $linkedCourse->id }} · {{ $linkedCourse->plainTitle() }}
                     @if($linkedCourse->start_date) [{{ $linkedCourse->start_date->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i') }}] @endif
                 </option>
             @endif

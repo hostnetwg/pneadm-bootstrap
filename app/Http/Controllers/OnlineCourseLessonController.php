@@ -213,7 +213,7 @@ class OnlineCourseLessonController extends Controller
                     'id' => (int) $course->id,
                     'id_hash' => '#'.$course->id,
                     'id_old' => (string) ($course->id_old ?? ''),
-                    'title_text' => trim(strip_tags((string) $course->title)),
+                    'title_text' => $course->plainTitle(''),
                     'title_html' => (string) $course->title,
                     'start_date' => $course->start_date ? $course->start_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
                     'end_date' => $course->end_date ? $course->end_date->copy()->timezone($tz)->format('Y-m-d H:i') : null,
