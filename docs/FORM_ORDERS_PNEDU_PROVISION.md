@@ -1,6 +1,6 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-08-22 (strategia platform-first; termin w mailach: start + czas trwania)
+Data aktualizacji: 2026-09-07 (wygląd nieaktywnych wierszy na `/courses`; wcześniej: strategia platform-first)
 
 **Strategia produktowa:** uczestnik ma przechodzić przez **pnedu.pl**, a nie tylko przez ClickMeeting — [strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md).
 
@@ -31,6 +31,8 @@ Panel `/courses`, kolumna **U**, pokazuje dwa niezależne liczniki operacyjne dl
 | `FV` | Ważne zamówienia bez klasycznego numeru FV (`invoice_number`) i bez oznaczenia „Bezpłatny dostęp - bez FV” | `/form-orders/{latestId}?filter_no_invoice=1&course_id={courseId}` (najwyższe id z tego zbioru) |
 
 **Wydajność (2026-08):** pierwszy HTML listy zawiera tylko niebieskie/zielone/żółte badge uczestników (`withCount`). Czerwone **U**, żółte **FV**, cała kolumna **Lejek** oraz badge rozliczenia szkoleń zamkniętych ładują się **po** renderze przez `GET /courses/index-stats?ids[]=…` (live, bez cache) — ten sam wzorzec co `/form-orders/index-stats`.
+
+**Nieaktywne szkolenia (2026-09):** wiersz z `is_active = 0` ma klasę `course-row-inactive` — szare tło całego wiersza, lewa krawędź, wyszarzony tekst, grafika w skali szarości. Badge **Nieaktywne** i przyciski akcji zostają w pełnym kolorze. Szkolenia zakończone, ale nadal aktywne, zostają przy dotychczasowym `table-secondary text-muted`. Gdy oba stany się pokrywają, wygrywa styl nieaktywnego.
 
 **Tryb spotkania live (kolumna C, na dole, szkolenia online):** ikona — zielony `bi-broadcast` = bezpośredni ClickMeeting (`clickmeeting_join_enabled`), niebieski `bi-display` = osadzony pokój na pnedu.pl (`embed_on_pnedu`). Tooltip na nagłówku **C** i na ikonie.
 

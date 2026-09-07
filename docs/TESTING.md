@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-08-23
+Data aktualizacji: 2026-09-07
 
 ## Cel
 
@@ -71,6 +71,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=IfirmaInvoicePaymentRegistrationServiceTest`, `--filter=DebtCaseAutoCloseServiceTest`, `--filter=BankStatementImportTest`, `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Lejek na `/courses` | `--filter=CourseFunnelStatsServiceTest`, `--filter=CoursesIndexStatsTest` |
+| Wygląd wiersza nieaktywnego na `/courses` | `--filter=CoursesIndexStatsTest` (klasa `course-row-inactive` vs `table-secondary` dla zakończonych aktywnych) |
 | Ankiety | **Brak** dedykowanych testów (import CSV, PDF, bramka). Smoke ręczny: import, PDF, `pnedu.pl/ankieta/{token}` → `/rekomendacja` → `/dziekujemy`; ponowne wejście (anon: cookie / nieanon: ten sam e-mail) → „już wypełniona”. Kanon: [SURVEYS.md](./SURVEYS.md). |
 | Artykuły / blog | Brak dedykowanych testów automatycznych. Smoke ręczny: `pneadm` → `Artykuły` → dodaj szkic, opublikuj z datą `published_at`, sprawdź `/blog` i `/blog/{slug}` w `pnedu`, sprawdź sitemapę; wejdź na artykuł 2× w tej samej sesji analitycznej (licznik +1), w incognito +1; wyłącz analitykę w panelu → licznik stoi; kolumna „Wyśw.” w panelu. SEO: meta title/description wg `ARTICLES.md`; GSC wg `pnedu/docs/GSC_CHECKLIST.md`. Testy: `--filter=ArticlePageViewTrackerTest`, `--filter=SeoSitemapTest`, `--filter=CourseSeoServiceTest`. Kanon: [ARTICLES.md](./ARTICLES.md), [pnedu/docs/BLOG_ARTICLES.md](../pnedu/docs/BLOG_ARTICLES.md), [pnedu/SEO.md](../pnedu/SEO.md). |
 | Pełny suite | `sail test` |

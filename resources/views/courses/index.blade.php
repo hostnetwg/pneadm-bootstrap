@@ -11,6 +11,37 @@
             text-align: left;
             padding: 0.65rem 0.75rem;
         }
+
+        .table > tbody > tr.course-row-inactive {
+            --bs-table-bg: #e9ecef;
+            --bs-table-striped-bg: #e9ecef;
+            --bs-table-hover-bg: #dee2e6;
+            --bs-table-accent-bg: #e9ecef;
+            --bs-table-color: #6c757d;
+            --bs-table-striped-color: #6c757d;
+            --bs-table-hover-color: #5c636a;
+            color: #6c757d;
+        }
+
+        .table > tbody > tr.course-row-inactive > * {
+            color: #6c757d;
+            background-color: var(--bs-table-bg);
+        }
+
+        .table > tbody > tr.course-row-inactive > td:first-child {
+            box-shadow: inset 4px 0 0 #868e96;
+            border-left: 4px solid #868e96;
+        }
+
+        .table > tbody > tr.course-row-inactive img.course-index-thumb {
+            filter: grayscale(1) brightness(0.7);
+            opacity: 0.9;
+        }
+
+        .table > tbody > tr.course-row-inactive .badge,
+        .table > tbody > tr.course-row-inactive .btn {
+            filter: none;
+        }
     </style>
 
     <div class="py-3">
@@ -286,7 +317,10 @@
                 </thead>
                 <tbody>
                     @foreach ($courses as $course)
-                    <tr class="{{ strtotime($course->end_date) < time() ? 'table-secondary text-muted' : '' }}">
+                    <tr @class([
+                        'course-row-inactive' => ! $course->is_active,
+                        'table-secondary text-muted' => $course->is_active && strtotime($course->end_date) < time(),
+                    ])>
                         <td class="text-center align-middle">{{ $course->id }}</td>
                         <td class="text-center align-middle small">
                             {{ $course->id_old ?? '-' }}
@@ -406,7 +440,7 @@
                         </td>                        
                         <td class="text-center align-middle">
                             @if ($course->image)
-                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100" class="img-thumbnail">
+                                <img src="{{ asset('storage/' . $course->image) }}" alt="Obrazek kursu" width="100" class="img-thumbnail course-index-thumb">
                             @else
                                 <span></span>
                             @endif

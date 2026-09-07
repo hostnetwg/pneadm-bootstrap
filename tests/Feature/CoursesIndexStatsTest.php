@@ -12,6 +12,23 @@ class CoursesIndexStatsTest extends TestCase
 {
     use RefreshDatabase;
 
+    private int $outputBufferLevel = 0;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $this->outputBufferLevel = ob_get_level();
+    }
+
+    protected function tearDown(): void
+    {
+        while (ob_get_level() > $this->outputBufferLevel) {
+            ob_end_clean();
+        }
+        parent::tearDown();
+    }
+
     private function actingOperator(): User
     {
         return User::factory()->create([
@@ -97,5 +114,89 @@ class CoursesIndexStatsTest extends TestCase
     {
         $this->getJson(route('courses.index-stats', ['ids' => [1]]))
             ->assertUnauthorized();
+    }
+
+    public function test_inactive_course_row_uses_inactive_class(): void
+    {
+        $user = $this->actingOperator();
+        $this->createCourse([
+            'title' => 'UNIQ-INACTIVE-ROW-STYLE',
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('courses.index', [
+                'date_filter' => 'upcoming',
+                'search' => 'UNIQ-INACTIVE-ROW-STYLE',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('UNIQ-INACTIVE-ROW-STYLE');
+        $response->assertSee('<tr class="course-row-inactive">', false);
+        $response->assertSee('Nieaktywne');
+    }
+
+    public function test_active_upcoming_course_row_does_not_use_inactive_class(): void
+    {
+        $user = $this->actingOperator();
+        $this->createCourse([
+            'title' => 'UNIQ-ACTIVE-ROW-STYLE',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('courses.index', [
+                'date_filter' => 'upcoming',
+                'search' => 'UNIQ-ACTIVE-ROW-STYLE',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('UNIQ-ACTIVE-ROW-STYLE');
+        $response->assertDontSee('<tr class="course-row-inactive">', false);
+        $response->assertSee('Aktywne');
+    }
+
+    public function test_ended_active_course_keeps_table_secondary_and_not_inactive_class(): void
+    {
+        $user = $this->actingOperator();
+        $this->createCourse([
+            'title' => 'UNIQ-ENDED-ACTIVE-ROW',
+            'is_active' => true,
+            'start_date' => now()->subDays(7),
+            'end_date' => now()->subDays(6),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('courses.index', [
+                'date_filter' => 'past',
+                'search' => 'UNIQ-ENDED-ACTIVE-ROW',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('UNIQ-ENDED-ACTIVE-ROW');
+        $response->assertSee('<tr class="table-secondary text-muted">', false);
+        $response->assertDontSee('<tr class="course-row-inactive">', false);
+    }
+
+    public function test_ended_inactive_course_prefers_inactive_row_class(): void
+    {
+        $user = $this->actingOperator();
+        $this->createCourse([
+            'title' => 'UNIQ-ENDED-INACTIVE-ROW',
+            'is_active' => false,
+            'start_date' => now()->subDays(7),
+            'end_date' => now()->subDays(6),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('courses.index', [
+                'date_filter' => 'past',
+                'search' => 'UNIQ-ENDED-INACTIVE-ROW',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('UNIQ-ENDED-INACTIVE-ROW');
+        $response->assertSee('<tr class="course-row-inactive">', false);
+        $response->assertDontSee('<tr class="table-secondary text-muted">', false);
     }
 }

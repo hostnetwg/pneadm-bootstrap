@@ -1,11 +1,15 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-08-23  
+Data utworzenia/aktualizacji: 2026-09-07  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-07) — nieaktywne szkolenia na liście `/courses`
+
+Wiersze z `is_active = 0` mają klasę `course-row-inactive`: szare tło, lewa krawędź, wyszarzony tekst, przyciemniona grafika. Badge **Nieaktywne** i przyciski akcji zostają kolorowe. Zakończone, ale aktywne szkolenia bez zmiany (`table-secondary`). Deploy: tylko `pneadm` (`git pull`, cache widoków; bez migracji). Kanon: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
 
 ## Ostatnio (2026-09-02) — ręczne zamknięcie zapisów na pełną edycję
 
