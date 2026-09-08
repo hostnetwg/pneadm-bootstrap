@@ -169,7 +169,7 @@
                         <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
                         <small class="text-muted d-block">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
                         @php
-                            $liveRoomMode = old('live_room_mode', 'clickmeeting');
+                            $liveRoomMode = old('live_room_mode', 'embed_pnedu');
                             $embedEmailLinkEnabled = (bool) old(
                                 'embed_email_link_enabled',
                                 $liveRoomMode === 'embed_pnedu'

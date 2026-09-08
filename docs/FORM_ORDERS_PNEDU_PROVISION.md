@@ -242,13 +242,15 @@ Konfiguracja testów (izolacja bazy analityki, `is_active` w fabryce): **[TESTIN
 
 ## Konfiguracja kursu online
 
+W **tworzeniu** kursu (`/courses/create`) domyślnie zaznaczone są: **Osadzony pokój na pnedu.pl** oraz **Link w e-mailu do osadzonego w PNEDU pokoju**. Przy wyborze **Pokój na ClickMeeting** checkbox linku e-mail jest ukrywany i odznaczany.
+
 W edycji kursu (`/courses/{id}/edit`):
 
 - **Platforma:** `clickmeeting` (małymi literami — wymagane przez provision)
 - **ID wydarzenia ClickMeeting:** `room_id` z panelu CM
 - **Wejście do pokoju dla uczestnika** (radio, dokładnie jedna opcja):
-  - **Pokój na ClickMeeting** (domyślnie) — przycisk zewnętrzny na pnedu
+  - **Pokój na ClickMeeting** — przycisk zewnętrzny na pnedu
   - **Osadzony pokój na pnedu.pl** — przycisk embed na pnedu (`embed_on_pnedu`); dodatkowy checkbox decyduje, czy maile też mają prowadzić głównie do embed — zob. `pnedu/docs/DASHBOARD_LIVE_EMBED.md`
-- **Link w e-mailu do osadzonego w PNEDU pokoju:** domyślnie zaznaczony przy opcji embed; odznaczenie przywraca dotychczasowe maile z bezpośrednim linkiem CM.
+- **Link w e-mailu do osadzonego w PNEDU pokoju:** widoczny i zaznaczany przy opcji embed; przy ClickMeeting ukryty i odznaczony. Odznaczenie przy embed przywraca maile z bezpośrednim linkiem CM.
 - **Link do spotkania:** opcjonalny fallback / inne platformy
 - **Hasło do spotkania:** gdy wydarzenie na hasło
