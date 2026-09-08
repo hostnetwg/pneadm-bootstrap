@@ -25,6 +25,13 @@ class OnlinePaymentOrder extends Model
         'total_amount',
         'currency',
         'buyer_type',
+        'customer_profile',
+        'terms_version',
+        'terms_hash',
+        'early_performance_scope',
+        'early_performance_statement_version',
+        'early_performance_accepted_at',
+        'legal_confirmation_sent_at',
         'email',
         'first_name',
         'last_name',
@@ -39,6 +46,8 @@ class OnlinePaymentOrder extends Model
         'address_data' => 'array',
         'form_data' => 'array',
         'total_amount' => 'decimal:2',
+        'early_performance_accepted_at' => 'datetime',
+        'legal_confirmation_sent_at' => 'datetime',
     ];
 
     public const STATUS_PENDING = 'pending';

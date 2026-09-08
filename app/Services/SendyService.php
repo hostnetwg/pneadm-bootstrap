@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class SendyService
 {
     private string $apiKey;
+
     private string $baseUrl;
 
     public function __construct()
@@ -23,26 +24,28 @@ class SendyService
     public function getBrands(): array
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/brands/get-brands.php', [
-                'api_key' => $this->apiKey
+            $response = Http::asForm()->post($this->baseUrl.'/api/brands/get-brands.php', [
+                'api_key' => $this->apiKey,
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return $data ?? [];
             }
 
             Log::error('Sendy API Error - getBrands', [
                 'status' => $response->status(),
-                'body' => $response->body()
+                'body' => $response->body(),
             ]);
 
             return [];
         } catch (Exception $e) {
             Log::error('Sendy Service Exception - getBrands', [
                 'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return [];
         }
     }
@@ -53,21 +56,22 @@ class SendyService
     public function getLists(string $brandId, bool $includeHidden = false): array
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/lists/get-lists.php', [
+            $response = Http::asForm()->post($this->baseUrl.'/api/lists/get-lists.php', [
                 'api_key' => $this->apiKey,
                 'brand_id' => $brandId,
-                'include_hidden' => $includeHidden ? 'yes' : 'no'
+                'include_hidden' => $includeHidden ? 'yes' : 'no',
             ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return $data ?? [];
             }
 
             Log::error('Sendy API Error - getLists', [
                 'status' => $response->status(),
                 'body' => $response->body(),
-                'brand_id' => $brandId
+                'brand_id' => $brandId,
             ]);
 
             return [];
@@ -75,8 +79,9 @@ class SendyService
             Log::error('Sendy Service Exception - getLists', [
                 'message' => $e->getMessage(),
                 'brand_id' => $brandId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return [];
         }
     }
@@ -110,20 +115,21 @@ class SendyService
     public function getActiveSubscriberCount(string $listId): int
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/subscribers/active-subscriber-count.php', [
+            $response = Http::asForm()->post($this->baseUrl.'/api/subscribers/active-subscriber-count.php', [
                 'api_key' => $this->apiKey,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             if ($response->successful()) {
                 $count = (int) $response->body();
+
                 return $count;
             }
 
             Log::error('Sendy API Error - getActiveSubscriberCount', [
                 'status' => $response->status(),
                 'body' => $response->body(),
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             return 0;
@@ -131,8 +137,9 @@ class SendyService
             Log::error('Sendy Service Exception - getActiveSubscriberCount', [
                 'message' => $e->getMessage(),
                 'list_id' => $listId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return 0;
         }
     }
@@ -143,10 +150,10 @@ class SendyService
     public function getSubscriptionStatus(string $email, string $listId): string
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/subscribers/subscription-status.php', [
+            $response = Http::asForm()->post($this->baseUrl.'/api/subscribers/subscription-status.php', [
                 'api_key' => $this->apiKey,
                 'email' => $email,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             if ($response->successful()) {
@@ -157,7 +164,7 @@ class SendyService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'email' => $email,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             return 'Unknown';
@@ -166,8 +173,9 @@ class SendyService
                 'message' => $e->getMessage(),
                 'email' => $email,
                 'list_id' => $listId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return 'Unknown';
         }
     }
@@ -182,21 +190,21 @@ class SendyService
                 'api_key' => $this->apiKey,
                 'email' => $email,
                 'list' => $listId,
-                'boolean' => 'true'
+                'boolean' => 'true',
             ], $additionalData);
 
-            $response = Http::asForm()->post($this->baseUrl . '/subscribe', $data);
+            $response = Http::asForm()->post($this->baseUrl.'/subscribe', $data);
 
             if ($response->successful()) {
                 $result = trim($response->body());
-                
+
                 // Sendy zwraca różne odpowiedzi:
                 // 'true' - sukces
                 // 'Already subscribed.' - email już jest na liście (to też sukces)
                 // 'Bounced email address.' - email odbija (błąd)
                 // 'Email is suppressed.' - email zablokowany (błąd)
                 // Inne komunikaty błędów
-                
+
                 // Loguj wszystkie odpowiedzi dla debugowania (tylko pierwsze 10)
                 static $logCount = 0;
                 if ($logCount < 10) {
@@ -204,23 +212,23 @@ class SendyService
                         'response' => $result,
                         'response_length' => strlen($result),
                         'email' => $email,
-                        'list_id' => $listId
+                        'list_id' => $listId,
                     ]);
                     $logCount++;
                 }
-                
+
                 if ($result === 'true' || $result === 'Already subscribed.') {
                     return true;
                 }
-                
+
                 // Jeśli to błąd, zaloguj szczegóły
                 Log::warning('Sendy API Warning - subscribe', [
                     'response' => $result,
                     'email' => $email,
                     'list_id' => $listId,
-                    'additional_data' => $additionalData
+                    'additional_data' => $additionalData,
                 ]);
-                
+
                 return false;
             }
 
@@ -228,7 +236,7 @@ class SendyService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'email' => $email,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             return false;
@@ -237,10 +245,22 @@ class SendyService
                 'message' => $e->getMessage(),
                 'email' => $email,
                 'list_id' => $listId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
+    }
+
+    /**
+     * Zapis na listę służącą wyłącznie realizacji zamówionego szkolenia.
+     * Brak pola gdpr: ta operacja nie stanowi nadania zgody marketingowej.
+     */
+    public function subscribeOperational(string $email, string $listId, array $additionalData = []): bool
+    {
+        unset($additionalData['gdpr']);
+
+        return $this->subscribe($email, $listId, $additionalData);
     }
 
     /**
@@ -249,14 +269,15 @@ class SendyService
     public function unsubscribe(string $email, string $listId): bool
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/unsubscribe', [
+            $response = Http::asForm()->post($this->baseUrl.'/unsubscribe', [
                 'email' => $email,
                 'list' => $listId,
-                'boolean' => 'true'
+                'boolean' => 'true',
             ]);
 
             if ($response->successful()) {
                 $result = $response->body();
+
                 return $result === 'true';
             }
 
@@ -264,7 +285,7 @@ class SendyService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'email' => $email,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             return false;
@@ -273,8 +294,9 @@ class SendyService
                 'message' => $e->getMessage(),
                 'email' => $email,
                 'list_id' => $listId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
     }
@@ -285,14 +307,15 @@ class SendyService
     public function deleteSubscriber(string $email, string $listId): bool
     {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/subscribers/delete.php', [
+            $response = Http::asForm()->post($this->baseUrl.'/api/subscribers/delete.php', [
                 'api_key' => $this->apiKey,
                 'list_id' => $listId,
-                'email' => $email
+                'email' => $email,
             ]);
 
             if ($response->successful()) {
                 $result = $response->body();
+
                 return $result === 'true';
             }
 
@@ -300,7 +323,7 @@ class SendyService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'email' => $email,
-                'list_id' => $listId
+                'list_id' => $listId,
             ]);
 
             return false;
@@ -309,8 +332,9 @@ class SendyService
                 'message' => $e->getMessage(),
                 'email' => $email,
                 'list_id' => $listId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
     }
@@ -327,32 +351,33 @@ class SendyService
         string $subject = 'Newsletter'
     ): ?string {
         try {
-            $response = Http::asForm()->post($this->baseUrl . '/api/lists/create-list.php', [
+            $response = Http::asForm()->post($this->baseUrl.'/api/lists/create-list.php', [
                 'api_key' => $this->apiKey,
                 'brand_id' => $brandId,
                 'list_name' => $listName,
                 'from_name' => $fromName,
                 'from_email' => $fromEmail,
                 'reply_to' => $replyTo,
-                'subject' => $subject
+                'subject' => $subject,
             ]);
 
             if ($response->successful()) {
                 $result = $response->body();
-                
+
                 // Sendy zwraca ID listy jako string lub JSON z błędem
                 if (is_numeric($result) || (is_string($result) && strlen($result) > 0 && $result !== 'true' && $result !== 'false')) {
                     return $result;
                 }
-                
+
                 // Sprawdź czy to JSON z błędem
                 $jsonResult = json_decode($result, true);
                 if ($jsonResult && isset($jsonResult['error'])) {
                     Log::error('Sendy API Error - createList', [
                         'error' => $jsonResult['error'],
                         'list_name' => $listName,
-                        'brand_id' => $brandId
+                        'brand_id' => $brandId,
                     ]);
+
                     return null;
                 }
             }
@@ -361,7 +386,7 @@ class SendyService
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'list_name' => $listName,
-                'brand_id' => $brandId
+                'brand_id' => $brandId,
             ]);
 
             return null;
@@ -370,8 +395,9 @@ class SendyService
                 'message' => $e->getMessage(),
                 'list_name' => $listName,
                 'brand_id' => $brandId,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -384,7 +410,7 @@ class SendyService
         $results = [
             'success' => 0,
             'failed' => 0,
-            'errors' => []
+            'errors' => [],
         ];
 
         foreach ($subscribers as $subscriber) {
@@ -392,9 +418,10 @@ class SendyService
             $name = $subscriber['name'] ?? null;
             $rspo = $subscriber['rspo'] ?? null;
 
-            if (!$email) {
+            if (! $email) {
                 $results['failed']++;
-                $results['errors'][] = "Brak adresu email dla: " . ($name ?? 'nieznana szkoła');
+                $results['errors'][] = 'Brak adresu email dla: '.($name ?? 'nieznana szkoła');
+
                 continue;
             }
 
@@ -402,7 +429,7 @@ class SendyService
             if ($name) {
                 $additionalData['name'] = $name;
             }
-            
+
             // Dodaj custom field RSPO jeśli istnieje
             // Sendy używa personalization tag jako nazwy parametru
             // Jeśli w Sendy masz custom field z tagiem [RSPO,fallback=], użyj 'RSPO' jako parametru
@@ -432,16 +459,17 @@ class SendyService
     {
         try {
             $brands = $this->getBrands();
+
             return [
                 'success' => true,
                 'message' => 'Połączenie z Sendy API działa poprawnie',
                 'brands_count' => count($brands),
-                'brands' => $brands
+                'brands' => $brands,
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Błąd połączenia z Sendy API: ' . $e->getMessage()
+                'message' => 'Błąd połączenia z Sendy API: '.$e->getMessage(),
             ];
         }
     }

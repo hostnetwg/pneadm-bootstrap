@@ -233,6 +233,13 @@ class FormOrder extends Model
         'online_payment_recovery_sent_at',
         'submission_source',
         'order_form_variant',
+        'customer_profile',
+        'terms_version',
+        'terms_hash',
+        'early_performance_scope',
+        'early_performance_statement_version',
+        'early_performance_accepted_at',
+        'legal_confirmation_sent_at',
 
         // Dane KSeF
         'ksef_number',
@@ -286,6 +293,8 @@ class FormOrder extends Model
         'status_completed' => 'integer',
         'cancelled_at' => 'datetime',
         'online_payment_recovery_sent_at' => 'datetime',
+        'early_performance_accepted_at' => 'datetime',
+        'legal_confirmation_sent_at' => 'datetime',
         'updated_manually_at' => 'datetime',
         'ksef_sent_at' => 'datetime',
         'ksef_email_pending' => 'boolean',

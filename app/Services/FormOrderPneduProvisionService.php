@@ -190,6 +190,9 @@ class FormOrderPneduProvisionService
                     'clickmeeting_event_id' => trim((string) optional($course->onlineDetails)->clickmeeting_event_id),
                     'instructor_line' => $this->instructorLineForProvisionEmail($course->instructor),
                     'start_date_line' => CourseAccessEmailSchedule::prefixedStartLine($course),
+                    'data_source_name' => strtolower(trim((string) $order->orderer_email)) !== strtolower($email)
+                        ? trim((string) ($order->orderer_name ?: $order->buyer_name))
+                        : null,
                     'reused_participant' => $reusedParticipant,
                 ];
 
@@ -276,6 +279,7 @@ class FormOrderPneduProvisionService
                         $afterCommit['instructor_line'] ?? null,
                         $afterCommit['start_date_line'] ?? null,
                         $liveAccess,
+                        $afterCommit['data_source_name'] ?? null,
                     ));
                 } else {
                     $token = Password::broker('pnedu_users')->createToken($pneduUser);
@@ -285,6 +289,7 @@ class FormOrderPneduProvisionService
                         $afterCommit['instructor_line'] ?? null,
                         $afterCommit['start_date_line'] ?? null,
                         $liveAccess,
+                        $afterCommit['data_source_name'] ?? null,
                     ));
                 }
             } catch (Throwable $e) {

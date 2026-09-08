@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-07
+Data aktualizacji: 2026-09-08
 
 ## Cel
 
@@ -70,6 +70,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest` |
 | Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=IfirmaInvoicePaymentRegistrationServiceTest`, `--filter=DebtCaseAutoCloseServiceTest`, `--filter=BankStatementImportTest`, `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
+| Legalny checkout / dokumenty | **pnedu:** `tests/Unit/LegalCheckoutServiceTest.php`, `tests/Unit/SendyOperationalConsentTest.php`, `tests/Feature/LegalDocumentsTest.php`, `tests/Feature/AnalyticsConsentTest.php`; **pneadm:** `tests/Unit/PneduProvisionArticle14NoticeTest.php` |
 | Lejek na `/courses` | `--filter=CourseFunnelStatsServiceTest`, `--filter=CoursesIndexStatsTest` |
 | Wygląd wiersza nieaktywnego na `/courses` | `--filter=CoursesIndexStatsTest` (klasa `course-row-inactive` vs `table-secondary` dla zakończonych aktywnych) |
 | Ankiety | **Brak** dedykowanych testów (import CSV, PDF, bramka). Smoke ręczny: import, PDF, `pnedu.pl/ankieta/{token}` → `/rekomendacja` → `/dziekujemy`; ponowne wejście (anon: cookie / nieanon: ten sam e-mail) → „już wypełniona”. Kanon: [SURVEYS.md](./SURVEYS.md). |
@@ -83,3 +84,15 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 1. `sail test` (lub `--filter=` dla dotkniętego modułu),
 2. `sail pint` na zmienionych plikach PHP,
 3. aktualizacja dokumentacji — patrz [AI_HUMAN_COMMUNICATION.md](./AI_HUMAN_COMMUNICATION.md) sekcja 14.
+
+## Weryfikacja minimalnego legalnego checkoutu — 2026-09-08
+
+- `pnedu`: 24 testy zakresowe / 109 asercji — zaliczone.
+- `pneadm`: `PneduProvisionArticle14NoticeTest` — 1 test / 2 asercje — zaliczony.
+- Pint zmienionych plików obu aplikacji — zaliczony.
+- Kompilacja Blade i produkcyjny build Vite obu aplikacji — zaliczone.
+- Migracja dowodów checkoutu zastosowana poprawnie wyłącznie w lokalnej bazie deweloperskiej; migracja produkcyjna nie była wykonywana.
+- Pełny `pnedu`: 412 zaliczonych, 110 niezaliczonych. Błędy są związane głównie z nieaktualnym schematem testowej tabeli `users` (brak `first_name`) oraz testami wybierającymi bieżące, zmienne dane kursów.
+- Pełny `pneadm`: 766 zaliczonych, 42 niezaliczone, 24 ryzykowne, 2 pominięte. Test modułu art. 14 jest zielony; pozostałe błędy dotyczą wcześniejszych rozbieżności schematu/stanu danych modułów bankowych, księgowych i provision.
+
+Nie oznaczać pełnych zestawów jako zielone do czasu naprawy izolacji i migracji baz testowych. Zakresowa weryfikacja checkoutu nie wymaga migracji produkcyjnej.

@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-08-08  
+Data utworzenia/aktualizacji: 2026-09-08  
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -58,6 +58,7 @@ Kluczowe obszary:
 - bramka ankiet `/ankieta/{token}` (native form + opcjonalna `/rekomendacja`, albo redirect external),
 - newsletter,
 - SEO.
+- wersjonowane dokumenty prawne i dowody checkoutu.
 
 Najważniejsze miejsca w kodzie:
 
@@ -70,6 +71,8 @@ Najważniejsze miejsca w kodzie:
 - `app/Services/MarketingCampaignLinkResolver.php`,
 - `app/Services/MarketingCampaignLinkTracker.php`,
 - `app/Services/CoursePageViewTracker.php`,
+- `app/Services/LegalCheckoutService.php`,
+- `app/Services/LegalDocumentService.php`,
 - `resources/views/courses/show.blade.php`,
 - `resources/views/training-offers/pedagogical-councils/`,
 - `resources/views/courses/order-form.blade.php`.

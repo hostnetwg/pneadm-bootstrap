@@ -22,6 +22,7 @@ class PneduFormOrderProvisionedExistingUser extends Notification
         protected ?string $instructorLine = null,
         protected ?string $startDateLine = null,
         protected ?PneduProvisionLiveAccessContext $liveAccess = null,
+        protected ?string $dataSourceName = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -84,6 +85,14 @@ class PneduFormOrderProvisionedExistingUser extends Notification
 
         if (! $loginAfterEmbedNote) {
             $message->action('Zaloguj się na pnedu.pl', $loginUrl);
+        }
+
+        if (filled($this->dataSourceName)) {
+            $message->line(
+                'Informacja RODO: Twoje dane otrzymaliśmy od zamawiającego „'.$this->dataSourceName
+                .'”, który zgłosił Cię na szkolenie. Pełna informacja o przetwarzaniu danych: '
+                .$base.'/rodo-art-14'
+            );
         }
 
         return $message

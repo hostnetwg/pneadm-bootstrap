@@ -1,11 +1,17 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-07  
+Data utworzenia/aktualizacji: 2026-09-08  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-08) — minimalny legalny checkout
+
+Wdrożono jeden warunkowy checkbox tylko dla osoby prywatnej/JDG niezawodowej przy szkoleniu rozpoczynającym się w ciągu 14 dni, wersjonowanie Regulaminu i dowodu zamówienia, trwałe potwierdzenia PDF, informację art. 14 dla uczestnika, operacyjne listy Sendy i minimalną zgodę analityczną cookies.
+
+Przed produkcją: przegląd treści przez prawnika, wdrożenie obu repozytoriów i migracji według `docs/deploy/2026-09-minimal-legal-checkout-deploy.md`, następnie smoke czterech formularzy i wiadomości Mailpit. Kanon: `docs/LEGAL_CHECKOUT.md`.
 
 ## Ostatnio (2026-09-07) — nieaktywne szkolenia na liście `/courses`
 

@@ -65,7 +65,7 @@ class FormOrderSendySyncService
         $sendy = app(SendyService::class);
 
         foreach ($contacts as $contact) {
-            $ok = $sendy->subscribe($contact['email'], $listId, [
+            $ok = $sendy->subscribeOperational($contact['email'], $listId, [
                 'name' => $contact['name'],
                 'Sername' => $contact['sername'],
                 'data' => $contact['data'],
@@ -74,6 +74,7 @@ class FormOrderSendySyncService
 
             if ($ok) {
                 $results['success']++;
+
                 continue;
             }
 
@@ -128,7 +129,7 @@ class FormOrderSendySyncService
         $sendy = app(SendyService::class);
 
         foreach ($contacts as $contact) {
-            $ok = $sendy->subscribe($contact['email'], $listId, [
+            $ok = $sendy->subscribeOperational($contact['email'], $listId, [
                 'name' => $contact['name'],
                 'Sername' => $contact['sername'],
                 'data' => $contact['data'],
@@ -137,6 +138,7 @@ class FormOrderSendySyncService
 
             if ($ok) {
                 $results['success']++;
+
                 continue;
             }
 
@@ -243,6 +245,7 @@ class FormOrderSendySyncService
         // Jeśli wygląda na osobę (co najmniej dwa człony), rozbij na imię + nazwisko.
         if (str_contains($name, ' ')) {
             $parts = preg_split('/\s+/', $name, 2) ?: [];
+
             return [
                 trim((string) ($parts[0] ?? '')),
                 trim((string) ($parts[1] ?? '')),

@@ -23,6 +23,7 @@ class PneduFormOrderProvisionedNewUser extends Notification
         protected ?string $instructorLine = null,
         protected ?string $startDateLine = null,
         protected ?PneduProvisionLiveAccessContext $liveAccess = null,
+        protected ?string $dataSourceName = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -70,6 +71,14 @@ class PneduFormOrderProvisionedNewUser extends Notification
         $message
             ->line('Po ustawieniu hasła zobaczysz swoje szkolenia na pnedu.pl — przycisk dołączenia do spotkania na żywo aktywuje się 2 godziny przed startem.')
             ->action('Ustaw hasło na pnedu.pl', $url);
+
+        if (filled($this->dataSourceName)) {
+            $message->line(
+                'Informacja RODO: Twoje dane otrzymaliśmy od zamawiającego „'.$this->dataSourceName
+                .'”, który zgłosił Cię na szkolenie. Pełna informacja o przetwarzaniu danych: '
+                .$base.'/rodo-art-14'
+            );
+        }
 
         if ($html = $this->liveAccessSectionHtml($liveAccess)) {
             $message->line($html);
