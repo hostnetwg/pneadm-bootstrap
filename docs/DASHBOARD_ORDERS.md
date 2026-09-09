@@ -41,7 +41,9 @@ Kolumna **Wejście:** referrer → kampania → UTM → `direct (bezpośrednio)`
 
 ### Rozwiązywanie problemów („Aktywni teraz” = 0)
 
-Blok czyta **wyłącznie** `analytics_events` (nie Google Analytics). Ruch w GA przy zerze w panelu zwykle oznacza, że **worker kolejki na pnedu.pl** nie zapisuje eventów — szczegóły i checklista: [`docs/deploy/PRODUCTION_QUEUE_OPS.md`](deploy/PRODUCTION_QUEUE_OPS.md).
+Blok czyta **wyłącznie** `analytics_events` (nie Google Analytics).
+
+Od 2026-09-09 własny lejek na pnedu.pl **nie wymaga** zgody „Akceptuję analityczne”. Jeśli w tabeli widać tylko złożone zamówienia albo zero ruchu, najpierw sprawdź **worker kolejki** na pnedu.pl — szczegóły: [`docs/deploy/PRODUCTION_QUEUE_OPS.md`](deploy/PRODUCTION_QUEUE_OPS.md). Nie mylić z Google Analytics (to nadal za banerem cookies).
 
 Szybka diagnostyka na prod (SSH):
 

@@ -28,7 +28,9 @@ cd /home/srv66127/domains/pnedu.pl/app
 git status
 git pull origin main
 # Potwierdź, że produkcja NIE ma ANALYTICS_CONSENT_REQUIRED=false
-# (domyślnie zgoda analityczna jest wymagana).
+# (Google Analytics / GTM nadal wymaga zgody).
+# Własny lejek „Aktywni teraz” jest first-party i działa bez tej zgody
+# (FIRST_PARTY_OPERATIONAL_WITHOUT_ANALYTICS_CONSENT, domyślnie true).
 /opt/alt/php82/usr/bin/php artisan optimize:clear
 /opt/alt/php82/usr/bin/php artisan view:clear
 /opt/alt/php82/usr/bin/php artisan config:cache

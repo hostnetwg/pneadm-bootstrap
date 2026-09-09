@@ -1,11 +1,15 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-08  
+Data utworzenia/aktualizacji: 2026-09-09  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-09) — Aktywni teraz vs zgoda cookies
+
+Po legalnym checkoutcie baner cookies zablokował też własny lejek, więc w „Aktywni teraz” zostawały głównie złożone zamówienia. Naprawa na `pnedu`: first-party eventy formularza i sesja `pne_analytics_sid` znów działają bez „Akceptuję analityczne”. Google Analytics / GTM nadal tylko po zgodzie. Deploy: tylko `pnedu` (`git pull`, `optimize:clear`, `view:cache`, `queue:restart`; bez migracji).
 
 ## Ostatnio (2026-09-08) — minimalny legalny checkout
 

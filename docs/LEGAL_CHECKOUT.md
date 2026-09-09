@@ -45,4 +45,4 @@ Publiczna informacja art. 14 znajduje się pod `/rodo-art-14`. Potwierdzenie zam
 
 Listy kursowe są operacyjne i nie zapisują pola `gdpr` jako dowodu marketingowego. Dla zamówienia online — zarówno powiązanego z `form_orders`, jak i samodzielnego — synchronizacja następuje dopiero przy pierwszym przejściu statusu na `paid`; dla faktury odroczonej — po skutecznym zapisie.
 
-GA/GTM i własna analityka są blokowane do zgody analitycznej. Zgoda nie włącza sygnałów reklamowych. Użytkownik może zmienić decyzję przez link „Ustawienia cookies” w stopce.
+GA/GTM uruchamiamy dopiero po „Akceptuję analityczne”. Własny lejek operacyjny (wejście na kurs i formularz, interakcje techniczne, „Aktywni teraz”) działa bez tej zgody, jako cookies niezbędne do obsługi zakupu. Zgoda Google nie włącza sygnałów reklamowych. Użytkownik może zmienić decyzję przez link „Ustawienia cookies” w stopce. Awaryjny powrót do blokady lejka: `FIRST_PARTY_OPERATIONAL_WITHOUT_ANALYTICS_CONSENT=false`.
