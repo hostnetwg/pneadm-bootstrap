@@ -1,0 +1,5 @@
+ID,"E-mail uczestnika","Imię i nazwisko","Numer telefonu",Postęp,"Dopisano do kursu","Dostęp wygasa"
+255,anna.nowak@example.test,"Anna Nowak",501111111,"0 / 24 (0%)",-,"Bez limitu"
+411,jan.kowalski@example.test,"Jan Kowalski",502222222,"0 / 24 (0%)",-,"2027-02-09 19:43:33"
+860,iwona.solo@example.test,Iwona,,"0 / 24 (0%)",-,"Bez limitu"
+900,expired.user@example.test,"Ewa Wygasła",503333333,"0 / 24 (0%)",-,"2022-05-18 23:16:41"

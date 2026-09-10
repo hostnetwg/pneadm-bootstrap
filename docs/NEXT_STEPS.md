@@ -1,11 +1,19 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-09  
+Data utworzenia/aktualizacji: 2026-09-10  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-10) — E-mail o przeniesieniu kursu online na pnedu.pl
+
+Na liście dostępów (`/online-courses/{id}/enrollments`) można wysłać e-mail pojedynczo i zbiorczo: kurs jest już na pnedu.pl. Widać, do kogo i kiedy poszedł (kolumna + karta). Podczas wysyłki zbiorczej jest żywy pasek postępu i przycisk przerwania (batch Laravel). Zbiorczo tylko osoby z ważnym dostępem. Nie tworzy kont. Deploy: `pneadm` (+ `pnedu` fillable telefon/ID Publigo) + migracje `phone`/`legacy_publigo_user_id` i `online_course_enrollment_email_logs` + `queue:restart`. Kanon: [ONLINE-COURSES.md](./ONLINE-COURSES.md), [deploy/2026-09-online-course-platform-migration-email-deploy.md](./deploy/2026-09-online-course-platform-migration-email-deploy.md).
+
+## Ostatnio (2026-09-10) — Import CSV dostępów kursów online (Publigo)
+
+Na liście dostępów kursu online (`/online-courses/{id}/enrollments`) jest import CSV z eksportu nowoczesna-edukacja.pl. Zapisuje e-mail, imię/nazwisko (nazwisko może być puste), telefon, ID Publigo i datę wygaśnięcia z wiersza (albo bezterminowo). Duplikaty e-mail pomijane. Checkbox „Pomiń już wygasłe”. Bez tworzenia kont pnedu i bez maili. Deploy: `pneadm` + migracja `phone` / `legacy_publigo_user_id`. Kanon: [ONLINE-COURSES.md](./ONLINE-COURSES.md), [deploy/2026-09-online-course-publigo-csv-import-deploy.md](./deploy/2026-09-online-course-publigo-csv-import-deploy.md).
 
 ## Ostatnio (2026-09-09) — Aktywni teraz vs zgoda cookies
 

@@ -145,6 +145,7 @@ Legenda kanału docelowego: **SYS** = `system.pnedu.pl`, **NEWS** = Sendy/`news`
 | Wiadomość / mechanizm | Pliki (orientacyjnie) | Kanał docelowy | Status wdrożenia (Laravel + SES) |
 |----------------------|------------------------|----------------|----------------------------------|
 | Dostęp do nagrań / materiałów / zaświadczeń | `CourseAccessMail`, `SendCourseAccessEmailJob` | **SYS** | **wdrożone** — trait `UsesSystemMailSettings`; linki → `pnedu.pl`; log: `certificate_email_logs` |
+| Kurs online — przeniesienie na pnedu.pl | `OnlineCoursePlatformMigrationMail`, `SendOnlineCoursePlatformMigrationEmailJob` | **SYS** | **wdrożone** — log: `online_course_enrollment_email_logs` |
 | Link do listy zaświadczeń | `CertificateLinkMail`, job | **SYS** | **wdrożone** |
 | Pojedyncze zaświadczenie | `CertificateSingleLinkMail`, job | **SYS** | **wdrożone** |
 | Prośba o uzupełnienie danych | `DataCompletionRequestMail` | **SYS** | **wdrożone** — usunięty mailer SMTP `data_completion`; szablon maila: `kontakt@pnedu.pl`, `www.pnedu.pl` |

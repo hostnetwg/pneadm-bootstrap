@@ -19,8 +19,10 @@ class OnlineCourseEnrollment extends Model
         'email',
         'first_name',
         'last_name',
+        'phone',
         'access_expires_at',
         'access_source',
+        'legacy_publigo_user_id',
         'notes',
     ];
 
@@ -61,6 +63,11 @@ class OnlineCourseEnrollment extends Model
     public function certificate(): HasOne
     {
         return $this->hasOne(Certificate::class, 'online_course_enrollment_id');
+    }
+
+    public function emailLogs(): HasMany
+    {
+        return $this->hasMany(OnlineCourseEnrollmentEmailLog::class, 'online_course_enrollment_id');
     }
 
     public function hasExpiredAccess(): bool

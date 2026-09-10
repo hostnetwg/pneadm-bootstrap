@@ -16,7 +16,12 @@
         @error('last_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 </div>
-<p class="small text-muted">E-mail musi odpowiadać kontu użytkownika na pnedu.pl. Imię, nazwisko i e-mail trafiają na zaświadczenia powiązanych webinarów (rejestracja z poziomu lekcji kursu online).</p>
+<p class="small text-muted">E-mail musi odpowiadać kontu użytkownika na pnedu.pl. Imię, nazwisko i e-mail trafiają na zaświadczenia powiązanych webinarów (rejestracja z poziomu lekcji kursu online). Data i miejsce urodzenia na zaświadczeniu kursu online pochodzą z konta pnedu.pl, nie z tego formularza.</p>
+<div class="mb-3">
+    <label class="form-label" for="phone">Telefon</label>
+    <input id="phone" name="phone" type="tel" class="form-control @error('phone') is-invalid @enderror" maxlength="50" autocomplete="tel" value="{{ old('phone', $e?->phone ?? '') }}">
+    @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+</div>
 <div class="mb-3">
     <label class="form-label" for="access_expires_at">Data wygaśnięcia dostępu (opcjonalnie, UTC — puste = bezterminowo)</label>
     <input id="access_expires_at" name="access_expires_at" type="datetime-local" class="form-control"
@@ -25,6 +30,11 @@
 <div class="mb-3">
     <label class="form-label" for="access_source">Źródło</label>
     <input id="access_source" name="access_source" class="form-control" value="{{ old('access_source', $e?->access_source ?? 'manual') }}" placeholder="manual, publigo_migration, …">
+</div>
+<div class="mb-3">
+    <label class="form-label" for="legacy_publigo_user_id">ID użytkownika Publigo</label>
+    <input id="legacy_publigo_user_id" name="legacy_publigo_user_id" class="form-control @error('legacy_publigo_user_id') is-invalid @enderror" maxlength="32" value="{{ old('legacy_publigo_user_id', $e?->legacy_publigo_user_id ?? '') }}" placeholder="np. 255">
+    @error('legacy_publigo_user_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 <div class="mb-3">
     <label class="form-label" for="notes">Notatki</label>

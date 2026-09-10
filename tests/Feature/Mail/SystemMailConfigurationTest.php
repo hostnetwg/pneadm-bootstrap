@@ -7,8 +7,11 @@ use App\Mail\CertificateSingleLinkMail;
 use App\Mail\CourseAccessMail;
 use App\Mail\DataCompletionRequestMail;
 use App\Mail\InstructorTrainingLinksMail;
+use App\Mail\OnlineCoursePlatformMigrationMail;
 use App\Models\Course;
 use App\Models\DataCompletionToken;
+use App\Models\OnlineCourse;
+use App\Models\OnlineCourseEnrollment;
 use App\Models\Participant;
 use App\Notifications\PneduFormOrderProvisionedExistingUser;
 use App\Notifications\PneduFormOrderProvisionedNewUser;
@@ -102,6 +105,70 @@ class SystemMailConfigurationTest extends TestCase
         $this->assertStringContainsString('Z poważaniem', $html);
         $this->assertStringNotContainsString('&nbsp;', $html);
         $this->assertStringContainsString('Szkolenie i nagranie', $html);
+    }
+
+    public function test_online_course_platform_migration_mail_uses_system_mailer(): void
+    {
+        $mail = new OnlineCoursePlatformMigrationMail(
+            enrollment: new OnlineCourseEnrollment(['first_name' => 'Jan', 'email' => 'jan@example.com']),
+            course: new OnlineCourse(['title' => 'Kurs i&nbsp;nagranie']),
+            hasPneduAccount: true,
+            participantEmail: 'jan@example.com',
+            loginUrl: 'https://pnedu.pl/login',
+            registerUrl: 'https://pnedu.pl/register?email=jan%40example.com',
+            forgotPasswordUrl: 'https://pnedu.pl/forgot-password',
+            courseUrl: 'https://pnedu.pl/dashboard/kursy-online/1',
+            accessExpiresAtFormatted: null,
+            accessExpired: false,
+        );
+
+        $built = $mail->build();
+        $this->assertSystemMailHeaders($mail);
+        $this->assertStringNotContainsString('&nbsp;', $built->subject);
+        $this->assertStringContainsString('Kurs i nagranie', $built->subject);
+        $this->assertStringContainsString('Przeniesienie kursu na pnedu.pl', $built->subject);
+        $html = $built->render();
+        $this->assertStringNotContainsString('kontakt@nowoczesna-edukacja.pl', $html);
+        $this->assertStringNotContainsString('biuro@nowoczesna-edukacja.pl', $html);
+        $this->assertCustomMailIsPolish($html);
+        $this->assertStringContainsString('Z poważaniem', $html);
+        $this->assertStringContainsString('pnedu.pl', $html);
+        $this->assertStringContainsString('nowoczesna-edukacja.pl', $html);
+        $this->assertStringContainsString('Przenosimy kursy online oraz dostępy uczestników', $html);
+        $this->assertStringContainsString('Przejdź do kursu', $html);
+        $this->assertStringContainsString('Nie pamiętam hasła', $html);
+        $this->assertStringContainsString('https://pnedu.pl/forgot-password', $html);
+        $this->assertStringContainsString('jest już konto na pnedu.pl', $html);
+        $this->assertStringNotContainsString('Załóż konto na pnedu.pl', $html);
+        $this->assertStringNotContainsString('/register', $html);
+        $this->assertStringNotContainsString('&nbsp;', $html);
+    }
+
+    public function test_online_course_platform_migration_mail_without_account_shows_register_only(): void
+    {
+        $mail = new OnlineCoursePlatformMigrationMail(
+            enrollment: new OnlineCourseEnrollment(['first_name' => 'Ewa', 'email' => 'ewa@example.com']),
+            course: new OnlineCourse(['title' => 'Kurs online']),
+            hasPneduAccount: false,
+            participantEmail: 'ewa@example.com',
+            loginUrl: 'https://pnedu.pl/login',
+            registerUrl: 'https://pnedu.pl/register?email=ewa%40example.com',
+            forgotPasswordUrl: 'https://pnedu.pl/forgot-password',
+            courseUrl: null,
+            accessExpiresAtFormatted: null,
+            accessExpired: false,
+        );
+
+        $html = $mail->build()->render();
+        $this->assertSystemMailHeaders($mail);
+        $this->assertCustomMailIsPolish($html);
+        $this->assertStringContainsString('nie ma jeszcze konta', $html);
+        $this->assertStringContainsString('Załóż konto na pnedu.pl', $html);
+        $this->assertStringContainsString('https://pnedu.pl/register?email=ewa%40example.com', $html);
+        $this->assertStringNotContainsString('Nie pamiętam hasła', $html);
+        $this->assertStringNotContainsString('forgot-password', $html);
+        $this->assertStringNotContainsString('Przejdź do kursu', $html);
+        $this->assertStringNotContainsString('Zaloguj się na pnedu.pl', $html);
     }
 
     public function test_certificate_link_mails_use_system_mailer(): void

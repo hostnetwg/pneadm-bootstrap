@@ -145,12 +145,13 @@ Szczegóły struktury kursu: [ONLINE-COURSES.md](./ONLINE-COURSES.md).
 ### Admin
 
 - Edycja kursu: sekcja **Zaświadczenia (kurs online)** w formularzu
-- Zapisy: `/online-courses/{id}/enrollments` — generuj / usuń certyfikat, pobierz PDF
+- Zapisy: `/online-courses/{id}/enrollments` — generuj / usuń certyfikat, pobierz PDF; import CSV z Publigo (dostępy, nie dane urodzenia)
 
 ### pnedu
 
 - `/dashboard/kursy-online/{enrollment}/zaswiadczenie` — profil + pobranie
-- Imię i nazwisko z konta użytkownika; email zapisu musi zgadzać się z kontem
+- Imię, nazwisko, data i miejsce urodzenia na PDF **z konta pnedu.pl** (`users`), nie z rekordu zapisu. Zapis (`online_course_enrollments`) wiąże e-mail i może trzymać imię/nazwisko/telefon z importu Publigo — przy pobraniu przez uczestnika i tak wygrywa profil konta.
+- Wydanie z panelu adm („Generuj”) bierze imię i nazwisko z zapisu; data/miejsce urodzenia zostają puste.
 
 Dokumentacja frontu: `pnedu/docs/CERTIFICATES.md`.
 

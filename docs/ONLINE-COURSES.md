@@ -26,7 +26,7 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 - `2026_07_07_120000_add_certificate_fields_to_online_courses_table.php` — pola zaświadczeń na kursie
 - `2026_07_07_120001_extend_certificates_for_online_courses.php` — certyfikaty powiązane z enrollment
 - `2026_07_08_120000_add_training_scope_to_online_courses_table.php` — zakres na PDF
-- `2026_07_08_130000_add_certificate_duration_minutes_to_online_courses_table.php` — czas trwania (min) na PDF
+- `2026_09_10_140000_create_online_course_enrollment_email_logs_table.php` — log wysyłki e-maila o przeniesieniu kursu na pnedu.pl
 
 ### Tabele i znaczenie
 
@@ -37,7 +37,7 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 | `online_course_lessons` | Lekcja: tytuł, `body_html`, `is_published`, `sort_order` |
 | `online_course_lesson_embeds` | Wideo: `video_url`, `platform` enum: `youtube` \| `vimeo` \| `other`, opcjonalny tytuł, kolejność |
 | `online_course_lesson_resource_links` | Linki / materiały dodatkowe (URL + tytuł) |
-| `online_course_enrollments` | Dostęp: `online_course_id` + **znormalizowany e-mail** (unikalny per kurs), imię/nazwisko, `access_expires_at` (UTC, null = bezterminowo), `access_source`, `notes` |
+| `online_course_enrollment_email_logs` | Historia wysyłki e-maila o przeniesieniu na pnedu.pl (`type = platform_migration`, status `queued`/`sent`/`failed`, `sent_at`) |
 | `online_course_lesson_completions` | Zapis „lekcja ukończona” dla pary (enrollment, lesson) |
 | `online_course_lesson_notes` | Notatka tekstowa użytkownika do lekcji (per enrollment) |
 
@@ -62,7 +62,9 @@ erDiagram
 - **Moduły:** `OnlineCourseModuleController` — dodawanie / edycja / usuwanie; kolejność modułów (drag & drop na stronie edycji kursu): POST `online-courses/{course}/modules/reorder` (`OnlineCoursesController::reorderModules`), body JSON `{ "order": [id_modułu, …] }`.
 - **Lekcje:** `OnlineCourseLessonController` — tworzenie z domyślnym `sort_order` = max+1 w module; walidacja tytułu i `body_html`; **embedy i linki** synchronizowane z pól formularza `embeds[]` oraz `resource_links[]` (puste URL są pomijane). Kolejność i przenoszenie między modułami: POST `online-courses/{course}/lessons/reorder`, body JSON `{ "modules": [ { "id": id_modułu, "lesson_ids": [id_lekcji, …] }, … ] }` — kolejność tablicy modułów = kolejność kart na stronie; każda lekcja musi wystąpić dokładnie raz.
 - **UI struktury:** `resources/views/online-courses/edit.blade.php` + SortableJS (`partials/structure-sortable.blade.php`) — przeciąganie modułów i lekcji, zapis przez AJAX.
-- **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu; akcje certyfikatów (generuj / usuń / PDF).
+- **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu; telefon i `legacy_publigo_user_id`; na liście badge **Konto pnedu.pl** (dopasowanie e-maila do `pnedu.users`, link do karty użytkownika); wyszukiwarka i filtry (dostęp, konto pnedu, źródło, zaświadczenie, status e-maila) oraz sortowanie kolumn; **e-mail o przeniesieniu na pnedu.pl** (pojedynczo i zbiorczo, log `online_course_enrollment_email_logs`); akcje certyfikatów (generuj / usuń / PDF).
+- **Import CSV (Publigo):** na liście dostępów (`/online-courses/{id}/enrollments`) — ten sam eksport co przy uczestnikach szkoleń (`ID`, e-mail, imię i nazwisko, telefon, `Dostęp wygasa`). Serwis: `OnlineCourseEnrollmentPubligoImportService`. Duplikat e-maila w kursie = pominięcie. Checkbox **Pomiń osoby z już wygasłym dostępem**. „Bez limitu” → dostęp bezterminowy. Daty CSV interpretowane jako `Europe/Warsaw`, zapis UTC. **Nie** tworzy kont pnedu. Maile o przeniesieniu na pnedu.pl są **osobną akcją** na liście (pojedynczo / zbiorczo), nie lecą przy imporcie. Postęp lekcji ze starej platformy nie jest importowany. Źródło zapisu: `publigo_migration`.
+- **E-mail o przeniesieniu na pnedu.pl:** przycisk przy osobie + wysyłka zbiorcza (tylko ważny dostęp; tryby: nie wysłano / ponów do wszystkich). Przed wysyłką modal z **podglądem HTML** i zatwierdzeniem. Treść zależy od konta pnedu.pl: **jest konto** → logowanie, link do kursu i reset hasła (`/forgot-password`); **brak konta** → tylko instrukcja i link rejestracji na ten sam e-mail. Informuje o przeniesieniu ze starej platformy (nowoczesna-edukacja.pl). Kanał SYS. Kolumna **E-mail pnedu.pl** pokazuje datę wysyłki. Karta na liście pokazuje wysłane/eligible; podczas wysyłki zbiorczej **żywy pasek postępu** (odpytuje batch co 2 s, z możliwością przerwania). Zbiorczo wymaga kolejki (`sail artisan queue:work` / worker na prod).
 - **Zaświadczenia:** sekcja w formularzu edycji kursu (`certificate-fields`); pobieranie na pnedu przez API adm — patrz [CERTIFICATES.md](./CERTIFICATES.md).
 
 Widoki Blade: `resources/views/online-courses/`.
@@ -117,9 +119,10 @@ Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/d
 
 **pneadm**
 
-- Migracje: `database/migrations/2026_05_11_*`, `2026_05_12_*`
+- Migracje: `database/migrations/2026_05_11_*`, `2026_05_12_*`, `2026_09_10_113500_*`, `2026_09_10_140000_*`
 - Modele: `app/Models/OnlineCourse*.php`
 - Kontrolery: `app/Http/Controllers/OnlineCoursesController.php`, `OnlineCourseModuleController.php`, `OnlineCourseLessonController.php`, `OnlineCourseEnrollmentController.php`
+- Serwis importu: `app/Services/OnlineCourseEnrollmentPubligoImportService.php`
 - Trasy: `routes/web.php` (grupa `online-courses`…)
 - Widoki: `resources/views/online-courses/`
 
@@ -132,10 +135,11 @@ Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/d
 
 ## Rozszerzenia na później (niezaimplementowane w kodzie bazowym)
 
-- Automatyczne zapisy po zakupie / formularzu (obecnie enrollment ręczny lub zewnętrzny import przez `access_source`).
+- Automatyczne zapisy po zakupie / formularzu (obecnie enrollment ręczny, import CSV Publigo przez `access_source = publigo_migration`, albo przyszły checkout).
+- Tworzenie kont pnedu.pl i maile „ustaw hasło” przy imporcie dostępów do kursów online.
 - Publiczna strona ofertowa kursu online po `slug` (obecnie nacisk na dashboard po zapisie).
 - Synchronizacja z tabelą `users` po `user_id` zamiast dopasowania po e-mailu — wymagałaby zmiany schematu.
 
 ---
 
-*Ostatnia synchronizacja opisu z kodem: lipiec 2026.*
+*Ostatnia synchronizacja opisu z kodem: wrzesień 2026.*

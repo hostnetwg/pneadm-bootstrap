@@ -445,10 +445,17 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::delete('online-courses/{online_course}/modules/{module}/lessons/{lesson}', [OnlineCourseLessonController::class, 'destroy'])->name('online-courses.lessons.destroy');
     Route::get('online-courses/{online_course}/enrollments', [OnlineCourseEnrollmentController::class, 'index'])->name('online-courses.enrollments.index');
     Route::get('online-courses/{online_course}/enrollments/create', [OnlineCourseEnrollmentController::class, 'create'])->name('online-courses.enrollments.create');
+    Route::post('online-courses/{online_course}/enrollments/import', [OnlineCourseEnrollmentController::class, 'import'])->name('online-courses.enrollments.import');
+    Route::post('online-courses/{online_course}/enrollments/send-platform-migration-bulk', [OnlineCourseEnrollmentController::class, 'sendPlatformMigrationEmailsBulk'])->name('online-courses.enrollments.send-platform-migration-bulk');
+    Route::get('online-courses/{online_course}/enrollments/platform-migration-email-preview-bulk', [OnlineCourseEnrollmentController::class, 'previewPlatformMigrationEmailsBulk'])->name('online-courses.enrollments.preview-platform-migration-bulk');
+    Route::get('online-courses/{online_course}/enrollments/platform-migration-email-status', [OnlineCourseEnrollmentController::class, 'platformMigrationEmailBatchStatus'])->name('online-courses.enrollments.platform-migration-email-status');
+    Route::post('online-courses/{online_course}/enrollments/platform-migration-email-cancel', [OnlineCourseEnrollmentController::class, 'cancelPlatformMigrationEmailBatch'])->name('online-courses.enrollments.platform-migration-email-cancel');
     Route::post('online-courses/{online_course}/enrollments', [OnlineCourseEnrollmentController::class, 'store'])->name('online-courses.enrollments.store');
     Route::get('online-courses/{online_course}/enrollments/{enrollment}/edit', [OnlineCourseEnrollmentController::class, 'edit'])->name('online-courses.enrollments.edit');
     Route::put('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'update'])->name('online-courses.enrollments.update');
     Route::delete('online-courses/{online_course}/enrollments/{enrollment}', [OnlineCourseEnrollmentController::class, 'destroy'])->name('online-courses.enrollments.destroy');
+    Route::get('online-courses/{online_course}/enrollments/{enrollment}/platform-migration-email-preview', [OnlineCourseEnrollmentController::class, 'previewPlatformMigrationEmail'])->name('online-courses.enrollments.preview-platform-migration');
+    Route::post('online-courses/{online_course}/enrollments/{enrollment}/send-platform-migration', [OnlineCourseEnrollmentController::class, 'sendPlatformMigrationEmail'])->name('online-courses.enrollments.send-platform-migration');
     Route::get('online-courses/{online_course}/enrollments/{enrollment}/certificate', [OnlineCourseEnrollmentController::class, 'storeCertificate'])->name('online-courses.enrollments.certificate.store');
     Route::get('online-courses/{online_course}/enrollments/{enrollment}/certificate/generate', [OnlineCourseEnrollmentController::class, 'generateCertificate'])->name('online-courses.enrollments.certificate.generate');
 
