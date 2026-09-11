@@ -1,11 +1,15 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-10  
+Data utworzenia/aktualizacji: 2026-09-11  
 Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-11) — Wielu uczestników w create/edit zamówienia ADM
+
+Formularze `/form-orders/create` i `/form-orders/{id}/edit` mają dodawanie i edycję wielu uczestników (jak pnedu.pl). Cena × liczba osób, klon kopiuje całą listę. Deploy: tylko `pneadm` (`git pull`, cache widoków; bez migracji). Kanon: `docs/FORM_ORDERS_PARTICIPANTS.md`.
 
 ## Ostatnio (2026-09-10) — E-mail o przeniesieniu kursu online na pnedu.pl
 

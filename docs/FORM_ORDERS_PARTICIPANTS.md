@@ -21,9 +21,13 @@
 | **Online (bramka)** | **Zablokowana** od razu po utworzeniu zamówienia (także awaiting / cancelled) |
 | **Odroczona FV** | Do wystawienia faktury (`invoice_number`) / `status_completed` |
 
-## Panel ADM (`/form-orders/{id}`)
+## Panel ADM — create / edit (`/form-orders/create`, `/form-orders/{id}/edit`)
 
-- Lista kart uczestników z kopiowaniem danych.
+- Lista kart uczestników z kopiowaniem danych na **podglądzie** zamówienia.
+- **Dodawanie i edycja wielu uczestników** na create/edit — ten sam układ co publiczny formularz (imię, nazwisko, e-mail, „Dodaj kolejnego uczestnika”). Limit: `config/form_orders.php` → `max_participants` (domyślnie 50).
+- Cena na create/edit: `product_price` = kwota całkowita; JS mnoży cenę jednostkową × liczbę osób. Serwer zapisuje listę przez `FormOrderAdminParticipantService` → `FormOrderParticipant::syncManyFromFormOrder()` (dopasowanie po e-mailu zachowuje `participant_id`).
+- Duplikat e-maila **w ramach jednego zamówienia** jest blokowany. Panel nie blokuje e-maili już zapisanych na szkoleniu (obsługa ręczna).
+- Klonowanie zamówienia (`?clone_from=`) kopiuje **wszystkich** uczestników, nie tylko głównego.
 - Karta **STATUS ZAMÓWIENIA** (prawa kolumna, nad „Wystaw fakturę iFirma”): checklista uczestników na szkoleniu (PNEDU) i faktury. Gdy brakuje któregoś kroku, a zamówienie **nie** jest anulowane ani zamknięte legacy — wyraźne **Nieprzetworzone**. Anulowane/zamknięte nie dostają tej flagi. Partial AJAX: `GET /form-orders/{id}/operational-status`.
 - Sekcja **Formularz zamówienia na PNEDU**: link edycji + **Pobierz PDF zamówienia** (`GET /form-orders/{id}/pdf`) — ten sam PDF co po złożeniu na pnedu.pl.
 - **Dodaj uczestnika do PNEDU** przy każdej osobie + **Dodaj wszystkich naraz**.
@@ -47,7 +51,8 @@
 |--------|--------|
 | pnedu sync / cena | `OrderFormParticipantService`, `FormOrderParticipant`, `CourseController` |
 | UI formularza | `order-form-participants*.blade.php`, `order-form.blade.php`, `order-form-v2.blade.php` |
-| ADM | `form-orders/partials/participants-cards.blade.php`, `FormOrderPneduProvisionService` |
+| ADM create/edit | `form-orders/partials/participants-form*.blade.php`, `FormOrderAdminParticipantService` |
+| ADM show | `form-orders/partials/participants-cards.blade.php`, `FormOrderPneduProvisionService` |
 | Helpers FV | `FormOrder::invoiceLineQuantity()`, `invoiceUnitPrice()` |
 
 ## Provision PNEDU

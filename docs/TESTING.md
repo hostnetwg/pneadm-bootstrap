@@ -71,6 +71,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=IfirmaInvoicePaymentRegistrationServiceTest`, `--filter=DebtCaseAutoCloseServiceTest`, `--filter=BankStatementImportTest`, `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Legalny checkout / dokumenty | **pnedu:** `tests/Unit/LegalCheckoutServiceTest.php`, `tests/Unit/SendyOperationalConsentTest.php`, `tests/Feature/LegalDocumentsTest.php`, `tests/Feature/AnalyticsConsentTest.php`; **pneadm:** `tests/Unit/PneduProvisionArticle14NoticeTest.php` |
+| Wielu uczestników create/edit FORM | `--filter=FormOrderAdminMultipleParticipantsTest` |
 | Lejek na `/courses` | `--filter=CourseFunnelStatsServiceTest`, `--filter=CoursesIndexStatsTest` |
 | Wygląd wiersza nieaktywnego na `/courses` | `--filter=CoursesIndexStatsTest` (klasa `course-row-inactive` vs `table-secondary` dla zakończonych aktywnych) |
 | Ankiety | **Brak** dedykowanych testów (import CSV, PDF, bramka). Smoke ręczny: import, PDF, `pnedu.pl/ankieta/{token}` → `/rekomendacja` → `/dziekujemy`; ponowne wejście (anon: cookie / nieanon: ten sam e-mail) → „już wypełniona”. Kanon: [SURVEYS.md](./SURVEYS.md). |

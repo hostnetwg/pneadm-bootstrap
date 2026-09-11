@@ -121,43 +121,21 @@
                             </div>
                         </div>
 
-                        {{-- UCZESTNIK --}}
+                        {{-- UCZESTNICY --}}
                         <div class="card mb-4">
                             <div class="card-header bg-success text-white">
                                 <h6 class="mb-0">
-                                    <i class="bi bi-person"></i> UCZESTNIK
+                                    <i class="bi bi-people"></i> UCZESTNICY
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <label for="participant_firstname" class="form-label">Imię <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control @error('participant_firstname') is-invalid @enderror" 
-                                               id="participant_firstname" name="participant_firstname" 
-                                               value="{{ old('participant_firstname', $prefill['participant_firstname'] ?? '') }}" required>
-                                        @error('participant_firstname')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="participant_lastname" class="form-label">Nazwisko <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control @error('participant_lastname') is-invalid @enderror" 
-                                               id="participant_lastname" name="participant_lastname" 
-                                               value="{{ old('participant_lastname', $prefill['participant_lastname'] ?? '') }}" required>
-                                        @error('participant_lastname')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="participant_email" class="form-label">Email uczestnika - tu zostaną wysłane dane dostępowe do szkolenia <span class="text-danger">*</span></label>
-                                        <input type="email" class="form-control @error('participant_email') is-invalid @enderror" 
-                                               id="participant_email" name="participant_email" 
-                                               value="{{ old('participant_email', $prefill['participant_email'] ?? '') }}" required>
-                                        @error('participant_email')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
+                                <p class="small text-muted mb-3">
+                                    Na te adresy e-mail trafią dane dostępowe do szkolenia. Szkoła lub firma może dodać wielu uczestników — kwota przelicza się automatycznie (cena × liczba osób).
+                                </p>
+                                @include('form-orders.partials.participants-form', [
+                                    'participantsPrefill' => $participantsPrefill ?? [],
+                                    'unitPrice' => $participantUnitPrice ?? null,
+                                ])
                             </div>
                         </div>
 
@@ -483,6 +461,9 @@
                     renderInfo(item);
                     if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
                         priceInput.value = item.default_price;
+                        if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
+                            window.formOrderParticipantsSetUnitPrice(item.default_price);
+                        }
                     }
                 },
             });
@@ -502,5 +483,6 @@
             }
         });
     </script>
+    @include('form-orders.partials.participants-form-script')
     @include('form-orders.partials.gus-nip-lookup-script')
 </x-app-layout>

@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\FormOrder;
 use App\Models\OnlinePaymentOrder;
 use App\Services\FormOrderAccessExtensionService;
+use App\Services\FormOrderAdminParticipantService;
 use App\Services\FormOrderCancellationService;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaAccountingMonthSyncService;
@@ -628,10 +629,11 @@ class FormOrdersController extends Controller
         $prefill = [];
         $cloneSourceId = null;
         $cloneWarning = null;
+        $participantsPrefill = [];
 
         $cloneFrom = (int) $request->integer('clone_from');
         if ($cloneFrom > 0) {
-            $sourceOrder = FormOrder::with('primaryParticipant')->find($cloneFrom);
+            $sourceOrder = FormOrder::with(['primaryParticipant', 'participants'])->find($cloneFrom);
 
             if (! $sourceOrder) {
                 $cloneWarning = 'Nie znaleziono zamówienia do skopiowania.';
@@ -640,9 +642,6 @@ class FormOrdersController extends Controller
                 $prefill = [
                     'course_id' => $sourceOrder->product_id,
                     'product_price' => $sourceOrder->product_price,
-                    'participant_firstname' => $sourceOrder->primaryParticipant?->participant_firstname,
-                    'participant_lastname' => $sourceOrder->primaryParticipant?->participant_lastname,
-                    'participant_email' => $sourceOrder->primaryParticipant?->participant_email,
                     'orderer_name' => $sourceOrder->orderer_name,
                     'orderer_phone' => $sourceOrder->orderer_phone,
                     'orderer_email' => $sourceOrder->orderer_email,
@@ -660,6 +659,7 @@ class FormOrdersController extends Controller
                     'invoice_payment_delay' => $sourceOrder->invoice_payment_delay,
                     'notes' => $sourceOrder->notes,
                 ];
+                $participantsPrefill = app(FormOrderAdminParticipantService::class)->rowsFromFormOrder($sourceOrder);
             }
         }
 
@@ -681,7 +681,21 @@ class FormOrdersController extends Controller
             }
         }
 
-        return view('form-orders.create', compact('courses', 'prefill', 'cloneSourceId', 'cloneWarning', 'selectedCourse'));
+        $participantUnitPrice = null;
+        if (! empty($prefill['product_price'])) {
+            $count = max(1, count($participantsPrefill));
+            $participantUnitPrice = round(((float) $prefill['product_price']) / $count, 2);
+        }
+
+        return view('form-orders.create', compact(
+            'courses',
+            'prefill',
+            'cloneSourceId',
+            'cloneWarning',
+            'selectedCourse',
+            'participantsPrefill',
+            'participantUnitPrice'
+        ));
     }
 
     /**
@@ -690,18 +704,14 @@ class FormOrdersController extends Controller
     public function store(Request $request)
     {
         try {
-            // Walidacja danych
-            $request->validate([
+            $participantService = app(FormOrderAdminParticipantService::class);
+
+            $request->validate(array_merge([
                 // Dane produktu/szkolenia
                 'course_id' => 'required|exists:courses,id',
                 'product_name' => 'nullable|string|max:255',
                 'product_price' => 'nullable|numeric|min:0',
                 'product_description' => 'nullable|string',
-
-                // Dane uczestnika
-                'participant_firstname' => 'required|string|max:100',
-                'participant_lastname' => 'required|string|max:100',
-                'participant_email' => 'required|email|max:255',
 
                 // Dane zamawiającego
                 'orderer_name' => 'required|string|max:255',
@@ -739,7 +749,10 @@ class FormOrdersController extends Controller
 
                 // Notatki
                 'notes' => 'nullable|string',
-            ]);
+            ], $participantService->validationRules()), $participantService->validationMessages());
+
+            $participantRows = $participantService->parseFromRequest($request);
+            $participantService->assertEmailsUniqueOnOrder($participantRows);
 
             // Pobierz dane kursu
             $course = \App\Models\Course::findOrFail($request->course_id);
@@ -783,18 +796,13 @@ class FormOrdersController extends Controller
                 'ip_address' => $request->ip(),
             ]);
 
-            // Tworzenie uczestnika w tabeli form_order_participants
-            \App\Models\FormOrderParticipant::create([
-                'form_order_id' => $formOrder->id,
-                'participant_firstname' => $request->participant_firstname,
-                'participant_lastname' => $request->participant_lastname,
-                'participant_email' => $request->participant_email,
-                'is_primary' => true,
-            ]);
+            $participantService->sync($formOrder, $participantRows);
 
             return redirect()->route('form-orders.show', $formOrder->id)
                 ->with('success', 'Zamówienie zostało pomyślnie utworzone.');
 
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             return redirect()->back()
                 ->withInput()
@@ -1080,18 +1088,19 @@ class FormOrdersController extends Controller
 
             // Jeśli przychodzi z pełnej strony edycji, aktualizuj wszystkie pola
             if ($isFromEditPage) {
-                // Walidacja metadanych KSeF Podmiot3 — ETAP 1.
-                // Uwaga: nie czyścimy automatycznie role / id_type / identifier
-                // kiedy ksef_entity_source = 'none' — admin może świadomie trzymać
-                // wartości (np. jst_recipient) do czasu ETAPU 2. Mapowanie i tak je ignoruje.
-                $request->validate([
+                $participantService = app(FormOrderAdminParticipantService::class);
+
+                $request->validate(array_merge([
                     'course_id' => 'nullable|integer|exists:courses,id',
                     'ksef_entity_source' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ENTITY_SOURCES),
                     'ksef_additional_entity_role' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ROLES),
                     'ksef_additional_entity_id_type' => 'nullable|string|in:'.implode(',', FormOrder::KSEF_ADDITIONAL_ENTITY_ID_TYPES),
                     'ksef_additional_entity_identifier' => 'nullable|string|max:50',
                     'ksef_admin_note' => 'nullable|string',
-                ]);
+                ], $participantService->validationRules()), $participantService->validationMessages());
+
+                $participantRows = $participantService->parseFromRequest($request);
+                $participantService->assertEmailsUniqueOnOrder($participantRows);
 
                 // Jeżeli zmieniono szkolenie, przepnij powiązane pola produktu (id/nazwa/publigo/wariant cenowy).
                 $newCourseId = (int) $request->input('course_id');
@@ -1125,7 +1134,8 @@ class FormOrdersController extends Controller
                         );
                         $zamowienie->course_price_variant_id = $matchedVariant?->id;
                         if ($matchedVariant !== null) {
-                            $priceAfterCourseChange = $matchedVariant->getCurrentPrice();
+                            $unitPrice = $matchedVariant->getCurrentPrice();
+                            $priceAfterCourseChange = round(((float) $unitPrice) * max(1, count($participantRows)), 2);
                             $zamowienie->product_price = $priceAfterCourseChange;
                         }
                     }
@@ -1169,26 +1179,8 @@ class FormOrdersController extends Controller
             $zamowienie->updated_manually_at = now();
             $zamowienie->save();
 
-            // Aktualizuj lub utwórz głównego uczestnika w form_order_participants (bez zapisu do form_orders)
             if ($isFromEditPage) {
-                $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
-                    ->where('is_primary', true)
-                    ->first();
-
-                $participantData = [
-                    'participant_firstname' => $request->input('participant_firstname'),
-                    'participant_lastname' => $request->input('participant_lastname'),
-                    'participant_email' => $request->input('participant_email'),
-                ];
-
-                if ($participant) {
-                    $participant->update($participantData);
-                } else {
-                    \App\Models\FormOrderParticipant::create(array_merge($participantData, [
-                        'form_order_id' => $id,
-                        'is_primary' => true,
-                    ]));
-                }
+                app(FormOrderAdminParticipantService::class)->sync($zamowienie, $participantRows);
             }
 
             // Jeśli nie ma ukrytego pola, sprawdzamy referer (fallback)
@@ -1242,6 +1234,8 @@ class FormOrdersController extends Controller
 
                 return redirect()->route('form-orders.index', $redirectParams)->with('success', 'Zamówienie zostało zaktualizowane.');
             }
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             $isFromShowPage = $request->has('from_show_page') && $request->input('from_show_page') == '1';
             $isFromEditPage = $request->has('from_edit_page') && $request->input('from_edit_page') == '1';
@@ -3018,25 +3012,34 @@ class FormOrdersController extends Controller
     public function edit(Request $request, $id)
     {
         try {
-            $zamowienie = FormOrder::with('primaryParticipant')->findOrFail($id);
-
-            $participant = \App\Models\FormOrderParticipant::where('form_order_id', $id)
-                ->where('is_primary', true)
-                ->first();
-
-            // Dane do formularza – z form_order_participants; display_* daje spójny fallback przy starych kolumnach
-            $participantData = [
-                'firstname' => $participant?->participant_firstname ?? '',
-                'lastname' => $participant?->participant_lastname ?? '',
-                'email' => $participant?->participant_email ?? $zamowienie->display_participant_email ?? '',
-            ];
-            if (empty($participantData['firstname']) && empty($participantData['lastname']) && ! empty(trim($zamowienie->display_participant_name ?? ''))) {
-                $parts = explode(' ', trim($zamowienie->display_participant_name), 2);
-                $participantData['firstname'] = $parts[0] ?? '';
-                $participantData['lastname'] = $parts[1] ?? '';
+            $zamowienie = FormOrder::with(['primaryParticipant', 'participants'])->findOrFail($id);
+            $participantService = app(FormOrderAdminParticipantService::class);
+            $participantsPrefill = $participantService->rowsFromFormOrder($zamowienie);
+            if ($participantsPrefill === []) {
+                $participantsPrefill = [[
+                    'first_name' => $zamowienie->display_participant_name
+                        ? (explode(' ', trim((string) $zamowienie->display_participant_name), 2)[0] ?? '')
+                        : '',
+                    'last_name' => $zamowienie->display_participant_name
+                        ? (explode(' ', trim((string) $zamowienie->display_participant_name), 2)[1] ?? '')
+                        : '',
+                    'email' => (string) ($zamowienie->display_participant_email ?? ''),
+                ]];
             }
 
-            return view('form-orders.edit', compact('zamowienie', 'participant', 'participantData'));
+            $participantCount = max(1, count($participantsPrefill));
+            $participantUnitPrice = $zamowienie->product_price !== null
+                ? round(((float) $zamowienie->product_price) / $participantCount, 2)
+                : null;
+
+            $participant = $zamowienie->primaryParticipant;
+
+            return view('form-orders.edit', compact(
+                'zamowienie',
+                'participant',
+                'participantsPrefill',
+                'participantUnitPrice'
+            ));
         } catch (Exception $e) {
             return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
         }
