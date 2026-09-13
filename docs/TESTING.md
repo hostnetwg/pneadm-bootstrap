@@ -105,7 +105,7 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 
 - migracja `2026_09_13_163000_create_price_offer_histories_table` (backfill bieżącej ceny od `created_at`),
 - `pneadm` `PriceOmnibusServiceTest`: najniższa z historii, wyłączenie wpisu, pogłębienie promocji jako nowa obniżka, `sync` przy zmianie ceny,
-- `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”.
+- `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”; na `/kursy` sama kwota, bez „od” i bez „/ osoba”; przy kursie etykieta „Autor”, nie „Prowadzący”.
 
 ## Weryfikacja bezpłatnego zapisu kursów — 2026-09-13
 
