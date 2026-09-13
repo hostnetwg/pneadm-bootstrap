@@ -70,6 +70,13 @@ class OnlinePaymentOrder extends Model
         return $this->belongsTo(Course::class);
     }
 
+    public function displayProductName(): string
+    {
+        $item = $this->formOrder?->orderItems?->first();
+
+        return (string) ($item?->product_name ?: $this->course?->title ?: 'Produkt');
+    }
+
     public function webhookLogs()
     {
         return $this->hasMany(WebhookLog::class, 'online_payment_order_id');

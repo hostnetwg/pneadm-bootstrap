@@ -4,6 +4,11 @@
     </x-slot>
     <div class="py-3">
         <div class="container-fluid px-4" style="max-width: 640px;">
+            @include('online-courses.partials.navigation-tabs', [
+                'onlineCourse' => $online_course,
+                'activeTab' => 'enrollments',
+            ])
+
             @if($errors->any())
                 <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
             @endif

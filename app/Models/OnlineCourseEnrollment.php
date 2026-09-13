@@ -21,6 +21,8 @@ class OnlineCourseEnrollment extends Model
         'last_name',
         'phone',
         'access_expires_at',
+        'access_starts_at',
+        'access_note',
         'access_source',
         'legacy_publigo_user_id',
         'notes',
@@ -28,6 +30,7 @@ class OnlineCourseEnrollment extends Model
 
     protected $casts = [
         'access_expires_at' => 'datetime',
+        'access_starts_at' => 'datetime',
     ];
 
     protected function setEmailAttribute(string $value): void
@@ -80,6 +83,24 @@ class OnlineCourseEnrollment extends Model
         $expiresAt = $this->access_expires_at->copy()->setTimezone('UTC');
 
         return $expiresAt->lt($now);
+    }
+
+    public function hasAccessStarted(): bool
+    {
+        if (! $this->access_starts_at) {
+            return true;
+        }
+
+        return ! $this->access_starts_at->copy()->setTimezone('UTC')->gt(Carbon::now('UTC'));
+    }
+
+    public function accessStartLabel(): ?string
+    {
+        if (! $this->access_starts_at) {
+            return null;
+        }
+
+        return $this->access_starts_at->copy()->timezone('Europe/Warsaw')->format('d.m.Y');
     }
 
     public function emailMatchesUser(string $userEmail): bool

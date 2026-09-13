@@ -4,13 +4,17 @@ namespace App\Services;
 
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
+use App\Models\OrderFulfillment;
+use App\Models\OrderItemRecipient;
 use App\Models\Participant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Wyliczany status operacyjny zamówienia — pełne zamknięcie: uczestnicy na szkoleniu + faktura.
+ * Wyliczany status operacyjny zamówienia — pełne zamknięcie: dostęp + faktura.
+ * Szkolenia live: uczestnicy na `courses`/`participants`.
+ * Produkty (`order_kind=product`): odbiorcy i `order_fulfillments`.
  */
 class FormOrderOperationalStatusService
 {
@@ -41,6 +45,10 @@ class FormOrderOperationalStatusService
      */
     public function evaluate(FormOrder $order): array
     {
+        if ($order->isProductOrder()) {
+            return $this->evaluateProductOrder($order);
+        }
+
         $warnings = [];
         $courseId = $this->resolveCourseId($order);
 
@@ -160,6 +168,77 @@ class FormOrderOperationalStatusService
         return $this->buildResult(self::STATUS_NEEDS_PROVISIONING, $expected, $provisioned, $warnings, $courseId);
     }
 
+    /**
+     * @return array{
+     *   status: string,
+     *   label: string,
+     *   badge_class: string,
+     *   expected_count: int,
+     *   provisioned_count: int,
+     *   warnings: array<int, string>,
+     *   course_id: int|null
+     * }
+     */
+    private function evaluateProductOrder(FormOrder $order): array
+    {
+        $warnings = [];
+        $recipients = $this->activeProductRecipients($order);
+        $expected = $recipients->count();
+        $provisioned = $recipients
+            ->filter(fn (OrderItemRecipient $recipient) => $this->isProductRecipientFulfilled($recipient))
+            ->count();
+
+        if ($order->cancelled_at !== null) {
+            if ($provisioned > 0) {
+                $warnings[] = 'Zamówienie anulowane, ale co najmniej jeden uczestnik nadal ma nadany dostęp do produktu.';
+            }
+
+            return $this->buildResult(self::STATUS_CANCELLED, $expected, $provisioned, $warnings, null, true);
+        }
+
+        if ($order->legacy_handled_at !== null) {
+            return $this->buildResult(self::STATUS_LEGACY_HANDLED, $expected, $provisioned, [], null, true);
+        }
+
+        if ($expected === 0) {
+            $warnings[] = 'Brak odbiorców produktu z adresem e-mail.';
+
+            return $this->buildResult(self::STATUS_INCONSISTENT, 0, 0, $warnings, null, true);
+        }
+
+        if ($order->pnedu_provisioned_at !== null && $provisioned === 0) {
+            $warnings[] = 'Oznaczono provision PNEDU, ale brak nadanego dostępu do produktu.';
+        }
+
+        if ($order->has_invoice && $provisioned === 0) {
+            $warnings[] = 'Wystawiono fakturę, ale dostęp do produktu nie został nadany.';
+        }
+
+        if ($order->status_completed == 1 && $provisioned === 0) {
+            $warnings[] = 'Legacy: status „Zakończone” bez nadanego dostępu do produktu.';
+        }
+
+        if ($provisioned === $expected) {
+            if (! $order->isBillingComplete()) {
+                $warnings[] = 'Dostęp nadany, ale faktura nie została wystawiona.';
+
+                return $this->buildResult(self::STATUS_NEEDS_INVOICE, $expected, $provisioned, $warnings, null, true);
+            }
+
+            return $this->buildResult(self::STATUS_PROCESSED, $expected, $provisioned, $warnings, null, true);
+        }
+
+        if ($provisioned > 0) {
+            return $this->buildResult(self::STATUS_PARTIALLY_PROCESSED, $expected, $provisioned, $warnings, null, true);
+        }
+
+        if (! empty($warnings)) {
+            return $this->buildResult(self::STATUS_INCONSISTENT, $expected, $provisioned, $warnings, null, true);
+        }
+
+        return $this->buildResult(self::STATUS_NEEDS_PROVISIONING, $expected, $provisioned, $warnings, null, true);
+    }
+
     public function needsAttention(FormOrder $order): bool
     {
         $status = $this->evaluate($order)['status'];
@@ -202,26 +281,34 @@ class FormOrderOperationalStatusService
             ->whereNull("{$table}.cancelled_at")
             ->whereNull("{$table}.legacy_handled_at")
             ->where(function ($outer) use ($table, $provisioned) {
-                $outer->where(function ($noBilling) use ($table) {
-                    $noBilling->whereNull("{$table}.invoice_exempt_at")
-                        ->where(function ($noInv) use ($table) {
-                            $noInv->whereNull("{$table}.invoice_number")
-                                ->orWhere("{$table}.invoice_number", '')
-                                ->orWhere("{$table}.invoice_number", '0');
+                $outer->where(function ($training) use ($table, $provisioned) {
+                    $this->constrainToTrainingOrders($training, $table);
+                    $training->where(function ($existing) use ($table, $provisioned) {
+                        $existing->where(function ($noBilling) use ($table) {
+                            $this->constrainMissingBilling($noBilling, $table);
+                        })->orWhereNotExists(function ($sub) use ($table) {
+                            $sub->selectRaw('1')
+                                ->from('form_order_participants as fop_has')
+                                ->whereColumn('fop_has.form_order_id', "{$table}.id")
+                                ->whereNull('fop_has.deleted_at')
+                                ->whereRaw("TRIM(fop_has.participant_email) != ''");
+                        })->orWhereExists(function ($sub) use ($table, $provisioned) {
+                            $sub->selectRaw('1')
+                                ->from('form_order_participants as fop_unprov')
+                                ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
+                                ->whereNull('fop_unprov.deleted_at')
+                                ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
+                                ->whereRaw("NOT ({$provisioned})");
                         });
-                })->orWhereNotExists(function ($sub) use ($table) {
-                    $sub->selectRaw('1')
-                        ->from('form_order_participants as fop_has')
-                        ->whereColumn('fop_has.form_order_id', "{$table}.id")
-                        ->whereNull('fop_has.deleted_at')
-                        ->whereRaw("TRIM(fop_has.participant_email) != ''");
-                })->orWhereExists(function ($sub) use ($table, $provisioned) {
-                    $sub->selectRaw('1')
-                        ->from('form_order_participants as fop_unprov')
-                        ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
-                        ->whereNull('fop_unprov.deleted_at')
-                        ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
-                        ->whereRaw("NOT ({$provisioned})");
+                    });
+                })->orWhere(function ($product) use ($table) {
+                    $this->constrainToProductOrders($product, $table);
+                    $product->where(function ($needs) use ($table) {
+                        $needs->where(function ($noBilling) use ($table) {
+                            $this->constrainMissingBilling($noBilling, $table);
+                        })->orWhereNotExists($this->productRecipientExistsQuery($table, 'oir_has'))
+                            ->orWhereExists($this->productRecipientUnfulfilledQuery($table, 'oir_unprov'));
+                    });
                 });
             });
     }
@@ -232,7 +319,11 @@ class FormOrderOperationalStatusService
     public function scopeNeedsActiveOperationalHandling(Builder $query): Builder
     {
         $query = $this->scopeNeedsOperationalHandling($query);
-        $query->where($this->linkedToActiveCourseConstraint());
+        $table = $query->getModel()->getTable();
+        $query->where(function ($outer) use ($table) {
+            $outer->where($this->linkedToActiveCourseConstraint())
+                ->orWhere("{$table}.order_kind", 'product');
+        });
 
         return $query;
     }
@@ -490,28 +581,43 @@ class FormOrderOperationalStatusService
             ->whereNull("{$table}.cancelled_at")
             ->whereNull("{$table}.legacy_handled_at")
             ->where(function ($outer) use ($table, $provisioned) {
-                $outer->whereNotExists(function ($sub) use ($table) {
-                    $sub->selectRaw('1')
-                        ->from('form_order_participants as fop_need')
-                        ->whereColumn('fop_need.form_order_id', "{$table}.id")
-                        ->whereNull('fop_need.deleted_at')
-                        ->whereRaw("TRIM(fop_need.participant_email) != ''");
-                })->orWhereExists(function ($sub) use ($table, $provisioned) {
-                    $sub->selectRaw('1')
-                        ->from('form_order_participants as fop_unprov')
-                        ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
-                        ->whereNull('fop_unprov.deleted_at')
-                        ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
-                        ->whereRaw("NOT ({$provisioned})");
-                })->orWhere(function ($sub) use ($table) {
-                    $sub->whereNull("{$table}.pnedu_provisioned_at")
-                        ->whereExists(function ($emailSub) use ($table) {
-                            $emailSub->selectRaw('1')
-                                ->from('form_order_participants as fop_pnedu')
-                                ->whereColumn('fop_pnedu.form_order_id', "{$table}.id")
-                                ->whereNull('fop_pnedu.deleted_at')
-                                ->whereRaw("TRIM(fop_pnedu.participant_email) != ''");
+                $outer->where(function ($training) use ($table, $provisioned) {
+                    $this->constrainToTrainingOrders($training, $table);
+                    $training->where(function ($existing) use ($table, $provisioned) {
+                        $existing->whereNotExists(function ($sub) use ($table) {
+                            $sub->selectRaw('1')
+                                ->from('form_order_participants as fop_need')
+                                ->whereColumn('fop_need.form_order_id', "{$table}.id")
+                                ->whereNull('fop_need.deleted_at')
+                                ->whereRaw("TRIM(fop_need.participant_email) != ''");
+                        })->orWhereExists(function ($sub) use ($table, $provisioned) {
+                            $sub->selectRaw('1')
+                                ->from('form_order_participants as fop_unprov')
+                                ->whereColumn('fop_unprov.form_order_id', "{$table}.id")
+                                ->whereNull('fop_unprov.deleted_at')
+                                ->whereRaw("TRIM(fop_unprov.participant_email) != ''")
+                                ->whereRaw("NOT ({$provisioned})");
+                        })->orWhere(function ($sub) use ($table) {
+                            $sub->whereNull("{$table}.pnedu_provisioned_at")
+                                ->whereExists(function ($emailSub) use ($table) {
+                                    $emailSub->selectRaw('1')
+                                        ->from('form_order_participants as fop_pnedu')
+                                        ->whereColumn('fop_pnedu.form_order_id', "{$table}.id")
+                                        ->whereNull('fop_pnedu.deleted_at')
+                                        ->whereRaw("TRIM(fop_pnedu.participant_email) != ''");
+                                });
                         });
+                    });
+                })->orWhere(function ($product) use ($table) {
+                    $this->constrainToProductOrders($product, $table);
+                    $product->where(function ($needs) use ($table) {
+                        $needs->whereNotExists($this->productRecipientExistsQuery($table, 'oir_need'))
+                            ->orWhereExists($this->productRecipientUnfulfilledQuery($table, 'oir_unprov'))
+                            ->orWhere(function ($sub) use ($table) {
+                                $sub->whereNull("{$table}.pnedu_provisioned_at")
+                                    ->whereExists($this->productRecipientExistsQuery($table, 'oir_pnedu'));
+                            });
+                    });
                 });
             });
     }
@@ -551,23 +657,31 @@ class FormOrderOperationalStatusService
                         ->where("{$table}.invoice_number", '!=', '0');
                 })->orWhereNotNull("{$table}.invoice_exempt_at");
             })
-            ->whereExists(function ($sub) use ($table) {
-                $sub->selectRaw('1')
-                    ->from('form_order_participants as fop_exp')
-                    ->whereColumn('fop_exp.form_order_id', "{$table}.id")
-                    ->whereNull('fop_exp.deleted_at')
-                    ->whereRaw("TRIM(fop_exp.participant_email) != ''");
-            })
-            ->whereNotExists(function ($sub) use ($table) {
-                $courseSql = $this->resolveCourseIdSql($table);
-                $provisioned = $this->participantProvisionedExistsSql('fop_miss', $courseSql);
+            ->where(function ($kind) use ($table) {
+                $kind->where(function ($training) use ($table) {
+                    $this->constrainToTrainingOrders($training, $table);
+                    $training->whereExists(function ($sub) use ($table) {
+                        $sub->selectRaw('1')
+                            ->from('form_order_participants as fop_exp')
+                            ->whereColumn('fop_exp.form_order_id', "{$table}.id")
+                            ->whereNull('fop_exp.deleted_at')
+                            ->whereRaw("TRIM(fop_exp.participant_email) != ''");
+                    })->whereNotExists(function ($sub) use ($table) {
+                        $courseSql = $this->resolveCourseIdSql($table);
+                        $provisioned = $this->participantProvisionedExistsSql('fop_miss', $courseSql);
 
-                $sub->selectRaw('1')
-                    ->from('form_order_participants as fop_miss')
-                    ->whereColumn('fop_miss.form_order_id', "{$table}.id")
-                    ->whereNull('fop_miss.deleted_at')
-                    ->whereRaw("TRIM(fop_miss.participant_email) != ''")
-                    ->whereRaw("NOT ({$provisioned})");
+                        $sub->selectRaw('1')
+                            ->from('form_order_participants as fop_miss')
+                            ->whereColumn('fop_miss.form_order_id', "{$table}.id")
+                            ->whereNull('fop_miss.deleted_at')
+                            ->whereRaw("TRIM(fop_miss.participant_email) != ''")
+                            ->whereRaw("NOT ({$provisioned})");
+                    });
+                })->orWhere(function ($product) use ($table) {
+                    $this->constrainToProductOrders($product, $table);
+                    $product->whereExists($this->productRecipientExistsQuery($table, 'oir_exp'))
+                        ->whereNotExists($this->productRecipientUnfulfilledQuery($table, 'oir_miss'));
+                });
             });
     }
 
@@ -677,6 +791,47 @@ class FormOrderOperationalStatusService
     }
 
     /**
+     * @return Collection<int, OrderItemRecipient>
+     */
+    public function activeProductRecipients(FormOrder $order): Collection
+    {
+        $order->loadMissing('orderItems.recipients.fulfillments');
+
+        return $order->orderItems
+            ->flatMap(fn ($item) => $item->recipients)
+            ->filter(fn (OrderItemRecipient $recipient) => trim((string) ($recipient->email ?? '')) !== '')
+            ->reject(fn (OrderItemRecipient $recipient) => $recipient->isCancelled())
+            ->values();
+    }
+
+    public function isProductRecipientFulfilled(OrderItemRecipient $recipient): bool
+    {
+        if ($recipient->relationLoaded('fulfillments')) {
+            return $recipient->fulfillments->contains(
+                fn (OrderFulfillment $fulfillment) => $fulfillment->status === OrderFulfillment::STATUS_SUCCEEDED
+            );
+        }
+
+        return $recipient->fulfillments()
+            ->where('status', OrderFulfillment::STATUS_SUCCEEDED)
+            ->exists();
+    }
+
+    /**
+     * SQL EXISTS: odbiorca produktu ma zakończony fulfillment.
+     */
+    public function productRecipientFulfilledExistsSql(string $recipientAlias): string
+    {
+        $fulfillmentAlias = 'oful_'.$recipientAlias;
+
+        return "EXISTS (
+            SELECT 1 FROM order_fulfillments {$fulfillmentAlias}
+            WHERE {$fulfillmentAlias}.order_item_recipient_id = {$recipientAlias}.id
+              AND {$fulfillmentAlias}.status = 'succeeded'
+        )";
+    }
+
+    /**
      * @param  array<int, string>  $warnings
      * @return array{status: string, label: string, badge_class: string, expected_count: int, provisioned_count: int, warnings: array<int, string>, course_id: int|null}
      */
@@ -685,11 +840,12 @@ class FormOrderOperationalStatusService
         int $expected,
         int $provisioned,
         array $warnings,
-        ?int $courseId
+        ?int $courseId,
+        bool $isProduct = false
     ): array {
         return [
             'status' => $status,
-            'label' => $this->labelForStatus($status),
+            'label' => $this->labelForStatus($status, $isProduct),
             'badge_class' => $this->badgeClassForStatus($status),
             'expected_count' => $expected,
             'provisioned_count' => $provisioned,
@@ -698,8 +854,16 @@ class FormOrderOperationalStatusService
         ];
     }
 
-    private function labelForStatus(string $status): string
+    private function labelForStatus(string $status, bool $isProduct = false): string
     {
+        if ($isProduct) {
+            return match ($status) {
+                self::STATUS_NEEDS_PROVISIONING => 'Do nadania dostępu',
+                self::STATUS_PARTIALLY_PROCESSED => 'Częściowo nadano',
+                default => $this->labelForStatus($status),
+            };
+        }
+
         return match ($status) {
             self::STATUS_CANCELLED => 'Anulowane',
             self::STATUS_PROCESSED => 'Przetworzone',
@@ -709,6 +873,65 @@ class FormOrderOperationalStatusService
             self::STATUS_INCONSISTENT => 'Wymaga kontroli',
             self::STATUS_LEGACY_HANDLED => 'Legacy — zamknięte',
             default => $status,
+        };
+    }
+
+    private function constrainToTrainingOrders(mixed $query, string $table): void
+    {
+        $query->where(function ($kind) use ($table) {
+            $kind->where("{$table}.order_kind", '!=', 'product')
+                ->orWhereNull("{$table}.order_kind");
+        });
+    }
+
+    private function constrainToProductOrders(mixed $query, string $table): void
+    {
+        $query->where("{$table}.order_kind", 'product');
+    }
+
+    private function constrainMissingBilling(mixed $query, string $table): void
+    {
+        $query->whereNull("{$table}.invoice_exempt_at")
+            ->where(function ($noInv) use ($table) {
+                $noInv->whereNull("{$table}.invoice_number")
+                    ->orWhere("{$table}.invoice_number", '')
+                    ->orWhere("{$table}.invoice_number", '0');
+            });
+    }
+
+    /**
+     * @return \Closure(\Illuminate\Database\Query\Builder): void
+     */
+    private function productRecipientExistsQuery(string $table, string $alias): \Closure
+    {
+        $itemAlias = 'oi_'.$alias;
+
+        return function ($sub) use ($table, $alias, $itemAlias) {
+            $sub->selectRaw('1')
+                ->from("order_item_recipients as {$alias}")
+                ->join("order_items as {$itemAlias}", "{$itemAlias}.id", '=', "{$alias}.order_item_id")
+                ->whereColumn("{$itemAlias}.form_order_id", "{$table}.id")
+                ->whereRaw("TRIM({$alias}.email) != ''")
+                ->where("{$alias}.status", '!=', OrderItemRecipient::STATUS_CANCELLED);
+        };
+    }
+
+    /**
+     * @return \Closure(\Illuminate\Database\Query\Builder): void
+     */
+    private function productRecipientUnfulfilledQuery(string $table, string $alias): \Closure
+    {
+        $itemAlias = 'oi_'.$alias;
+        $fulfilled = $this->productRecipientFulfilledExistsSql($alias);
+
+        return function ($sub) use ($table, $alias, $itemAlias, $fulfilled) {
+            $sub->selectRaw('1')
+                ->from("order_item_recipients as {$alias}")
+                ->join("order_items as {$itemAlias}", "{$itemAlias}.id", '=', "{$alias}.order_item_id")
+                ->whereColumn("{$itemAlias}.form_order_id", "{$table}.id")
+                ->whereRaw("TRIM({$alias}.email) != ''")
+                ->where("{$alias}.status", '!=', OrderItemRecipient::STATUS_CANCELLED)
+                ->whereRaw("NOT ({$fulfilled})");
         };
     }
 

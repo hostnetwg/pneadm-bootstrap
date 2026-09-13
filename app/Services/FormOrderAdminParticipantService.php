@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
+use App\Models\OrderFulfillment;
+use App\Models\OrderItem;
+use App\Models\OrderItemRecipient;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -151,6 +154,121 @@ class FormOrderAdminParticipantService
             $order->pnedu_provisioned_at = null;
             $order->save();
         }
+
+        if ($order->isProductOrder()) {
+            $this->syncProductRecipients($order);
+        }
+    }
+
+    /**
+     * Utrzymuje order_item_recipients przy edycji uczestników w ADM
+     * (literówka w e-mailu → wycofanie → poprawka → ponowne nadanie).
+     */
+    private function syncProductRecipients(FormOrder $order): void
+    {
+        $order->load(['participants', 'orderItems.recipients.fulfillments']);
+        $item = $order->orderItems->first();
+        if (! $item instanceof OrderItem) {
+            return;
+        }
+
+        $participants = $order->participants->sortBy('id')->values();
+        $existing = $item->recipients->sortBy('id')->values();
+        $usedIds = [];
+        $pairs = [];
+        $revoke = app(ProductOrderAccessRevokeService::class);
+
+        foreach ($participants as $participant) {
+            $email = strtolower(trim((string) $participant->participant_email));
+            $recipient = $existing->first(
+                fn (OrderItemRecipient $row) => (int) $row->form_order_participant_id === (int) $participant->id
+                    && ! in_array($row->id, $usedIds, true)
+            ) ?: $existing->first(
+                fn (OrderItemRecipient $row) => strtolower(trim((string) $row->email)) === $email
+                    && ! in_array($row->id, $usedIds, true)
+            );
+
+            if ($recipient) {
+                $usedIds[] = $recipient->id;
+                $pairs[] = [$participant, $recipient];
+            }
+        }
+
+        foreach ($participants as $participant) {
+            $alreadyPaired = collect($pairs)->contains(
+                fn (array $pair) => $pair[0]->id === $participant->id
+            );
+            if ($alreadyPaired) {
+                continue;
+            }
+
+            $leftover = $existing->first(
+                fn (OrderItemRecipient $row) => ! in_array($row->id, $usedIds, true)
+            );
+            if ($leftover) {
+                $usedIds[] = $leftover->id;
+                $pairs[] = [$participant, $leftover];
+            }
+        }
+
+        foreach ($pairs as [$participant, $recipient]) {
+            $email = strtolower(trim((string) $participant->participant_email));
+            $emailChanged = strtolower(trim((string) $recipient->email)) !== $email;
+            $wasFulfilled = $recipient->fulfillments->contains(
+                fn (OrderFulfillment $fulfillment) => $fulfillment->status === OrderFulfillment::STATUS_SUCCEEDED
+            );
+            if ($emailChanged && $wasFulfilled) {
+                $revoke->revokeRecipient($recipient);
+            }
+
+            $recipient->update([
+                'form_order_participant_id' => $participant->id,
+                'first_name' => $participant->participant_firstname,
+                'last_name' => $participant->participant_lastname,
+                'email' => $email,
+                'status' => ($emailChanged && $wasFulfilled)
+                    ? OrderItemRecipient::STATUS_PENDING
+                    : $recipient->status,
+            ]);
+        }
+
+        foreach ($participants as $participant) {
+            $alreadyPaired = collect($pairs)->contains(
+                fn (array $pair) => $pair[0]->id === $participant->id
+            );
+            if ($alreadyPaired) {
+                continue;
+            }
+
+            OrderItemRecipient::query()->create([
+                'order_item_id' => $item->id,
+                'form_order_participant_id' => $participant->id,
+                'first_name' => $participant->participant_firstname,
+                'last_name' => $participant->participant_lastname,
+                'email' => strtolower(trim((string) $participant->participant_email)),
+                'status' => OrderItemRecipient::STATUS_PENDING,
+            ]);
+        }
+
+        foreach ($existing as $recipient) {
+            if (in_array($recipient->id, $usedIds, true)) {
+                continue;
+            }
+
+            $wasFulfilled = $recipient->fulfillments->contains(
+                fn (OrderFulfillment $fulfillment) => $fulfillment->status === OrderFulfillment::STATUS_SUCCEEDED
+            );
+            if ($wasFulfilled) {
+                $revoke->revokeRecipient($recipient);
+            }
+            $recipient->delete();
+        }
+
+        $item->update([
+            'quantity' => max(1, $participants->count()),
+            'line_total' => number_format(((float) $item->unit_price) * max(1, $participants->count()), 2, '.', ''),
+        ]);
+        $revoke->syncProvisionedAt($order->fresh(['orderItems.recipients.fulfillments']) ?? $order);
     }
 
     /**

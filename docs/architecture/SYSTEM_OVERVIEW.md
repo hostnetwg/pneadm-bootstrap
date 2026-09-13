@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-09-08  
+Data utworzenia/aktualizacji: 2026-09-12
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -14,6 +14,7 @@ użytkownik / klient
     ↓
 pnedu.pl
     ├─ oferta szkoleń
+    ├─ katalog nagranych kursów
     ├─ oferty szkoleń bez terminu
     ├─ opis szkolenia
     ├─ formularz zamówienia
@@ -48,6 +49,7 @@ Kluczowe obszary:
 
 - strona główna,
 - listy szkoleń,
+- katalog i oferty nagranych kursów `/kursy`,
 - katalog ofert szkoleń bez terminu,
 - szczegóły szkolenia,
 - formularz zamówienia,
@@ -66,12 +68,16 @@ Najważniejsze miejsca w kodzie:
 - `app/Http/Controllers/CourseController.php`,
 - `app/Http/Controllers/TrainingOfferController.php`,
 - `app/Http/Controllers/PaymentController.php`,
+- `app/Http/Controllers/OnlineCourseStorefrontController.php`,
+- `app/Http/Controllers/ProductCheckoutController.php`,
 - `app/Http/Controllers/CertificateController.php`,
 - `app/Services/MarketingAttributionService.php`,
 - `app/Services/MarketingCampaignLinkResolver.php`,
 - `app/Services/MarketingCampaignLinkTracker.php`,
 - `app/Services/CoursePageViewTracker.php`,
 - `app/Services/LegalCheckoutService.php`,
+- `app/Services/ProductOrderService.php`,
+- `app/Services/ProductOrderFulfillmentService.php`,
 - `app/Services/LegalDocumentService.php`,
 - `resources/views/courses/show.blade.php`,
 - `resources/views/training-offers/pedagogical-councils/`,
@@ -115,6 +121,7 @@ Najważniejsze miejsca w kodzie:
 - `app/Services/MarketingCampaignStatsService.php`,
 - `app/Services/CourseFunnelStatsService.php`,
 - `app/Services/FormOrderPneduProvisionService.php`.
+- `app/Services/PneduProductOrderFulfillmentService.php`.
 - `app/Services/ParticipantLiveAccessService.php`.
 
 Strategia produktowa (uczestnik przez pnedu.pl, CM jako fallback): [strategy/PNEDU_PLATFORM_FIRST.md](../strategy/PNEDU_PLATFORM_FIRST.md).  
@@ -155,6 +162,14 @@ To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie
 | certyfikaty | `certificates`, `certificate_templates`, `certificate_email_logs` | oba |
 | ankiety | `surveys`, `survey_questions`, `survey_responses`, `course_survey_links`, `survey_templates`, `survey_template_questions`, `survey_settings`, `survey_testimonials` | wyniki/import/szablony/moderacja: `adm.pnedu.pl`; wypełnianie native + bramka: `pnedu.pl` (`/ankieta/{token}`); szczegóły: `docs/SURVEYS.md` |
 | LMS | `online_courses`, `online_course_modules`, `online_course_lessons` | oba |
+| katalog i sprzedaż produktów | `products`, `product_offers`, `product_prices`, `order_items`, `order_item_recipients`, `order_fulfillments` | konfiguracja/obsługa: `adm.pnedu.pl`; oferta, checkout i fulfillment: `pnedu.pl` |
+| historia cen (Omnibus) | `price_offer_histories` | zapis i korekta: `adm.pnedu.pl`; odczyt na `pnedu.pl` |
+
+### Ewolucja sprzedaży produktów
+
+Od 2026-09-11 nowy katalog produktowy jest rozwijany addytywnie obok stabilnej sprzedaży szkoleń. `form_orders.product_id` nadal oznacza `courses.id`; tej semantyki nie wolno rozszerzać o `online_courses.id`. Zamówienie katalogowe ma `form_orders.order_kind = product`, puste `product_id` i relację do `order_items`.
+
+Kurs nagrany jest mapowany jako `products.type = online_course` i `products.resource_id = online_courses.id`. `order_items` przechowuje niezmienny snapshot sprzedaży, `order_item_recipients` osoby otrzymujące produkt, a `order_fulfillments` idempotencję i wynik dostawy. Płatność online uruchamia fulfillment w pnedu; ręczna akcja z adm nadaje albo wycofuje dostęp per osoba albo wszystkim (bez ClickMeeting). `FormOrderOperationalStatusService` dla `order_kind = product` liczy dostęp po fulfillmentach i synchronizuje `pnedu_provisioned_at`; szkolenia live zostają na `participants`. Pozwala to później obsłużyć ebooki, usługi i produkty fizyczne bez kopiowania checkoutu i płatności. Kanon: [`PRODUCT_COMMERCE.md`](../PRODUCT_COMMERCE.md).
 
 ## Obecne Integracje
 

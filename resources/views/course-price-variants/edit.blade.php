@@ -310,6 +310,12 @@
                     </button>
                 </div>
             </form>
+
+            @include('partials.price-omnibus-history', [
+                'subject' => $variant,
+                'excludeRoute' => fn ($row) => route('courses.price-variants.omnibus.exclude', [$course->id, $variant->id, $row]),
+                'restoreRoute' => fn ($row) => route('courses.price-variants.omnibus.restore', [$course->id, $variant->id, $row]),
+            ])
         </div>
     </div>
 

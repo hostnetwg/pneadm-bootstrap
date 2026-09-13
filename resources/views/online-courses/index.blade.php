@@ -46,6 +46,7 @@
                             <th>Slug</th>
                             <th>Moduły/lekcje</th>
                             <th>Dostępy</th>
+                            <th>Konfiguracja sprzedaży</th>
                             <th>Aktywny</th>
                             <th>W panelu PNEDU</th>
                             <th></th>
@@ -74,15 +75,31 @@
                                 <td><code>{{ $course->slug }}</code></td>
                                 <td>{{ $course->modules_count }}/{{ $course->lessons_count }}</td>
                                 <td>{{ $course->enrollments_count }}</td>
+                                <td>
+                                    @php
+                                        $salesProduct = $course->salesProduct;
+                                        $salesOffer = $salesProduct?->defaultOffer;
+                                        $activePriceCount = $salesOffer?->prices?->where('is_active', true)->count() ?? 0;
+                                    @endphp
+                                    @if($salesProduct?->is_active && $salesOffer?->is_active)
+                                        <span class="badge text-bg-success">Gotowa</span>
+                                        <small class="text-muted d-block">{{ $activePriceCount }} cen(y)</small>
+                                    @elseif($salesProduct)
+                                        <span class="badge text-bg-secondary">Wyłączona</span>
+                                    @else
+                                        <span class="badge text-bg-warning">Brak konfiguracji</span>
+                                    @endif
+                                </td>
                                 <td>{{ $course->is_active ? 'Tak' : 'Nie' }}</td>
                                 <td>{{ $course->visible_in_dashboard ? 'Tak' : 'Nie' }}</td>
                                 <td class="text-end text-nowrap">
                                     <a href="{{ route('online-courses.edit', $course) }}" class="btn btn-sm btn-outline-primary">Edycja</a>
+                                    <a href="{{ route('online-courses.sales.edit', $course) }}" class="btn btn-sm btn-outline-success">Sprzedaż</a>
                                     <a href="{{ route('online-courses.enrollments.index', $course) }}" class="btn btn-sm btn-outline-secondary">Dostępy</a>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="text-muted">Brak kursów online.</td></tr>
+                            <tr><td colspan="9" class="text-muted">Brak kursów online.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

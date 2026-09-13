@@ -269,7 +269,7 @@ class FormOrdersController extends Controller
 
         // Pobieramy dane z paginacją lub wszystkie rekordy (primaryParticipant – dane uczestnika z form_order_participants)
         if ($perPage === 'all') {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->get();
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'orderItems.recipients.fulfillments', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->get();
             // Tworzymy własny obiekt paginacji dla wszystkich rekordów
             $zamowienia = new \Illuminate\Pagination\LengthAwarePaginator(
                 $zamowienia,
@@ -279,7 +279,7 @@ class FormOrdersController extends Controller
                 ['path' => request()->url(), 'pageName' => 'page']
             );
         } else {
-            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->paginate($perPage);
+            $zamowienia = $query->with(['marketingCampaign.sourceType', 'primaryParticipant', 'participants', 'onlinePaymentOrders', 'orderItems.recipients.fulfillments', 'course.instructor', 'activeDebtCases'])->orderByDesc('id')->paginate($perPage);
         }
 
         // Pobierz informacje o duplikatach dla wyświetlanych zamówień (cache 60 s — pełny skan jest drogi)
@@ -820,6 +820,8 @@ class FormOrdersController extends Controller
             'primaryParticipant.participant.liveAccess',
             'participants.participant.liveAccess',
             'onlinePaymentOrders',
+            'orderItems.product',
+            'orderItems.recipients.fulfillments',
             'course.instructor',
             'coursePriceVariant',
             'cancelledByUser',
@@ -1434,6 +1436,93 @@ class FormOrdersController extends Controller
 
         $http = (int) ($result['http_code'] ?? 500);
         unset($result['http_code']);
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Nadaje dostępy wynikające z generycznych pozycji zamówienia produktowego.
+     */
+    public function fulfillProductOrder(Request $request, int $id)
+    {
+        $order = FormOrder::query()->findOrFail($id);
+        if (! $order->isProductOrder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'To nie jest zamówienie z katalogu produktów.',
+            ], 422);
+        }
+
+        $recipientId = $request->integer('recipient_id') ?: null;
+        $result = app(\App\Services\PneduProductOrderFulfillmentService::class)->fulfill($id, $recipientId);
+        $http = (int) ($result['http_code'] ?? (($result['success'] ?? false) ? 200 : 422));
+        unset($result['http_code']);
+
+        if (! $request->expectsJson()) {
+            return redirect()
+                ->back()
+                ->with(
+                    ($result['success'] ?? false) ? 'success' : 'error',
+                    $result['message'] ?? $result['error'] ?? 'Nie udało się nadać dostępów.'
+                );
+        }
+
+        return response()->json($result, $http);
+    }
+
+    /**
+     * Wycofuje dostęp do kursu online (bez ClickMeeting) — jeden odbiorca albo wszyscy.
+     */
+    public function revokeProductAccess(Request $request, int $id)
+    {
+        if (! auth()->user()->hasRole('admin') && ! auth()->user()->hasRole('super_admin')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Brak uprawnień do wycofania dostępu.',
+            ], 403);
+        }
+
+        $order = FormOrder::query()
+            ->with('orderItems.recipients.fulfillments')
+            ->findOrFail($id);
+        if (! $order->isProductOrder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'To nie jest zamówienie z katalogu produktów.',
+            ], 422);
+        }
+
+        $recipientId = $request->integer('recipient_id') ?: null;
+        $result = app(\App\Services\ProductOrderAccessRevokeService::class)->revoke($order, $recipientId);
+
+        if ($result['success'] ?? false) {
+            \App\Models\ActivityLog::logCustom(
+                'Wycofanie dostępu produktowego',
+                $recipientId
+                    ? "Wycofano dostęp produktowy w zamówieniu #{$id} dla odbiorcy #{$recipientId}."
+                    : "Wycofano dostęp produktowy wszystkim odbiorcom zamówienia #{$id}.",
+                [
+                    'model_type' => FormOrder::class,
+                    'model_id' => $id,
+                    'model_name' => "Zamówienie #{$id}",
+                    'new_values' => [
+                        'recipient_id' => $recipientId,
+                        'revoked' => $result['revoked'] ?? 0,
+                    ],
+                ]
+            );
+        }
+
+        $http = ($result['success'] ?? false) ? 200 : 422;
+
+        if (! $request->expectsJson()) {
+            return redirect()
+                ->back()
+                ->with(
+                    ($result['success'] ?? false) ? 'success' : 'error',
+                    $result['message'] ?? $result['error'] ?? 'Nie udało się wycofać dostępu.'
+                );
+        }
 
         return response()->json($result, $http);
     }
@@ -2121,9 +2210,34 @@ class FormOrdersController extends Controller
         ]);
     }
 
+    /**
+     * Partial HTML panelu dostępów produktowych (soft-refresh po nadaniu / wycofaniu).
+     */
+    public function productFulfillmentPartial(Request $request, int $id)
+    {
+        if ($request->hasSession()) {
+            $request->session()->save();
+        }
+
+        $zamowienie = FormOrder::with([
+            'orderItems.product',
+            'orderItems.recipients.fulfillments',
+        ])->find($id);
+
+        if (! $zamowienie) {
+            return response('Zamówienie nie zostało znalezione.', 404);
+        }
+
+        return view('form-orders.partials.product-fulfillment', [
+            'zamowienie' => $zamowienie,
+        ]);
+    }
+
     public function operationalStatusPartial(int $id)
     {
-        $zamowienie = FormOrder::query()->findOrFail($id);
+        $zamowienie = FormOrder::query()
+            ->with(['participants', 'orderItems.recipients.fulfillments'])
+            ->findOrFail($id);
 
         return view('form-orders.partials.operational-status-panel', [
             'zamowienie' => $zamowienie,

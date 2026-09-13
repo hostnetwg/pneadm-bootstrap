@@ -79,10 +79,58 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Import CSV dostępów kursów online (Publigo) | `--filter=OnlineCourseEnrollmentPubligoImport` |
 | Lista dostępów kursu online (wyszukiwarka, filtry, sort) | `--filter=OnlineCourseEnrollmentListQueryTest` |
 | E-mail przeniesienia kursu online na pnedu.pl | `--filter=OnlineCourseEnrollmentPlatformMigrationMailTest`, `--filter=test_online_course_platform_migration_mail_uses_system_mailer` |
+| Katalog sprzedaży i warianty cenowe kursów online | `--filter=OnlineCourseSalesCatalogTest`, `--filter=ProductPriceTest` |
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
+| Omnibus — historia cen i wyłączenie wpisu | `--filter=PriceOmnibusServiceTest` |
+| Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
+| Oferta przy istniejącym dostępie | **pnedu:** `sail artisan test --filter=StorefrontOwnerAccessTest` |
+| Katalog bez sprzedaży | `--filter=test_admin_can_keep_course_in_catalog_with_sales_disabled` **oraz pnedu:** `--filter=StorefrontArchiveSalesTest` |
+| Zamówienia produktowe i ręczny fulfillment w ADM | `--filter=ProductOrderAdminTest` |
+| Status operacyjny zamówień produktowych | `--filter=FormOrderOperationalStatusTest`, `--filter=FormOrderOperationalStatusServiceSqlTest` |
+| Publiczny katalog, checkout i fulfillment kursów nagranych | **pnedu:** `sail artisan test tests/Feature/ProductCheckoutTest.php`, `sail artisan test tests/Feature/DashboardPendingProductCoursesTest.php`, `sail artisan test tests/Unit/ProductAccessExpiryServiceTest.php`, `sail artisan test tests/Unit/ProductLegalCheckoutServiceTest.php`, `sail artisan test tests/Unit/WithdrawalWindowServiceTest.php`, `sail artisan test tests/Feature/LegalDocumentsTest.php` |
 | Pełny suite | `sail test` |
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
+
+## Weryfikacja katalogu bez sprzedaży — 2026-09-13
+
+- `pneadm` `test_admin_can_keep_course_in_catalog_with_sales_disabled`: `is_public` bez `is_active` na ofercie, produkt zostaje aktywny.
+- `pnedu` `StorefrontArchiveSalesTest`: karta i oferta „Sprzedaż wyłączona”, `noindex`, checkout 404.
+
+## Weryfikacja oferty przy istniejącym dostępie — 2026-09-13
+
+- `pnedu` `StorefrontOwnerAccessTest`: gość widzi cennik; bezterminowy chowa ceny; czasowy ma datę i „Przedłuż dostęp”; przedsprzedaż bez „Przejdź”; wygasły zostaje przy zwykłym zakupie.
+
+## Weryfikacja Omnibus — 2026-09-13
+
+- migracja `2026_09_13_163000_create_price_offer_histories_table` (backfill bieżącej ceny od `created_at`),
+- `pneadm` `PriceOmnibusServiceTest`: najniższa z historii, wyłączenie wpisu, pogłębienie promocji jako nowa obniżka, `sync` przy zmianie ceny,
+- `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”.
+
+## Weryfikacja skróconego copy checkoutu kursów — 2026-09-13
+
+- `pnedu` `ProductCheckoutTest`: szkoła ma ukryty blok 14 dni i oświadczenie; osoba/JDG dostaje krótki akapit + link `/odstapienie-od-umowy`; nowa treść oświadczenia niezaznaczona i weryfikowana backendem; potwierdzenie pokazuje tekst z zamówienia, nie aktualną etykietę; gwarancja używa liczby dni z oferty;
+- `pnedu` `ProductLegalCheckoutServiceTest`: pending / niezatwierdzona kwalifikacja zostaje przy `service_and_digital` i wersji `2026-09-13-course-v1`;
+- `pnedu` `LegalCheckoutServiceTest`: szkolenia live nadal mają brzmienie „realizacji szkolenia” / `2026-09-08-v2`.
+
+## Weryfikacja przedsprzedaży i gwarancji — 2026-09-12
+
+- migracja `2026_09_12_104200_add_presale_and_satisfaction_guarantee` zastosowana lokalnie (batch 109),
+- `pnedu` `ProductCheckoutTest`: katalog pokazuje 30 dni gwarancji, osoba prywatna bez oświadczenia przy natychmiastowym starcie dostaje błąd, przedsprzedaż pomija oświadczenie i zapisuje snapshot startu,
+- `pnedu` `DashboardPendingProductCoursesTest`: enrollment przed datą startu pokazuje „Dostęp od…” i blokuje lekcje,
+- `pnedu` `ProductLegalCheckoutServiceTest` + `ProductAccessExpiryServiceTest` (okres od późniejszej daty: nadanie / start),
+- `pneadm` `OnlineCourseSalesCatalogTest`: domyślna gwarancja 30, zapis `access_starts_at` / `access_note`.
+
+## Weryfikacja sprzedaży kursów nagranych — 2026-09-12
+
+- migracje katalogu i zamówień zastosowane lokalnie w bazie `pneadm` (batch 107 i 108),
+- `pnedu` `ProductCheckoutTest`: katalog, oferta, faktura odroczona, PDF/edycja podsumowania, prefill e-maila zalogowanego użytkownika, PayU, PayNow, snapshoty, webhook `paid` i idempotentny fulfillment,
+- `pnedu` `DashboardPendingProductCoursesTest` — karta oczekująca tylko dla e-maila uczestnika, komunikat po FV odroczonej, „Dokończ płatność” / rezygnacja tylko przy nieopłaconym online, rezygnacja kasuje tylko kartę tej osoby, zniknięcie po nadaniu dostępu,
+- `pnedu` `ProductAccessExpiryServiceTest`: nowy, wygasły, aktywny, bezterminowy, stała data i start z przyszłości,
+- `pneadm` `ProductOrderAdminTest`: panel produktu, fulfill per osoba / wszyscy, wycofanie dostępu (admin), sync e-mailu odbiorcy po edycji uczestnika,
+- `pneadm` status operacyjny produktów: filtry „Do obsługi / Nieprzetworzone / Przetworzone” liczą `order_fulfillments`, a nie uczestników szkoleń live,
+- Pint uruchamiany na zmienionych plikach PHP obu aplikacji,
+- kompilacja Blade pnedu.
 
 ## Po zmianach w kodzie
 

@@ -28,22 +28,28 @@
         $stateBadgeLabel = 'Przetworzone';
     }
 
+    $isProductOrder = $zamowienie->isProductOrder();
+
     if ($participantsOk) {
         $participantsIcon = 'bi-check-circle-fill text-success';
-        $participantsTitle = 'Uczestnicy dodani';
-        $participantsDetail = 'Na szkoleniu (PNEDU): '.$provisioned.'/'.$expected;
+        $participantsTitle = $isProductOrder ? 'Dostępy nadane' : 'Uczestnicy dodani';
+        $participantsDetail = $isProductOrder
+            ? 'Nadane: '.$provisioned.'/'.$expected
+            : 'Na szkoleniu (PNEDU): '.$provisioned.'/'.$expected;
         $participantsDetailClass = 'text-muted';
     } elseif ($provisioned > 0) {
         $participantsIcon = 'bi-exclamation-circle-fill text-warning';
-        $participantsTitle = 'Uczestnicy częściowo dodani';
-        $participantsDetail = 'Na szkoleniu (PNEDU): '.$provisioned.'/'.$expected;
+        $participantsTitle = $isProductOrder ? 'Dostępy częściowo nadane' : 'Uczestnicy częściowo dodani';
+        $participantsDetail = $isProductOrder
+            ? 'Nadane: '.$provisioned.'/'.$expected
+            : 'Na szkoleniu (PNEDU): '.$provisioned.'/'.$expected;
         $participantsDetailClass = 'text-warning';
     } else {
         $participantsIcon = 'bi-x-circle-fill text-danger';
-        $participantsTitle = 'Uczestnicy nie dodani';
+        $participantsTitle = $isProductOrder ? 'Dostępy nie nadane' : 'Uczestnicy nie dodani';
         $participantsDetail = $expected > 0
-            ? 'Na szkoleniu (PNEDU): 0/'.$expected
-            : 'Brak uczestnika z adresem e-mail.';
+            ? ($isProductOrder ? 'Nadane: 0/'.$expected : 'Na szkoleniu (PNEDU): 0/'.$expected)
+            : ($isProductOrder ? 'Brak odbiorcy produktu z adresem e-mail.' : 'Brak uczestnika z adresem e-mail.');
         $participantsDetailClass = 'text-danger';
     }
 
@@ -107,7 +113,7 @@
         @if($showOperationalLabel || $isCancelled || $isLegacyClosed)
             <div class="mt-3">
                 @if($showOperationalLabel)
-                    <span class="badge {{ $op['badge_class'] }}" title="Status operacyjny (uczestnicy + faktura)">
+                    <span class="badge {{ $op['badge_class'] }}" title="{{ $isProductOrder ? 'Status operacyjny (dostępy + faktura)' : 'Status operacyjny (uczestnicy + faktura)' }}">
                         {{ $op['label'] }}
                     </span>
                 @endif

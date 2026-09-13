@@ -34,9 +34,11 @@ use App\Http\Controllers\NODNSzkoleniaController;
 use App\Http\Controllers\OnlineCourseEnrollmentController;
 use App\Http\Controllers\OnlineCourseLessonController;
 use App\Http\Controllers\OnlineCourseModuleController;
+use App\Http\Controllers\OnlineCourseSalesController;
 use App\Http\Controllers\OnlineCoursesController;
 use App\Http\Controllers\OnlinePaymentOrderController;
 use App\Http\Controllers\ParticipantController;
+use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PubligoController;
 use App\Http\Controllers\RSPOController;
@@ -231,6 +233,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/publigo/reset', [FormOrdersController::class, 'resetPubligoStatus'])->name('publigo.reset');
             Route::post('/{id}/pnedu/provision', [FormOrdersController::class, 'provisionPneduAccess'])->name('pnedu.provision');
             Route::post('/{id}/pnedu/provision-all', [FormOrdersController::class, 'provisionPneduAccessAll'])->name('pnedu.provision-all');
+            Route::post('/{id}/product/fulfill', [FormOrdersController::class, 'fulfillProductOrder'])->name('product.fulfill');
+            Route::post('/{id}/product/revoke', [FormOrdersController::class, 'revokeProductAccess'])->name('product.revoke');
+            Route::get('/{id}/product-fulfillment', [FormOrdersController::class, 'productFulfillmentPartial'])->name('product-fulfillment');
             Route::get('/{id}/pnedu/access-email-preview', [FormOrdersController::class, 'previewPneduAccessEmail'])->name('pnedu.access-email-preview');
             Route::post('/{id}/pnedu/resend-access-email', [FormOrdersController::class, 'resendPneduAccessEmail'])->name('pnedu.resend-access-email');
             Route::post('/{id}/online-payment/send-recovery-email', [FormOrdersController::class, 'sendOnlinePaymentRecoveryEmail'])->name('online-payment.send-recovery-email');
@@ -425,12 +430,28 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/{id}/restore', [CoursePriceVariantController::class, 'restore'])->name('restore');
         Route::post('/{id}/deactivate', [CoursePriceVariantController::class, 'deactivate'])->name('deactivate');
         Route::post('/{id}/activate', [CoursePriceVariantController::class, 'activate'])->name('activate');
+        Route::post('/{id}/omnibus/{history}/exclude', [\App\Http\Controllers\PriceOfferHistoryController::class, 'excludeCourseVariant'])->name('omnibus.exclude');
+        Route::post('/{id}/omnibus/{history}/restore', [\App\Http\Controllers\PriceOfferHistoryController::class, 'restoreCourseVariant'])->name('omnibus.restore');
     });
 
     // Kursy online nagraniowe (LMS) — oddzielnie od szkoleń (courses).
     Route::get('online-courses/search/linkable-courses', [OnlineCourseLessonController::class, 'searchLinkableCourses'])
         ->name('online-courses.linkable-courses.search');
     Route::resource('online-courses', OnlineCoursesController::class);
+    Route::get('online-courses/{online_course}/sales', [OnlineCourseSalesController::class, 'edit'])
+        ->name('online-courses.sales.edit');
+    Route::put('online-courses/{online_course}/sales', [OnlineCourseSalesController::class, 'update'])
+        ->name('online-courses.sales.update');
+    Route::post('online-courses/{online_course}/sales/prices', [ProductPriceController::class, 'store'])
+        ->name('online-courses.sales.prices.store');
+    Route::put('online-courses/{online_course}/sales/prices/{product_price}', [ProductPriceController::class, 'update'])
+        ->name('online-courses.sales.prices.update');
+    Route::delete('online-courses/{online_course}/sales/prices/{product_price}', [ProductPriceController::class, 'destroy'])
+        ->name('online-courses.sales.prices.destroy');
+    Route::post('online-courses/{online_course}/sales/prices/{product_price}/omnibus/{history}/exclude', [\App\Http\Controllers\PriceOfferHistoryController::class, 'excludeProductPrice'])
+        ->name('online-courses.sales.prices.omnibus.exclude');
+    Route::post('online-courses/{online_course}/sales/prices/{product_price}/omnibus/{history}/restore', [\App\Http\Controllers\PriceOfferHistoryController::class, 'restoreProductPrice'])
+        ->name('online-courses.sales.prices.omnibus.restore');
     Route::post('online-courses/{online_course}/modules/reorder', [OnlineCoursesController::class, 'reorderModules'])
         ->name('online-courses.modules.reorder');
     Route::post('online-courses/{online_course}/lessons/reorder', [OnlineCourseLessonController::class, 'reorder'])

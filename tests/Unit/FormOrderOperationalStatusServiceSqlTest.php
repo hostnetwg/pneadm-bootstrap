@@ -38,6 +38,18 @@ class FormOrderOperationalStatusServiceSqlTest extends TestCase
         $this->assertStringContainsString('cancelled_at', $sql);
         $this->assertStringContainsString('invoice_number', $sql);
         $this->assertStringContainsString('form_order_participants', $sql);
+        $this->assertStringContainsString('order_kind', $sql);
+        $this->assertStringContainsString('order_fulfillments', $sql);
+    }
+
+    public function test_product_recipient_fulfilled_sql_checks_succeeded_fulfillment(): void
+    {
+        $service = new FormOrderOperationalStatusService;
+        $sql = $service->productRecipientFulfilledExistsSql('oir_unprov');
+
+        $this->assertStringContainsString('order_fulfillments', $sql);
+        $this->assertStringContainsString('oir_unprov.id', $sql);
+        $this->assertStringContainsString('succeeded', $sql);
     }
 
     public function test_scope_needs_invoice_sql_checks_invoice_exemption_and_cancellation(): void
@@ -62,6 +74,20 @@ class FormOrderOperationalStatusServiceSqlTest extends TestCase
         $sql = $query->toSql();
 
         $this->assertStringContainsString('pnedu_provisioned_at', $sql);
+        $this->assertStringContainsString('form_order_participants', $sql);
+        $this->assertStringContainsString('order_kind', $sql);
+        $this->assertStringContainsString('order_fulfillments', $sql);
+    }
+
+    public function test_scope_processed_sql_includes_product_fulfillments(): void
+    {
+        $service = new FormOrderOperationalStatusService;
+        $query = \App\Models\FormOrder::query();
+        $service->scopeProcessed($query);
+        $sql = $query->toSql();
+
+        $this->assertStringContainsString('order_kind', $sql);
+        $this->assertStringContainsString('order_fulfillments', $sql);
         $this->assertStringContainsString('form_order_participants', $sql);
     }
 }

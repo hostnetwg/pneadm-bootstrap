@@ -17,10 +17,10 @@
                 </div>
             @endif
 
-            <ul class="nav nav-tabs mb-3">
-                <li class="nav-item"><span class="nav-link active">Dane kursu</span></li>
-                <li class="nav-item"><a class="nav-link" href="{{ route('online-courses.enrollments.index', $course) }}">Dostępy</a></li>
-            </ul>
+            @include('online-courses.partials.navigation-tabs', [
+                'onlineCourse' => $course,
+                'activeTab' => 'course',
+            ])
 
             <div class="row g-4">
                 <div class="col-lg-6">

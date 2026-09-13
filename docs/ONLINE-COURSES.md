@@ -27,6 +27,8 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 - `2026_07_07_120001_extend_certificates_for_online_courses.php` — certyfikaty powiązane z enrollment
 - `2026_07_08_120000_add_training_scope_to_online_courses_table.php` — zakres na PDF
 - `2026_09_10_140000_create_online_course_enrollment_email_logs_table.php` — log wysyłki e-maila o przeniesieniu kursu na pnedu.pl
+- `2026_09_11_214500_create_product_catalog_tables.php` — katalog sprzedażowy, kanały i warianty cenowe
+- `2026_09_12_050500_create_product_order_tables.php` — pozycje zamówień, odbiorcy, fulfillment oraz zamówienia bramkowe bez `course_id`
 
 ### Tabele i znaczenie
 
@@ -40,6 +42,12 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 | `online_course_enrollment_email_logs` | Historia wysyłki e-maila o przeniesieniu na pnedu.pl (`type = platform_migration`, status `queued`/`sent`/`failed`, `sent_at`) |
 | `online_course_lesson_completions` | Zapis „lekcja ukończona” dla pary (enrollment, lesson) |
 | `online_course_lesson_notes` | Notatka tekstowa użytkownika do lekcji (per enrollment) |
+| `products` | Kanoniczny produkt sprzedażowy; dla kursu online `type = online_course`, `resource_id = online_courses.id` |
+| `product_offers` | Kanał sprzedaży pnedu, publikacja, zakup grupowy i dostępne metody płatności |
+| `product_prices` | Warianty cenowe za uczestnika: promocja, VAT i reguła dostępu |
+| `order_items` | Snapshot kupionego produktu, ceny, VAT, ilości i reguły dostępu |
+| `order_item_recipients` | Osoby, którym należy wydać konkretną pozycję zamówienia |
+| `order_fulfillments` | Idempotentny zapis nadania dostępu, konta, enrollmentu i wyniku |
 
 ### Diagram relacji (uproszczony)
 
@@ -54,6 +62,12 @@ erDiagram
     online_course_enrollments ||--o{ online_course_lesson_notes : notes
     online_course_lessons ||--o{ online_course_lesson_completions : completed
     online_course_lessons ||--o{ online_course_lesson_notes : about
+    online_courses ||--o| products : sold_as
+    products ||--o{ product_offers : offers
+    product_offers ||--o{ product_prices : variants
+    form_orders ||--o{ order_items : contains
+    order_items ||--o{ order_item_recipients : grants_to
+    order_item_recipients ||--o{ order_fulfillments : fulfilled_by
 ```
 
 ## Panel administracyjny (pneadm)
@@ -65,6 +79,9 @@ erDiagram
 - **Dostępy (zapisy):** `OnlineCourseEnrollmentController` — `updateOrCreate` po parze `(online_course_id, email)`; e-mail normalizowany (`strtolower` + trim); opcjonalna data wygaśnięcia dostępu; telefon i `legacy_publigo_user_id`; na liście badge **Konto pnedu.pl** (dopasowanie e-maila do `pnedu.users`, link do karty użytkownika); wyszukiwarka i filtry (dostęp, konto pnedu, źródło, zaświadczenie, status e-maila) oraz sortowanie kolumn; **e-mail o przeniesieniu na pnedu.pl** (pojedynczo i zbiorczo, log `online_course_enrollment_email_logs`); akcje certyfikatów (generuj / usuń / PDF).
 - **Import CSV (Publigo):** na liście dostępów (`/online-courses/{id}/enrollments`) — ten sam eksport co przy uczestnikach szkoleń (`ID`, e-mail, imię i nazwisko, telefon, `Dostęp wygasa`). Serwis: `OnlineCourseEnrollmentPubligoImportService`. Duplikat e-maila w kursie = pominięcie. Checkbox **Pomiń osoby z już wygasłym dostępem**. „Bez limitu” → dostęp bezterminowy. Daty CSV interpretowane jako `Europe/Warsaw`, zapis UTC. **Nie** tworzy kont pnedu. Maile o przeniesieniu na pnedu.pl są **osobną akcją** na liście (pojedynczo / zbiorczo), nie lecą przy imporcie. Postęp lekcji ze starej platformy nie jest importowany. Źródło zapisu: `publigo_migration`.
 - **E-mail o przeniesieniu na pnedu.pl:** przycisk przy osobie + wysyłka zbiorcza (tylko ważny dostęp; tryby: nie wysłano / ponów do wszystkich). Przed wysyłką modal z **podglądem HTML** i zatwierdzeniem. Treść zależy od konta pnedu.pl: **jest konto** → logowanie, link do kursu i reset hasła (`/forgot-password`); **brak konta** → tylko instrukcja i link rejestracji na ten sam e-mail. Informuje o przeniesieniu ze starej platformy (nowoczesna-edukacja.pl). Kanał SYS. Kolumna **E-mail pnedu.pl** pokazuje datę wysyłki. Karta na liście pokazuje wysłane/eligible; podczas wysyłki zbiorczej **żywy pasek postępu** (odpytuje batch co 2 s, z możliwością przerwania). Zbiorczo wymaga kolejki (`sail artisan queue:work` / worker na prod).
+- **Sprzedaż:** zakładka `/online-courses/{id}/sales` tworzy produkt, domyślną ofertę pnedu oraz warianty cenowe. Po aktywacji produktu, publicznej oferty i wariantu kurs trafia do `/kursy` na pnedu. Cena jest za uczestnika; zamówienie może obejmować wiele osób. Kanały: faktura odroczona, PayU, PayNow.
+- **Obsługa zamówienia produktowego:** karta `/form-orders/{id}` pokazuje osobny panel **Dostępy do produktu**, analogicznie do szkoleń: **Nadaj dostęp** przy każdej osobie, **Nadaj dostęp wszystkim**, **Wycofaj dostęp** (admin) przy osobie i wszystkim. Bez tokenu ClickMeeting. Wycofanie usuwa zapis w `online_course_enrollments` i pozwala nadać dostęp ponownie po poprawce e-mailu. Faktura i dostęp są niezależne. Płatność online nadaje dostęp automatycznie po `paid`. Lista zamówień liczy status po `order_fulfillments` i `pnedu_provisioned_at`.
+- **Nawigacja kursu:** wspólne zakładki **Dane kursu / Sprzedaż / Dostępy** są widoczne na edycji kursu, konfiguracji sprzedaży oraz liście, dodawaniu i edycji dostępów.
 - **Zaświadczenia:** sekcja w formularzu edycji kursu (`certificate-fields`); pobieranie na pnedu przez API adm — patrz [CERTIFICATES.md](./CERTIFICATES.md).
 
 Widoki Blade: `resources/views/online-courses/`.
@@ -95,6 +112,16 @@ Wszystkie modele `App\Models\OnlineCourse*` w pnedu mają `protected $connection
 | GET | `…/zaswiadczenie/pobierz` | pobranie PDF (API adm) |
 
 Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/docs/CERTIFICATES.md`.
+
+### Publiczna sprzedaż
+
+- `GET /kursy` — katalog kursów nagranych; link **Kursy** w głównym menu po **Szkolenia**,
+- `GET /kursy/{product:slug}` — oferta i warianty,
+- `GET|POST /kursy/{product:slug}/zamowienie` — checkout,
+- `GET /zamowienia-kursow/{ident}` — podsumowanie,
+- kursy nagrane nie są obecnie prezentowane na stronie głównej.
+
+Po potwierdzeniu PayU/PayNow `PaymentController` synchronizuje `form_orders.payment_status` i wywołuje idempotentny `ProductOrderFulfillmentService`. Serwis tworzy lub wykorzystuje konto `pnedu.users`, aktualizuje `online_course_enrollments` i wysyła e-mail dostępu.
 
 ### Reguły dostępu (`DashboardOnlineCoursesController`)
 
@@ -133,11 +160,12 @@ Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/d
 - Widoki: `resources/views/dashboard/online-courses/`
 - Konfiguracja: `config/database.php` (`pneadm`), `config/services.php` (`pneadm.public_url`)
 
-## Rozszerzenia na później (niezaimplementowane w kodzie bazowym)
+## Rozszerzenia na później
 
-- Automatyczne zapisy po zakupie / formularzu (obecnie enrollment ręczny, import CSV Publigo przez `access_source = publigo_migration`, albo przyszły checkout).
-- Tworzenie kont pnedu.pl i maile „ustaw hasło” przy imporcie dostępów do kursów online.
-- Publiczna strona ofertowa kursu online po `slug` (obecnie nacisk na dashboard po zapisie).
+- Kupony i korekty ceny (`order_adjustments`) bez zmiany snapshotu pozycji.
+- Produkty cyfrowe inne niż kurs: ebooki i pliki do pobrania.
+- Usługi i produkty fizyczne z osobnym fulfillmentem; sama flaga `requires_shipping` nie wdraża wysyłki.
+- Osobna akcja ponowienia wyłącznie niedostarczonego e-maila po udanym fulfillment.
 - Synchronizacja z tabelą `users` po `user_id` zamiast dopasowania po e-mailu — wymagałaby zmiany schematu.
 
 ---

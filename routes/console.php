@@ -38,3 +38,7 @@ Schedule::command('analytics:aggregate-order-forms')
     ->dailyAt('03:45')
     ->timezone($analyticsTimezone)
     ->withoutOverlapping(30);
+
+Schedule::command('omnibus:sync-prices')
+    ->hourly()
+    ->withoutOverlapping(10);

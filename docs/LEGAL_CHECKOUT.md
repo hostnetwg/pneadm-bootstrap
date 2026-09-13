@@ -12,7 +12,23 @@ Oświadczenie jest wymagane tylko dla:
 - profilu `jdg` („JDG — zakup niezawodowy”),
 - gdy termin live przypada nie później niż z końcem 14. dnia od zamówienia w strefie `Europe/Warsaw`.
 
-Źródłem prawdy jest backend `pnedu/app/Services/LegalCheckoutService.php`.
+Źródłem prawdy dla szkoleń live jest backend `pnedu/app/Services/LegalCheckoutService.php`.
+
+Checkout kursów nagranych (`ProductLegalCheckoutService` + `WithdrawalWindowService`):
+
+- oświadczenie jest wymagane dla osoby prywatnej / JDG, gdy **planowany start świadczenia wpada w 14 dni od zawarcia umowy** (Europe/Warsaw), także przy przedsprzedaży za 3 dni;
+- start po upływie tego terminu nie wymaga zgody na wcześniejsze świadczenie;
+- kwalifikacja kursu (`LEGAL_PRODUCT_QUALIFICATION`) jest `pending` — zakres oświadczenia zostaje `service_and_digital`;
+- checkout kursów nagranych pokazuje osobne brzmienie `product_early_performance` (wersja `2026-09-13-course-v1`); szkolenia live zostają przy `early_performance` / `2026-09-08-v2`;
+- dokładna treść zaakceptowanego oświadczenia jest zapisywana na `form_orders.early_performance_statement_text` i wraca w potwierdzeniu z zamówienia, nie z aktualnej etykiety formularza;
+- osoba/JDG widzi krótki komunikat o 14 dniach z linkiem do `/odstapienie-od-umowy`; szkoła nie;
+- gwarancja satysfakcji to **osobna obietnica** (liczba dni z oferty, od rozpoczęcia dostępu); zgłoszenie e-mailem lub telefonicznie; pełne zasady nadal nie są w Regulaminie.
+
+Potwierdzenie kursu: `ProductOrderConfirmationMail` dołącza PDF specyfikacji zamówienia, właściwy Regulamin i wzór odstąpienia. `legal_confirmation_sent_at` oznacza przekazanie do mailera, nie potwierdzone doręczenie. Błędy: `legal_confirmation_failed_at` + komenda `legal:retry-product-confirmations`.
+
+Projekt nowej wersji Regulaminu: `draft-pending-approval` (nieopublikowany). Lista decyzji: [LEGAL_PRODUCT_LAUNCH_DECISIONS.md](./LEGAL_PRODUCT_LAUNCH_DECISIONS.md).
+
+Przy ogłoszonej obniżce ceny (szkolenia i kursy nagrane) front pokazuje „Najniższą cenę z 30 dni przed obniżką” z historii ofert (`price_offer_histories`). To obowiązek ustawy o informowaniu o cenach, nie część oświadczenia 14-dniowego.
 
 ## Dowody
 

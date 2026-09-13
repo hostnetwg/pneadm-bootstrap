@@ -23,6 +23,11 @@
                 </div>
             @endif
 
+            @include('online-courses.partials.navigation-tabs', [
+                'onlineCourse' => $online_course,
+                'activeTab' => 'enrollments',
+            ])
+
             @include('participants.partials.mail-system-config-alert')
 
             <div id="sendingMigrationEmailsAlert" class="alert alert-info d-none mb-3" role="alert"

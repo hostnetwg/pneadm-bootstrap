@@ -1,6 +1,6 @@
 # Provision PNEDU z zamówienia formularza („Dodaj tylko do PNEDU”)
 
-Data aktualizacji: 2026-09-07 (wygląd nieaktywnych wierszy na `/courses`; wcześniej: strategia platform-first)
+Data aktualizacji: 2026-09-12 (status operacyjny zamówień produktowych); wcześniej 2026-09-07 (wygląd nieaktywnych wierszy na `/courses`; strategia platform-first)
 
 **Strategia produktowa:** uczestnik ma przechodzić przez **pnedu.pl**, a nie tylko przez ClickMeeting — [strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md).
 
@@ -20,6 +20,10 @@ Endpoint: `POST /form-orders/{id}/pnedu/provision`
 | **3** | E-mail do uczestnika | Zawsze próbowany po kroku 2, niezależnie od wyniku ClickMeeting |
 
 Status w panelu: `form_orders.pnedu_provisioned_at`, `pnedu_user_existed_before`, pola `pnedu_clickmeeting_*`.
+
+Dla zamówień katalogowych (`order_kind = product`) to samo pole daty ustawia fulfillment produktu w pnedu. Lista `/form-orders` liczy wtedy dostęp po `order_fulfillments`, a nie po uczestnikach szkolenia live. Badge **U** na `/courses` nadal dotyczy wyłącznie `courses`.
+
+Na karcie produktu operator nadaje i wycofuje dostęp per osoba albo wszystkim (jak przy szkoleniach, bez ClickMeeting). Wycofanie czyści enrollment i `pnedu_provisioned_at`; konto `pnedu.users` zostaje. Edycja e-mailu uczestnika w ADM aktualizuje `order_item_recipients` i — gdy dostęp był nadany — sama go wycofuje, żeby można było nadać go na poprawny adres.
 
 ## Liczniki na liście szkoleń
 

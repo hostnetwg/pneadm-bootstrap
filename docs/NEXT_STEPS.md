@@ -3,13 +3,51 @@
 Data utworzenia/aktualizacji: 2026-09-13
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-09-13) — Domyślne zaświadczenia w ustawieniach serii
+## Ostatnio (2026-09-13) — Skrócenie copy na checkoutcie kursów nagranych
+
+Tylko treści i prezentacja: krótki akapit 14 dni (osoba/JDG), nowe brzmienie oświadczenia kursu (`2026-09-13-course-v1`, zakres nadal usługa + treści cyfrowe), gwarancja jako „zgłoszenie” z liczbą dni z oferty. Bez checkboxa regulaminu, bez zmiany przycisku, bez nowej wersji Regulaminu. Otwarte: kwalifikacja prawna kursu i pełne zasady gwarancji.
+
+## Wcześniej (2026-09-13) — Przygotowanie prawne sprzedaży kursów nagranych
+
+Lokalnie: okno 14 dni vs planowany start (nie „data w przyszłości”), zapis treści oświadczenia, PDF potwierdzenia, checkout i odstąpienie, art. 14 w mailu uczestnika, snapshot przedłużenia, cofnięcie przedłużenia bez kasowania innych praw. Regulamin 2026-09-08 bez zmian. Projekt nowej wersji nieopublikowany. **Kursy nie są gotowe do produkcji** — decyzje: [LEGAL_PRODUCT_LAUNCH_DECISIONS.md](./LEGAL_PRODUCT_LAUNCH_DECISIONS.md).
+
+## Wcześniej (2026-09-13) — Katalog bez sprzedaży (archiwum)
+
+W ADM: **Pokazuj w katalogu /kursy** i **Można kupić** osobno. Kurs archiwalny widać na pnedu.pl z komunikatem „Sprzedaż wyłączona”, bez checkoutu, bez sitemapy (`noindex`). Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Wcześniej (2026-09-13) — Oferta kursu przy istniejącym dostępie
+
+Na `/kursy` i `/kursy/{slug}` zalogowany uczestnik (e-mail enrollmentu) widzi „Przejdź do kursu”, datę końca albo „Dostęp od”. Przy dostępie czasowym te same warianty służą do przedłużenia (okres od obecnej daty końca). Bezterminowy chowa cennik. Po wygaśnięciu zwykły zakup. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Wcześniej (2026-09-13) — Domyślne zaświadczenia w ustawieniach serii
 
 Na `/courses/series/{id}/edit` można ustawić format numeracji i szablon zaświadczeń. Nowe szkolenia dodane do serii dostają te wartości (tylko gdy mają jeszcze domyślne `/PNE`). Historycznych nie ruszamy. Dla TIK migracja wstępnie ustawia `{nr}/{course_id}/{year}/TIK` i szablon 5. Kanon: [CERTIFICATES.md](./CERTIFICATES.md).
 
 ## Strategia produktowa — platform-first
 
 Kanon: **[strategy/PNEDU_PLATFORM_FIRST.md](./strategy/PNEDU_PLATFORM_FIRST.md)** — uczestnik ma przechodzić przez pnedu.pl (konto, dashboard, embed), ClickMeeting jako silnik + fallback. Przy nowych funkcjach live/dostępu sprawdzaj zgodność z tym dokumentem.
+
+## Ostatnio (2026-09-13) — Omnibus z historią cen i korektą ręczną
+
+Najniższa cena z 30 dni przed obniżką liczy się z `price_offer_histories` (kursy nagrane i szkolenia), nie z pola „cena regularna”. ADM: wyłączenie / przywrócenie wpisu z powodem. Harmonogram: `omnibus:sync-prices` co godzinę. Migracja `2026_09_13_163000_create_price_offer_histories_table`. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Wcześniej (2026-09-13) — Promocja kursów nagranych jak przy szkoleniach
+
+Na `/kursy`, ofercie i checkoutcie wariant z aktywną promocją i datą końcową pokazuje „Promocja trwa do” oraz linię Omnibus. W ADM jest przełącznik **Pokaż licznik do końca promocji**. Migracja `2026_09_13_160000_add_show_promotion_countdown_to_product_prices`.
+
+## Wcześniej (2026-09-12) — Przedsprzedaż i 30 dni gwarancji satysfakcji
+
+Kursy nagrane: data startu i notatka na wariancie ceny; gwarancja (domyślnie 30 dni) na ofercie. Zegar gwarancji od faktycznego startu dostępu. Zwrot tylko ręcznie (mail/telefon + ADM). Oświadczenie 14-dniowe nie pokazuje się przy przyszłej dacie startu. Dashboard blokuje lekcje do dnia startu. Migracja `2026_09_12_104200_add_presale_and_satisfaction_guarantee`. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md), [LEGAL_CHECKOUT.md](./LEGAL_CHECKOUT.md).
+
+## Wcześniej (2026-09-12) — Sprzedaż nagranych kursów online
+
+Wdrożono lokalnie w obu aplikacjach pełny flow: menu **Kursy**, katalog `/kursy`, oferta, checkout dla wielu uczestników, faktura odroczona, PayU, PayNow oraz generyczne snapshoty `order_items`. Status `paid` automatycznie tworzy/wykorzystuje konto pnedu i nadaje dostęp. W ADM na `/form-orders/{id}` operator nadaje i wycofuje dostęp per osoba albo wszystkim (jak przy szkoleniach, bez ClickMeeting). Edycja e-mailu uczestnika synchronizuje odbiorców produktu. Lista `/form-orders` rozpoznaje zamówienia produktowe po `order_fulfillments`. Podsumowanie `/zamowienia-kursow/{ident}` pokazuje numer ID, PDF i edycję jak przy szkoleniach. Na `/dashboard/kursy-online` uczestnik (tylko e-mail z zamówienia) widzi zablokowaną kartę do czasu nadania dostępu; przy nieopłaconej płatności online ma **Dokończ płatność** albo rezygnację. Rezygnacja kasuje tylko jego kartę.
+
+Przed produkcją pozostają: przegląd prawny treści cyfrowych, pełny smoke obu bramek w sandboxie oraz deploy obu aplikacji zgodnie z runbookiem. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Wcześniej (2026-09-11) — Fundament sprzedaży produktów i kursów online
+
+Dodano addytywny katalog `products` → `product_offers` → `product_prices` oraz zakładkę **Sprzedaż** przy kursach nagranych. Administrator może skonfigurować slug/SKU/SEO, PayU, PayNow, fakturę odroczoną i warianty ceny za uczestnika z dostępem na rok, dwa lata, bezterminowo lub do daty. Nie zmieniono sprzedaży `courses` ani semantyki `form_orders.product_id`.
 
 ## Ostatnio (2026-09-11) — Wielu uczestników w create/edit zamówienia ADM
 

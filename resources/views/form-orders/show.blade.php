@@ -476,7 +476,11 @@ nowoczesna-edukacja.pl </div>
                         </div>
                     </div>
 
-                    @include('form-orders.partials.participants-cards', ['zamowienie' => $zamowienie])
+                    @if($zamowienie->isProductOrder())
+                        @include('form-orders.partials.product-fulfillment', ['zamowienie' => $zamowienie])
+                    @else
+                        @include('form-orders.partials.participants-cards', ['zamowienie' => $zamowienie])
+                    @endif
 
                     @if($zamowienie->orderer_name || $zamowienie->orderer_phone || $zamowienie->orderer_email)
                         <div class="card mb-3">
@@ -1373,6 +1377,165 @@ nowoczesna-edukacja.pl `;
                 initPneduStatusWidgets({ autoCollapseFopId: expandFopId || null, autoCollapseMs: 2200 });
                 // STATUS ZAMÓWIENIA (0/1 → 1/1 itd.) — ten sam partial co po wystawieniu FV iFirma.
                 refreshOperationalStatusPanel();
+            });
+        }
+
+        function softRefreshProductFulfillment() {
+            const root = document.getElementById('formOrderProductFulfillmentRoot');
+            if (!root) {
+                return Promise.reject(new Error('Brak panelu dostępów produktu'));
+            }
+            const url = root.getAttribute('data-fulfillment-partial-url');
+            if (!url) {
+                return Promise.reject(new Error('Brak URL partial'));
+            }
+            const scrollY = window.scrollY;
+            return fetch(url, {
+                headers: {
+                    'Accept': 'text/html',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            }).then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Nie udało się odświeżyć panelu dostępów');
+                }
+                return res.text();
+            }).then(function (html) {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = html.trim();
+                const next = wrap.querySelector('#formOrderProductFulfillmentRoot') || wrap.firstElementChild;
+                if (!next) {
+                    throw new Error('Pusta odpowiedź partial');
+                }
+                root.replaceWith(next);
+                window.scrollTo(0, scrollY);
+                refreshOperationalStatusPanel();
+            });
+        }
+
+        function fulfillProductAccess(orderId, options) {
+            options = options || {};
+            const recipientId = options.recipientId || null;
+            const buttons = document.querySelectorAll('.js-product-fulfill-btn');
+            const resultDiv = (recipientId && document.getElementById('productFulfillResult_' + recipientId))
+                || document.getElementById('productFulfillResultAll')
+                || document.getElementById('productFulfillResult');
+            buttons.forEach((btn) => {
+                btn.disabled = true;
+                if (!btn.dataset.productOriginalHtml) {
+                    btn.dataset.productOriginalHtml = btn.innerHTML;
+                }
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Przetwarzanie...';
+            });
+            if (resultDiv) {
+                resultDiv.innerHTML = '<div class="alert alert-info py-2 mb-0 small" role="status"><span class="spinner-border spinner-border-sm me-2"></span>Nadawanie dostępu…</div>';
+            }
+
+            const payload = {};
+            if (recipientId) {
+                payload.recipient_id = recipientId;
+            }
+
+            fetch(`/form-orders/${orderId}/product/fulfill`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(payload),
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data.success) {
+                    return softRefreshProductFulfillment();
+                }
+                const message = data.message || data.error || 'Nie udało się nadać dostępu.';
+                if (resultDiv) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">' + message + '</div>';
+                }
+                buttons.forEach((btn) => {
+                    btn.disabled = false;
+                    btn.innerHTML = btn.dataset.productOriginalHtml || btn.innerHTML;
+                });
+            })
+            .catch(() => {
+                if (resultDiv) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">Wystąpił błąd podczas nadawania dostępu.</div>';
+                }
+                buttons.forEach((btn) => {
+                    btn.disabled = false;
+                    btn.innerHTML = btn.dataset.productOriginalHtml || btn.innerHTML;
+                });
+            });
+        }
+
+        function revokeProductAccess(orderId) {
+            const modalEl = document.getElementById('revokeProductAccessModal');
+            const button = document.getElementById('revokeProductAccessConfirmBtn');
+            const errorEl = document.getElementById('revokeProductAccessError');
+            if (errorEl) {
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="bi bi-hourglass-split"></i> Wycofywanie...';
+            }
+
+            const payload = {};
+            if (modalEl && modalEl.dataset.revokeAll !== '1' && modalEl.dataset.recipientId) {
+                payload.recipient_id = Number(modalEl.dataset.recipientId);
+            }
+
+            fetch(`/form-orders/${orderId}/product/revoke`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(payload),
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data.success) {
+                    hideBootstrapModal(modalEl)
+                        .then(function () {
+                            return softRefreshProductFulfillment();
+                        })
+                        .then(function () {
+                            clearOrphanModalBackdrop();
+                            if (button) {
+                                button.disabled = false;
+                                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp';
+                            }
+                        })
+                        .catch(function () {
+                            location.reload();
+                        });
+                    return;
+                }
+                const message = data.error || data.message || 'Nie udało się wycofać dostępu.';
+                if (errorEl) {
+                    errorEl.textContent = message;
+                    errorEl.classList.remove('d-none');
+                }
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp';
+                }
+            })
+            .catch(() => {
+                if (errorEl) {
+                    errorEl.textContent = 'Wystąpił błąd podczas wycofywania dostępu.';
+                    errorEl.classList.remove('d-none');
+                }
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp';
+                }
             });
         }
 
@@ -3389,6 +3552,58 @@ nowoczesna-edukacja.pl `;
                     }
                 });
             }
+
+            const revokeProductModal = document.getElementById('revokeProductAccessModal');
+            if (revokeProductModal) {
+                revokeProductModal.addEventListener('show.bs.modal', function (event) {
+                    const trigger = event.relatedTarget && event.relatedTarget.classList.contains('js-revoke-product-btn')
+                        ? event.relatedTarget
+                        : null;
+                    const errorEl = document.getElementById('revokeProductAccessError');
+                    const nameEl = document.getElementById('revokeProductParticipantName');
+                    const emailEl = document.getElementById('revokeProductParticipantEmail');
+                    const emailRow = document.getElementById('revokeProductEmailRow');
+                    const introEl = document.getElementById('revokeProductAccessIntro');
+                    const titleEl = document.getElementById('revokeProductAccessModalLabel');
+                    const confirmBtn = document.getElementById('revokeProductAccessConfirmBtn');
+                    const revokeAll = trigger ? trigger.getAttribute('data-revoke-all') === '1' : false;
+                    const recipientId = trigger ? (trigger.getAttribute('data-recipient-id') || '') : '';
+                    const name = trigger ? (trigger.getAttribute('data-participant-name') || '—') : '—';
+                    const email = trigger ? (trigger.getAttribute('data-participant-email') || '') : '';
+
+                    revokeProductModal.dataset.revokeAll = revokeAll ? '1' : '0';
+                    revokeProductModal.dataset.recipientId = recipientId;
+                    if (errorEl) {
+                        errorEl.classList.add('d-none');
+                        errorEl.textContent = '';
+                    }
+                    if (nameEl) {
+                        nameEl.textContent = name;
+                    }
+                    if (emailEl) {
+                        emailEl.textContent = email || '—';
+                    }
+                    if (emailRow) {
+                        emailRow.classList.toggle('d-none', revokeAll || email === '');
+                    }
+                    if (introEl) {
+                        introEl.innerHTML = revokeAll
+                            ? 'Czy na pewno chcesz wycofać dostęp do kursu online dla <strong>wszystkich</strong> uczestników zamówienia <strong>#' + {{ $zamowienie->id }} + '</strong>?'
+                            : 'Czy na pewno chcesz wycofać dostęp do kursu online dla wybranego uczestnika w zamówieniu <strong>#' + {{ $zamowienie->id }} + '</strong>?';
+                    }
+                    if (titleEl) {
+                        titleEl.innerHTML = revokeAll
+                            ? '<i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp wszystkim'
+                            : '<i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp — ' + name;
+                    }
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = revokeAll
+                            ? '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp wszystkim'
+                            : '<i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp';
+                    }
+                });
+            }
         });
 
         // Wstaw ID szkolenia do filtra (klik w „ID szkolenia (courses): …”)
@@ -4155,6 +4370,49 @@ nowoczesna-edukacja.pl `;
             </div>
         </div>
     </div>
+
+    @if($zamowienie->isProductOrder())
+    <div class="modal fade" id="revokeProductAccessModal" tabindex="-1" aria-labelledby="revokeProductAccessModalLabel" aria-hidden="true"
+         data-revoke-all="0"
+         data-recipient-id="">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="revokeProductAccessModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Wycofaj dostęp
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="revokeProductAccessIntro">Czy na pewno chcesz wycofać dostęp do kursu online?</p>
+                    <div class="bg-light p-3 rounded">
+                        <h6 class="mb-2">Szczegóły:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Zamówienie:</strong> #{{ $zamowienie->id }}</li>
+                            <li><strong>Uczestnik:</strong> <span id="revokeProductParticipantName">—</span></li>
+                            <li id="revokeProductEmailRow"><strong>E-mail:</strong> <span id="revokeProductParticipantEmail">—</span></li>
+                            <li><strong>Produkt:</strong> {{ $zamowienie->display_product_name }}</li>
+                        </ul>
+                    </div>
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Uwaga:</strong> Usuwamy dostęp do kursu online (zapis w kursie).
+                        Konto na pnedu.pl zostaje. Po poprawieniu e-mailu możesz nadać dostęp ponownie.
+                    </div>
+                    <div id="revokeProductAccessError" class="alert alert-danger py-2 small mt-2 mb-0 d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Anuluj
+                    </button>
+                    <button type="button" class="btn btn-warning" id="revokeProductAccessConfirmBtn" onclick="revokeProductAccess({{ $zamowienie->id }})">
+                        <i class="bi bi-arrow-clockwise"></i> Wycofaj dostęp
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modal zwolnienia z faktury (bezpłatny dostęp) --}}
     <div class="modal fade" id="invoiceExemptModal" tabindex="-1" aria-labelledby="invoiceExemptModalLabel" aria-hidden="true">

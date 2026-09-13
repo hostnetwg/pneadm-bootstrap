@@ -4,7 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\FormOrder;
 use App\Models\FormOrderParticipant;
+use App\Models\OnlineCourse;
+use App\Models\OrderFulfillment;
+use App\Models\OrderItem;
+use App\Models\OrderItemRecipient;
 use App\Models\Participant;
+use App\Models\Product;
+use App\Models\ProductOffer;
+use App\Models\ProductPrice;
 use App\Models\User;
 use App\Services\FormOrderOperationalStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -180,6 +187,7 @@ class FormOrderOperationalStatusTest extends TestCase
         ]);
         FormOrderParticipant::where('form_order_id', $missingInvoice->id)
             ->update(['participant_id' => $missingInvoiceParticipant->id]);
+        $missingInvoice->update(['pnedu_provisioned_at' => now()]);
 
         $missingParticipant = $this->createOrderWithParticipant($courseId, ['invoice_number' => 'FV/1/2026'], [
             'participant_email' => 'missing-participant@example.test',
@@ -200,6 +208,7 @@ class FormOrderOperationalStatusTest extends TestCase
         ]);
         FormOrderParticipant::where('form_order_id', $freeAccessDone->id)
             ->update(['participant_id' => $freeAccessParticipant->id]);
+        $freeAccessDone->update(['pnedu_provisioned_at' => now()]);
 
         $cancelled = $this->createOrderWithParticipant($courseId, [
             'cancelled_at' => now(),
@@ -379,5 +388,164 @@ class FormOrderOperationalStatusTest extends TestCase
         $after->assertDontSee('Nieprzetworzone', false);
         $after->assertSee('Przetworzone', false);
         $after->assertSee('Faktura wystawiona', false);
+    }
+
+    public function test_unfulfilled_product_order_needs_provisioning_and_stays_in_active_queue(): void
+    {
+        $order = $this->createProductOrder();
+        $service = app(FormOrderOperationalStatusService::class);
+        $status = $service->evaluate($order->fresh(['orderItems.recipients.fulfillments']));
+
+        $this->assertSame(FormOrderOperationalStatusService::STATUS_NEEDS_PROVISIONING, $status['status']);
+        $this->assertSame('Do nadania dostępu', $status['label']);
+        $this->assertSame(1, $status['expected_count']);
+        $this->assertSame(0, $status['provisioned_count']);
+        $this->assertNull($status['course_id']);
+        $this->assertTrue($service->needsAttention($order));
+        $this->assertTrue($service->needsOperationalHandling($order));
+        $this->assertTrue(FormOrder::new()->whereKey($order->id)->exists());
+        $this->assertTrue(FormOrder::needsHandling()->whereKey($order->id)->exists());
+        $this->assertTrue(FormOrder::needsActiveHandling()->whereKey($order->id)->exists());
+        $this->assertFalse(FormOrder::processed()->whereKey($order->id)->exists());
+    }
+
+    public function test_fulfilled_product_order_without_invoice_needs_invoice_not_course_participant(): void
+    {
+        $order = $this->createProductOrder();
+        $this->markProductOrderFulfilled($order);
+
+        $service = app(FormOrderOperationalStatusService::class);
+        $status = $service->evaluate($order->fresh(['orderItems.recipients.fulfillments']));
+
+        $this->assertSame(FormOrderOperationalStatusService::STATUS_NEEDS_INVOICE, $status['status']);
+        $this->assertSame(1, $status['provisioned_count']);
+        $this->assertFalse($service->needsAttention($order->fresh()));
+        $this->assertTrue($service->needsOperationalHandling($order->fresh()));
+        $this->assertTrue(FormOrder::needsHandling()->whereKey($order->id)->exists());
+        $this->assertTrue(FormOrder::needsActiveHandling()->whereKey($order->id)->exists());
+        $this->assertFalse(FormOrder::new()->whereKey($order->id)->exists());
+        $this->assertFalse(FormOrder::processed()->whereKey($order->id)->exists());
+        $this->assertStringContainsString('Dostęp nadany, ale faktura nie została wystawiona.', implode(' ', $status['warnings']));
+    }
+
+    public function test_fulfilled_and_invoiced_product_order_is_processed(): void
+    {
+        $order = $this->createProductOrder(['invoice_number' => 'FV/KURS/1/2026']);
+        $this->markProductOrderFulfilled($order);
+
+        $service = app(FormOrderOperationalStatusService::class);
+        $status = $service->evaluate($order->fresh(['orderItems.recipients.fulfillments']));
+
+        $this->assertSame(FormOrderOperationalStatusService::STATUS_PROCESSED, $status['status']);
+        $this->assertFalse($service->needsAttention($order->fresh()));
+        $this->assertFalse($service->needsOperationalHandling($order->fresh()));
+        $this->assertFalse(FormOrder::needsHandling()->whereKey($order->id)->exists());
+        $this->assertFalse(FormOrder::needsActiveHandling()->whereKey($order->id)->exists());
+        $this->assertTrue(FormOrder::processed()->whereKey($order->id)->exists());
+    }
+
+    /**
+     * @param  array<string, mixed>  $orderOverrides
+     */
+    private function createProductOrder(array $orderOverrides = []): FormOrder
+    {
+        $course = OnlineCourse::query()->create([
+            'slug' => 'status-product-'.uniqid(),
+            'title' => 'Kurs produktowy status',
+            'is_active' => true,
+            'visible_in_dashboard' => true,
+        ]);
+        $product = Product::query()->create([
+            'type' => Product::TYPE_ONLINE_COURSE,
+            'resource_id' => $course->id,
+            'name' => $course->title,
+            'slug' => 'status-product-'.uniqid(),
+            'fulfillment_type' => Product::FULFILLMENT_ONLINE_COURSE_ACCESS,
+            'is_active' => true,
+            'requires_shipping' => false,
+        ]);
+        $offer = ProductOffer::query()->create([
+            'product_id' => $product->id,
+            'code' => ProductOffer::DEFAULT_CODE,
+            'sales_channel' => ProductOffer::CHANNEL_PNEDU,
+            'is_active' => true,
+            'is_public' => true,
+            'allow_multiple_recipients' => true,
+            'allow_deferred_invoice' => true,
+        ]);
+        $price = ProductPrice::query()->create([
+            'product_offer_id' => $offer->id,
+            'name' => 'Dostęp 12 miesięcy',
+            'is_active' => true,
+            'price' => '199.00',
+            'currency' => 'PLN',
+            'tax_treatment' => ProductPrice::TAX_EXEMPT,
+            'access_policy' => ProductPrice::ACCESS_DURATION_FROM_GRANT,
+            'access_duration_value' => 12,
+            'access_duration_unit' => 'months',
+        ]);
+        $order = FormOrder::query()->create(array_merge([
+            'ident' => FormOrder::generateIdent(),
+            'order_date' => now('UTC'),
+            'order_kind' => 'product',
+            'product_name' => $product->name,
+            'product_price' => '199.00',
+            'orderer_name' => 'Szkoła Status',
+            'orderer_email' => 'status-'.uniqid().'@example.test',
+            'buyer_name' => 'Gmina Testowa',
+            'payment_mode' => FormOrder::PAYMENT_MODE_DEFERRED_INVOICE,
+            'payment_status' => FormOrder::PAYMENT_STATUS_SUBMITTED,
+            'status_completed' => 0,
+        ], $orderOverrides));
+        $participant = FormOrderParticipant::query()->create([
+            'form_order_id' => $order->id,
+            'participant_firstname' => 'Anna',
+            'participant_lastname' => 'Nowak',
+            'participant_email' => 'anna-status@example.test',
+            'is_primary' => true,
+        ]);
+        $item = OrderItem::query()->create([
+            'form_order_id' => $order->id,
+            'product_id' => $product->id,
+            'product_offer_id' => $offer->id,
+            'product_price_id' => $price->id,
+            'product_type' => Product::TYPE_ONLINE_COURSE,
+            'product_name' => $product->name,
+            'fulfillment_type' => Product::FULFILLMENT_ONLINE_COURSE_ACCESS,
+            'requires_shipping' => false,
+            'unit_price' => '199.00',
+            'quantity' => 1,
+            'line_total' => '199.00',
+            'currency' => 'PLN',
+            'tax_treatment' => ProductPrice::TAX_EXEMPT,
+            'access_policy' => ProductPrice::ACCESS_DURATION_FROM_GRANT,
+            'access_duration_value' => 12,
+            'access_duration_unit' => 'months',
+            'metadata' => ['online_course_id' => $course->id],
+        ]);
+        OrderItemRecipient::query()->create([
+            'order_item_id' => $item->id,
+            'form_order_participant_id' => $participant->id,
+            'first_name' => 'Anna',
+            'last_name' => 'Nowak',
+            'email' => 'anna-status@example.test',
+            'status' => OrderItemRecipient::STATUS_PENDING,
+        ]);
+
+        return $order->fresh(['orderItems.recipients.fulfillments', 'participants']);
+    }
+
+    private function markProductOrderFulfilled(FormOrder $order): void
+    {
+        $recipient = $order->orderItems->firstOrFail()->recipients->firstOrFail();
+        OrderFulfillment::query()->create([
+            'order_item_recipient_id' => $recipient->id,
+            'type' => OrderFulfillment::TYPE_ONLINE_COURSE_ACCESS,
+            'idempotency_key' => 'test-product-status-'.$recipient->id,
+            'status' => OrderFulfillment::STATUS_SUCCEEDED,
+            'granted_at' => now('UTC'),
+        ]);
+        $recipient->update(['status' => OrderItemRecipient::STATUS_FULFILLED]);
+        $order->update(['pnedu_provisioned_at' => now('UTC')]);
     }
 }

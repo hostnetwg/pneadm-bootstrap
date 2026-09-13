@@ -2,11 +2,11 @@
     $op = $zamowienie->operational_status;
 @endphp
 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-    <span class="badge {{ $op['badge_class'] }}" title="Status operacyjny (uczestnicy + faktura)">
+    <span class="badge {{ $op['badge_class'] }}" title="{{ $zamowienie->isProductOrder() ? 'Status operacyjny (dostępy + faktura)' : 'Status operacyjny (uczestnicy + faktura)' }}">
         {{ $op['label'] }}
     </span>
     @if($op['expected_count'] > 0)
-        <span class="badge bg-light text-dark border" title="Uczestnicy z dostępem na szkoleniu / oczekiwani">
+        <span class="badge bg-light text-dark border" title="{{ $zamowienie->isProductOrder() ? 'Odbiorcy z nadanym dostępem / oczekiwani' : 'Uczestnicy z dostępem na szkoleniu / oczekiwani' }}">
             <i class="bi bi-people"></i> {{ $op['provisioned_count'] }}/{{ $op['expected_count'] }}
         </span>
     @endif
