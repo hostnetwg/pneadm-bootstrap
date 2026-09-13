@@ -58,6 +58,7 @@ class ProductPriceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
+            'is_complimentary' => ['nullable', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
             'price' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
             'tax_treatment' => ['required', 'string', 'in:exempt,standard'],
@@ -86,8 +87,16 @@ class ProductPriceController extends Controller
             ? $this->nullableTrim($validated['tax_exemption_basis'] ?? null)
             : null;
         unset($validated['tax_rate_percent']);
+        $validated['is_complimentary'] = (bool) ($validated['is_complimentary'] ?? false);
 
-        if (! (bool) $validated['is_promotion']) {
+        if ($validated['is_complimentary']) {
+            $validated['price'] = '0.00';
+            $validated['is_promotion'] = false;
+            $validated['promotion_price'] = null;
+            $validated['promotion_starts_at'] = null;
+            $validated['promotion_ends_at'] = null;
+            $validated['show_promotion_countdown'] = false;
+        } elseif (! (bool) $validated['is_promotion']) {
             $validated['promotion_price'] = null;
             $validated['promotion_starts_at'] = null;
             $validated['promotion_ends_at'] = null;

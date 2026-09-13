@@ -27,6 +27,7 @@ Wszystkie w `pneadm/database/migrations/` (baza `pneadm`):
 2026_09_13_160000_add_show_promotion_countdown_to_product_prices.php
 2026_09_13_163000_create_price_offer_histories_table.php
 2026_09_13_220000_add_product_legal_snapshot_fields.php
+2026_09_13_234500_add_is_complimentary_to_product_prices.php
 ```
 
 ## Lokalnie

@@ -107,6 +107,12 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 - `pneadm` `PriceOmnibusServiceTest`: najniższa z historii, wyłączenie wpisu, pogłębienie promocji jako nowa obniżka, `sync` przy zmianie ceny,
 - `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”.
 
+## Weryfikacja bezpłatnego zapisu kursów — 2026-09-13
+
+- migracja `2026_09_13_234500_add_is_complimentary_to_product_prices`,
+- `pneadm` `OnlineCourseSalesCatalogTest`: flaga zeruje cenę i wyłącza promocję,
+- `pnedu` `FreeCourseSignupTest`: CTA bez 0,00 zł, checkout 404 dla wariantu bezpłatnego, nowy e-mail dostaje konto i mail, powtórny zapis bez duplikatu, przedsprzedaż zostawia datę startu.
+
 ## Weryfikacja skróconego copy checkoutu kursów — 2026-09-13
 
 - `pnedu` `ProductCheckoutTest`: szkoła ma ukryty blok 14 dni i oświadczenie; osoba/JDG dostaje krótki akapit + link `/odstapienie-od-umowy`; nowa treść oświadczenia niezaznaczona i weryfikowana backendem; potwierdzenie pokazuje tekst z zamówienia, nie aktualną etykietę; gwarancja używa liczby dni z oferty;

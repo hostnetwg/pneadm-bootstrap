@@ -165,7 +165,11 @@
                         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <span>
                                 <strong>{{ $price->name }}</strong>
-                                <span class="text-muted ms-2">{{ number_format($price->currentPrice(), 2, ',', ' ') }} zł</span>
+                                @if($price->isComplimentary())
+                                    <span class="badge text-bg-success ms-2">Bezpłatny zapis</span>
+                                @else
+                                    <span class="text-muted ms-2">{{ number_format($price->currentPrice(), 2, ',', ' ') }} zł</span>
+                                @endif
                             </span>
                             <span class="d-flex gap-2">
                                 <span class="badge {{ $price->is_active ? 'text-bg-success' : 'text-bg-secondary' }}">

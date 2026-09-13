@@ -96,7 +96,32 @@ class OnlineCourseSalesCatalogTest extends TestCase
             '2026-11-01',
             $createdPrice->access_starts_at?->timezone('Europe/Warsaw')->format('Y-m-d')
         );
+        $this->assertFalse($createdPrice->isComplimentary());
 
+        $this->actingAs($admin)
+            ->post(route('online-courses.sales.prices.store', $course), [
+                'name' => 'Bezpłatny dostęp testowy',
+                'description' => '',
+                'is_active' => '1',
+                'is_complimentary' => '1',
+                'sort_order' => '20',
+                'price' => '199.00',
+                'tax_treatment' => ProductPrice::TAX_EXEMPT,
+                'is_promotion' => '1',
+                'promotion_price' => '99.00',
+                'access_policy' => ProductPrice::ACCESS_DURATION_FROM_GRANT,
+                'access_duration_value' => '3',
+                'access_duration_unit' => 'months',
+            ])
+            ->assertRedirect(route('online-courses.sales.edit', $course));
+
+        $freePrice = ProductPrice::query()
+            ->where('product_offer_id', $offer->id)
+            ->where('name', 'Bezpłatny dostęp testowy')
+            ->firstOrFail();
+        $this->assertTrue($freePrice->isComplimentary());
+        $this->assertSame('0.00', (string) $freePrice->price);
+        $this->assertFalse($freePrice->is_promotion);
     }
 
     public function test_active_sales_requires_at_least_one_payment_method(): void

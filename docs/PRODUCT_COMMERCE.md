@@ -167,6 +167,8 @@ Kurs pojawia się publicznie tylko wtedy, gdy kurs źródłowy, produkt i oferta
 
 Checkout zapisuje snapshot i obsługuje fakturę odroczoną, PayU i PayNow. PayU/PayNow pobierają nazwę, ilość i cenę jednostkową z `order_items`, jeżeli `course_id` jest puste.
 
+Bezpłatny zapis publiczny to osobna ścieżka (`/kursy/{slug}/zapis`), nie wariant 0 zł w checkoutcie. Flaga `product_prices.is_complimentary` pokazuje **„Zapisz się bezpłatnie”** i od razu tworzy konto oraz `online_course_enrollments` ze źródłem `free_signup`. Obok może stać płatny wariant. Checkout i PayU odrzucają wariant bezpłatny.
+
 SEO:
 
 - unikalne title/meta/canonical,

@@ -3,7 +3,11 @@
 Data utworzenia/aktualizacji: 2026-09-13
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-09-13) — Skrócenie copy na checkoutcie kursów nagranych
+## Ostatnio (2026-09-13) — Bezpłatny zapis na kurs nagrany
+
+Na ofercie, obok płatnego wariantu: **„Zapisz się bezpłatnie”**. Krótki formularz, od razu konto + dostęp + mail. Nie przez checkout 0 zł. Flaga w ADM: **Bezpłatny zapis publiczny**. Migracja `2026_09_13_234500_add_is_complimentary_to_product_prices`.
+
+## Wcześniej (2026-09-13) — Skrócenie copy na checkoutcie kursów nagranych
 
 Tylko treści i prezentacja: krótki akapit 14 dni (osoba/JDG), nowe brzmienie oświadczenia kursu (`2026-09-13-course-v1`, zakres nadal usługa + treści cyfrowe), gwarancja jako „zgłoszenie” z liczbą dni z oferty. Bez checkboxa regulaminu, bez zmiany przycisku, bez nowej wersji Regulaminu. Otwarte: kwalifikacja prawna kursu i pełne zasady gwarancji.
 

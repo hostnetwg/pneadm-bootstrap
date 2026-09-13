@@ -106,6 +106,15 @@
 
         <div class="col-12">
             <div class="form-check">
+                <input type="hidden" name="is_complimentary" value="0">
+                <input id="{{ $formId }}IsComplimentary" type="checkbox" name="is_complimentary" value="1" class="form-check-input"
+                       @checked((bool) old('is_complimentary', $price?->is_complimentary ?? false))>
+                <label class="form-check-label" for="{{ $formId }}IsComplimentary">Bezpłatny zapis publiczny</label>
+                <div class="form-text">Na ofercie pojawia się przycisk „Zapisz się bezpłatnie”. Cena zostaje ustawiona na 0 zł i nie idzie przez checkout ani PayU.</div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="form-check">
                 <input type="hidden" name="is_promotion" value="0">
                 <input id="{{ $formId }}IsPromotion" type="checkbox" name="is_promotion" value="1" class="form-check-input"
                        data-promotion-toggle @checked((bool) old('is_promotion', $price?->is_promotion ?? false))>
