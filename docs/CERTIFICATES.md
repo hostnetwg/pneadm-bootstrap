@@ -1,7 +1,7 @@
 # Zaświadczenia — dokumentacja (kanon: pneadm)
 
 Opis systemu generowania PDF zaświadczeń w ekosystemie **pneadm** (adm) + **pnedu** (front).  
-Ostatnia aktualizacja: **lipiec 2026**.
+Ostatnia aktualizacja: **2026-09-13**.
 
 ## Spis treści
 
@@ -118,6 +118,21 @@ Lista numerowana: linie zaczynające się od `1.`, `2.` itd. — renderowane jak
 - **Zakres:** pole „Zakres szkolenia / Zagadnienia” → `courses.description`
 - Szablon: `certificate_template_id`, format: `certificate_format`
 
+### Domyślne zaświadczenia w serii szkoleń
+
+Na edycji serii (`/courses/series/{id}/edit`) można ustawić:
+
+- `course_series.certificate_format` — np. `{nr}/{course_id}/{year}/TIK`
+- `course_series.certificate_template_id` — np. szablon 5 „Szablon Domyślny TIK”
+
+Przy **dodaniu** szkolenia do serii te wartości kopiują się na kurs, **tylko gdy** format szkolenia jest nadal domyślny `{nr}/{course_id}/{year}/PNE` i szablon jest pusty albo już taki sam jak w serii. Szkolenia już w serii **nie są** nadpisywane (brak backfillu). Po dodaniu pola na `/courses/{id}/edit` zostają ręcznie edytowalne.
+
+Przy **usunięciu** z serii: cofnięcie do `/PNE` i pustego szablonu tylko wtedy, gdy szkolenie nadal ma dokładnie wartości z ustawień serii. Ręczna zmiana formatu/szablonu oraz historyczne szablony (np. id 6) zostają.
+
+Puste pola w serii = brak automatyzacji. Serwis: `App\Services\Certificate\CourseSeriesCertificateSettings` (z `CourseSeriesController::updateCourses`).
+
+Migracja `2026_09_13_191300_add_certificate_defaults_to_course_series_table` dodaje kolumny i wstępnie wypełnia serię `tik-w-pracy-nauczyciela` (format TIK + szablon 5, jeśli istnieje).
+
 ### pnedu
 
 - Zalogowany użytkownik: `/dashboard/zaswiadczenia`
@@ -196,10 +211,11 @@ Kursy online — **tylko przez zalogowane konto** na pnedu (brak tokenu publiczn
 | Zmienne `event_text` | `app/Services/Certificate/CertificateTemplateVariableResolver.php` |
 | Kursy online — wydanie | `app/Services/Certificate/OnlineCourseCertificateIssueService.php` |
 | Numeracja | `app/Services/Certificate/CertificateNumberGenerator.php` |
+| Seria — auto format/szablon z ustawień serii | `app/Services/Certificate/CourseSeriesCertificateSettings.php`, `CourseSeriesController::updateCourses` |
 | Admin szablony | `app/Http/Controllers/CertificateTemplateController.php` |
 | Admin online | `app/Http/Controllers/OnlineCoursesController.php`, `OnlineCourseEnrollmentController.php` |
 | Model | `app/Models/Certificate.php` |
-| Testy | `tests/Unit/CertificateTemplateVariableResolverTest.php` |
+| Testy | `tests/Unit/CertificateTemplateVariableResolverTest.php`, `tests/Feature/CourseSeriesCertificateSettingsTest.php` |
 
 ---
 
@@ -219,6 +235,7 @@ Kursy online — **tylko przez zalogowane konto** na pnedu (brak tokenu publiczn
 
 | Migracja | Opis |
 |----------|------|
+| `2026_09_13_191300_add_certificate_defaults_to_course_series_table` | Domyślny format i szablon zaświadczeń na `course_series` (+ wstępne TIK) |
 | `2026_07_07_120000_add_certificate_fields_to_online_courses_table` | Pola cert na `online_courses` |
 | `2026_07_07_120001_extend_certificates_for_online_courses` | FK enrollment, nullable participant/course |
 | `2026_07_08_120000_add_training_scope_to_online_courses_table` | `training_scope` |

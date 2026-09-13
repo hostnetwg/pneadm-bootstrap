@@ -62,6 +62,8 @@
                     @endif
                 </div>
 
+                @include('courses.series.partials.certificate-defaults', ['series' => $series])
+
                 <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
                 <a href="{{ route('courses.series.index') }}" class="btn btn-secondary">Anuluj</a>
             </form>

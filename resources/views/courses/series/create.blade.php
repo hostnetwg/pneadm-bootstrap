@@ -50,6 +50,8 @@
                     <div class="form-text">Dozwolone formaty: JPEG, PNG, JPG, GIF (max 2MB)</div>
                 </div>
 
+                @include('courses.series.partials.certificate-defaults', ['series' => null])
+
                 <button type="submit" class="btn btn-primary">Utwórz serię</button>
                 <a href="{{ route('courses.series.index') }}" class="btn btn-secondary">Anuluj</a>
             </form>

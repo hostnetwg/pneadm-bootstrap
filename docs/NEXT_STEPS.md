@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-11  
+Data utworzenia/aktualizacji: 2026-09-13
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-13) — Domyślne zaświadczenia w ustawieniach serii
+
+Na `/courses/series/{id}/edit` można ustawić format numeracji i szablon zaświadczeń. Nowe szkolenia dodane do serii dostają te wartości (tylko gdy mają jeszcze domyślne `/PNE`). Historycznych nie ruszamy. Dla TIK migracja wstępnie ustawia `{nr}/{course_id}/{year}/TIK` i szablon 5. Kanon: [CERTIFICATES.md](./CERTIFICATES.md).
 
 ## Strategia produktowa — platform-first
 

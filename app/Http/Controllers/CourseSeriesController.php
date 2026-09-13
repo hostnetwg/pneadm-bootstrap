@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CourseSeries;
+use App\Models\CertificateTemplate;
 use App\Models\Course;
+use App\Models\CourseSeries;
+use App\Services\Certificate\CourseSeriesCertificateSettings;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CourseSeriesController extends Controller
 {
@@ -16,6 +19,7 @@ class CourseSeriesController extends Controller
     public function index()
     {
         $series = CourseSeries::withCount('courses')->orderBy('sort_order')->orderBy('name')->get();
+
         return view('courses.series.index', compact('series'));
     }
 
@@ -24,7 +28,9 @@ class CourseSeriesController extends Controller
      */
     public function create()
     {
-        return view('courses.series.create');
+        $certificateTemplates = $this->certificateTemplatesForSeries();
+
+        return view('courses.series.create', compact('certificateTemplates'));
     }
 
     /**
@@ -38,14 +44,18 @@ class CourseSeriesController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'certificate_format' => 'nullable|string|max:255',
+            'certificate_template_id' => 'nullable|exists:certificate_templates,id',
         ]);
+
+        $this->normalizeCertificateDefaults($validated);
 
         // Generowanie sluga z nazwy
         $validated['slug'] = Str::slug($validated['name']);
-        
+
         // Sprawdzenie unikalności sluga (proste zabezpieczenie, można rozbudować)
         if (CourseSeries::where('slug', $validated['slug'])->exists()) {
-            $validated['slug'] .= '-' . time();
+            $validated['slug'] .= '-'.time();
         }
 
         // Obsługa przesyłania obrazka
@@ -67,10 +77,10 @@ class CourseSeriesController extends Controller
     {
         // Pobierz kursy przypisane do serii (już posortowane przez relację w modelu)
         $courses = $series->courses;
-        
+
         // Pobierz ID kursów już przypisanych do serii
         $assignedCourseIds = $courses->pluck('id')->toArray();
-        
+
         // Pobierz wszystkie kursy do wyboru (do formularza dodawania w widoku show)
         // Sortowanie po dacie rozpoczęcia od najnowszych, z instruktorem i wszystkimi potrzebnymi polami
         // Wykluczamy kursy już przypisane do serii
@@ -78,14 +88,16 @@ class CourseSeriesController extends Controller
             ->whereNotIn('id', $assignedCourseIds)
             ->orderBy('start_date', 'desc')
             ->get(['id', 'title', 'start_date', 'instructor_id', 'is_active', 'is_paid', 'type', 'category', 'source_id_old']);
-        
+
         // Pobierz opcje dla source_id_old
         $sourceIdOldOptions = Course::whereNotNull('source_id_old')
-                                  ->where('source_id_old', '!=', '')
-                                  ->distinct()
-                                  ->orderBy('source_id_old')
-                                  ->pluck('source_id_old');
-        
+            ->where('source_id_old', '!=', '')
+            ->distinct()
+            ->orderBy('source_id_old')
+            ->pluck('source_id_old');
+
+        $series->load('certificateTemplate');
+
         return view('courses.series.show', compact('series', 'courses', 'allCourses', 'sourceIdOldOptions'));
     }
 
@@ -94,7 +106,9 @@ class CourseSeriesController extends Controller
      */
     public function edit(CourseSeries $series)
     {
-        return view('courses.series.edit', compact('series'));
+        $certificateTemplates = $this->certificateTemplatesForSeries($series);
+
+        return view('courses.series.edit', compact('series', 'certificateTemplates'));
     }
 
     /**
@@ -109,14 +123,18 @@ class CourseSeriesController extends Controller
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'remove_image' => 'nullable|string',
+            'certificate_format' => 'nullable|string|max:255',
+            'certificate_template_id' => 'nullable|exists:certificate_templates,id',
         ]);
+
+        $this->normalizeCertificateDefaults($validated);
 
         // Aktualizacja sluga tylko jeśli zmieniła się nazwa (opcjonalnie)
         if ($series->name !== $validated['name']) {
-             $validated['slug'] = Str::slug($validated['name']);
-             if (CourseSeries::where('slug', $validated['slug'])->where('id', '!=', $series->id)->exists()) {
-                $validated['slug'] .= '-' . time();
-             }
+            $validated['slug'] = Str::slug($validated['name']);
+            if (CourseSeries::where('slug', $validated['slug'])->where('id', '!=', $series->id)->exists()) {
+                $validated['slug'] .= '-'.time();
+            }
         }
 
         // Usunięcie obrazka, jeśli użytkownik zaznaczył "Usuń obrazek"
@@ -133,7 +151,7 @@ class CourseSeriesController extends Controller
             if ($series->image && Storage::disk('public')->exists($series->image)) {
                 Storage::disk('public')->delete($series->image);
             }
-            
+
             // Zapis nowego obrazka
             $validated['image'] = $request->file('image')->store('course_series', 'public');
         } else {
@@ -142,26 +160,36 @@ class CourseSeriesController extends Controller
         }
 
         $series->update($validated);
-        
+
         return redirect()->route('courses.series.index')->with('success', 'Seria została zaktualizowana.');
     }
 
     /**
      * Update courses assigned to the series.
      */
-    public function updateCourses(Request $request, CourseSeries $series)
+    public function updateCourses(Request $request, CourseSeries $series, CourseSeriesCertificateSettings $seriesCertificateSettings)
     {
+        $previousCourseIds = $series->courses()->pluck('courses.id')->all();
+
         // Oczekujemy formatu: ['courses' => [id1, id2, id3]] (kolejność ma znaczenie)
+        $newCourseIds = [];
         if ($request->has('courses')) {
-             $syncData = [];
-             foreach ($request->input('courses', []) as $index => $courseId) {
-                 $syncData[$courseId] = ['order_in_series' => $index + 1];
-             }
-             $series->courses()->sync($syncData);
+            $syncData = [];
+            foreach ($request->input('courses', []) as $index => $courseId) {
+                $courseId = (int) $courseId;
+                if ($courseId <= 0) {
+                    continue;
+                }
+                $syncData[$courseId] = ['order_in_series' => $index + 1];
+                $newCourseIds[] = $courseId;
+            }
+            $series->courses()->sync($syncData);
         } else {
             // Jeśli tablica pusta, usuwamy wszystkie przypisania
             $series->courses()->detach();
         }
+
+        $seriesCertificateSettings->applyMembershipChange($series->fresh(), $previousCourseIds, $newCourseIds);
 
         return redirect()->route('courses.series.show', $series)->with('success', 'Lista kursów została zaktualizowana.');
     }
@@ -172,7 +200,30 @@ class CourseSeriesController extends Controller
     public function destroy(CourseSeries $series)
     {
         $series->delete();
+
         return redirect()->route('courses.series.index')->with('success', 'Seria została usunięta.');
     }
-}
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function normalizeCertificateDefaults(array &$validated): void
+    {
+        $format = trim((string) ($validated['certificate_format'] ?? ''));
+        $validated['certificate_format'] = $format === '' ? null : $format;
+        $validated['certificate_template_id'] = $validated['certificate_template_id'] ?: null;
+    }
+
+    private function certificateTemplatesForSeries(?CourseSeries $series = null): Collection
+    {
+        return CertificateTemplate::query()
+            ->where(function ($query) use ($series) {
+                $query->where('is_active', true);
+                if ($series?->certificate_template_id) {
+                    $query->orWhere('id', $series->certificate_template_id);
+                }
+            })
+            ->orderBy('name')
+            ->get();
+    }
+}

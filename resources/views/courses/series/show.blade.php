@@ -78,6 +78,27 @@
                                     <td>{{ $series->description }}</td>
                                 </tr>
                                 @endif
+                                <tr>
+                                    <td><strong>Format zaświadczeń:</strong></td>
+                                    <td>
+                                        @if($series->certificate_format)
+                                            <code>{{ $series->certificate_format }}</code>
+                                        @else
+                                            <span class="text-muted">nie ustawiono</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Szablon zaświadczeń:</strong></td>
+                                    <td>
+                                        @if($series->certificateTemplate)
+                                            {{ $series->certificateTemplate->name }}
+                                            <span class="text-muted">(id {{ $series->certificate_template_id }})</span>
+                                        @else
+                                            <span class="text-muted">nie ustawiono</span>
+                                        @endif
+                                    </td>
+                                </tr>
                             </table>
                         </div>
                         <div class="col-md-4 text-center">
@@ -116,6 +137,11 @@
                                 <div class="alert alert-light border mb-3 small">
                                     <i class="fas fa-info-circle me-2"></i>
                                     Przeciągnij elementy, aby zmienić kolejność. Zapisz zmiany przyciskiem na dole.
+                                    @if($series->hasCertificateDefaults())
+                                        Nowe szkolenia z domyślnym formatem <code>{nr}/{course_id}/{year}/PNE</code>
+                                        dostaną ustawienia zaświadczeń z tej serii.
+                                        Szkolenia już na liście nie są zmieniane.
+                                    @endif
                                 </div>
 
                                 <div class="list-group mb-3" id="courses_list" style="max-height: 600px; overflow-y: auto;">

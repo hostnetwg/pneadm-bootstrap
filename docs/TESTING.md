@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-08
+Data aktualizacji: 2026-09-13
 
 ## Cel
 
@@ -79,6 +79,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Import CSV dostępów kursów online (Publigo) | `--filter=OnlineCourseEnrollmentPubligoImport` |
 | Lista dostępów kursu online (wyszukiwarka, filtry, sort) | `--filter=OnlineCourseEnrollmentListQueryTest` |
 | E-mail przeniesienia kursu online na pnedu.pl | `--filter=OnlineCourseEnrollmentPlatformMigrationMailTest`, `--filter=test_online_course_platform_migration_mail_uses_system_mailer` |
+| Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
 | Pełny suite | `sail test` |
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
