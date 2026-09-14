@@ -34,13 +34,38 @@
                 <form method="get" action="{{ route('online-courses.index') }}" class="d-flex gap-2">
                     <input type="search" name="q" value="{{ $q }}" class="form-control" placeholder="Szukaj tytułu, slug, ID Publigo…">
                     <button type="submit" class="btn btn-outline-secondary">Szukaj</button>
+                    @if($q !== '')
+                        <a href="{{ route('online-courses.index') }}" class="btn btn-outline-secondary">Wyczyść</a>
+                    @endif
                 </form>
                 <a href="{{ route('online-courses.create') }}" class="btn btn-primary">Nowy kurs online</a>
             </div>
+            @if($canReorder)
+                <div id="online-courses-reorder-root"
+                     class="alert alert-light border mb-3"
+                     data-reorder-url="{{ route('online-courses.reorder') }}">
+                    <p class="mb-2">
+                        <i class="bi bi-arrows-move text-primary"></i>
+                        <strong>Kolejność na /kursy:</strong> przeciągnij wiersze albo użyj strzałek.
+                        Na pnedu.pl najpierw widać kursy ze sprzedażą, potem wyłączone — w tej kolejności.
+                    </p>
+                    <div id="online-courses-reorder-toast"
+                         class="alert alert-success alert-dismissible fade show d-none mb-0 py-2"
+                         role="alert">
+                        <span data-toast-body></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Zamknij"></button>
+                    </div>
+                </div>
+            @else
+                <p class="text-muted small mb-3">Żeby zmienić kolejność na /kursy, wyczyść wyszukiwanie.</p>
+            @endif
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
                     <thead>
                         <tr>
+                            @if($canReorder)
+                                <th class="text-center" style="width: 5rem;" title="Kolejność na publicznym /kursy">Kolej.</th>
+                            @endif
                             <th>ID</th>
                             <th>Tytuł</th>
                             <th>Slug</th>
@@ -52,9 +77,31 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="{{ $canReorder ? 'online-courses-sortable' : '' }}">
                         @forelse($courses as $course)
-                            <tr>
+                            <tr class="{{ $canReorder ? 'online-course-row' : '' }}"
+                                @if($canReorder) data-course-id="{{ $course->id }}" @endif>
+                                @if($canReorder)
+                                    <td class="text-center text-nowrap">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary btn-online-course-move-up"
+                                                title="Wyżej"
+                                                aria-label="Przesuń wyżej">
+                                            <i class="bi bi-chevron-up"></i>
+                                        </button>
+                                        <span class="online-course-drag-handle d-inline-flex align-items-center justify-content-center mx-1 text-muted"
+                                              title="Przeciągnij"
+                                              style="cursor: grab;">
+                                            <i class="bi bi-grip-vertical"></i>
+                                        </span>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary btn-online-course-move-down"
+                                                title="Niżej"
+                                                aria-label="Przesuń niżej">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                    </td>
+                                @endif
                                 <td>{{ $course->id }}</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
@@ -99,12 +146,14 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="text-muted">Brak kursów online.</td></tr>
+                            <tr><td colspan="{{ $canReorder ? 10 : 9 }}" class="text-muted">Brak kursów online.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-            {{ $courses->links() }}
+            @if(! $canReorder)
+                {{ $courses->links() }}
+            @endif
         </div>
     </div>
 
@@ -176,4 +225,5 @@
         })();
     </script>
     @endpush
+    @include('online-courses.partials.index-sortable')
 </x-app-layout>

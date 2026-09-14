@@ -124,7 +124,7 @@ Panel pozwala:
 - dodawać, edytować, dezaktywować i usuwać warianty cenowe,
 - skonfigurować promocję i okres dostępu.
 
-`Pokazuj w katalogu` publikuje kartę na `/kursy`. Żeby dało się kupić, potrzebne są jeszcze `Można kupić`, co najmniej jeden sposób płatności i aktywny wariant ceny. Kurs tylko w katalogu (sprzedaż wyłączona) ma na pnedu.pl komunikat „Sprzedaż wyłączona”, `noindex` i nie trafia do sitemapy.
+`Pokazuj w katalogu` publikuje kartę na `/kursy`. Żeby dało się kupić, potrzebne są jeszcze `Można kupić`, co najmniej jeden sposób płatności i aktywny wariant ceny. Kurs tylko w katalogu (sprzedaż wyłączona) ma na pnedu.pl wyszarzony, nieaktywny przycisk „Zamawiam dostęp”, na stronie oferty komunikat „Sprzedaż wyłączona”, `noindex` i nie trafia do sitemapy. Kolejność kart ustawiasz na `/online-courses` (przeciągnij wiersz albo strzałki). Publiczny katalog najpierw pokazuje sprzedaż otwartą, potem wyłączoną, w tej kolejności.
 
 ### Modele i serwisy
 

@@ -29,6 +29,7 @@ Migracje (wyłącznie w tym repozytorium, katalog `database/migrations/`):
 - `2026_09_10_140000_create_online_course_enrollment_email_logs_table.php` — log wysyłki e-maila o przeniesieniu kursu na pnedu.pl
 - `2026_09_11_214500_create_product_catalog_tables.php` — katalog sprzedażowy, kanały i warianty cenowe
 - `2026_09_12_050500_create_product_order_tables.php` — pozycje zamówień, odbiorcy, fulfillment oraz zamówienia bramkowe bez `course_id`
+- `2026_09_14_090000_add_catalog_sort_order_to_online_courses.php` — kolejność kart na `/kursy`
 
 ### Tabele i znaczenie
 
@@ -115,7 +116,7 @@ Szczegóły zaświadczeń online: `pnedu/docs/CERTIFICATES.md`, kanon: `pneadm/d
 
 ### Publiczna sprzedaż
 
-- `GET /kursy` — katalog kursów nagranych; link **Kursy** w głównym menu po **Szkolenia**,
+- `GET /kursy` — katalog kursów nagranych; link **Kursy** w głównym menu po **Szkolenia**; kolejność z `online_courses.catalog_sort_order` (ADM `/online-courses`), najpierw sprzedaż otwarta,
 - `GET /kursy/{product:slug}` — oferta i warianty,
 - `GET|POST /kursy/{product:slug}/zamowienie` — checkout,
 - `GET /zamowienia-kursow/{ident}` — podsumowanie,

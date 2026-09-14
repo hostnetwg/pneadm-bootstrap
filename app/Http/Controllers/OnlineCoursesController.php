@@ -19,10 +19,13 @@ class OnlineCoursesController extends Controller
     public function index(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $canReorder = $q === '';
         $query = OnlineCourse::query()
             ->with(['instructor', 'salesProduct.defaultOffer.prices'])
             ->withCount(['modules', 'lessons', 'enrollments'])
-            ->latest('id');
+            ->orderBy('catalog_sort_order')
+            ->orderBy('title')
+            ->orderBy('id');
 
         if ($q !== '') {
             $query->where(function ($sub) use ($q) {
@@ -32,9 +35,42 @@ class OnlineCoursesController extends Controller
             });
         }
 
-        $courses = $query->paginate(20)->withQueryString();
+        $courses = $canReorder
+            ? $query->get()
+            : $query->paginate(20)->withQueryString();
 
-        return view('online-courses.index', compact('courses', 'q'));
+        return view('online-courses.index', compact('courses', 'q', 'canReorder'));
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array'],
+            'order.*' => ['integer', 'exists:online_courses,id'],
+        ]);
+
+        $order = array_values(array_unique(array_map('intval', $validated['order'])));
+        $expectedIds = OnlineCourse::query()
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $sortedOrder = collect($order)->sort()->values()->all();
+
+        if ($sortedOrder !== $expectedIds) {
+            return response()->json([
+                'message' => 'Lista musi zawierać wszystkie kursy.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($order): void {
+            foreach ($order as $position => $id) {
+                OnlineCourse::query()->whereKey($id)->update(['catalog_sort_order' => $position]);
+            }
+        });
+
+        return response()->json(['message' => 'Kolejność kursów na /kursy zapisana.']);
     }
 
     public function create(): View

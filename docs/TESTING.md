@@ -80,6 +80,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Lista dostępów kursu online (wyszukiwarka, filtry, sort) | `--filter=OnlineCourseEnrollmentListQueryTest` |
 | E-mail przeniesienia kursu online na pnedu.pl | `--filter=OnlineCourseEnrollmentPlatformMigrationMailTest`, `--filter=test_online_course_platform_migration_mail_uses_system_mailer` |
 | Katalog sprzedaży i warianty cenowe kursów online | `--filter=OnlineCourseSalesCatalogTest`, `--filter=ProductPriceTest` |
+| Kolejność kursów na `/kursy` | **pneadm:** `--filter=OnlineCourseCatalogOrderTest`; **pnedu:** `--filter=StorefrontCatalogOrderTest` |
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
 | Omnibus — historia cen i wyłączenie wpisu | `--filter=PriceOmnibusServiceTest` |
 | Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
@@ -105,7 +106,7 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 
 - migracja `2026_09_13_163000_create_price_offer_histories_table` (backfill bieżącej ceny od `created_at`),
 - `pneadm` `PriceOmnibusServiceTest`: najniższa z historii, wyłączenie wpisu, pogłębienie promocji jako nowa obniżka, `sync` przy zmianie ceny,
-- `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”; na `/kursy` sama kwota, bez „od” i bez „/ osoba”; przy kursie etykieta „Autor”, nie „Prowadzący”; niezakupione karty: „Zamawiam dostęp” i „Zobacz szczegóły”; jeden wariant płatny → „Zamawiam kurs”, kilka → „Zamawiam ten wariant”.
+- `pnedu` katalog: copy „Najniższa cena z 30 dni przed obniżką”; na `/kursy` sama kwota, bez „od” i bez „/ osoba”; przy kursie etykieta „Autor”, nie „Prowadzący”; niezakupione karty: „Zamawiam dostęp” i „Zobacz szczegóły”; sprzedaż wyłączona: wyszarzony, nieaktywny „Zamawiam dostęp”; jeden wariant płatny → „Zamawiam kurs”, kilka → „Zamawiam ten wariant”; lista po 25 kursów, paginacja Bootstrap po polsku (bez „Showing…” / `pagination.previous`); kolejność z ADM, najpierw sprzedaż otwarta.
 
 ## Weryfikacja bezpłatnego zapisu kursów — 2026-09-13
 
