@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-09-14) — Kolejność katalogu /kursy
 
-Na `/online-courses` przeciągasz kursy (albo strzałki). Ta kolejność idzie na `/kursy`. Publiczna lista najpierw pokazuje sprzedaż otwartą, potem wyłączoną. Karta bez sprzedaży ma wyszarzony, nieaktywny przycisk „Zamawiam dostęp”. Migracja `2026_09_14_090000_add_catalog_sort_order_to_online_courses`.
+Na `/online-courses` przeciągasz kursy (albo strzałki). Ta kolejność idzie na `/kursy`. Publiczna lista najpierw pokazuje sprzedaż otwartą, potem wyłączoną. Karta bez sprzedaży ma wyszarzony, nieaktywny przycisk „Sprzedaż zamknięta”. Migracja `2026_09_14_090000_add_catalog_sort_order_to_online_courses`.
 
 ## Ostatnio (2026-09-13) — Bezpłatny zapis na kurs nagrany
 
