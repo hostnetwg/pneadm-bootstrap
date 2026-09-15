@@ -159,7 +159,7 @@ Publiczne trasy pnedu:
 
 - `/kursy` — katalog; menu **Kursy** bezpośrednio po **Szkolenia**,
 - `/kursy/{slug}` — oferta kursu i warianty,
-- `/kursy/{slug}/zamowienie` — checkout wielu uczestników, z pobraniem danych nabywcy/odbiorcy z GUS po NIP,
+- `/kursy/{slug}/zamowienie` — checkout wielu uczestników, z pobraniem danych nabywcy/odbiorcy z GUS po NIP; telefon zamawiającego jest wymagany jak na szkoleniu,
 - `/kursy/{slug}/zamowienie/{ident}` — edycja odroczonego zamówienia,
 - `/zamowienia-kursow/{ident}` — podsumowanie z numerem ID, PDF i przyciskiem EDYTUJ.
 
