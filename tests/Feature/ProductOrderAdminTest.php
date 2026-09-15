@@ -37,7 +37,23 @@ class ProductOrderAdminTest extends TestCase
             ->assertSee('Nadaj dostęp')
             ->assertDontSee('Dodaj uczestnika do PNEDU')
             ->assertSee('„KURS:”', false)
-            ->assertDontSee('„SZKOLENIE:”', false);
+            ->assertDontSee('„SZKOLENIE:”', false)
+            ->assertDontSee('id="sendOnlinePaymentRecoveryBtn"', false);
+    }
+
+    public function test_unpaid_online_product_order_shows_recovery_email_button(): void
+    {
+        $this->withoutVite();
+        $order = $this->createProductOrder();
+        $order->update([
+            'payment_mode' => FormOrder::PAYMENT_MODE_ONLINE_GATEWAY,
+            'payment_status' => FormOrder::PAYMENT_STATUS_CANCELLED,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('form-orders.show', $order->id))
+            ->assertOk()
+            ->assertSee('id="sendOnlinePaymentRecoveryBtn"', false);
     }
 
     public function test_manual_fulfillment_uses_protected_pnedu_internal_endpoint(): void

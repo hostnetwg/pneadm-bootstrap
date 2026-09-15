@@ -1077,10 +1077,6 @@ class FormOrder extends Model
      */
     public function isEligibleForOnlinePaymentRecoveryEmail(): bool
     {
-        if ($this->isProductOrder()) {
-            return false;
-        }
-
         if ($this->payment_mode !== self::PAYMENT_MODE_ONLINE_GATEWAY) {
             return false;
         }
