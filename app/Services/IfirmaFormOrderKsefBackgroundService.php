@@ -52,7 +52,7 @@ class IfirmaFormOrderKsefBackgroundService
             return;
         }
 
-        $order->ksef_status = 'queued';
+        $order->ksef_status = 'pending';
         $order->ksef_error = null;
         $order->save();
 
@@ -86,12 +86,6 @@ class IfirmaFormOrderKsefBackgroundService
         $invoiceId = trim((string) ($order->ifirma_invoice_id ?? ''));
         if ($invoiceId === '') {
             $this->markFailed($order, 'Brak ID faktury iFirma.');
-
-            return;
-        }
-
-        if ($order->ksef_status === 'pending') {
-            $this->fetchOrReschedule($order, 1);
 
             return;
         }

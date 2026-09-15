@@ -36,13 +36,13 @@ class IfirmaFormOrderKsefSubmissionServiceTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $payload = $response->getData(true);
         $this->assertTrue($payload['ksef_queued']);
-        $this->assertSame('queued', $payload['ksef_status']);
+        $this->assertSame('pending', $payload['ksef_status']);
         $this->assertTrue($payload['ksef_email_pending']);
         $this->assertSame('50/8/2026', $payload['invoice_number']);
 
         $order->refresh();
         $this->assertTrue((bool) $order->ksef_email_pending);
-        $this->assertSame('queued', $order->ksef_status);
+        $this->assertSame('pending', $order->ksef_status);
 
         Queue::assertPushed(SubmitFormOrderToKsefJob::class, function (SubmitFormOrderToKsefJob $job) use ($order) {
             return $job->formOrderId === $order->id;
@@ -71,7 +71,7 @@ class IfirmaFormOrderKsefSubmissionServiceTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $order->refresh();
         $this->assertFalse((bool) $order->ksef_email_pending);
-        $this->assertSame('queued', $order->ksef_status);
+        $this->assertSame('pending', $order->ksef_status);
     }
 
     public function test_does_not_use_ifirma_id_as_invoice_number_in_payload(): void
@@ -103,7 +103,7 @@ class IfirmaFormOrderKsefSubmissionServiceTest extends TestCase
             'orderer_email' => 'fail@example.test',
             'ifirma_invoice_id' => '888',
             'invoice_number' => '1/9/2026',
-            'ksef_status' => 'queued',
+            'ksef_status' => 'pending',
         ]);
 
         $api = \Mockery::mock(\App\Services\IfirmaApiService::class);

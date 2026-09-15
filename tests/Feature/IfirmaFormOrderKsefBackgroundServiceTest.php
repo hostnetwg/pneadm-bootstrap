@@ -103,14 +103,14 @@ class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
             'orderer_email' => 'poll@example.test',
             'invoice_number' => '12/9/2026',
             'ifirma_invoice_id' => '557',
-            'ksef_status' => 'queued',
+            'ksef_status' => 'pending',
         ]);
 
         $this->actingAs($user)
             ->getJson(route('form-orders.ifirma.ksef-status', $order->id))
             ->assertOk()
             ->assertJsonPath('awaiting', true)
-            ->assertJsonPath('ksef_status', 'queued')
+            ->assertJsonPath('ksef_status', 'pending')
             ->assertJsonPath('ksef_number', null);
     }
 
