@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-09-15) — Recovery płatności kursu online (tylko ADM)
 
-Na `/form-orders/{id}` kursu online z nieopłaconą bramką jest przycisk **Wyślij mail recovery płatności**, tak jak przy szkoleniu. Mail ma tylko **Zapłać ponownie** (bez FV odroczonej). Cron godzinowy nadal wysyła recovery wyłącznie dla szkoleń live. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md), [pnedu/docs/ONLINE_PAYMENT_ABANDONMENT.md](../pnedu/docs/ONLINE_PAYMENT_ABANDONMENT.md).
+Na `/form-orders/{id}` kursu online z nieopłaconą bramką jest przycisk **Wyślij mail recovery płatności**, tak jak przy szkoleniu. Mail ma tylko **Zapłać ponownie** (bez FV odroczonej). Brak rekordu w `online_payment_orders` nie blokuje podglądu ani wysyłki. Cron godzinowy nadal wysyła recovery wyłącznie dla szkoleń live. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md), [pnedu/docs/ONLINE_PAYMENT_ABANDONMENT.md](../pnedu/docs/ONLINE_PAYMENT_ABANDONMENT.md).
 
 ## Wcześniej (2026-09-15) — Prefiks nazwy na FV iFirma
 
