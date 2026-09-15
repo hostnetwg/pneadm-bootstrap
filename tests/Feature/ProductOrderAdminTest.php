@@ -35,7 +35,9 @@ class ProductOrderAdminTest extends TestCase
             ->assertOk()
             ->assertSee('DOSTĘPY DO PRODUKTU')
             ->assertSee('Nadaj dostęp')
-            ->assertDontSee('Dodaj uczestnika do PNEDU');
+            ->assertDontSee('Dodaj uczestnika do PNEDU')
+            ->assertSee('„KURS:”', false)
+            ->assertDontSee('„SZKOLENIE:”', false);
     }
 
     public function test_manual_fulfillment_uses_protected_pnedu_internal_endpoint(): void

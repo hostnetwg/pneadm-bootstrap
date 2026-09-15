@@ -27,5 +27,6 @@ Przed każdą zmianą w integracji z iFirma (wystawianie FV, lista, wpłaty, KSe
 - **Miesiąc księgowy przed wystawieniem FV z adm:** `App\Services\IfirmaAccountingMonthSyncService` — wywoływany z `FormOrdersController` (pro forma, krajowa, z odbiorcą, +KSeF). Wymaga `IFIRMA_KEY_ABONENT` w `.env` (prod). API pozwala tylko na krok `NAST` / `POPRZ`; przy większej różnicy wykonywana jest pętla (max 24 miesiące).
 - Sync statusu płatności / windykacja: `App\Services\IfirmaInvoicePaymentStatusService` + `docs/WINDYKACJA.md`
 - KSeF / wystawianie: `docs/KSEF_FORM_ORDERS.md`
+- **Prefiks `NazwaPelna`:** checkbox na `/form-orders/{id}` dokleja `SZKOLENIE:` / `KURS:` / `E-BOOK:` wg rodzaju zamówienia (`FormOrder::ifirmaInvoiceNamePrefix()`). Flaga requestu nadal `prefix_szkolenie_in_product_name`.
 
 Ostatnia weryfikacja treści docs przy etapie syncu miesiąca księgowego: 2026-09-01.

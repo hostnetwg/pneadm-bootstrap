@@ -3,7 +3,11 @@
 Data utworzenia/aktualizacji: 2026-09-15
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-09-15) — Dashboard: kolumna Produkt
+## Ostatnio (2026-09-15) — Prefiks nazwy na FV iFirma
+
+Checkbox na `/form-orders/{id}` nadal jest, ale etykieta i `NazwaPelna` zależą od produktu: szkolenie `SZKOLENIE:`, kurs online `KURS:`, e-book (na później) `E-BOOK:`. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md), [IFIRMA_API.md](./IFIRMA_API.md).
+
+## Wcześniej (2026-09-15) — Dashboard: kolumna Produkt
 
 Na `/` tabela **Ostatnie zamówienia FORM** pokazuje nazwę z `form_orders.product_name` (szkolenie albo kurs online) pod kolumną **Produkt**. Debug eventów i „Aktywni teraz” też mówią „Produkt”; tytuł może dojść ze snapshotu, zamówienia albo ścieżki `/kursy/{slug}`. Lejek analityki nadal nie emituje osobnych eventów checkoutu kursu (to osobny etap). Kanon: [DASHBOARD_ORDERS.md](./DASHBOARD_ORDERS.md).
 

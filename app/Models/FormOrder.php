@@ -917,6 +917,52 @@ class FormOrder extends Model
     }
 
     /**
+     * Prefiks nazwy towaru na FV iFirma: SZKOLENIE / KURS / E-BOOK.
+     */
+    public function ifirmaInvoiceNamePrefix(): string
+    {
+        if (! $this->isProductOrder()) {
+            return 'SZKOLENIE';
+        }
+
+        return match ($this->catalogProductType()) {
+            Product::TYPE_EBOOK => 'E-BOOK',
+            default => 'KURS',
+        };
+    }
+
+    public function withIfirmaInvoiceNamePrefix(string $productName): string
+    {
+        $productName = self::plainProductName($productName, '');
+        $prefix = $this->ifirmaInvoiceNamePrefix();
+
+        if (preg_match('/^\s*(SZKOLENIE|KURS|E-BOOK)\s*:/iu', $productName)) {
+            return $productName !== '' ? $productName : $prefix.':';
+        }
+
+        return $productName !== '' ? $prefix.': '.$productName : $prefix.':';
+    }
+
+    public function catalogProductType(): ?string
+    {
+        $item = $this->relationLoaded('orderItems')
+            ? $this->orderItems->first()
+            : $this->orderItems()->first();
+
+        if (! $item) {
+            return null;
+        }
+
+        if (filled($item->product_type)) {
+            return (string) $item->product_type;
+        }
+
+        $item->loadMissing('product');
+
+        return $item->product?->type;
+    }
+
+    /**
      * Liczba sztuk na FV iFirma = liczba uczestników zamówienia (min. 1).
      */
     public function invoiceLineQuantity(): int

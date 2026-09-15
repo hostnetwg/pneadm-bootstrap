@@ -14,6 +14,8 @@ class Product extends Model
 
     public const TYPE_ONLINE_COURSE = 'online_course';
 
+    public const TYPE_EBOOK = 'ebook';
+
     public const FULFILLMENT_ONLINE_COURSE_ACCESS = 'online_course_access';
 
     protected $fillable = [

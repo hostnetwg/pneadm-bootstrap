@@ -2023,7 +2023,7 @@ class FormOrdersController extends Controller
             // Przygotowanie pozycji faktury pro forma
             // Zgodnie z dokumentacją API iFirma - próba z różnymi wariantami nazw pól
             $pozycja = [
-                'NazwaPelna' => $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name),
+                'NazwaPelna' => $this->ifirmaNazwaPelnaFromRequest($request, $zamowienie),
                 'Ilosc' => (float) $zamowienie->invoiceLineQuantity(),
                 'CenaJednostkowa' => $zamowienie->invoiceUnitPrice(),
                 'Jednostka' => 'sztuk',
@@ -2583,7 +2583,7 @@ class FormOrdersController extends Controller
             // Pozostałe pola w dokładnej kolejności jak w działającym kodzie
             $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
-            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
+            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, $zamowienie);
             $pozycja['Jednostka'] = 'sztuk';
 
             // TypStawkiVat NA KOŃCU!
@@ -2953,7 +2953,7 @@ class FormOrdersController extends Controller
             // Pozostałe pola
             $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
-            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
+            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, $zamowienie);
             $pozycja['Jednostka'] = 'sztuk';
             $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
 
@@ -3374,7 +3374,7 @@ class FormOrdersController extends Controller
             // Pozostałe pola
             $pozycja['Ilosc'] = (float) $zamowienie->invoiceLineQuantity();
             $pozycja['CenaJednostkowa'] = $cenaJednostkowa;
-            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, (string) $zamowienie->product_name);
+            $pozycja['NazwaPelna'] = $this->ifirmaNazwaPelnaFromRequest($request, $zamowienie);
             $pozycja['Jednostka'] = 'sztuk';
             $pozycja['TypStawkiVat'] = $vatExempt ? 'ZW' : 'PRC';
 
@@ -4256,21 +4256,18 @@ class FormOrdersController extends Controller
     }
 
     /**
-     * Nazwa pozycji (NazwaPelna) na fakturze iFirma — opcjonalny prefiks z UI: „SZKOLENIE: ”.
+     * Nazwa pozycji (NazwaPelna) na fakturze iFirma — opcjonalny prefiks z UI
+     * (SZKOLENIE / KURS / E-BOOK).
      */
-    private function ifirmaNazwaPelnaFromRequest(Request $request, string $productName): string
+    private function ifirmaNazwaPelnaFromRequest(Request $request, FormOrder $zamowienie): string
     {
-        $productName = FormOrder::plainProductName($productName, '');
+        $productName = FormOrder::plainProductName((string) $zamowienie->product_name, '');
 
         if (! $request->boolean('prefix_szkolenie_in_product_name')) {
             return $productName;
         }
 
-        if (preg_match('/^\s*SZKOLENIE\s*:/iu', $productName)) {
-            return $productName;
-        }
-
-        return 'SZKOLENIE: '.$productName;
+        return $zamowienie->withIfirmaInvoiceNamePrefix($productName);
     }
 
     /**

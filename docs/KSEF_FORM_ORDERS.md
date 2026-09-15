@@ -285,6 +285,8 @@ przyciski wystawiania dokumentu. ETAP 3 ujednolica sposób budowania
 obiektu `Kontrahent` dla wszystkich tych ścieżek i podpina metadane KSeF
 Podmiotu3 tam, gdzie endpoint iFirma to jawnie wspiera.
 
+**Prefiks nazwy towaru (`NazwaPelna`):** checkbox na karcie zamówienia dokleja `SZKOLENIE:` (szkolenie live), `KURS:` (kurs online) albo `E-BOOK:` (e-book). Flaga requestu: `prefix_szkolenie_in_product_name`. Szczegóły: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
 ### Mapa przycisków → endpointów iFirma → zachowania Podmiotu3
 
 | Przycisk                                    | Metoda kontrolera                   | Endpoint iFirma                       | `PodmiotyDodatkowe` | Wysyłka do KSeF |

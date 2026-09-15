@@ -41,6 +41,7 @@
 ## Faktura iFirma
 
 - Jedna pozycja: `Ilosc` = liczba uczestników, `CenaJednostkowa` = `invoiceUnitPrice()` (total / N).
+- `NazwaPelna`: opcjonalny prefiks z checkboxa na karcie — szkolenie `SZKOLENIE:`, kurs online `KURS:`, e-book `E-BOOK:` (`FormOrder::ifirmaInvoiceNamePrefix()`).
 - Uwagi FV: `UCZESTNIK:` / `UCZESTNICY:` z listy.
 - Po wystawieniu FV przez API (krajowa / z odbiorcą / z KSeF): **bez przeładowania strony** — `applyIssuedInvoiceUi()` uzupełnia numer FV, ID iFirma, daty, numer KSeF (gdy jest) oraz odświeża panel STATUS ZAMÓWIENIA. Przycisk „Odśwież stronę” usunięty z komunikatu sukcesu.
 - Licznik nawigacji (`GET /form-orders/navigation-filter-count`) jest AJAX (`X-Requested-With`) i **nie** może nadpisywać `url()->previous()` — inaczej `back()` (np. ustawienie hasła użytkownika pnedu) ląduje na surowym JSON-ie.
@@ -53,7 +54,7 @@
 | UI formularza | `order-form-participants*.blade.php`, `order-form.blade.php`, `order-form-v2.blade.php` |
 | ADM create/edit | `form-orders/partials/participants-form*.blade.php`, `FormOrderAdminParticipantService` |
 | ADM show | `form-orders/partials/participants-cards.blade.php`, `FormOrderPneduProvisionService` |
-| Helpers FV | `FormOrder::invoiceLineQuantity()`, `invoiceUnitPrice()` |
+| Helpers FV | `FormOrder::invoiceLineQuantity()`, `invoiceUnitPrice()`, `ifirmaInvoiceNamePrefix()` |
 
 ## Provision PNEDU
 

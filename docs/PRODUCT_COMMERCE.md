@@ -1,6 +1,6 @@
 # Sprzedaż produktów na pnedu.pl
 
-Data utworzenia: 2026-09-11; aktualizacja: 2026-09-13
+Data utworzenia: 2026-09-11; aktualizacja: 2026-09-15
 Status: etapy 1–4 wdrożone lokalnie — katalog, checkout, płatności i fulfillment
 
 ## Cel
@@ -11,7 +11,19 @@ Rozszerzenie obecnej sprzedaży szkoleń terminowych (`courses`) o inne typy pro
 2. w przyszłości ebooki i usługi (np. konsultacje),
 3. gotowość architektoniczna na produkty fizyczne.
 
-Pierwszym wdrażanym typem jest `online_course`.
+Pierwszym wdrażanym typem jest `online_course`. Stała `Product::TYPE_EBOOK` jest już zarezerwowana pod przyszłe e-booki.
+
+## Faktura iFirma — prefiks nazwy towaru
+
+Na `/form-orders/{id}` checkbox „Dodaj «…:» na początku nazwy towaru lub usługi na fakturze (API iFirma)” zostaje. Tekst prefiksu zależy od zamówienia:
+
+| Rodzaj | Prefiks `NazwaPelna` |
+|--------|----------------------|
+| Szkolenie live (`order_kind` ≠ `product`) | `SZKOLENIE:` |
+| Produkt `online_course` | `KURS:` |
+| Produkt `ebook` (na później) | `E-BOOK:` |
+
+Logika: `FormOrder::ifirmaInvoiceNamePrefix()` / `withIfirmaInvoiceNamePrefix()`. Request nadal wysyła `prefix_szkolenie_in_product_name` (odznaczenie = nazwa bez prefiksu). Nie duplikuje prefiksu, jeśli nazwa już zaczyna się od `SZKOLENIE:` / `KURS:` / `E-BOOK:`.
 
 ## Decyzje biznesowe
 
@@ -68,7 +80,7 @@ Migracja:
 
 Kanoniczna tożsamość produktu:
 
-- `type` — stabilny alias biznesowy, obecnie `online_course`,
+- `type` — stabilny alias biznesowy; obecnie `online_course`, zarezerwowane `ebook`,
 - `resource_id` — dla kursu online: `online_courses.id`,
 - `name`, `slug`, opcjonalne `sku`,
 - `fulfillment_type` — obecnie `online_course_access`,

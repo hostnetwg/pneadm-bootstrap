@@ -603,7 +603,7 @@ nowoczesna-edukacja.pl </div>
                                     <input class="form-check-input" type="checkbox" value="1"
                                            id="ifirma_prefix_szkolenie_in_product_name" checked>
                                     <label class="form-check-label" for="ifirma_prefix_szkolenie_in_product_name">
-                                        Dodaj <strong>„SZKOLENIE:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
+                                        Dodaj <strong>„{{ $zamowienie->ifirmaInvoiceNamePrefix() }}:”</strong> na początku nazwy towaru lub usługi na fakturze (API iFirma)
                                     </label>
                                 </div>
 
