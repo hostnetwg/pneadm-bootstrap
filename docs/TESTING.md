@@ -114,7 +114,7 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 - migracja `2026_09_13_234500_add_is_complimentary_to_product_prices`,
 - `pneadm` `OnlineCourseSalesCatalogTest`: flaga zeruje cenę i wyłącza promocję,
 - `pnedu` `FreeCourseSignupTest`: CTA bez 0,00 zł, checkout 404 dla wariantu bezpłatnego, nowy e-mail dostaje konto i mail, powtórny zapis bez duplikatu, przedsprzedaż zostawia datę startu, zalogowany zapis odświeża licznik „Kursy online (N)” (cache 120 s),
-- `pnedu` `ProductCheckoutTest`: GET `/kursy/{slug}/zamowienie?price=` nie może dostać 500 po odfiltrowaniu wariantów bezpłatnych; checkout ma 4 kroki (Profil / Kontakt / Faktura / Płatność) jak formularz szkolenia V2; nowy zakup startuje od profilu „Osoba prywatna”; przy osobie prywatnej jest przełącznik kopiowania danych zamawiającego do uczestnika i faktury; pola Imię / Nazwisko / e-mail / telefon są w jednym wierszu (`col-md-3`).
+- `pnedu` `ProductCheckoutTest`: GET `/kursy/{slug}/zamowienie?price=` nie może dostać 500 po odfiltrowaniu wariantów bezpłatnych; checkout ma 4 kroki (Profil / Kontakt / Faktura / Płatność) jak formularz szkolenia V2; nowy zakup startuje od profilu „Osoba prywatna”; przy osobie prywatnej jest przełącznik kopiowania danych zamawiającego do uczestnika i faktury; pola Imię / Nazwisko / e-mail / telefon są w jednym wierszu (`col-md-3`); ponowny submit online/odroczony nie tworzy duplikatu; mail potwierdzenia dopiero po udanym starcie bramki albo po FV odroczonej.
 
 ## Weryfikacja skróconego copy checkoutu kursów — 2026-09-13
 
