@@ -87,7 +87,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
 | Oferta przy istniejącym dostępie | **pnedu:** `sail artisan test --filter=StorefrontOwnerAccessTest` |
 | Katalog bez sprzedaży | `--filter=test_admin_can_keep_course_in_catalog_with_sales_disabled` **oraz pnedu:** `--filter=StorefrontArchiveSalesTest` |
-| Zamówienia produktowe i ręczny fulfillment w ADM | `--filter=ProductOrderAdminTest` |
+| Zamówienia produktowe i ręczny fulfillment w ADM | `--filter=ProductOrderAdminTest` (także edycja: select katalogu zamiast `courses`) |
 | Status operacyjny zamówień produktowych | `--filter=FormOrderOperationalStatusTest`, `--filter=FormOrderOperationalStatusServiceSqlTest` |
 | Publiczny katalog, checkout i fulfillment kursów nagranych | **pnedu:** `sail artisan test tests/Feature/ProductCheckoutTest.php`, `sail artisan test tests/Feature/DashboardPendingProductCoursesTest.php`, `sail artisan test tests/Unit/ProductAccessExpiryServiceTest.php`, `sail artisan test tests/Unit/ProductLegalCheckoutServiceTest.php`, `sail artisan test tests/Unit/WithdrawalWindowServiceTest.php`, `sail artisan test tests/Feature/LegalDocumentsTest.php` |
 | Pełny suite | `sail test` |
@@ -136,7 +136,7 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 - `pnedu` `ProductCheckoutTest`: katalog, oferta, faktura odroczona, PDF/edycja podsumowania, prefill e-maila zalogowanego użytkownika, PayU, PayNow, snapshoty, webhook `paid` i idempotentny fulfillment,
 - `pnedu` `DashboardPendingProductCoursesTest` — karta oczekująca tylko dla e-maila uczestnika, komunikat po FV odroczonej, „Dokończ płatność” / rezygnacja tylko przy nieopłaconym online, rezygnacja kasuje tylko kartę tej osoby, zniknięcie po nadaniu dostępu,
 - `pnedu` `ProductAccessExpiryServiceTest`: nowy, wygasły, aktywny, bezterminowy, stała data i start z przyszłości,
-- `pneadm` `ProductOrderAdminTest`: panel produktu, fulfill per osoba / wszyscy, wycofanie dostępu (admin), sync e-mailu odbiorcy po edycji uczestnika,
+- `pneadm` `ProductOrderAdminTest`: panel produktu, fulfill per osoba / wszyscy, wycofanie dostępu (admin), sync e-mailu odbiorcy po edycji uczestnika, edycja zamówienia produktowego bez `course_id` (select katalogu `products`),
 - `pneadm` status operacyjny produktów: filtry „Do obsługi / Nieprzetworzone / Przetworzone” liczą `order_fulfillments`, a nie uczestników szkoleń live,
 - Pint uruchamiany na zmienionych plikach PHP obu aplikacji,
 - kompilacja Blade pnedu.

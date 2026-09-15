@@ -185,6 +185,7 @@ Kanoniczna implementacja działa w `pnedu`:
 - płatność online `paid` uruchamia automatyczne konto + enrollment,
 - panel pneadm wywołuje endpoint dla ręcznej akcji **Nadaj dostęp** (jeden uczestnik albo wszyscy),
 - panel pneadm ma **Wycofaj dostęp** (jeden uczestnik albo wszyscy) bez ClickMeeting: usuwa enrollment, zeruje fulfillment i `pnedu_provisioned_at`, zostawia konto pnedu.pl,
+- edycja `/form-orders/{id}/edit` dla `order_kind = product` pokazuje **Kurs online** (`catalog_product_id` + `GET /form-orders/products/search`), a nie select szkoleń live; `form_orders.product_id` zostaje `null`, produkt siedzi w `order_items.product_id`,
 - edycja uczestników w ADM synchronizuje `order_item_recipients`; zmiana e-mailu osoby z nadanym dostępem sama wycofuje stary dostęp,
 - istniejące konto jest używane po znormalizowanym e-mailu,
 - nowe konto otrzymuje wiadomość z ustawieniem hasła,

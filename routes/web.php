@@ -214,6 +214,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::get('/index-stats', [FormOrdersController::class, 'indexStats'])->name('index-stats');
             Route::get('/navigation-filter-count', [FormOrdersController::class, 'navigationFilterCount'])->name('navigation-filter-count');
             Route::get('/courses/search', [FormOrdersController::class, 'searchCourses'])->name('courses.search');
+            Route::get('/products/search', [FormOrdersController::class, 'searchCatalogProducts'])->name('products.search');
             Route::get('/create', [FormOrdersController::class, 'create'])->name('create');
             Route::post('/gus-lookup-by-nip', GusLookupController::class)
                 ->middleware('throttle:30,1')

@@ -148,6 +148,70 @@ class ProductOrderAdminTest extends TestCase
             ->assertSee('Wycofaj dostęp');
     }
 
+    public function test_product_order_edit_uses_catalog_product_select_instead_of_training_course(): void
+    {
+        $this->withoutVite();
+        $order = $this->createProductOrder();
+        $product = Product::query()->findOrFail($order->orderItems->first()->product_id);
+
+        $this->actingAs($this->admin())
+            ->get(route('form-orders.edit', $order->id))
+            ->assertOk()
+            ->assertSee('Kurs online', false)
+            ->assertSee('name="catalog_product_id"', false)
+            ->assertSee($product->name, false)
+            ->assertDontSee('id="course_id"', false)
+            ->assertDontSee('Wybierz element z listy', false);
+    }
+
+    public function test_product_order_update_saves_without_training_course_id(): void
+    {
+        $order = $this->createProductOrder();
+        $productId = (int) $order->orderItems->first()->product_id;
+
+        $this->actingAs($this->admin())
+            ->put(route('form-orders.update', $order->id), $this->productEditPayload($order, [
+                'orderer_name' => 'Szkoła Poprawiona',
+            ]))
+            ->assertRedirect(route('form-orders.show', $order->id))
+            ->assertSessionHas('success');
+
+        $this->assertSame('Szkoła Poprawiona', $order->fresh()->orderer_name);
+        $this->assertNull($order->fresh()->product_id);
+        $this->assertSame($productId, (int) $order->fresh()->orderItems()->first()->product_id);
+    }
+
+    public function test_product_order_update_can_switch_catalog_product(): void
+    {
+        $order = $this->createProductOrder();
+        $other = $this->createCatalogProduct('Inny kurs nagrany', 'inny-kurs-nagrany', '249.00');
+
+        $this->actingAs($this->admin())
+            ->put(route('form-orders.update', $order->id), $this->productEditPayload($order, [
+                'catalog_product_id' => $other['product']->id,
+            ]))
+            ->assertRedirect(route('form-orders.show', $order->id));
+
+        $fresh = $order->fresh(['orderItems']);
+        $this->assertNull($fresh->product_id);
+        $this->assertSame('Inny kurs nagrany', $fresh->product_name);
+        $this->assertSame((int) $other['product']->id, (int) $fresh->orderItems->first()->product_id);
+        $this->assertSame((int) $other['course']->id, (int) ($fresh->orderItems->first()->metadata['online_course_id'] ?? 0));
+        $this->assertEquals(249.0, (float) $fresh->product_price);
+    }
+
+    public function test_catalog_product_search_returns_online_courses(): void
+    {
+        $order = $this->createProductOrder();
+        $product = Product::query()->findOrFail($order->orderItems->first()->product_id);
+
+        $this->actingAs($this->admin())
+            ->getJson(route('form-orders.products.search', ['q' => 'produktowy']))
+            ->assertOk()
+            ->assertJsonPath('items.0.id', $product->id)
+            ->assertJsonPath('items.0.title_text', $product->name);
+    }
+
     public function test_admin_participant_email_fix_updates_recipient_and_revokes_old_access(): void
     {
         $order = $this->createProductOrder();
@@ -206,19 +270,46 @@ class ProductOrderAdminTest extends TestCase
         return $enrollment;
     }
 
-    private function createProductOrder(int $recipientCount = 1): FormOrder
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function productEditPayload(FormOrder $order, array $overrides = []): array
+    {
+        $item = $order->orderItems->first();
+        $participant = $order->participants()->first();
+
+        return array_merge([
+            'from_edit_page' => '1',
+            'catalog_product_id' => $item?->product_id,
+            'product_price' => $order->product_price,
+            'orderer_name' => $order->orderer_name,
+            'orderer_email' => $order->orderer_email,
+            'buyer_name' => $order->buyer_name,
+            'participants' => [[
+                'first_name' => $participant?->participant_firstname ?? 'Anna',
+                'last_name' => $participant?->participant_lastname ?? 'Nowak',
+                'email' => $participant?->participant_email ?? 'anna@example.test',
+            ]],
+        ], $overrides);
+    }
+
+    /**
+     * @return array{course: OnlineCourse, product: Product, offer: ProductOffer, price: ProductPrice}
+     */
+    private function createCatalogProduct(string $title, string $slug, string $amount = '199.00'): array
     {
         $course = OnlineCourse::query()->create([
-            'slug' => 'admin-product-order-test',
-            'title' => 'Kurs produktowy w panelu',
+            'slug' => $slug,
+            'title' => $title,
             'is_active' => true,
             'visible_in_dashboard' => true,
         ]);
         $product = Product::query()->create([
             'type' => Product::TYPE_ONLINE_COURSE,
             'resource_id' => $course->id,
-            'name' => $course->title,
-            'slug' => 'admin-product-order-test',
+            'name' => $title,
+            'slug' => $slug,
             'fulfillment_type' => Product::FULFILLMENT_ONLINE_COURSE_ACCESS,
             'is_active' => true,
             'requires_shipping' => false,
@@ -236,13 +327,24 @@ class ProductOrderAdminTest extends TestCase
             'product_offer_id' => $offer->id,
             'name' => 'Dostęp 12 miesięcy',
             'is_active' => true,
-            'price' => '199.00',
+            'price' => $amount,
             'currency' => 'PLN',
             'tax_treatment' => ProductPrice::TAX_EXEMPT,
             'access_policy' => ProductPrice::ACCESS_DURATION_FROM_GRANT,
             'access_duration_value' => 12,
             'access_duration_unit' => 'months',
         ]);
+
+        return compact('course', 'product', 'offer', 'price');
+    }
+
+    private function createProductOrder(int $recipientCount = 1): FormOrder
+    {
+        $catalog = $this->createCatalogProduct('Kurs produktowy w panelu', 'admin-product-order-test');
+        $product = $catalog['product'];
+        $offer = $catalog['offer'];
+        $price = $catalog['price'];
+        $course = $catalog['course'];
         $order = FormOrder::query()->create([
             'ident' => FormOrder::generateIdent(),
             'order_date' => now('UTC'),

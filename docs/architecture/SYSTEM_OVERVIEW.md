@@ -167,7 +167,7 @@ To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie
 
 ### Ewolucja sprzedaży produktów
 
-Od 2026-09-11 nowy katalog produktowy jest rozwijany addytywnie obok stabilnej sprzedaży szkoleń. `form_orders.product_id` nadal oznacza `courses.id`; tej semantyki nie wolno rozszerzać o `online_courses.id`. Zamówienie katalogowe ma `form_orders.order_kind = product`, puste `product_id` i relację do `order_items`.
+Od 2026-09-11 nowy katalog produktowy jest rozwijany addytywnie obok stabilnej sprzedaży szkoleń. `form_orders.product_id` nadal oznacza `courses.id`; tej semantyki nie wolno rozszerzać o `online_courses.id`. Zamówienie katalogowe ma `form_orders.order_kind = product`, puste `product_id` i relację do `order_items`. Edycja w ADM rozdziela pola: szkolenie live → `course_id` / `courses`; kurs online → `catalog_product_id` / `products`.
 
 Kurs nagrany jest mapowany jako `products.type = online_course` i `products.resource_id = online_courses.id`. `order_items` przechowuje niezmienny snapshot sprzedaży, `order_item_recipients` osoby otrzymujące produkt, a `order_fulfillments` idempotencję i wynik dostawy. Płatność online uruchamia fulfillment w pnedu; ręczna akcja z adm nadaje albo wycofuje dostęp per osoba albo wszystkim (bez ClickMeeting). `FormOrderOperationalStatusService` dla `order_kind = product` liczy dostęp po fulfillmentach i synchronizuje `pnedu_provisioned_at`; szkolenia live zostają na `participants`. Pozwala to później obsłużyć ebooki, usługi i produkty fizyczne bez kopiowania checkoutu i płatności. Kanon: [`PRODUCT_COMMERCE.md`](../PRODUCT_COMMERCE.md).
 

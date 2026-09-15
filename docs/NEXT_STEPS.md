@@ -3,7 +3,11 @@
 Data utworzenia/aktualizacji: 2026-09-15
 Status: plan roboczy, do potwierdzenia przez właściciela
 
-## Ostatnio (2026-09-15) — KSeF w tle + raporty automatów
+## Ostatnio (2026-09-15) — Edycja zamówienia kursu online w ADM
+
+`/form-orders/{id}/edit` dla zamówienia produktowego nie używa już wymaganego selectu szkoleń live (`courses`). Jest osobne pole **Kurs online** z wyszukiwarką katalogu `products`. Zapis nie wymaga `course_id`; zmiana produktu aktualizuje `order_items` i zostawia `form_orders.product_id = null`. Szkolenia live bez zmian. Kanon: [PRODUCT_COMMERCE.md](./PRODUCT_COMMERCE.md).
+
+## Wcześniej (2026-09-15) — KSeF w tle + raporty automatów
 
 Czerwony przycisk na `/form-orders/{id}` po zwykłym numerze FV od razu puszcza dalej. Wysyłka do KSeF i numer MF idą w kolejce. Badge na zamówieniu; dźwięk tylko gdy nadal jesteś na tej karcie. Dziennik: **Admin → Raporty automatów**. Cron przypomnień o wygaśnięciu zapisuje przebieg (widać go też na liście uczestników). Migracja `ops_runs` / `ops_run_items`. Kanon: [OPS_REPORTS.md](./OPS_REPORTS.md), [KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md).
 
