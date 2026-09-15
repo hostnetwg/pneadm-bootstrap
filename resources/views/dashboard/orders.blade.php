@@ -44,7 +44,7 @@
                                         <th>Wejście</th>
                                         <th>Ścieżka sesji</th>
                                         <th>Teraz</th>
-                                        <th>Szkolenie</th>
+                                        <th>Produkt</th>
                                         <th>Urządzenie</th>
                                         <th class="text-end">Ostatnio</th>
                                     </tr>
@@ -354,7 +354,7 @@
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Ident</th>
-                                                <th>Szkolenie</th>
+                                                <th>Produkt</th>
                                                 <th>Data</th>
                                                 <th>Rozliczenie</th>
                                                 <th>Formularz</th>
@@ -370,8 +370,8 @@
                                                 @endphp
                                                 <tr>
                                                     <td><code>{{ $order->ident }}</code></td>
-                                                    <td class="text-truncate" style="max-width: 180px;" title="{{ $order->course?->title ?? '—' }}">
-                                                        {{ $order->course?->title ?? '—' }}
+                                                    <td class="text-truncate" style="max-width: 180px;" title="{{ $order->dashboardProductLabel() }}">
+                                                        {{ $order->dashboardProductLabel() }}
                                                     </td>
                                                     <td class="text-nowrap">{{ $order->formatOrderDateLocal('d.m.Y H:i') ?? '—' }}</td>
                                                     <td>
@@ -1293,7 +1293,7 @@
                     + '<div class="table-responsive" id="dashboardRecentOrdersTableWrap">'
                     + '<table class="table table-hover table-sm mb-0 align-middle">'
                     + '<thead class="table-light"><tr>'
-                    + '<th>Ident</th><th>Szkolenie</th><th>Data</th><th>Rozliczenie</th><th>Formularz</th><th class="text-end">Kwota</th><th></th>'
+                    + '<th>Ident</th><th>Produkt</th><th>Data</th><th>Rozliczenie</th><th>Formularz</th><th class="text-end">Kwota</th><th></th>'
                     + '</tr></thead>'
                     + '<tbody id="dashboardRecentOrdersBody">' + rows + '</tbody>'
                     + '</table></div>';

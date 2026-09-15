@@ -87,7 +87,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
 | Oferta przy istniejącym dostępie | **pnedu:** `sail artisan test --filter=StorefrontOwnerAccessTest` |
 | Katalog bez sprzedaży | `--filter=test_admin_can_keep_course_in_catalog_with_sales_disabled` **oraz pnedu:** `--filter=StorefrontArchiveSalesTest` |
-| Zamówienia produktowe i ręczny fulfillment w ADM | `--filter=ProductOrderAdminTest` (także edycja: select katalogu zamiast `courses`) |
+| Zamówienia produktowe i ręczny fulfillment w ADM | `--filter=ProductOrderAdminTest` (edycja katalogu; dashboard: kolumna Produkt z nazwą kursu online) |
 | Status operacyjny zamówień produktowych | `--filter=FormOrderOperationalStatusTest`, `--filter=FormOrderOperationalStatusServiceSqlTest` |
 | Publiczny katalog, checkout i fulfillment kursów nagranych | **pnedu:** `sail artisan test tests/Feature/ProductCheckoutTest.php`, `sail artisan test tests/Feature/DashboardPendingProductCoursesTest.php`, `sail artisan test tests/Unit/ProductAccessExpiryServiceTest.php`, `sail artisan test tests/Unit/ProductLegalCheckoutServiceTest.php`, `sail artisan test tests/Unit/WithdrawalWindowServiceTest.php`, `sail artisan test tests/Feature/LegalDocumentsTest.php` |
 | Pełny suite | `sail test` |

@@ -14,6 +14,7 @@ use App\Models\ProductOffer;
 use App\Models\ProductPrice;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Dashboard\DashboardOrdersDashboardService;
 use App\Services\FormOrderAdminParticipantService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -198,6 +199,22 @@ class ProductOrderAdminTest extends TestCase
         $this->assertSame((int) $other['product']->id, (int) $fresh->orderItems->first()->product_id);
         $this->assertSame((int) $other['course']->id, (int) ($fresh->orderItems->first()->metadata['online_course_id'] ?? 0));
         $this->assertEquals(249.0, (float) $fresh->product_price);
+    }
+
+    public function test_dashboard_recent_orders_show_catalog_product_name_under_produkt_column(): void
+    {
+        $this->withoutVite();
+        $order = $this->createProductOrder();
+
+        $row = app(DashboardOrdersDashboardService::class)->mapRecentOrderRow($order);
+        $this->assertSame('Kurs produktowy w panelu', $row['course_title']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('>Produkt</th>', false)
+            ->assertSee($order->ident, false)
+            ->assertSee('Kurs produktowy w panelu', false);
     }
 
     public function test_catalog_product_search_returns_online_courses(): void

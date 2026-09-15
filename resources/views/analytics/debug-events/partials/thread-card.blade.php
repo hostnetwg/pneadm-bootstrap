@@ -153,8 +153,8 @@
                             @if(filled($event->path))
                                 <div class="small"><code>{{ $event->path }}</code></div>
                             @endif
-                            @if(filled($event->course_title_snapshot))
-                                <div class="small text-muted">{{ $event->course_title_snapshot }}</div>
+                            @if(filled($event->displayProductTitle()))
+                                <div class="small text-muted">{{ $event->displayProductTitle() }}</div>
                             @endif
                             @if(filled($event->referrer_domain) && $loop->first)
                                 <div class="small text-muted">Referrer: {{ $event->referrer_domain }}</div>

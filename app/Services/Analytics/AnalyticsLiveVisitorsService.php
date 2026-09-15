@@ -261,6 +261,13 @@ class AnalyticsLiveVisitorsService
             }
         }
 
+        foreach ($sorted as $event) {
+            $fromProduct = $event->displayProductTitle();
+            if ($fromProduct !== '') {
+                return $fromProduct;
+            }
+        }
+
         return null;
     }
 

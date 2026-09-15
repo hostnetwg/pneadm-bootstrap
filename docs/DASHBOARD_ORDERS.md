@@ -81,6 +81,7 @@ Dzięki temu licznik **Dziś (FORM)**, słupek wykresu na bieżący dzień i tab
 
 Tabela **Ostatnie zamówienia FORM**:
 
+- Kolumna **Produkt** (wcześniej „Szkolenie”) pokazuje `form_orders.product_name` — działa dla szkoleń live i kursów online (oraz przyszłych e-booków). Nie korzysta z `courses.title`, bo zamówienia katalogowe mają puste `product_id`.
 - **Rozliczenie** — krótka etykieta (`Odroczona FV` = niebieski / `Online · PayU` / `Online · PayNow`); online: zielony opłacone, żółty w trakcie, czerwony anulowane/błąd; szczegóły w tooltipie. Zielona ikona **✓** na końcu = zamówienie przetworzone (FV + uczestnicy).
 
 ## Polling (wydajność LVE)
@@ -109,4 +110,5 @@ sail artisan test --filter=AnalyticsLiveVisitorsDashboardTest
 sail artisan test --filter=DashboardOrdersStatsApiTest
 sail artisan test --filter=DashboardCourseScheduleServiceTest
 sail artisan test --filter=FormOrderDashboardMetricsScopeTest
+sail artisan test --filter=test_dashboard_recent_orders_show_catalog_product_name
 ```

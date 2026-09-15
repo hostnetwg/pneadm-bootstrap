@@ -212,7 +212,7 @@
                         </div>
 
                         <details class="mt-3" @if($hasAdvancedFilters) open @endif>
-                            <summary class="small text-primary fw-semibold" style="cursor: pointer;">Filtry zaawansowane (ID sesji, kurs)</summary>
+                            <summary class="small text-primary fw-semibold" style="cursor: pointer;">Filtry zaawansowane (ID sesji, produkt)</summary>
                             <div class="row g-3 align-items-end mt-2">
                                 <div class="col-md-4">
                                     <label for="analytics_session_id" class="form-label small mb-1">Analytics session ID</label>
@@ -223,7 +223,7 @@
                                     <input type="text" class="form-control form-control-sm" id="order_form_session_id" name="order_form_session_id" value="{{ $filters['order_form_session_id'] ?? '' }}">
                                 </div>
                                 <div class="col-md-2">
-                                    <label for="course_id" class="form-label small mb-1">Course ID</label>
+                                    <label for="course_id" class="form-label small mb-1">ID produktu</label>
                                     <input type="number" class="form-control form-control-sm" id="course_id" name="course_id" value="{{ $filters['course_id'] ?? '' }}">
                                 </div>
                             </div>

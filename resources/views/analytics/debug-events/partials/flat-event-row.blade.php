@@ -8,7 +8,7 @@
         : '—';
 
     $contextParts = array_filter([
-        filled($event->course_title_snapshot) ? $event->course_title_snapshot : null,
+        filled($event->displayProductTitle()) ? $event->displayProductTitle() : null,
         filled($event->campaign_code) ? 'kamp. '.$event->campaign_code : null,
         filled($event->course_id) ? '#'.$event->course_id : null,
     ]);
@@ -63,7 +63,7 @@
                     <div class="text-muted text-uppercase fw-semibold mb-1" style="font-size: 0.7rem;">Kontekst</div>
                     <dl class="mb-0 debug-dl">
                         <dt>Kategoria</dt><dd>{{ $event->event_category ?: '—' }}</dd>
-                        <dt>Kurs</dt><dd>{{ $event->course_title_snapshot ?: '—' }} @if($event->course_id)(#{{ $event->course_id }})@endif</dd>
+                        <dt>Produkt</dt><dd>{{ $event->displayProductTitle() ?: '—' }} @if($event->course_id)(#{{ $event->course_id }})@endif</dd>
                         <dt>Kampania</dt><dd><code>{{ $event->campaign_code ?: '—' }}</code></dd>
                         <dt>Landing</dt><dd>{{ $event->landing_target ?: '—' }}</dd>
                     </dl>

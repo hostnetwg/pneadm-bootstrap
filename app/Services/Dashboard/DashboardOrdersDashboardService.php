@@ -208,7 +208,7 @@ class DashboardOrdersDashboardService
     }
 
     /**
-     * @param array{online: list<int>, deferred: list<int>, total: list<int>} $dailyChart
+     * @param  array{online: list<int>, deferred: list<int>, total: list<int>}  $dailyChart
      * @return array{total: int, online: int, deferred: int, avg: float, avg_label: string}
      */
     public function periodStatsFromChart(array $dailyChart, string $chartGranularity): array
@@ -298,7 +298,7 @@ class DashboardOrdersDashboardService
         return [
             'id' => (int) $order->id,
             'ident' => (string) $order->ident,
-            'course_title' => $order->course?->title,
+            'course_title' => $order->dashboardProductLabel(),
             'order_date' => $order->formatOrderDateLocal('d.m.Y H:i'),
             'product_price' => $price,
             'order_form_variant_label' => $order->orderFormVariantAdminLabel(),

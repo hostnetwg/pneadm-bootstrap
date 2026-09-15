@@ -15,7 +15,7 @@
     <td><code class="small">{{ $event->analytics_session_id }}</code></td>
     <td><code class="small">{{ $event->order_form_session_id }}</code></td>
     <td>{{ $event->course_id }}</td>
-    <td class="text-break">{{ $event->course_title_snapshot }}</td>
+    <td class="text-break">{{ $event->displayProductTitle() }}</td>
     <td><code>{{ $event->campaign_code }}</code></td>
     <td>{{ $event->landing_target }}</td>
     <td>{{ $event->utm_source }}</td>

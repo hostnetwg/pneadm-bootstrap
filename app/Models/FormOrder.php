@@ -984,6 +984,21 @@ class FormOrder extends Model
         return self::plainProductName($this->product_name);
     }
 
+    /**
+     * Etykieta produktu na dashboardzie: szkolenie live, kurs online albo przyszły e-book.
+     */
+    public function dashboardProductLabel(): string
+    {
+        $fromName = self::plainProductName($this->product_name, '');
+        if ($fromName !== '') {
+            return $fromName;
+        }
+
+        $fromCourse = self::plainProductName($this->course?->title ?? null, '');
+
+        return $fromCourse !== '' ? $fromCourse : '—';
+    }
+
     public static function plainProductName(?string $value, string $fallback = '—'): string
     {
         if ($value === null || trim($value) === '') {
