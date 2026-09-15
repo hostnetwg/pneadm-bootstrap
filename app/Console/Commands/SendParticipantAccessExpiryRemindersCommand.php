@@ -4,6 +4,9 @@ namespace App\Console\Commands;
 
 use App\Jobs\SendAccessExpiryReminderEmailJob;
 use App\Models\CertificateEmailLog;
+use App\Models\Course;
+use App\Models\OpsRun;
+use App\Services\Ops\OpsRunRecorder;
 use App\Services\ParticipantAccessExpiryReminderService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -17,7 +20,7 @@ class SendParticipantAccessExpiryRemindersCommand extends Command
 
     protected $description = 'Wysyła przypomnienia e-mail o zbliżającym się wygaśnięciu dostępu do nagrań/materiałów (płatne szkolenia)';
 
-    public function handle(ParticipantAccessExpiryReminderService $service): int
+    public function handle(ParticipantAccessExpiryReminderService $service, OpsRunRecorder $ops): int
     {
         if (! config('participant_access.expiry_reminder.enabled', true)) {
             $this->warn('Przypomnienia wyłączone (PARTICIPANT_ACCESS_EXPIRY_REMINDERS_ENABLED=false).');
@@ -42,10 +45,20 @@ class SendParticipantAccessExpiryRemindersCommand extends Command
 
         $dryRun = (bool) $this->option('dry-run');
         $queued = 0;
+        $byCourse = [];
 
         $this->info('Data referencyjna: '.$referenceDay->toDateString().' ('.$tz.')');
         if ($dryRun) {
             $this->comment('Tryb dry-run — bez wysyłki.');
+        }
+
+        $run = null;
+        if (! $dryRun) {
+            $run = $ops->startRun(
+                OpsRun::TYPE_ACCESS_EXPIRY_REMINDERS,
+                'Przypomnienia o wygaśnięciu dostępu — '.$referenceDay->format('d.m.Y'),
+                $referenceDay
+            );
         }
 
         foreach ($daysList as $daysBefore) {
@@ -76,6 +89,11 @@ class SendParticipantAccessExpiryRemindersCommand extends Command
                     continue;
                 }
 
+                $courseId = (int) $participant->course_id;
+                if (! isset($byCourse[$courseId])) {
+                    $byCourse[$courseId] = ['queued' => 0, 'days' => []];
+                }
+
                 $log = CertificateEmailLog::create([
                     'course_id' => $participant->course_id,
                     'participant_id' => $participant->id,
@@ -87,6 +105,7 @@ class SendParticipantAccessExpiryRemindersCommand extends Command
                         'days_before' => $daysBefore,
                         'automated' => true,
                         'reference_date' => $referenceDay->toDateString(),
+                        'ops_run_id' => $run?->id,
                     ],
                 ]);
 
@@ -98,11 +117,35 @@ class SendParticipantAccessExpiryRemindersCommand extends Command
                 );
 
                 $queued++;
+                $byCourse[$courseId]['queued']++;
+                $byCourse[$courseId]['days'][$daysBefore] = ($byCourse[$courseId]['days'][$daysBefore] ?? 0) + 1;
             }
         }
 
-        if (! $dryRun) {
-            $this->info("Zlecono {$queued} wiadomości (kolejka).");
+        if (! $dryRun && $run) {
+            if ($byCourse === []) {
+                $ops->refreshSummary($run);
+            } else {
+                $courses = Course::query()->whereIn('id', array_keys($byCourse))->get()->keyBy('id');
+                foreach ($byCourse as $courseId => $stats) {
+                    $course = $courses->get($courseId);
+                    if (! $course) {
+                        continue;
+                    }
+                    $ops->upsertItem(
+                        $run,
+                        $course,
+                        'success',
+                        'Zlecono '.$stats['queued'].' przypomnień automatycznych.',
+                        [
+                            'queued' => $stats['queued'],
+                            'days_before' => $stats['days'],
+                            'automated' => true,
+                        ]
+                    );
+                }
+            }
+            $this->info("Zlecono {$queued} wiadomości (kolejka). Raport automatów #{$run->id}.");
         }
 
         return self::SUCCESS;

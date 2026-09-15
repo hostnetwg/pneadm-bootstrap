@@ -785,15 +785,36 @@ nowoczesna-edukacja.pl </div>
                                         </div>
                                     </div>
                                     <div class="col-12 mt-2">
+                                        @php
+                                            $ksefAwaiting = $zamowienie->isAwaitingKsefNumber();
+                                            $ksefFailed = $zamowienie->ksef_status === 'failed';
+                                            $showKsefRow = $zamowienie->hasConfirmedKsef()
+                                                || $zamowienie->hasIfirmaInvoiceId()
+                                                || filled($zamowienie->invoice_number)
+                                                || $ksefAwaiting
+                                                || $ksefFailed;
+                                        @endphp
                                         <div id="ksefNumberDisplay"
-                                             class="small border rounded px-2 py-1 bg-light @if(! $zamowienie->hasConfirmedKsef() && ! $zamowienie->hasIfirmaInvoiceId() && blank($zamowienie->invoice_number)) d-none @endif"
+                                             class="small border rounded px-2 py-1 bg-light @if(! $showKsefRow) d-none @endif"
                                              @if($zamowienie->hasConfirmedKsef())
                                              title="Przyjęte w KSeF{{ $zamowienie->ksef_sent_at ? ': '.$zamowienie->ksef_sent_at->timezone(config('app.timezone'))->format('d.m.Y H:i') : '' }}"
+                                             @elseif($ksefAwaiting)
+                                             title="Wysyłka do KSeF i numer MF idą w tle"
+                                             @elseif($ksefFailed)
+                                             title="{{ $zamowienie->ksef_error }}"
                                              @else
                                              title="Synchronizuj z iFirma po numerze FV lub ID dokumentu"
                                              @endif>
                                             <span class="text-muted">Numer KSeF:</span>
                                             <code class="text-success text-break" id="ksefNumberValue">@if($zamowienie->hasConfirmedKsef()){{ $zamowienie->ksef_number }}@else<span class="text-muted">—</span>@endif</code>
+                                            <span id="ksefStatusBadge"
+                                                  class="badge ms-1 align-middle @if($zamowienie->ksef_status === 'queued') bg-warning text-dark @elseif($zamowienie->ksef_status === 'pending') bg-warning text-dark @elseif($ksefFailed) bg-danger @elseif($zamowienie->hasConfirmedKsef()) bg-success @else d-none @endif">
+                                                @if($zamowienie->ksef_status === 'queued')w kolejce
+                                                @elseif($zamowienie->ksef_status === 'pending')oczekuje na MF
+                                                @elseif($ksefFailed)błąd KSeF
+                                                @elseif($zamowienie->hasConfirmedKsef())KSeF
+                                                @endif
+                                            </span>
                                             <button type="button"
                                                     class="btn btn-link btn-sm p-0 ms-1 align-baseline text-secondary"
                                                     id="syncIfirmaKsefBtn"
@@ -2808,7 +2829,7 @@ nowoczesna-edukacja.pl `;
             }).join('');
 
             return `
-                <div class="alert alert-info mb-0">
+                <div class="alert alert-info mb-0 ifirma-ksef-progress-wrap">
                     <strong>Postęp wystawiania faktury z KSeF</strong>
                     <ul class="list-unstyled mb-2 mt-2">${items}</ul>
                     <div class="progress" style="height: 6px;">
@@ -2818,20 +2839,142 @@ nowoczesna-edukacja.pl `;
             `;
         }
 
-        function applyKsefNumberDisplay(ksefNumber) {
+        function applyKsefNumberDisplay(ksefNumber, options) {
+            options = options || {};
             const wrap = document.getElementById('ksefNumberDisplay');
             const valueEl = document.getElementById('ksefNumberValue');
+            const badge = document.getElementById('ksefStatusBadge');
             if (!wrap || !valueEl) {
                 return;
             }
-            if (!ksefNumber) {
-                valueEl.innerHTML = '<span class="text-muted">—</span>';
-                wrap.title = 'Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce';
+            const status = options.status || (ksefNumber ? 'sent' : null);
+            wrap.classList.remove('d-none');
+            if (badge) {
+                badge.classList.remove('d-none', 'bg-warning', 'text-dark', 'bg-danger', 'bg-success', 'bg-info');
+            }
+            if (ksefNumber) {
+                valueEl.textContent = ksefNumber;
+                wrap.title = 'Przyjęte w KSeF';
+                if (badge) {
+                    badge.classList.add('bg-success');
+                    badge.textContent = 'KSeF';
+                }
                 return;
             }
-            valueEl.textContent = ksefNumber;
-            wrap.classList.remove('d-none');
-            wrap.title = 'Przyjęte w KSeF';
+            valueEl.innerHTML = '<span class="text-muted">—</span>';
+            if (status === 'queued') {
+                wrap.title = 'Wysyłka do KSeF w kolejce';
+                if (badge) {
+                    badge.classList.add('bg-warning', 'text-dark');
+                    badge.textContent = 'w kolejce';
+                }
+                return;
+            }
+            if (status === 'pending') {
+                wrap.title = 'Oczekiwanie na numer KSeF z Ministerstwa Finansów';
+                if (badge) {
+                    badge.classList.add('bg-warning', 'text-dark');
+                    badge.textContent = 'oczekuje na MF';
+                }
+                return;
+            }
+            if (status === 'failed') {
+                wrap.title = options.error || 'Błąd wysyłki do KSeF';
+                if (badge) {
+                    badge.classList.add('bg-danger');
+                    badge.textContent = 'błąd KSeF';
+                }
+                return;
+            }
+            wrap.title = 'Brak numeru KSeF w zamówieniu — użyj synchronizacji z iFirma po ręcznej wysyłce';
+            if (badge) {
+                badge.classList.add('d-none');
+                badge.textContent = '';
+            }
+        }
+
+        let ksefStatusPollTimer = null;
+        let ksefStatusPollHeard = false;
+
+        function stopKsefStatusPoll() {
+            if (ksefStatusPollTimer) {
+                clearInterval(ksefStatusPollTimer);
+                ksefStatusPollTimer = null;
+            }
+        }
+
+        function applyKsefStatusPayload(data, playSound) {
+            if (!data || !data.success) {
+                return;
+            }
+            applyKsefNumberDisplay(data.ksef_number || null, {
+                status: data.ksef_status || null,
+                error: data.ksef_error || null,
+            });
+            if (data.ksef_number && playSound && !ksefStatusPollHeard) {
+                ksefStatusPollHeard = true;
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('success');
+                }
+                stopKsefStatusPoll();
+            } else if (data.ksef_status === 'failed' && playSound && !ksefStatusPollHeard) {
+                ksefStatusPollHeard = true;
+                if (typeof window.formOrderPlayUiSound === 'function') {
+                    window.formOrderPlayUiSound('ksef_error');
+                }
+                stopKsefStatusPoll();
+            }
+        }
+
+        function startKsefStatusPoll(orderId) {
+            stopKsefStatusPoll();
+            ksefStatusPollHeard = false;
+            let attempts = 0;
+            const maxAttempts = 180;
+            const tick = async function () {
+                attempts += 1;
+                if (attempts > maxAttempts) {
+                    stopKsefStatusPoll();
+                    return;
+                }
+                try {
+                    const response = await fetch(`/form-orders/${orderId}/ifirma/ksef-status`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const data = await response.json();
+                    applyKsefStatusPayload(data, true);
+                    if (data.ksef_number || data.ksef_status === 'failed') {
+                        const resultDiv = document.getElementById('ifirmaResult');
+                        if (resultDiv && data.ksef_number) {
+                            const existingProgress = resultDiv.querySelector('.ifirma-ksef-progress-wrap');
+                            if (existingProgress) {
+                                resultDiv.innerHTML = renderIfirmaKsefProgress([
+                                    { label: 'Wystawianie faktury w iFirma', status: 'done' },
+                                    { label: 'Zapis numeru faktury w zamówieniu', status: 'done' },
+                                    { label: 'Przesyłanie do KSeF', status: 'done' },
+                                    { label: 'Oczekiwanie na numer KSeF (MF)', status: 'done', detail: `KSeF: ${data.ksef_number}` },
+                                    { label: 'Zakończenie procesu', status: 'done' },
+                                ]) + `<div class="alert alert-success alert-dismissible fade show mt-2 mb-0" role="alert">
+                                    <i class="bi bi-check-circle"></i>
+                                    <strong>Numer KSeF:</strong> <code>${data.ksef_number}</code>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+            tick();
+            ksefStatusPollTimer = setInterval(tick, 5000);
         }
 
         function applyIfirmaInvoiceIdDisplay(invoiceId) {
@@ -3022,6 +3165,7 @@ nowoczesna-edukacja.pl `;
 
         document.addEventListener('DOMContentLoaded', function () {
             const orderId = {{ $zamowienie->id }};
+            const ksefAwaitingOnLoad = @json($zamowienie->isAwaitingKsefNumber());
             const syncKsefBtn = document.getElementById('syncIfirmaKsefBtn');
             if (syncKsefBtn) {
                 syncKsefBtn.addEventListener('click', function () {
@@ -3051,6 +3195,9 @@ nowoczesna-edukacja.pl `;
                         icon: document.getElementById('syncIfirmaByIdIcon'),
                     });
                 });
+            }
+            if (ksefAwaitingOnLoad) {
+                startKsefStatusPoll(orderId);
             }
         });
 
@@ -3209,33 +3356,25 @@ nowoczesna-edukacja.pl `;
                 }
 
                 applyIssuedInvoiceUi(createData, orderId);
+                applyKsefNumberDisplay(createData.ksef_number || null, {
+                    status: createData.ksef_status || 'queued',
+                });
 
                 resultDiv.innerHTML = renderIfirmaKsefProgress([
                     { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
                     { label: 'Zapis numeru faktury w zamówieniu', status: 'done' },
-                    { label: 'Przesyłanie do KSeF', status: 'active' },
-                    { label: 'Oczekiwanie na numer KSeF (MF) — może potrwać kilka minut', status: 'pending' },
-                    { label: sendEmail ? 'Wysyłka e-mail z fakturą' : 'Zakończenie procesu', status: 'pending' },
-                ]);
+                    { label: 'Przesyłanie do KSeF', status: 'done', detail: 'zlecono w tle' },
+                    { label: 'Oczekiwanie na numer KSeF (MF) — w tle, możesz iść dalej', status: 'active' },
+                    { label: sendEmail ? 'Wysyłka e-mail z fakturą (po numerze KSeF)' : 'Zakończenie procesu', status: 'pending' },
+                ]) + `<div class="alert alert-success alert-dismissible fade show mt-2 mb-0" role="alert">
+                    <i class="bi bi-check-circle"></i>
+                    <strong>Fakturę wystawiono.</strong>
+                    ${createData.invoice_number ? `<div class="small mt-1">Numer faktury: <strong>${createData.invoice_number}</strong></div>` : ''}
+                    <div class="small">KSeF i${sendEmail ? ' e-mail' : ''} idą w tle. Możesz przejść do następnego zamówienia.</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
 
-                const { data: ksefData } = await postIfirmaInvoiceWithKsef(orderId, {
-                    ...basePayload,
-                    phase: 'ksef',
-                    invoice_id: createData.invoice_id,
-                });
-
-                // Po sukcesie nie chowamy etapów: ustaw progres na "done", a render wyniku dopisze podsumowanie.
-                if (ksefData && ksefData.success) {
-                    resultDiv.innerHTML = renderIfirmaKsefProgress([
-                        { label: 'Wystawianie faktury w iFirma', status: 'done', detail: createData.invoice_number ? `Nr ${createData.invoice_number}` : '' },
-                        { label: 'Zapis numeru faktury w zamówieniu', status: 'done' },
-                        { label: 'Przesyłanie do KSeF', status: 'done' },
-                        { label: 'Oczekiwanie na numer KSeF (MF)', status: 'done', detail: ksefData.ksef_number ? `KSeF: ${ksefData.ksef_number}` : '' },
-                        { label: sendEmail ? 'Wysyłka e-mail z fakturą' : 'Zakończenie procesu', status: 'done' },
-                    ]);
-                }
-
-                renderIfirmaKsefResult(ksefData, force, resultDiv);
+                startKsefStatusPoll(orderId);
             } catch (error) {
                 console.error('Error:', error);
                 if (typeof window.formOrderPlayUiSound === 'function') {

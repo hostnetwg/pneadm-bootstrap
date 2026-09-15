@@ -1427,6 +1427,22 @@ class IfirmaApiService
     }
 
     /**
+     * Heurystyka odrzucenia KSeF na pełnym payloadzie GET faktury.
+     *
+     * @param  array<string, mixed>|null  $payload
+     */
+    public function detectKsefRejectionFromInvoicePayload(?array $payload): ?string
+    {
+        if ($payload === null || $payload === []) {
+            return null;
+        }
+
+        $unwrapped = $this->unwrapInvoicePayload($payload);
+
+        return $this->detectProbableKsefRejectionMessage($unwrapped !== [] ? $unwrapped : $payload);
+    }
+
+    /**
      * Heurystyka na podstawie pól zawierających „ksef” i treści typowych dla odrzucenia przez MF / bramkę.
      *
      * @param  array<string,mixed>  $data

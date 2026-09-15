@@ -488,9 +488,9 @@
         
         <!-- Admin -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') || request()->routeIs('ops-reports.*') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#admin-collapse"
-                    aria-expanded="{{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') || request()->routeIs('ops-reports.*') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#gear"></use>
                 </svg>
@@ -499,7 +499,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('admin.*') || request()->routeIs('trash.*') || request()->routeIs('activity-logs.*') || request()->routeIs('ops-reports.*') ? 'show' : '' }}" id="admin-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li><a href="{{ route('admin.statistics.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                         <i class="bi bi-bar-chart me-1"></i>Statystyki
@@ -513,6 +513,9 @@
                         </a>
                     </li>
                     <li><a href="{{ route('admin.certificate-templates.index') }}" class="link-light d-inline-flex text-decoration-none rounded">Szablony Certyfikatów</a></li>
+                    <li><a href="{{ route('ops-reports.index') }}" class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('ops-reports.*') ? 'active fw-semibold text-white' : '' }}">
+                        <i class="bi bi-clipboard2-data me-1"></i>Raporty automatów
+                    </a></li>
                     <li><a href="{{ route('activity-logs.index') }}" class="link-light d-inline-flex text-decoration-none rounded">
                         <i class="bi bi-activity me-1"></i>Logi aktywności
                     </a></li>

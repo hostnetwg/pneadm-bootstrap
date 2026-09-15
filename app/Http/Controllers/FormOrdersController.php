@@ -11,6 +11,7 @@ use App\Services\FormOrderCancellationService;
 use App\Services\FormOrderPneduProvisionService;
 use App\Services\IfirmaAccountingMonthSyncService;
 use App\Services\IfirmaApiService;
+use App\Services\IfirmaFormOrderKsefBackgroundService;
 use App\Services\IfirmaFormOrderKsefSubmissionService;
 use App\Services\PubligoApiService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -2279,6 +2280,31 @@ class FormOrdersController extends Controller
     }
 
     /**
+     * Lekki status KSeF do pollingu na karcie zamówienia (bez wywołania iFirma).
+     */
+    public function ifirmaKsefStatus($id)
+    {
+        $zamowienie = FormOrder::find($id);
+
+        if (! $zamowienie) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Zamówienie nie zostało znalezione.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'ksef_number' => $zamowienie->hasConfirmedKsef() ? $zamowienie->ksef_number : null,
+            'ksef_status' => $zamowienie->ksef_status,
+            'ksef_error' => $zamowienie->ksef_error,
+            'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
+            'invoice_number' => $zamowienie->invoice_number,
+            'awaiting' => $zamowienie->isAwaitingKsefNumber(),
+        ]);
+    }
+
+    /**
      * Pobiera z iFirma NumerKSeF / daty FV / ifirma_invoice_id.
      * Preferuje zapisane ID; gdy brak lub prefer_number_lookup — wyszukuje po invoice_number.
      */
@@ -3406,14 +3432,26 @@ class FormOrdersController extends Controller
                     : null);
 
             if ($phase === 'create') {
+                $sendEmail = filter_var($request->input('send_email', false), FILTER_VALIDATE_BOOLEAN);
+                app(IfirmaFormOrderKsefBackgroundService::class)->queueAfterInvoice(
+                    $zamowienie,
+                    $sendEmail,
+                    $request->user()?->id
+                );
+                $zamowienie->refresh();
+
                 return response()->json(array_merge([
                     'success' => true,
                     'phase' => 'create',
                     'step' => 'invoice_created',
-                    'message' => 'Faktura wystawiona w iFirma. Numer zapisany w zamówieniu.',
+                    'ksef_queued' => true,
+                    'message' => 'Faktura wystawiona w iFirma. Numer zapisany w zamówieniu. KSeF idzie w tle.',
                     'invoice_id' => $invoiceId,
                     'invoice_number' => $resolvedInvoiceNumber,
                     'invoice_created' => true,
+                    'ksef_status' => $zamowienie->ksef_status,
+                    'ksef_number' => $zamowienie->ksef_number,
+                    'ksef_email_pending' => (bool) $zamowienie->ksef_email_pending,
                     'ifirma_response' => $result['data'] ?? null,
                 ], $this->invoiceDocumentDatesJsonPayload($zamowienie)));
             }

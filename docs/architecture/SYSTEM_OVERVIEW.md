@@ -220,6 +220,8 @@ Spóźnione webhooki `cancelled` / `failed` ze starszych prób nie mogą degrado
 
 Oficjalna dokumentacja API iFirma (kanon w repo): [docs/IFIRMA_API.md](../IFIRMA_API.md) → [https://api.ifirma.pl/](https://api.ifirma.pl/).
 
+Czerwony przycisk w adm wystawia FV synchronicznie, a wysyłkę do KSeF i numer MF dociąga w kolejce. Dziennik: `/ops-reports` ([OPS_REPORTS.md](../OPS_REPORTS.md), [KSEF_FORM_ORDERS.md](../KSEF_FORM_ORDERS.md)).
+
 Tracking powinien zapisywać tylko neutralne metadane:
 
 - `invoice_path_type`,

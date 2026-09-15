@@ -713,6 +713,12 @@ class FormOrder extends Model
             && trim($this->ksef_number) !== '';
     }
 
+    public function isAwaitingKsefNumber(): bool
+    {
+        return in_array($this->ksef_status, ['queued', 'pending'], true)
+            && ! $this->hasConfirmedKsef();
+    }
+
     /**
      * Wewnętrzny Identyfikator dokumentu w iFirma (nie mylić z PelnyNumer / KSeF).
      */

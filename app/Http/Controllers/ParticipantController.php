@@ -10,6 +10,8 @@ use App\Models\CertificateEmailLog;
 use App\Models\Course;
 use App\Models\CourseFileLink;
 use App\Models\CourseVideo;
+use App\Models\OpsRun;
+use App\Models\OpsRunItem;
 use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\ParticipantEmail;
@@ -784,6 +786,14 @@ class ParticipantController extends Controller
             $accessExpiryReminderEligibilityByParticipantId[(int) $p->id] = $eligibility;
         }
 
+        $latestAccessExpiryOpsItem = OpsRunItem::query()
+            ->where('subject_type', (new Course)->getMorphClass())
+            ->where('subject_id', $course->id)
+            ->whereHas('run', fn ($q) => $q->where('type', OpsRun::TYPE_ACCESS_EXPIRY_REMINDERS))
+            ->with('run')
+            ->latest('id')
+            ->first();
+
         $courseClickMeetingPlatform = strtolower(trim((string) optional($course->onlineDetails)->platform)) === 'clickmeeting';
         $courseClickMeetingEventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
         $courseLiveAccessAvailable = $courseClickMeetingPlatform
@@ -827,6 +837,7 @@ class ParticipantController extends Controller
             'accessExpiryReminderEligibleCount',
             'accessExpiryReminderUnsentCount',
             'accessExpiryReminderEligibilityByParticipantId',
+            'latestAccessExpiryOpsItem',
             'courseLiveAccessAvailable',
             'courseLiveMeetingEmailAvailable',
             'courseLiveMeetingRequiresToken',

@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-14
+Data utworzenia/aktualizacji: 2026-09-15
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-15) — KSeF w tle + raporty automatów
+
+Czerwony przycisk na `/form-orders/{id}` po zwykłym numerze FV od razu puszcza dalej. Wysyłka do KSeF i numer MF idą w kolejce. Badge na zamówieniu; dźwięk tylko gdy nadal jesteś na tej karcie. Dziennik: **Admin → Raporty automatów**. Cron przypomnień o wygaśnięciu zapisuje przebieg (widać go też na liście uczestników). Migracja `ops_runs` / `ops_run_items`. Kanon: [OPS_REPORTS.md](./OPS_REPORTS.md), [KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md).
 
 ## Ostatnio (2026-09-14) — Kolejność katalogu /kursy
 

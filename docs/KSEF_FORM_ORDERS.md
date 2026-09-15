@@ -301,21 +301,23 @@ wystawiana jest faktura tylko z nabywcą (bez `PodmiotyDodatkowe`). Tryb
 z twardym wymogiem Podmiotu3 — obecnie kontroler `form_orders` go nie używa.
 
 **E-mail przy czerwonym przycisku:** wysyłka z iFirma (`sendInvoiceByEmail`) jest
-wykonywana dopiero po **sukcesie** KSeF (NumerKSeF). Przy starcie fazy `ksef`, gdy
-`send_email=true`, zapisywane jest `form_orders.ksef_email_pending = true` **przed**
-pollem — intencja przeżywa timeout HTTP / brak NumerKSeF. Po pełnym sukcesie maili
-flaga wraca do `false`. Przy błędzie / częściowej wysyłce flaga zostaje (można
-dogonić przez **Odśwież KSeF**).
+wykonywana dopiero po **sukcesie** KSeF (NumerKSeF). Przy zleceniu KSeF w tle, gdy
+`send_email=true`, zapisywane jest `form_orders.ksef_email_pending = true`
+**zanim** MF nada numer. Po pełnym sukcesie maili flaga wraca do `false`. Przy
+błędzie / częściowej wysyłce flaga zostaje (można dogonić przez **Odśwież KSeF**
+albo poczekać na job w tle).
 
-**UI / API (2026-07):** przycisk czerwony wywołuje endpoint w **dwóch fazach**
-(`phase=create` → zapis **klasycznego** `invoice_number` = `PelnyNumer` (np. `56/8/2026`)
-oraz `ifirma_invoice_id` = `Identyfikator`, potem odświeżenie pól w formularzu;
-`phase=ksef` → KSeF + polling). **Nigdy** nie zapisujemy ID iFirma w `invoice_number`
-(ani w inpucie „Numer faktury”) — na ID i KSeF są osobne pola. Gdy GET faktury nie
-zwróci jeszcze `PelnyNumer`, numer FV zostaje pusty (ID i daty i tak się zapisują);
-uzupełnienie: **Odśwież** przy ID iFirma. Przy timeoutie KSeF ID i (jeśli był)
-numer FV pozostają (`partial_success` / `invoice_created` w JSON).
-Serwis: `App\Services\IfirmaFormOrderKsefSubmissionService`.
+**UI / API (2026-09):** przycisk czerwony w przeglądarce robi tylko fazę `create`
+(zapis `invoice_number` = `PelnyNumer` oraz `ifirma_invoice_id`). Od razu widać
+zwykły numer FV i można iść do następnego zamówienia. Wysyłka `ksef/send` oraz
+dociąganie NumerKSeF idą w kolejce (`SubmitFormOrderToKsefJob`,
+`FetchFormOrderKsefNumberJob`) — **bez** 5-minutowego pollingu w requeście HTTP.
+Status na karcie: badge `queued` / `pending` / `sent` / `failed`. Dźwięk tylko
+gdy nadal jesteś na **tym samym** zamówieniu i numer (albo błąd) wpadnie.
+Raport dnia: **Admin → Raporty automatów**. Szczegóły: [OPS_REPORTS.md](./OPS_REPORTS.md).
+`phase=ksef` nadal zleca tło (ponowienie). **Nigdy** nie zapisujemy ID iFirma
+w `invoice_number`. Serwisy: `IfirmaFormOrderKsefBackgroundService`,
+`IfirmaFormOrderKsefSubmissionService`.
 
 **Filtr nawigacji „Tylko z NIP bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
 `filter_no_ksef=1` — zamówienia z **NIP nabywcy** (`buyer_nip` z cyframi),
@@ -345,8 +347,8 @@ czyszczony** (wcześniej sync kasował ręczny wpis). Gdy sync uzyska NumerKSeF 
 `ksef_email_pending=true`, wysyła FV mailem przez iFirma (te same adresy co czerwony
 przycisk; ~400 ms między adresami; bez agresywnego retry). Po pełnym sukcesie
 czyści flagę — kolejne Odśwież nie wysyła ponownie. **Bez** flagi sync **nie** wysyła
-maila. Zbiorcze Odśwież / kolejka KSeF — poza zakresem tego etapu (gdy bulk: kolejka
-concurrency 1 + opóźnienie między jobami). Serwis:
+maila. Zbiorcze Odśwież starej kolejki `filter_no_ksef` — świadomie poza zakresem
+(2026-09): tło KSeF dotyczy **nowych** wystawień z czerwonego przycisku. Serwis:
 `App\Services\IfirmaFormOrderKsefSyncService`.
 
 **Daty FV przy wystawianiu (2026-08):** po `fakturakraj.json` panel robi `GET` faktury

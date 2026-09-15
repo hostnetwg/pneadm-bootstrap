@@ -12,6 +12,7 @@
     $reminderPct = $eligible > 0 ? min(100, (int) round($reminderSent / $eligible * 100)) : 0;
     $canBulkSend = (bool) ($accessExpiryReminderCanBulkSend ?? false);
     $unsentEligible = (int) ($accessExpiryReminderUnsentCount ?? 0);
+    $latestAccessExpiryOpsItem = $latestAccessExpiryOpsItem ?? null;
 @endphp
 @if(is_array($schedule))
     <div class="card border mb-4 {{ $canBulkSend ? '' : 'bg-light' }}">
@@ -48,6 +49,24 @@
                 Indywidualnie: „Wyślij przypomnienie” w kolumnie <em>Zaświadczenie</em>.
                 Status wysyłki: ikona <i class="fas fa-bell text-secondary"></i> przy numerze zaświadczenia w tabeli.
             </div>
+
+            @if($latestAccessExpiryOpsItem)
+                @php
+                    $expiryOpsRun = $latestAccessExpiryOpsItem->run;
+                    $expiryQueued = (int) ($latestAccessExpiryOpsItem->payload['queued'] ?? 0);
+                    $expiryWhen = $expiryOpsRun?->started_at?->timezone('Europe/Warsaw');
+                @endphp
+                <div class="alert alert-light border py-2 small mb-3">
+                    <i class="bi bi-clipboard2-data me-1"></i>
+                    Ostatni automat:
+                    <strong>{{ $expiryWhen?->format('d.m.Y H:i') ?: '—' }}</strong>
+                    — zlecono do <strong>{{ $expiryQueued }}</strong>
+                    {{ $expiryQueued === 1 ? 'osoby' : 'osób' }}.
+                    @if($expiryOpsRun)
+                        <a href="{{ route('ops-reports.show', $expiryOpsRun) }}">Raport</a>
+                    @endif
+                </div>
+            @endif
 
             @if($canBulkSend)
                 <div class="d-flex flex-wrap gap-2 mb-3">

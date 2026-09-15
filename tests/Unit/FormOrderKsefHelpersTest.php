@@ -38,6 +38,26 @@ class FormOrderKsefHelpersTest extends TestCase
         $this->assertTrue($order->hasIfirmaInvoiceId());
     }
 
+    public function test_is_awaiting_ksef_number(): void
+    {
+        $order = new FormOrder;
+        $order->ksef_status = 'queued';
+        $order->ksef_number = null;
+        $this->assertTrue($order->isAwaitingKsefNumber());
+
+        $order->ksef_status = 'pending';
+        $this->assertTrue($order->isAwaitingKsefNumber());
+
+        $order->ksef_status = 'sent';
+        $order->ksef_number = '7392137630-20260915-ABCDEF000001-11';
+        $this->assertFalse($order->isAwaitingKsefNumber());
+        $this->assertTrue($order->hasConfirmedKsef());
+
+        $order->ksef_status = 'failed';
+        $order->ksef_number = null;
+        $this->assertFalse($order->isAwaitingKsefNumber());
+    }
+
     public function test_has_physical_recipient_data_complete(): void
     {
         $order = new FormOrder;

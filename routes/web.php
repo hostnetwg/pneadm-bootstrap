@@ -37,6 +37,7 @@ use App\Http\Controllers\OnlineCourseModuleController;
 use App\Http\Controllers\OnlineCourseSalesController;
 use App\Http\Controllers\OnlineCoursesController;
 use App\Http\Controllers\OnlinePaymentOrderController;
+use App\Http\Controllers\OpsReportController;
 use App\Http\Controllers\ParticipantController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProfileController;
@@ -254,6 +255,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             Route::post('/{id}/ifirma/invoice-with-receiver', [FormOrdersController::class, 'createIfirmaInvoiceWithReceiver'])->name('ifirma.invoice-with-receiver');
             Route::post('/{id}/ifirma/invoice-with-ksef', [FormOrdersController::class, 'createIfirmaInvoiceWithKsef'])->name('ifirma.invoice-with-ksef');
             Route::post('/{id}/ifirma/sync-ksef', [FormOrdersController::class, 'syncIfirmaKsefMetadata'])->name('ifirma.sync-ksef');
+            Route::get('/{id}/ifirma/ksef-status', [FormOrdersController::class, 'ifirmaKsefStatus'])->name('ifirma.ksef-status');
             Route::patch('/{id}/ksef-settings', [FormOrdersController::class, 'updateKsefSettings'])->name('ksef-settings.update');
         });
 
@@ -591,6 +593,12 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::delete('/force-delete/{table}/{id}', [TrashController::class, 'forceDelete'])->name('force-delete');
         Route::delete('/empty-table/{table}', [TrashController::class, 'emptyTable'])->name('empty-table');
         Route::delete('/empty-all', [TrashController::class, 'emptyAll'])->name('empty-all');
+    });
+
+    // Raporty automatów (KSeF w tle, przypomnienia o wygaśnięciu, …)
+    Route::prefix('ops-reports')->name('ops-reports.')->group(function () {
+        Route::get('/', [OpsReportController::class, 'index'])->name('index');
+        Route::get('/{opsRun}', [OpsReportController::class, 'show'])->name('show');
     });
 
     // Logi aktywności (Activity Logs)

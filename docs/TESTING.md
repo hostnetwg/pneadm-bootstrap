@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-13
+Data aktualizacji: 2026-09-15
 
 ## Cel
 
@@ -67,7 +67,8 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Ustawienie hasła (nowe konto PNEDU) | **pnedu:** `sail test --filter=PasswordResetTest` |
 | ClickMeeting embed PoC (local) | `docs/DEV_CLICKMEETING_EMBED_POC.md`, `--filter=ClickMeetingEmbedPocTest` |
 | Osadzony pokój na pnedu (`embed_on_pnedu`) / radio live / link embed w mailu | migracje `2026_08_20_200210_*`, `2026_08_21_181500_*`, `2026_08_21_182800_*`, `2026_08_22_131100_*`; kanon: `pnedu/docs/DASHBOARD_LIVE_EMBED.md` |
-| KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest` |
+| KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaFormOrderKsefBackgroundServiceTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest` |
+| Raporty automatów | `--filter=IfirmaFormOrderKsefBackgroundServiceTest` (lista `/ops-reports`); kanon: [OPS_REPORTS.md](./OPS_REPORTS.md) |
 | Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=IfirmaInvoicePaymentRegistrationServiceTest`, `--filter=DebtCaseAutoCloseServiceTest`, `--filter=BankStatementImportTest`, `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |
 | Legalny checkout / dokumenty | **pnedu:** `tests/Unit/LegalCheckoutServiceTest.php`, `tests/Unit/SendyOperationalConsentTest.php`, `tests/Feature/LegalDocumentsTest.php`, `tests/Feature/AnalyticsConsentTest.php`; **pneadm:** `tests/Unit/PneduProvisionArticle14NoticeTest.php` |
