@@ -5,4 +5,4 @@
 Start numeracji. Stan produkcji z 18.09.2026.
 
 - Konto uczestnika, dashboard szkoleń, wejście na live (osadzony pokój na pnedu.pl i rezerwowy link ClickMeeting).
-- Historia tej aplikacji w panelu ADM (Konto → pnedu.pl), bez wpisu na publicznej stronie pnedu.pl.
+- Historia tej aplikacji w panelu ADM (pod Kontem, po linii), bez wpisu na publicznej stronie pnedu.pl.

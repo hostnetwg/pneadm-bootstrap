@@ -5,7 +5,7 @@ Projekty: `pneadm` + `pnedu` (tylko `CHANGELOG.md`). Brak migracji.
 
 ## Cel
 
-W menu **Konto** widać `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Kanon: [CHANGELOG_VERSIONING.md](../CHANGELOG_VERSIONING.md).
+Pod **Konto**, po linii, widać `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0` jako główne pozycje menu. Kanon: [CHANGELOG_VERSIONING.md](../CHANGELOG_VERSIONING.md).
 
 ## Po deployu
 
@@ -39,7 +39,7 @@ Nie trzeba `optimize:clear` na pnedu, jeśli weszło tylko `CHANGELOG.md` — AD
 ## Smoke
 
 1. Zaloguj się na adm.pnedu.pl.
-2. Menu **Konto** — dwie pozycje z `v 1.0`.
+2. Menu, pod **Konto** (po linii) — dwie pozycje z `v 1.0`.
 3. Klik ADM — aktualna 1.0 i ClickMeeting.
 4. Klik pnedu.pl — aktualna 1.0.
 

@@ -28,7 +28,9 @@ Numery obu aplikacji są **niezależne**.
 
 ## Panel
 
-Menu **Konto**:
+Menu **Konto** bez zmian (profil, wylogowanie).
+
+Poniżej, po poziomej linii, dwa główne punkty menu:
 
 - `adm.pnedu.pl v …`
 - `pnedu.pl v …`

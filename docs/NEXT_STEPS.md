@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-09-18) — Historia wersji w ADM
 
-W menu **Konto** są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Klik otwiera aktualną wersję i wcześniejsze wpisy. Źródło: `CHANGELOG.md` w każdym repo. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
+W menu, pod **Konto** (po linii), są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Klik otwiera aktualną wersję i wcześniejsze wpisy. Źródło: `CHANGELOG.md` w każdym repo. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
 
 ## Ostatnio (2026-09-18) — ClickMeeting → courses + sync linku
 
