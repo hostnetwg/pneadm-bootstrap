@@ -100,6 +100,38 @@ class ClickMeetingService
     }
 
     /**
+     * Porównanie minuty startu: ClickMeeting (Europe/Warsaw) vs courses.start_date (termin kalendarzowy PL, bez konwersji strefy).
+     */
+    public function startTimesDiffer(mixed $clickMeetingRaw, mixed $courseStart): bool
+    {
+        $clickMeetingKey = $this->toWarsawDatetimeLocal($clickMeetingRaw);
+        $courseKey = $this->courseStartDatetimeLocal($courseStart);
+
+        if ($clickMeetingKey === null) {
+            return false;
+        }
+
+        if ($courseKey === null) {
+            return true;
+        }
+
+        return $clickMeetingKey !== $courseKey;
+    }
+
+    public function courseStartDatetimeLocal(mixed $courseStart): ?string
+    {
+        if ($courseStart === null || $courseStart === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($courseStart)->format('Y-m-d\TH:i');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @return array{success: bool, error?: string, data?: mixed, status_code?: int}
      */
     public function registerParticipant(string $eventId, string $firstName, string $lastName, string $email): array

@@ -39,12 +39,21 @@ class ClickMeetingTrainingController extends Controller
         $trainings = $trainings->map(function (array $room) use ($linkedDetails, $clickMeetingService) {
             $eventId = trim((string) ($room['id'] ?? ''));
             $details = $eventId !== '' ? $linkedDetails->get($eventId) : null;
-            $room['linked_course'] = $details?->course;
+            $course = $details?->course;
+            $room['linked_course'] = $course;
             $apiRoomUrl = $clickMeetingService->extractRoomUrl($room);
             $storedLink = $details ? $clickMeetingService->normalizeRoomUrl($details->meeting_link) : null;
             $room['meeting_link_stale'] = $details !== null
                 && $apiRoomUrl !== null
                 && $clickMeetingService->roomUrlsDiffer($storedLink, $apiRoomUrl);
+
+            $cmStartRaw = $room['starts_at'] ?? $room['start_time'] ?? null;
+            $courseStart = $course?->start_date;
+            $room['course_pretty_start'] = $courseStart
+                ? Carbon::parse($courseStart)->format('d.m.Y H:i')
+                : null;
+            $room['start_time_stale'] = $details !== null
+                && $clickMeetingService->startTimesDiffer($cmStartRaw, $courseStart);
 
             return $room;
         });

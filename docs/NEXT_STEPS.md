@@ -9,7 +9,7 @@ W menu, pod **Konto** (po linii), są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. P
 
 ## Ostatnio (2026-09-18) — ClickMeeting → courses + sync linku
 
-Na `/clickmeeting/trainings` widać, które wydarzenia mają już szkolenie w `courses`. Brakujące można dodać z prefillem. Przycisk **Aktualizuj link z ClickMeeting** (lista i edycja kursu, tylko przy rozjeździe `room_url` vs `meeting_link`) zapisuje aktualny `room_url` do szkolenia, dostępów uczestników i kalendarza Google. Wysyłka maili live/provision też odświeża link z API. Tytułu kursu nie ruszamy. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
+Na `/clickmeeting/trainings` widać, które wydarzenia mają już szkolenie w `courses` oraz datę startu z courses. Przy rozjeździe terminu z ClickMeeting jest ostrzeżenie (bez automatycznego nadpisywania daty). Przycisk **Aktualizuj link z ClickMeeting** (lista i edycja kursu, tylko przy rozjeździe `room_url` vs `meeting_link`) zapisuje aktualny `room_url` do szkolenia, dostępów uczestników i kalendarza Google. Wysyłka maili live/provision też odświeża link z API. Tytułu kursu nie ruszamy. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
 
 ## Ostatnio (2026-09-15) — Recovery płatności kursu online (tylko ADM)
 

@@ -45,7 +45,7 @@ class ClickMeetingTrainingAdminTest extends TestCase
     public function test_trainings_list_marks_existing_course_and_hides_add_button(): void
     {
         $user = User::factory()->create();
-        $linkedCourse = $this->createOnlineCourse('Szkolenie już w ADM');
+        $linkedCourse = $this->createOnlineCourse('Szkolenie już w ADM', '2026-10-02 10:00:00');
         CourseOnlineDetails::create([
             'course_id' => $linkedCourse->id,
             'platform' => 'ClickMeeting',
@@ -94,7 +94,9 @@ class ClickMeetingTrainingAdminTest extends TestCase
             ->assertDontSee(route('clickmeeting.trainings.create-course', 10088702), false)
             ->assertSee(route('courses.edit', $linkedCourse->id), false)
             ->assertDontSee('Aktualizuj link z ClickMeeting')
-            ->assertDontSee('Link nieaktualny');
+            ->assertDontSee('Link nieaktualny')
+            ->assertDontSee('Termin się różni')
+            ->assertSee('Start w courses:');
     }
 
     public function test_trainings_list_marks_stale_meeting_link(): void
@@ -133,6 +135,45 @@ class ClickMeetingTrainingAdminTest extends TestCase
             ->assertOk()
             ->assertSee('Link nieaktualny')
             ->assertSee('Aktualizuj link z ClickMeeting');
+    }
+
+    public function test_trainings_list_warns_when_course_start_differs_from_clickmeeting(): void
+    {
+        $user = User::factory()->create();
+        $linkedCourse = $this->createOnlineCourse('Szkolenie z innym terminem', '2026-10-03 09:00:00');
+        CourseOnlineDetails::create([
+            'course_id' => $linkedCourse->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088702',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/istniejace',
+        ]);
+
+        Http::fake(function ($request) {
+            $url = rtrim($request->url(), '/');
+            if ($url === 'https://api.clickmeeting.com/v1/conferences') {
+                return Http::response([
+                    'active_conferences' => [],
+                    'scheduled_conferences' => [
+                        [
+                            'id' => 10088702,
+                            'name' => 'Istniejące szkolenie CM',
+                            'starts_at' => '2026-10-02T10:00:00+02:00',
+                            'room_url' => 'https://pnedu.clickmeeting.com/istniejace/',
+                            'status' => 'active',
+                        ],
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['error' => 'unexpected '.$request->url()], 500);
+        });
+
+        $this->actingAs($user)
+            ->get(route('clickmeeting.trainings.index'))
+            ->assertOk()
+            ->assertSee('Termin się różni')
+            ->assertSee('Start w courses:')
+            ->assertSee('03.10.2026');
     }
 
     public function test_sync_room_url_updates_course_and_live_access(): void
@@ -505,13 +546,15 @@ class ClickMeetingTrainingAdminTest extends TestCase
         ]);
     }
 
-    private function createOnlineCourse(string $title): Course
+    private function createOnlineCourse(string $title, ?string $startDate = null): Course
     {
+        $start = $startDate ? \Carbon\Carbon::parse($startDate) : now()->addDays(7);
+
         return Course::create([
             'title' => $title,
             'description' => 'Test',
-            'start_date' => now()->addDays(7),
-            'end_date' => now()->addDays(7)->addHours(3),
+            'start_date' => $start,
+            'end_date' => $start->copy()->addHours(3),
             'is_paid' => true,
             'type' => 'online',
             'category' => 'open',

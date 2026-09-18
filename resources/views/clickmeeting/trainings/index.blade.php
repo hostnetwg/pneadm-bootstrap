@@ -64,9 +64,16 @@
                                     @if(!empty($t['meeting_link_stale']))
                                         <span class="badge text-bg-warning ms-1">Link nieaktualny</span>
                                     @endif
+                                    @if(!empty($t['start_time_stale']))
+                                        <span class="badge text-bg-warning ms-1">Termin się różni</span>
+                                    @endif
                                     <a href="{{ route('courses.edit', $linkedCourse->id) }}" class="d-block small mt-1">
                                         #{{ $linkedCourse->id }} {{ $linkedCourse->title }}
                                     </a>
+                                    <div class="small mt-1 {{ !empty($t['start_time_stale']) ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                        Start w courses:
+                                        {{ $t['course_pretty_start'] ?? 'brak daty' }}
+                                    </div>
                                     @if(!empty($t['meeting_link_stale']))
                                         <form action="{{ route('clickmeeting.trainings.sync-room-url', $t['id']) }}"
                                               method="POST"

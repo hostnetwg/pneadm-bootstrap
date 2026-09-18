@@ -49,6 +49,8 @@ Przycisk **Aktualizuj link z ClickMeeting**:
 - na `/clickmeeting/trainings` tylko gdy `room_url` z API różni się od `meeting_link` (etykieta **Link nieaktualny** + przycisk),
 - na `/courses/{id}/edit` obok pola „Link do spotkania”, też tylko przy rozjeździe.
 
+Na liście, w kolumnie **Szkolenie w ADM**, widać też datę i godzinę startu z `courses.start_date`. Gdy różni się od terminu ClickMeeting (porównanie do minuty, CM w `Europe/Warsaw`, courses bez konwersji strefy) — etykieta **Termin się różni**. Bez automatycznej synchronizacji daty; operator poprawia w edycji szkolenia.
+
 Akcja:
 
 1. `GET /v1/conferences/{event_id}` → `room_url`,
@@ -71,9 +73,10 @@ Brak migracji. Po wrzuceniu kodu: `optimize:clear` na `pneadm`.
 Smoke:
 
 1. `/clickmeeting/trainings` — etykieta przy znanym szkoleniu, „Dodaj do szkoleń” przy nowym.
-2. Zmień nazwę pokoju w ClickMeeting → na liście **Link nieaktualny** → aktualizacja.
-3. To samo z `/courses/{id}/edit`.
-4. Provision / „Wyślij link do live” — w mailu nowy slug.
+2. Przy znanym szkoleniu widać **Start w courses**. Po zmianie daty w ClickMeeting — **Termin się różni**.
+3. Zmień nazwę pokoju w ClickMeeting → na liście **Link nieaktualny** → aktualizacja.
+4. To samo z `/courses/{id}/edit`.
+5. Provision / „Wyślij link do live” — w mailu nowy slug.
 
 ## Testy
 

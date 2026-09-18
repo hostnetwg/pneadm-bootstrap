@@ -6,7 +6,7 @@ Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1
 
 Start numeracji. Stan produkcji z 18.09.2026.
 
-- [Lista ClickMeeting](/clickmeeting/trainings) pokazuje, które wydarzenia mają już szkolenie w panelu ([Lista szkoleń](/courses)); brakujące można dodać z uzupełnionym formularzem (zapis ręczny).
+- [Lista ClickMeeting](/clickmeeting/trainings) pokazuje, które wydarzenia mają już szkolenie w panelu ([Lista szkoleń](/courses)); brakujące można dodać z uzupełnionym formularzem (zapis ręczny). Przy powiązanym szkoleniu widać start z courses; gdy różni się od ClickMeeting — ostrzeżenie (bez automatycznej zmiany daty).
 - Link do pokoju aktualizuje się tylko przy rozjeździe z ClickMeeting ([lista](/clickmeeting/trainings) i [edycja szkolenia](/courses)) oraz przy wysyłce maili live, provisionu i ponownej wysyłce dostępu ([Zamówienia FORM](/form-orders)).
 - W menu, pod Kontem (po linii), jest historia wersji [ADM](/changelog/adm) i [pnedu.pl](/changelog/pnedu).
 - Przy każdej z tych pozycji jest czerwone kółko z liczbą nieprzeczytanych punktów; po wejściu w historię kółko gaśnie (stan w koncie operatora). Mail do administratorów i superadministratorów tylko przy nowym numerze wersji, po decyzji Waldemara.

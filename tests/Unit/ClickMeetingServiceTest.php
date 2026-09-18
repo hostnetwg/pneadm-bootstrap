@@ -290,6 +290,25 @@ class ClickMeetingServiceTest extends TestCase
         $this->assertNull($service->toWarsawDatetimeLocal(null));
     }
 
+    public function test_start_times_differ_compares_warsaw_minute_with_course_wall_clock(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertFalse($service->startTimesDiffer(
+            '2026-10-02T10:00:00+02:00',
+            '2026-10-02 10:00:00'
+        ));
+        $this->assertTrue($service->startTimesDiffer(
+            '2026-10-02T10:00:00+02:00',
+            '2026-10-03 09:00:00'
+        ));
+        $this->assertTrue($service->startTimesDiffer(
+            '2026-10-02T10:00:00+02:00',
+            null
+        ));
+        $this->assertFalse($service->startTimesDiffer(null, '2026-10-02 10:00:00'));
+    }
+
     public function test_normalize_room_url_strips_trailing_slash(): void
     {
         $service = app(ClickMeetingService::class);
