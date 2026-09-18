@@ -93,6 +93,9 @@ class ParticipantLiveAccessService
         }
 
         $result = $this->buildSuccessfulClickMeetingResult($clickMeetingService, $eventId, $email);
+        if (! empty($result['room_url'])) {
+            app(ClickMeetingCourseRoomUrlSyncService::class)->applyRoomUrl($course, (string) $result['room_url']);
+        }
         $this->persistLiveAccess($participant, $course, $result, $formOrderId);
 
         return $result;

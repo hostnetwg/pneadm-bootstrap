@@ -3,6 +3,8 @@
         <h2 class="fw-semibold fs-4 text-dark">
             @if(!empty($sourceOffer))
                 {{ __('Dodaj szkolenie z oferty') }}
+            @elseif(!empty($sourceClickMeeting))
+                {{ __('Dodaj szkolenie z ClickMeeting') }}
             @else
                 {{ __('Dodaj nowe szkolenie') }}
             @endif
@@ -17,10 +19,24 @@
 
                 @php
                     $sourceOffer = $sourceOffer ?? null;
-                    $defaultIsPaid = old('is_paid', $sourceOffer ? '1' : '1');
-                    $defaultCategory = old('category', $sourceOffer->default_course_category ?? 'open');
-                    $defaultInstructorId = old('instructor_id', $sourceOffer->instructor_id ?? '');
+                    $sourceClickMeeting = $sourceClickMeeting ?? null;
+                    $defaultIsPaid = old('is_paid', '1');
+                    $defaultCategory = old('category', optional($sourceOffer)->default_course_category ?? 'open');
+                    $defaultInstructorId = old('instructor_id', optional($sourceOffer)->instructor_id ?? '');
                     $copyImageDefault = old('copy_image_from_offer', $sourceOffer && $sourceOffer->image ? '1' : '0');
+                    $defaultLiveRoomMode = old('live_room_mode', 'embed_pnedu');
+                    $defaultTitle = old(
+                        'title',
+                        $sourceClickMeeting['name'] ?? optional($sourceOffer)->title ?? ''
+                    );
+                    $defaultStartDate = old('start_date', $sourceClickMeeting['start_date'] ?? '');
+                    $defaultEndDate = old('end_date', $sourceClickMeeting['end_date'] ?? '');
+                    $defaultPlatform = old('platform', $sourceClickMeeting['platform'] ?? '');
+                    $defaultMeetingLink = old('meeting_link', $sourceClickMeeting['meeting_link'] ?? '');
+                    $defaultClickMeetingEventId = old(
+                        'clickmeeting_event_id',
+                        $sourceClickMeeting['event_id'] ?? ''
+                    );
                 @endphp
 
                 @if($sourceOffer)
@@ -38,9 +54,24 @@
                     <input type="hidden" name="training_offer_id" value="{{ old('training_offer_id', $sourceOffer->id) }}">
                 @endif
 
+                @if($sourceClickMeeting)
+                    <div class="alert alert-info d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <strong>Tworzenie szkolenia z ClickMeeting.</strong>
+                            Pola zostały uzupełnione z wydarzenia
+                            „{{ $sourceClickMeeting['name'] }}” (ID {{ $sourceClickMeeting['event_id'] }}).
+                            Uzupełnij pozostałe dane i zapisz.
+                            Publikacja na pnedu.pl jest wyłączona.
+                        </div>
+                        <a href="{{ route('clickmeeting.trainings.index') }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                            Wróć do listy ClickMeeting
+                        </a>
+                    </div>
+                @endif
+
                 <div class="mb-3">
                     <label for="title" class="form-label">Tytuł kursu</label>
-                    <input type="text" name="title" id="title" class="form-control" value="{{ old('title', $sourceOffer->title ?? '') }}" required>
+                    <input type="text" name="title" id="title" class="form-control" value="{{ $defaultTitle }}" required>
                 </div>
 
                 <div class="mb-3">
@@ -115,11 +146,11 @@
                 <div class="row row mb-3">
                     <div class="col-md-3">
                         <label for="start_date" class="form-label">Data rozpoczęcia</label>
-                        <input type="datetime-local" name="start_date" id="start_date" class="form-control" required>
+                        <input type="datetime-local" name="start_date" id="start_date" class="form-control" value="{{ $defaultStartDate }}" required>
                     </div>
                     <div class="col-md-3">
-                        <label>Data zakończenia</label>
-                        <input type="datetime-local" name="end_date" class="form-control" value="{{ old('end_date', $course->end_date ?? '') }}">
+                        <label for="end_date">Data zakończenia</label>
+                        <input type="datetime-local" name="end_date" id="end_date" class="form-control" value="{{ $defaultEndDate }}">
                         @error('end_date')
                             <div class="text-danger">{{ $message }}</div> <!-- ✅ Wyświetlanie błędu -->
                         @enderror
@@ -151,11 +182,11 @@
                 <div id="onlineFields" class="row">
                     <div class="col-md-4">
                         <label for="platform" class="form-label">Platforma</label>
-                        <input type="text" name="platform" id="platform" class="form-control">
+                        <input type="text" name="platform" id="platform" class="form-control" value="{{ $defaultPlatform }}">
                     </div>
                     <div class="col-md-4">
                         <label for="meeting_link" class="form-label">Link do spotkania</label>
-                        <input type="url" name="meeting_link" id="meeting_link" class="form-control">
+                        <input type="url" name="meeting_link" id="meeting_link" class="form-control" value="{{ $defaultMeetingLink }}">
                     </div>
                     <div class="col-md-4">
                         <label for="meeting_password" class="form-label">Hasło do spotkania</label>
@@ -166,10 +197,10 @@
                 <div class="row mb-2">
                     <div class="col-md-4 mb-3" id="clickmeeting-event-wrapper">
                         <label for="clickmeeting_event_id" class="form-label">ID wydarzenia ClickMeeting</label>
-                        <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ old('clickmeeting_event_id') }}">
+                        <input type="text" name="clickmeeting_event_id" id="clickmeeting_event_id" class="form-control" value="{{ $defaultClickMeetingEventId }}">
                         <small class="text-muted d-block">Uzupełnij tylko dla kursów online na ClickMeeting.</small>
                         @php
-                            $liveRoomMode = old('live_room_mode', 'embed_pnedu');
+                            $liveRoomMode = $defaultLiveRoomMode;
                             $embedEmailLinkEnabled = (bool) old(
                                 'embed_email_link_enabled',
                                 $liveRoomMode === 'embed_pnedu'

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -10,6 +11,93 @@ class ClickMeetingService
     public const ACCESS_TYPE_TOKEN = 3;
 
     public const ACCESS_TYPE_PASSWORD = 2;
+
+    /**
+     * @return array{
+     *     success: bool,
+     *     error?: string,
+     *     active_conferences?: list<array<string, mixed>>,
+     *     scheduled_conferences?: list<array<string, mixed>>
+     * }
+     */
+    public function listConferences(): array
+    {
+        $config = $this->apiConfig();
+        if ($config === null) {
+            return [
+                'success' => false,
+                'error' => 'Brak konfiguracji ClickMeeting API token.',
+            ];
+        }
+
+        try {
+            $response = Http::baseUrl($config['base_url'])
+                ->withHeaders(['X-Api-Key' => $config['api_key']])
+                ->get('conferences');
+
+            if (! $response->successful()) {
+                return [
+                    'success' => false,
+                    'error' => 'ClickMeeting zwrócił HTTP '.$response->status().' przy pobieraniu listy wydarzeń.',
+                ];
+            }
+
+            $payload = $response->json();
+            if (! is_array($payload)) {
+                $payload = [];
+            }
+
+            return [
+                'success' => true,
+                'active_conferences' => $this->conferenceList($payload['active_conferences'] ?? null),
+                'scheduled_conferences' => $this->conferenceList($payload['scheduled_conferences'] ?? null),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('ClickMeetingService: listConferences exception', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Błąd komunikacji z ClickMeeting: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function conferenceList(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $conferences = [];
+        foreach ($items as $item) {
+            if (is_array($item)) {
+                $conferences[] = $item;
+            }
+        }
+
+        return $conferences;
+    }
+
+    public function toWarsawDatetimeLocal(mixed $raw): ?string
+    {
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)
+                ->timezone('Europe/Warsaw')
+                ->format('Y-m-d\TH:i');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 
     /**
      * @return array{success: bool, error?: string, data?: mixed, status_code?: int}
@@ -332,9 +420,19 @@ class ClickMeetingService
             return null;
         }
 
-        $roomUrl = trim((string) ($conference['room_url'] ?? ''));
+        return $this->normalizeRoomUrl($conference['room_url'] ?? null);
+    }
 
-        return $roomUrl !== '' ? $roomUrl : null;
+    public function normalizeRoomUrl(mixed $raw): ?string
+    {
+        $url = rtrim(trim((string) $raw), '/');
+
+        return $url !== '' ? $url : null;
+    }
+
+    public function roomUrlsDiffer(mixed $left, mixed $right): bool
+    {
+        return $this->normalizeRoomUrl($left) !== $this->normalizeRoomUrl($right);
     }
 
     public function buildJoinUrl(string $roomUrl, ?string $token = null): string

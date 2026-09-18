@@ -12,6 +12,7 @@ use App\Models\FormOrder;
 use App\Models\Instructor;
 use App\Models\PaymentDisplayOption;
 use App\Models\TrainingOffer;
+use App\Services\ClickMeetingCourseRoomUrlSyncService;
 use App\Services\ClickMeetingService;
 use App\Services\CourseFormOrderBillingService;
 use App\Services\CourseFunnelStatsService;
@@ -935,23 +936,7 @@ class CoursesController extends Controller
      */
     public function create()
     {
-        // Pobranie listy instruktorów do formularza
-        $instructors = Instructor::all();
-        $paymentDisplayOptions = PaymentDisplayOption::getSettings();
-
-        // Pobranie listy aktywnych szablonów certyfikatów
-        $certificateTemplates = CertificateTemplate::where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        $sourceOffer = null;
-
-        $registrationSuccessorOptions = Course::query()
-            ->orderByDesc('start_date')
-            ->limit(200)
-            ->get(['id', 'title', 'start_date']);
-
-        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer', 'registrationSuccessorOptions'));
+        return view('courses.create', $this->courseCreateFormData());
     }
 
     /**
@@ -959,19 +944,62 @@ class CoursesController extends Controller
      */
     public function createFromTrainingOffer(TrainingOffer $trainingOffer)
     {
-        $instructors = Instructor::all();
-        $paymentDisplayOptions = PaymentDisplayOption::getSettings();
-        $certificateTemplates = CertificateTemplate::where('is_active', true)
-            ->orderBy('name')
-            ->get();
-        $sourceOffer = $trainingOffer->loadMissing('instructor');
+        return view('courses.create', $this->courseCreateFormData(
+            sourceOffer: $trainingOffer->loadMissing('instructor'),
+        ));
+    }
 
-        $registrationSuccessorOptions = Course::query()
-            ->orderByDesc('start_date')
-            ->limit(200)
-            ->get(['id', 'title', 'start_date']);
+    /**
+     * Formularz tworzenia szkolenia z prefill z wydarzenia ClickMeeting (bez automatycznego zapisu).
+     */
+    public function createFromClickMeeting(string $eventId, ClickMeetingService $clickMeetingService)
+    {
+        $eventId = trim($eventId);
+        abort_if($eventId === '', 404);
 
-        return view('courses.create', compact('instructors', 'certificateTemplates', 'paymentDisplayOptions', 'sourceOffer', 'registrationSuccessorOptions'));
+        $existingCourse = CourseOnlineDetails::courseForEventId($eventId);
+        if ($existingCourse) {
+            return redirect()
+                ->route('courses.edit', $existingCourse->id)
+                ->with('warning', 'To wydarzenie ClickMeeting jest już powiązane ze szkoleniem.');
+        }
+
+        $result = $clickMeetingService->getConference($eventId);
+        if (! ($result['success'] ?? false)) {
+            return redirect()
+                ->route('clickmeeting.trainings.index')
+                ->with('error', $result['error'] ?? 'Nie udało się pobrać wydarzenia z ClickMeeting.');
+        }
+
+        $conference = is_array($result['conference'] ?? null) ? $result['conference'] : [];
+
+        return view('courses.create', $this->courseCreateFormData(
+            sourceClickMeeting: $this->clickMeetingCoursePrefill($conference, $eventId, $clickMeetingService),
+        ));
+    }
+
+    public function syncClickMeetingRoomUrl(int $id, ClickMeetingCourseRoomUrlSyncService $syncService): RedirectResponse
+    {
+        $course = Course::with('onlineDetails')->findOrFail($id);
+        $result = $syncService->refreshFromApi($course);
+
+        $redirect = $this->redirectToCourseEdit($course->id);
+
+        if (! ($result['success'] ?? false)) {
+            return $redirect->with('error', $result['error'] ?? 'Nie udało się zaktualizować linku z ClickMeeting.');
+        }
+
+        if (! ($result['changed'] ?? false)) {
+            return $redirect->with('success', 'Link do spotkania jest już zgodny z ClickMeeting.');
+        }
+
+        $message = 'Zaktualizowano link do spotkania z ClickMeeting.';
+        $liveUpdated = (int) ($result['live_access_updated'] ?? 0);
+        if ($liveUpdated > 0) {
+            $message .= ' Odświeżono też link w dostępach uczestników ('.$liveUpdated.').';
+        }
+
+        return $redirect->with('success', $message);
     }
 
     public function store(Request $request)
@@ -1139,7 +1167,7 @@ class CoursesController extends Controller
         }
     }
 
-    public function edit($id)
+    public function edit($id, ClickMeetingCourseRoomUrlSyncService $roomUrlSync)
     {
         $course = Course::with(['location', 'onlineDetails', 'participants', 'priceVariants', 'registrationSuccessor'])->findOrFail($id);
         $instructors = Instructor::all();
@@ -1156,7 +1184,15 @@ class CoursesController extends Controller
             ->limit(200)
             ->get(['id', 'title', 'start_date']);
 
-        return view('courses.edit', compact('course', 'instructors', 'certificateTemplates', 'registrationSuccessorOptions') + $closedBilling);
+        $clickMeetingMeetingLinkStale = $roomUrlSync->isMeetingLinkStale($course);
+
+        return view('courses.edit', compact(
+            'course',
+            'instructors',
+            'certificateTemplates',
+            'registrationSuccessorOptions',
+            'clickMeetingMeetingLinkStale'
+        ) + $closedBilling);
     }
 
     /**
@@ -1552,6 +1588,71 @@ class CoursesController extends Controller
         }
 
         return $imagePath;
+    }
+
+    /**
+     * @param  array{
+     *     event_id?: string,
+     *     name?: string,
+     *     start_date?: string|null,
+     *     end_date?: string|null,
+     *     platform?: string,
+     *     meeting_link?: string|null
+     * }|null  $sourceClickMeeting
+     * @return array<string, mixed>
+     */
+    private function courseCreateFormData(?TrainingOffer $sourceOffer = null, ?array $sourceClickMeeting = null): array
+    {
+        return [
+            'instructors' => Instructor::all(),
+            'paymentDisplayOptions' => PaymentDisplayOption::getSettings(),
+            'certificateTemplates' => CertificateTemplate::where('is_active', true)
+                ->orderBy('name')
+                ->get(),
+            'sourceOffer' => $sourceOffer,
+            'sourceClickMeeting' => $sourceClickMeeting,
+            'registrationSuccessorOptions' => Course::query()
+                ->orderByDesc('start_date')
+                ->limit(200)
+                ->get(['id', 'title', 'start_date']),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $conference
+     * @return array{
+     *     event_id: string,
+     *     name: string,
+     *     start_date: string|null,
+     *     end_date: string|null,
+     *     platform: string,
+     *     meeting_link: string|null
+     * }
+     */
+    private function clickMeetingCoursePrefill(
+        array $conference,
+        string $eventId,
+        ClickMeetingService $clickMeetingService
+    ): array {
+        $startDate = $clickMeetingService->toWarsawDatetimeLocal(
+            $conference['starts_at'] ?? $conference['start_time'] ?? null
+        );
+        $endDate = $clickMeetingService->toWarsawDatetimeLocal(
+            $conference['ends_at'] ?? $conference['end_time'] ?? null
+        );
+
+        if ($startDate !== null && $endDate !== null && $endDate <= $startDate) {
+            $endDate = null;
+        }
+
+        return [
+            'event_id' => $eventId,
+            'name' => trim((string) ($conference['name'] ?? '')),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'platform' => 'ClickMeeting',
+            'meeting_link' => $clickMeetingService->extractRoomUrl($conference),
+        ];
     }
 
     /**

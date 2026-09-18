@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-15
+Data utworzenia/aktualizacji: 2026-09-18
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-18) — ClickMeeting → courses + sync linku
+
+Na `/clickmeeting/trainings` widać, które wydarzenia mają już szkolenie w `courses`. Brakujące można dodać z prefillem. Przycisk **Aktualizuj link z ClickMeeting** (lista i edycja kursu, tylko przy rozjeździe `room_url` vs `meeting_link`) zapisuje aktualny `room_url` do szkolenia, dostępów uczestników i kalendarza Google. Wysyłka maili live/provision też odświeża link z API. Tytułu kursu nie ruszamy. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
 
 ## Ostatnio (2026-09-15) — Recovery płatności kursu online (tylko ADM)
 

@@ -110,6 +110,12 @@ class ParticipantLiveAccessServiceTest extends TestCase
         $mock->shouldReceive('extractRoomUrl')
             ->once()
             ->andReturn('https://pnedu.clickmeeting.com/test-room');
+        $mock->shouldReceive('normalizeRoomUrl')
+            ->andReturnUsing(function ($raw) {
+                $url = rtrim(trim((string) $raw), '/');
+
+                return $url !== '' ? $url : null;
+            });
         $mock->shouldReceive('getAccessTokenForEmail')
             ->once()
             ->andReturn(['success' => true, 'token' => 'ABC123']);

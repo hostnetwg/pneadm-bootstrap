@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-09-12
+Data utworzenia/aktualizacji: 2026-09-18
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -23,6 +23,7 @@ pnedu.pl
 
 adm.pnedu.pl
     ├─ szkolenia
+    ├─ szkolenia ClickMeeting (lista API → prefill courses)
     ├─ oferty szkoleń
     ├─ zamówienia
     ├─ kampanie
@@ -112,6 +113,7 @@ Najważniejsze miejsca w kodzie:
 
 - `routes/web.php`,
 - `routes/api.php`,
+- `app/Http/Controllers/ClickMeetingTrainingController.php`,
 - `app/Http/Controllers/CoursesController.php`,
 - `app/Http/Controllers/TrainingOfferController.php`,
 - `app/Http/Controllers/FormOrdersController.php`,
@@ -145,6 +147,8 @@ Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION
 Oferty szkoleń bez ustalonego terminu są przechowywane w tabeli `training_offers` w bazie `pneadm`. Panel `adm.pnedu.pl` zarządza ich treścią, statusem aktywności i publikacją. Portal `pnedu.pl` czyta aktywne i opublikowane oferty z połączenia `pneadm` i prezentuje je w katalogu `Szkolenia -> Szkolenia rad pedagogicznych`.
 
 Z panelu administracyjnego można utworzyć szkolenie terminowe (`courses`) na podstawie oferty: formularz `courses/create` jest prefillowany, a `courses.training_offer_id` zapisuje źródło. Grafika oferty jest kopiowana do katalogu grafik szkolenia dopiero przy zapisie.
+
+Lista `/clickmeeting/trainings` pokazuje zaplanowane wydarzenia z API ClickMeeting i oznacza te, które mają już `course_online_details.clickmeeting_event_id`. Z listy można otworzyć prefill `/courses/create` (bez automatycznego zapisu). Link do pokoju (`meeting_link`) jest snapshotem `room_url`; przycisk sync na liście i na `/courses/{id}/edit` widać tylko przy rozjeździe. Wysyłka maila live też odświeża `room_url`. Kanon: [`CLICKMEETING_TRAININGS.md`](../CLICKMEETING_TRAININGS.md).
 
 To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie z terminem, uczestnikami, zamówieniami i certyfikatami. Mapowanie przyszłego kopiowania oferty do `courses` opisuje `docs/TRAINING_OFFERS.md`.
 

@@ -189,9 +189,16 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     });
 
     // ClickMeeting – lista zaplanowanych szkoleń
-    Route::middleware(['auth', 'verified', 'check.user.status'])          // lub inny zestaw middleware
-        ->get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
-        ->name('clickmeeting.trainings.index');
+    Route::middleware(['auth', 'verified', 'check.user.status'])->group(function () {
+        Route::get('/clickmeeting/trainings', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'index'])
+            ->name('clickmeeting.trainings.index');
+        Route::get('/clickmeeting/trainings/{eventId}/create-course', [CoursesController::class, 'createFromClickMeeting'])
+            ->whereNumber('eventId')
+            ->name('clickmeeting.trainings.create-course');
+        Route::post('/clickmeeting/trainings/{eventId}/sync-room-url', [\App\Http\Controllers\ClickMeetingTrainingController::class, 'syncRoomUrl'])
+            ->whereNumber('eventId')
+            ->name('clickmeeting.trainings.sync-room-url');
+    });
 
     // Sendy - listy mailingowe
     Route::prefix('sendy')->name('sendy.')->group(function () {
@@ -381,6 +388,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::post('/courses/{id}/sync-google-calendar', [CoursesController::class, 'syncGoogleCalendar'])
         ->whereNumber('id')
         ->name('courses.sync-google-calendar');
+    Route::post('/courses/{id}/sync-clickmeeting-room-url', [CoursesController::class, 'syncClickMeetingRoomUrl'])
+        ->whereNumber('id')
+        ->name('courses.sync-clickmeeting-room-url');
     Route::delete('/courses/{id}', [CoursesController::class, 'destroy'])->whereNumber('id')->name('courses.destroy');
     Route::get('/courses/{id}/edit', [CoursesController::class, 'edit'])->whereNumber('id')->name('courses.edit');
     Route::put('/courses/{id}', [CoursesController::class, 'update'])->whereNumber('id')->name('courses.update');

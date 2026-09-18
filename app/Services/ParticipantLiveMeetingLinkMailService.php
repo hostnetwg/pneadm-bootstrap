@@ -19,6 +19,7 @@ class ParticipantLiveMeetingLinkMailService
     public function __construct(
         private readonly ParticipantLiveAccessService $liveAccessService,
         private readonly PneduProvisionEmailContextBuilder $emailContextBuilder,
+        private readonly ClickMeetingCourseRoomUrlSyncService $roomUrlSync,
     ) {}
 
     /**
@@ -234,6 +235,14 @@ class ParticipantLiveMeetingLinkMailService
     public function resolveLiveContext(Participant $participant, Course $course): ?PneduProvisionLiveAccessContext
     {
         $course->loadMissing('onlineDetails');
+        $platform = strtolower(trim((string) optional($course->onlineDetails)->platform));
+        if ($platform === 'clickmeeting') {
+            $this->roomUrlSync->refreshFromApi($course);
+            $course->unsetRelation('onlineDetails');
+            $course->load('onlineDetails');
+            $participant->unsetRelation('liveAccess');
+        }
+
         $participant->loadMissing('liveAccess');
         $liveAccess = $participant->liveAccess;
 

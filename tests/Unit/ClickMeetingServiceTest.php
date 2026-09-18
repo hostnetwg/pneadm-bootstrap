@@ -252,4 +252,59 @@ class ClickMeetingServiceTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Brak konfiguracji', (string) ($result['error'] ?? ''));
     }
+
+    public function test_list_conferences_reads_active_and_scheduled_rooms(): void
+    {
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences' => Http::response([
+                'active_conferences' => [
+                    ['id' => 11, 'name' => 'Aktywne'],
+                ],
+                'scheduled_conferences' => [
+                    ['id' => 22, 'name' => 'Zaplanowane'],
+                ],
+            ], 200),
+        ]);
+
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+        ]);
+
+        $result = app(ClickMeetingService::class)->listConferences();
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(11, $result['active_conferences'][0]['id']);
+        $this->assertSame(22, $result['scheduled_conferences'][0]['id']);
+    }
+
+    public function test_to_warsaw_datetime_local_converts_utc_offset(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertSame(
+            '2026-10-01T10:00',
+            $service->toWarsawDatetimeLocal('2026-10-01T08:00:00+00:00')
+        );
+        $this->assertNull($service->toWarsawDatetimeLocal(''));
+        $this->assertNull($service->toWarsawDatetimeLocal(null));
+    }
+
+    public function test_normalize_room_url_strips_trailing_slash(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertSame(
+            'https://pnedu.clickmeeting.com/nowy',
+            $service->normalizeRoomUrl('https://pnedu.clickmeeting.com/nowy/')
+        );
+        $this->assertTrue($service->roomUrlsDiffer(
+            'https://pnedu.clickmeeting.com/stary',
+            'https://pnedu.clickmeeting.com/nowy/'
+        ));
+        $this->assertFalse($service->roomUrlsDiffer(
+            'https://pnedu.clickmeeting.com/nowy/',
+            'https://pnedu.clickmeeting.com/nowy'
+        ));
+    }
 }

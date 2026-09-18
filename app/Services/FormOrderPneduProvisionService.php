@@ -681,6 +681,11 @@ class FormOrderPneduProvisionService
         }
 
         $participant = $p->participant;
+        $this->refreshClickMeetingRoomUrlForProvisionEmail($course);
+        if ($participant) {
+            $participant->unsetRelation('liveAccess');
+            $participant->load('liveAccess');
+        }
         $clickMeetingResult = $this->clickMeetingResultFromLiveAccess($participant?->liveAccess);
         $liveAccess = app(PneduProvisionEmailContextBuilder::class)->build(
             $course,
@@ -776,6 +781,20 @@ class FormOrderPneduProvisionService
             $resolved['start_date_line'],
             $resolved['live_access'],
         );
+    }
+
+    private function refreshClickMeetingRoomUrlForProvisionEmail(Course $course): void
+    {
+        $course->loadMissing('onlineDetails');
+        $platform = strtolower(trim((string) optional($course->onlineDetails)->platform));
+        $eventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
+        if ($platform !== 'clickmeeting' || $eventId === '') {
+            return;
+        }
+
+        app(ClickMeetingCourseRoomUrlSyncService::class)->refreshFromApi($course);
+        $course->unsetRelation('onlineDetails');
+        $course->load('onlineDetails');
     }
 
     private function clickMeetingResultFromLiveAccess(?\App\Models\ParticipantLiveAccess $liveAccess): ?array

@@ -29,6 +29,23 @@
                 </div>
             @endif
 
+            @php
+                $clickMeetingEventId = trim((string) old(
+                    'clickmeeting_event_id',
+                    $course->onlineDetails->clickmeeting_event_id ?? ''
+                ));
+                $clickMeetingMeetingLinkStale = (bool) ($clickMeetingMeetingLinkStale ?? false);
+            @endphp
+            @if($clickMeetingEventId !== '' && $clickMeetingMeetingLinkStale)
+                <form id="sync-clickmeeting-room-url-form"
+                      action="{{ route('courses.sync-clickmeeting-room-url', $course->id) }}"
+                      method="POST"
+                      class="d-none"
+                      data-loading-submit>
+                    @csrf
+                </form>
+            @endif
+
             <!-- Błędy walidacji -->
             @if($errors->any())
                 <div class="alert alert-danger">
@@ -178,8 +195,22 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="meeting_link" class="form-label">Link do spotkania</label>
-                                <input type="text" name="meeting_link" class="form-control" id="meeting_link" 
+                                <input type="text" name="meeting_link" class="form-control" id="meeting_link"
                                     value="{{ $course->onlineDetails->meeting_link ?? '' }}">
+                                @if($clickMeetingEventId !== '' && $clickMeetingMeetingLinkStale)
+                                    <div class="mt-2">
+                                        <span class="badge text-bg-warning">Link nieaktualny</span>
+                                    </div>
+                                    <button type="submit"
+                                            form="sync-clickmeeting-room-url-form"
+                                            class="btn btn-sm btn-warning mt-2"
+                                            data-loading-text="Aktualizuję…">
+                                        Aktualizuj link z ClickMeeting
+                                    </button>
+                                    <div class="form-text">
+                                        ClickMeeting ma inny adres pokoju niż ten zapisany w szkoleniu. Tytułu nie zmieniamy.
+                                    </div>
+                                @endif
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="meeting_password" class="form-label">Hasło do spotkania</label>

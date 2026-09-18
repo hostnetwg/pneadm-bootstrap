@@ -10,6 +10,7 @@ use App\Services\ClickMeetingService;
 use App\Services\ParticipantLiveMeetingLinkMailService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -51,7 +52,22 @@ class ParticipantLiveMeetingLinkMailServiceTest extends TestCase
             $this->markTestSkipped('Brak wymaganych tabel.');
         }
 
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+            'services.google_calendar.enabled' => false,
+        ]);
+
         [$course, $participant] = $this->seedCourse(accessType: 1, withToken: false);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088701' => Http::response([
+                'conference' => [
+                    'id' => 10088701,
+                    'room_url' => 'https://pnedu.clickmeeting.com/open-room',
+                ],
+            ], 200),
+        ]);
 
         $context = app(ParticipantLiveMeetingLinkMailService::class)
             ->resolveLiveContext($participant->fresh(['liveAccess']), $course->fresh(['onlineDetails']));
@@ -60,6 +76,44 @@ class ParticipantLiveMeetingLinkMailServiceTest extends TestCase
         $this->assertTrue($context->showLiveSection);
         $this->assertSame('https://pnedu.clickmeeting.com/open-room', $context->joinUrl);
         $this->assertNull($context->token);
+    }
+
+    public function test_resolve_live_context_refreshes_stale_room_url_from_api(): void
+    {
+        if (! $this->tablesReady()) {
+            $this->markTestSkipped('Brak wymaganych tabel.');
+        }
+
+        config([
+            'services.clickmeeting.url' => 'https://api.clickmeeting.com/v1/',
+            'services.clickmeeting.token' => 'test-api-key',
+            'services.google_calendar.enabled' => false,
+        ]);
+
+        [$course, $participant] = $this->seedCourse(accessType: 1, withToken: false);
+
+        Http::fake([
+            'api.clickmeeting.com/v1/conferences/10088701' => Http::response([
+                'conference' => [
+                    'id' => 10088701,
+                    'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+                ],
+            ], 200),
+        ]);
+
+        $context = app(ParticipantLiveMeetingLinkMailService::class)
+            ->resolveLiveContext($participant->fresh(['liveAccess']), $course->fresh(['onlineDetails']));
+
+        $this->assertNotNull($context);
+        $this->assertSame('https://pnedu.clickmeeting.com/nowy-pokoj', $context->joinUrl);
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+            'meeting_link' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+        ]);
+        $this->assertDatabaseHas('participant_live_access', [
+            'participant_id' => $participant->id,
+            'room_url' => 'https://pnedu.clickmeeting.com/nowy-pokoj',
+        ]);
     }
 
     /**
