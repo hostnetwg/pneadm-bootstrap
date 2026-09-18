@@ -45,4 +45,29 @@ MD;
         $this->assertStringContainsString('<code>docs/CLICKMEETING_TRAININGS.md</code>', $html);
         $this->assertStringNotContainsString('<a href="docs/', $html);
     }
+
+    public function test_format_bullet_turns_panel_path_into_new_tab_link(): void
+    {
+        $html = ReleaseChangelogService::formatBulletHtml(
+            '[Lista ClickMeeting](/clickmeeting/trainings) pokazuje szkolenia.'
+        );
+
+        $this->assertStringContainsString(
+            '<a href="/clickmeeting/trainings" target="_blank" rel="noopener noreferrer">Lista ClickMeeting</a>',
+            $html
+        );
+        $this->assertStringNotContainsString('javascript:', $html);
+    }
+
+    public function test_format_bullet_turns_http_url_into_new_tab_link(): void
+    {
+        $html = ReleaseChangelogService::formatBulletHtml(
+            '[Lista ClickMeeting](https://adm.pnedu.pl/clickmeeting/trainings)'
+        );
+
+        $this->assertStringContainsString(
+            '<a href="https://adm.pnedu.pl/clickmeeting/trainings" target="_blank" rel="noopener noreferrer">Lista ClickMeeting</a>',
+            $html
+        );
+    }
 }

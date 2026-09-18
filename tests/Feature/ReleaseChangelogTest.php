@@ -47,7 +47,9 @@ class ReleaseChangelogTest extends TestCase
             ->assertSee('adm.pnedu.pl v 1.0')
             ->assertSee('pnedu.pl v 1.0')
             ->assertSee('Aktualna wersja 1.0')
-            ->assertSee('Lista ClickMeeting');
+            ->assertSee('Lista ClickMeeting')
+            ->assertSee('/clickmeeting/trainings', false)
+            ->assertSee('target="_blank"', false);
     }
 
     public function test_authenticated_user_sees_pnedu_changelog(): void

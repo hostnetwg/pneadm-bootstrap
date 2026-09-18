@@ -85,8 +85,10 @@ class ReleaseChangelogService
             static function (array $matches): string {
                 $label = $matches[1];
                 $url = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                if (preg_match('#^https?://#i', $url) === 1) {
-                    return '<a href="'.e($url).'" target="_blank" rel="noopener">'.$label.'</a>';
+                $isHttp = preg_match('#^https?://#i', $url) === 1;
+                $isPanelPath = str_starts_with($url, '/') && ! str_starts_with($url, '//');
+                if ($isHttp || $isPanelPath) {
+                    return '<a href="'.e($url).'" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
                 }
 
                 return $label.' (<code>'.e($url).'</code>)';

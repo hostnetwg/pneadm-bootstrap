@@ -23,6 +23,7 @@ Numery obu aplikacji są **niezależne**.
 - Start: **1.0** (18.09.2026) — bez odtwarzania całej historii wstecz.
 - Format nagłówka: `## 1.0 — 2026-09-18` (najnowsza wersja na górze).
 - Kilka zdań po polsku + link do kanonu w `docs/`.
+- Gdy wpis dotyczy ekranu w panelu ADM, daj markdown `[nazwa menu](/ścieżka)` (np. `[Lista ClickMeeting](/clickmeeting/trainings)`). W widoku historii to jest link w **nowej karcie**. Ścieżki `docs/` zostają jako kod, nie jako klikalny URL.
 - **Nowy numer** (1.1, 1.2, …) — Cursor **sugeruje** po znaczącym etapie; **Waldemar potwierdza**.
 - **Hotfix** — dopisujemy do bieżącej wersji, bez nowego numeru (też po potwierdzeniu, gdy nieoczywiste).
 
