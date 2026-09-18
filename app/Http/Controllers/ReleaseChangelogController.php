@@ -15,6 +15,10 @@ class ReleaseChangelogController extends Controller
         $current = $data['releases'][0] ?? null;
         $history = array_slice($data['releases'], 1);
 
+        if (auth()->check() && $data['readable']) {
+            $changelog->markSeen(auth()->user(), $app);
+        }
+
         return view('changelog.show', [
             'changelog' => $data,
             'current' => $current,

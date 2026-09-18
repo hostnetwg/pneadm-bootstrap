@@ -24,8 +24,8 @@ Numery obu aplikacji są **niezależne**.
 - Format nagłówka: `## 1.0 — 2026-09-18` (najnowsza wersja na górze).
 - Kilka zdań po polsku + link do kanonu w `docs/`.
 - Gdy wpis dotyczy ekranu w panelu ADM, daj markdown `[nazwa menu](/ścieżka)` (np. `[Lista ClickMeeting](/clickmeeting/trainings)`). W widoku historii to jest link w **nowej karcie**. Ścieżki `docs/` zostają jako kod, nie jako klikalny URL.
-- **Nowy numer** (1.1, 1.2, …) — Cursor **sugeruje** po znaczącym etapie; **Waldemar potwierdza**.
-- **Hotfix** — dopisujemy do bieżącej wersji, bez nowego numeru (też po potwierdzeniu, gdy nieoczywiste).
+- **Nowy numer** (1.1, 1.2, …) — Cursor **sugeruje** po znaczącym etapie; **Waldemar potwierdza** przed wpisem. Po potwierdzeniu numeru Cursor **pyta, czy wysłać mail** do aktywnych administratorów i superadministratorów (`changelog:notify-admins {adm|pnedu}`). Nie wysyłać przy hotfixie i nigdy samemu bez „tak”.
+- **Hotfix** — dopisujemy do bieżącej wersji, bez nowego numeru (też po potwierdzeniu, gdy nieoczywiste). Bez maila — wystarczy czerwone kółko w menu.
 
 ## Panel
 
@@ -35,6 +35,8 @@ Poniżej, po poziomej linii, dwa główne punkty menu:
 
 - `adm.pnedu.pl v …`
 - `pnedu.pl v …`
+
+Przy każdej pozycji — czerwone kółko z liczbą punktów historii, których dany operator jeszcze nie otworzył. Wejście w `/changelog/adm` gasi kółko ADM, wejście w `/changelog/pnedu` gasi kółko pnedu. Stan w `users.preferences.changelog_seen` (konto, nie ciasteczko). Przy pierwszym logowaniu widać od razu liczbę z bieżącego changelogu.
 
 Strony: `/changelog/adm`, `/changelog/pnedu`.
 
@@ -49,3 +51,13 @@ Lokalnie, gdy zmienna pusta: `../pnedu/CHANGELOG.md` obok katalogu `pneadm`.
 ## Deploy
 
 Brak migracji. Po `git pull` obu repo: `optimize:clear` na `pneadm` (i na `pnedu`, jeśli wrzucasz tam `CHANGELOG.md`).
+
+Mail o nowej wersji (nie hotfix):
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+/opt/alt/php82/usr/bin/php artisan changelog:notify-admins adm --dry-run
+/opt/alt/php82/usr/bin/php artisan changelog:notify-admins adm
+```
+
+To samo z `pnedu` zamiast `adm`, gdy nowy numer jest po stronie frontu. Odbiorcy: aktywni `admin` i `super_admin` z [listy użytkowników](https://adm.pnedu.pl/admin/users).

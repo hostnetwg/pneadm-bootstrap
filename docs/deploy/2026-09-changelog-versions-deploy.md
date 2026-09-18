@@ -39,9 +39,9 @@ Nie trzeba `optimize:clear` na pnedu, jeśli weszło tylko `CHANGELOG.md` — AD
 ## Smoke
 
 1. Zaloguj się na adm.pnedu.pl.
-2. Menu, pod **Konto** (po linii) — dwie pozycje z `v 1.0`.
-3. Klik ADM — aktualna 1.0 i ClickMeeting.
-4. Klik pnedu.pl — aktualna 1.0.
+2. Menu, pod **Konto** (po linii) — dwie pozycje z `v 1.0` i czerwonym kółkiem (pierwsze logowanie).
+3. Klik ADM — aktualna 1.0 i ClickMeeting; kółko ADM znika, pnedu.pl zostaje.
+4. Klik pnedu.pl — aktualna 1.0; kółko pnedu.pl znika.
 
 ## Rollback
 

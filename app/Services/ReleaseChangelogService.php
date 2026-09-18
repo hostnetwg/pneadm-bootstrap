@@ -2,13 +2,21 @@
 
 namespace App\Services;
 
+use App\Models\User;
+
 class ReleaseChangelogService
 {
+    public const SEEN_PREFERENCE_KEY = 'changelog_seen';
+
     /**
-     * @return list<array{app: string, label: string, version: string}>
+     * @return list<array{app: string, label: string, version: string, unread: int}>
      */
-    public function menuItems(): array
+    public function menuItems(?User $user = null): array
     {
+        $user ??= auth()->user();
+        if (! $user instanceof User) {
+            $user = null;
+        }
         $items = [];
         foreach (array_keys(config('release.apps', [])) as $app) {
             $changelog = $this->forApp($app);
@@ -16,10 +24,54 @@ class ReleaseChangelogService
                 'app' => $app,
                 'label' => $changelog['label'],
                 'version' => $changelog['version'] ?? '—',
+                'unread' => $this->unreadCount($changelog, $user),
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * @param  array{app?: string, releases?: list<array{bullets?: list<string>}>}  $changelog
+     */
+    public function bulletCount(array $changelog): int
+    {
+        $count = 0;
+        foreach ($changelog['releases'] ?? [] as $release) {
+            $count += count($release['bullets'] ?? []);
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  array{app?: string, releases?: list<array{bullets?: list<string>}>}  $changelog
+     */
+    public function unreadCount(array $changelog, ?User $user): int
+    {
+        $total = $this->bulletCount($changelog);
+        if ($total === 0 || $user === null) {
+            return 0;
+        }
+
+        $app = (string) ($changelog['app'] ?? '');
+        $seen = (int) data_get($user->preferences, self::SEEN_PREFERENCE_KEY.'.'.$app, 0);
+
+        return max(0, $total - $seen);
+    }
+
+    public function markSeen(User $user, string $app): void
+    {
+        $changelog = $this->forApp($app);
+        $preferences = $user->preferences ?? [];
+        $seen = $preferences[self::SEEN_PREFERENCE_KEY] ?? [];
+        if (! is_array($seen)) {
+            $seen = [];
+        }
+        $seen[$app] = $this->bulletCount($changelog);
+        $preferences[self::SEEN_PREFERENCE_KEY] = $seen;
+        $user->preferences = $preferences;
+        $user->save();
     }
 
     /**

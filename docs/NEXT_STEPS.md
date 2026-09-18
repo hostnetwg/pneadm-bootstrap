@@ -5,7 +5,7 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 ## Ostatnio (2026-09-18) — Historia wersji w ADM
 
-W menu, pod **Konto** (po linii), są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Klik otwiera aktualną wersję i wcześniejsze wpisy. Źródło: `CHANGELOG.md` w każdym repo. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
+W menu, pod **Konto** (po linii), są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Przy każdej pozycji czerwone kółko z liczbą nieprzeczytanych punktów (stan w koncie). Klik otwiera historię i gasi kółko tej aplikacji. Mail do adminów/superadminów tylko przy nowym numerze, po decyzji Waldemara: `sail artisan changelog:notify-admins adm`. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
 
 ## Ostatnio (2026-09-18) — ClickMeeting → courses + sync linku
 

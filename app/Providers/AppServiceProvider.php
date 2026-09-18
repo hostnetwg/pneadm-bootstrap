@@ -52,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(MessageSent::class, [OutboundMailCapture::class, 'record']);
 
         View::composer('layouts.navigation', function ($view) {
-            $view->with('releaseMenu', app(ReleaseChangelogService::class)->menuItems());
+            $view->with('releaseMenu', app(ReleaseChangelogService::class)->menuItems(auth()->user()));
         });
     }
 }

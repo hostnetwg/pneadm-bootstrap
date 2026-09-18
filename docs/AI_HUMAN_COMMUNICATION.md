@@ -220,7 +220,7 @@ Szablon runbooka deploy: patrz `docs/deploy/2026-07-participant-live-access-and-
 
 ### Historia wersji (`CHANGELOG.md`)
 
-Po znaczącym etapie Cursor **sugeruje**, czy to hotfix do bieżącej wersji, czy nowy numer (1.1, 1.2, …). **Waldemar potwierdza** przed wpisem. Hotfixy dopisujemy do aktualnej wersji. Źródło: `pneadm/CHANGELOG.md` i `pnedu/CHANGELOG.md`. Widok w ADM: pod Kontem, po linii. Kanon: `docs/CHANGELOG_VERSIONING.md`.
+Po znaczącym etapie Cursor **sugeruje**, czy to hotfix do bieżącej wersji, czy nowy numer (1.1, 1.2, …). **Waldemar potwierdza** przed wpisem. Przy nowym numerze Cursor **dodatkowo pyta, czy wysłać mail** do adminów i superadminów — nie wysyła sam. Hotfixy dopisujemy do aktualnej wersji (kółko w menu, bez maila). Źródło: `pneadm/CHANGELOG.md` i `pnedu/CHANGELOG.md`. Widok w ADM: pod Kontem, po linii. Kanon: `docs/CHANGELOG_VERSIONING.md`.
 
 ---
 

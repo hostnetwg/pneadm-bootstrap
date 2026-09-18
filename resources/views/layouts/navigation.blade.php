@@ -14,6 +14,26 @@
             </svg>
         </button>
     </div>
+    <style>
+        .release-nav-link {
+            position: relative;
+        }
+        .release-nav-badge {
+            display: inline-block;
+            min-width: 1.15rem;
+            height: 1.15rem;
+            margin-left: 0.4rem;
+            padding: 0 0.3rem;
+            border-radius: 999px;
+            background: #dc3545;
+            color: #fff;
+            font-size: 0.625rem;
+            font-weight: 700;
+            line-height: 1.15rem;
+            text-align: center;
+            box-shadow: 0 0 0 2px #212529;
+        }
+    </style>
     <ul class="list-unstyled ps-0" id="menuAccordion">
 
         <!-- Dashboard -->
@@ -564,10 +584,20 @@
 
         <li class="border-top my-3"></li>
         @foreach($releaseMenu ?? [] as $releaseItem)
+            @php
+                $releaseUnread = (int) ($releaseItem['unread'] ?? 0);
+            @endphp
             <li class="mb-1">
                 <a href="{{ route('changelog.show', $releaseItem['app']) }}"
-                   class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light text-decoration-none {{ request()->routeIs('changelog.show') && request()->route('app') === $releaseItem['app'] ? 'fw-semibold text-white' : '' }}">
+                   class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light text-decoration-none release-nav-link {{ request()->routeIs('changelog.show') && request()->route('app') === $releaseItem['app'] ? 'fw-semibold text-white' : '' }}">
                     {{ $releaseItem['label'] }} v {{ $releaseItem['version'] }}
+                    @if($releaseUnread > 0)
+                        <span id="release-nav-badge-{{ $releaseItem['app'] }}"
+                              class="release-nav-badge"
+                              aria-label="{{ $releaseUnread }} {{ $releaseUnread === 1 ? 'nieprzeczytana zmiana' : 'nieprzeczytanych zmian' }}">
+                            {{ $releaseUnread > 9 ? '9+' : $releaseUnread }}
+                        </span>
+                    @endif
                 </a>
             </li>
         @endforeach

@@ -52,6 +52,32 @@ class ReleaseChangelogTest extends TestCase
             ->assertSee('target="_blank"', false);
     }
 
+    public function test_menu_shows_unread_badges_before_opening_changelog(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('id="release-nav-badge-adm"', false)
+            ->assertSee('id="release-nav-badge-pnedu"', false);
+    }
+
+    public function test_opening_adm_changelog_clears_only_adm_badge(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('changelog.show', 'adm'))
+            ->assertOk()
+            ->assertDontSee('id="release-nav-badge-adm"', false)
+            ->assertSee('id="release-nav-badge-pnedu"', false);
+
+        $user->refresh();
+        $this->assertGreaterThan(0, data_get($user->preferences, 'changelog_seen.adm', 0));
+        $this->assertSame(0, (int) data_get($user->preferences, 'changelog_seen.pnedu', 0));
+    }
+
     public function test_authenticated_user_sees_pnedu_changelog(): void
     {
         $user = User::factory()->create();

@@ -70,4 +70,33 @@ MD;
             $html
         );
     }
+
+    public function test_unread_count_is_all_bullets_when_nothing_seen(): void
+    {
+        $user = new \App\Models\User;
+        $user->preferences = [];
+        $changelog = [
+            'app' => 'adm',
+            'releases' => [
+                ['bullets' => ['a', 'b']],
+                ['bullets' => ['c']],
+            ],
+        ];
+
+        $this->assertSame(3, app(ReleaseChangelogService::class)->unreadCount($changelog, $user));
+    }
+
+    public function test_unread_count_subtracts_seen_bullets(): void
+    {
+        $user = new \App\Models\User;
+        $user->preferences = ['changelog_seen' => ['adm' => 2]];
+        $changelog = [
+            'app' => 'adm',
+            'releases' => [
+                ['bullets' => ['a', 'b', 'c']],
+            ],
+        ];
+
+        $this->assertSame(1, app(ReleaseChangelogService::class)->unreadCount($changelog, $user));
+    }
 }

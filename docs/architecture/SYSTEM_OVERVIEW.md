@@ -150,7 +150,7 @@ Z panelu administracyjnego można utworzyć szkolenie terminowe (`courses`) na p
 
 Lista `/clickmeeting/trainings` pokazuje zaplanowane wydarzenia z API ClickMeeting i oznacza te, które mają już `course_online_details.clickmeeting_event_id`. Z listy można otworzyć prefill `/courses/create` (bez automatycznego zapisu). Link do pokoju (`meeting_link`) jest snapshotem `room_url`; przycisk sync na liście i na `/courses/{id}/edit` widać tylko przy rozjeździe. Wysyłka maila live też odświeża `room_url`. Kanon: [`CLICKMEETING_TRAININGS.md`](../CLICKMEETING_TRAININGS.md).
 
-Krótka historia wersji obu aplikacji jest w `CHANGELOG.md` (każde repo osobno) i w panelu ADM pod **Konto**, po linii, jako główne pozycje menu. Kanon: [`CHANGELOG_VERSIONING.md`](../CHANGELOG_VERSIONING.md).
+Krótka historia wersji obu aplikacji jest w `CHANGELOG.md` (każde repo osobno) i w panelu ADM pod **Konto**, po linii, jako główne pozycje menu (czerwone kółko = nieprzeczytane punkty, stan w koncie operatora). Kanon: [`CHANGELOG_VERSIONING.md`](../CHANGELOG_VERSIONING.md).
 
 To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie z terminem, uczestnikami, zamówieniami i certyfikatami. Mapowanie przyszłego kopiowania oferty do `courses` opisuje `docs/TRAINING_OFFERS.md`.
 
