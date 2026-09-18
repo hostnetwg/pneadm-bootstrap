@@ -4,8 +4,8 @@ Ten dokument definiuje **obowiązującą** formę współpracy nad projektami `p
 
 > Plik w `pnedu`: `docs/AI_HUMAN_COMMUNICATION.md` (skrót + wskazanie na ten kanon). Zasada jest też w `.cursorrules` obu projektów.
 
-**Ostatnia aktualizacja:** 2026-07-31  
-**Wersja:** 2.2 (prompt do ChatGPT tylko na wyraźną prośbę)
+**Ostatnia aktualizacja:** 2026-09-18  
+**Wersja:** 2.3 (historia wersji w CHANGELOG.md; prompt do ChatGPT tylko na wyraźną prośbę)
 
 ---
 
@@ -217,6 +217,10 @@ Po **każdej nowej funkcjonalności** lub **znaczącym etapie** (feature, więks
 
 Szablon runbooka deploy: patrz `docs/deploy/2026-07-participant-live-access-and-tests.md`.  
 **Ścieżki prod (SeoHost):** `docs/deploy/PRODUCTION_PATHS.md` — `~/domains/adm.pnedu.pl/pneadm`, `~/domains/pnedu.pl/app`.
+
+### Historia wersji (`CHANGELOG.md`)
+
+Po znaczącym etapie Cursor **sugeruje**, czy to hotfix do bieżącej wersji, czy nowy numer (1.1, 1.2, …). **Waldemar potwierdza** przed wpisem. Hotfixy dopisujemy do aktualnej wersji. Źródło: `pneadm/CHANGELOG.md` i `pnedu/CHANGELOG.md`. Widok w ADM: Konto. Kanon: `docs/CHANGELOG_VERSIONING.md`.
 
 ---
 

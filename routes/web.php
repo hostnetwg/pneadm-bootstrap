@@ -593,6 +593,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/courses/{course}/surveys/import', [SurveyImportController::class, 'showImportForm'])->name('surveys.import');
     Route::post('/courses/{course}/surveys/import', [SurveyImportController::class, 'import'])->name('surveys.import.store');
 
+    Route::get('/changelog/{app}', [\App\Http\Controllers\ReleaseChangelogController::class, 'show'])
+        ->whereIn('app', ['adm', 'pnedu'])
+        ->name('changelog.show');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

@@ -220,7 +220,7 @@ Schema::create('online_payment_orders', ...); // Domyślnie baza pneadm
 
 ## 💬 Forma komunikacji Waldemar ↔ ChatGPT ↔ Cursor (OBOWIĄZKOWE)
 
-Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.2).
+Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.3).
 
 **Role:** Waldemar — decyzje biznesowe i prod; ChatGPT — konsultant tylko na wyraźną prośbę Waldemara; Cursor — implementacja, testy, fakty z repo.
 
@@ -228,7 +228,7 @@ Pełny opis: `docs/AI_HUMAN_COMMUNICATION.md` (kanon, wersja 2.2).
 
 **Tryby:** A = jasny zakres → wdrażaj | B = brak decyzji → pytaj | C = brak faktów → diagnozuj, potem propozycja.
 
-**Dokumentacja po funkcjonalnościach (OBOWIĄZKOWE):** po każdej nowej funkcji / znaczącym etapie aktualizuj `docs/` (moduł, `docs/deploy/`, `TESTING.md`, `NEXT_STEPS.md`, `architecture/SYSTEM_OVERVIEW.md` gdy trzeba) + podsumowanie dla Waldemara. Szczegóły: `AI_HUMAN_COMMUNICATION.md` sekcja 14. Sam commit bez docs = niedokończony etap.
+**Dokumentacja po funkcjonalnościach (OBOWIĄZKOWE):** po każdej nowej funkcji / znaczącym etapie aktualizuj `docs/` (moduł, `docs/deploy/`, `TESTING.md`, `NEXT_STEPS.md`, `architecture/SYSTEM_OVERVIEW.md` gdy trzeba) + podsumowanie dla Waldemara. Szczegóły: `AI_HUMAN_COMMUNICATION.md` sekcja 14. Sam commit bez docs = niedokończony etap. Po znaczącym etapie **zaproponuj** wpis w `CHANGELOG.md` (hotfix do bieżącej wersji albo nowy numer) — **nie nadawaj numeru bez potwierdzenia Waldemara**.
 
 Po **znaczącym** etapie: raport **11 punktów** (kontekst, wdrożone, nie wdrożone, pliki, migracje/komendy, testy, ryzyka tech/prod, pytania→Waldemar, pytania→ChatGPT tylko gdy poproszono, następny krok) oraz:
 1. Podsumowanie dla Waldemara (proste, po polsku)

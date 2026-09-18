@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-09-18
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-18) — Historia wersji w ADM
+
+W menu **Konto** są `adm.pnedu.pl v 1.0` i `pnedu.pl v 1.0`. Klik otwiera aktualną wersję i wcześniejsze wpisy. Źródło: `CHANGELOG.md` w każdym repo. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
+
 ## Ostatnio (2026-09-18) — ClickMeeting → courses + sync linku
 
 Na `/clickmeeting/trainings` widać, które wydarzenia mają już szkolenie w `courses`. Brakujące można dodać z prefillem. Przycisk **Aktualizuj link z ClickMeeting** (lista i edycja kursu, tylko przy rozjeździe `room_url` vs `meeting_link`) zapisuje aktualny `room_url` do szkolenia, dostępów uczestników i kalendarza Google. Wysyłka maili live/provision też odświeża link z API. Tytułu kursu nie ruszamy. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).

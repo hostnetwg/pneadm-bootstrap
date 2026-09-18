@@ -14,9 +14,11 @@ use App\Observers\DebtCaseObserver;
 use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 use App\Observers\ProductPriceObserver;
+use App\Services\ReleaseChangelogService;
 use App\Support\OutboundMailCapture;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -48,5 +50,9 @@ class AppServiceProvider extends ServiceProvider
         DebtCase::observe(DebtCaseObserver::class);
 
         Event::listen(MessageSent::class, [OutboundMailCapture::class, 'record']);
+
+        View::composer('layouts.navigation', function ($view) {
+            $view->with('releaseMenu', app(ReleaseChangelogService::class)->menuItems());
+        });
     }
 }

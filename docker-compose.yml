@@ -21,6 +21,7 @@ services:
     volumes:
       - '.:/var/www/html'
       - '../pne-certificate-generator:/var/www/pne-certificate-generator'
+      - '../pnedu/CHANGELOG.md:/var/www/pnedu/CHANGELOG.md:ro'
     networks:
       - sail
       - pne-network

@@ -528,9 +528,9 @@
 
         <!-- Konto -->
         <li class="mb-1">
-            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.edit') ? '' : 'collapsed' }}"
+            <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('profile.edit') || request()->routeIs('changelog.show') ? '' : 'collapsed' }}"
                     data-bs-toggle="collapse" data-bs-target="#account-collapse"
-                    aria-expanded="{{ request()->routeIs('profile.edit') ? 'true' : 'false' }}">
+                    aria-expanded="{{ request()->routeIs('profile.edit') || request()->routeIs('changelog.show') ? 'true' : 'false' }}">
                 <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                     <use xlink:href="#people-circle"></use>
                 </svg>
@@ -539,7 +539,7 @@
                     <use xlink:href="#chevron-right"></use>
                 </svg>
             </button>
-            <div class="collapse {{ request()->routeIs('profile.edit') ? 'show' : '' }}" id="account-collapse" data-bs-parent="#menuAccordion">
+            <div class="collapse {{ request()->routeIs('profile.edit') || request()->routeIs('changelog.show') ? 'show' : '' }}" id="account-collapse" data-bs-parent="#menuAccordion">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
                     <li>
                         <a href="{{ route('profile.edit') }}"
@@ -555,6 +555,15 @@
                            Wyloguj
                         </a>
                     </li>
+                    @foreach($releaseMenu ?? [] as $releaseItem)
+                        <li>
+                            <a href="{{ route('changelog.show', $releaseItem['app']) }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('changelog.show') && request()->route('app') === $releaseItem['app'] ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                {{ $releaseItem['label'] }} v {{ $releaseItem['version'] }}
+                            </a>
+                        </li>
+                    @endforeach
                     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                         @csrf
                     </form>
