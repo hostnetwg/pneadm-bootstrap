@@ -1,7 +1,7 @@
 # Zaświadczenia — dokumentacja (kanon: pneadm)
 
 Opis systemu generowania PDF zaświadczeń w ekosystemie **pneadm** (adm) + **pnedu** (front).  
-Ostatnia aktualizacja: **2026-09-13**.
+Ostatnia aktualizacja: **2026-09-19**.
 
 ## Spis treści
 
@@ -117,6 +117,19 @@ Lista numerowana: linie zaczynające się od `1.`, `2.` itd. — renderowane jak
   `download_enabled` | `in_preparation` | `no_certificate`
 - **Zakres:** pole „Zakres szkolenia / Zagadnienia” → `courses.description`
 - Szablon: `certificate_template_id`, format: `certificate_format`
+- **Rejestracja zaświadczenia:** checkbox `certificate_registration_open` („Włącz rejestrację zaświadczenia”) + token publiczny
+
+### E-mail „Prześlij linki prowadzącemu”
+
+Na karcie szkolenia (`/courses/{id}`) treść wiadomości buduje `App\Support\CourseInstructorLinksEmailBody`.
+
+Gdy na edycji kursu jest włączona **Rejestracja zaświadczenia** (`certificate_registration_open`) i istnieje token, **pierwszy punkt** w mailu to publiczny URL na pnedu.pl:
+
+`1) Lista obecności / zaświadczenie: {pnedu}/certificate-registration/{token}`
+
+Link jest wstawiany na podstawie samej flagi (nie okna od–do), żeby prowadzący dostał go przed startem szkolenia. Kolejność dalszych punktów bez zmian: nagrania → materiały → ankiety.
+
+Testy: `tests/Unit/CourseInstructorLinksEmailBodyTest.php`.
 
 ### Domyślne zaświadczenia w serii szkoleń
 
@@ -215,7 +228,8 @@ Kursy online — **tylko przez zalogowane konto** na pnedu (brak tokenu publiczn
 | Admin szablony | `app/Http/Controllers/CertificateTemplateController.php` |
 | Admin online | `app/Http/Controllers/OnlineCoursesController.php`, `OnlineCourseEnrollmentController.php` |
 | Model | `app/Models/Certificate.php` |
-| Testy | `tests/Unit/CertificateTemplateVariableResolverTest.php`, `tests/Feature/CourseSeriesCertificateSettingsTest.php` |
+| Testy | `tests/Unit/CertificateTemplateVariableResolverTest.php`, `tests/Feature/CourseSeriesCertificateSettingsTest.php`, `tests/Unit/CourseInstructorLinksEmailBodyTest.php` |
+| E-mail do prowadzącego | `app/Support/CourseInstructorLinksEmailBody.php` |
 
 ---
 

@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-18
+Data aktualizacji: 2026-09-19
 
 ## Cel
 
@@ -86,6 +86,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Katalog sprzedaży i warianty cenowe kursów online | `--filter=OnlineCourseSalesCatalogTest`, `--filter=ProductPriceTest` |
 | Kolejność kursów na `/kursy` | **pneadm:** `--filter=OnlineCourseCatalogOrderTest`; **pnedu:** `--filter=StorefrontCatalogOrderTest` |
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
+| Linki e-mail do prowadzącego | `--filter=CourseInstructorLinksEmailBodyTest` (pierwszy punkt: `Lista obecności / zaświadczenie`, gdy flaga na edycji kursu jest włączona). Kanon: [CERTIFICATES.md](./CERTIFICATES.md). |
 | Omnibus — historia cen i wyłączenie wpisu | `--filter=PriceOmnibusServiceTest` |
 | Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
 | Oferta przy istniejącym dostępie | **pnedu:** `sail artisan test --filter=StorefrontOwnerAccessTest` |

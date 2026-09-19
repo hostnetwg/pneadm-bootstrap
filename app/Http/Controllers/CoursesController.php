@@ -846,7 +846,7 @@ class CoursesController extends Controller
     }
 
     /**
-     * Wysyłka wiadomości z linkami nagraniów / materiałów / ankiet do prowadzącego szkolenie.
+     * Wysyłka wiadomości z linkami (rejestracja zaświadczenia, nagrania, materiały, ankiety) do prowadzącego.
      */
     public function emailInstructorTrainingLinks(Request $request, int $id): RedirectResponse
     {

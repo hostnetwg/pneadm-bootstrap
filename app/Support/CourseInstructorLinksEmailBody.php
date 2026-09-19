@@ -44,6 +44,16 @@ class CourseInstructorLinksEmailBody
 
         $n = 1;
 
+        // Lista obecności / zaświadczenie — pierwszy punkt, gdy flaga na edycji kursu jest włączona
+        if ($course->isCertificateRegistrationOpenForExtendedAccess()) {
+            $regUrl = $course->certificateRegistrationPublicUrl();
+            if ($regUrl !== null) {
+                $lines[] = "{$n}) Lista obecności / zaświadczenie: ".$regUrl;
+                $lines[] = '';
+                $n++;
+            }
+        }
+
         // Nagrania
         $videoLines = [];
         foreach ($course->videos->sortBy('order') as $video) {
@@ -86,17 +96,6 @@ class CourseInstructorLinksEmailBody
             }
             $lines[] = '';
             $n++;
-        }
-
-        // Lista obecności (rejestracja zaświadczenia na pnedu.pl)
-        if ($course->isCertificateRegistrationActiveNow()) {
-            $regUrl = $course->certificateRegistrationPublicUrl();
-            if ($regUrl !== null) {
-                $lines[] = "{$n}) LISTA OBECNOŚCI:";
-                $lines[] = '   '.$regUrl;
-                $lines[] = '';
-                $n++;
-            }
         }
 
         // Ankiety — bez tytułów, tylko URL uczestnika

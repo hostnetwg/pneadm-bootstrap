@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-18
+Data utworzenia/aktualizacji: 2026-09-19
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-19) — Link rejestracji zaświadczenia w mailu do prowadzącego
+
+Na `/courses/{id}` w **Prześlij linki prowadzącemu** pierwszy punkt to `Lista obecności / zaświadczenie`, gdy na edycji kursu jest włączona **Rejestracja zaświadczenia**. Bez okna od–do. Kanon: [CERTIFICATES.md](./CERTIFICATES.md).
 
 ## Ostatnio (2026-09-18) — Historia wersji w ADM
 
