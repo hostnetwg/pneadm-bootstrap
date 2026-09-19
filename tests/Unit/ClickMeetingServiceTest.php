@@ -326,4 +326,17 @@ class ClickMeetingServiceTest extends TestCase
             'https://pnedu.clickmeeting.com/nowy'
         ));
     }
+
+    public function test_access_type_label_maps_known_values(): void
+    {
+        $service = app(ClickMeetingService::class);
+
+        $this->assertSame(1, ClickMeetingService::ACCESS_TYPE_OPEN);
+        $this->assertSame('Dla wszystkich', $service->accessTypeLabel(1));
+        $this->assertSame('Hasło', $service->accessTypeLabel(2));
+        $this->assertSame('Tokeny', $service->accessTypeLabel(3));
+        $this->assertSame('—', $service->accessTypeLabel(null));
+        $this->assertSame(1, $service->extractAccessType(['access_type' => '1']));
+        $this->assertNull($service->extractAccessType([]));
+    }
 }

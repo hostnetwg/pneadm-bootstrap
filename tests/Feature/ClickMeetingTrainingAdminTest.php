@@ -99,6 +99,131 @@ class ClickMeetingTrainingAdminTest extends TestCase
             ->assertSee('Start w courses:');
     }
 
+    public function test_trainings_list_shows_access_type_and_warns_when_closed_is_not_open(): void
+    {
+        $user = User::factory()->create();
+        $closedCourse = $this->createOnlineCourse('Szkolenie zamknięte CM', '2026-10-02 10:00:00', 'closed');
+        CourseOnlineDetails::create([
+            'course_id' => $closedCourse->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088702',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/zamkniete',
+        ]);
+        $openCourse = $this->createOnlineCourse('Szkolenie otwarte CM', '2026-10-01 10:00:00', 'open');
+        CourseOnlineDetails::create([
+            'course_id' => $openCourse->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088701',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/otwarte',
+        ]);
+
+        Http::fake(function ($request) {
+            $url = rtrim($request->url(), '/');
+            if ($url === 'https://api.clickmeeting.com/v1/conferences') {
+                return Http::response([
+                    'active_conferences' => [],
+                    'scheduled_conferences' => [
+                        [
+                            'id' => 10088701,
+                            'name' => 'Otwarte CM',
+                            'starts_at' => '2026-10-01T10:00:00+02:00',
+                            'room_pin' => 111,
+                            'room_type' => 'webinar',
+                            'status' => 'active',
+                            'access_type' => 1,
+                            'room_url' => 'https://pnedu.clickmeeting.com/otwarte',
+                        ],
+                        [
+                            'id' => 10088702,
+                            'name' => 'Zamknięte CM',
+                            'starts_at' => '2026-10-02T10:00:00+02:00',
+                            'room_pin' => 222,
+                            'room_type' => 'webinar',
+                            'status' => 'active',
+                            'access_type' => 3,
+                            'room_url' => 'https://pnedu.clickmeeting.com/zamkniete',
+                        ],
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['error' => 'unexpected '.$request->url()], 500);
+        });
+
+        $this->actingAs($user)
+            ->get(route('clickmeeting.trainings.index'))
+            ->assertOk()
+            ->assertSee('Dostęp CM')
+            ->assertSee('Dla wszystkich')
+            ->assertSee('Tokeny')
+            ->assertSee('Zamknięte ≠ dla wszystkich')
+            ->assertSee('Szkolenie zamknięte wymaga w ClickMeeting dostępu „Dla wszystkich”')
+            ->assertSee('Dostęp CM do zmiany');
+    }
+
+    public function test_trainings_list_reconciles_live_access_type_in_background(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse('Snapshot access type', '2026-10-02 10:00:00');
+        CourseOnlineDetails::create([
+            'course_id' => $course->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088702',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/istniejace',
+        ]);
+        $participant = Participant::query()->create([
+            'course_id' => $course->id,
+            'first_name' => 'Anna',
+            'last_name' => 'Nowak',
+            'email' => 'anna.access-type@example.test',
+            'order' => 1,
+        ]);
+        ParticipantLiveAccess::query()->create([
+            'participant_id' => $participant->id,
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10088702',
+            'room_url' => 'https://pnedu.clickmeeting.com/istniejace',
+            'token' => 'OLDTOK',
+            'access_type' => 3,
+            'status' => 'success',
+            'synced_at' => now()->subDay(),
+        ]);
+
+        Http::fake(function ($request) {
+            $url = rtrim($request->url(), '/');
+            if ($url === 'https://api.clickmeeting.com/v1/conferences') {
+                return Http::response([
+                    'active_conferences' => [],
+                    'scheduled_conferences' => [
+                        [
+                            'id' => 10088702,
+                            'name' => 'Istniejące szkolenie CM',
+                            'starts_at' => '2026-10-02T10:00:00+02:00',
+                            'room_pin' => 222,
+                            'room_type' => 'webinar',
+                            'status' => 'active',
+                            'access_type' => 1,
+                            'room_url' => 'https://pnedu.clickmeeting.com/istniejace/',
+                        ],
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['error' => 'unexpected '.$request->url()], 500);
+        });
+
+        $this->actingAs($user)
+            ->get(route('clickmeeting.trainings.index'))
+            ->assertOk()
+            ->assertSee('Dla wszystkich');
+
+        $this->assertDatabaseHas('participant_live_access', [
+            'participant_id' => $participant->id,
+            'access_type' => 1,
+        ]);
+    }
+
     public function test_trainings_list_marks_stale_meeting_link(): void
     {
         $user = User::factory()->create();
@@ -328,6 +453,39 @@ class ClickMeetingTrainingAdminTest extends TestCase
             ->assertDontSee('Link nieaktualny');
     }
 
+    public function test_course_edit_warns_when_closed_course_is_not_open_in_clickmeeting(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse('Edycja zamknięte', category: 'closed');
+        CourseOnlineDetails::create([
+            'course_id' => $course->id,
+            'platform' => 'ClickMeeting',
+            'clickmeeting_event_id' => '10088714',
+            'meeting_link' => 'https://pnedu.clickmeeting.com/zamkniete-edit',
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://api.clickmeeting.com/v1/conferences/10088714') {
+                return Http::response([
+                    'conference' => [
+                        'id' => 10088714,
+                        'access_type' => 3,
+                        'room_url' => 'https://pnedu.clickmeeting.com/zamkniete-edit',
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['error' => 'unexpected '.$request->url()], 500);
+        });
+
+        $this->actingAs($user)
+            ->get(route('courses.edit', $course->id))
+            ->assertOk()
+            ->assertSee('Dostęp w ClickMeeting:')
+            ->assertSee('Tokeny')
+            ->assertSee('Szkolenie zamknięte: w ClickMeeting ustaw dostęp „Dla wszystkich”');
+    }
+
     public function test_create_course_form_is_prefilled_from_clickmeeting(): void
     {
         $user = User::factory()->create();
@@ -546,7 +704,7 @@ class ClickMeetingTrainingAdminTest extends TestCase
         ]);
     }
 
-    private function createOnlineCourse(string $title, ?string $startDate = null): Course
+    private function createOnlineCourse(string $title, ?string $startDate = null, string $category = 'open'): Course
     {
         $start = $startDate ? \Carbon\Carbon::parse($startDate) : now()->addDays(7);
 
@@ -557,7 +715,7 @@ class ClickMeetingTrainingAdminTest extends TestCase
             'end_date' => $start->copy()->addHours(3),
             'is_paid' => true,
             'type' => 'online',
-            'category' => 'open',
+            'category' => $category,
             'is_active' => true,
             'certificate_format' => '{nr}/{course_id}/{year}/PNE',
         ]);

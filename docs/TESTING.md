@@ -10,11 +10,12 @@ Opisuje jak uruchamiać testy lokalnie oraz konfigurację `phpunit.xml`, która 
 
 ```bash
 sail up -d
-sail artisan migrate --env=testing   # opcjonalnie — RefreshDatabase robi to w testach Feature
-sail test                            # pełny suite
+sail test                            # pełny suite — PHPUnit sam ustawia bazę `testing`
 sail test --filter=NazwaTestu        # pojedyncza klasa / metoda
 sail pint                            # formatowanie przed commitem
 ```
+
+**Nigdy** `sail artisan migrate:fresh` ani `migrate:fresh --env=testing` bez pliku `.env.testing` z `DB_DATABASE=testing`. Sam `--env=testing` **nie** czyta `phpunit.xml` — bez `.env.testing` Artisan bierze `.env` i bazę **pneadm** (to wyczyściło lokalne dane 19.09.2026). Od 19.09 aplikacja **blokuje** `migrate:fresh` / `db:wipe` na każdej bazie innej niż `testing` (`docs/DATA_SAFETY.md`). `sail test` jest bezpieczny, bo PHPUnit nadpisuje `DB_DATABASE=testing`.
 
 **Oczekiwany stan (2026-07-26):** po zmianie reguły duplikatów dodano `FormOrderDuplicatesDetectionTest` — uruchom `sail test --filter=FormOrderDuplicatesDetectionTest`.
 

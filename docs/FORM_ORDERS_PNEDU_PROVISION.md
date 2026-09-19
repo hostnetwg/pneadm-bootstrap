@@ -61,6 +61,8 @@ Stałe `access_type` (API ClickMeeting):
 | `2` | Hasło |
 | `3` | Token (jednorazowy na uczestnika) |
 
+`participant_live_access.access_type` to snapshot. Po zmianie dostępu w ClickMeeting panel dopasowuje go w tle (lista CM, edycja szkolenia, maile live, `/transmisja` na pnedu). Ustawień w CM nie nadpisujemy. Szkolenia zamknięte: w CM ma być `1` (Dla wszystkich). Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
+
 ### Pola w bazie
 
 **Snapshot na zamówieniu (`form_orders`)** — widoczny w kroku 2 panelu zamówienia:

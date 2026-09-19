@@ -3,6 +3,18 @@
 Data utworzenia/aktualizacji: 2026-09-19
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-19) — Ochrona baz przed migrate:fresh
+
+`migrate:fresh` na devie skasowało `pneadm`, bo `--env=testing` bez `.env.testing` bierze `.env`. Na prod przy zwykłym `git pull` + `migrate --force` tego ryzyka nie ma. W kodzie jest blokada `fresh`/`wipe` na bazach innych niż `testing`. Kanon: [DATA_SAFETY.md](./DATA_SAFETY.md).
+
+## Ostatnio (2026-09-19) — Nocny mysqldump na SeoHost
+
+SeoHost i tak robi dzienne/tygodniowe/miesięczne kopie w Backup Managerze (i 60 dni przez BOK). Dodatkowo skrypt `prod-mysql-nightly-backup.sh` zrzuca SQL do `~/backups/mysql` (14 nocy). Cron w DirectAdmin trzeba dodać ręcznie. Kanon: [deploy/MYSQL_BACKUP.md](./deploy/MYSQL_BACKUP.md).
+
+## Ostatnio (2026-09-19) — Typ dostępu ClickMeeting + szkolenia zamknięte
+
+Na `/clickmeeting/trainings` jest kolumna **Dostęp CM**. Szkolenie z kategorią **Zamknięte** musi mieć w ClickMeeting **Dla wszystkich** (jeden link dla dyrektora). Gdy jest inaczej — ostrzeżenie na liście i na `/courses/{id}/edit`. Panel nie zmienia ustawień w CM; dopasowuje tylko snapshot `access_type` w tle. Wejście na `/transmisja` też czyta aktualny typ z API. Kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
+
 ## Ostatnio (2026-09-19) — Link rejestracji zaświadczenia w mailu do prowadzącego
 
 Na `/courses/{id}` w **Prześlij linki prowadzącemu** pierwszy punkt to `Lista obecności / zaświadczenie`, gdy na edycji kursu jest włączona **Rejestracja zaświadczenia**. Bez okna od–do. Kanon: [CERTIFICATES.md](./CERTIFICATES.md).

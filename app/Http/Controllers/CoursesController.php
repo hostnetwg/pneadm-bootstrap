@@ -1184,14 +1184,21 @@ class CoursesController extends Controller
             ->limit(200)
             ->get(['id', 'title', 'start_date']);
 
-        $clickMeetingMeetingLinkStale = $roomUrlSync->isMeetingLinkStale($course);
+        $clickMeetingInspect = $roomUrlSync->inspectFromApi($course);
+        $clickMeetingMeetingLinkStale = $clickMeetingInspect['meeting_link_stale'];
+        $clickMeetingAccessTypeLabel = $clickMeetingInspect['access_type_label'];
+        $clickMeetingClosedAccessWarning = $clickMeetingInspect['closed_access_warning'];
+        $clickMeetingInspectError = $clickMeetingInspect['error'];
 
         return view('courses.edit', compact(
             'course',
             'instructors',
             'certificateTemplates',
             'registrationSuccessorOptions',
-            'clickMeetingMeetingLinkStale'
+            'clickMeetingMeetingLinkStale',
+            'clickMeetingAccessTypeLabel',
+            'clickMeetingClosedAccessWarning',
+            'clickMeetingInspectError'
         ) + $closedBilling);
     }
 

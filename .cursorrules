@@ -30,6 +30,10 @@
 ### ✅ ALWAYS Use Sail Prefix
 When running PHP/Laravel/Artisan commands, ALWAYS prefix with `sail`:
 
+**Destructive DB commands:** NEVER `sail artisan migrate:fresh`, `migrate:refresh`, `migrate:reset`, or `db:wipe` against `pneadm` / prod names. PHPUnit uses database `testing`. Artisan `--env=testing` does **not** read `phpunit.xml` — it needs `.env.testing`. The app blocks those commands unless `DB_DATABASE=testing` or `ALLOW_DESTRUCTIVE_DB=true`. Kanon: `docs/DATA_SAFETY.md`.
+
+**Correct Examples:**
+
 **Correct Examples:**
 ```bash
 sail artisan migrate

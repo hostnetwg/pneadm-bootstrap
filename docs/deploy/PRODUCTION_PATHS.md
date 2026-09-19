@@ -29,9 +29,11 @@ PHP na prod (hosting współdzielony):
 | **Dev (lokalnie)** | `./vendor/bin/sail` lub alias `sail` | `sail artisan migrate` |
 | **Prod (SeoHost)** | `/opt/alt/php82/usr/bin/php artisan …` | `/opt/alt/php82/usr/bin/php artisan migrate --force` |
 
-Na prod **nigdy:** `sail artisan …`, `sail composer …`, `sail npm …`.
+Na prod **nigdy:** `sail artisan …`, `sail composer …`, `sail npm …`, `migrate:fresh`, `migrate:refresh`, `db:wipe`. Kanon: [`DATA_SAFETY.md`](../DATA_SAFETY.md).
 
 Runbooki deploy, cron i kolejka: zawsze pełna ścieżka PHP powyżej (lub `php artisan …` jeśli `php` w PATH wskazuje na 8.2).
+
+Kopie MySQL: SeoHost Backup Manager (dzienne/tygodniowe/miesięczne + 60 dni przez BOK) oraz własny nocny `mysqldump` — [`MYSQL_BACKUP.md`](./MYSQL_BACKUP.md). Bezpieczeństwo `migrate` vs `fresh`: [`DATA_SAFETY.md`](../DATA_SAFETY.md).
 
 ## Typowy deploy
 

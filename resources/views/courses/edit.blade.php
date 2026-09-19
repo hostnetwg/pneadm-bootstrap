@@ -29,6 +29,17 @@
                 </div>
             @endif
 
+            @if(! empty($clickMeetingInspectError))
+                <div class="alert alert-danger">
+                    ClickMeeting: {{ $clickMeetingInspectError }}
+                </div>
+            @endif
+            @if(! empty($clickMeetingClosedAccessWarning))
+                <div class="alert alert-warning">
+                    {{ $clickMeetingClosedAccessWarning }}
+                </div>
+            @endif
+
             @php
                 $clickMeetingEventId = trim((string) old(
                     'clickmeeting_event_id',
@@ -197,6 +208,11 @@
                                 <label for="meeting_link" class="form-label">Link do spotkania</label>
                                 <input type="text" name="meeting_link" class="form-control" id="meeting_link"
                                     value="{{ $course->onlineDetails->meeting_link ?? '' }}">
+                                @if($clickMeetingEventId !== '' && ! empty($clickMeetingAccessTypeLabel))
+                                    <div class="form-text">
+                                        Dostęp w ClickMeeting: <strong>{{ $clickMeetingAccessTypeLabel }}</strong>
+                                    </div>
+                                @endif
                                 @if($clickMeetingEventId !== '' && $clickMeetingMeetingLinkStale)
                                     <div class="mt-2">
                                         <span class="badge text-bg-warning">Link nieaktualny</span>

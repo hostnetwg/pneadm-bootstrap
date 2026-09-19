@@ -43,7 +43,7 @@ class CourseOnlineDetails extends Model
         $details = static::query()
             ->where('clickmeeting_event_id', $eventId)
             ->whereHas('course')
-            ->with('course:id,title,start_date')
+            ->with('course:id,title,start_date,category')
             ->orderByDesc('course_id')
             ->first();
 
@@ -69,7 +69,7 @@ class CourseOnlineDetails extends Model
             ->select(['id', 'course_id', 'clickmeeting_event_id', 'meeting_link'])
             ->whereIn('clickmeeting_event_id', $eventIds)
             ->whereHas('course')
-            ->with('course:id,title,start_date')
+            ->with('course:id,title,start_date,category')
             ->orderByDesc('course_id')
             ->get()
             ->groupBy(fn (self $details) => trim((string) $details->clickmeeting_event_id))

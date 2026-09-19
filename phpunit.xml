@@ -23,6 +23,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_DATABASE" value="testing"/>
+        <env name="DB_PNEDU_DATABASE" value="testing"/>
+        <env name="DB_SECOND_DATABASE" value="testing"/>
         <!-- Analityka musi trafiać do tej samej bazy co RefreshDatabase (migrate:fresh),
              inaczej migrate tworzy tabele w pne_analytics i dostajemy „already exists”. -->
         <env name="DB_ANALYTICS_DATABASE" value="testing"/>

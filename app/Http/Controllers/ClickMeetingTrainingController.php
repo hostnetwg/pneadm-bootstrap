@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CourseOnlineDetails;
+use App\Services\ClickMeetingAccessSnapshotService;
 use App\Services\ClickMeetingCourseRoomUrlSyncService;
 use App\Services\ClickMeetingService;
 use Carbon\Carbon;
@@ -14,8 +15,10 @@ class ClickMeetingTrainingController extends Controller
     /**
      * Wyświetla listę szkoleń ClickMeeting.
      */
-    public function index(ClickMeetingService $clickMeetingService): View
-    {
+    public function index(
+        ClickMeetingService $clickMeetingService,
+        ClickMeetingAccessSnapshotService $accessSnapshots
+    ): View {
         $result = $clickMeetingService->listConferences();
         abort_if(! ($result['success'] ?? false), 502, $result['error'] ?? 'Błąd pobierania listy konferencji');
 
@@ -36,7 +39,7 @@ class ClickMeetingTrainingController extends Controller
             $trainings->pluck('id')->map(fn ($id) => (string) $id)->all()
         );
 
-        $trainings = $trainings->map(function (array $room) use ($linkedDetails, $clickMeetingService) {
+        $trainings = $trainings->map(function (array $room) use ($linkedDetails, $clickMeetingService, $accessSnapshots) {
             $eventId = trim((string) ($room['id'] ?? ''));
             $details = $eventId !== '' ? $linkedDetails->get($eventId) : null;
             $course = $details?->course;
@@ -54,6 +57,27 @@ class ClickMeetingTrainingController extends Controller
                 : null;
             $room['start_time_stale'] = $details !== null
                 && $clickMeetingService->startTimesDiffer($cmStartRaw, $courseStart);
+
+            $accessType = $clickMeetingService->extractAccessType($room);
+            if ($accessType === null && $course !== null && $eventId !== '') {
+                $detail = $clickMeetingService->getConference($eventId);
+                if ($detail['success'] ?? false) {
+                    $accessType = isset($detail['access_type'])
+                        ? (int) $detail['access_type']
+                        : $clickMeetingService->extractAccessType($detail['conference'] ?? []);
+                }
+            }
+            $room['access_type'] = $accessType;
+            $room['access_type_label'] = $clickMeetingService->accessTypeLabel($accessType);
+            $room['closed_should_be_open'] = $course !== null
+                && $accessSnapshots->closedCourseShouldUseOpenAccess($course, $accessType);
+            $room['closed_access_warning'] = $room['closed_should_be_open']
+                ? $accessSnapshots->closedAccessWarning($accessType)
+                : null;
+
+            if ($course !== null) {
+                $accessSnapshots->reconcileCourse((int) $course->id, $accessType);
+            }
 
             return $room;
         });

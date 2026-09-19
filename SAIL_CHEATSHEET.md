@@ -69,11 +69,12 @@ sail artisan migrate
 # Rollback migrations
 sail artisan migrate:rollback
 
-# Rollback all migrations
-sail artisan migrate:reset
+# Rollback migrations
+sail artisan migrate:rollback
 
-# Fresh database with seeds
-sail artisan migrate:fresh --seed
+# Fresh / wipe — TYLKO baza `testing` (blokada w kodzie, docs/DATA_SAFETY.md)
+# sail artisan migrate:fresh --env=testing
+# NIE: sail artisan migrate:fresh   ← to skasowało lokalne pneadm 19.09.2026
 
 # Run seeders only
 sail artisan db:seed

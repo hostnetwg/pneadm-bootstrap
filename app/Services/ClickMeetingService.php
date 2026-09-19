@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Log;
 
 class ClickMeetingService
 {
-    public const ACCESS_TYPE_TOKEN = 3;
+    public const ACCESS_TYPE_OPEN = 1;
 
     public const ACCESS_TYPE_PASSWORD = 2;
+
+    public const ACCESS_TYPE_TOKEN = 3;
 
     /**
      * @return array{
@@ -81,6 +83,25 @@ class ClickMeetingService
         }
 
         return $conferences;
+    }
+
+    public function extractAccessType(array $room): ?int
+    {
+        if (! array_key_exists('access_type', $room) || $room['access_type'] === null || $room['access_type'] === '') {
+            return null;
+        }
+
+        return (int) $room['access_type'];
+    }
+
+    public function accessTypeLabel(?int $accessType): string
+    {
+        return match ($accessType) {
+            self::ACCESS_TYPE_OPEN => 'Dla wszystkich',
+            self::ACCESS_TYPE_PASSWORD => 'Hasło',
+            self::ACCESS_TYPE_TOKEN => 'Tokeny',
+            default => $accessType !== null ? 'Typ '.$accessType : '—',
+        };
     }
 
     public function toWarsawDatetimeLocal(mixed $raw): ?string

@@ -15,6 +15,7 @@ use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 use App\Observers\ProductPriceObserver;
 use App\Services\ReleaseChangelogService;
+use App\Support\DestructiveDatabaseGuard;
 use App\Support\OutboundMailCapture;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
@@ -36,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        DestructiveDatabaseGuard::register();
+
         Paginator::useBootstrapFour();
 
         // Rejestracja Observer dla automatycznego zapisu uczestników

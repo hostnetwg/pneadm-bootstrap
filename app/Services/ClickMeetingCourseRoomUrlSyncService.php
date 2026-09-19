@@ -17,6 +17,7 @@ class ClickMeetingCourseRoomUrlSyncService
     public function __construct(
         private readonly ClickMeetingService $clickMeeting,
         private readonly CourseGoogleCalendarSyncService $googleCalendar,
+        private readonly ClickMeetingAccessSnapshotService $accessSnapshots,
     ) {}
 
     /**
@@ -57,36 +58,84 @@ class ClickMeetingCourseRoomUrlSyncService
             return $result;
         }
 
-        $roomUrl = $this->clickMeeting->extractRoomUrl($conferenceResult['conference'] ?? []);
+        $conference = $conferenceResult['conference'] ?? [];
+        $accessType = isset($conferenceResult['access_type'])
+            ? (int) $conferenceResult['access_type']
+            : $this->clickMeeting->extractAccessType($conference);
+        $roomUrl = $this->clickMeeting->extractRoomUrl($conference);
         $result = $this->applyRoomUrl($course, $roomUrl, $syncCalendarWhenChanged);
+        $this->accessSnapshots->reconcileCourse($courseId, $accessType);
         $this->remember($courseId, $result);
 
         return $result;
     }
 
-    public function isMeetingLinkStale(Course $course): bool
+    /**
+     * @return array{
+     *     success: bool,
+     *     meeting_link_stale: bool,
+     *     access_type: int|null,
+     *     access_type_label: string,
+     *     closed_should_be_open: bool,
+     *     closed_access_warning: string|null,
+     *     error: string|null
+     * }
+     */
+    public function inspectFromApi(Course $course): array
     {
+        $empty = [
+            'success' => false,
+            'meeting_link_stale' => false,
+            'access_type' => null,
+            'access_type_label' => $this->clickMeeting->accessTypeLabel(null),
+            'closed_should_be_open' => false,
+            'closed_access_warning' => null,
+            'error' => null,
+        ];
+
         $course->loadMissing('onlineDetails');
         $eventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
         if ($eventId === '') {
-            return false;
+            return $empty;
         }
 
         $conferenceResult = $this->clickMeeting->getConference($eventId);
         if (! ($conferenceResult['success'] ?? false)) {
-            return false;
+            $empty['error'] = (string) ($conferenceResult['error'] ?? 'Nie udało się pobrać wydarzenia z ClickMeeting.');
+
+            return $empty;
         }
 
-        $apiRoomUrl = $this->clickMeeting->extractRoomUrl($conferenceResult['conference'] ?? []);
-        if ($apiRoomUrl === null) {
-            return false;
-        }
+        $conference = $conferenceResult['conference'] ?? [];
+        $accessType = isset($conferenceResult['access_type'])
+            ? (int) $conferenceResult['access_type']
+            : $this->clickMeeting->extractAccessType($conference);
+        $this->accessSnapshots->reconcileCourse((int) $course->id, $accessType);
 
+        $apiRoomUrl = $this->clickMeeting->extractRoomUrl($conference);
         $storedLink = $this->clickMeeting->normalizeRoomUrl(
             optional($course->onlineDetails)->meeting_link
         );
+        $meetingLinkStale = $apiRoomUrl !== null
+            && $this->clickMeeting->roomUrlsDiffer($storedLink, $apiRoomUrl);
+        $closedShouldBeOpen = $this->accessSnapshots->closedCourseShouldUseOpenAccess($course, $accessType);
 
-        return $this->clickMeeting->roomUrlsDiffer($storedLink, $apiRoomUrl);
+        return [
+            'success' => true,
+            'meeting_link_stale' => $meetingLinkStale,
+            'access_type' => $accessType,
+            'access_type_label' => $this->clickMeeting->accessTypeLabel($accessType),
+            'closed_should_be_open' => $closedShouldBeOpen,
+            'closed_access_warning' => $closedShouldBeOpen
+                ? $this->accessSnapshots->closedAccessWarning($accessType)
+                : null,
+            'error' => null,
+        ];
+    }
+
+    public function isMeetingLinkStale(Course $course): bool
+    {
+        return $this->inspectFromApi($course)['meeting_link_stale'];
     }
 
     /**

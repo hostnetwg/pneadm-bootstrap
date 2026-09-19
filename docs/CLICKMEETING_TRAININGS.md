@@ -1,6 +1,6 @@
 # Szkolenia ClickMeeting → courses
 
-Data utworzenia/aktualizacji: 2026-09-18  
+Data utworzenia/aktualizacji: 2026-09-19  
 Status: wdrożone lokalnie
 
 ## Cel
@@ -51,6 +51,33 @@ Przycisk **Aktualizuj link z ClickMeeting**:
 
 Na liście, w kolumnie **Szkolenie w ADM**, widać też datę i godzinę startu z `courses.start_date`. Gdy różni się od terminu ClickMeeting (porównanie do minuty, CM w `Europe/Warsaw`, courses bez konwersji strefy) — etykieta **Termin się różni**. Bez automatycznej synchronizacji daty; operator poprawia w edycji szkolenia.
 
+Kolumna **Dostęp CM** pokazuje aktualny `access_type` z ClickMeeting: **Dla wszystkich** (1), **Hasło** (2), **Tokeny** (3). Gdy lista nie ma pola, dla powiązanych szkoleń panel dociąga je z `GET /conferences/{id}`.
+
+## Typ dostępu po powiązaniu szkolenia
+
+Operator może zmienić dostęp w ClickMeeting już po wpisaniu `clickmeeting_event_id`. Panel **nie** zmienia ustawień w CM (brak automatycznego PUT).
+
+Naprawa w tle (tylko snapshot u nas):
+
+- lista `/clickmeeting/trainings` — dopasowuje `participant_live_access.access_type` do aktualnego CM,
+- edycja szkolenia i sync linku / maile live — to samo po `GET conferences/{id}`,
+- wejście na `/transmisja` (pnedu) — zapisuje aktualny `access_type` i `room_url` przed budową embedu. Przy „Dla wszystkich” nie wymaga tokenu.
+
+## Szkolenia zamknięte (kategoria = Zamknięte)
+
+Dla rad pedagogicznych i innych zamkniętych: dyrektor dostaje **jeden ogólny link** ClickMeeting i rozsyła nauczycielom. Listy uczestników na starcie nie ma (albo jest tylko dyrektor). Rejestracja obecności / zaświadczenia buduje listę dopiero w trakcie.
+
+W ClickMeeting musi być dostęp **Dla wszystkich**. Tokeny albo hasło zablokują wejście osobom spoza listy. Panel pokazuje ostrzeżenie:
+
+- na `/clickmeeting/trainings` (alert + etykieta **Zamknięte ≠ dla wszystkich**),
+- na `/courses/{id}/edit` (żółty komunikat + podpis „Dostęp w ClickMeeting”).
+
+Zmianę dostępu operator robi ręcznie w panelu ClickMeeting.
+
+Osadzony pokój na pnedu.pl **bez logowania** (gość z linkiem od dyrektora) **nie jest wdrożony**. Zamknięte szkolenia na razie wchodzą bezpośrednim linkiem CM. Decyzja o publicznym embedzie — osobny etap (konto, bezpieczeństwo, platform-first).
+
+## Odświeżenie przy wysyłce maila (etap 2)
+
 Akcja:
 
 1. `GET /v1/conferences/{event_id}` → `room_url`,
@@ -72,11 +99,12 @@ Brak migracji. Po wrzuceniu kodu: `optimize:clear` na `pneadm`.
 
 Smoke:
 
-1. `/clickmeeting/trainings` — etykieta przy znanym szkoleniu, „Dodaj do szkoleń” przy nowym.
+1. `/clickmeeting/trainings` — etykieta przy znanym szkoleniu, „Dodaj do szkoleń” przy nowym. Kolumna **Dostęp CM**.
 2. Przy znanym szkoleniu widać **Start w courses**. Po zmianie daty w ClickMeeting — **Termin się różni**.
-3. Zmień nazwę pokoju w ClickMeeting → na liście **Link nieaktualny** → aktualizacja.
-4. To samo z `/courses/{id}/edit`.
-5. Provision / „Wyślij link do live” — w mailu nowy slug.
+3. Szkolenie **Zamknięte** z tokenami w CM — alert **Zamknięte ≠ dla wszystkich**.
+4. Zmień nazwę pokoju w ClickMeeting → na liście **Link nieaktualny** → aktualizacja.
+5. To samo z `/courses/{id}/edit` (także ostrzeżenie zamknięte + podpis typu dostępu).
+6. Provision / „Wyślij link do live” — w mailu nowy slug.
 
 ## Testy
 

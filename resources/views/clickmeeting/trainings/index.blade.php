@@ -26,6 +26,24 @@
                 ClickMeeting jest źródłem zaplanowanych szkoleń online. Tu widać, które wydarzenia mają już rekord w
                 <a href="{{ route('courses.index') }}">szkoleniach</a>.
             </p>
+
+            @php
+                $closedAccessProblems = collect($trainings)->filter(fn ($row) => ! empty($row['closed_should_be_open']));
+            @endphp
+            @if($closedAccessProblems->isNotEmpty())
+                <div class="alert alert-warning">
+                    <strong>Szkolenie zamknięte wymaga w ClickMeeting dostępu „Dla wszystkich”.</strong>
+                    Dyrektor dostaje jeden link i rozsyła nauczycielom — tokeny albo hasło zablokują wejście.
+                    <ul class="mb-0 mt-2">
+                        @foreach($closedAccessProblems as $problem)
+                            <li>
+                                #{{ $problem['linked_course']->id }} {{ $problem['linked_course']->title }}
+                                — teraz: {{ $problem['access_type_label'] ?? '—' }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             <div class="d-flex justify-content-between mb-3">
                 <a href="{{ route('clickmeeting.trainings.index') }}" class="btn btn-primary">
                     Odśwież listę
@@ -41,6 +59,7 @@
                         <th style="width: 280px;">Tytuł</th>
                         <th style="width: 120px;">PIN pokoju</th>
                         <th style="width: 130px;">Typ pokoju</th>
+                        <th style="width: 130px;">Dostęp CM</th>
                         <th style="width: 100px;">Status</th>
                         <th>Szkolenie w ADM</th>
                     </tr>
@@ -57,6 +76,12 @@
                             <td>{{ $t['name'] }}</td>
                             <td>{{ $t['room_pin'] ?? '—' }}</td>
                             <td>{{ ucfirst($t['room_type'] ?? '—') }}</td>
+                            <td>
+                                {{ $t['access_type_label'] ?? '—' }}
+                                @if(!empty($t['closed_should_be_open']))
+                                    <span class="badge text-bg-warning d-block mt-1">Zamknięte ≠ dla wszystkich</span>
+                                @endif
+                            </td>
                             <td>{{ ucfirst($t['status'] ?? 'aktywne') }}</td>
                             <td>
                                 @if($linkedCourse)
@@ -66,6 +91,9 @@
                                     @endif
                                     @if(!empty($t['start_time_stale']))
                                         <span class="badge text-bg-warning ms-1">Termin się różni</span>
+                                    @endif
+                                    @if(!empty($t['closed_should_be_open']))
+                                        <span class="badge text-bg-warning ms-1">Dostęp CM do zmiany</span>
                                     @endif
                                     <a href="{{ route('courses.edit', $linkedCourse->id) }}" class="d-block small mt-1">
                                         #{{ $linkedCourse->id }} {{ $linkedCourse->title }}
@@ -99,7 +127,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center">Brak szkoleń do wyświetlenia.</td>
+                            <td colspan="8" class="text-center">Brak szkoleń do wyświetlenia.</td>
                         </tr>
                     @endforelse
                 </tbody>
