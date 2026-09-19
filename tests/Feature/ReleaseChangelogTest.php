@@ -44,9 +44,9 @@ class ReleaseChangelogTest extends TestCase
         $this->actingAs($user)
             ->get(route('changelog.show', 'adm'))
             ->assertOk()
-            ->assertSee('adm.pnedu.pl v 1.0')
+            ->assertSee('adm.pnedu.pl v 1.1')
             ->assertSee('pnedu.pl v 1.0')
-            ->assertSee('Aktualna wersja 1.0')
+            ->assertSee('Aktualna wersja 1.1')
             ->assertSee('Lista ClickMeeting')
             ->assertSee('/clickmeeting/trainings', false)
             ->assertSee('target="_blank"', false);

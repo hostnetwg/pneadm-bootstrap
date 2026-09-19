@@ -151,6 +151,9 @@
                                                 </div>
                                             </div>
                                         @endif
+                                        <div id="course-select-error" class="alert alert-warning mt-2 mb-0 py-2 small d-none" role="alert">
+                                            Nie udało się uruchomić wyszukiwarki. Odśwież stronę.
+                                        </div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="product_price" class="form-label">Cena (PLN)</label>
@@ -518,10 +521,12 @@
             'instructor' => '',
         ] : null;
     @endphp
+    @include('partials.ensure-course-select-init')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const priceInput = document.getElementById('product_price');
             const nameInput = document.getElementById('product_name');
+            const selectError = document.getElementById('course-select-error');
             const applyCatalogItem = function (item) {
                 if (!item) {
                     return;
@@ -537,43 +542,56 @@
                 }
             };
 
-            @if($isProductOrderEdit)
-            window.initCourseSelect && window.initCourseSelect('catalog_product_id', {
-                searchUrl: @json($catalogProductSearchUrl),
-                preselected: @json($catalogProductSelectPreselected),
-                placeholder: 'Wybierz lub wpisz tytuł / ID kursu online...',
-                onCourseChanged: applyCatalogItem,
-            });
-            @else
-            const searchUrl = @json($courseSearchUrl);
-            const preselected = @json($courseSelectPreselected);
-            const archivedToggle = document.getElementById('course_include_archived');
-            const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
-            let includeArchived = false;
-            try {
-                includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
-            } catch (e) {}
-            if (archivedToggle) {
-                archivedToggle.checked = includeArchived;
-            }
-
-            const ts = window.initCourseSelect && window.initCourseSelect('course_id', {
-                searchUrl,
-                preselected,
-                includeArchived,
-                onCourseChanged: applyCatalogItem,
-            });
-
-            if (ts && archivedToggle) {
-                archivedToggle.addEventListener('change', function () {
-                    const checked = !!archivedToggle.checked;
-                    try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
-                    if (typeof ts.setIncludeArchived === 'function') {
-                        ts.setIncludeArchived(checked);
+            function boot(initFn) {
+                if (!initFn) {
+                    if (selectError) {
+                        selectError.classList.remove('d-none');
                     }
+                    return;
+                }
+
+                @if($isProductOrderEdit)
+                initFn('catalog_product_id', {
+                    searchUrl: @json($catalogProductSearchUrl),
+                    preselected: @json($catalogProductSelectPreselected),
+                    placeholder: 'Wybierz lub wpisz tytuł / ID kursu online...',
+                    onCourseChanged: applyCatalogItem,
                 });
+                @else
+                const searchUrl = @json($courseSearchUrl);
+                const preselected = @json($courseSelectPreselected);
+                const archivedToggle = document.getElementById('course_include_archived');
+                const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
+                let includeArchived = false;
+                try {
+                    includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
+                } catch (e) {}
+                if (archivedToggle) {
+                    archivedToggle.checked = includeArchived;
+                }
+
+                const ts = initFn('course_id', {
+                    searchUrl,
+                    preselected,
+                    includeArchived,
+                    onCourseChanged: applyCatalogItem,
+                });
+
+                if (ts && archivedToggle) {
+                    archivedToggle.addEventListener('change', function () {
+                        const checked = !!archivedToggle.checked;
+                        try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
+                        if (typeof ts.setIncludeArchived === 'function') {
+                            ts.setIncludeArchived(checked);
+                        }
+                    });
+                }
+                @endif
             }
-            @endif
+
+            window.ensureCourseSelectInit().then(boot).catch(function () {
+                boot(null);
+            });
         });
     </script>
     @include('form-orders.partials.participants-form-script')

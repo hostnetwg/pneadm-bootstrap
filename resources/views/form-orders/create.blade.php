@@ -98,6 +98,9 @@
                                                 </label>
                                             </div>
                                         </div>
+                                        <div id="course-select-error" class="alert alert-warning mt-2 mb-0 py-2 small d-none" role="alert">
+                                            Nie udało się uruchomić wyszukiwarki szkoleń. Odśwież stronę.
+                                        </div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="product_price" class="form-label">Cena (PLN)</label>
@@ -410,6 +413,7 @@
             'instructor' => optional($preselectedCourse->instructor)->full_title_name ?? '',
         ] : null;
     @endphp
+    @include('partials.ensure-course-select-init')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const searchUrl = @json($courseSearchUrl);
@@ -419,6 +423,7 @@
             const courseDetails = document.getElementById('course-details');
             const priceInput = document.getElementById('product_price');
             const archivedToggle = document.getElementById('course_include_archived');
+            const selectError = document.getElementById('course-select-error');
 
             const STORAGE_KEY = 'formOrders.courseSelect.includeArchived';
             let includeArchived = false;
@@ -453,34 +458,46 @@
                 courseInfo.style.display = 'block';
             }
 
-            const ts = window.initCourseSelect && window.initCourseSelect('course_id', {
-                searchUrl,
-                preselected,
-                includeArchived,
-                onCourseChanged: function (item) {
-                    renderInfo(item);
-                    if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
-                        priceInput.value = item.default_price;
-                        if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
-                            window.formOrderParticipantsSetUnitPrice(item.default_price);
+            function boot(initFn) {
+                if (!initFn) {
+                    if (selectError) {
+                        selectError.classList.remove('d-none');
+                    }
+                    return;
+                }
+                const ts = initFn('course_id', {
+                    searchUrl,
+                    preselected,
+                    includeArchived,
+                    onCourseChanged: function (item) {
+                        renderInfo(item);
+                        if (item && item.default_price !== null && item.default_price !== undefined && priceInput) {
+                            priceInput.value = item.default_price;
+                            if (typeof window.formOrderParticipantsSetUnitPrice === 'function') {
+                                window.formOrderParticipantsSetUnitPrice(item.default_price);
+                            }
                         }
-                    }
-                },
-            });
-
-            if (ts && preselected) {
-                renderInfo(preselected);
-            }
-
-            if (ts && archivedToggle) {
-                archivedToggle.addEventListener('change', function () {
-                    const checked = !!archivedToggle.checked;
-                    try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
-                    if (typeof ts.setIncludeArchived === 'function') {
-                        ts.setIncludeArchived(checked);
-                    }
+                    },
                 });
+
+                if (ts && preselected) {
+                    renderInfo(preselected);
+                }
+
+                if (ts && archivedToggle) {
+                    archivedToggle.addEventListener('change', function () {
+                        const checked = !!archivedToggle.checked;
+                        try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
+                        if (typeof ts.setIncludeArchived === 'function') {
+                            ts.setIncludeArchived(checked);
+                        }
+                    });
+                }
             }
+
+            window.ensureCourseSelectInit().then(boot).catch(function () {
+                boot(null);
+            });
         });
     </script>
     @include('form-orders.partials.participants-form-script')

@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-09-18
+Data utworzenia/aktualizacji: 2026-09-19
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -24,6 +24,7 @@ pnedu.pl
 adm.pnedu.pl
     ├─ szkolenia
     ├─ szkolenia ClickMeeting (lista API → prefill courses)
+    ├─ panel live szkolenia (`/courses/{id}/live`)
     ├─ oferty szkoleń
     ├─ zamówienia
     ├─ kampanie

@@ -20,12 +20,24 @@ class CourseOnlineDetails extends Model
         'clickmeeting_join_enabled',
         'embed_on_pnedu',
         'embed_email_link_enabled',
+        'live_bar_attendance_enabled',
+        'live_bar_materials_enabled',
+        'live_bar_survey_enabled',
+        'live_bar_certificate_enabled',
+        'live_offer_course_id',
+        'live_offer_enabled',
     ];
 
     protected $casts = [
         'clickmeeting_join_enabled' => 'boolean',
         'embed_on_pnedu' => 'boolean',
         'embed_email_link_enabled' => 'boolean',
+        'live_bar_attendance_enabled' => 'boolean',
+        'live_bar_materials_enabled' => 'boolean',
+        'live_bar_survey_enabled' => 'boolean',
+        'live_bar_certificate_enabled' => 'boolean',
+        'live_offer_course_id' => 'integer',
+        'live_offer_enabled' => 'boolean',
     ];
 
     public function course()

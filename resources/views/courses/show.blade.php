@@ -737,6 +737,11 @@
                                 <a href="{{ route('courses.edit', $course->id) }}" class="btn btn-warning">
                                     <i class="fas fa-edit"></i> Edytuj szkolenie
                                 </a>
+                                @if($course->onlineDetails)
+                                    <a href="{{ route('courses.live', $course->id) }}" class="btn btn-success">
+                                        <i class="fas fa-broadcast-tower"></i> Panel live
+                                    </a>
+                                @endif
                                 <a href="{{ route('participants.index', $course->id) }}" class="btn btn-info text-white">
                                     <i class="fas fa-users"></i> Uczestnicy ({{ $course->participants->count() }})
                                 </a>

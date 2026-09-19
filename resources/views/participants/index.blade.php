@@ -79,6 +79,9 @@
                     <a href="{{ route('courses.show', $course->id) }}" class="btn btn-outline-primary">
                         <i class="fas fa-eye me-1"></i> Powrót do kursu
                     </a>
+                    <a href="{{ route('courses.live', $course->id) }}" class="btn btn-success">
+                        <i class="fas fa-broadcast-tower me-1"></i> Panel live
+                    </a>
                     <a href="{{ route('participants.create', $course) }}" class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i> Dodaj uczestnika
                     </a>

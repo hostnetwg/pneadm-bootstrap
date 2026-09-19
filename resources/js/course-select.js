@@ -39,6 +39,21 @@ function statusBadgeHtml(status) {
     }
 }
 
+function appendQuery(url, extra) {
+    const parts = [];
+    Object.keys(extra).forEach((key) => {
+        const value = extra[key];
+        if (value === undefined || value === null) {
+            return;
+        }
+        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(String(value)));
+    });
+    if (parts.length === 0) {
+        return url;
+    }
+    return url + (String(url).includes('?') ? '&' : '?') + parts.join('&');
+}
+
 function normalizeCourseSearchItems(data) {
     if (Array.isArray(data)) {
         return data;
@@ -92,9 +107,10 @@ export function initCourseSelect(selectId, options) {
             // Każde wyszukiwanie zastępuje poprzednią listę (preload na fokusie
             // zostawiał #515, #514 przy wpisywaniu #50).
             self.clearOptions();
-            const url = options.searchUrl
-                + '?q=' + encodeURIComponent(query || '')
-                + '&include_archived=' + (includeArchived ? '1' : '0');
+            const url = appendQuery(options.searchUrl, {
+                q: query || '',
+                include_archived: includeArchived ? '1' : '0',
+            });
             fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',

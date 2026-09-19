@@ -31,6 +31,21 @@
         }
     }
 
+    function appendQuery(url, extra) {
+        var parts = [];
+        Object.keys(extra).forEach(function (key) {
+            var value = extra[key];
+            if (value === undefined || value === null) {
+                return;
+            }
+            parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(String(value)));
+        });
+        if (parts.length === 0) {
+            return url;
+        }
+        return url + (String(url).indexOf('?') !== -1 ? '&' : '?') + parts.join('&');
+    }
+
     function normalizeCourseSearchItems(data) {
         if (Array.isArray(data)) {
             return data;
@@ -117,9 +132,10 @@
                 preload: 'focus',
                 load: function (query, callback) {
                     this.clearOptions();
-                    var url = options.searchUrl
-                        + '?q=' + encodeURIComponent(query || '')
-                        + '&include_archived=' + (includeArchived ? '1' : '0');
+                    var url = appendQuery(options.searchUrl, {
+                        q: query || '',
+                        include_archived: includeArchived ? '1' : '0',
+                    });
 
                     fetch(url, {
                         headers: {

@@ -1,0 +1,605 @@
+<x-app-layout>
+    <x-slot name="header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="fw-semibold fs-4 text-dark mb-1">
+                    <i class="fas fa-broadcast-tower me-2"></i>Panel live
+                </h2>
+                <p class="text-muted mb-0">
+                    <strong>{!! $course->title !!}</strong>
+                    @if($course->start_date)
+                        <span class="ms-2">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ $course->start_date->timezone(config('app.timezone'))->format('d.m.Y H:i') }}
+                        </span>
+                    @endif
+                </p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('courses.show', $course->id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-eye me-1"></i> Szkolenie
+                </a>
+                <a href="{{ route('participants.index', $course->id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-users me-1"></i> Uczestnicy
+                </a>
+            </div>
+        </div>
+    </x-slot>
+
+    @php
+        $flags = $state['flags'];
+        $resources = $state['resources'];
+        $links = $state['links'];
+        $embedEntries = $state['embed_entries'];
+    @endphp
+
+    <div class="container py-3" id="course-live-panel"
+         data-update-url="{{ route('courses.live.update', $course->id) }}"
+         data-offer-update-url="{{ route('courses.live.offer', $course->id) }}"
+         data-state-url="{{ route('courses.live', $course->id) }}">
+        @if(session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
+
+        @if(! $state['has_online_details'])
+            <div class="alert alert-warning">
+                To szkolenie nie ma jeszcze danych online.
+                <a href="{{ route('courses.edit', $course->id) }}">Ustaw ClickMeeting / osadzony pokój</a>, potem wróć tutaj.
+            </div>
+        @elseif(! $state['embed_on_pnedu'])
+            <div class="alert alert-warning">
+                Belka działa tylko na <strong>osadzonym pokoju</strong> (`/transmisja`).
+                Teraz radio jest na ClickMeeting — uczestnicy tej belki nie zobaczą.
+                <a href="{{ route('courses.edit', $course->id) }}">Zmień w edycji szkolenia</a>.
+            </div>
+        @endif
+
+        @php
+            $offer = $state['offer'] ?? ['enabled' => false, 'course_id' => null, 'course' => null];
+            $offerEnabled = (bool) ($offer['enabled'] ?? false);
+            $offerItem = $offer['course'] ?? null;
+        @endphp
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>Oferta kolejnego szkolenia</strong>
+                <span class="text-muted small d-block">
+                    Wybierz inne szkolenie, które chcesz pokazać uczestnikom na transmisji. Bieżące spotkanie nie jest na liście.
+                </span>
+            </div>
+            <div class="card-body py-3">
+                <label for="live_offer_course_id" class="form-label mb-1">Szkolenie do oferty</label>
+                <select class="form-control" id="live_offer_course_id">
+                    @if($offerItem)
+                        <option value="{{ $offerItem['id'] }}" selected>
+                            #{{ $offerItem['id'] }} · {{ $offerItem['title_text'] }}
+                            @if(!empty($offerItem['start_date']))
+                                [{{ $offerItem['start_date'] }}]
+                            @endif
+                        </option>
+                    @endif
+                </select>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-1">
+                    <small class="form-text text-muted mb-0">Domyślnie nadchodzące i trwające. Wpisz tytuł / ID, by szukać też w archiwum.</small>
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="live_offer_include_archived">
+                        <label class="form-check-label small" for="live_offer_include_archived">
+                            Pokaż również archiwalne
+                        </label>
+                    </div>
+                </div>
+                <div id="live-offer-select-error" class="alert alert-warning mt-2 mb-0 py-2 small d-none" role="alert">
+                    Nie udało się uruchomić wyszukiwarki szkoleń. Odśwież stronę.
+                </div>
+
+                <div id="live-offer-actions" class="mt-3 pt-3 border-top {{ $offerItem ? '' : 'd-none' }}">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button type="button" class="btn {{ $offerEnabled ? 'btn-outline-secondary' : 'btn-primary' }}"
+                                id="live-offer-toggle"
+                                @disabled(! $state['has_online_details'])>
+                            @if($offerEnabled)
+                                <i class="fas fa-eye-slash me-1"></i> Ukryj ofertę
+                            @else
+                                <i class="fas fa-bullhorn me-1"></i> Wyświetl uczestnikom
+                            @endif
+                        </button>
+                        <span id="live-offer-badge" class="badge {{ $offerEnabled ? 'text-bg-success' : 'text-bg-light text-muted border' }}">
+                            {{ $offerEnabled ? 'Włączona' : 'Ukryta' }}
+                        </span>
+                    </div>
+                    <div id="live-offer-save-status" class="small text-muted mt-2">
+                        @if($offerEnabled)
+                            Oferta jest włączona. Uczestnicy zobaczą ją na transmisji w ciągu kilkunastu sekund.
+                        @else
+                            Po wybraniu szkolenia włącz ofertę przyciskiem. Uczestnicy zobaczą belkę z przyciskiem „Zamawiam szkolenie” (opis szkolenia, nie od razu formularz).
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Co pokazać na belce</strong>
+                        <span class="text-muted small d-block">Przełącznik działa tylko wtedy, gdy dany zasób jest już na szkoleniu. Link wchodzi i schodzi u uczestnika w ciągu kilkunastu sekund.</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="course-live-form" method="post" action="{{ route('courses.live.update', $course->id) }}">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="live_bar_attendance_enabled" value="0">
+                            <input type="hidden" name="live_bar_certificate_enabled" value="0">
+                            <input type="hidden" name="live_bar_materials_enabled" value="0">
+                            <input type="hidden" name="live_bar_survey_enabled" value="0">
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="live_bar_attendance_enabled" name="live_bar_attendance_enabled" value="1"
+                                       @checked($flags['attendance'] && $resources['attendance']['ready'])
+                                       @disabled(! $state['has_online_details'] || ! $resources['attendance']['ready'])>
+                                <label class="form-check-label {{ $resources['attendance']['ready'] ? '' : 'text-muted' }}" for="live_bar_attendance_enabled">
+                                    Rejestracja: lista obecności
+                                </label>
+                                <div class="small {{ $resources['attendance']['ready'] ? 'text-success' : 'text-muted' }}">
+                                    @if($resources['attendance']['parked'] ?? false)
+                                        Na obecnym osadzonym live uczestnik jest już zalogowany i na liście — ten przycisk jest ukryty.
+                                        Wróci, gdy live będzie dostępny bez konta pnedu (np. zamknięty link od dyrektora).
+                                    @elseif($resources['attendance']['ready'])
+                                        Jest link rejestracji (jak w mailu do prowadzącego — bez okna od–do).
+                                    @else
+                                        Brak włączonej rejestracji zaświadczenia z tokenem.
+                                        <a href="{{ route('courses.edit', $course->id) }}">Ustaw na karcie szkolenia</a>
+                                        — dopóki tego nie ma, przełącznik jest nieaktywny.
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="live_bar_materials_enabled" name="live_bar_materials_enabled" value="1"
+                                       @checked($flags['materials'] && $resources['materials']['ready'])
+                                       @disabled(! $state['has_online_details'] || ! $resources['materials']['ready'])>
+                                <label class="form-check-label {{ $resources['materials']['ready'] ? '' : 'text-muted' }}" for="live_bar_materials_enabled">
+                                    Materiały
+                                </label>
+                                <div class="small {{ $resources['materials']['ready'] ? 'text-success' : 'text-muted' }}">
+                                    @if($resources['materials']['ready'])
+                                        {{ count($resources['materials']['items']) }}
+                                        {{ count($resources['materials']['items']) === 1 ? 'link' : 'linki' }}
+                                        z karty szkolenia (także przed końcem szkolenia — tylko belka, nie dashboard).
+                                    @else
+                                        Brak linków w materiałach kursu.
+                                        <a href="{{ route('courses.show', $course->id) }}">Dodaj na karcie szkolenia</a>
+                                        — dopóki tego nie ma, przełącznik jest nieaktywny.
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="live_bar_survey_enabled" name="live_bar_survey_enabled" value="1"
+                                       @checked($flags['survey'] && $resources['survey']['ready'])
+                                       @disabled(! $state['has_online_details'] || ! $resources['survey']['ready'])>
+                                <label class="form-check-label {{ $resources['survey']['ready'] ? '' : 'text-muted' }}" for="live_bar_survey_enabled">
+                                    Ankieta
+                                </label>
+                                <div class="small {{ $resources['survey']['ready'] ? 'text-success' : 'text-muted' }}">
+                                    @if($resources['survey']['ready'])
+                                        Aktywna ankieta w oknie czasowym ({{ count($resources['survey']['items']) }}).
+                                    @else
+                                        Brak aktywnej ankiety w oknie od–do.
+                                        <a href="{{ route('courses.show', $course->id) }}">Dodaj na karcie szkolenia</a>
+                                        — dopóki tego nie ma, przełącznik jest nieaktywny.
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-4">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="live_bar_certificate_enabled" name="live_bar_certificate_enabled" value="1"
+                                       @checked($flags['certificate'] && $resources['certificate']['ready'])
+                                       @disabled(! $state['has_online_details'] || ! $resources['certificate']['ready'])>
+                                <label class="form-check-label {{ $resources['certificate']['ready'] ? '' : 'text-muted' }}" for="live_bar_certificate_enabled">
+                                    Pobierz zaświadczenie
+                                </label>
+                                <div class="small {{ $resources['certificate']['ready'] ? 'text-success' : 'text-muted' }}">
+                                    @if($resources['certificate']['ready'])
+                                        Status zaświadczeń: udostępnione na pnedu.pl.
+                                    @else
+                                        Status zaświadczeń nie jest ustawiony na „Udostępnij pobieranie zaświadczeń (link na pnedu.pl)”.
+                                        <a href="{{ route('courses.edit', $course->id) }}">Zmień na karcie szkolenia</a>
+                                        — dopóki tego nie ma, przełącznik jest nieaktywny.
+                                    @endif
+                                </div>
+                            </div>
+
+                            <noscript>
+                                <button type="submit" class="btn btn-primary">Zapisz</button>
+                            </noscript>
+                        </form>
+                        <p class="small text-muted mb-0" id="course-live-save-status">Zapis automatyczny po przełączeniu.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card mb-3">
+                    <div class="card-header"><strong>Widoczne teraz na transmisji</strong></div>
+                    <div class="card-body" id="course-live-preview">
+                        @if(count($links) === 0)
+                            <p class="text-muted mb-0">Uczestnik nie widzi żadnego dodatkowego przycisku.</p>
+                        @else
+                            <ul class="mb-0 ps-3">
+                                @foreach($links as $link)
+                                    <li>
+                                        <a href="{{ $link['url'] }}" target="_blank" rel="noopener noreferrer">{{ $link['label'] }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><strong>Wejścia przez osadzony pokój</strong></div>
+                    <div class="card-body" id="course-live-embed-counts">
+                        <p class="mb-1">
+                            Kiedykolwiek na `/transmisja`:
+                            <strong id="course-live-embed-ever">{{ $embedEntries['ever'] }}</strong>
+                        </p>
+                        <p class="mb-0 text-muted">
+                            Ostatnie 15 minut:
+                            <strong id="course-live-embed-recent">{{ $embedEntries['recent_15min'] }}</strong>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const panel = document.getElementById('course-live-panel');
+            if (!panel) {
+                return;
+            }
+            const form = document.getElementById('course-live-form');
+            const statusEl = document.getElementById('course-live-save-status');
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const updateUrl = panel.getAttribute('data-update-url');
+            const stateUrl = panel.getAttribute('data-state-url');
+            const attendance = document.getElementById('live_bar_attendance_enabled');
+            const certificate = document.getElementById('live_bar_certificate_enabled');
+            const materials = document.getElementById('live_bar_materials_enabled');
+            const survey = document.getElementById('live_bar_survey_enabled');
+
+            function setStatus(text, isError) {
+                if (!statusEl) {
+                    return;
+                }
+                statusEl.textContent = text;
+                statusEl.classList.toggle('text-danger', !!isError);
+                statusEl.classList.toggle('text-muted', !isError);
+            }
+
+            function payload() {
+                return {
+                    live_bar_attendance_enabled: !!(attendance && attendance.checked && !attendance.disabled),
+                    live_bar_certificate_enabled: !!(certificate && certificate.checked && !certificate.disabled),
+                    live_bar_materials_enabled: !!(materials && materials.checked && !materials.disabled),
+                    live_bar_survey_enabled: !!(survey && survey.checked && !survey.disabled),
+                };
+            }
+
+            function applySwitch(el, on, ready, hasDetails) {
+                if (!el) {
+                    return;
+                }
+                const canToggle = !!hasDetails && !!ready;
+                el.disabled = !canToggle;
+                el.checked = !!on && canToggle;
+                const label = el.id ? document.querySelector('label[for="' + el.id + '"]') : null;
+                if (label) {
+                    label.classList.toggle('text-muted', !canToggle);
+                }
+            }
+
+            function renderState(state) {
+                if (!state) {
+                    return;
+                }
+                const hasDetails = !!state.has_online_details;
+                applySwitch(attendance, state.flags?.attendance, state.resources?.attendance?.ready, hasDetails);
+                applySwitch(certificate, state.flags?.certificate, state.resources?.certificate?.ready, hasDetails);
+                applySwitch(materials, state.flags?.materials, state.resources?.materials?.ready, hasDetails);
+                applySwitch(survey, state.flags?.survey, state.resources?.survey?.ready, hasDetails);
+                const preview = document.getElementById('course-live-preview');
+                if (preview) {
+                    const links = Array.isArray(state.links) ? state.links : [];
+                    if (links.length === 0) {
+                        preview.innerHTML = '<p class="text-muted mb-0">Uczestnik nie widzi żadnego dodatkowego przycisku.</p>';
+                    } else {
+                        const ul = document.createElement('ul');
+                        ul.className = 'mb-0 ps-3';
+                        links.forEach(function (link) {
+                            const li = document.createElement('li');
+                            const a = document.createElement('a');
+                            a.href = link.url;
+                            a.target = '_blank';
+                            a.rel = 'noopener noreferrer';
+                            a.textContent = link.label;
+                            li.appendChild(a);
+                            ul.appendChild(li);
+                        });
+                        preview.replaceChildren(ul);
+                    }
+                }
+                const ever = document.getElementById('course-live-embed-ever');
+                const recent = document.getElementById('course-live-embed-recent');
+                if (ever) {
+                    ever.textContent = String(state.embed_entries?.ever ?? 0);
+                }
+                if (recent) {
+                    recent.textContent = String(state.embed_entries?.recent_15min ?? 0);
+                }
+            }
+
+            function saveFlags() {
+                if (!updateUrl || !form) {
+                    return;
+                }
+                const canSave = [attendance, certificate, materials, survey].some(function (el) {
+                    return el && !el.disabled;
+                });
+                if (!canSave) {
+                    return;
+                }
+                setStatus('Zapisuję…', false);
+                fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(payload()),
+                }).then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                }).then(function (result) {
+                    if (!result.ok) {
+                        setStatus(result.data?.error || 'Nie udało się zapisać.', true);
+                        return;
+                    }
+                    renderState(result.data?.state);
+                    setStatus('Zapisane. Uczestnik zobaczy zmianę przy następnym odczycie (ok. 12 s).', false);
+                }).catch(function () {
+                    setStatus('Nie udało się zapisać.', true);
+                });
+            }
+
+            [attendance, certificate, materials, survey].forEach(function (input) {
+                if (!input) {
+                    return;
+                }
+                input.addEventListener('change', saveFlags);
+            });
+
+            function refreshState() {
+                if (!stateUrl) {
+                    return;
+                }
+                fetch(stateUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                }).then(function (res) {
+                    return res.ok ? res.json() : null;
+                }).then(function (state) {
+                    if (state) {
+                        renderState(state);
+                    }
+                }).catch(function () {});
+            }
+
+            setInterval(refreshState, 12000);
+        })();
+    </script>
+
+    @php
+        $liveOfferSearchUrl = route('courses.live.search', ['exclude_id' => $course->id]);
+        $liveOfferPreselected = $offerItem ?: null;
+        $liveOfferEnabled = $offerEnabled;
+        $liveOfferHasDetails = (bool) $state['has_online_details'];
+    @endphp
+    @include('partials.ensure-course-select-init')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchUrl = @json($liveOfferSearchUrl);
+            const preselected = @json($liveOfferPreselected);
+            const hasOnlineDetails = @json($liveOfferHasDetails);
+            const offerUpdateUrl = document.getElementById('course-live-panel')?.getAttribute('data-offer-update-url') || '';
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const archivedToggle = document.getElementById('live_offer_include_archived');
+            const errorEl = document.getElementById('live-offer-select-error');
+            const actionsEl = document.getElementById('live-offer-actions');
+            const toggleBtn = document.getElementById('live-offer-toggle');
+            const badgeEl = document.getElementById('live-offer-badge');
+            const statusEl = document.getElementById('live-offer-save-status');
+            const STORAGE_KEY = 'courseLive.offerSelect.includeArchived';
+            let includeArchived = false;
+            let selectedItem = preselected;
+            let offerEnabled = @json($liveOfferEnabled);
+
+            try {
+                includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
+            } catch (e) {}
+            if (archivedToggle) {
+                archivedToggle.checked = includeArchived;
+            }
+
+            function selectedCourseId() {
+                return selectedItem && selectedItem.id ? parseInt(selectedItem.id, 10) : null;
+            }
+
+            function setOfferStatus(text, isError) {
+                if (!statusEl) {
+                    return;
+                }
+                statusEl.textContent = text;
+                statusEl.classList.toggle('text-danger', !!isError);
+                statusEl.classList.toggle('text-muted', !isError);
+            }
+
+            function renderToggle() {
+                const hasSelection = !!selectedCourseId();
+                if (actionsEl) {
+                    actionsEl.classList.toggle('d-none', !hasSelection);
+                }
+                if (!toggleBtn) {
+                    return;
+                }
+                toggleBtn.disabled = !hasOnlineDetails || !hasSelection;
+                if (offerEnabled && hasSelection) {
+                    toggleBtn.className = 'btn btn-outline-secondary';
+                    toggleBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Ukryj ofertę';
+                    if (badgeEl) {
+                        badgeEl.className = 'badge text-bg-success';
+                        badgeEl.textContent = 'Włączona';
+                    }
+                } else {
+                    toggleBtn.className = 'btn btn-primary';
+                    toggleBtn.innerHTML = '<i class="fas fa-bullhorn me-1"></i> Wyświetl uczestnikom';
+                    if (badgeEl) {
+                        badgeEl.className = 'badge text-bg-light text-muted border';
+                        badgeEl.textContent = 'Ukryta';
+                    }
+                }
+            }
+
+            let saveChain = Promise.resolve();
+
+            function saveOffer(enabled) {
+                if (!offerUpdateUrl || !hasOnlineDetails) {
+                    return Promise.resolve();
+                }
+                const courseId = selectedCourseId();
+                if (enabled && !courseId) {
+                    setOfferStatus('Najpierw wybierz szkolenie do oferty.', true);
+                    return Promise.resolve();
+                }
+                saveChain = saveChain.then(function () {
+                    if (toggleBtn && window.PneButtonLoading) {
+                        window.PneButtonLoading.setButtonLoading(toggleBtn, true, enabled ? 'Włączam…' : 'Ukrywam…');
+                    }
+                    setOfferStatus('Zapisuję…', false);
+                    return fetch(offerUpdateUrl, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            live_offer_course_id: courseId,
+                            live_offer_enabled: !!enabled,
+                        }),
+                    }).then(function (res) {
+                        return res.json().then(function (data) {
+                            return { ok: res.ok, data: data };
+                        });
+                    }).then(function (result) {
+                        if (toggleBtn && window.PneButtonLoading) {
+                            window.PneButtonLoading.setButtonLoading(toggleBtn, false);
+                        }
+                        if (!result.ok) {
+                            setOfferStatus(result.data?.error || 'Nie udało się zapisać oferty.', true);
+                            renderToggle();
+                            return;
+                        }
+                        const offer = result.data?.state?.offer || {};
+                        offerEnabled = !!offer.enabled;
+                        if (offer.course) {
+                            selectedItem = offer.course;
+                        } else if (!courseId) {
+                            selectedItem = null;
+                        }
+                        renderToggle();
+                        if (offerEnabled) {
+                            setOfferStatus('Oferta włączona. Uczestnicy zobaczą ją na transmisji w ciągu kilkunastu sekund.', false);
+                        } else {
+                            setOfferStatus('Oferta ukryta.', false);
+                        }
+                    }).catch(function () {
+                        if (toggleBtn && window.PneButtonLoading) {
+                            window.PneButtonLoading.setButtonLoading(toggleBtn, false);
+                        }
+                        setOfferStatus('Nie udało się zapisać oferty.', true);
+                        renderToggle();
+                    });
+                });
+                return saveChain;
+            }
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function () {
+                    saveOffer(!offerEnabled);
+                });
+            }
+
+            renderToggle();
+
+            window.ensureCourseSelectInit().then(function (initFn) {
+                if (!initFn) {
+                    if (errorEl) {
+                        errorEl.classList.remove('d-none');
+                    }
+                    return;
+                }
+                const ts = initFn('live_offer_course_id', {
+                    searchUrl: searchUrl,
+                    preselected: preselected,
+                    includeArchived: includeArchived,
+                    placeholder: 'Wybierz szkolenie do oferty (nie to, które trwa)…',
+                    onCourseChanged: function (item) {
+                        const wasEnabled = offerEnabled;
+                        selectedItem = item && item.id ? item : null;
+                        offerEnabled = false;
+                        renderToggle();
+                        if (!hasOnlineDetails) {
+                            return;
+                        }
+                        if (!selectedItem || wasEnabled) {
+                            saveOffer(false);
+                        }
+                    },
+                });
+                if (ts && archivedToggle) {
+                    archivedToggle.addEventListener('change', function () {
+                        const checked = !!archivedToggle.checked;
+                        try { window.localStorage.setItem(STORAGE_KEY, checked ? '1' : '0'); } catch (e) {}
+                        if (typeof ts.setIncludeArchived === 'function') {
+                            ts.setIncludeArchived(checked);
+                        }
+                    });
+                }
+            }).catch(function () {
+                if (errorEl) {
+                    errorEl.classList.remove('d-none');
+                }
+            });
+        });
+    </script>
+</x-app-layout>

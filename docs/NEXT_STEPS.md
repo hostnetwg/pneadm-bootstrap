@@ -3,6 +3,38 @@
 Data utworzenia/aktualizacji: 2026-09-19
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-19) — Wersje 1.1 (ADM + pnedu.pl)
+
+Po potwierdzeniu Waldemara: `pneadm/CHANGELOG.md` i `pnedu/CHANGELOG.md` mają **1.1** (belka live + oferta). Mail do adminów tylko po osobnym „tak”: `sail artisan changelog:notify-admins adm` oraz `… pnedu`. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).
+
+## Ostatnio (2026-09-19) — Rejestracja na belce live ukryta
+
+**Rejestracja: lista obecności** nie wychodzi na `/transmisja`: uczestnik jest już zalogowany i na liście. W panelu ADM przełącznik zostaje, ale jest nieaktywny (wróci przy live bez konta pnedu). Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Pobierz zaświadczenie na belce live
+
+Czwarty przełącznik na `/courses/{id}/live`: **Pobierz zaświadczenie**. Aktywny tylko gdy Status zaświadczeń = „Udostępnij pobieranie zaświadczeń (link na pnedu.pl)”. Uczestnik otwiera `/dashboard/zaswiadczenia/{id}`. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Przełączniki belki tylko przy gotowym zasobie
+
+Na `/courses/{id}/live` włączniki listy obecności, materiałów i ankiety są nieaktywne, dopóki dany zasób jest na szkoleniu (token rejestracji / link materiałów / aktywna ankieta). PATCH nie zapisze flagi ON bez zasobu. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Oferta kolejnego szkolenia na transmisji
+
+Na `/courses/{id}/live` wybierasz inne szkolenie i włączasz **Wyświetl uczestnikom**. Na `/transmisja` pod belką PNE wysuwa się złoty pasek (tytuł, termin, prowadzący, **Zamawiam szkolenie** → opis szkolenia). Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Oferta kolejnego szkolenia na panelu live (tylko ADM)
+
+Selector na `/courses/{id}/live` **nie przełącza panelu**. Służy do wyboru **innego** szkolenia (bieżące jest wyłączone z listy) i przycisku **Wyświetl uczestnikom** / **Ukryj ofertę**. Stan jest w bazie; na `/transmisja` jeszcze nic nie wychodzi. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Selector szkolenia na panelu live + naprawa TomSelect w FORM
+
+`GET /form-orders/courses/search` nadal zwraca tylko płatne `courses`, nie katalog nagranych kursów. Jeśli Vite nie wstawi `initCourseSelect`, strona ładuje `public/js/course-select-fallback.js`. Selector na panelu live **nie** skacze między panelami — służy do oferty (zob. punkt wyżej).
+
+## Ostatnio (2026-09-19) — Belka zasobów na transmisji (etap 1)
+
+Panel ADM `/courses/{id}/live`: trzy niezależne przełączniki (lista obecności, materiały, ankieta). Na `/transmisja` przyciski wchodzą i schodzą bez odświeżania (poll `meeting-status`). Klik = nowa karta + zejście z pełnego ekranu. Zamknięte CM i harmonogram godzin — poza zakresem. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md), [INSTRUCTOR_PORTAL.md](./INSTRUCTOR_PORTAL.md).
+
 ## Ostatnio (2026-09-19) — Ochrona baz przed migrate:fresh
 
 `migrate:fresh` na devie skasowało `pneadm`, bo `--env=testing` bez `.env.testing` bierze `.env`. Na prod przy zwykłym `git pull` + `migrate --force` tego ryzyka nie ma. W kodzie jest blokada `fresh`/`wipe` na bazach innych niż `testing`. Kanon: [DATA_SAFETY.md](./DATA_SAFETY.md).

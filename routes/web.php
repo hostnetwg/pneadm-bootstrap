@@ -16,6 +16,7 @@ use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\CoursePriceVariantController;
+use App\Http\Controllers\CourseLiveController;
 use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardLiveVisitorsController;
@@ -382,6 +383,17 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::post('/courses', [CoursesController::class, 'store'])->name('courses.store');
     // Trasy z parametrem {id} ograniczamy do wartości numerycznych
     Route::get('/courses/{id}', [CoursesController::class, 'show'])->whereNumber('id')->name('courses.show');
+    Route::get('/courses/live-search', [CourseLiveController::class, 'search'])
+        ->name('courses.live.search');
+    Route::get('/courses/{id}/live', [CourseLiveController::class, 'show'])
+        ->whereNumber('id')
+        ->name('courses.live');
+    Route::patch('/courses/{id}/live', [CourseLiveController::class, 'update'])
+        ->whereNumber('id')
+        ->name('courses.live.update');
+    Route::patch('/courses/{id}/live-offer', [CourseLiveController::class, 'updateOffer'])
+        ->whereNumber('id')
+        ->name('courses.live.offer');
     Route::post('/courses/{id}/email-instructor-training-links', [CoursesController::class, 'emailInstructorTrainingLinks'])
         ->whereNumber('id')
         ->name('courses.email-instructor-training-links');

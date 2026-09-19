@@ -2,6 +2,15 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.1 — 2026-09-19
+
+Belka zasobów i oferta na osadzonej transmisji.
+
+- Na szkoleniu z danymi online jest **Panel live** (`/courses/{id}/live`; skrót na karcie szkolenia i liście uczestników). Operator włącza niezależnie materiały, ankietę i **Pobierz zaświadczenie** — tylko gdy dany zasób już jest na szkoleniu. Linki wchodzą i schodzą u uczestnika bez odświeżania transmisji.
+- **Rejestracja: lista obecności** zostaje na panelu, ale jest nieaktywna: na obecnym osadzonym live uczestnik jest już zalogowany i na liście. Wróci przy live bez konta pnedu.
+- Oferta kolejnego szkolenia: wybór innego kursu + **Wyświetl uczestnikom** / **Ukryj ofertę**.
+- Kanon: [LIVE_EMBED_RESOURCE_BAR.md](docs/LIVE_EMBED_RESOURCE_BAR.md)
+
 ## 1.0 — 2026-09-18
 
 Start numeracji. Stan produkcji z 18.09.2026.
