@@ -21,6 +21,7 @@ class ParticipantLiveAccess extends Model
         'embed_token_consumed_at',
         'embed_first_entered_at',
         'embed_last_entered_at',
+        'embed_last_seen_at',
         'status',
         'message',
         'synced_at',
@@ -32,6 +33,7 @@ class ParticipantLiveAccess extends Model
         'embed_token_consumed_at' => 'datetime',
         'embed_first_entered_at' => 'datetime',
         'embed_last_entered_at' => 'datetime',
+        'embed_last_seen_at' => 'datetime',
         'synced_at' => 'datetime',
         'expires_at' => 'datetime',
     ];

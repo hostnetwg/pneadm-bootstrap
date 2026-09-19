@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-09-19
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-19) — Kto jest teraz na live + szybsza belka
+
+Panel `/courses/{id}/live` pokazuje imię i e-mail osób z otwartym `/transmisja` (`embed_last_seen_at`, okno 90 s). Przełączniki belki dochodzą u uczestnika w ok. 5 s (nie 12 s): poll 5 s, cache belki 2 s, API CM nadal 12 s, pauza przy ukrytej karcie. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
 ## Ostatnio (2026-09-19) — Wersje 1.1 (ADM + pnedu.pl)
 
 Po potwierdzeniu Waldemara: `pneadm/CHANGELOG.md` i `pnedu/CHANGELOG.md` mają **1.1** (belka live + oferta). Mail do adminów tylko po osobnym „tak”: `sail artisan changelog:notify-admins adm` oraz `… pnedu`. Kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md).

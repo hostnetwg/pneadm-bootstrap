@@ -11,11 +11,10 @@ Kanon: [LIVE_EMBED_RESOURCE_BAR.md](../LIVE_EMBED_RESOURCE_BAR.md), [CHANGELOG_V
 
 ## Migracje
 
-Tylko **pneadm** (baza `pneadm`, tabela `course_online_details`):
+Tylko **pneadm** (baza `pneadm`):
 
-- `2026_09_19_130000_add_live_bar_flags_to_course_online_details_table.php`
-- `2026_09_19_213000_add_live_offer_to_course_online_details_table.php`
-- `2026_09_19_221500_add_live_bar_certificate_to_course_online_details_table.php`
+- `course_online_details`: flagi belki + oferta
+- `participant_live_access.embed_last_seen_at` (`2026_09_19_231700_…`) — kto jest teraz na `/transmisja`
 
 pnedu **bez** migracji (czyta te same kolumny).
 
@@ -49,9 +48,10 @@ git pull origin main
 
 1. Menu ADM: `adm.pnedu.pl v 1.1` i `pnedu.pl v 1.1`.
 2. Szkolenie z osadzonym pokojem → **Panel live**.
-3. Włącz **Materiały** (gdy jest link) — na `/transmisja` żółty przycisk bez F5 (kilkanaście sekund).
+3. Włącz **Materiały** (gdy jest link) — na `/transmisja` żółty przycisk bez F5 (ok. 5 s).
 4. **Wyświetl uczestnikom** inną ofertę — złota belka, **Zamawiam szkolenie** → opis kursu.
 5. **Rejestracja: lista obecności** na panelu szara; na belce jej nie ma.
+6. Wejście uczestnika na `/transmisja` → na panelu live widać imię i e-mail w **Teraz na osadzonym live**. Zamknięcie karty → znika.
 
 ## Rollback
 
@@ -62,5 +62,5 @@ Cofnięcie commitów na obu repo + `optimize:clear`. Kolumny belki mogą zostać
 ```bash
 cd /home/hostnet/WEB-APP/pneadm && ./vendor/bin/sail artisan migrate
 cd /home/hostnet/WEB-APP/pneadm && ./vendor/bin/sail test --filter=CourseLivePanelTest
-cd /home/hostnet/WEB-APP/pnedu && ./vendor/bin/sail test --filter=LiveTransmissionResourceBar
+cd /home/hostnet/WEB-APP/pnedu && ./vendor/bin/sail test --filter=LiveEmbedPresence
 ```

@@ -18,7 +18,7 @@ Szkolenia zamknięte na ogólnym linku ClickMeeting (bez konta pnedu) **są poza
 | 2 | Sterowanie: **osobny panel live** (rekomendacja poniżej), nie lista uczestników. |
 | 3 | Uczestnik zostaje na transmisji. Klik w link: **nowa karta** + **wyjście z pełnego ekranu** (pokój w pierwszej karcie zostaje). |
 | 4 | Zamknięte / sam CM: nie w etapie 1. |
-| 5 | Odznaczenie w ADM → link znika z belki przy następnym odczycie (kilkanaście sekund). |
+| 5 | Odznaczenie w ADM → link znika z belki przy następnym odczycie (ok. 5 s; cache belki 2 s). |
 
 Harmonogram (minuty po starcie, % czasu, pół godziny przed końcem) — **etap 2**, nie teraz.
 
@@ -29,7 +29,7 @@ Belka instruktora na transmisji i konta prowadzących na pnedu.pl — **parkowan
 Panel: **`/courses/{id}/live`**.
 
 - otwierany na **drugim monitorze** na czas spotkania,
-- cztery niezależne przełączniki (nieaktywne, dopóki nie ma statusu pobierania zaświadczeń / materiałów / aktywnej ankiety; **Rejestracja: lista obecności** zawsze nieaktywna na obecnym embedzie) + podgląd, które linki istnieją + liczba wejść embed (`embed_last_entered_at`: kiedykolwiek / ostatnie 15 min),
+- cztery niezależne przełączniki (nieaktywne, dopóki nie ma statusu pobierania zaświadczeń / materiałów / aktywnej ankiety; **Rejestracja: lista obecności** zawsze nieaktywna na obecnym embedzie) + podgląd, które linki istnieją + **kto jest teraz** na `/transmisja` (`embed_last_seen_at` z heartbeat) + liczby wejść (`embed_last_entered_at`: kiedykolwiek / ostatnie 15 min),
 - **oferta kolejnego szkolenia:** TomSelect (bez bieżącego kursu) + **Wyświetl uczestnikom** / **Ukryj ofertę**. Druga belka na `/transmisja` (pod paskiem PNE): tytuł, termin, prowadzący, przycisk **Zamawiam szkolenie** (opis `/courses/{id}`, nowa karta + zejście z pełnego ekranu). Poll `live_offer`. Kolumny `live_offer_course_id` + `live_offer_enabled`.
 - zapis belki od razu po przełączeniu checkboxów (stan w `course_online_details`, nie w sesji operatora).
 
@@ -44,7 +44,7 @@ Gdy radio nie jest na osadzony pokój, panel ostrzega — belka i tak nic nie po
 
 - Tylko zalogowany właściciel rekordu `participants`, tylko gdy `embed_on_pnedu`.
 - Checkbox ON **i** zasób istnieje (URL materiałów / status zaświadczeń `download_enabled` / aktywna ankieta) → przycisk na zielonym pasku PNE (widok normalny i pełny ekran). **Rejestracja: lista obecności** nie wychodzi na belkę, dopóki `/transmisja` wymaga konta i rekordu uczestnika.
-- Poll `GET …/transmisja/meeting-status` (pierwszy odczyt ~0,4 s, potem ok. 12 s) — pola `resource_links` i `live_offer`.
+- Poll `GET …/transmisja/meeting-status` (pierwszy odczyt ~0,4 s, potem **5 s**; pauza gdy karta ukryta). API ClickMeeting nadal cache **12 s**. Belka+oferta mają cache **2 s** na szkolenie, żeby wielu widzów nie waliło w te same SELECT-y. Pola `resource_links` i `live_offer`.
 - Klik: `target=_blank` + zejście z pełnego ekranu; iframe CM zostaje.
 - Przyciski mają ikony. **Pobierz zaświadczenie** ma ikonę dyplomu (dokument + pieczęć), nie medal. Niewkliknięty link: ikona **rzadko, miękko miga** (dwa impulsy co ~10 s, nie cały przycisk). Po kliknięciu mignięcie gaśnie dla tej przeglądarki (ciasteczko `pne_live_bar_seen_{courseId}`, 18 h). `prefers-reduced-motion` wyłącza animację.
 - Mobile: dziś embed i tak schodzi na CM — belki tam nie ma (etap 1).
@@ -70,11 +70,16 @@ Kolumny w `course_online_details` (domyślnie OFF):
 - `live_offer_course_id` (nullable, FK `courses.id`)
 - `live_offer_enabled` (domyślnie OFF)
 
+Kolumna w `participant_live_access`:
+
+- `embed_last_seen_at` — ostatni heartbeat `/transmisja` (throttling 20 s). Panel live pokazuje osoby z znacznikiem z ostatnich 90 s.
+
 Migracje:
 
 - `pneadm/database/migrations/2026_09_19_130000_add_live_bar_flags_to_course_online_details_table.php`
 - `pneadm/database/migrations/2026_09_19_213000_add_live_offer_to_course_online_details_table.php`
 - `pneadm/database/migrations/2026_09_19_221500_add_live_bar_certificate_to_course_online_details_table.php`
+- `pneadm/database/migrations/2026_09_19_231700_add_embed_last_seen_at_to_participant_live_access_table.php`
 
 ```bash
 # lokalnie
@@ -82,7 +87,7 @@ cd /home/hostnet/WEB-APP/pneadm && sail artisan migrate
 # testy
 cd /home/hostnet/WEB-APP/pneadm && sail test --filter=CourseLivePanelTest
 cd /home/hostnet/WEB-APP/pnedu && sail test --filter=LiveTransmissionResourceBar
-cd /home/hostnet/WEB-APP/pnedu && sail test --filter=LiveTransmissionMeetingStatusResourceBar
+cd /home/hostnet/WEB-APP/pnedu && sail test --filter=LiveEmbedPresence
 ```
 
 Prod: migracja tylko w `pneadm` (`/opt/alt/php82/usr/bin/php artisan migrate --force`). pnedu bez migracji.
@@ -97,4 +102,3 @@ Gdy operator włączy ofertę w ADM, na `/transmisja` pod zielonym paskiem PNE w
 - Automatyczne okna: np. lista + materiały X minut po `start_date`, ankieta Y minut / % przed `end_date`.
 - Belka sterująca dla instruktora na `/transmisja`, jeśli e-mail = `instructors.email`.
 - Szerszy portal prowadzącego: [INSTRUCTOR_PORTAL.md](./INSTRUCTOR_PORTAL.md).
-- Kto jest **teraz** na `/transmisja` (obecność Redis po stronie pnedu, nie tylko `embed_last_entered_at`).

@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\Course;
 use App\Models\CourseOnlineDetails;
 use App\Models\CourseSurveyLink;
+use App\Models\Participant;
 use App\Models\ParticipantLiveAccess;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Stan belki zasobów na osadzonej transmisji: flagi ADM + URL-e, które realnie pójdą do uczestnika.
@@ -28,6 +30,12 @@ class CourseLiveResourceBarService
      */
     public const ATTENDANCE_VISIBLE_ON_AUTHENTICATED_EMBED = false;
 
+    public const ONLINE_WINDOW_SECONDS = 90;
+
+    public const ONLINE_LIST_LIMIT = 100;
+
+    public const PANEL_POLL_MS = 5000;
+
     /**
      * @return array{
      *     flags: array{attendance: bool, certificate: bool, materials: bool, survey: bool},
@@ -41,7 +49,8 @@ class CourseLiveResourceBarService
      *     links: list<array{key: string, label: string, url: string}>,
      *     embed_on_pnedu: bool,
      *     has_online_details: bool,
-     *     embed_entries: array{ever: int, recent_15min: int}
+     *     embed_entries: array{ever: int, recent_15min: int},
+     *     online_now: array{count: int, viewers: list<array{id: int, name: string, email: string}>, truncated: bool, window_seconds: int}
      * }
      */
     public function panelState(Course $course): array
@@ -84,6 +93,7 @@ class CourseLiveResourceBarService
             'embed_on_pnedu' => (bool) ($details?->embed_on_pnedu),
             'has_online_details' => $details !== null,
             'embed_entries' => $this->embedEntryCounts($course),
+            'online_now' => $this->onlineNow($course),
         ];
     }
 
@@ -297,6 +307,65 @@ class CourseLiveResourceBarService
             'recent_15min' => (int) (clone $base)
                 ->where('embed_last_entered_at', '>=', now()->subMinutes(15))
                 ->count(),
+        ];
+    }
+
+    /**
+     * Osoby z aktywnym heartbeatem na /transmisja (okno ~TTL slotu obecności).
+     *
+     * @return array{count: int, viewers: list<array{id: int, name: string, email: string}>, truncated: bool, window_seconds: int}
+     */
+    public function onlineNow(Course $course): array
+    {
+        $empty = [
+            'count' => 0,
+            'viewers' => [],
+            'truncated' => false,
+            'window_seconds' => self::ONLINE_WINDOW_SECONDS,
+        ];
+
+        try {
+            if (! Schema::hasColumn('participant_live_access', 'embed_last_seen_at')) {
+                return $empty;
+            }
+        } catch (\Throwable) {
+            return $empty;
+        }
+
+        $cutoff = now()->subSeconds(self::ONLINE_WINDOW_SECONDS);
+        $base = ParticipantLiveAccess::query()
+            ->where('course_id', $course->id)
+            ->whereNotNull('embed_last_seen_at')
+            ->where('embed_last_seen_at', '>=', $cutoff);
+
+        $count = (int) (clone $base)->count();
+        $rows = (clone $base)
+            ->with(['participant' => function ($query) {
+                $query->select('id', 'first_name', 'last_name', 'email');
+            }])
+            ->orderByDesc('embed_last_seen_at')
+            ->limit(self::ONLINE_LIST_LIMIT)
+            ->get();
+
+        $viewers = [];
+        foreach ($rows as $access) {
+            $participant = $access->participant;
+            if (! $participant instanceof Participant) {
+                continue;
+            }
+            $name = trim((string) $participant->first_name.' '.(string) $participant->last_name);
+            $viewers[] = [
+                'id' => (int) $participant->id,
+                'name' => $name !== '' ? $name : 'Uczestnik #'.$participant->id,
+                'email' => (string) ($participant->email ?? ''),
+            ];
+        }
+
+        return [
+            'count' => $count,
+            'viewers' => $viewers,
+            'truncated' => $count > count($viewers),
+            'window_seconds' => self::ONLINE_WINDOW_SECONDS,
         ];
     }
 }

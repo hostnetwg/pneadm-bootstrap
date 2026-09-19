@@ -31,12 +31,14 @@
         $resources = $state['resources'];
         $links = $state['links'];
         $embedEntries = $state['embed_entries'];
+        $onlineNow = $state['online_now'] ?? ['count' => 0, 'viewers' => [], 'truncated' => false];
     @endphp
 
     <div class="container py-3" id="course-live-panel"
          data-update-url="{{ route('courses.live.update', $course->id) }}"
          data-offer-update-url="{{ route('courses.live.offer', $course->id) }}"
-         data-state-url="{{ route('courses.live', $course->id) }}">
+         data-state-url="{{ route('courses.live', $course->id) }}"
+         data-poll-ms="{{ \App\Services\CourseLiveResourceBarService::PANEL_POLL_MS }}">
         @if(session('success'))
             <div class="alert alert-success">{{ session('success') }}</div>
         @endif
@@ -125,7 +127,7 @@
                 <div class="card">
                     <div class="card-header">
                         <strong>Co pokazać na belce</strong>
-                        <span class="text-muted small d-block">Przełącznik działa tylko wtedy, gdy dany zasób jest już na szkoleniu. Link wchodzi i schodzi u uczestnika w ciągu kilkunastu sekund.</span>
+                        <span class="text-muted small d-block">Przełącznik działa tylko wtedy, gdy dany zasób jest już na szkoleniu. Link wchodzi i schodzi u uczestnika w ciągu ok. 5 s.</span>
                     </div>
                     <div class="card-body">
                         <form id="course-live-form" method="post" action="{{ route('courses.live.update', $course->id) }}">
@@ -244,7 +246,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card mb-3">
                     <div class="card-header"><strong>Wejścia przez osadzony pokój</strong></div>
                     <div class="card-body" id="course-live-embed-counts">
                         <p class="mb-1">
@@ -255,6 +257,35 @@
                             Ostatnie 15 minut:
                             <strong id="course-live-embed-recent">{{ $embedEntries['recent_15min'] }}</strong>
                         </p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                        <strong>Teraz na osadzonym live</strong>
+                        <span class="badge text-bg-success" id="course-live-online-count">{{ (int) ($onlineNow['count'] ?? 0) }}</span>
+                    </div>
+                    <div class="card-body" id="course-live-online-now">
+                        @if(($onlineNow['count'] ?? 0) === 0)
+                            <p class="text-muted mb-0">Nikt nie ma teraz otwartego `/transmisja`.</p>
+                        @else
+                            <ul class="mb-0 ps-3">
+                                @foreach(($onlineNow['viewers'] ?? []) as $viewer)
+                                    <li>
+                                        <strong>{{ $viewer['name'] }}</strong>
+                                        @if(! empty($viewer['email']))
+                                            <span class="text-muted">{{ $viewer['email'] }}</span>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                            @if(! empty($onlineNow['truncated']))
+                                <p class="small text-muted mb-0 mt-2">Lista obcięta do 100 osób.</p>
+                            @endif
+                        @endif
+                    </div>
+                    <div class="card-footer small text-muted">
+                        Heartbeat z `/transmisja` (ok. 25 s). Znika po zamknięciu karty albo po ok. 1,5 min bez sygnału.
                     </div>
                 </div>
             </div>
@@ -346,6 +377,48 @@
                 if (recent) {
                     recent.textContent = String(state.embed_entries?.recent_15min ?? 0);
                 }
+                renderOnlineNow(state.online_now);
+            }
+
+            function renderOnlineNow(online) {
+                const box = document.getElementById('course-live-online-now');
+                const badge = document.getElementById('course-live-online-count');
+                const data = online && typeof online === 'object' ? online : {};
+                const viewers = Array.isArray(data.viewers) ? data.viewers : [];
+                const count = Number(data.count || 0);
+                if (badge) {
+                    badge.textContent = String(count);
+                }
+                if (!box) {
+                    return;
+                }
+                if (count === 0 || viewers.length === 0) {
+                    box.innerHTML = '<p class="text-muted mb-0">Nikt nie ma teraz otwartego `/transmisja`.</p>';
+                    return;
+                }
+                const ul = document.createElement('ul');
+                ul.className = 'mb-0 ps-3';
+                viewers.forEach(function (viewer) {
+                    const li = document.createElement('li');
+                    const name = document.createElement('strong');
+                    name.textContent = viewer.name || ('Uczestnik #' + (viewer.id || ''));
+                    li.appendChild(name);
+                    if (viewer.email) {
+                        li.appendChild(document.createTextNode(' '));
+                        const email = document.createElement('span');
+                        email.className = 'text-muted';
+                        email.textContent = viewer.email;
+                        li.appendChild(email);
+                    }
+                    ul.appendChild(li);
+                });
+                box.replaceChildren(ul);
+                if (data.truncated) {
+                    const note = document.createElement('p');
+                    note.className = 'small text-muted mb-0 mt-2';
+                    note.textContent = 'Lista obcięta do 100 osób.';
+                    box.appendChild(note);
+                }
             }
 
             function saveFlags() {
@@ -379,7 +452,7 @@
                         return;
                     }
                     renderState(result.data?.state);
-                    setStatus('Zapisane. Uczestnik zobaczy zmianę przy następnym odczycie (ok. 12 s).', false);
+                    setStatus('Zapisane. Uczestnik zobaczy zmianę w ciągu ok. 5 s.', false);
                 }).catch(function () {
                     setStatus('Nie udało się zapisać.', true);
                 });
@@ -394,6 +467,9 @@
 
             function refreshState() {
                 if (!stateUrl) {
+                    return;
+                }
+                if (document.visibilityState === 'hidden') {
                     return;
                 }
                 fetch(stateUrl, {
@@ -412,7 +488,13 @@
                 }).catch(function () {});
             }
 
-            setInterval(refreshState, 12000);
+            const pollMs = parseInt(panel.getAttribute('data-poll-ms') || '5000', 10);
+            setInterval(refreshState, pollMs);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') {
+                    refreshState();
+                }
+            });
         })();
     </script>
 

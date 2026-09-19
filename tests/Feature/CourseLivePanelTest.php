@@ -7,6 +7,7 @@ use App\Models\CourseFileLink;
 use App\Models\CourseOnlineDetails;
 use App\Models\CourseSurveyLink;
 use App\Models\ParticipantLiveAccess;
+use App\Models\Participant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -66,6 +67,7 @@ class CourseLivePanelTest extends TestCase
             ->assertSee('Pokaż również archiwalne', false)
             ->assertSee('przełącznik jest nieaktywny', false)
             ->assertSee('live będzie dostępny bez konta pnedu', false)
+            ->assertSee('Teraz na osadzonym live', false)
             ->getContent();
         $this->assertSwitchDisabled($html, 'live_bar_attendance_enabled', true);
         $this->assertSwitchDisabled($html, 'live_bar_certificate_enabled', true);
@@ -362,6 +364,52 @@ class CourseLivePanelTest extends TestCase
             ->assertOk()
             ->assertJsonPath('embed_entries.ever', 2)
             ->assertJsonPath('embed_entries.recent_15min', 1);
+    }
+
+    public function test_online_now_lists_viewers_with_recent_heartbeat(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse();
+        $this->attachOnlineDetails($course, embed: true);
+
+        $online = Participant::query()->create([
+            'course_id' => $course->id,
+            'first_name' => 'Anna',
+            'last_name' => 'Teraz',
+            'email' => 'anna.now@example.test',
+            'order' => 1,
+        ]);
+        $stale = Participant::query()->create([
+            'course_id' => $course->id,
+            'first_name' => 'Bartek',
+            'last_name' => 'Wczoraj',
+            'email' => 'bartek.now@example.test',
+            'order' => 2,
+        ]);
+
+        ParticipantLiveAccess::query()->create([
+            'participant_id' => $online->id,
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'embed_last_entered_at' => now()->subMinutes(3),
+            'embed_last_seen_at' => now()->subSeconds(20),
+            'status' => 'success',
+        ]);
+        ParticipantLiveAccess::query()->create([
+            'participant_id' => $stale->id,
+            'course_id' => $course->id,
+            'platform' => 'clickmeeting',
+            'embed_last_entered_at' => now()->subMinutes(3),
+            'embed_last_seen_at' => now()->subMinutes(10),
+            'status' => 'success',
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('courses.live', $course->id))
+            ->assertOk()
+            ->assertJsonPath('online_now.count', 1)
+            ->assertJsonPath('online_now.viewers.0.name', 'Anna Teraz')
+            ->assertJsonPath('online_now.viewers.0.email', 'anna.now@example.test');
     }
 
     public function test_live_course_search_hides_archived_until_toggled_or_typed(): void
