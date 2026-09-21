@@ -102,6 +102,97 @@ class ParticipantLiveAccessService
     }
 
     /**
+     * Ręczne dodanie uczestnika: ten sam krok co przycisk ClickMeeting, tylko gdy pokój ma access_type = tokeny.
+     *
+     * @return array{
+     *   success: bool,
+     *   status?: string,
+     *   detail?: string,
+     *   token?: string|null,
+     *   room_url?: string|null,
+     *   access_type?: int|null,
+     *   warning?: string
+     * }|null  null = nie dotyczy (inna platforma / nie tokeny / szkolenie zakończone)
+     */
+    public function autoProvisionIfTokenRoom(Participant $participant, Course $course): ?array
+    {
+        if ($course->hasEnded()) {
+            return null;
+        }
+
+        $course->loadMissing('onlineDetails');
+        $platform = strtolower(trim((string) optional($course->onlineDetails)->platform));
+        $eventId = trim((string) optional($course->onlineDetails)->clickmeeting_event_id);
+
+        if ($platform !== 'clickmeeting' || $eventId === '') {
+            return null;
+        }
+
+        $email = strtolower(trim((string) $participant->email));
+        if ($email === '' || ! str_contains($email, '@')) {
+            return [
+                'success' => false,
+                'status' => 'skipped_missing_email',
+                'detail' => 'Pokój ClickMeeting jest na tokeny, ale uczestnik nie ma prawidłowego e-maila — nie dodano go do ClickMeeting.',
+                'warning' => 'Uczestnik zapisany. Brak e-maila: nie zarejestrowano go w ClickMeeting (pokój na tokeny).',
+            ];
+        }
+
+        $conference = app(ClickMeetingService::class)->getConference($eventId);
+        if (! ($conference['success'] ?? false)) {
+            return [
+                'success' => false,
+                'status' => 'conference_failed',
+                'detail' => (string) ($conference['error'] ?? 'Nie udało się pobrać wydarzenia ClickMeeting.'),
+                'warning' => 'Uczestnik zapisany, ale nie udało się sprawdzić dostępu ClickMeeting. '
+                    .($conference['error'] ?? ''),
+            ];
+        }
+
+        $accessType = isset($conference['access_type']) ? (int) $conference['access_type'] : null;
+        if ($accessType !== ClickMeetingService::ACCESS_TYPE_TOKEN) {
+            return null;
+        }
+
+        return $this->provisionClickMeetingForParticipant($participant, $course);
+    }
+
+    /**
+     * Próbuje unieważnić token CM przed usunięciem uczestnika.
+     * Błąd API (404, timeout, brak wydarzenia) nie blokuje usunięcia.
+     *
+     * @return array{ok: bool, skipped: bool, invalidated?: bool, detail?: string}
+     */
+    public function invalidateTokenBeforeParticipantDelete(Participant $participant, Course $course): array
+    {
+        $participant->loadMissing('liveAccess');
+        $token = trim((string) ($participant->liveAccess?->token ?? ''));
+        if ($token === '') {
+            return [
+                'ok' => true,
+                'skipped' => true,
+            ];
+        }
+
+        $result = $this->invalidateClickMeetingToken($participant, $course);
+        if ($result['success'] ?? false) {
+            return [
+                'ok' => true,
+                'skipped' => false,
+                'invalidated' => true,
+                'detail' => (string) ($result['detail'] ?? 'Token ClickMeeting został unieważniony.'),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'skipped' => false,
+            'invalidated' => false,
+            'detail' => (string) ($result['detail'] ?? 'Nie udało się unieważnić tokenu ClickMeeting.'),
+        ];
+    }
+
+    /**
      * @param  array{status?: string, detail?: string, token?: string|null, room_url?: string|null, access_type?: int|null}  $clickMeetingResult
      */
     public function persistLiveAccess(

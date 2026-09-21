@@ -7,9 +7,49 @@ Status: plan roboczy, do potwierdzenia przez właściciela
 
 Karty w sekcji „Szkolenia zakończone” na `/szkolenia-indywidualne` pokazują cenę i linię Omnibus przy aktywnej promocji (jak nadchodzące). Też: formularz V2, `pay-online`, lista wariantów na stronie kursu. Test: `ArchivedCourseOmnibusTest`. Kanon: [LEGAL_CHECKOUT.md](./LEGAL_CHECKOUT.md).
 
+## Ostatnio (2026-09-20) — Oferta: checkbox „Ukryj po 2 minutach”
+
+Domyślnie zaznaczony. ON = auto-ukrycie po 120 s; OFF = oferta do ręcznego Ukryj. Kolumna `live_offer_auto_hide`. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-20) — Oferta live: auto-ukrycie 2 min + fix backdrop
+
+Oferta „Wyświetl uczestnikom” sama znika po **2 minutach** (serwer: `live_offer_enabled_at`; panel ADM i okienko na `/transmisja`). Ręczne ukrycie nadal działa od razu. Po schowaniu okienka usuwany jest zostający backdrop Bootstrap (przyciemniony, nieklikalny live). Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md). Migracja: `live_offer_enabled_at`.
+
+## Ostatnio (2026-09-20) — Belka i obecność po powrocie na kartę
+
+Poll Materiałów/Ankiety/Zaświadczenia **nie ginie** po długim byciu na innej karcie: nie zatrzymujemy go przy `hidden`, wznawiamy na visibility/pageshow/focus + watchdog. Okno „Teraz na live” = 180 s. Przy wygasłej sesji (401/419) jedno auto-odświeżenie. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-20) — Oferta live jako okienko Bootstrap
+
+Zamiast złotej belki: wyśrodkowane modal z pełną grafiką, tematem, datą, prowadzącym, ceną/promocją, skróconym opisem oraz **Zamawiam szkolenie** → formularz + **Opis szkolenia** → pełny opis na stronie kursu. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-20) — Lista „Teraz na osadzonym live”
+
+Panel nie zdejmuje osoby przy przełączeniu karty na ADM (`pagehide` / bfcache). Heartbeat leci od razu po wejściu; poll belki też odświeża `embed_last_seen_at`. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-20) — Imię i nazwisko na stronie zaświadczenia (pnedu)
+
+`/dashboard/zaswiadczenia/{course}` pokazuje **Zaświadczenie dla: Imię Nazwisko** z rekordu uczestnika (formularz urodzenia, podgląd, „Trwa pobieranie…”). Kanon: [pnedu/docs/CERTIFICATES.md](../../pnedu/docs/CERTIFICATES.md).
+
+## Ostatnio (2026-09-20) — Token ClickMeeting przy ręcznym dodaniu / usunięciu uczestnika
+
+Gdy pokój CM jest na **tokeny**: dodanie z `/participants/create` od razu rejestruje osobę w ClickMeeting i zapisuje token (jak przycisk ClickMeeting). Usunięcie najpierw próbuje unieważnić token w CM; błąd API (404 / brak wydarzenia) nie blokuje usunięcia. Kanon: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
+
+## Ostatnio (2026-09-20) — Kopiuj linki na czat ClickMeeting
+
+Panel `/courses/{id}/live`: gotowy tekst (materiały / ankieta / zaświadczenie / oferta) + **Kopiuj na czat**. API CM nie umie wysłać czatu — operator wkleja ręcznie. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-20) — Formularz wejścia gościa (imię, nazwisko, e-mail)
+
+Na `/live/{token}` najpierw formularz (jak lobby ClickMeeting, plus nazwisko) zapisuje / aktualizuje `participants`, potem iframe. Belka gościa bez przycisku rejestracji. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+
+## Ostatnio (2026-09-19) — Live bez logowania (gość, A+B)
+
+Szkolenie **zamknięte** + osadzony pokój + CM „Dla wszystkich”: sekretny `/live/{token}` (formularz → iframe + belka: materiały / ankieta / oferta; bez zaświadczenia). Link w ADM (karta + panel live). Bez katalogu pnedu.pl i bez maila z ADM. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md), [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md).
+
 ## Ostatnio (2026-09-19) — Kto jest teraz na live + szybsza belka
 
-Panel `/courses/{id}/live` pokazuje imię i e-mail osób z otwartym `/transmisja` (`embed_last_seen_at`, okno 90 s). Przełączniki belki dochodzą u uczestnika w ok. 5 s (nie 12 s): poll 5 s, cache belki 2 s, API CM nadal 12 s, pauza przy ukrytej karcie. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+Panel `/courses/{id}/live` pokazuje imię i e-mail osób z otwartym `/transmisja` (`embed_last_seen_at`, okno **180 s**). Przełączniki belki dochodzą u uczestnika w ok. 5 s; po powrocie na kartę bez F5 belka i obecność wznawiają się same. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
 
 ## Ostatnio (2026-09-19) — Wersje 1.1 (ADM + pnedu.pl)
 
@@ -29,7 +69,7 @@ Na `/courses/{id}/live` włączniki listy obecności, materiałów i ankiety są
 
 ## Ostatnio (2026-09-19) — Oferta kolejnego szkolenia na transmisji
 
-Na `/courses/{id}/live` wybierasz inne szkolenie i włączasz **Wyświetl uczestnikom**. Na `/transmisja` pod belką PNE wysuwa się złoty pasek (tytuł, termin, prowadzący, **Zamawiam szkolenie** → opis szkolenia). Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
+Na `/courses/{id}/live` wybierasz inne szkolenie i włączasz **Wyświetl uczestnikom**. Na `/transmisja` pojawia się wyśrodkowane okienko (pełna grafika, tytuł, termin, prowadzący, cena/promocja, skrócony opis, **Zamawiam szkolenie** → formularz, **Opis szkolenia** → strona kursu). Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
 
 ## Ostatnio (2026-09-19) — Oferta kolejnego szkolenia na panelu live (tylko ADM)
 

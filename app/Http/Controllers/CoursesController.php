@@ -18,6 +18,7 @@ use App\Services\CourseFormOrderBillingService;
 use App\Services\CourseFunnelStatsService;
 use App\Services\CourseGoogleCalendarSyncService;
 use App\Services\GoogleCalendarClientFactory;
+use App\Services\GuestLiveLinkService;
 use App\Support\CourseInstructorLinksEmailBody;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -825,6 +826,7 @@ class CoursesController extends Controller
             ->first();
 
         $instructorLinksEmailBody = CourseInstructorLinksEmailBody::build($course);
+        $guestLive = app(GuestLiveLinkService::class)->panelState($course);
 
         $closedBilling = $this->closedCourseBillingViewData($course);
 
@@ -839,6 +841,7 @@ class CoursesController extends Controller
             'deletedVariants',
             'priceVariantOrderCounts',
             'instructorLinksEmailBody',
+            'guestLive',
             'googleCalendarEnabled',
             'googleCalendarConfigured',
             'googleCalendarSyncActive',

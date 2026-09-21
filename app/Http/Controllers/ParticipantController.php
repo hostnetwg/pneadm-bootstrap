@@ -1627,12 +1627,32 @@ class ParticipantController extends Controller
         $lastOrder = $course->participants()->max('order') ?? 0;
 
         // Tworzenie nowego uczestnika z przypisanym numerem porządkowym
-        $course->participants()->create(array_merge(
+        $participant = $course->participants()->create(array_merge(
             $data,
             ['order' => $lastOrder + 1]
         ));
 
-        return redirect()->route('participants.index', $course)->with('success', 'Uczestnik dodany.');
+        $cm = app(ParticipantLiveAccessService::class)->autoProvisionIfTokenRoom(
+            $participant,
+            $course->fresh(['onlineDetails']) ?? $course
+        );
+
+        if ($cm === null) {
+            return redirect()->route('participants.index', $course)->with('success', 'Uczestnik dodany.');
+        }
+
+        if (($cm['status'] ?? '') === 'success') {
+            $message = 'Uczestnik dodany i zarejestrowany w ClickMeeting.';
+            if (! empty($cm['token'])) {
+                $message .= ' Token dostępu zapisany.';
+            }
+
+            return redirect()->route('participants.index', $course)->with('success', $message);
+        }
+
+        return redirect()->route('participants.index', $course)
+            ->with('success', 'Uczestnik dodany.')
+            ->with('error', $cm['warning'] ?? $cm['detail'] ?? 'Nie udało się dodać uczestnika do ClickMeeting.');
     }
 
     /**
@@ -1949,9 +1969,36 @@ class ParticipantController extends Controller
      */
     public function destroy(Course $course, Participant $participant)
     {
+        if ((int) $participant->course_id !== (int) $course->id) {
+            return redirect()->route('participants.index', $course)->with('error', 'Uczestnik nie należy do tego kursu.');
+        }
+
+        $prep = app(ParticipantLiveAccessService::class)->invalidateTokenBeforeParticipantDelete(
+            $participant,
+            $course
+        );
+
         $participant->delete();
 
-        return redirect()->route('participants.index', $course)->with('success', 'Uczestnik usunięty.');
+        $message = 'Uczestnik usunięty.';
+        if ($prep['skipped'] ?? true) {
+            return redirect()->route('participants.index', $course)->with('success', $message);
+        }
+
+        if ($prep['invalidated'] ?? false) {
+            return redirect()->route('participants.index', $course)->with(
+                'success',
+                $message.' Token ClickMeeting został unieważniony.'
+            );
+        }
+
+        return redirect()->route('participants.index', $course)
+            ->with('success', $message)
+            ->with(
+                'info',
+                'Token w ClickMeeting nie został unieważniony: '
+                .($prep['detail'] ?? 'problem z API wydarzenia.')
+            );
     }
 
     /**

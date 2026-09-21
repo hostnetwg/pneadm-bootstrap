@@ -230,6 +230,11 @@
                                         </tr>
                                     @endif
                                 </table>
+                                @include('courses.partials.guest-live-link', [
+                                    'guestLive' => $guestLive ?? null,
+                                    'inputId' => 'show-guest-live-url',
+                                    'wrapperClass' => 'mb-0 mt-2',
+                                ])
                             </div>
                         </div>
                     @endif

@@ -49,7 +49,7 @@ git pull origin main
 1. Menu ADM: `adm.pnedu.pl v 1.1` i `pnedu.pl v 1.1`.
 2. Szkolenie z osadzonym pokojem → **Panel live**.
 3. Włącz **Materiały** (gdy jest link) — na `/transmisja` żółty przycisk bez F5 (ok. 5 s).
-4. **Wyświetl uczestnikom** inną ofertę — złota belka, **Zamawiam szkolenie** → opis kursu.
+4. **Wyświetl uczestnikom** inną ofertę — wyśrodkowane okienko (pełna grafika, cena, opis), **Zamawiam szkolenie** → formularz zamówienia.
 5. **Rejestracja: lista obecności** na panelu szara; na belce jej nie ma.
 6. Wejście uczestnika na `/transmisja` → na panelu live widać imię i e-mail w **Teraz na osadzonym live**. Zamknięcie karty → znika.
 

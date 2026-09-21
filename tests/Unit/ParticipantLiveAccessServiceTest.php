@@ -223,4 +223,80 @@ class ParticipantLiveAccessServiceTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('missing_token', $result['status']);
     }
+
+    public function test_auto_provision_skips_when_clickmeeting_room_is_open_to_everyone(): void
+    {
+        $course = new Course(['title' => 'Open room', 'end_date' => now()->addDay()]);
+        $course->setRelation('onlineDetails', new CourseOnlineDetails([
+            'platform' => 'clickmeeting',
+            'clickmeeting_event_id' => '10088701',
+        ]));
+        $participant = new Participant([
+            'email' => 'jan@example.com',
+            'first_name' => 'Jan',
+            'last_name' => 'Kowalski',
+        ]);
+
+        $mock = Mockery::mock(ClickMeetingService::class);
+        $mock->shouldReceive('getConference')
+            ->once()
+            ->with('10088701')
+            ->andReturn([
+                'success' => true,
+                'access_type' => ClickMeetingService::ACCESS_TYPE_OPEN,
+                'conference' => [],
+            ]);
+        $mock->shouldNotReceive('registerParticipant');
+        $this->app->instance(ClickMeetingService::class, $mock);
+
+        $result = app(ParticipantLiveAccessService::class)->autoProvisionIfTokenRoom($participant, $course);
+
+        $this->assertNull($result);
+    }
+
+    public function test_invalidate_before_delete_skips_when_there_is_no_token(): void
+    {
+        $course = new Course(['title' => 'Live']);
+        $participant = new Participant(['email' => 'a@example.com']);
+        $participant->setRelation('liveAccess', null);
+
+        $result = app(ParticipantLiveAccessService::class)->invalidateTokenBeforeParticipantDelete(
+            $participant,
+            $course
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['skipped']);
+    }
+
+    public function test_invalidate_before_delete_does_not_block_when_api_fails(): void
+    {
+        $course = new Course(['title' => 'Dawny webinar']);
+        $liveAccess = new ParticipantLiveAccess([
+            'token' => 'OLDTOKEN',
+            'clickmeeting_event_id' => '10088701',
+        ]);
+        $participant = new Participant(['email' => 'a@example.com']);
+        $participant->setRelation('liveAccess', $liveAccess);
+
+        $mock = Mockery::mock(ClickMeetingService::class);
+        $mock->shouldReceive('deactivateTokens')
+            ->once()
+            ->with('10088701', ['OLDTOKEN'])
+            ->andReturn([
+                'success' => false,
+                'error' => 'ClickMeeting zwrócił HTTP 404 przy unieważnianiu tokenu.',
+            ]);
+        $this->app->instance(ClickMeetingService::class, $mock);
+
+        $result = app(ParticipantLiveAccessService::class)->invalidateTokenBeforeParticipantDelete(
+            $participant,
+            $course
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['skipped']);
+        $this->assertFalse($result['invalidated']);
+        $this->assertStringContainsString('404', (string) $result['detail']);
+    }
 }

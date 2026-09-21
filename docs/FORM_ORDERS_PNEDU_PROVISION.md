@@ -206,6 +206,10 @@ W mailu: informacja o 2 miesiącach + link awaryjny do `/forgot-password`.
 
 Lista: `/courses/{id}/participants` → przycisk **ClickMeeting** (gdy platforma = clickmeeting, jest event_id, szkolenie nie zakończone).
 
+Ręczne **dodanie** uczestnika (`/courses/{id}/participants/create`): gdy szkolenie ma ID wydarzenia ClickMeeting **i** pokój ma dostęp **Tokeny** (`access_type = 3`), od razu ten sam krok co przycisk (rejestracja w CM + zapis tokenu). Przy „Dla wszystkich” / haśle — bez auto-rejestracji. Szkolenie zakończone — bez auto-kroku.
+
+Ręczne **usunięcie** uczestnika: jeśli ma zapisany token, najpierw próba `DELETE` tokenu w ClickMeeting; potem zawsze soft-delete w ADM. Błąd API (HTTP 404 przy starym wydarzeniu, timeout, brak połączenia) **nie blokuje** usunięcia — na liście jest komunikat, że token w CM nie został unieważniony.
+
 Route: `POST /courses/{course}/participants/{participant}/provision-live-access`
 
 Gdy widoczny jest token (`CM: …`):
@@ -238,6 +242,7 @@ Cron: codziennie 04:15 (`routes/console.php`) — usuwa całe rekordy `participa
 sail test --filter=ClickMeetingServiceTest
 sail test --filter=PneduProvisionEmailContextBuilderTest
 sail test --filter=ParticipantLiveAccessServiceTest
+sail test --filter=ParticipantManualClickMeetingTest
 sail test --filter=FormOrderPneduProvisionRelinkTest
 sail test --filter=FormOrderPneduResetTest
 sail test --filter=FormOrderPneduAccessEmailResendTest

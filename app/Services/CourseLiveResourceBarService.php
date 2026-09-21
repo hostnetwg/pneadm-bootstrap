@@ -24,17 +24,36 @@ class CourseLiveResourceBarService
 
     public const LABEL_SURVEY = 'Wypełnij ankietę';
 
+    public const CHAT_ATTENDANCE = 'LISTA OBECNOŚCI';
+
+    public const CHAT_MATERIALS = 'MATERIAŁY';
+
+    public const CHAT_SURVEY = 'ANKIETA';
+
+    public const CHAT_CERTIFICATE = 'ZAŚWIADCZENIE';
+
+    public const CHAT_OFFER = 'SZKOLENIE';
+
+    public const CHAT_OFFER_TITLE_MAX = 40;
+
     /**
-     * Osadzony /transmisja jest dziś tylko dla zalogowanego uczestnika — rejestracja na belce
-     * wróci, gdy live będzie dostępny bez konta pnedu (np. zamknięty link od dyrektora).
+     * Osadzony /transmisja i gość /live/{token}: rejestracji na belce nie ma.
+     * Gość podaje imię, nazwisko i e-mail na formularzu przed wejściem.
      */
     public const ATTENDANCE_VISIBLE_ON_AUTHENTICATED_EMBED = false;
 
-    public const ONLINE_WINDOW_SECONDS = 90;
+    public const ONLINE_WINDOW_SECONDS = 180;
+
+    /** Oferta na live: po tylu sekundach znika sama (uczestnik + przełącznik ADM), chyba że operator ukryje wcześniej. */
+    public const LIVE_OFFER_AUTO_HIDE_SECONDS = 120;
 
     public const ONLINE_LIST_LIMIT = 100;
 
     public const PANEL_POLL_MS = 5000;
+
+    public function __construct(
+        private readonly GuestLiveLinkService $guestLive,
+    ) {}
 
     /**
      * @return array{
@@ -50,7 +69,9 @@ class CourseLiveResourceBarService
      *     embed_on_pnedu: bool,
      *     has_online_details: bool,
      *     embed_entries: array{ever: int, recent_15min: int},
-     *     online_now: array{count: int, viewers: list<array{id: int, name: string, email: string}>, truncated: bool, window_seconds: int}
+     *     online_now: array{count: int, viewers: list<array{id: int, name: string, email: string}>, truncated: bool, window_seconds: int},
+     *     guest_live: array{eligible: bool, url: ?string, hint: string},
+     *     cm_chat: array{text: string, empty: bool, lines: list<array{label: string, url: string, text: string}>}
      * }
      */
     public function panelState(Course $course): array
@@ -61,6 +82,9 @@ class CourseLiveResourceBarService
         $surveys = $this->surveyItems($course);
         $attendanceUrl = $this->attendanceUrl($course);
         $certificateUrl = $this->certificateDownloadUrl($course);
+        $guestLive = $this->guestLive->panelState($course);
+        $guestEligible = (bool) ($guestLive['eligible'] ?? false);
+        $offer = $this->offerState($course, $details);
 
         return [
             'flags' => [
@@ -69,11 +93,11 @@ class CourseLiveResourceBarService
                 'materials' => (bool) ($details?->live_bar_materials_enabled),
                 'survey' => (bool) ($details?->live_bar_survey_enabled),
             ],
-            'offer' => $this->offerState($course, $details),
+            'offer' => $offer,
             'resources' => [
                 'attendance' => [
-                    'ready' => self::ATTENDANCE_VISIBLE_ON_AUTHENTICATED_EMBED && $attendanceUrl !== null,
-                    'parked' => ! self::ATTENDANCE_VISIBLE_ON_AUTHENTICATED_EMBED,
+                    'ready' => false,
+                    'parked' => true,
                     'url' => $attendanceUrl,
                 ],
                 'certificate' => [
@@ -89,12 +113,116 @@ class CourseLiveResourceBarService
                     'items' => $surveys,
                 ],
             ],
-            'links' => $this->visibleLinks($course),
+            'links' => $guestEligible ? $this->visibleLinksForGuest($course) : $this->visibleLinks($course),
             'embed_on_pnedu' => (bool) ($details?->embed_on_pnedu),
             'has_online_details' => $details !== null,
             'embed_entries' => $this->embedEntryCounts($course),
             'online_now' => $this->onlineNow($course),
+            'guest_live' => $guestLive,
+            'cm_chat' => $this->clickMeetingChat($course, $offer),
         ];
+    }
+
+    /**
+     * Tekst do wklejenia na czat ClickMeeting (osoby poza osadzonym `/transmisja`).
+     * Te same włączone zasoby co belka + oferta; nie wymaga `embed_on_pnedu`.
+     *
+     * @param  array{enabled: bool, course_id: ?int, course: ?array<string, mixed>}|null  $offer
+     * @return array{text: string, empty: bool, lines: list<array{label: string, url: string, text: string}>}
+     */
+    public function clickMeetingChat(Course $course, ?array $offer = null): array
+    {
+        $course->loadMissing(['onlineDetails', 'fileLinks', 'surveyLinks']);
+        $details = $course->onlineDetails;
+        $lines = [];
+
+        $attendanceUrl = $this->attendanceUrl($course);
+        if ($attendanceUrl !== null) {
+            $lines[] = $this->chatLine(self::CHAT_ATTENDANCE, $attendanceUrl);
+        }
+
+        if ($details instanceof CourseOnlineDetails) {
+            if ($details->live_bar_materials_enabled) {
+                foreach ($this->materialItems($course) as $item) {
+                    $lines[] = $this->chatLine(self::CHAT_MATERIALS, $item['url']);
+                }
+            }
+
+            if ($details->live_bar_survey_enabled) {
+                foreach ($this->surveyItems($course) as $item) {
+                    $lines[] = $this->chatLine(self::CHAT_SURVEY, $item['url']);
+                }
+            }
+
+            if ($details->live_bar_certificate_enabled) {
+                $url = $this->certificateDownloadUrl($course);
+                if ($url !== null) {
+                    $lines[] = $this->chatLine(self::CHAT_CERTIFICATE, $url);
+                }
+            }
+        }
+
+        $offer ??= $this->offerState($course, $details instanceof CourseOnlineDetails ? $details : null);
+        if (($offer['enabled'] ?? false) && (int) ($offer['course_id'] ?? 0) > 0) {
+            $offerUrl = $this->publicCourseUrl((int) $offer['course_id']);
+            if ($offerUrl !== null) {
+                $title = trim((string) ($offer['course']['title_text'] ?? ''));
+                $lines[] = $this->chatLine(self::CHAT_OFFER, $offerUrl, $this->offerTitleSnippet($title));
+            }
+        }
+
+        $parts = array_map(static fn (array $line): string => $line['text'], $lines);
+        $text = implode("\n", $parts);
+
+        return [
+            'text' => $text,
+            'empty' => $text === '',
+            'lines' => $lines,
+        ];
+    }
+
+    /**
+     * @return array{label: string, url: string, text: string}
+     */
+    private function chatLine(string $label, string $url, ?string $titleSnippet = null): array
+    {
+        $text = ($titleSnippet !== null && $titleSnippet !== '')
+            ? $label.': '.$titleSnippet.' ... '.$url
+            : $label.': '.$url;
+
+        return [
+            'label' => $label,
+            'url' => $url,
+            'text' => $text,
+        ];
+    }
+
+    private function offerTitleSnippet(string $title): ?string
+    {
+        $title = trim(preg_replace('/\s+/u', ' ', $title) ?? $title);
+        if ($title === '') {
+            return null;
+        }
+
+        if (mb_strlen($title) <= self::CHAT_OFFER_TITLE_MAX) {
+            return $title;
+        }
+
+        return trim(mb_substr($title, 0, self::CHAT_OFFER_TITLE_MAX));
+    }
+
+    public function publicCourseUrl(int $courseId): ?string
+    {
+        if ($courseId <= 0) {
+            return null;
+        }
+
+        $base = rtrim((string) config('services.pnedu_frontend_url', ''), '/');
+        if ($base === '') {
+            return null;
+        }
+
+        return $base.'/courses/'.$courseId;
     }
 
     /**
@@ -158,7 +286,53 @@ class CourseLiveResourceBarService
     }
 
     /**
-     * @return array{enabled: bool, course_id: ?int, course: ?array<string, mixed>}
+     * Belka gościa `/live/{token}`: materiały + ankieta; bez rejestracji (formularz przed wejściem) i bez zaświadczenia.
+     *
+     * @return list<array{key: string, label: string, url: string}>
+     */
+    public function visibleLinksForGuest(Course $course): array
+    {
+        $course->loadMissing(['onlineDetails', 'fileLinks', 'surveyLinks']);
+        $details = $course->onlineDetails;
+        if (! $details instanceof CourseOnlineDetails || ! $details->embed_on_pnedu) {
+            return [];
+        }
+
+        $links = [];
+
+        if ($details->live_bar_materials_enabled) {
+            foreach ($this->materialItems($course) as $item) {
+                $links[] = [
+                    'key' => 'material-'.$item['id'],
+                    'label' => self::LABEL_MATERIALS,
+                    'url' => $item['url'],
+                ];
+            }
+        }
+
+        if ($details->live_bar_survey_enabled) {
+            foreach ($this->surveyItems($course) as $item) {
+                $links[] = [
+                    'key' => 'survey-'.$item['id'],
+                    'label' => self::LABEL_SURVEY,
+                    'url' => $item['url'],
+                ];
+            }
+        }
+
+        return $links;
+    }
+
+    /**
+     * @return array{
+     *   enabled: bool,
+     *   course_id: ?int,
+     *   course: ?array<string, mixed>,
+     *   auto_hide: bool,
+     *   enabled_at: ?string,
+     *   expires_at: ?string,
+     *   auto_hide_seconds: int
+     * }
      */
     public function offerState(Course $liveCourse, ?CourseOnlineDetails $details): array
     {
@@ -166,10 +340,23 @@ class CourseLiveResourceBarService
             'enabled' => false,
             'course_id' => null,
             'course' => null,
+            'auto_hide' => true,
+            'enabled_at' => null,
+            'expires_at' => null,
+            'auto_hide_seconds' => self::LIVE_OFFER_AUTO_HIDE_SECONDS,
         ];
+
+        if ($details instanceof CourseOnlineDetails) {
+            $this->expireLiveOfferIfNeeded($details);
+            $details->refresh();
+        }
 
         $offerId = (int) ($details?->live_offer_course_id ?? 0);
         if ($offerId <= 0 || $offerId === (int) $liveCourse->id) {
+            if ($details instanceof CourseOnlineDetails) {
+                $empty['auto_hide'] = $details->live_offer_auto_hide !== false;
+            }
+
             return $empty;
         }
 
@@ -181,11 +368,70 @@ class CourseLiveResourceBarService
             return $empty;
         }
 
+        $enabled = (bool) ($details?->live_offer_enabled);
+        $autoHide = $details?->live_offer_auto_hide !== false;
+        $enabledAt = $details?->live_offer_enabled_at;
+        $expiresAt = null;
+        if ($enabled && $autoHide && $enabledAt) {
+            $expiresAt = $enabledAt->copy()->addSeconds(self::LIVE_OFFER_AUTO_HIDE_SECONDS);
+        }
+
         return [
-            'enabled' => (bool) ($details?->live_offer_enabled),
+            'enabled' => $enabled,
             'course_id' => (int) $offerCourse->id,
             'course' => $this->adminSelectItem($offerCourse),
+            'auto_hide' => $autoHide,
+            'enabled_at' => $enabled && $autoHide && $enabledAt ? $enabledAt->toIso8601String() : null,
+            'expires_at' => $expiresAt?->toIso8601String(),
+            'auto_hide_seconds' => self::LIVE_OFFER_AUTO_HIDE_SECONDS,
         ];
+    }
+
+    /**
+     * Wyłącza ofertę po LIVE_OFFER_AUTO_HIDE_SECONDS tylko gdy live_offer_auto_hide = true.
+     */
+    public function expireLiveOfferIfNeeded(CourseOnlineDetails $details): bool
+    {
+        if (! $details->live_offer_enabled) {
+            if ($details->live_offer_enabled_at !== null) {
+                $details->live_offer_enabled_at = null;
+                $details->save();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        if ($details->live_offer_auto_hide === false) {
+            if ($details->live_offer_enabled_at !== null) {
+                $details->live_offer_enabled_at = null;
+                $details->save();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        if ($details->live_offer_enabled_at === null) {
+            $details->live_offer_enabled_at = now();
+            $details->save();
+
+            return true;
+        }
+
+        $deadline = $details->live_offer_enabled_at->copy()
+            ->addSeconds(self::LIVE_OFFER_AUTO_HIDE_SECONDS);
+        if (now()->lt($deadline)) {
+            return false;
+        }
+
+        $details->live_offer_enabled = false;
+        $details->live_offer_enabled_at = null;
+        $details->save();
+
+        return true;
     }
 
     /**

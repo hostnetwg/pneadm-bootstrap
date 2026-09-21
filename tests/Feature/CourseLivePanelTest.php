@@ -64,10 +64,16 @@ class CourseLivePanelTest extends TestCase
             ->assertSee('Oferta kolejnego szkolenia', false)
             ->assertSee('Wyświetl uczestnikom', false)
             ->assertSee('id="live_offer_course_id"', false)
+            ->assertSee('id="live_offer_auto_hide"', false)
+            ->assertSee('Ukryj ofertę po 2 minutach', false)
             ->assertSee('Pokaż również archiwalne', false)
             ->assertSee('przełącznik jest nieaktywny', false)
-            ->assertSee('live będzie dostępny bez konta pnedu', false)
+            ->assertSee('Na zalogowanym `/transmisja`', false)
             ->assertSee('Teraz na osadzonym live', false)
+            ->assertSee('Na czat ClickMeeting', false)
+            ->assertSee('Kopiuj na czat', false)
+            ->assertSee('Włącz materiały, ankietę, zaświadczenie albo ofertę', false)
+            ->assertDontSee('Live bez logowania (gość)', false)
             ->getContent();
         $this->assertSwitchDisabled($html, 'live_bar_attendance_enabled', true);
         $this->assertSwitchDisabled($html, 'live_bar_certificate_enabled', true);
@@ -146,6 +152,54 @@ class CourseLivePanelTest extends TestCase
         $this->assertSwitchDisabled($html, 'live_bar_certificate_enabled', false);
         $this->assertSwitchDisabled($html, 'live_bar_materials_enabled', false);
         $this->assertSwitchDisabled($html, 'live_bar_survey_enabled', false);
+    }
+
+    public function test_closed_embed_shows_guest_live_url_and_keeps_attendance_on_the_gate_form(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse();
+        $course->update([
+            'category' => 'closed',
+            'certificate_registration_open' => true,
+            'certificate_registration_token' => 'reg-live-token',
+        ]);
+        $this->attachOnlineDetails($course, embed: true);
+
+        $html = $this->actingAs($user)
+            ->get(route('courses.live', $course->id))
+            ->assertOk()
+            ->assertSee('Live bez logowania (gość)', false)
+            ->assertSee('/live/', false)
+            ->assertSee('Maila z ADM jeszcze nie wysyłamy', false)
+            ->assertSee('imię, nazwisko i e-mail', false)
+            ->getContent();
+
+        $this->assertSwitchDisabled($html, 'live_bar_attendance_enabled', true);
+
+        $this->actingAs($user)
+            ->get(route('courses.show', $course->id))
+            ->assertOk()
+            ->assertSee('Live bez logowania (gość)', false)
+            ->assertSee('/live/', false);
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $course->id,
+        ]);
+        $this->assertNotNull($course->fresh()->onlineDetails?->guest_live_token);
+    }
+
+    public function test_open_embed_does_not_publish_guest_live_url(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse();
+        $this->attachOnlineDetails($course, embed: true);
+
+        $this->actingAs($user)
+            ->get(route('courses.live', $course->id))
+            ->assertOk()
+            ->assertDontSee('Live bez logowania (gość)', false);
+
+        $this->assertNull($course->fresh()->onlineDetails?->guest_live_token);
     }
 
     public function test_enabling_survey_without_active_survey_does_not_turn_flag_on(): void
@@ -276,7 +330,11 @@ class CourseLivePanelTest extends TestCase
             ->assertJsonPath('state.flags.materials', true)
             ->assertJsonPath('state.flags.survey', false)
             ->assertJsonPath('state.links.0.label', 'Pobierz materiały')
-            ->assertJsonCount(1, 'state.links');
+            ->assertJsonCount(1, 'state.links')
+            ->assertJsonPath('state.cm_chat.empty', false)
+            ->assertJsonPath('state.cm_chat.lines.0.url', 'https://drive.google.com/file/test')
+            ->assertJsonPath('state.cm_chat.lines.0.label', 'MATERIAŁY')
+            ->assertJsonPath('state.cm_chat.text', "MATERIAŁY: https://drive.google.com/file/test");
 
         $this->actingAs($user)
             ->patchJson(route('courses.live.update', $course->id), [
@@ -296,7 +354,50 @@ class CourseLivePanelTest extends TestCase
                 'live_bar_survey_enabled' => false,
             ])
             ->assertOk()
-            ->assertJsonPath('state.links', []);
+            ->assertJsonPath('state.links', [])
+            ->assertJsonPath('state.cm_chat.empty', true);
+    }
+
+    public function test_clickmeeting_chat_copy_includes_on_links_even_when_embed_is_off(): void
+    {
+        $user = User::factory()->create();
+        $course = $this->createOnlineCourse();
+        $this->attachOnlineDetails($course, embed: false);
+
+        CourseFileLink::query()->create([
+            'course_id' => $course->id,
+            'url' => 'https://drive.google.com/file/cm-chat',
+            'title' => 'Slajdy',
+            'order' => 0,
+        ]);
+
+        $this->actingAs($user)
+            ->patchJson(route('courses.live.update', $course->id), [
+                'live_bar_attendance_enabled' => false,
+                'live_bar_certificate_enabled' => false,
+                'live_bar_materials_enabled' => true,
+                'live_bar_survey_enabled' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('state.embed_on_pnedu', false)
+            ->assertJsonPath('state.links', [])
+            ->assertJsonPath('state.cm_chat.empty', false)
+            ->assertJsonPath('state.cm_chat.lines.0.url', 'https://drive.google.com/file/cm-chat')
+            ->assertJsonPath('state.cm_chat.lines.0.label', 'MATERIAŁY')
+            ->assertJsonPath('state.cm_chat.text', 'MATERIAŁY: https://drive.google.com/file/cm-chat');
+
+        $html = $this->actingAs($user)
+            ->get(route('courses.live', $course->id))
+            ->assertOk()
+            ->assertSee('Na czat ClickMeeting', false)
+            ->assertSee('https://drive.google.com/file/cm-chat', false)
+            ->getContent();
+
+        $this->assertStringContainsString('Kopiuj na czat', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/id="course-live-cm-chat"[^>]*\sdisabled/',
+            $html
+        );
     }
 
     public function test_links_stay_hidden_when_embed_is_off(): void
@@ -491,13 +592,24 @@ class CourseLivePanelTest extends TestCase
             ->assertJsonPath('ok', true)
             ->assertJsonPath('state.offer.enabled', true)
             ->assertJsonPath('state.offer.course_id', $promo->id)
-            ->assertJsonPath('state.offer.course.title_text', 'Kolejne szkolenie oferta');
+            ->assertJsonPath('state.offer.course.title_text', 'Kolejne szkolenie oferta')
+            ->assertJsonPath('state.cm_chat.empty', false)
+            ->assertJsonPath('state.cm_chat.lines.0.label', 'SZKOLENIE')
+            ->assertJsonPath('state.cm_chat.lines.0.url', 'http://localhost:8081/courses/'.$promo->id)
+            ->assertJsonPath(
+                'state.cm_chat.text',
+                'SZKOLENIE: Kolejne szkolenie oferta ... http://localhost:8081/courses/'.$promo->id
+            );
 
         $this->assertDatabaseHas('course_online_details', [
             'course_id' => $live->id,
             'live_offer_course_id' => $promo->id,
             'live_offer_enabled' => 1,
         ]);
+
+        $this->assertNotNull(
+            $live->fresh('onlineDetails')->onlineDetails->live_offer_enabled_at
+        );
 
         $this->actingAs($user)
             ->patchJson(route('courses.live.offer', $live->id), [
@@ -506,7 +618,12 @@ class CourseLivePanelTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('state.offer.enabled', false)
-            ->assertJsonPath('state.offer.course_id', $promo->id);
+            ->assertJsonPath('state.offer.course_id', $promo->id)
+            ->assertJsonPath('state.offer.expires_at', null);
+
+        $this->assertNull(
+            $live->fresh('onlineDetails')->onlineDetails->live_offer_enabled_at
+        );
 
         $this->actingAs($user)
             ->get(route('courses.live', $live->id))
@@ -514,6 +631,102 @@ class CourseLivePanelTest extends TestCase
             ->assertSee('Kolejne szkolenie oferta', false)
             ->assertSee('Ukryta', false)
             ->assertDontSee('window.location.href = liveUrlFor', false);
+    }
+
+    public function test_live_offer_auto_hides_after_two_minutes(): void
+    {
+        $user = User::factory()->create();
+        $live = $this->createOnlineCourse();
+        $promo = Course::query()->create([
+            'title' => 'Oferta auto hide',
+            'description' => 'Test',
+            'start_date' => now()->addDays(10),
+            'end_date' => now()->addDays(10)->addHours(3),
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+        ]);
+        $this->attachOnlineDetails($live, embed: true);
+
+        $this->actingAs($user)
+            ->patchJson(route('courses.live.offer', $live->id), [
+                'live_offer_course_id' => $promo->id,
+                'live_offer_enabled' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('state.offer.enabled', true)
+            ->assertJsonPath('state.offer.auto_hide_seconds', 120);
+
+        $this->assertTrue(
+            (bool) $live->fresh('onlineDetails')->onlineDetails->live_offer_auto_hide
+        );
+        $this->assertNotNull(
+            $live->fresh('onlineDetails')->onlineDetails->live_offer_enabled_at
+        );
+
+        $this->travel(121)->seconds();
+
+        $this->actingAs($user)
+            ->getJson(route('courses.live', $live->id))
+            ->assertOk()
+            ->assertJsonPath('offer.enabled', false)
+            ->assertJsonPath('offer.course_id', $promo->id);
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $live->id,
+            'live_offer_enabled' => 0,
+        ]);
+        $this->assertNull($live->fresh('onlineDetails')->onlineDetails->live_offer_enabled_at);
+    }
+
+    public function test_live_offer_stays_on_when_auto_hide_is_disabled(): void
+    {
+        $user = User::factory()->create();
+        $live = $this->createOnlineCourse();
+        $promo = Course::query()->create([
+            'title' => 'Oferta bez auto hide',
+            'description' => 'Test',
+            'start_date' => now()->addDays(10),
+            'end_date' => now()->addDays(10)->addHours(3),
+            'is_paid' => true,
+            'type' => 'online',
+            'category' => 'open',
+            'is_active' => true,
+            'certificate_format' => '{nr}/{course_id}/{year}/PNE',
+        ]);
+        $this->attachOnlineDetails($live, embed: true);
+
+        $this->actingAs($user)
+            ->patchJson(route('courses.live.offer', $live->id), [
+                'live_offer_course_id' => $promo->id,
+                'live_offer_enabled' => true,
+                'live_offer_auto_hide' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('state.offer.enabled', true)
+            ->assertJsonPath('state.offer.auto_hide', false)
+            ->assertJsonPath('state.offer.expires_at', null);
+
+        $this->assertFalse(
+            (bool) $live->fresh('onlineDetails')->onlineDetails->live_offer_auto_hide
+        );
+        $this->assertNull($live->fresh('onlineDetails')->onlineDetails->live_offer_enabled_at);
+
+        $this->travel(300)->seconds();
+
+        $this->actingAs($user)
+            ->getJson(route('courses.live', $live->id))
+            ->assertOk()
+            ->assertJsonPath('offer.enabled', true)
+            ->assertJsonPath('offer.auto_hide', false);
+
+        $this->assertDatabaseHas('course_online_details', [
+            'course_id' => $live->id,
+            'live_offer_enabled' => 1,
+            'live_offer_auto_hide' => 0,
+        ]);
     }
 
     private function createOnlineCourse(): Course

@@ -74,7 +74,7 @@ W ClickMeeting musi być dostęp **Dla wszystkich**. Tokeny albo hasło zablokuj
 
 Zmianę dostępu operator robi ręcznie w panelu ClickMeeting.
 
-Osadzony pokój na pnedu.pl **bez logowania** (gość z linkiem od dyrektora) **nie jest wdrożony**. Zamknięte szkolenia na razie wchodzą bezpośrednim linkiem CM. Decyzja o publicznym embedzie — osobny etap (konto, bezpieczeństwo, platform-first).
+Osadzony pokój na pnedu.pl **bez logowania:** sekretny `/live/{token}` (formularz imię / nazwisko / e-mail → rekord uczestnika → pokój + belka). Link tylko w ADM (karta szkolenia + panel live). **Nie** w katalogu pnedu.pl, **nie** w sitemapie, **nie** w mailu z ADM (mail do dyrektora jeszcze nie). W ClickMeeting musi być **Dla wszystkich**. Kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md).
 
 ## Odświeżenie przy wysyłce maila (etap 2)
 

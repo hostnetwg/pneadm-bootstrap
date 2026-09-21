@@ -148,7 +148,7 @@ Migracja `2026_09_13_191300_add_certificate_defaults_to_course_series_table` dod
 
 ### pnedu
 
-- Zalogowany użytkownik: `/dashboard/zaswiadczenia`
+- Zalogowany użytkownik: `/dashboard/zaswiadczenia` oraz `/dashboard/zaswiadczenia/{course}` (imię i nazwisko uczestnika z rekordu `participants` na formularzu / podglądzie / stronie pobierania)
 - Bez logowania: link z tokenem — patrz [CERTIFICATE_DOWNLOAD_LINKS.md](./CERTIFICATE_DOWNLOAD_LINKS.md)
 
 ---

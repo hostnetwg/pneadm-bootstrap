@@ -32,6 +32,7 @@
         $links = $state['links'];
         $embedEntries = $state['embed_entries'];
         $onlineNow = $state['online_now'] ?? ['count' => 0, 'viewers' => [], 'truncated' => false];
+        $cmChat = $state['cm_chat'] ?? ['text' => '', 'empty' => true, 'lines' => []];
     @endphp
 
     <div class="container py-3" id="course-live-panel"
@@ -111,11 +112,26 @@
                             {{ $offerEnabled ? 'Włączona' : 'Ukryta' }}
                         </span>
                     </div>
+                    @php
+                        $offerAutoHide = ($offer['auto_hide'] ?? true) !== false;
+                    @endphp
+                    <div class="form-check mt-2 mb-0">
+                        <input class="form-check-input" type="checkbox" id="live_offer_auto_hide"
+                               @checked($offerAutoHide)
+                               @disabled(! $state['has_online_details'])>
+                        <label class="form-check-label" for="live_offer_auto_hide">
+                            Ukryj ofertę po 2 minutach
+                        </label>
+                    </div>
                     <div id="live-offer-save-status" class="small text-muted mt-2">
                         @if($offerEnabled)
-                            Oferta jest włączona. Uczestnicy zobaczą ją na transmisji w ciągu kilkunastu sekund.
+                            @if($offerAutoHide)
+                                Oferta włączona na 2 minuty — potem schowa się sama (chyba że ukryjesz wcześniej).
+                            @else
+                                Oferta włączona bez limitu czasu — schowa się dopiero po „Ukryj ofertę”.
+                            @endif
                         @else
-                            Po wybraniu szkolenia włącz ofertę przyciskiem. Uczestnicy zobaczą belkę z przyciskiem „Zamawiam szkolenie” (opis szkolenia, nie od razu formularz).
+                            Po wybraniu szkolenia włącz ofertę przyciskiem. Domyślnie znika po <strong>2 minutach</strong> (odznacz checkbox, jeśli ma zostać do ręcznego ukrycia).
                         @endif
                     </div>
                 </div>
@@ -124,6 +140,18 @@
 
         <div class="row g-3">
             <div class="col-lg-7">
+                @if(! empty($state['guest_live']['url']))
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>Link do live bez logowania</strong></div>
+                        <div class="card-body py-3">
+                            @include('courses.partials.guest-live-link', [
+                                'guestLive' => $state['guest_live'],
+                                'inputId' => 'live-guest-live-url',
+                                'wrapperClass' => 'mb-0',
+                            ])
+                        </div>
+                    </div>
+                @endif
                 <div class="card">
                     <div class="card-header">
                         <strong>Co pokazać na belce</strong>
@@ -148,10 +176,10 @@
                                 </label>
                                 <div class="small {{ $resources['attendance']['ready'] ? 'text-success' : 'text-muted' }}">
                                     @if($resources['attendance']['parked'] ?? false)
-                                        Na obecnym osadzonym live uczestnik jest już zalogowany i na liście — ten przycisk jest ukryty.
-                                        Wróci, gdy live będzie dostępny bez konta pnedu (np. zamknięty link od dyrektora).
+                                        Gość na `/live/{token}` podaje imię, nazwisko i e-mail na formularzu przed wejściem (jak lobby ClickMeeting, plus nazwisko).
+                                        Na zalogowanym `/transmisja` belka też nie pokazuje rejestracji — uczestnik jest już na liście.
                                     @elseif($resources['attendance']['ready'])
-                                        Jest link rejestracji (jak w mailu do prowadzącego — bez okna od–do).
+                                        Goście na `/live/…` zobaczą ten przycisk. Zalogowani na `/transmisja` nadal go nie widzą.
                                     @else
                                         Brak włączonej rejestracji zaświadczenia z tokenem.
                                         <a href="{{ route('courses.edit', $course->id) }}">Ustaw na karcie szkolenia</a>
@@ -230,6 +258,36 @@
 
             <div class="col-lg-5">
                 <div class="card mb-3">
+                    <div class="card-header"><strong>Na czat ClickMeeting</strong></div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">
+                            Osoby na bezpośrednim linku pokoju nie widzą belki. Skopiuj i wklej na czat w ClickMeeting.
+                            Tekst zmienia się razem z przełącznikami i ofertą.
+                        </p>
+                        <textarea class="form-control form-control-sm font-monospace"
+                                  id="course-live-cm-chat"
+                                  rows="6"
+                                  readonly
+                                  @disabled($cmChat['empty'] ?? true)>{{ $cmChat['text'] ?? '' }}</textarea>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    id="course-live-cm-chat-copy"
+                                    @disabled($cmChat['empty'] ?? true)>
+                                Kopiuj na czat
+                            </button>
+                            <span class="small text-muted" id="course-live-cm-chat-status">
+                                @if($cmChat['empty'] ?? true)
+                                    Włącz materiały, ankietę, zaświadczenie albo ofertę.
+                                @else
+                                    Wklej w czat publiczny pokoju ClickMeeting.
+                                @endif
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
                     <div class="card-header"><strong>Widoczne teraz na transmisji</strong></div>
                     <div class="card-body" id="course-live-preview">
                         @if(count($links) === 0)
@@ -285,7 +343,7 @@
                         @endif
                     </div>
                     <div class="card-footer small text-muted">
-                        Heartbeat z `/transmisja` (ok. 25 s). Znika po zamknięciu karty albo po ok. 1,5 min bez sygnału.
+                        Heartbeat z `/transmisja` (ok. 25 s) + poll belki. Znika po zamknięciu karty albo po ok. 3 min bez sygnału. Powrót na kartę wznawia belkę i obecność bez odświeżania.
                     </div>
                 </div>
             </div>
@@ -378,7 +436,65 @@
                     recent.textContent = String(state.embed_entries?.recent_15min ?? 0);
                 }
                 renderOnlineNow(state.online_now);
+                renderCmChat(state.cm_chat);
+                if (state.offer && typeof window.pneLiveSyncOffer === 'function') {
+                    window.pneLiveSyncOffer(state.offer);
+                }
             }
+
+            function renderCmChat(chat) {
+                const box = document.getElementById('course-live-cm-chat');
+                const copyBtn = document.getElementById('course-live-cm-chat-copy');
+                const status = document.getElementById('course-live-cm-chat-status');
+                const data = chat && typeof chat === 'object' ? chat : {};
+                const text = typeof data.text === 'string' ? data.text : '';
+                const empty = text.trim() === '';
+                if (box) {
+                    box.value = text;
+                    box.disabled = empty;
+                }
+                if (copyBtn) {
+                    copyBtn.disabled = empty;
+                    if (copyBtn.dataset.copied !== '1') {
+                        copyBtn.textContent = 'Kopiuj na czat';
+                    }
+                }
+                if (status && copyBtn?.dataset.copied !== '1') {
+                    status.textContent = empty
+                        ? 'Włącz materiały, ankietę, zaświadczenie albo ofertę.'
+                        : 'Wklej w czat publiczny pokoju ClickMeeting.';
+                }
+            }
+
+            const cmChatCopy = document.getElementById('course-live-cm-chat-copy');
+            if (cmChatCopy) {
+                cmChatCopy.addEventListener('click', function () {
+                    const box = document.getElementById('course-live-cm-chat');
+                    const text = box && !box.disabled ? box.value : '';
+                    if (!text) {
+                        return;
+                    }
+                    const done = function () {
+                        cmChatCopy.dataset.copied = '1';
+                        cmChatCopy.textContent = 'Skopiowano!';
+                        setTimeout(function () {
+                            cmChatCopy.dataset.copied = '0';
+                            cmChatCopy.textContent = 'Kopiuj na czat';
+                        }, 2000);
+                    };
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(done).catch(function () {
+                            box.focus();
+                            box.select();
+                        });
+                    } else {
+                        box.focus();
+                        box.select();
+                    }
+                });
+            }
+
+            window.pneLiveRenderState = renderState;
 
             function renderOnlineNow(online) {
                 const box = document.getElementById('course-live-online-now');
@@ -502,6 +618,7 @@
         $liveOfferSearchUrl = route('courses.live.search', ['exclude_id' => $course->id]);
         $liveOfferPreselected = $offerItem ?: null;
         $liveOfferEnabled = $offerEnabled;
+        $liveOfferAutoHide = ($offer['auto_hide'] ?? true) !== false;
         $liveOfferHasDetails = (bool) $state['has_online_details'];
     @endphp
     @include('partials.ensure-course-select-init')
@@ -513,6 +630,7 @@
             const offerUpdateUrl = document.getElementById('course-live-panel')?.getAttribute('data-offer-update-url') || '';
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             const archivedToggle = document.getElementById('live_offer_include_archived');
+            const autoHideToggle = document.getElementById('live_offer_auto_hide');
             const errorEl = document.getElementById('live-offer-select-error');
             const actionsEl = document.getElementById('live-offer-actions');
             const toggleBtn = document.getElementById('live-offer-toggle');
@@ -522,6 +640,9 @@
             let includeArchived = false;
             let selectedItem = preselected;
             let offerEnabled = @json($liveOfferEnabled);
+            let offerAutoHide = @json($liveOfferAutoHide);
+            let offerExpiresAt = null;
+            let offerCountdownTimer = null;
 
             try {
                 includeArchived = window.localStorage.getItem(STORAGE_KEY) === '1';
@@ -529,9 +650,16 @@
             if (archivedToggle) {
                 archivedToggle.checked = includeArchived;
             }
+            if (autoHideToggle) {
+                autoHideToggle.checked = offerAutoHide;
+            }
 
             function selectedCourseId() {
                 return selectedItem && selectedItem.id ? parseInt(selectedItem.id, 10) : null;
+            }
+
+            function readAutoHide() {
+                return autoHideToggle ? !!autoHideToggle.checked : true;
             }
 
             function setOfferStatus(text, isError) {
@@ -543,10 +671,84 @@
                 statusEl.classList.toggle('text-muted', !isError);
             }
 
+            function clearOfferCountdown() {
+                if (offerCountdownTimer) {
+                    clearInterval(offerCountdownTimer);
+                    offerCountdownTimer = null;
+                }
+            }
+
+            function formatOfferRemaining(expiresIso) {
+                if (!expiresIso) {
+                    return null;
+                }
+                const end = Date.parse(expiresIso);
+                if (!Number.isFinite(end)) {
+                    return null;
+                }
+                const sec = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return m + ':' + String(s).padStart(2, '0');
+            }
+
+            function refreshOfferCountdownText() {
+                if (!offerEnabled || !offerAutoHide || !offerExpiresAt) {
+                    return;
+                }
+                const left = formatOfferRemaining(offerExpiresAt);
+                if (left === null) {
+                    return;
+                }
+                if (left === '0:00') {
+                    setOfferStatus('Oferta wygasa…', false);
+                    return;
+                }
+                setOfferStatus('Oferta włączona — znika za ' + left + ' (albo Ukryj wcześniej).', false);
+            }
+
+            function startOfferCountdown(expiresIso) {
+                clearOfferCountdown();
+                offerExpiresAt = expiresIso || null;
+                if (!offerAutoHide || !offerExpiresAt) {
+                    offerExpiresAt = null;
+                    if (offerEnabled && !offerAutoHide) {
+                        setOfferStatus('Oferta włączona bez limitu — schowa się po „Ukryj ofertę”.', false);
+                    }
+                    return;
+                }
+                refreshOfferCountdownText();
+                offerCountdownTimer = setInterval(refreshOfferCountdownText, 1000);
+            }
+
+            function applyOfferFromState(offer) {
+                const data = offer && typeof offer === 'object' ? offer : {};
+                offerEnabled = !!data.enabled;
+                if (typeof data.auto_hide === 'boolean') {
+                    offerAutoHide = data.auto_hide;
+                    if (autoHideToggle) {
+                        autoHideToggle.checked = offerAutoHide;
+                    }
+                }
+                if (data.course && data.course.id) {
+                    selectedItem = data.course;
+                }
+                renderToggle();
+                if (offerEnabled) {
+                    startOfferCountdown(typeof data.expires_at === 'string' ? data.expires_at : null);
+                } else {
+                    clearOfferCountdown();
+                    offerExpiresAt = null;
+                }
+            }
+
             function renderToggle() {
                 const hasSelection = !!selectedCourseId();
                 if (actionsEl) {
                     actionsEl.classList.toggle('d-none', !hasSelection);
+                }
+                if (autoHideToggle) {
+                    autoHideToggle.disabled = !hasOnlineDetails;
                 }
                 if (!toggleBtn) {
                     return;
@@ -566,12 +768,29 @@
                         badgeEl.className = 'badge text-bg-light text-muted border';
                         badgeEl.textContent = 'Ukryta';
                     }
+                    clearOfferCountdown();
+                    offerExpiresAt = null;
                 }
             }
 
+            window.pneLiveSyncOffer = function (offer) {
+                const data = offer && typeof offer === 'object' ? offer : {};
+                const wasEnabled = offerEnabled;
+                applyOfferFromState(data);
+                if (!offerEnabled && wasEnabled) {
+                    setOfferStatus(
+                        offerAutoHide
+                            ? 'Oferta ukryta (ręcznie lub po 2 minutach).'
+                            : 'Oferta ukryta.',
+                        false
+                    );
+                }
+            };
+
             let saveChain = Promise.resolve();
 
-            function saveOffer(enabled) {
+            function saveOffer(enabled, options) {
+                const opts = options && typeof options === 'object' ? options : {};
                 if (!offerUpdateUrl || !hasOnlineDetails) {
                     return Promise.resolve();
                 }
@@ -580,11 +799,14 @@
                     setOfferStatus('Najpierw wybierz szkolenie do oferty.', true);
                     return Promise.resolve();
                 }
+                const autoHide = typeof opts.autoHide === 'boolean' ? opts.autoHide : readAutoHide();
                 saveChain = saveChain.then(function () {
-                    if (toggleBtn && window.PneButtonLoading) {
+                    if (toggleBtn && window.PneButtonLoading && !opts.quiet) {
                         window.PneButtonLoading.setButtonLoading(toggleBtn, true, enabled ? 'Włączam…' : 'Ukrywam…');
                     }
-                    setOfferStatus('Zapisuję…', false);
+                    if (!opts.quiet) {
+                        setOfferStatus('Zapisuję…', false);
+                    }
                     return fetch(offerUpdateUrl, {
                         method: 'PATCH',
                         headers: {
@@ -597,6 +819,7 @@
                         body: JSON.stringify({
                             live_offer_course_id: courseId,
                             live_offer_enabled: !!enabled,
+                            live_offer_auto_hide: !!autoHide,
                         }),
                     }).then(function (res) {
                         return res.json().then(function (data) {
@@ -608,20 +831,27 @@
                         }
                         if (!result.ok) {
                             setOfferStatus(result.data?.error || 'Nie udało się zapisać oferty.', true);
+                            if (autoHideToggle) {
+                                autoHideToggle.checked = offerAutoHide;
+                            }
                             renderToggle();
                             return;
                         }
                         const offer = result.data?.state?.offer || {};
-                        offerEnabled = !!offer.enabled;
-                        if (offer.course) {
-                            selectedItem = offer.course;
-                        } else if (!courseId) {
-                            selectedItem = null;
+                        applyOfferFromState(offer);
+                        if (result.data?.state && typeof window.pneLiveRenderState === 'function') {
+                            window.pneLiveRenderState(result.data.state);
                         }
-                        renderToggle();
                         if (offerEnabled) {
-                            setOfferStatus('Oferta włączona. Uczestnicy zobaczą ją na transmisji w ciągu kilkunastu sekund.', false);
-                        } else {
+                            if (offerAutoHide) {
+                                if (!offerExpiresAt) {
+                                    setOfferStatus('Oferta włączona na 2 minuty. Uczestnicy zobaczą ją w ciągu kilku sekund.', false);
+                                }
+                            } else {
+                                setOfferStatus('Oferta włączona bez limitu — schowa się po „Ukryj ofertę”.', false);
+                            }
+                        } else if (!opts.quiet) {
+                            clearOfferCountdown();
                             setOfferStatus('Oferta ukryta.', false);
                         }
                     }).catch(function () {
@@ -629,6 +859,9 @@
                             window.PneButtonLoading.setButtonLoading(toggleBtn, false);
                         }
                         setOfferStatus('Nie udało się zapisać oferty.', true);
+                        if (autoHideToggle) {
+                            autoHideToggle.checked = offerAutoHide;
+                        }
                         renderToggle();
                     });
                 });
@@ -638,6 +871,17 @@
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', function () {
                     saveOffer(!offerEnabled);
+                });
+            }
+
+            if (autoHideToggle) {
+                autoHideToggle.addEventListener('change', function () {
+                    offerAutoHide = readAutoHide();
+                    if (!hasOnlineDetails || !selectedCourseId()) {
+                        return;
+                    }
+                    // Od razu zapisujemy preferencję (i restartujemy / kasujemy timer, jeśli oferta już włączona).
+                    saveOffer(offerEnabled, { autoHide: offerAutoHide, quiet: !offerEnabled });
                 });
             }
 

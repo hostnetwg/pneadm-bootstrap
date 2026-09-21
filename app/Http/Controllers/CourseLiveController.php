@@ -167,6 +167,7 @@ class CourseLiveController extends Controller
                 Rule::notIn([(int) $course->id]),
             ],
             'live_offer_enabled' => ['required', 'boolean'],
+            'live_offer_auto_hide' => ['sometimes', 'boolean'],
         ]);
 
         $offerCourseId = isset($validated['live_offer_course_id'])
@@ -184,8 +185,16 @@ class CourseLiveController extends Controller
             ], 422);
         }
 
+        $autoHide = array_key_exists('live_offer_auto_hide', $validated)
+            ? (bool) $validated['live_offer_auto_hide']
+            : true;
+
+        $willEnable = $enabled && $offerCourseId !== null;
         $details->live_offer_course_id = $offerCourseId;
-        $details->live_offer_enabled = $enabled && $offerCourseId !== null;
+        $details->live_offer_enabled = $willEnable;
+        $details->live_offer_auto_hide = $autoHide;
+        // Timer 2 min tylko gdy auto-ukrycie ON; bez niego oferta stoi do ręcznego Ukryj.
+        $details->live_offer_enabled_at = ($willEnable && $autoHide) ? now() : null;
         $details->save();
 
         $course->unsetRelation('onlineDetails');
