@@ -91,6 +91,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Seria — auto format/szablon zaświadczeń | `--filter=CourseSeriesCertificateSettingsTest` |
 | Linki e-mail do prowadzącego | `--filter=CourseInstructorLinksEmailBodyTest` (pierwszy punkt: `Lista obecności / zaświadczenie`, gdy flaga na edycji kursu jest włączona). Kanon: [CERTIFICATES.md](./CERTIFICATES.md). |
 | Omnibus — historia cen i wyłączenie wpisu | `--filter=PriceOmnibusServiceTest` |
+| Omnibus na szkoleniach zakończonych | **pnedu:** `sail artisan test --filter=ArchivedCourseOmnibusTest` |
 | Promocja i licznik na `/kursy` | **pnedu:** `sail artisan test --filter=test_catalog_shows_promotion_end_omnibus_and_countdown` |
 | Oferta przy istniejącym dostępie | **pnedu:** `sail artisan test --filter=StorefrontOwnerAccessTest` |
 | Katalog bez sprzedaży | `--filter=test_admin_can_keep_course_in_catalog_with_sales_disabled` **oraz pnedu:** `--filter=StorefrontArchiveSalesTest` |
@@ -110,6 +111,11 @@ Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNED
 ## Weryfikacja oferty przy istniejącym dostępie — 2026-09-13
 
 - `pnedu` `StorefrontOwnerAccessTest`: gość widzi cennik; bezterminowy chowa ceny; czasowy ma datę i „Przedłuż dostęp”; przedsprzedaż bez „Przejdź”; wygasły zostaje przy zwykłym zakupie.
+
+## Weryfikacja Omnibus — 2026-09-21
+
+- `pnedu` `ArchivedCourseOmnibusTest`: karta w sekcji „Szkolenia zakończone” oraz strona kursu pokazują „Najniższa cena z 30 dni przed obniżką” przy aktywnej promocji,
+- Omnibus dopięty też do formularza V2 (`order-form-v2-offer-price`) i `pay-online`, oraz do listy wariantów na stronie kursu.
 
 ## Weryfikacja Omnibus — 2026-09-13
 

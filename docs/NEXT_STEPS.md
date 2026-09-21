@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-19
+Data utworzenia/aktualizacji: 2026-09-21
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-21) — Omnibus na szkoleniach zakończonych
+
+Karty w sekcji „Szkolenia zakończone” na `/szkolenia-indywidualne` pokazują cenę i linię Omnibus przy aktywnej promocji (jak nadchodzące). Też: formularz V2, `pay-online`, lista wariantów na stronie kursu. Test: `ArchivedCourseOmnibusTest`. Kanon: [LEGAL_CHECKOUT.md](./LEGAL_CHECKOUT.md).
 
 ## Ostatnio (2026-09-19) — Kto jest teraz na live + szybsza belka
 

@@ -30,6 +30,8 @@ Projekt nowej wersji Regulaminu: `draft-pending-approval` (nieopublikowany). Lis
 
 Przy ogłoszonej obniżce ceny (szkolenia i kursy nagrane) front pokazuje „Najniższą cenę z 30 dni przed obniżką” z historii ofert (`price_offer_histories`). To obowiązek ustawy o informowaniu o cenach, nie część oświadczenia 14-dniowego.
 
+Od 2026-09-21 ta sama linia Omnibus jest też na kartach **szkoleń zakończonych** (`/szkolenia-indywidualne` → sekcja archiwum), na stronie opisu kursu przy wielu wariantach z promocją, w nagłówku ceny formularza V2 oraz na `pay-online` — zawsze tylko gdy promocja jest aktywna.
+
 ## Dowody
 
 Migracja `2026_09_08_210000_add_legal_checkout_evidence_to_orders.php` rozszerza `form_orders` i `online_payment_orders` o:
