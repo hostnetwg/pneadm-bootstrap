@@ -2,6 +2,13 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.2 — 2026-09-23
+
+Dopisanie do nagrania po szkoleniu.
+
+- Na [Liście szkoleń](/courses), w edycji szkolenia, jest karta **Dopisanie do nagrania**. Włączenie daje jeden link dla dyrektora. Formularz na pnedu.pl dopisuje uczestnika. Nowy adres od razu dostaje konto z hasłem z formularza. Gdy konto już jest, hasła nie zmieniamy — osoba loguje się dotychczasowym.
+- Kanon: [RECORDING_ENROLLMENT.md](docs/RECORDING_ENROLLMENT.md)
+
 ## 1.1 — 2026-09-19
 
 Belka zasobów i oferta na osadzonej transmisji.

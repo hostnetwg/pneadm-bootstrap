@@ -1268,6 +1268,8 @@ class CoursesController extends Controller
             'certificate_registration_open' => 'nullable',
             'certificate_registration_starts_at' => 'nullable|date',
             'certificate_registration_ends_at' => 'nullable|date|after_or_equal:certificate_registration_starts_at',
+            'recording_enrollment_open' => 'nullable',
+            'recording_enrollment_ends_at' => 'nullable|date',
             'id_old' => 'nullable|string|max:255',
             'source_id_old' => 'nullable|string|max:255',
             'show_on_pnedu' => 'nullable|boolean',
@@ -1319,6 +1321,13 @@ class CoursesController extends Controller
             ? $request->input('certificate_registration_ends_at') : null;
         if ($validated['certificate_registration_open'] && empty($course->certificate_registration_token)) {
             $validated['certificate_registration_token'] = \Illuminate\Support\Str::random(64);
+        }
+
+        $validated['recording_enrollment_open'] = $request->has('recording_enrollment_open');
+        $validated['recording_enrollment_ends_at'] = $request->filled('recording_enrollment_ends_at')
+            ? $request->input('recording_enrollment_ends_at') : null;
+        if ($validated['recording_enrollment_open'] && empty($course->recording_enrollment_token)) {
+            $validated['recording_enrollment_token'] = \Illuminate\Support\Str::random(64);
         }
 
         $validated['certificate_registration_collect_birth_data'] = $request->boolean('certificate_registration_collect_birth_data');

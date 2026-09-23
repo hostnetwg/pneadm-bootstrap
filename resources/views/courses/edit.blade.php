@@ -557,6 +557,46 @@
                     </div>
                 </div>
 
+                <div class="card mb-4" id="recording-enrollment">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-play-circle me-1"></i> Dopisanie do nagrania</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Publiczny formularz na pnedu.pl dopisuje uczestnika i od razu zakłada konto z hasłem ustawionym w tym formularzu. Kto już ma konto, loguje się dotychczasowym hasłem — nie zmieniamy go. Data i miejsce urodzenia uzupełniają się przy pobieraniu zaświadczenia, jeśli jest to wymagane.</p>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" name="recording_enrollment_open" class="form-check-input" id="recording_enrollment_open" {{ old('recording_enrollment_open', $course->recording_enrollment_open) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="recording_enrollment_open">Włącz dopisywanie do nagrania</label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="recording_enrollment_ends_at" class="form-label">Formularz dostępny do (opcjonalnie)</label>
+                            <input type="datetime-local" name="recording_enrollment_ends_at" id="recording_enrollment_ends_at" class="form-control" value="{{ old('recording_enrollment_ends_at', $course->recording_enrollment_ends_at ? $course->recording_enrollment_ends_at->format('Y-m-d\TH:i') : '') }}">
+                            <div class="form-text">Puste = do wyłączenia ręcznego, ale nie dłużej niż trwa dostęp do nagrania tego szkolenia.</div>
+                        </div>
+                        @if($course->recording_enrollment_open && ! $course->isRecordingEnrollmentActiveNow())
+                            <div class="alert alert-warning py-2 small">{{ $course->recordingEnrollmentInactiveMessage() }}</div>
+                        @endif
+                        @if($course->recording_enrollment_token)
+                            @php $recordingUrl = $course->recordingEnrollmentPublicUrl(); @endphp
+                            <div class="mb-3">
+                                <label class="form-label">Link do formularza</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-monospace" id="recording-enrollment-url" value="{{ $recordingUrl }}" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('recording-enrollment-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">
+                                        Kopiuj link
+                                    </button>
+                                </div>
+                                @if($recordingUrl)
+                                    <a href="{{ $recordingUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-link btn-sm mt-1 px-0">
+                                        <i class="fas fa-external-link-alt me-1"></i>Otwórz formularz w nowej karcie
+                                    </a>
+                                @endif
+                            </div>
+                        @else
+                            <p class="text-muted small mb-0">Zapisz szkolenie z włączonym dopisywaniem — pojawi się link dla dyrektora.</p>
+                        @endif
+                    </div>
+                </div>
+
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {{ $course->is_active ? 'checked' : '' }}>
                     <label class="form-check-label" for="is_active">Aktywny</label>

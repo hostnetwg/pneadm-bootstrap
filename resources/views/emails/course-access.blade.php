@@ -90,7 +90,7 @@
                 <a href="{{ $certificateUrl }}" class="btn-link {{ $hasPneduAccount ? 'btn-link-secondary' : '' }}">Pobierz zaświadczenie</a>
             @endif
             @if($needsAccountForRecordings)
-                <a href="{{ $registerUrl }}" class="btn-link btn-link-outline">Załóż konto na pnedu.pl</a>
+                <a href="{{ $registerUrl }}" class="btn-link btn-link-outline">Dokończ rejestrację</a>
             @endif
         </p>
 
@@ -107,11 +107,12 @@
         @endif
 
         @if($needsAccountForRecordings)
-            <p>Rejestracja konta (użyj adresu <strong>{{ $participantEmail }}</strong>):<br>
+            <p>Dokończ rejestrację i ustaw hasło. Adres e-mail jest już wpisany i zostaje bez zmian:<br>
                 <a class="wrap-link" href="{{ $registerUrl }}">{{ $registerUrl }}</a>
             </p>
             <p class="text-muted" style="font-size: 0.9em; color: #6c757d;">
                 Po rejestracji i zalogowaniu nagranie oraz materiały będą dostępne w panelu „Moje szkolenia” na pnedu.pl.
+                W panelu użytkownika można zmienić hasło lub całkowicie usunąć konto na pnedu.pl.
             </p>
         @endif
 

@@ -165,7 +165,7 @@ To nie są rekordy `courses`. Rekord `courses` nadal oznacza konkretne szkolenie
 | płatności | `online_payment_orders`, `payment_webhook_logs` | oba |
 | kampanie | `marketing_campaigns`, `marketing_source_types` | `adm.pnedu.pl`, wejścia w `pnedu.pl` |
 | statystyki obecne | `marketing_campaign_stats_daily`, `course_page_stats_daily` | oba |
-| uczestnicy | `participants`, `participant_emails`, `participant_live_access` | `adm.pnedu.pl`, panel w `pnedu.pl` |
+| uczestnicy | `participants`, `participant_emails`, `participant_live_access` | `adm.pnedu.pl`, panel w `pnedu.pl`; dopisanie do nagrania (formularz z hasłem, konto pnedu od razu): [RECORDING_ENROLLMENT.md](../RECORDING_ENROLLMENT.md) |
 | certyfikaty | `certificates`, `certificate_templates`, `certificate_email_logs` | oba |
 | ankiety | `surveys`, `survey_questions`, `survey_responses`, `course_survey_links`, `survey_templates`, `survey_template_questions`, `survey_settings`, `survey_testimonials` | wyniki/import/szablony/moderacja: `adm.pnedu.pl`; wypełnianie native + bramka: `pnedu.pl` (`/ankieta/{token}`); szczegóły: `docs/SURVEYS.md` |
 | LMS | `online_courses`, `online_course_modules`, `online_course_lessons` | oba |

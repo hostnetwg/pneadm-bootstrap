@@ -12,6 +12,7 @@ use App\Models\Participant;
 use App\Models\ParticipantDownloadToken;
 use App\Models\PneduUser;
 use App\Services\Mail\SystemMailDiagnostics;
+use App\Support\PneduRegistrationLink;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -112,7 +113,11 @@ class SendCourseAccessEmailJob implements ShouldQueue
             $certificateUrl = $pneduFrontendUrl.'/certificate/'.$token.'/'.$course->id;
         }
 
-        $registerUrl = $pneduFrontendUrl.'/register?email='.urlencode($email);
+        $registerUrl = PneduRegistrationLink::url(
+            $email,
+            $participant->first_name,
+            $participant->last_name
+        );
 
         try {
             $deliveryMeta = app(SystemMailDiagnostics::class)->send(

@@ -1,10 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\CertificateApiController;
+use App\Http\Controllers\CertificateTemplateController;
+use App\Http\Controllers\PubligoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PubligoController;
-use App\Http\Controllers\CertificateTemplateController;
-use App\Http\Controllers\Api\CertificateApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,10 +30,10 @@ Route::post('/publigo/webhook-test', [PubligoController::class, 'webhookTest'])
     ->name('publigo.webhook.test');
 
 // Prosty test endpoint
-Route::post('/publigo/simple-test', function() {
+Route::post('/publigo/simple-test', function () {
     return response()->json([
         'message' => 'Simple test endpoint working',
-        'timestamp' => now()->toISOString()
+        'timestamp' => now()->toISOString(),
     ]);
 });
 
@@ -44,7 +44,7 @@ Route::post('/admin/certificate-templates/upload-background', [CertificateTempla
 Route::delete('/admin/certificate-templates/delete-background', [CertificateTemplateController::class, 'deleteBackground'])->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
 
 // Test endpoint z przykładowymi danymi Publigo
-Route::post('/publigo/test-data', function() {
+Route::post('/publigo/test-data', function () {
     $testData = [
         'id' => 12345,
         'user_id' => 67890,
@@ -57,8 +57,8 @@ Route::post('/publigo/test-data', function() {
             [
                 'product_id' => 359, // ID kursu z URL
                 'details' => 'Kurs testowy',
-                'external_id' => 359
-            ]
+                'external_id' => 359,
+            ],
         ],
         'items' => [
             [
@@ -68,20 +68,20 @@ Route::post('/publigo/test-data', function() {
                 'quantity' => 1,
                 'discount' => 0,
                 'subtotal' => 299.00,
-                'price' => 299.00
-            ]
+                'price' => 299.00,
+            ],
         ],
         'customer' => [
             'first_name' => 'Jan',
             'last_name' => 'Kowalski',
-            'email' => 'jan.kowalski@example.com'
-        ]
+            'email' => 'jan.kowalski@example.com',
+        ],
     ];
-    
+
     return response()->json([
         'message' => 'Test data generated',
         'data' => $testData,
-        'timestamp' => now()->toISOString()
+        'timestamp' => now()->toISOString(),
     ]);
 });
 
@@ -100,6 +100,11 @@ Route::post('/participants/update-birth-data', [CertificateApiController::class,
     ->name('api.participants.update-birth-data');
 
 // Rejestracja zaświadczenia (formularz na pnedu) – chronione tokenem API
+Route::prefix('recording-enrollment')->name('api.recording-enrollment.')->middleware('api.token')->group(function () {
+    Route::get('/status/{token}', [\App\Http\Controllers\Api\RecordingEnrollmentController::class, 'status'])->name('status');
+    Route::post('/register', [\App\Http\Controllers\Api\RecordingEnrollmentController::class, 'register'])->name('register');
+});
+
 Route::prefix('certificate-registration')->name('api.certificate-registration.')->middleware('api.token')->group(function () {
     Route::get('/status/{token}', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'status'])->name('status');
     Route::get('/status-by-course/{course}', [\App\Http\Controllers\Api\CertificateRegistrationController::class, 'statusByCourse'])->name('status-by-course');

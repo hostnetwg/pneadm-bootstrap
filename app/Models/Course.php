@@ -49,6 +49,9 @@ class Course extends Model
         'certificate_registration_token',
         'certificate_registration_collect_birth_data',
         'certificate_registration_birth_data_required',
+        'recording_enrollment_open',
+        'recording_enrollment_ends_at',
+        'recording_enrollment_token',
         'next_participant_order',
         'access_duration_days',
         'access_notes',
@@ -84,6 +87,8 @@ class Course extends Model
         'certificate_registration_ends_at' => 'datetime',
         'certificate_registration_collect_birth_data' => 'boolean',
         'certificate_registration_birth_data_required' => 'boolean',
+        'recording_enrollment_open' => 'boolean',
+        'recording_enrollment_ends_at' => 'datetime',
         'next_participant_order' => 'integer',
         'post_end_access_duration_value' => 'integer',
         'google_calendar_synced_at' => 'datetime',
@@ -392,6 +397,84 @@ class Course extends Model
         }
 
         return $base.'/certificate-registration/'.$token;
+    }
+
+    /**
+     * Czy publiczny formularz dopisania do nagrania jest włączony i jeszcze w terminie.
+     * Termin liczy się też z okna dostępu do nagrania (ta sama data wygaśnięcia co przy rejestracji zaświadczenia).
+     */
+    public function isRecordingEnrollmentActiveNow(?\DateTimeInterface $now = null): bool
+    {
+        if (! $this->recording_enrollment_open) {
+            return false;
+        }
+
+        if (trim((string) ($this->recording_enrollment_token ?? '')) === '') {
+            return false;
+        }
+
+        $now = $now ? \Carbon\Carbon::parse($now) : now();
+
+        if ($this->recording_enrollment_ends_at && $now->gt($this->recording_enrollment_ends_at)) {
+            return false;
+        }
+
+        return ! $this->recordingAccessWindowHasEnded($now);
+    }
+
+    public function recordingEnrollmentInactiveMessage(?\DateTimeInterface $now = null): string
+    {
+        if (! $this->recording_enrollment_open) {
+            return 'Dopisywanie do nagrania jest wyłączone.';
+        }
+
+        if (trim((string) ($this->recording_enrollment_token ?? '')) === '') {
+            return 'Dopisywanie do nagrania nie jest skonfigurowane dla tego szkolenia.';
+        }
+
+        $now = $now ? \Carbon\Carbon::parse($now) : now();
+
+        if ($this->recording_enrollment_ends_at && $now->gt($this->recording_enrollment_ends_at)) {
+            return 'Termin dopisania do nagrania już minął.';
+        }
+
+        if ($this->recordingAccessWindowHasEnded($now)) {
+            return 'Dostęp do nagrania tego szkolenia już się skończył.';
+        }
+
+        return 'Dopisywanie do nagrania jest wyłączone.';
+    }
+
+    public function recordingAccessWindowHasEnded(?\DateTimeInterface $now = null): bool
+    {
+        $expires = app(\App\Services\ParticipantAccessExpiryService::class)
+            ->defaultExpiresAtFromCourseEnd($this);
+
+        if ($expires === null) {
+            return false;
+        }
+
+        $now = $now ? \Carbon\Carbon::parse($now) : now();
+
+        return $expires->lte($now);
+    }
+
+    /**
+     * Publiczny URL formularza dopisania do nagrania na pnedu.pl (lub null).
+     */
+    public function recordingEnrollmentPublicUrl(): ?string
+    {
+        $token = trim((string) ($this->recording_enrollment_token ?? ''));
+        if ($token === '') {
+            return null;
+        }
+
+        $base = rtrim((string) config('services.pnedu_frontend_url', ''), '/');
+        if ($base === '') {
+            return null;
+        }
+
+        return $base.'/dostep-do-szkolenia/'.$token;
     }
 
     /**

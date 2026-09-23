@@ -65,6 +65,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Moduł | Filtr / plik |
 |-------|----------------|
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
+| Dopisanie do nagrania po szkoleniu | `--filter=RecordingEnrollmentApiTest`; **pnedu:** `--filter=RecordingEnrollmentTest` (założenie konta pomijane, gdy `testing.users` nie ma `deleted_at` / `first_name` / `email_verified_at`; nie równolegle z suite pneadm); kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md) |
 | ClickMeeting lista → courses | `--filter=ClickMeetingTrainingAdminTest`; kanon: [CLICKMEETING_TRAININGS.md](./CLICKMEETING_TRAININGS.md) |
 | Historia wersji ADM / pnedu.pl | `--filter=ReleaseChangelog`; mail `--filter=ReleaseChangelogNotify`; kanon: [CHANGELOG_VERSIONING.md](./CHANGELOG_VERSIONING.md) |
 | ClickMeeting sync `room_url` / maile live | `--filter=ClickMeetingTrainingAdminTest`, `--filter=ParticipantLiveMeetingLinkMailServiceTest` |

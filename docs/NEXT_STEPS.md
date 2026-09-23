@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-21
+Data utworzenia/aktualizacji: 2026-09-23
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-23) — Dopisanie do nagrania po szkoleniu
+
+Ręczny przełącznik na edycji każdego szkolenia. Link `/dostep-do-szkolenia/{token}`: hasło jest na tym formularzu. Nowy adres dostaje od razu konto na pnedu.pl i wejście do panelu szkoleń. Istniejące konto: hasła nie zmieniamy, prosimy o zalogowanie. Kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md). Deploy: [2026-09-recording-enrollment-deploy.md](./deploy/2026-09-recording-enrollment-deploy.md).
 
 ## Ostatnio (2026-09-21) — Omnibus na szkoleniach zakończonych
 

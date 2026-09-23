@@ -435,6 +435,42 @@
                             @endif
                         </div>
                     </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-play-circle me-1"></i> Dopisanie do nagrania</h5>
+                            <a href="{{ route('courses.edit', [$course->id, 'filter_preserve' => 1]) }}#recording-enrollment" class="btn btn-sm btn-outline-primary">Edytuj ustawienia</a>
+                        </div>
+                        <div class="card-body">
+                            @if($course->recording_enrollment_open)
+                                <p class="mb-2">
+                                    @if($course->isRecordingEnrollmentActiveNow())
+                                        <span class="badge bg-success">Włączone</span>
+                                    @else
+                                        <span class="badge bg-warning text-dark">Włączone, formularz zamknięty</span>
+                                    @endif
+                                    @if($course->recording_enrollment_ends_at)
+                                        <span class="text-muted small ms-1">do {{ $course->recording_enrollment_ends_at->format('d.m.Y H:i') }}</span>
+                                    @endif
+                                </p>
+                                @if(! $course->isRecordingEnrollmentActiveNow())
+                                    <p class="small text-warning mb-2">{{ $course->recordingEnrollmentInactiveMessage() }}</p>
+                                @endif
+                                @php $recordingUrl = $course->recordingEnrollmentPublicUrl(); @endphp
+                                @if($recordingUrl)
+                                    <div class="input-group">
+                                        <input type="text" class="form-control form-control-sm font-monospace" id="show-recording-enrollment-url" value="{{ $recordingUrl }}" readonly>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('show-recording-enrollment-url').value); this.textContent='Skopiowano!'; setTimeout(() => this.textContent='Kopiuj link', 2000);">Kopiuj link</button>
+                                    </div>
+                                    <a href="{{ $recordingUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-link btn-sm mt-1 px-0">
+                                        <i class="fas fa-external-link-alt me-1"></i>Otwórz formularz w nowej karcie
+                                    </a>
+                                @endif
+                            @else
+                                <p class="text-muted mb-0">Wyłączone. Włącz w <a href="{{ route('courses.edit', [$course->id, 'filter_preserve' => 1]) }}#recording-enrollment">edycji szkolenia</a>.</p>
+                            @endif
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-4">
