@@ -48,7 +48,9 @@
                                 @else
                                     Bez daty publikacji
                                 @endif
-                                @if($article->author)
+                                @if($article->author_name)
+                                    <span class="mx-1">|</span> Autor: {{ $article->author_name }}
+                                @elseif($article->author)
                                     <span class="mx-1">|</span> Autor: {{ $article->author->name }}
                                 @endif
                             </div>
@@ -92,7 +94,10 @@
                                     <span class="text-muted small">(publiczny blog, zgodnie z ustawieniami analityki)</span>
                                 </dd>
 
-                                <dt>Autor</dt>
+                                <dt>Autor (publiczny)</dt>
+                                <dd>{{ $article->author_name ?: 'Brak' }}</dd>
+
+                                <dt>Konto panelu</dt>
                                 <dd>{{ $article->author?->name ?? 'Brak' }}</dd>
 
                                 <dt>Utworzono</dt>

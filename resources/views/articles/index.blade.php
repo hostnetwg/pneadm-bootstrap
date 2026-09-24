@@ -145,7 +145,7 @@
                                             {{ $article->formattedViewCount() }}
                                         </span>
                                     </td>
-                                    <td>{{ $article->author?->name ?? 'Brak' }}</td>
+                                    <td>{{ $article->author_name ?: ($article->author?->name ?? 'Brak') }}</td>
                                     <td>
                                         <span class="badge {{ $article->comments_enabled ? 'bg-primary' : 'bg-light text-dark' }}">
                                             {{ $article->comments_enabled ? 'Włączone później' : 'Wyłączone' }}

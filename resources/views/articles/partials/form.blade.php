@@ -36,6 +36,13 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="author_name" class="form-label">Autor artykułu</label>
+                    <input type="text" name="author_name" id="author_name" class="form-control @error('author_name') is-invalid @enderror" value="{{ old('author_name', $article->author_name) }}" maxlength="120" placeholder="np. Anna Kowalska">
+                    <div class="form-text">Wyświetlany publicznie na <code>/blog</code> pod krótkim opisem (po prawej). Pole opcjonalne.</div>
+                    @error('author_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="mb-3">
                     <label for="content_html" class="form-label">Treść HTML</label>
                     <textarea name="content_html" id="content_html" class="form-control @error('content_html') is-invalid @enderror" rows="16" placeholder="<p>Wpisz treść artykułu...</p>">{{ old('content_html', $article->content_html) }}</textarea>
                     <div class="form-text">Dozwolone są podstawowe znaczniki HTML, np. akapity, nagłówki, listy, linki i tabele. Encja <code>&amp;nbsp;</code> jest traktowana jako twarda spacja.</div>

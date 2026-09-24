@@ -32,7 +32,7 @@ Moduł `Artykuły` w panelu `pneadm` służy do zarządzania wpisami publikowany
 
 `pnedu` czyta opublikowane artykuły z bazy `pneadm`:
 
-- `/blog` — lista opublikowanych artykułów (kolejność: `sort_order`, potem data publikacji).
+- `/blog` — lista opublikowanych artykułów (kolejność: `sort_order`, potem data publikacji). Pod excerptem, po prawej: **autor** (`author_name`), jeśli ustawiony w panelu.
 - `/blog/{slug}` — szczegóły artykułu.
 - **Wyświetlenia:** przy każdym kwalifikującym się wejściu na artykuł inkrementowany jest `view_count` (reguły jak w `Analityka → Ustawienia`, max. raz na sesję `pne_analytics_sid`).
 - **Liczniki „nowe” przy menu Blog:** czerwona plakietka z liczbą artykułów opublikowanych po ostatniej wizycie użytkownika na blogu (stan w `localStorage` przeglądarki — znika po wejściu na `/blog` lub artykuł).
@@ -65,7 +65,7 @@ Komentarze powinny być publicznie widoczne dopiero po zatwierdzeniu.
 ### Typowy workflow redakcyjny
 
 1. **Utwórz szkic** (`draft`) — treść niewidoczna na `pnedu.pl`.
-2. Uzupełnij: tytuł, slug, excerpt, treść HTML, opcjonalnie okładkę.
+2. Uzupełnij: tytuł, slug, excerpt, opcjonalnie **autora**, treść HTML, opcjonalnie okładkę.
 3. Uzupełnij **SEO**: `meta_title`, `meta_description` (patrz sekcja poniżej).
 4. Ustaw **status `published`** i **datę publikacji** (`published_at`) — może być teraz lub w przyszłości (zaplanowany start).
 5. **Podgląd w panelu** → sprawdź układ.
@@ -93,6 +93,7 @@ Komentarze powinny być publicznie widoczne dopiero po zatwierdzeniu.
 | Tytuł | Widoczny na blogu; podstawa slug i SEO, gdy brak meta |
 | Slug | URL: `/blog/{slug}` — unikalny, SEO-friendly |
 | Krótki opis (excerpt) | Lead na liście i w hero artykułu |
+| Autor artykułu | Publiczna nazwa na `/blog` (pod excerptem, wyrównanie do prawej); opcjonalne |
 | Treść HTML | Główna treść; w edytorze `&nbsp;` zapisuje się poprawnie |
 | Status | `draft` / `published` |
 | Data publikacji | Wymagana do widoczności publicznej |
@@ -161,12 +162,13 @@ Pełny kanon techniczny frontu: **`pnedu/SEO.md`**. Checklista Search Console: *
 | `2026_08_23_000001_create_articles_table.php` | Tabela `articles` |
 | `2026_08_23_000002_add_sort_order_to_articles_table.php` | Kolejność na blogu |
 | `2026_08_23_000003_add_view_count_to_articles_table.php` | Licznik wyświetleń |
+| `2026_09_24_000001_add_author_name_to_articles_table.php` | Publiczna nazwa autora (`author_name`) |
 
 Prod (panel):
 
 ```bash
 cd ~/domains/adm.pnedu.pl/pneadm
-/opt/alt/php82/usr/bin/php artisan migrate --path=database/migrations/2026_08_23_000003_add_view_count_to_articles_table.php --force
+/opt/alt/php82/usr/bin/php artisan migrate --path=database/migrations/2026_09_24_000001_add_author_name_to_articles_table.php --force
 ```
 
 (lub `--force` pełne migrate, jeśli brakuje wcześniejszych).

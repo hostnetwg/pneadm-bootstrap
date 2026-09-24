@@ -64,6 +64,7 @@ class ArticleController extends Controller
         $validated['comments_enabled'] = $request->boolean('comments_enabled');
         $validated['content_html'] = $this->sanitizeHtml($validated['content_html'] ?? null);
         $validated['author_id'] = $request->user()?->id;
+        $validated['author_name'] = $this->normalizeAuthorName($validated['author_name'] ?? null);
 
         unset($validated['cover_image']);
 
@@ -101,6 +102,7 @@ class ArticleController extends Controller
         $validated = $this->validateArticle($request, $article);
         $validated['comments_enabled'] = $request->boolean('comments_enabled');
         $validated['content_html'] = $this->sanitizeHtml($validated['content_html'] ?? null);
+        $validated['author_name'] = $this->normalizeAuthorName($validated['author_name'] ?? null);
 
         unset($validated['cover_image']);
 
@@ -184,6 +186,7 @@ class ArticleController extends Controller
             'content_html' => ['nullable', 'string'],
             'status' => ['required', Rule::in([Article::STATUS_DRAFT, Article::STATUS_PUBLISHED])],
             'published_at' => ['nullable', 'date'],
+            'author_name' => ['nullable', 'string', 'max:120'],
             'cover_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
@@ -207,6 +210,13 @@ class ArticleController extends Controller
         $filename = Article::seoCoverImageFilename($article, $extension);
 
         return $file->storeAs('articles/covers', $filename, 'public');
+    }
+
+    private function normalizeAuthorName(?string $authorName): ?string
+    {
+        $authorName = trim((string) $authorName);
+
+        return $authorName !== '' ? $authorName : null;
     }
 
     private function sanitizeHtml(?string $html): ?string

@@ -27,6 +27,7 @@ class Article extends Model
         'status',
         'published_at',
         'author_id',
+        'author_name',
         'cover_image',
         'meta_title',
         'meta_description',
