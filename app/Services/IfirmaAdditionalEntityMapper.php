@@ -24,9 +24,10 @@ use RuntimeException;
  *  - rola spoza obsługiwanej listy              ⇒ RuntimeException,
  *  - `id_type` inny niż NULL/''/'NIP'/'IDWew'     ⇒ RuntimeException (zero cichego fallbacku),
  *  - niekompletne dane `recipient_*`            ⇒ RuntimeException,
- *  - rola wymagająca NIP (JST, grupa VAT) + pusty NIP ⇒ RuntimeException,
- *  - typ IDWew + JST/VAT: `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip` (A2),
- *  - typ IDWew + odbiorca: tylko `IdentyfikatorWewnetrznyZNip`.
+ *  - rola wymagająca NIP (JST, grupa VAT) + typ NIP/brak + pusty NIP ⇒ RuntimeException,
+ *  - typ IDWew (odbiorca / JST / grupa VAT): tylko `IdentyfikatorWewnetrznyZNip`
+ *    (KSeF FA(3): NIP lub IDWew; iFirma oba pola opcjonalne). `recipient_nip`
+ *    nie jest wymagany i nie trafia do payloadu.
  *
  * Legacy: `buildLegacyRecipientPhysicalOnly()` — zwykły odbiorca (rola ODBIORCA)
  * wyłącznie z `recipient_*`, gdy KSeF jest wyłączony (`ksef_entity_source=none`).
@@ -102,28 +103,19 @@ class IfirmaAdditionalEntityMapper
                 );
             }
 
+            // FA(3) / MF: Podmiot3 z rolą 8/9 identyfikuje się NIP lub IDWew
+            // (nie obu naraz). Przy modelu IDWew nie wysyłamy NIP — iFirma
+            // oznacza oba pola jako opcjonalne.
+            // https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/
             $podmiot['IdentyfikatorWewnetrznyZNip'] = $idwew;
-
-            // A2: JST / grupa VAT — IDWew + NIP Podmiotu3 z recipient_nip (dokumentacja iFirma:
-            // https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/ — oba pola dozwolone).
-            if (FormOrder::isKsefRoleRequiringNip($role)) {
-                $nip = $this->resolveRecipientNipOnly($order);
-                if ($nip === null || $nip === '') {
-                    throw new RuntimeException(
-                        'KSeF Podmiot3: rola "'.$role.'" z typem IDWew wymaga też NIP Podmiotu3 w recipient_nip '
-                        .'(obok IdentyfikatorWewnetrznyZNip). Uzupełnij NIP w karcie ODBIORCA / Podmiot3.'
-                    );
-                }
-                $podmiot['NIP'] = $nip;
-            }
         } else {
             $nip = $this->resolveNip($order);
 
             if (FormOrder::isKsefRoleRequiringNip($role) && ($nip === null || $nip === '')) {
                 throw new RuntimeException(
                     'KSeF Podmiot3: rola "'.$role.'" (iFirma: '.FormOrder::ksefRoleIfirmaCode($role).') wymaga niepustego NIP. '
-                    .'Uzupełnij recipient_nip lub ksef_additional_entity_identifier (typ NIP). '
-                    .'KSeF nie przyjmie JST ani członka grupy VAT bez NIP podmiotu — blokujemy request przed uderzeniem do iFirma.'
+                    .'Uzupełnij recipient_nip lub ksef_additional_entity_identifier (typ NIP), albo ustaw typ IDWew. '
+                    .'Przy typie NIP KSeF oczekuje NIP Podmiotu3 — blokujemy request przed uderzeniem do iFirma.'
                 );
             }
 

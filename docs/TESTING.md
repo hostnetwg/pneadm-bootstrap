@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-19
+Data aktualizacji: 2026-09-28
 
 ## Cel
 

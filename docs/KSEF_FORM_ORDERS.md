@@ -19,7 +19,7 @@ Dokument opisuje wdrożenie obsługi dodatkowego podmiotu na fakturze
 | **ETAP 1** | Kolumny metadanych `ksef_*` + backfill `recipient` → `odbiorca` | ✅ wdrożony |
 | **ETAP 2** | Role `odbiorca` / `jst_recipient` (8) / `vat_group_member` (9), UI metadanych w adm, fail-fast | ✅ wdrożony |
 | **ETAP 3** | Przyciski iFirma na `/form-orders/{id}`, `IfirmaKontrahentBuilder`, `PodmiotyDodatkowe` (zmiana API iFirma 2026-08-04), dwufazowy czerwony przycisk + sync KSeF | ✅ wdrożony w **adm** |
-| **ETAP 4** | Faktor / inne role / rename `recipient_*` / Podmiot3 na pro formie | ⏸ częściowo: **A2 wdrożone** (JST/VAT + IDWew → `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip`) |
+| **ETAP 4** | Faktor / inne role / rename `recipient_*` / Podmiot3 na pro formie | ⏸ częściowo: **IDWew dla JST/VAT** = tylko `IdentyfikatorWewnetrznyZNip` (2026-09, decyzja: NIP nieobowiązkowy) |
 | **pnedu.pl** | Oznaczenia KSeF / role w publicznym formularzu zamówienia | ❌ poza zakresem (świadomie) |
 
 Badge „ETAP 3” w UI adm (`show` / `edit` / `create`) oznacza powyższy stan metadanych +
@@ -164,11 +164,13 @@ przypadkach:
 3. `ksef_entity_source = 'recipient'` + brak któregokolwiek z:
    `recipient_name`, `recipient_postal_code`, `recipient_city`.
 4. `ksef_entity_source = 'recipient'` + rola ∈ `{jst_recipient, vat_group_member}`
-   + pusty NIP (po normalizacji cyfrowej). KSeF nie przyjmie JST ani
-   członka grupy VAT bez NIP, więc odrzucamy request przed uderzeniem do iFirma.
-5. `id_type = IDWew` + rola JST/VAT + pusty `recipient_nip` → fail-fast
-   (wymagane oba: `IdentyfikatorWewnetrznyZNip` z identyfikatora oraz `NIP`
-   z `recipient_nip` — wariant A2).
+   + `id_type` inny niż `IDWew` + pusty NIP (po normalizacji cyfrowej). Przy typie
+   NIP / braku typu KSeF oczekuje NIP Podmiotu3, więc odrzucamy request przed
+   uderzeniem do iFirma.
+5. `id_type = IDWew` (dowolna obsłużona rola, w tym JST/VAT) → tylko
+   `IdentyfikatorWewnetrznyZNip`. `recipient_nip` nie jest wymagany i **nie**
+   trafia do payloadu (KSeF FA(3): NIP **lub** IDWew; iFirma oba pola opcjonalne).
+   Niepoprawny / pusty IDWew → fail-fast.
 
 Dodatkowo kontroler zwraca **HTTP 400**, gdy
 `ksef_entity_source = 'none'` w ścieżkach explicit wymagających Podmiotu3
@@ -211,11 +213,13 @@ Reguły dla pola `NIP` (po usunięciu znaków nie-cyfrowych):
 | `NULL` / `''`   | (ignorowana)    | z `recipient_nip`                       |
 | `'NIP'`         | puste           | z `recipient_nip`                       |
 | `'NIP'`         | niepuste        | z `ksef_additional_entity_identifier`   |
+| `'IDWew'`       | poprawny IDWew  | **pominięty** — pole `IdentyfikatorWewnetrznyZNip` |
 | inne            | (dowolna)       | **fail-fast**, brak requestu do iFirma  |
 
-Dla ról `jst_recipient` i `vat_group_member` pusty NIP (po normalizacji)
-kończy się fail-fastem. Dla roli `odbiorca` pusty NIP jest dopuszczalny
-(osoba prywatna bez NIP).
+Dla ról `jst_recipient` i `vat_group_member` przy typie NIP / braku typu pusty NIP
+(po normalizacji) kończy się fail-fastem. Przy `id_type=IDWew` NIP nie jest
+wymagany (szkoła / jednostka podrzędna JST bez własnego NIP — model MF).
+Dla roli `odbiorca` pusty NIP jest dopuszczalny (osoba prywatna bez NIP).
 
 ## Heurystyka z `invoice_notes`
 
@@ -240,7 +244,8 @@ Elementy:
   Na **create** domyślnie zaznaczony; na show/edit odzwierciedla wartość z bazy.
   Wybór roli JST / grupa VAT automatycznie zaznacza checkbox (jeśli był odznaczony).
 - Select `ksef_additional_entity_role` z etykietami kanoniczny kod + kod iFirma
-  oraz inline `alert-info` dla ról JST/grupy VAT (semantyka + wymagany NIP).
+  oraz inline `alert-info` dla ról JST/grupy VAT (NIP przy typie NIP; przy IDWew
+  wystarczy identyfikator wewnętrzny).
 - Select `ksef_additional_entity_id_type` z `alert-warning` przy wyborze typu
   innego niż `NIP`.
 - Input `ksef_additional_entity_identifier` z podpowiedzią o regule
@@ -431,7 +436,9 @@ API 2026-08 — `PodmiotyDodatkowe`, nie `Kontrahent.OdbiorcaNaFakturze`):
 - tryb `invoice_with_receiver` + niekompletne `recipient_*` → pusta tablica;
 - tryb `invoice_with_receiver` + `source='recipient'` → jak mapper (`auto`);
 - gate `podmiot3_mode=required` + `source='none'` → `IfirmaKontrahentException`;
-- `jst_recipient` z pustym NIP → `RuntimeException` (HTTP 422);
+- `jst_recipient` z pustym NIP i bez IDWew → `RuntimeException` (HTTP 422);
+- `jst_recipient` / `vat_group_member` + `id_type=IDWew` (także bez `recipient_nip`)
+  → `IdentyfikatorWewnetrznyZNip` bez pola `NIP`;
 - pro forma → **nigdy** nie buduje `PodmiotyDodatkowe`.
 
 Powiązane: `IfirmaAdditionalEntityMapperTest`, `FormOrderKsefHelpersTest`,
@@ -443,10 +450,12 @@ Powiązane: `IfirmaAdditionalEntityMapperTest`, `FormOrderKsefHelpersTest`,
 - Potwierdzenie i ewentualne wdrożenie obsługi faktora / `DOKONUJACY_PLATNOSCI`
   po zweryfikowaniu mapowania w iFirma (w publicznej dokumentacji brak osobnej
   wartości `FAKTOR` w polu `Rola`).
-- ✅ **A2 (2026-08):** `IdentyfikatorWewnetrznyZNip` + `NIP` z `recipient_nip`
-  dla ról JST / grupa VAT przy `id_type=IDWew`
-  ([dokumentacja iFirma](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/)).
-  Dla `odbiorca` + IDWew nadal tylko `IdentyfikatorWewnetrznyZNip`.
+- ✅ **IDWew dla JST/VAT (2026-09):** tylko `IdentyfikatorWewnetrznyZNip`
+  (KSeF FA(3): NIP **lub** IDWew; [broszura FA(3)](https://ksef.podatki.gov.pl/media/jknpcymf/broszura-informacyjna-dotyczaca-struktury-logicznej-fa-3-04032026.pdf),
+  [JST](https://ksef.podatki.gov.pl/jednostki-samorzadu-terytorialnego-jst/),
+  [iFirma PodmiotyDodatkowe](https://api.ifirma.pl/dodatkowy-podmiot-na-fakturze/)).
+  Wcześniejszy wariant A2 (IDWew **plus** NIP z `recipient_nip`) był zbyt
+  restrykcyjny wobec jednostek bez własnego NIP.
 - Dodatkowe role (`DODATKOWY_NABYWCA`, `DOKONUJACY_PLATNOSCI`, `PRACOWNIK`, `INNA`)
   tylko przy realnym przypadku biznesowym.
 - Podmiot3 na pro formie — **tylko** po potwierdzeniu w dokumentacji iFirma
@@ -470,12 +479,14 @@ dopiero potem kod ETAP 4.
      **czerwony** przycisk (create → KSeF) → sprawdź `NumerKSeF` w adm i w iFirma;
    - upewnij się, że e-mail z FV idzie dopiero po nadaniu numeru KSeF.
 2. **Decyzja Waldemara — ETAP 4.1:**
-   - **A2)** ✅ wdrożone — JST/VAT + IDWew → `IdentyfikatorWewnetrznyZNip` + `NIP` (`recipient_nip`);
+   - **A2)** zastąpione 2026-09 — JST/VAT + IDWew → tylko `IdentyfikatorWewnetrznyZNip`
+     (NIP odbiorcy nieobowiązkowy; #10177).
    - **B)** nowa rola biznesowa (np. płatnik), jeśli pojawi się konkretne zamówienie;
    - **C)** procedura operacyjna + szkolenie zespołu z UI adm;
    - **D)** później: pola KSeF w formularzu publicznym pnedu.pl (osobny projekt).
 
-Następny krok po A2: smoke na zamówieniu z JST+IDWew (np. #7987) fioletowym/czerwonym przyciskiem.
+Następny krok po IDWew-only: smoke na zamówieniu z JST+IDWew bez NIP odbiorcy
+(np. #10177) czerwonym przyciskiem.
 
 ## Identyfikatory faktury na `form_orders`
 

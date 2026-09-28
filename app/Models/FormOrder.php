@@ -109,10 +109,9 @@ class FormOrder extends Model
     ];
 
     /**
-     * Kanoniczne kody ról, dla których mapowanie w ETAP 2 WYMAGA niepustego NIP
-     * (patrz IfirmaAdditionalEntityMapper::build()): w praktyce KSeF nie przyjmie
-     * JST ani członka grupy VAT bez NIP podmiotu, więc odrzucamy fail-fast
-     * zanim uderzymy do iFirma.
+     * Kanoniczne kody ról, dla których mapowanie wymaga niepustego NIP, gdy
+     * typ identyfikatora to NIP lub pusty (patrz IfirmaAdditionalEntityMapper::build()).
+     * Przy id_type=IDWew wystarczy IdentyfikatorWewnetrznyZNip (KSeF FA(3): NIP lub IDWew).
      *
      * @var array<int, string>
      */
@@ -1579,11 +1578,11 @@ class FormOrder extends Model
     }
 
     /**
-     * Czy kanoniczny kod roli wymaga niepustego NIP w payloadzie iFirma (fail-fast).
+     * Czy kanoniczny kod roli wymaga niepustego NIP w payloadzie iFirma (fail-fast),
+     * gdy typ identyfikatora to NIP lub pusty. Przy IDWew NIP nie jest wymagany.
      *
-     * Dla ról JST (rola 8) i członka grupy VAT (rola 9) KSeF wymaga identyfikacji
-     * podmiotu po NIP — pusty NIP oznaczałby błąd walidacyjny po stronie iFirma/KSeF.
-     * Odrzucamy taki request jeszcze przed wywołaniem API.
+     * Dla ról JST (rola 8) i członka grupy VAT (rola 9) KSeF FA(3) wymaga
+     * identyfikacji NIP lub IDWew. Przy typie NIP pusty NIP blokujemy przed API.
      */
     public static function isKsefRoleRequiringNip(?string $role): bool
     {

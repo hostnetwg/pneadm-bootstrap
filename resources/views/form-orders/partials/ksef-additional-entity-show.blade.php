@@ -2,8 +2,8 @@
     Blok prezentacji „KSeF – Podmiot3 (metadane)” na widoku szczegółów zamówienia.
     Tylko do odczytu. Logika i ograniczenia opisane w docs/KSEF_FORM_ORDERS.md.
 
-    Stan ETAP 3 + A2: role odbiorca / jst_recipient / vat_group_member.
-    Payload iFirma: PodmiotyDodatkowe. JST/VAT: NIP obowiązkowy; przy IDWew też IdentyfikatorWewnetrznyZNip.
+    Stan ETAP 3: role odbiorca / jst_recipient / vat_group_member.
+    Payload iFirma: PodmiotyDodatkowe. JST/VAT przy typie NIP: NIP obowiązkowy; przy IDWew tylko IdentyfikatorWewnetrznyZNip.
 --}}
 @php
     /** @var \App\Models\FormOrder $zamowienie */
@@ -33,14 +33,16 @@
                     ? substr($rawIdwew, 0, 10).'-'.substr($rawIdwew, 10)
                     : $rawIdwew;
             }
-        }
-        if ($idType === FormOrder::KSEF_ID_TYPE_NIP && ! empty(trim((string) $identifier))) {
+        } elseif ($idType === FormOrder::KSEF_ID_TYPE_NIP && ! empty(trim((string) $identifier))) {
             $effectiveIdentifier = preg_replace('/[^0-9]/', '', (string) $identifier);
-        } elseif (! empty(trim((string) $zamowienie->recipient_nip))) {
+        } elseif ($idType !== FormOrder::KSEF_ID_TYPE_IDWEW && ! empty(trim((string) $zamowienie->recipient_nip))) {
             $effectiveIdentifier = preg_replace('/[^0-9]/', '', (string) $zamowienie->recipient_nip);
         }
     }
-    $missingRequiredNip = $isActive && $roleRequiresNip && ($effectiveIdentifier === null || $effectiveIdentifier === '');
+    $missingRequiredNip = $isActive
+        && $roleRequiresNip
+        && $idType !== FormOrder::KSEF_ID_TYPE_IDWEW
+        && ($effectiveIdentifier === null || $effectiveIdentifier === '');
 
     $invoiceNotesRaw = (string) ($zamowienie->invoice_notes ?? '');
     $invoiceNotes = mb_strtolower($invoiceNotesRaw);

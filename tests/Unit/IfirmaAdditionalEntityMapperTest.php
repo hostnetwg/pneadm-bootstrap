@@ -159,7 +159,7 @@ class IfirmaAdditionalEntityMapperTest extends TestCase
         $this->assertSame('ODBIORCA', $payload['Rola']);
     }
 
-    public function test_builds_idwew_plus_recipient_nip_for_jst_role(): void
+    public function test_idwew_for_jst_omits_recipient_nip_even_when_filled(): void
     {
         $order = $this->makeOrder($this->baseRecipientAttributes([
             'recipient_nip' => '774-303-80-67',
@@ -172,21 +172,40 @@ class IfirmaAdditionalEntityMapperTest extends TestCase
 
         $this->assertSame('JEDN_SAMORZADU_TERYT', $payload['Rola']);
         $this->assertSame('7743211258-00709', $payload['IdentyfikatorWewnetrznyZNip']);
-        $this->assertSame('7743038067', $payload['NIP']);
+        $this->assertArrayNotHasKey('NIP', $payload);
     }
 
-    public function test_fail_fast_on_idwew_for_jst_without_recipient_nip(): void
+    public function test_idwew_for_jst_succeeds_without_recipient_nip(): void
     {
         $order = $this->makeOrder($this->baseRecipientAttributes([
+            'recipient_name' => 'Szkoła Podstawowa nr 7 im. 3. Korczaka',
             'recipient_nip' => null,
             'ksef_additional_entity_role' => FormOrder::KSEF_ROLE_JST_RECIPIENT,
             'ksef_additional_entity_id_type' => FormOrder::KSEF_ID_TYPE_IDWEW,
-            'ksef_additional_entity_identifier' => '7743211258-00709',
+            'ksef_additional_entity_identifier' => '8451951677-12000',
         ]));
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches('/wymaga też NIP Podmiotu3/');
-        $this->mapper->build($order);
+        $payload = $this->mapper->build($order);
+
+        $this->assertSame('JEDN_SAMORZADU_TERYT', $payload['Rola']);
+        $this->assertSame('8451951677-12000', $payload['IdentyfikatorWewnetrznyZNip']);
+        $this->assertArrayNotHasKey('NIP', $payload);
+    }
+
+    public function test_idwew_for_vat_group_succeeds_without_recipient_nip(): void
+    {
+        $order = $this->makeOrder($this->baseRecipientAttributes([
+            'recipient_nip' => null,
+            'ksef_additional_entity_role' => FormOrder::KSEF_ROLE_VAT_GROUP_MEMBER,
+            'ksef_additional_entity_id_type' => FormOrder::KSEF_ID_TYPE_IDWEW,
+            'ksef_additional_entity_identifier' => '5252248481-00001',
+        ]));
+
+        $payload = $this->mapper->build($order);
+
+        $this->assertSame('CZLONEK_GRUPY_VAT', $payload['Rola']);
+        $this->assertSame('5252248481-00001', $payload['IdentyfikatorWewnetrznyZNip']);
+        $this->assertArrayNotHasKey('NIP', $payload);
     }
 
     public function test_fail_fast_on_unsupported_role(): void

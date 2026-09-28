@@ -86,10 +86,10 @@
         </div>
 
         <div id="ksefRoleHintJst" class="small text-info mb-1 @if(!($isRoleJst && $isRecipient)) d-none @endif">
-            <i class="bi bi-info-circle"></i> JST: wymagany NIP w Odbiorcy. Przy typie IDWew wysyłamy też ID wewnętrzny (NIP+IDWew).
+            <i class="bi bi-info-circle"></i> JST: przy typie NIP wymagany NIP w Odbiorcy. Przy IDWew wystarczy identyfikator wewnętrzny (bez NIP szkoły).
         </div>
         <div id="ksefRoleHintVat" class="small text-info mb-1 @if(!($isRoleVatGroup && $isRecipient)) d-none @endif">
-            <i class="bi bi-info-circle"></i> Grupa VAT: NIP członka obowiązkowy.
+            <i class="bi bi-info-circle"></i> Grupa VAT: przy typie NIP wymagany NIP członka. Przy IDWew wystarczy identyfikator wewnętrzny.
         </div>
         <div id="ksefIdTypeWarning" class="small text-warning mb-1 @if(!($ksefIdType !== null && $ksefIdType !== '' && ! FormOrder::isKsefIdTypeSupported($ksefIdType) && $isRecipient)) d-none @endif">
             <i class="bi bi-exclamation-triangle"></i> Typ nieobsługiwany — fail-fast przy wystawianiu.

@@ -1,7 +1,11 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-23
+Data utworzenia/aktualizacji: 2026-09-28
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## Ostatnio (2026-09-28) — JST/VAT + IDWew bez NIP odbiorcy
+
+Przy roli JST / grupa VAT i typie IDWew payload iFirma ma tylko `IdentyfikatorWewnetrznyZNip`. NIP szkoły nie jest wymagany (KSeF FA(3): NIP lub IDWew). Kanon: [KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md). Deploy: [2026-09-ksef-idwew-without-recipient-nip-deploy.md](./deploy/2026-09-ksef-idwew-without-recipient-nip-deploy.md).
 
 ## Ostatnio (2026-09-23) — Dopisanie do nagrania po szkoleniu
 

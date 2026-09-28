@@ -8,8 +8,8 @@
       - kolumny `recipient_*` są historycznie nazwane, ale pełnią rolę danych Podmiotu3
         niezależnie od wybranej roli (nota nazewnicza w KSEF_FORM_ORDERS.md),
       - payload iFirma: root PodmiotyDodatkowe (od 2026-08-04; nie Kontrahent.OdbiorcaNaFakturze),
-      - inne role / id_type niż NIP → fail-fast (HTTP 422 w kontrolerze),
-      - dla JST i grupy VAT dodatkowo wymagany niepusty NIP — fail-fast przed requestem do iFirma.
+      - inne role / id_type inny niż NIP i IDWew → fail-fast (HTTP 422 w kontrolerze),
+      - dla JST i grupy VAT przy typie NIP wymagany niepusty NIP; przy IDWew wystarczy identyfikator wewnętrzny.
       - bez zmian w publicznym formularzu pnedu.pl.
 --}}
 @php
@@ -57,7 +57,7 @@
     <div class="card-body">
         <p class="text-muted small mb-3">
             Metadane sterujące traktowaniem danych <code>recipient_*</code> jako Podmiotu3 (dodatkowego podmiotu na fakturze) przy wystawianiu faktury w iFirma i wysyłce do KSeF.
-            Obsługiwane role: <code>odbiorca</code> (iFirma: <code>ODBIORCA</code>), <code>jst_recipient</code> (iFirma: <code>JEDN_SAMORZADU_TERYT</code>, KSeF rola 8), <code>vat_group_member</code> (iFirma: <code>CZLONEK_GRUPY_VAT</code>, KSeF rola 9). Typ ID: <code>NIP</code> lub <code>IDWew</code> (przy JST/VAT + IDWew wymagany też NIP w <code>recipient_nip</code>).
+            Obsługiwane role: <code>odbiorca</code> (iFirma: <code>ODBIORCA</code>), <code>jst_recipient</code> (iFirma: <code>JEDN_SAMORZADU_TERYT</code>, KSeF rola 8), <code>vat_group_member</code> (iFirma: <code>CZLONEK_GRUPY_VAT</code>, KSeF rola 9). Typ ID: <code>NIP</code> lub <code>IDWew</code> (przy IDWew NIP odbiorcy nie jest wymagany — KSeF FA(3): NIP lub IDWew).
             Szczegóły: <code>docs/KSEF_FORM_ORDERS.md</code>.
         </p>
 
@@ -122,13 +122,13 @@
         @if ($isRoleJst && $isRecipient)
             <div class="alert alert-info py-1 mb-2 small">
                 <i class="bi bi-info-circle"></i>
-                <strong>JST — rola 8:</strong> w <code>recipient_*</code> powinny być dane <strong>jednostki samorządu terytorialnego</strong> (gminy/powiatu/województwa), a nie jednostki podrzędnej. NIP podmiotu jest obowiązkowy — przy pustym NIP request do iFirma zostanie zablokowany (fail-fast).
+                <strong>JST — rola 8:</strong> w <code>recipient_*</code> dane jednostki podrzędnej (np. szkoły). Przy typie NIP NIP jest obowiązkowy. Przy typie IDWew wystarczy identyfikator wewnętrzny (NIP JST + 5 cyfr) — szkoła nie musi mieć własnego NIP.
             </div>
         @endif
         @if ($isRoleVatGroup && $isRecipient)
             <div class="alert alert-info py-1 mb-2 small">
                 <i class="bi bi-info-circle"></i>
-                <strong>Członek grupy VAT — rola 9:</strong> w <code>recipient_*</code> powinny być dane <strong>członka grupy VAT</strong> (jednostka, która faktycznie otrzymała towar/usługę) z jego NIP. NIP <strong>grupy VAT</strong> wpisujesz w nagłówku nabywcy (firm_nip). NIP członka jest obowiązkowy — fail-fast przy pustym NIP.
+                <strong>Członek grupy VAT — rola 9:</strong> w <code>recipient_*</code> dane <strong>członka grupy VAT</strong>. NIP <strong>grupy VAT</strong> wpisujesz w nagłówku nabywcy (firm_nip). Przy typie NIP NIP członka jest obowiązkowy; przy IDWew wystarczy identyfikator wewnętrzny.
             </div>
         @endif
 
