@@ -1,6 +1,6 @@
 # Marketing — handoff dla developera (kontynuacja bez historii chatów AI)
 
-**Ostatnia aktualizacja:** 2026-06-19  
+**Ostatnia aktualizacja:** 2026-09-28  
 **Projekty:** `pneadm` (adm) + `pnedu` (front)  
 **Baza danych:** wspólna `pneadm` dla kampanii, zamówień, statystyk
 
@@ -70,7 +70,8 @@ sail artisan migrate   # tylko migracje bazy pnedu (users itd.)
 - **Zliczanie (pnedu):** `MarketingCampaignLinkTracker` + middleware `CaptureMarketingSource` + skrócony link `/l/{code}`
 - **Wyświetlanie (adm):** kolumna **Wejś.** na `/marketing-campaigns`
 - **Deduplikacja:** max 1× gość / kampania / dzień (cache + cookie `pne_funnel_sid`)
-- **Dane historyczne:** tylko od wdrożenia — starsze kliknięcia nie są backfillowane
+- **Zgoda cookies:** licznik Wejś. **nie** czeka na baner analityczny. Zapis atrybucji UTM (cookie/sesja) nadal tylko po zgodzie
+- **Dane historyczne:** tylko od wdrożenia — starsze kliknięcia nie są backfillowane. Luka 8–28.09.2026 (bramka zgody) też bez backfillu
 
 ### 3.3 Filtr okresu na liście kampanii (wariant 2)
 
@@ -86,6 +87,7 @@ sail artisan migrate   # tylko migracje bazy pnedu (users itd.)
 - Sortowanie **Wejś.** — naprawione (subquery zamiast nieistniejącego `orderBySum()`; bez `select()` nadpisującego `withSum`)
 - Przełączniki analityki na dev — middleware odświeżania nie może nadpisywać `forget` cookie przy toggle
 - Wielokampaniowe kliknięcia tego samego użytkownika — działają (osobny klucz cache per `campaign_code`)
+- Wejś. z linku UTM przy braku zgody na cookies analityczne — od 8.09.2026 middleware wracał przed trackerem; od 28.09.2026 licznik idzie przed bramką zgody
 
 ### 3.5 Świadoma decyzja (bez zmian w kodzie)
 
@@ -199,6 +201,7 @@ cd pnedu && sail artisan test --filter=MarketingAnalyticsOptOutTest
 |---------|----------|-------------|
 | Przełączniki analityki zawsze czerwone OFF | Middleware renewal nadpisywał `forget` | Naprawione; wyczyść cookie `pne_skip_*` lub incognito |
 | Wejś. nie rośnie po kliknięciu | Opt-out lejka włączony | Lejek → ON na `/settings/analityka` |
+| Sendy ma kliknięcia, Wejś. prawie 0 | Do 28.09.2026 licznik czekał na cookie analityczne; pierwsze wejście z maila go nie ma | Po wdrożeniu poprawki nowe kliknięcia się liczą; starej luki nie da się odtworzyć |
 | Wejś. na adm, klik na pnedu.pl | `PNEDU_PUBLIC_URL` wskazuje prod | Ustaw `http://localhost:8081` w dev |
 | Drugie kliknięcie innej kampanii = 0 | Brak `utm_campaign` w URL (nawigacja wewnętrzna) | Testuj pełny link z adm, nie sam opis kursu |
 | Sortowanie Wejś. = 500 | Stary `orderBySum()` | Już naprawione subquery |

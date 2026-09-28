@@ -138,7 +138,7 @@ UI: `Marketing → Lejek konwersji`, kolumna „Lejek” na `/courses`.
 
 **Opt-out zespołu (pnedu + adm):** przełączniki na **Ustawienia → Analityka** (`/settings/analityka`) lub linki `?pne_skip_funnel=1&token=…` / `?pne_skip_analytics=1&token=…` (`MARKETING_FUNNEL_SKIP_TOKEN` w `.env` obu projektów). Lejek OFF wyłącza zliczanie wejść w `course_page_stats_daily` i eventy GA `course_view` / `order_form_view`. GA/GTM OFF pomija ładowanie GA4 i GTM na pnedu.pl. **Wyłączenie trwa do ręcznego ON** — cookie ma techniczny TTL (`MARKETING_FUNNEL_SKIP_COOKIE_DAYS`, domyślnie 365 dni), ale jest **odnawiane przy każdej wizycie** na pnedu.pl i w panelu adm, więc nie wygasa samo po roku.
 
-**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` / `fb_source` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Ten sam gość może tego samego dnia zliczyć **kilka różnych** kampanii. Respektuje opt-out lejka (`pne_skip_funnel=1` blokuje też wejścia z linków). Dane tylko od wdrożenia licznika (brak backfillu).
+**Wejścia z linku kampanii** (`marketing_campaign_stats_daily`, kolumna **Wejś.**): liczone przy pierwszym wejściu z `utm_campaign` / `fb` / `fb_source` w URL lub po skróconym `/l/{kod}` — osobno dla każdej kampanii, max 1× gość/kampania/dzień. Ten sam gość może tego samego dnia zliczyć **kilka różnych** kampanii. Licznik działa **bez** zgody na cookies analityczne (własny lejek; „Tylko niezbędne” też się liczy). Zapis UTM do cookie `pne_marketing` i sesji zamówienia nadal tylko po zgodzie na analitykę. Respektuje opt-out lejka (`pne_skip_funnel=1` blokuje też wejścia z linków). Dane tylko od wdrożenia licznika (brak backfillu). Kliknięcia z maili między 8 a 28 września 2026, które wpadły na stronę bez cookie analitycznego, nie zostały zapisane i nie da się ich dociągnąć wstecz.
 
 **Lista kampanii — filtr okresu** (`MarketingCampaignStatsService`):
 
@@ -321,3 +321,4 @@ Edytuj `CourseFunnelStatsService::orderCountsForCourses()` — faktura: `invoice
 | 2026-06-17 | Fix sortowania Wejś. (subquery zamiast `orderBySum`) |
 | 2026-06-17 | Filtr okresu na liście kampanii (`MarketingCampaignStatsService`, presety dat, aktywność w okresie) |
 | 2026-06-19 | [MARKETING-HANDOFF.md](./MARKETING-HANDOFF.md) — dokument kontynuacji pracy bez historii chatów AI |
+| 2026-09-28 | Wejś. z linku UTM liczone także bez zgody na cookies analityczne (naprawa bramki z 8.09.2026 w `CaptureMarketingSource`) |
