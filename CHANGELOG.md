@@ -9,6 +9,7 @@ Dopisanie do nagrania po szkoleniu.
 - Na [Liście szkoleń](/courses), w edycji szkolenia, jest karta **Dopisanie do nagrania**. Włączenie daje jeden link dla dyrektora. Formularz na pnedu.pl dopisuje uczestnika. Nowy adres od razu dostaje konto z hasłem z formularza. Gdy konto już jest, hasła nie zmieniamy — osoba loguje się dotychczasowym.
 - Kanon: [RECORDING_ENROLLMENT.md](docs/RECORDING_ENROLLMENT.md)
 - **Hotfix 2026-09-28:** na [zamówieniu FORM](/form-orders) przy roli JST / grupa VAT i identyfikatorze wewnętrznym (IDWew) nie trzeba już NIP szkoły. KSeF przyjmuje NIP **lub** IDWew. Kanon: [KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md)
+- **Hotfix 2026-09-28:** na [karcie użytkownika pnedu.pl](/admin/pnedu-users) można poprawić imię, nazwisko, e-mail, datę i miejsce urodzenia. Zmiana e-maila aktualizuje też uczestników szkoleń. Kanon: [PNEDU_USERS_ADMIN.md](docs/PNEDU_USERS_ADMIN.md)
 
 ## 1.1 — 2026-09-19
 

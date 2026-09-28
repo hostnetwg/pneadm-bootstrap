@@ -3,6 +3,10 @@
 Data utworzenia/aktualizacji: 2026-09-28
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-28) — Edycja danych użytkownika pnedu.pl w ADM
+
+Na karcie `/admin/pnedu-users/{id}` można zmienić imię, nazwisko, e-mail, datę i miejsce urodzenia (uprawnienie „Edycja użytkowników”). Zmiana e-maila zeruje weryfikację i aktualizuje rekordy uczestników; zamówienia FORM zostają przy starym adresie. Kanon: [PNEDU_USERS_ADMIN.md](./PNEDU_USERS_ADMIN.md).
+
 ## Ostatnio (2026-09-28) — JST/VAT + IDWew bez NIP odbiorcy
 
 Przy roli JST / grupa VAT i typie IDWew payload iFirma ma tylko `IdentyfikatorWewnetrznyZNip`. NIP szkoły nie jest wymagany (KSeF FA(3): NIP lub IDWew). Kanon: [KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md). Deploy: [2026-09-ksef-idwew-without-recipient-nip-deploy.md](./deploy/2026-09-ksef-idwew-without-recipient-nip-deploy.md).

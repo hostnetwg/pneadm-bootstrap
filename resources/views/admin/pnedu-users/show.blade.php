@@ -32,26 +32,147 @@
                     <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Dane konta</h5>
                 </div>
                 <div class="card-body">
+                    @if(auth()->user()->hasPermission('users.edit'))
+                        <form method="post"
+                              id="pnedu-user-update-form"
+                              action="{{ route('admin.pnedu-users.update', ['pnedu_user' => $user->getKey()]) }}"
+                              class="mb-4 pb-3 border-bottom"
+                              data-original-email="{{ $user->email }}">
+                            @csrf
+                            @method('PUT')
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="pnedu_user_first_name">Imię</label>
+                                    <input type="text"
+                                           class="form-control @error('first_name') is-invalid @enderror"
+                                           id="pnedu_user_first_name"
+                                           name="first_name"
+                                           value="{{ old('first_name', $user->first_name) }}"
+                                           required
+                                           maxlength="255"
+                                           autocomplete="given-name">
+                                    @error('first_name')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="pnedu_user_last_name">Nazwisko</label>
+                                    <input type="text"
+                                           class="form-control @error('last_name') is-invalid @enderror"
+                                           id="pnedu_user_last_name"
+                                           name="last_name"
+                                           value="{{ old('last_name', $user->last_name) }}"
+                                           required
+                                           maxlength="255"
+                                           autocomplete="family-name">
+                                    @error('last_name')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="pnedu_user_email">E-mail (login)</label>
+                                    <input type="email"
+                                           class="form-control @error('email') is-invalid @enderror"
+                                           id="pnedu_user_email"
+                                           name="email"
+                                           value="{{ old('email', $user->email) }}"
+                                           required
+                                           maxlength="255"
+                                           autocomplete="email">
+                                    @error('email')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="pnedu_user_birth_date">Data urodzenia</label>
+                                    <input type="date"
+                                           class="form-control @error('birth_date') is-invalid @enderror"
+                                           id="pnedu_user_birth_date"
+                                           name="birth_date"
+                                           value="{{ old('birth_date', $user->birth_date?->format('Y-m-d')) }}"
+                                           max="{{ now()->subDay()->format('Y-m-d') }}">
+                                    @error('birth_date')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label" for="pnedu_user_birth_place">Miejsce urodzenia</label>
+                                    <input type="text"
+                                           class="form-control @error('birth_place') is-invalid @enderror"
+                                           id="pnedu_user_birth_place"
+                                           name="birth_place"
+                                           value="{{ old('birth_place', $user->birth_place) }}"
+                                           maxlength="255"
+                                           autocomplete="address-level2">
+                                    @error('birth_place')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <p class="text-muted small mt-2 mb-3">
+                                Zmiana e-maila zmienia login na pnedu.pl. Nowy adres jest niezweryfikowany; flaga bounce znika.
+                                Imię, nazwisko, data/miejsce urodzenia i e-mail są przepisywane na rekordy uczestników z tym adresem.
+                                Zamówienia FORM zostają przy poprzednim e-mailu.
+                            </p>
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="bi bi-save me-1"></i> Zapisz dane
+                            </button>
+                        </form>
+
+                        <div class="modal fade" id="pneduUpdateEmailModal" tabindex="-1" aria-labelledby="pneduUpdateEmailModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-warning text-dark">
+                                        <h2 class="modal-title fs-5" id="pneduUpdateEmailModalLabel">
+                                            <i class="bi bi-envelope-exclamation me-1"></i>
+                                            Zmiana e-maila konta
+                                        </h2>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="mb-2">Zmienić adres e-mail (login) tego konta?</p>
+                                        <div class="alert alert-warning mb-0">
+                                            Użytkownik loguje się nowym adresem. Weryfikacja e-mail wraca do „nie”.
+                                            E-mail na rekordach uczestników (szkolenia) zostanie zaktualizowany.
+                                            Zamówienia FORM zostają przy starym e-mailu.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                        <button type="submit"
+                                                form="pnedu-user-update-form"
+                                                class="btn btn-warning"
+                                                id="pneduUpdateEmailConfirmBtn">
+                                            Zmień e-mail
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <dl class="row mb-0">
                         <dt class="col-sm-4 text-muted">ID</dt>
                         <dd class="col-sm-8"><span class="badge bg-secondary">{{ $user->id }}</span></dd>
 
-                        <dt class="col-sm-4 text-muted">Imię</dt>
-                        <dd class="col-sm-8">{{ $user->first_name ?: '—' }}</dd>
+                        @unless(auth()->user()->hasPermission('users.edit'))
+                            <dt class="col-sm-4 text-muted">Imię</dt>
+                            <dd class="col-sm-8">{{ $user->first_name ?: '—' }}</dd>
 
-                        <dt class="col-sm-4 text-muted">Nazwisko</dt>
-                        <dd class="col-sm-8">{{ $user->last_name ?: '—' }}</dd>
+                            <dt class="col-sm-4 text-muted">Nazwisko</dt>
+                            <dd class="col-sm-8">{{ $user->last_name ?: '—' }}</dd>
 
-                        <dt class="col-sm-4 text-muted">Data urodzenia</dt>
-                        <dd class="col-sm-8">{{ $user->birth_date?->format('Y-m-d') ?? '—' }}</dd>
+                            <dt class="col-sm-4 text-muted">Data urodzenia</dt>
+                            <dd class="col-sm-8">{{ $user->birth_date?->format('Y-m-d') ?? '—' }}</dd>
 
-                        <dt class="col-sm-4 text-muted">Miejsce urodzenia</dt>
-                        <dd class="col-sm-8">{{ $user->birth_place ?: '—' }}</dd>
+                            <dt class="col-sm-4 text-muted">Miejsce urodzenia</dt>
+                            <dd class="col-sm-8">{{ $user->birth_place ?: '—' }}</dd>
 
-                        <dt class="col-sm-4 text-muted">E-mail</dt>
-                        <dd class="col-sm-8">
-                            <a href="mailto:{{ $user->email }}" class="text-decoration-none">{{ $user->email }}</a>
-                        </dd>
+                            <dt class="col-sm-4 text-muted">E-mail</dt>
+                            <dd class="col-sm-8">
+                                <a href="mailto:{{ $user->email }}" class="text-decoration-none">{{ $user->email }}</a>
+                            </dd>
+                        @endunless
 
                         <dt class="col-sm-4 text-muted">E-mail zweryfikowany</dt>
                         <dd class="col-sm-8">
@@ -591,6 +712,32 @@
             bindConfirmSubmitModal('pnedu-clear-undeliverable-form', 'pneduClearUndeliverableModal', 'pneduClearUndeliverableConfirmBtn');
             bindConfirmSubmitModal('pnedu-verify-email-form', 'pneduVerifyEmailModal', 'pneduVerifyEmailConfirmBtn');
             bindConfirmSubmitModal('pnedu-user-destroy-form', 'pneduDestroyUserModal', 'pneduDestroyUserConfirmBtn');
+
+            (function bindEmailChangeConfirm() {
+                const form = document.getElementById('pnedu-user-update-form');
+                const modalEl = document.getElementById('pneduUpdateEmailModal');
+                const confirmBtn = document.getElementById('pneduUpdateEmailConfirmBtn');
+                if (!form || !modalEl || !confirmBtn || !window.bootstrap?.Modal) {
+                    return;
+                }
+
+                let confirmed = false;
+                const original = (form.dataset.originalEmail || '').trim().toLowerCase();
+
+                form.addEventListener('submit', function (e) {
+                    const emailInput = form.querySelector('[name="email"]');
+                    const next = (emailInput?.value || '').trim().toLowerCase();
+                    if (next === original || confirmed) {
+                        return;
+                    }
+                    e.preventDefault();
+                    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                });
+
+                confirmBtn.addEventListener('click', function () {
+                    confirmed = true;
+                });
+            })();
         })();
     </script>
     @endpush

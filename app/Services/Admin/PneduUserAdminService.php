@@ -387,6 +387,55 @@ class PneduUserAdminService
         return array_values(array_filter($normalized, fn (string $email) => isset($paidSet[$email])));
     }
 
+    /**
+     * Przepisuje imię, nazwisko, datę/miejsce urodzenia i (opcjonalnie) e-mail
+     * na rekordach {@see Participant} dopasowanych po starym adresie.
+     *
+     * @param  array{first_name: string, last_name: string, birth_date: mixed, birth_place: ?string, email?: string}  $fields
+     * @return array{updated: int, skipped: int}
+     */
+    public function syncLinkedParticipants(string $matchEmail, array $fields): array
+    {
+        $norm = Participant::normalizeEmail($matchEmail);
+        if ($norm === null) {
+            return ['updated' => 0, 'skipped' => 0];
+        }
+
+        $participants = Participant::query()
+            ->withTrashed()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$norm])
+            ->get();
+
+        $updated = 0;
+        $skipped = 0;
+        $newEmail = isset($fields['email']) ? (string) $fields['email'] : null;
+
+        foreach ($participants as $participant) {
+            if ($newEmail !== null && $newEmail !== '') {
+                $duplicate = Participant::findDuplicateInCourse(
+                    (int) $participant->course_id,
+                    $newEmail,
+                    (int) $participant->id
+                );
+                if ($duplicate !== null) {
+                    $skipped++;
+
+                    continue;
+                }
+                $participant->email = $newEmail;
+            }
+
+            $participant->first_name = $fields['first_name'];
+            $participant->last_name = $fields['last_name'];
+            $participant->birth_date = $fields['birth_date'];
+            $participant->birth_place = $fields['birth_place'];
+            $participant->save();
+            $updated++;
+        }
+
+        return ['updated' => $updated, 'skipped' => $skipped];
+    }
+
     public function undeliverableReasonLabel(?string $reason): string
     {
         return match ($reason) {

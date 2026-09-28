@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -119,6 +120,116 @@ class PneduUsersController extends Controller
             'adminService' => $this->pneduUserAdmin,
             'verificationEmailPreview' => $verificationEmailPreview,
         ]);
+    }
+
+    public function update(Request $request, PneduUser $pnedu_user): RedirectResponse
+    {
+        $this->authorizePneduUserManage();
+
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'email' => [
+                'required',
+                'string',
+                'lowercase',
+                'email',
+                'max:255',
+                Rule::unique(PneduUser::class, 'email_unique_slot')->ignore($pnedu_user->id),
+            ],
+            'birth_date' => ['nullable', 'date', 'before:today'],
+            'birth_place' => ['nullable', 'string', 'max:255'],
+        ], [
+            'first_name.required' => 'Podaj imię.',
+            'last_name.required' => 'Podaj nazwisko.',
+            'email.required' => 'Podaj adres e-mail.',
+            'email.email' => 'Podaj poprawny adres e-mail.',
+            'email.unique' => 'To konto e-mail jest już używane przez innego użytkownika pnedu.pl.',
+            'birth_date.before' => 'Data urodzenia musi być wcześniejsza niż dzisiaj.',
+        ]);
+
+        $old = [
+            'first_name' => $pnedu_user->first_name,
+            'last_name' => $pnedu_user->last_name,
+            'email' => $pnedu_user->email,
+            'birth_date' => $pnedu_user->birth_date?->format('Y-m-d'),
+            'birth_place' => $pnedu_user->birth_place,
+        ];
+        $matchEmail = (string) $pnedu_user->email;
+
+        $pnedu_user->first_name = trim($validated['first_name']);
+        $pnedu_user->last_name = trim($validated['last_name']);
+        $pnedu_user->email = $validated['email'];
+        $pnedu_user->birth_date = $validated['birth_date'] ?? null;
+        $pnedu_user->birth_place = isset($validated['birth_place']) && $validated['birth_place'] !== ''
+            ? trim((string) $validated['birth_place'])
+            : null;
+
+        $emailChanged = $pnedu_user->isDirty('email');
+        if ($emailChanged) {
+            $pnedu_user->email_verified_at = null;
+            $pnedu_user->clearEmailDeliverabilityFlags();
+        }
+
+        try {
+            $pnedu_user->save();
+        } catch (QueryException $e) {
+            if (($e->errorInfo[1] ?? null) === 1062) {
+                throw ValidationException::withMessages([
+                    'email' => 'To konto e-mail jest już używane przez innego użytkownika pnedu.pl.',
+                ]);
+            }
+
+            throw $e;
+        }
+
+        $syncFields = [
+            'first_name' => $pnedu_user->first_name,
+            'last_name' => $pnedu_user->last_name,
+            'birth_date' => $pnedu_user->birth_date,
+            'birth_place' => $pnedu_user->birth_place,
+        ];
+        if ($emailChanged) {
+            $syncFields['email'] = $pnedu_user->email;
+        }
+        $sync = $this->pneduUserAdmin->syncLinkedParticipants($matchEmail, $syncFields);
+
+        ActivityLog::logCustom(
+            'Użytkownik pnedu.pl: edycja danych konta',
+            $emailChanged
+                ? 'Zmieniono dane konta ID '.$pnedu_user->id.' (e-mail: '.$old['email'].' → '.$pnedu_user->email.'). Weryfikacja e-mail i flaga bounce zostały zresetowane. Zsynchronizowano uczestników: '.$sync['updated'].', pominięto: '.$sync['skipped'].'.'
+                : 'Zmieniono dane konta ID '.$pnedu_user->id.' ('.$pnedu_user->email.'). Zsynchronizowano uczestników: '.$sync['updated'].', pominięto: '.$sync['skipped'].'.',
+            [
+                'old_values' => $old,
+                'new_values' => [
+                    'pnedu_user_id' => $pnedu_user->id,
+                    'first_name' => $pnedu_user->first_name,
+                    'last_name' => $pnedu_user->last_name,
+                    'email' => $pnedu_user->email,
+                    'birth_date' => $pnedu_user->birth_date?->format('Y-m-d'),
+                    'birth_place' => $pnedu_user->birth_place,
+                    'email_changed' => $emailChanged,
+                    'participants_updated' => $sync['updated'],
+                    'participants_skipped' => $sync['skipped'],
+                ],
+            ]
+        );
+
+        $success = 'Zapisano dane konta.';
+        if ($emailChanged) {
+            $success .= ' Nowy e-mail jest niezweryfikowany — użytkownik loguje się nowym adresem.';
+        }
+        if ($sync['updated'] > 0) {
+            $success .= ' Zaktualizowano '.$sync['updated'].' '.($sync['updated'] === 1 ? 'rekord uczestnika' : 'rekordów uczestników').'.';
+        }
+        if ($sync['skipped'] > 0) {
+            $success .= ' Pominięto '.$sync['skipped'].' (na szkoleniu jest już uczestnik z nowym e-mailem).';
+        }
+        $success .= ' Zamówienia FORM zostają przy poprzednim e-mailu.';
+
+        return redirect()
+            ->route('admin.pnedu-users.show', $pnedu_user)
+            ->with('success', $success);
     }
 
     public function sendVerificationEmail(PneduUser $pnedu_user): RedirectResponse

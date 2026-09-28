@@ -15,8 +15,8 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\BankStatementImportController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\CertificateTemplateController;
-use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\CourseLiveController;
+use App\Http\Controllers\CoursePriceVariantController;
 use App\Http\Controllers\CoursesController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardLiveVisitorsController;
@@ -96,6 +96,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             ->middleware('throttle:30,1')
             ->name('pnedu-users.access-credentials-password');
         Route::post('pnedu-users/{pnedu_user}/set-password', [PneduUsersController::class, 'setPassword'])->name('pnedu-users.set-password');
+        Route::put('pnedu-users/{pnedu_user}', [PneduUsersController::class, 'update'])->name('pnedu-users.update');
         Route::post('pnedu-users/{pnedu_user}/verify-email', [PneduUsersController::class, 'verifyEmail'])->name('pnedu-users.verify-email');
         Route::delete('pnedu-users/{pnedu_user}', [PneduUsersController::class, 'destroy'])->name('pnedu-users.destroy');
         Route::post('pnedu-users/{id}/restore', [PneduUsersController::class, 'restore'])->name('pnedu-users.restore');
