@@ -2,19 +2,22 @@
 
 namespace App\Support\GrowthOS;
 
+use App\Models\GrowthOS\GrowthCampaign;
+use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\GrowthSessionConceptStore;
 use Carbon\CarbonImmutable;
 
 /**
  * Etap 0.3: sesyjny prototyp przygotowania webinaru TIK od zera.
  *
- * Brak bazy, API, publikacji i wysyłek. Cały stan żyje tylko w sesji HTTP.
+ * Kampania i koncepcja są zapisywane w bazie. Reszta stanu żyje w sesji HTTP.
  */
 class DemoTikWebinarProject
 {
     public const PROJECT_ID = 'tik-webinar-session';
 
-    private const SESSION_PROJECT = 'growth_os.demo_tik_project';
+    public const SESSION_PROJECT = 'growth_os.demo_tik_project';
 
     /**
      * @return list<array{value: string, label: string}>
@@ -78,8 +81,7 @@ class DemoTikWebinarProject
             $topic = self::ideas()[0]['title'];
         }
 
-        $project = [
-            'id' => self::PROJECT_ID,
+        $project = self::freshWorkspace([
             'type' => $data['type'],
             'live_date' => $data['live_date'],
             'live_time' => $data['live_time'],
@@ -87,34 +89,12 @@ class DemoTikWebinarProject
             'goal' => $data['goal'],
             'topic' => $topic,
             'status' => 'PLANNING',
-            'created_at' => now()->toIso8601String(),
-            'completed_steps' => [],
-            'direction' => [
-                'why_now' => 'AI w narzędziach edukacyjnych szybko się zmienia, a nauczyciele potrzebują praktycznych przykładów bez technologicznego żargonu.',
-                'audience' => 'Nauczyciele szkół podstawowych i ponadpodstawowych, dyrektorzy zainteresowani TIK.',
-                'problem' => 'Jak przygotować lepsze materiały szybciej i bez poczucia, że trzeba być informatykiem.',
-                'takeaway' => 'Uczestnik wychodzi z listą funkcji Canva AI i kilkoma gotowymi promptami do własnych lekcji.',
-                'sell_later' => 'być może',
-            ],
-            'concept' => [
-                'title' => $topic,
-                'subtitle' => 'Praktyczny webinar TIK dla nauczycieli',
-                'promise' => 'Pokażemy, jak wykorzystać Canva AI do szybszego tworzenia materiałów dydaktycznych.',
-                'points' => [
-                    '5 funkcji Canva AI, które realnie skracają przygotowanie materiałów.',
-                    'Przykłady: karta pracy, prezentacja, dyplom, grafika do lekcji.',
-                    'Typowe błędy w promptach i jak ich uniknąć.',
-                    'Bezpieczne użycie AI w szkole.',
-                ],
-                'plan' => 'Wprowadzenie -> pokaz 5 funkcji -> mini case z lekcji -> pytania -> podsumowanie i CTA.',
-                'cta' => 'Pobierz checklistę promptów i dołącz do kolejnego szkolenia pogłębiającego.',
-                'lead_magnet' => 'PDF: 7 promptów Canva AI dla nauczyciela.',
-                'next_product' => 'być może',
-            ],
-            'concept_versions' => [],
-            'concept_ai_proposal' => null,
-            'materials' => self::defaultMaterials(),
-        ];
+        ]);
+
+        $user = auth()->user();
+        if ($user instanceof User) {
+            $project = app(GrowthSessionConceptStore::class)->createCampaign($project, $user);
+        }
 
         self::saveProject($project);
 
@@ -127,8 +107,11 @@ class DemoTikWebinarProject
     public static function project(): ?array
     {
         $project = session(self::SESSION_PROJECT);
+        if (is_array($project)) {
+            return app(GrowthSessionConceptStore::class)->overlay($project);
+        }
 
-        return is_array($project) ? $project : null;
+        return self::restoreOwnedProject();
     }
 
     /**
@@ -148,6 +131,7 @@ class DemoTikWebinarProject
     public static function saveProject(array $project): void
     {
         session([self::SESSION_PROJECT => $project]);
+        app(GrowthSessionConceptStore::class)->syncStatus($project);
     }
 
     /**
@@ -234,6 +218,7 @@ class DemoTikWebinarProject
             $project['status'] = 'PLANNING';
         }
 
+        self::persistConcept($project);
         self::saveProject($project);
 
         return $project;
@@ -337,6 +322,7 @@ class DemoTikWebinarProject
             $project['status'] = 'PLANNING';
         }
 
+        self::persistConcept($project);
         self::saveProject($project);
 
         return $project;
@@ -352,6 +338,99 @@ class DemoTikWebinarProject
         self::saveProject($project);
 
         return $project;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function restoreOwnedProject(): ?array
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $campaign = app(GrowthSessionConceptStore::class)->latestOwnedCampaign($user);
+        if (! $campaign instanceof GrowthCampaign) {
+            return null;
+        }
+
+        $topic = trim((string) ($campaign->working_topic ?: $campaign->name));
+        $project = self::freshWorkspace([
+            'type' => $campaign->type,
+            'live_date' => $campaign->live_at?->toDateString() ?? now()->toDateString(),
+            'live_time' => $campaign->live_at?->format('H:i') ?? '20:00',
+            'host' => '—',
+            'goal' => $campaign->goal ?: 'unknown',
+            'topic' => $topic !== '' ? $topic : self::ideas()[0]['title'],
+            'status' => 'PLANNING',
+            'growth_campaign_id' => $campaign->id,
+        ]);
+        $project = app(GrowthSessionConceptStore::class)->overlay($project);
+        session([self::SESSION_PROJECT => $project]);
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    private static function freshWorkspace(array $fields): array
+    {
+        $topic = trim((string) ($fields['topic'] ?? ''));
+
+        return [
+            'id' => self::PROJECT_ID,
+            'type' => $fields['type'] ?? 'Webinar TIK',
+            'live_date' => $fields['live_date'] ?? now()->toDateString(),
+            'live_time' => $fields['live_time'] ?? '20:00',
+            'host' => $fields['host'] ?? '—',
+            'goal' => $fields['goal'] ?? 'unknown',
+            'topic' => $topic,
+            'status' => $fields['status'] ?? 'PLANNING',
+            'growth_campaign_id' => $fields['growth_campaign_id'] ?? null,
+            'created_at' => now()->toIso8601String(),
+            'completed_steps' => [],
+            'direction' => [
+                'why_now' => 'AI w narzędziach edukacyjnych szybko się zmienia, a nauczyciele potrzebują praktycznych przykładów bez technologicznego żargonu.',
+                'audience' => 'Nauczyciele szkół podstawowych i ponadpodstawowych, dyrektorzy zainteresowani TIK.',
+                'problem' => 'Jak przygotować lepsze materiały szybciej i bez poczucia, że trzeba być informatykiem.',
+                'takeaway' => 'Uczestnik wychodzi z listą funkcji Canva AI i kilkoma gotowymi promptami do własnych lekcji.',
+                'sell_later' => 'być może',
+            ],
+            'concept' => [
+                'title' => $topic,
+                'subtitle' => 'Praktyczny webinar TIK dla nauczycieli',
+                'promise' => 'Pokażemy, jak wykorzystać Canva AI do szybszego tworzenia materiałów dydaktycznych.',
+                'points' => [
+                    '5 funkcji Canva AI, które realnie skracają przygotowanie materiałów.',
+                    'Przykłady: karta pracy, prezentacja, dyplom, grafika do lekcji.',
+                    'Typowe błędy w promptach i jak ich uniknąć.',
+                    'Bezpieczne użycie AI w szkole.',
+                ],
+                'plan' => 'Wprowadzenie -> pokaz 5 funkcji -> mini case z lekcji -> pytania -> podsumowanie i CTA.',
+                'cta' => 'Pobierz checklistę promptów i dołącz do kolejnego szkolenia pogłębiającego.',
+                'lead_magnet' => 'PDF: 7 promptów Canva AI dla nauczyciela.',
+                'next_product' => 'być może',
+            ],
+            'concept_versions' => [],
+            'concept_ai_proposal' => null,
+            'materials' => self::defaultMaterials(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function persistConcept(array $project): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->persistConcept($project, $user);
     }
 
     /**

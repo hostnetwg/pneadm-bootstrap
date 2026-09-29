@@ -1,15 +1,17 @@
-<?php 
+<?php
 
 namespace App\Models;
 
+use App\Models\GrowthOS\GrowthCampaign;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Traits\LogsActivity;
 
 class Instructor extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $table = 'instructors';
 
@@ -56,7 +58,7 @@ class Instructor extends Model
      */
     public function getGenderLabelAttribute()
     {
-        return match($this->gender) {
+        return match ($this->gender) {
             'male' => 'Mężczyzna',
             'female' => 'Kobieta',
             'other' => 'Inna',
@@ -74,7 +76,7 @@ class Instructor extends Model
             'male' => 'Mężczyzna',
             'female' => 'Kobieta',
             'other' => 'Inna',
-            'prefer_not_to_say' => 'Nie chcę określać'
+            'prefer_not_to_say' => 'Nie chcę określać',
         ];
     }
 
@@ -86,10 +88,14 @@ class Instructor extends Model
         return $this->hasMany(Course::class, 'instructor_id');
     }
 
+    public function primaryGrowthCampaigns(): HasMany
+    {
+        return $this->hasMany(GrowthCampaign::class, 'primary_instructor_id');
+    }
+
     /**
      * Relacja do ankiet przypisanych do instruktora
      */
-
     public function instructorInvoices()
     {
         return $this->hasMany(InstructorInvoice::class, 'instructor_id');

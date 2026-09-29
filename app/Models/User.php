@@ -3,16 +3,18 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\GrowthOS\GrowthCampaign;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Traits\LogsActivity;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -63,24 +65,29 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
+    public function ownedGrowthCampaigns(): HasMany
+    {
+        return $this->hasMany(GrowthCampaign::class, 'owner_user_id');
+    }
+
     /**
      * Sprawdź czy użytkownik ma daną rolę
      */
     public function hasRole($role)
     {
         // Sprawdź czy role jest załadowane i czy to obiekt
-        if (!$this->relationLoaded('role')) {
+        if (! $this->relationLoaded('role')) {
             $this->load('role');
         }
-        
-        if (!$this->role || !is_object($this->role)) {
+
+        if (! $this->role || ! is_object($this->role)) {
             return false;
         }
-        
+
         if (is_string($role)) {
             return $this->role->name === $role;
         }
-        
+
         return $this->role->id === $role;
     }
 
@@ -90,10 +97,10 @@ class User extends Authenticatable
     public function hasPermission($permission)
     {
         // Sprawdź czy role jest załadowane i czy to obiekt
-        if (!$this->relationLoaded('role')) {
+        if (! $this->relationLoaded('role')) {
             $this->load('role');
         }
-        
+
         return $this->role && is_object($this->role) && method_exists($this->role, 'hasPermission') && $this->role->hasPermission($permission);
     }
 
@@ -103,10 +110,10 @@ class User extends Authenticatable
     public function hasLevel($level)
     {
         // Sprawdź czy role jest załadowane i czy to obiekt
-        if (!$this->relationLoaded('role')) {
+        if (! $this->relationLoaded('role')) {
             $this->load('role');
         }
-        
+
         return $this->role && is_object($this->role) && isset($this->role->level) && $this->role->level >= $level;
     }
 

@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 17:03 CEST<br>
+Last updated: 2026-09-29 20:00 CEST<br>
 Branch: main<br>
-Commit: 7137962<br>
-Stage: v0.1 data model documentation<br>
+Commit: working tree / pending commit (base 2064198)<br>
+Stage: v0.1 campaign restore<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap v0.1 — dokumentacja minimalnego modelu danych przed migracjami. Prototyp UX i propozycje AI nadal działają w sesji HTTP.
+Etap v0.1 — po zalogowaniu w innej przeglądarce wraca ostatnia kampania właściciela i zapisana koncepcja. Kierunek, materiały, checklista, propozycja AI, zadania i decyzje zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -28,6 +28,9 @@ Etap v0.1 — dokumentacja minimalnego modelu danych przed migracjami. Prototyp 
 - Menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox.
 - Formularz **Zaplanuj webinar TIK**.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
+- Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii i koncepcji.
+- Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
+- Utworzenie projektu zapisuje `growth_campaigns`. Ręczny zapis koncepcji i „Zastosuj” zapisują jeden artifact `concept`. „Odrzuć” i sama propozycja AI nie zapisują koncepcji.
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
 - **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
@@ -68,25 +71,25 @@ Zaplanuj TIK
 
 ## 6. Czego świadomie jeszcze NIE robimy
 
-- Brak migracji DB.
+- Prototyp nie zapisuje jeszcze kierunku, materiałów, checklisty, zadań ani decyzji do bazy.
 - Brak zapisu wywołań AI do DB; propozycja pozostaje w sesji HTTP.
 - Brak Anthropic, Gemini, OpenRouter, automatycznego routingu modeli i fallbacku między providerami.
 - Brak YouTube API.
 - Brak Sendy API.
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
-- Stan projektu i propozycji działa tylko w sesji HTTP; poza nią powstaje wyłącznie techniczny log metadanych AI.
+- Kierunek, materiały, checklista i propozycja AI działają w sesji HTTP. Poza sesją zostaje kampania, zapisana koncepcja i techniczny log metadanych AI.
 - Brak AI poza etapem Koncepcja.
-- Model danych v0.1 jest obecnie opisany koncepcyjnie; migracje nie zostały jeszcze utworzone.
+- Prowadzący nie jest jeszcze zapisywany. Po odtworzeniu projektu pole prowadzącego jest puste.
+- `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
 
 ## 7. Otwarte pytania
 
-- Czy zaakceptować zaproponowane tabele v0.1 i przejść do migracji?
 - Czy historia wersji ma mieć „przywróć wersję”, czy tylko podgląd?
 
 ## 8. Następny krok
 
-Po akceptacji dokumentacji modelu danych v0.1 przygotować migracje w `pneadm/database/migrations/` dla GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
+Zapis decyzji człowieka jako osobnego rekordu. Nie przenosić jeszcze kierunku, materiałów ani zadań.
 
 ## 9. Ostatnie zmiany
 
@@ -96,7 +99,14 @@ Po akceptacji dokumentacji modelu danych v0.1 przygotować migracje w `pneadm/da
 - Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
 - Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
 - Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
-- Udokumentowano minimalny model danych v0.1 przed migracjami: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
+- Zalogowanie bez sesji odtwarza ostatnią kampanię właściciela i artifact `concept`.
+- Utworzenie projektu zapisuje kampanię, a zapis koncepcji i „Zastosuj” zapisują artifact `concept`.
+- Dodano testy integralności v0.1: unikalność klucza, puste relacje, cascade kampanii, `nullOnDelete` i blokada usunięcia właściciela.
+- Dodano modele `App\Models\GrowthOS` i relacje dla 4 tabel v0.1.
+- Dodano migrację `2026_09_29_191500_create_growth_os_v0_1_tables` dla 4 tabel v0.1.
+- Zmieniono zaakceptowany zakres modelu danych v0.1 na 4 tabele: GrowthCampaign, Artifact, Task i Decision.
+- Topic i Expert przeniesiono poza pierwszą migrację; ekspert v0.1 opiera się o istniejący `Instructor`.
+- Doprecyzowano kontrakt artifactu: `key`, `type`, `schema_version`, `payload`, bez osobnej tabeli wersji w v0.1.
 - Zachowano symulację lokalną przy wyłączonym prawdziwym AI.
 - Dodano automatyczne testy bez prawdziwych i płatnych requestów.
 - Wcześniej: edycja, cofnięcie zatwierdzenia i historia koncepcji w sesji.

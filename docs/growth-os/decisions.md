@@ -131,7 +131,23 @@ Consequences: Dopiero „Zastosuj” zmienia koncepcję; „Odrzuć”, błędny
 ## DEC-017
 
 Date: 2026-09-29<br>
-Status: ACTIVE<br>
+Status: SUPERSEDED by DEC-018<br>
 Decision: Model danych v0.1 zaczynamy od minimalnego fundamentu: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.<br>
 Rationale: Po walidacji prototypu i pilotażu AI potrzebujemy trwałego stanu procesu, ale bez budowania pełnego CRM, grafu klientów ani integracji wykonawczych na zapas.<br>
 Consequences: Najpierw dokumentacja modelu w `docs/growth-os/architecture.md`, potem migracje w `pneadm/database/migrations/` po akceptacji. Poza zakresem v0.1 pozostają Customer Graph, Metrics, Content/Product Graph, publikacje, wysyłki i RAG.
+
+## DEC-018
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Model danych v0.1 obejmuje tylko 4 główne tabele: `growth_campaigns`, `growth_artifacts`, `growth_tasks` i `growth_decisions`.<br>
+Rationale: Po konsultacji zewnętrznej i decyzji właściciela v0.1 ma utrwalić proces, a nie budować Topic Graph ani Expert Graph. Temat pozostaje w danych kampanii/koncepcji, a ekspert jest oparty o istniejący `App\Models\Instructor` jako opcjonalny główny prowadzący kampanii.<br>
+Consequences: W pierwszych migracjach nie tworzymy `growth_topics`, `growth_experts`, `growth_campaign_topic`, `growth_campaign_expert` ani `growth_artifact_versions`. `growth_decisions` pozostaje osobną tabelą jako kanoniczna historia decyzji człowieka. Migracje powstaną dopiero po akceptacji tej dokumentacji.
+
+## DEC-019
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Artifact ma kontrakt `key` + `type` + `schema_version` + `payload`, osobne statusy encji są kanoniczne, a wersjonowanie artifactów w v0.1 ogranicza się do licznika `version`.<br>
+Rationale: `payload` JSON daje elastyczność dla różnych materiałów, ale tylko pod warunkiem walidowanego kontraktu `type + schema_version`. Pełna historia wersji zwiększyłaby zakres v0.1 ponad potrzebę trwałego stanu procesu.<br>
+Consequences: `growth_artifacts` ma `unique(growth_campaign_id, key)`. `published` nie jest statusem artifactu; publikacja będzie później osobną domeną. Pełna historia/przywracanie wersji może powstać później w osobnej tabeli.

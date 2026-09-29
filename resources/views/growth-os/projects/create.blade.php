@@ -13,7 +13,7 @@
 
         @if($errors->any())
             <div class="alert alert-danger" role="alert">
-                Sprawdź pola formularza. Prototyp nie zapisuje danych w bazie.
+                Sprawdź pola formularza.
             </div>
         @endif
 

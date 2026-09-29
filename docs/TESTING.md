@@ -125,6 +125,14 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 - `OpenAiProviderTest`: Responses API, `store: false`, structured output, jedna ponowna próba dla 429/5xx, bezpieczny błąd po wyczerpaniu retry i odrzucenie błędnego JSON.
 - Wszystkie testy używają fake/mock HTTP lub fake providera; `Http::preventStrayRequests()` blokuje prawdziwe i płatne wywołania.
 - Wynik: testy jednostkowe Growth OS **5 passed / 13 assertions**; testy feature Growth OS **20 passed / 109 assertions**; razem **25 passed / 122 assertions**.
+
+## Weryfikacja PNE Growth OS — model v0.1 (2026-09-29)
+
+- `GrowthOsV01SchemaTest`: cztery tabele, brak tabel tematów i ekspertów, unikalny klucz materiału w kampanii.
+- `GrowthOsV01RelationsTest`: kampania, właściciel, instruktor, materiał, zadanie i decyzja.
+- `GrowthOsV01IntegrityTest`: ten sam klucz w drugiej kampanii, puste relacje, usunięcie kampanii kasuje dzieci, usunięcie materiału lub zadania czyści powiązania, usunięcie instruktora czyści wskazanie, usunięcie właściciela jest zablokowane, brak `SoftDeletes` na tabelach Growth OS.
+- Wynik `GrowthOsV01IntegrityTest`: **6 passed / 39 assertions**.
+- `GrowthOsConceptPersistenceTest`: utworzenie projektu zapisuje kampanię; ręczny zapis i „Zastosuj” zapisują artifact `concept`; sama propozycja i „Odrzuć” nie zmieniają zapisu; inna sesja tego samego właściciela odtwarza kampanię i koncepcję, bez statusu materiałów; inny użytkownik tej kampanii nie widzi.
 - Ręczny smoke test z prawdziwym OpenAI wymaga lokalnego `OPENAI_API_KEY` i jawnego `GROWTH_AI_ENABLED=true`; nie jest częścią automatycznego suite.
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).

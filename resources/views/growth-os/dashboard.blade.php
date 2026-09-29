@@ -61,7 +61,7 @@
                     <div class="card-body">
                         <h3 class="h5 mb-2">Nie ma jeszcze projektu webinaru TIK</h3>
                         <p class="text-secondary mb-3">
-                            Zacznij od prostego planu: data live, prowadzący, cel i temat. Prototyp zapisze to tylko w sesji.
+                            Zacznij od prostego planu: data live, prowadzący, cel i temat. Kampania zostanie zapisana, a prowadzący zostaje w tej sesji.
                         </p>
                         <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">
                             Zaplanuj webinar TIK
@@ -98,8 +98,8 @@
             <div class="alert alert-info mb-0" role="note">
                 <h2 class="h6" id="growth-note-heading">Granice prototypu</h2>
                 <p class="mb-0 small">
-                    To nie jest Course, MarketingCampaign ani prawdziwa wysyłka. Wszystko działa tylko w sesji HTTP.
-                    AI jest symulowane, a publikacje i maile nie są uruchamiane.
+                    To nie jest Course, MarketingCampaign ani prawdziwa wysyłka. Kampania i koncepcja wracają po zalogowaniu.
+                    Kierunek, materiały, checklista i propozycja AI zostają w przeglądarce, w której powstały. Publikacje i maile nie są uruchamiane.
                 </p>
             </div>
         </section>

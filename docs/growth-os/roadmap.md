@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Projekt modelu danych v0.1 jest dokumentowany przed migracjami. Zakres minimalny: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
+Ostatnia kampania i koncepcja wracają po zalogowaniu. Reszta procesu zostaje w przeglądarce, w której powstała.
 
 ## NEXT
 
-Po akceptacji dokumentacji modelu v0.1: przygotować migracje w `pneadm/database/migrations/`, bez przenoszenia jeszcze całego UX z sesji do DB.
+Zapis decyzji człowieka. Bez przenoszenia kierunku, materiałów i zadań.
 
 ## LATER
 
@@ -41,7 +41,7 @@ Zakres:
 - propozycja AI do przyjęcia albo odrzucenia,
 - prosta historia wersji w sesji.
 
-## Etap 0.3.2 — Pilotaż OpenAI Dla Koncepcji — zaimplementowany, oczekuje na smoke test
+## Etap 0.3.2 — Pilotaż OpenAI Dla Koncepcji — zaimplementowany i zweryfikowany ręcznie
 
 Zakres:
 
@@ -60,8 +60,6 @@ Zakres minimalny:
 
 - DB,
 - GrowthCampaign,
-- Topic,
-- Expert,
 - Artifact,
 - Task,
 - Decision.
@@ -70,7 +68,30 @@ Warunek:
 
 - zaakceptowana dokumentacja modelu danych w `architecture.md`.
 - migracje w `pneadm`, bo tabele należą do bazy `pneadm`.
-- bez Customer Graph, Metrics, Content/Product Graph, publikacji i wysyłek.
+- bez Topic Graph, Expert Graph, Customer Graph, Metrics, Content/Product Graph, publikacji i wysyłek.
+
+Kolejność wdrożenia:
+
+1. migracje 4 tabel — zrobione,
+2. modele i relacje — zrobione,
+3. testy integralności — zrobione,
+4. pierwszy vertical slice: Campaign + Concept Artifact — zrobione,
+5. trwałe odtworzenie projektu po ponownym wejściu — zrobione dla kampanii i koncepcji,
+6. Decision,
+7. Task,
+8. później dalsze materiały.
+
+Kryterium sukcesu:
+
+- Waldemar może rozpocząć projekt webinaru TIK, zapisać koncepcję, zamknąć przeglądarkę, wrócić później i kontynuować ten sam projekt z zachowanymi artifactami, zadaniami i decyzjami człowieka.
+- Flow UX pozostaje prosty, a AI nadal wymaga jawnego **Zastosuj / Odrzuć**.
+
+Poza v0.1:
+
+- Topic jako osobna encja,
+- Expert Graph jako rozszerzenie istniejącego `Instructor`,
+- pełna historia wersji artifactów,
+- publikacja, dystrybucja i integracje wykonawcze.
 
 ## v0.2 — AI Drafts I Research
 

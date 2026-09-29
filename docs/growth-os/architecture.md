@@ -1,6 +1,6 @@
 # PNE Growth OS — Architecture
 
-Status: architektura koncepcyjna, bez migracji.
+Status: kampania i koncepcja zapisują się z prototypu; reszta procesu zostaje w sesji.
 
 ## Zasada Główna
 
@@ -9,8 +9,8 @@ Status: architektura koncepcyjna, bez migracji.
 ## Przyszłe Obiekty Domenowe
 
 - **Growth Campaign** — strategiczny projekt wokół tematu, eksperta, treści i celu.
-- **Topic** — potrzeba, temat lub obszar zainteresowania rynku.
-- **Expert** — profil ekspercki oparty o istniejącego prowadzącego / instruktora.
+- **Topic** — potrzeba, temat lub obszar zainteresowania rynku; future, nie należy do pierwszego schematu v0.1.
+- **Expert** — profil ekspercki oparty o istniejącego prowadzącego / instruktora; future, w v0.1 używamy opcjonalnego powiązania z istniejącym `Instructor`.
 - **Artifact** — roboczy rezultat pracy: draft, brief, grafika, konspekt, prompt, materiał.
 - **Task** — zadanie przygotowawcze lub operacyjne.
 - **Decision / Approval** — decyzja właściciela lub osoby odpowiedzialnej.
@@ -34,72 +34,175 @@ Status: architektura koncepcyjna, bez migracji.
 
 `Growth Campaign` może prowadzić do `Course`, może korzystać z istniejącego `Course`, albo w ogóle nie mieć produktu sprzedażowego.
 
-## Model Danych v0.1 — Projekt Przed Migracjami
+## Model Danych v0.1
 
-Status: zaakceptowany kierunek minimalny, migracje jeszcze nieutworzone.
+Status: zaakceptowany zakres domenowy; migracja i modele `App\Models\GrowthOS` istnieją. Zapis prototypu jeszcze nie.
 
-Pierwszy trwały model danych ma przechować tylko fundament pracy Growth OS. Nie obejmuje jeszcze Customer Graph, Product Graph, metryk, YouTube, Sendy, publikacji ani zewnętrznych side effectów.
+Pierwszy trwały model danych ma utrwalić już zweryfikowany proces Growth OS, a nie budować pełny Topic Graph, Expert Graph, Customer Graph ani system publikacji. v0.1 obejmuje tylko cztery główne tabele:
 
-### Tabele Kierunkowe
+- `growth_campaigns`,
+- `growth_artifacts`,
+- `growth_tasks`,
+- `growth_decisions`.
+
+Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_topic` ani `growth_campaign_expert`. Temat pozostaje częścią kampanii/koncepcji, a ekspert opiera się na istniejącym `App\Models\Instructor`.
+
+### Tabele v0.1
 
 `growth_campaigns`
 
 - główny workspace strategiczny,
-- pola kierunkowe: `name`, `slug`, `type`, `status`, `goal`, `owner_user_id`, `starts_at`, `ends_at`, `summary`,
-- przykładowy typ: `webinar`, później także `content_series`, `expert_campaign`, `product_launch`,
-- statusy kierunkowe: `draft`, `planning`, `in_progress`, `paused`, `completed`, `archived`.
-
-`growth_topics`
-
-- temat, potrzeba rynku albo hipoteza,
-- pola kierunkowe: `title`, `slug`, `summary`, `audience`, `problem`, `promise`, `source`, `status`,
-- może istnieć niezależnie od kampanii i być później użyty w wielu kampaniach.
-
-`growth_experts`
-
-- profil ekspercki używany przez Growth OS,
-- pola kierunkowe: `display_name`, `role`, `bio`, `expertise`, `source_type`, `source_id`, `status`,
-- `source_type/source_id` pozwalają później powiązać eksperta z istniejącym instruktorem/prowadzącym bez twardej zależności w pierwszej migracji.
+- pola: `id`, `name`, `type`, `status`, `goal`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `timestamps`,
+- `primary_instructor_id` jest opcjonalnym powiązaniem z istniejącym `instructors.id`,
+- `slug` nie jest obowiązkowy w v0.1.
 
 `growth_artifacts`
 
 - roboczy lub zatwierdzony rezultat pracy,
-- pola kierunkowe: `growth_campaign_id`, `type`, `status`, `title`, `summary`, `payload`, `version`, `created_by_user_id`, `approved_at`,
-- przykłady typów: `concept`, `agenda`, `email_draft`, `youtube_description`, `lead_magnet_outline`, `ai_proposal`.
+- pola kierunkowe: `id`, `growth_campaign_id`, `key`, `type`, `status`, `title`, `summary`, `schema_version`, `version`, `payload`, `created_by_user_id`, `timestamps`,
+- `key` jednoznacznie identyfikuje artifact w kampanii, np. `concept`, `main-mail`, `reminder-mail`, `follow-up`, `youtube-description`, `host-script`,
+- `type` określa kategorię artifactu, np. `concept`, `email`, `youtube_description`, `script`, `graphic_brief`,
+- `type + schema_version` definiuje kontrakt danych `payload`,
+- `payload` nie jest dowolnym workiem JSON bez walidowanego kontraktu,
+- `version` jest licznikiem bieżącej wersji, nie pełną historią wersji.
 
 `growth_tasks`
 
 - zadania operacyjne wewnątrz kampanii,
-- pola kierunkowe: `growth_campaign_id`, `growth_artifact_id`, `title`, `description`, `status`, `assignee_user_id`, `due_at`, `completed_at`,
+- pola kierunkowe: `id`, `growth_campaign_id`, `growth_artifact_id`, `title`, `description`, `status`, `assignee_user_id`, `due_at`, `completed_at`, `timestamps`,
+- `growth_artifact_id` i `assignee_user_id` są opcjonalne,
 - nie zastępuje systemu ticketowego; ma prowadzić proces Growth OS krok po kroku.
 
 `growth_decisions`
 
-- decyzje i approvale człowieka,
-- pola kierunkowe: `growth_campaign_id`, `growth_artifact_id`, `growth_task_id`, `type`, `status`, `question`, `decision`, `decided_by_user_id`, `decided_at`, `meta`,
-- statusy kierunkowe: `pending`, `approved`, `rejected`, `changes_requested`, `superseded`.
+- kanoniczny zapis decyzji człowieka,
+- pola kierunkowe: `id`, `growth_campaign_id`, `growth_artifact_id`, `growth_task_id`, `type`, `status`, `question`, `decision`, `decided_by_user_id`, `decided_at`, `meta`, `timestamps`,
+- `growth_artifact_id`, `growth_task_id`, `question`, `decision`, `decided_by_user_id`, `decided_at` i `meta` są opcjonalne,
+- `Artifact.status` odpowiada na pytanie: „w jakim stanie jest materiał?”,
+- `Decision` odpowiada na pytanie: „kto, kiedy i jaką decyzję podjął?”.
 
-### Relacje Minimalne
+### Statusy Kanoniczne
 
-- `growth_campaigns` może mieć wiele `growth_artifacts`, `growth_tasks` i `growth_decisions`.
-- `growth_artifacts` należą do kampanii; mogą opcjonalnie wskazywać temat lub eksperta po dodaniu pivotów.
-- `growth_tasks` mogą wskazywać artifact, którego dotyczą.
-- `growth_decisions` mogą dotyczyć kampanii, artifactu albo taska.
-- Powiązania wiele-do-wielu, które warto rozważyć w migracjach v0.1:
-  - `growth_campaign_topic`,
-  - `growth_campaign_expert`.
+`growth_campaigns.status`
 
-### Zasady v0.1
+- `draft` — Szkic,
+- `planning` — Planowanie,
+- `preparing` — Przygotowanie,
+- `ready` — Gotowy,
+- `live` — LIVE,
+- `follow_up` — Follow-up,
+- `completed` — Zakończony,
+- `paused` — Wstrzymany,
+- `cancelled` — Anulowany,
+- `archived` — Zarchiwizowany.
 
-- Migracje należą do `pneadm`, bo model danych dotyczy bazy `pneadm`.
-- Nie zapisujemy jeszcze pełnych promptów, odpowiedzi AI ani danych klientów.
-- Pole `payload` może przechowywać strukturalny draft/artifact jako JSON, ale tylko dla treści Growth OS, nie dla PII.
-- Każda tabela powinna mieć `timestamps`; soft delete do decyzji przy migracjach, domyślnie tylko tam, gdzie ma sens operacyjny.
-- Model ma umożliwić przeniesienie prototypu TIK z sesji do DB bez budowania dużego dashboardu.
+Nie używamy osobnego statusu `scheduled`; termin wydarzenia wynika z pól daty/czasu, a nie ze statusu procesu.
+
+`growth_artifacts.status`
+
+- `not_started` — Nie rozpoczęto,
+- `draft` — Wersja robocza,
+- `review` — Do sprawdzenia,
+- `approved` — Zatwierdzone,
+- `archived` — Zarchiwizowane.
+
+Nie dodajemy statusu `published`; publikacja będzie później osobną domeną Content / Distribution / Integration.
+
+`growth_tasks.status`
+
+- `todo` — Do zrobienia,
+- `in_progress` — W trakcie,
+- `blocked` — Zablokowane,
+- `done` — Gotowe,
+- `cancelled` — Anulowane.
+
+`growth_decisions.status`
+
+- `pending` — Do decyzji,
+- `approved` — Zaakceptowano,
+- `rejected` — Odrzucono,
+- `changes_requested` — Do poprawy,
+- `superseded` — Zastąpiona nowszą decyzją.
+
+### Relacje v0.1
+
+```text
+GrowthCampaign
+├── belongsTo User jako owner
+├── belongsTo Instructor jako primaryInstructor (nullable)
+├── hasMany GrowthArtifact
+├── hasMany GrowthTask
+└── hasMany GrowthDecision
+
+GrowthArtifact
+├── belongsTo GrowthCampaign
+├── belongsTo User jako createdBy (nullable)
+├── hasMany GrowthTask
+└── hasMany GrowthDecision
+
+GrowthTask
+├── belongsTo GrowthCampaign
+├── belongsTo GrowthArtifact (nullable)
+├── belongsTo User jako assignee (nullable)
+└── hasMany GrowthDecision
+
+GrowthDecision
+├── belongsTo GrowthCampaign
+├── belongsTo GrowthArtifact (nullable)
+├── belongsTo GrowthTask (nullable)
+└── belongsTo User jako decidedBy (nullable)
+
+User
+└── hasMany GrowthCampaign jako ownedGrowthCampaigns
+
+Instructor
+└── hasMany GrowthCampaign jako primaryGrowthCampaigns
+```
+
+Nie tworzymy w v0.1 innych grafów ani pivotów.
+
+### Unikalności I Indeksy Kierunkowe
+
+- wszystkie FK indeksowane,
+- `growth_campaigns.status`,
+- `growth_campaigns.type`,
+- `growth_campaigns.owner_user_id`,
+- `growth_artifacts`: `unique(growth_campaign_id, key)`,
+- `growth_artifacts`: `index(growth_campaign_id, status)`,
+- `growth_tasks`: `index(growth_campaign_id, status)`,
+- `growth_tasks.due_at`,
+- `growth_decisions`: `index(growth_campaign_id, status)`.
+
+Nie dodajemy nadmiarowych indeksów „na przyszłość”.
+
+### Soft Delete
+
+Na v0.1 nie zakładamy `SoftDeletes` jako domyślnej zasady dla wszystkich tabel. Preferujemy jawne statusy, takie jak `archived` i `cancelled`. Soft delete może zostać dodany później tam, gdzie pojawi się konkretna potrzeba operacyjna.
+
+### Sukces v0.1
+
+Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, że Waldemar może:
+
+- rozpocząć projekt webinaru TIK,
+- zapisać koncepcję,
+- zamknąć przeglądarkę,
+- wrócić później,
+- kontynuować ten sam projekt,
+- zachować artifacty,
+- zachować zadania,
+- zachować decyzje człowieka,
+- nadal korzystać z prostego flow UX,
+- nadal mieć obowiązkowe jawne **Zastosuj / Odrzuć** dla AI.
 
 ### Poza Zakresem v0.1
 
-- Customer / Organization,
+- `growth_topics`,
+- `growth_experts`,
+- pivoty tematów i ekspertów,
+- osobna tabela `growth_artifact_versions`,
+- Customer Graph,
+- Topic Graph,
+- Expert Graph,
 - Content / Product Graph,
 - Event / Activity / Metrics,
 - publikacje i wysyłki,
@@ -109,9 +212,9 @@ Pierwszy trwały model danych ma przechować tylko fundament pracy Growth OS. Ni
 
 ## Obecny Etap 0.3.2
 
-Obecnie nie ma jeszcze tabel domenowych Growth OS. Prototyp działa tylko w sesji HTTP i nie zapisuje stanu do bazy.
+Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu oraz jeden artifact `concept` przy ręcznym zapisie i przy „Zastosuj”. Odświeżenie w tej samej sesji czyta te dane z bazy. Kierunek, materiały, checklista, propozycja AI, zadania i decyzje zostają w sesji.
 
-Nie tworzymy jeszcze migracji. Następny krok po akceptacji modelu v0.1 to przygotowanie migracji w `pneadm/database/migrations/`.
+Po zalogowaniu bez sesji wraca ostatnia kampania właściciela i artifact `concept`. Następny krok to zapis decyzji człowieka.
 
 Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
 

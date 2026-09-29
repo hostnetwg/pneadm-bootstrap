@@ -36,7 +36,7 @@ class ProjectController extends Controller
         $goalValues = collect(DemoTikWebinarProject::goals())->pluck('value')->all();
 
         $data = $request->validate([
-            'type' => ['required', 'string', 'max:80'],
+            'type' => ['required', 'string', 'max:40'],
             'live_date' => ['required', 'date'],
             'live_time' => ['required', 'date_format:H:i'],
             'host' => ['required', 'string', 'max:120'],
@@ -48,7 +48,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project['id'])
-            ->with('success', 'Utworzono projekt webinaru TIK w tej sesji. Nic nie zapisano w bazie.');
+            ->with('success', 'Utworzono projekt webinaru. Kampania jest zapisana. Prowadzący i reszta procesu zostają w tej sesji.');
     }
 
     public function show(string $project): View
@@ -111,7 +111,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Zapisano koncepcję w tej sesji. Nic nie opublikowano.')
+            ->with('success', 'Zapisano koncepcję. Pozostałe etapy zostają w tej sesji.')
             ->withFragment('concept');
     }
 
@@ -216,7 +216,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Zastosowano propozycję AI w tej sesji. Sprawdź koncepcję i zatwierdź, gdy będzie gotowa.')
+            ->with('success', 'Zastosowano propozycję AI i zapisano koncepcję. Sprawdź ją i zatwierdź, gdy będzie gotowa.')
             ->withFragment('concept');
     }
 

@@ -8,7 +8,7 @@
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                 <div>
                     <h2 class="h4 mb-2">Projekty</h2>
-                    <p class="text-secondary mb-0">Na etapie 0.3 projekt webinaru istnieje tylko w Twojej sesji.</p>
+                    <p class="text-secondary mb-0">Kampania i koncepcja wracają po zalogowaniu. Kierunek, materiały i checklista zostają w przeglądarce, w której powstały.</p>
                 </div>
                 <a href="{{ route('growth.projects.create') }}" class="btn btn-primary align-self-start">
                     Zaplanuj webinar TIK
@@ -21,7 +21,7 @@
                 <div class="card-body">
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <span class="badge text-bg-primary">{{ $projectStatusLabels[$project['status']] ?? $project['status'] }}</span>
-                        <span class="badge bg-light text-secondary border">Sesja</span>
+                        <span class="badge bg-light text-secondary border">Zapisana kampania</span>
                     </div>
                     <h3 class="h5 mb-2">{{ $project['topic'] }}</h3>
                     <p class="mb-1"><strong>Live:</strong> {{ $project['live_date'] }} {{ $project['live_time'] }}</p>
