@@ -77,6 +77,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
         Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
         Route::post('/projects/{project}/steps/{step}/reopen', [GrowthOsProjectController::class, 'reopenStep'])->name('projects.steps.reopen');
+        Route::put('/projects/{project}/direction', [GrowthOsProjectController::class, 'updateDirection'])->name('projects.direction.update');
         Route::put('/projects/{project}/concept', [GrowthOsProjectController::class, 'updateConcept'])->name('projects.concept.update');
         Route::post('/projects/{project}/concept/ai', [GrowthOsProjectController::class, 'requestConceptAi'])
             ->middleware('throttle:growth-ai')

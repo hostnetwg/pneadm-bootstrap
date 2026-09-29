@@ -10,7 +10,7 @@ use App\Support\GrowthOS\DemoTikWebinarProject;
 use Carbon\CarbonImmutable;
 
 /**
- * Zapisuje z sesyjnego prototypu kampanię, koncepcję i dziesięć materiałów roboczych.
+ * Zapisuje z sesyjnego prototypu kampanię, kierunek, koncepcję i dziesięć materiałów roboczych.
  */
 class GrowthSessionConceptStore
 {
@@ -21,6 +21,12 @@ class GrowthSessionConceptStore
     public const MATERIAL_TYPE = 'material';
 
     public const SCHEMA_VERSION = 1;
+
+    public const DIRECTION_KEY = 'direction';
+
+    public const DIRECTION_TYPE = 'direction';
+
+    public const DECISION_DIRECTION_APPROVAL = 'direction_approval';
 
     public const DECISION_CONCEPT_APPROVAL = 'concept_approval';
 
@@ -148,6 +154,7 @@ class GrowthSessionConceptStore
             $project['concept'] = $artifact->payload;
         }
 
+        $project = $this->overlayDirection($project, $campaign->id);
         $project = $this->overlayMaterials($project, $campaign->id);
 
         $approval = $this->latestConceptApproval((int) $campaign->id);
@@ -159,6 +166,13 @@ class GrowthSessionConceptStore
             $completed['concept'] = $approval->decided_at?->toIso8601String() ?? now()->toIso8601String();
         } elseif ($approval instanceof GrowthDecision) {
             unset($completed['concept']);
+        }
+
+        $directionApproval = $this->latestDirectionApproval((int) $campaign->id);
+        if ($directionApproval instanceof GrowthDecision && $directionApproval->status === GrowthDecision::STATUS_APPROVED) {
+            $completed['direction'] = $directionApproval->decided_at?->toIso8601String() ?? now()->toIso8601String();
+        } elseif ($directionApproval instanceof GrowthDecision) {
+            unset($completed['direction']);
         }
         $project['completed_steps'] = $completed;
 
@@ -177,6 +191,7 @@ class GrowthSessionConceptStore
         string $question,
         string $decision,
         array $meta = [],
+        ?string $artifactKey = null,
     ): void {
         $campaignId = $project['growth_campaign_id'] ?? null;
         if (! is_numeric($campaignId)) {
@@ -185,7 +200,7 @@ class GrowthSessionConceptStore
 
         $artifact = GrowthArtifact::query()
             ->where('growth_campaign_id', (int) $campaignId)
-            ->where('key', self::CONCEPT_KEY)
+            ->where('key', $artifactKey ?? self::CONCEPT_KEY)
             ->first();
 
         GrowthDecision::query()->create([
@@ -250,6 +265,60 @@ class GrowthSessionConceptStore
         $artifact->save();
     }
 
+    public function supersedeApprovedDirection(int $campaignId): void
+    {
+        GrowthDecision::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('type', self::DECISION_DIRECTION_APPROVAL)
+            ->where('status', GrowthDecision::STATUS_APPROVED)
+            ->update(['status' => GrowthDecision::STATUS_SUPERSEDED]);
+    }
+
+    public function latestDirectionApproval(int $campaignId): ?GrowthDecision
+    {
+        $decision = GrowthDecision::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('type', self::DECISION_DIRECTION_APPROVAL)
+            ->latest('id')
+            ->first();
+
+        return $decision instanceof GrowthDecision ? $decision : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public function persistDirection(array $project, User $actor): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        $direction = $project['direction'] ?? null;
+        if (! is_numeric($campaignId) || ! is_array($direction)) {
+            return;
+        }
+
+        $artifact = GrowthArtifact::query()->firstOrNew([
+            'growth_campaign_id' => (int) $campaignId,
+            'key' => self::DIRECTION_KEY,
+        ]);
+
+        $artifact->type = self::DIRECTION_TYPE;
+        $artifact->status = GrowthArtifact::STATUS_DRAFT;
+        $artifact->title = 'Kierunek';
+        $artifact->schema_version = self::SCHEMA_VERSION;
+        $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
+        $artifact->payload = [
+            'why_now' => trim((string) ($direction['why_now'] ?? '')),
+            'audience' => trim((string) ($direction['audience'] ?? '')),
+            'problem' => trim((string) ($direction['problem'] ?? '')),
+            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+        ];
+        if (! $artifact->exists) {
+            $artifact->created_by_user_id = $actor->id;
+        }
+        $artifact->save();
+    }
+
     public function latestConceptApproval(int $campaignId): ?GrowthDecision
     {
         $decision = GrowthDecision::query()
@@ -284,6 +353,37 @@ class GrowthSessionConceptStore
             GrowthCampaign::STATUS_PREPARING => 'PREPARING',
             default => 'PLANNING',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private function overlayDirection(array $project, int $campaignId): array
+    {
+        $artifact = GrowthArtifact::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('key', self::DIRECTION_KEY)
+            ->first();
+
+        if (! $artifact instanceof GrowthArtifact || ! is_array($artifact->payload)) {
+            return $project;
+        }
+
+        $direction = $project['direction'] ?? [];
+        if (! is_array($direction)) {
+            $direction = [];
+        }
+
+        foreach (['why_now', 'audience', 'problem', 'takeaway', 'sell_later'] as $field) {
+            if (is_string($artifact->payload[$field] ?? null)) {
+                $direction[$field] = $artifact->payload[$field];
+            }
+        }
+
+        $project['direction'] = $direction;
+
+        return $project;
     }
 
     /**

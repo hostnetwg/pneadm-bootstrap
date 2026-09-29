@@ -71,45 +71,61 @@
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="direction-heading">Pomysł i kierunek</h2>
                 @if(isset($project['completed_steps']['direction']))
-                    <span class="badge text-bg-success">Zatwierdzone w sesji</span>
+                    <span class="badge text-bg-success">Gotowe</span>
                 @else
                     <span class="badge text-bg-danger">Czeka na decyzję</span>
                 @endif
             </div>
             <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Temat</h3>
-                        <p>{{ $project['topic'] }}</p>
+                <p class="mb-3"><span class="h6 text-secondary">Temat</span><br>{{ $project['topic'] }}</p>
+                <form method="POST" action="{{ route('growth.projects.direction.update', $project['id']) }}">
+                    @csrf
+                    @method('PUT')
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="direction_why_now" class="form-label">Dlaczego teraz</label>
+                            <textarea id="direction_why_now" name="why_now" rows="3" class="form-control @error('why_now') is-invalid @enderror" required>{{ old('why_now', $project['direction']['why_now'] ?? '') }}</textarea>
+                            @error('why_now')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="direction_audience" class="form-label">Dla kogo</label>
+                            <textarea id="direction_audience" name="audience" rows="3" class="form-control @error('audience') is-invalid @enderror" required>{{ old('audience', $project['direction']['audience'] ?? '') }}</textarea>
+                            @error('audience')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="direction_problem" class="form-label">Jaki problem rozwiązujemy</label>
+                            <textarea id="direction_problem" name="problem" rows="3" class="form-control @error('problem') is-invalid @enderror" required>{{ old('problem', $project['direction']['problem'] ?? '') }}</textarea>
+                            @error('problem')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="direction_takeaway" class="form-label">Co uczestnik ma wynieść</label>
+                            <textarea id="direction_takeaway" name="takeaway" rows="3" class="form-control @error('takeaway') is-invalid @enderror" required>{{ old('takeaway', $project['direction']['takeaway'] ?? '') }}</textarea>
+                            @error('takeaway')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="direction_sell_later" class="form-label">Czy chcemy coś później sprzedawać</label>
+                            <select id="direction_sell_later" name="sell_later" class="form-select @error('sell_later') is-invalid @enderror" required>
+                                @foreach(['nie', 'być może', 'tak'] as $option)
+                                    <option value="{{ $option }}" @selected(old('sell_later', $project['direction']['sell_later'] ?? 'być może') === $option)>{{ $option }}</option>
+                                @endforeach
+                            </select>
+                            @error('sell_later')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Dlaczego teraz</h3>
-                        <p>{{ $project['direction']['why_now'] }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Dla kogo</h3>
-                        <p>{{ $project['direction']['audience'] }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Jaki problem rozwiązujemy</h3>
-                        <p>{{ $project['direction']['problem'] }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Co uczestnik ma wynieść</h3>
-                        <p>{{ $project['direction']['takeaway'] }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h3 class="h6 text-secondary">Czy chcemy coś później sprzedawać</h3>
-                        <p>{{ $project['direction']['sell_later'] }}</p>
-                    </div>
-                </div>
-                <div class="alert alert-info small mb-3">
-                    Sugestia AI: temat jest aktualny, bo łączy AI z konkretną pracą nauczyciela. Komunikację prowadź przez oszczędność czasu, nie przez technologiczną modę.
+                    <button type="submit" class="btn btn-outline-primary mt-3">Zapisz kierunek</button>
+                </form>
+                <div class="alert alert-info small mt-3 mb-3">
+                    Sugestia AI: temat jest aktualny, bo łączy AI z konkretną pracą nauczyciela. Komunikację prowadź przez oszczędność czasu, nie przez technologiczną modę. Ta podpowiedź zostaje tylko w tej przeglądarce.
                 </div>
                 @unless(isset($project['completed_steps']['direction']))
                     <form method="POST" action="{{ route('growth.projects.steps.complete', [$project['id'], 'direction']) }}">
                         @csrf
                         <button type="submit" class="btn btn-primary">Zatwierdź kierunek</button>
+                    </form>
+                @else
+                    <form method="POST" action="{{ route('growth.projects.steps.reopen', [$project['id'], 'direction']) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-secondary">Cofnij zatwierdzenie</button>
                     </form>
                 @endunless
             </div>

@@ -13,7 +13,7 @@ use Carbon\CarbonImmutable;
 /**
  * Etap 0.3: sesyjny prototyp przygotowania webinaru TIK od zera.
  *
- * Kampania, koncepcja i dziesięć materiałów roboczych są zapisywane w bazie. Kierunek, propozycja AI i prowadzący żyją w sesji HTTP.
+ * Kampania, kierunek, koncepcja i dziesięć materiałów roboczych są zapisywane w bazie. Propozycja AI i prowadzący żyją w sesji HTTP.
  */
 class DemoTikWebinarProject
 {
@@ -154,6 +154,18 @@ class DemoTikWebinarProject
         $project['status'] = $step === 'direction' ? 'PLANNING' : 'PREPARING';
 
         self::saveProject($project);
+        if ($step === 'direction') {
+            self::persistDirection($project);
+            self::recordConceptDecision(
+                $project,
+                GrowthSessionConceptStore::DECISION_DIRECTION_APPROVAL,
+                GrowthDecision::STATUS_APPROVED,
+                'Czy kierunek webinaru jest gotowy?',
+                'Kierunek zatwierdzony.',
+                [],
+                GrowthSessionConceptStore::DIRECTION_KEY,
+            );
+        }
         if ($step === 'concept') {
             self::recordConceptDecision(
                 $project,
@@ -184,11 +196,25 @@ class DemoTikWebinarProject
         $project['completed_steps'] = $completed;
         $project['status'] = isset($completed['concept']) ? 'PREPARING' : 'PLANNING';
 
+        if ($step === 'direction') {
+            self::supersedeDirectionApproval($project);
+        }
         if ($step === 'concept') {
             self::supersedeConceptApproval($project);
         }
 
         self::saveProject($project);
+        if ($step === 'direction') {
+            self::recordConceptDecision(
+                $project,
+                GrowthSessionConceptStore::DECISION_DIRECTION_APPROVAL,
+                GrowthDecision::STATUS_CHANGES_REQUESTED,
+                'Czy cofnąć zatwierdzenie kierunku?',
+                'Cofnięto zatwierdzenie kierunku.',
+                [],
+                GrowthSessionConceptStore::DIRECTION_KEY,
+            );
+        }
         if ($step === 'concept') {
             self::recordConceptDecision(
                 $project,
@@ -339,6 +365,11 @@ class DemoTikWebinarProject
 
         if (isset($proposal['concept']['audience'])) {
             $project['direction']['audience'] = trim((string) $proposal['concept']['audience']);
+            if (isset($project['completed_steps']['direction'])) {
+                unset($project['completed_steps']['direction']);
+                self::supersedeDirectionApproval($project);
+            }
+            self::persistDirection($project);
         }
 
         $project['concept'] = self::normalizeConcept($proposal['concept']);
@@ -482,6 +513,7 @@ class DemoTikWebinarProject
         string $question,
         string $decision,
         array $meta = [],
+        ?string $artifactKey = null,
     ): void {
         $user = auth()->user();
         if (! $user instanceof User) {
@@ -496,7 +528,64 @@ class DemoTikWebinarProject
             $question,
             $decision,
             $meta,
+            $artifactKey,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function persistDirection(array $project): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->persistDirection($project, $user);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function supersedeDirectionApproval(array $project): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->supersedeApprovedDirection((int) $campaignId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function updateDirection(string $projectId, array $data): array
+    {
+        $project = self::requireProject($projectId);
+        $direction = $project['direction'] ?? [];
+        if (! is_array($direction)) {
+            $direction = [];
+        }
+
+        $direction['why_now'] = trim((string) ($data['why_now'] ?? ''));
+        $direction['audience'] = trim((string) ($data['audience'] ?? ''));
+        $direction['problem'] = trim((string) ($data['problem'] ?? ''));
+        $direction['takeaway'] = trim((string) ($data['takeaway'] ?? ''));
+        $direction['sell_later'] = trim((string) ($data['sell_later'] ?? ''));
+        $project['direction'] = $direction;
+
+        if (isset($project['completed_steps']['direction'])) {
+            unset($project['completed_steps']['direction']);
+            self::supersedeDirectionApproval($project);
+        }
+
+        self::persistDirection($project);
+        self::saveProject($project);
+
+        return $project;
     }
 
     /**

@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 21:15 CEST<br>
+Last updated: 2026-09-29 21:30 CEST<br>
 Branch: main<br>
-Commit: c998c9b<br>
-Stage: v0.1 material artifacts<br>
+Commit: working tree / pending commit (base e570f7e)<br>
+Stage: v0.1 direction artifact<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap v0.1 — 10 materiałów roboczych zapisuje status i szkic przy kampanii i wraca po zalogowaniu. Kierunek, propozycja AI i prowadzący zostają w przeglądarce, w której powstały.
+Etap v0.1 — kierunek zapisuje pięć pól i decyzję zatwierdzenia. Propozycja AI i prowadzący zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -28,12 +28,13 @@ Etap v0.1 — 10 materiałów roboczych zapisuje status i szkic przy kampanii i 
 - Menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox.
 - Formularz **Zaplanuj webinar TIK**.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
-- Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, koncepcji, decyzji przy koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
+- Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, kierunku, koncepcji, decyzji przy kierunku i koncepcji, 9 zadań operacyjnych i 10 materiałów roboczych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
-- Utworzenie projektu zapisuje `growth_campaigns`. Ręczny zapis koncepcji i „Zastosuj” zapisują jeden artifact `concept`. „Odrzuć” i sama propozycja AI nie zapisują koncepcji.
+- Utworzenie projektu zapisuje `growth_campaigns`. „Zapisz kierunek” i zatwierdzenie kierunku zapisują artifact `direction`. Ręczny zapis koncepcji i „Zastosuj” zapisują jeden artifact `concept`. „Odrzuć” i sama propozycja AI nie zapisują koncepcji.
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
 - Checklista pokazuje 9 zadań operacyjnych z checkboxem. Pozostałe punkty osi czasu są informacją i nie mają checkboxa.
 - Dziesięć materiałów ma edytowalny szkic i status. „Zapisz materiał” zapisuje artifact `material`. Samo otwarcie ekranu nie tworzy wiersza.
+- Etap **Kierunek**: edycja pięciu pól, zatwierdzenie i cofnięcie. Stała podpowiedź AI nie jest zapisywana.
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
 - **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
 - Propozycja AI nigdy nie nadpisuje bieżącej koncepcji aż do jawnego „Zastosuj”; można ją odrzucić.
@@ -73,14 +74,14 @@ Zaplanuj TIK
 
 ## 6. Czego świadomie jeszcze NIE robimy
 
-- Prototyp nie zapisuje jeszcze kierunku do bazy.
+- Prototyp nie zapisuje jeszcze prowadzącego ani propozycji AI do bazy.
 - Brak zapisu wywołań AI do DB; propozycja pozostaje w sesji HTTP.
 - Brak Anthropic, Gemini, OpenRouter, automatycznego routingu modeli i fallbacku między providerami.
 - Brak YouTube API.
 - Brak Sendy API.
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
-- Kierunek, propozycja AI i prowadzący działają w sesji HTTP. Poza sesją zostaje kampania, zapisana koncepcja, decyzje przy koncepcji, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) i techniczny log metadanych AI.
+- Propozycja AI i prowadzący działają w sesji HTTP. Poza sesją zostaje kampania, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) i techniczny log metadanych AI.
 - Brak AI poza etapem Koncepcja.
 - Prowadzący nie jest jeszcze zapisywany. Po odtworzeniu projektu pole prowadzącego jest puste.
 - `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
@@ -91,7 +92,7 @@ Zaplanuj TIK
 
 ## 8. Następny krok
 
-Trwały kierunek. Nie przenosić propozycji AI ani prowadzącego. Zadania operacyjne nie sterują głównym CTA.
+Trwały prowadzący. Nie przenosić propozycji AI. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
 
@@ -101,6 +102,7 @@ Trwały kierunek. Nie przenosić propozycji AI ani prowadzącego. Zadania operac
 - Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
 - Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
 - Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
+- „Zapisz kierunek” utrwala pięć pól. „Zatwierdź kierunek” i cofnięcie zapisują decyzję `direction_approval`.
 - „Zapisz materiał” utrwala status i szkic dziesięciu materiałów jako artifact `material`. Etykieta publikacji zostaje w payloadzie.
 - Nowa kampania dostaje 9 zadań operacyjnych ze stabilnym `key`. Checkbox przełącza `todo` i `done`. Istniejące kampanie uzupełnia komenda `growth:seed-operational-tasks`.
 - Zastosuj, Odrzuć, „Koncepcja gotowa” i cofnięcie zatwierdzenia zapisują decyzję człowieka.
@@ -128,6 +130,7 @@ Trwały kierunek. Nie przenosić propozycji AI ani prowadzącego. Zadania operac
 - [consultations/2026-09-growth-os-0-3-chatgpt-package.md](./consultations/2026-09-growth-os-0-3-chatgpt-package.md)
 - [consultations/2026-09-29-growth-os-operational-tasks-decision.md](./consultations/2026-09-29-growth-os-operational-tasks-decision.md)
 - [consultations/2026-09-29-growth-os-material-artifacts-decision.md](./consultations/2026-09-29-growth-os-material-artifacts-decision.md)
+- [consultations/2026-09-29-growth-os-direction-decision.md](./consultations/2026-09-29-growth-os-direction-decision.md)
 
 ## Question for consultant
 

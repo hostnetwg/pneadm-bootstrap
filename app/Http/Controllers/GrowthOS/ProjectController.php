@@ -79,7 +79,7 @@ class ProjectController extends Controller
         DemoTikWebinarProject::completeStep($project, $step);
 
         $message = $step === 'direction'
-            ? 'Kierunek zatwierdzony w tej sesji. Przejdź do koncepcji webinaru.'
+            ? 'Kierunek zatwierdzony. Decyzja została zapisana.'
             : 'Koncepcja gotowa. Decyzja została zapisana.';
 
         return redirect()
@@ -96,8 +96,26 @@ class ProjectController extends Controller
             ->route('growth.projects.show', $project)
             ->with('success', $step === 'concept'
                 ? 'Cofnięto zatwierdzenie koncepcji. Decyzja została zapisana.'
-                : 'Cofnięto zatwierdzenie w tej sesji. Etap wrócił do „Do dopracowania”.')
+                : 'Cofnięto zatwierdzenie kierunku. Decyzja została zapisana.')
             ->withFragment($step);
+    }
+
+    public function updateDirection(Request $request, string $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'why_now' => ['required', 'string', 'max:1000'],
+            'audience' => ['required', 'string', 'max:500'],
+            'problem' => ['required', 'string', 'max:1000'],
+            'takeaway' => ['required', 'string', 'max:1000'],
+            'sell_later' => ['required', Rule::in(['nie', 'być może', 'tak'])],
+        ]);
+
+        DemoTikWebinarProject::updateDirection($project, $data);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zapisano kierunek.')
+            ->withFragment('direction');
     }
 
     public function updateConcept(Request $request, string $project): RedirectResponse

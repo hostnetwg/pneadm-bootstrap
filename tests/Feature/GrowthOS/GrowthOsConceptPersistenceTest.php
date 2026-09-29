@@ -158,12 +158,12 @@ class GrowthOsConceptPersistenceTest extends TestCase
         $this->actingAs($user)
             ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']));
 
-        $this->assertSame(0, GrowthDecision::query()->count());
+        $this->assertSame(1, GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_DIRECTION_APPROVAL)->count());
 
         $this->actingAs($user)
             ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'concept']));
 
-        $approval = GrowthDecision::query()->first();
+        $approval = GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL)->first();
         $this->assertNotNull($approval);
         $this->assertSame(GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL, $approval->type);
         $this->assertSame(GrowthDecision::STATUS_APPROVED, $approval->status);

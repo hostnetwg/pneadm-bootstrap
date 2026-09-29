@@ -166,4 +166,12 @@ Date: 2026-09-29<br>
 Status: ACTIVE<br>
 Decision: Dziesięć materiałów roboczych webinaru zapisuje się jako artifacty typu `material` ze stabilnym `key`, statusem i szkicem. Zapis następuje przy jawnym „Zapisz materiał”, nie przy wejściu na ekran. Kierunek pozostaje w sesji.<br>
 Rationale: To ten sam kontrakt co koncepcja. Status i szkic mają wracać po zalogowaniu, bez nowego ekranu, bez AI i bez decyzji człowieka.<br>
-Consequences: Klucze: `youtube-description`, `main-graphic`, `facebook-post`, `main-mail`, `reminder-mail`, `landing`, `host-script`, `participant-material`, `obs-intro`, `follow-up`. `schema_version` = 1. `payload` trzyma status widoczny w UX oraz szkic. Etykieta „Opublikowane / zaplanowane” zostaje w `payload.status`, a kolumna `status` dostaje `approved`, bo `published` nie jest statusem artifactu. Zapis nie tworzy `growth_decisions` i nie zmienia reguł następnego kroku. Kierunek, propozycja AI i prowadzący nadal nie są trwałe.
+Consequences: Klucze: `youtube-description`, `main-graphic`, `facebook-post`, `main-mail`, `reminder-mail`, `landing`, `host-script`, `participant-material`, `obs-intro`, `follow-up`. `schema_version` = 1. `payload` trzyma status widoczny w UX oraz szkic. Etykieta „Opublikowane / zaplanowane” zostaje w `payload.status`, a kolumna `status` dostaje `approved`, bo `published` nie jest statusem artifactu. Zapis nie tworzy `growth_decisions` i nie zmienia reguł następnego kroku. Kierunek, propozycja AI i prowadzący nadal nie są trwałe. Trwałość kierunku opisuje późniejszy DEC-022.
+
+## DEC-022
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Kierunek webinaru zapisuje się jako artifact `direction` z pięcioma polami. „Zatwierdź kierunek” i cofnięcie są decyzją `direction_approval`. Propozycja AI przy kierunku i prowadzący zostają w sesji.<br>
+Rationale: Po zalogowaniu ma wracać treść kierunku i fakt zatwierdzenia, tak jak przy koncepcji. Stała podpowiedź AI nie jest decyzją ani treścią właściciela.<br>
+Consequences: Klucz `direction`, `type=direction`, `schema_version=1`. `payload`: `why_now`, `audience`, `problem`, `takeaway`, `sell_later`. Zapis jest jawny. Zatwierdzenie tworzy decyzję `approved` i utrwala bieżące pola. Cofnięcie oznacza poprzednią decyzję jako `superseded` i dodaje `changes_requested`. Edycja zatwierdzonego kierunku też oznacza decyzję jako `superseded`, bez nowej decyzji. „Zastosuj” przy koncepcji, jeśli zmienia odbiorców, zapisuje kierunek i cofa jego zatwierdzenie. Prowadzący i propozycja AI nadal nie są trwałe.
