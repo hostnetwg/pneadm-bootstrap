@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-29 20:00 CEST<br>
 Branch: main<br>
-Commit: working tree / pending commit (base 2064198)<br>
+Commit: 6d54b1a<br>
 Stage: v0.1 campaign restore<br>
 Current blocker: none
 
