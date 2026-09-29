@@ -2,6 +2,15 @@
 
 Krótka numeracja panelu. Szczegóły zawsze w `docs/`. Nowy numer wersji (np. 1.1) tylko po potwierdzeniu Waldemara. Hotfixy dopisujemy do bieżącej wersji.
 
+## 1.3 — 2026-09-29
+
+PNE Growth OS — pilotaż prawdziwego AI w etapie Koncepcja webinaru.
+
+- Na [PNE Rozwój](/growth) w projekcie webinaru TIK etap **Koncepcja** może opcjonalnie korzystać z OpenAI do przygotowania propozycji zmiany / rozbudowy treści. AI tworzy tylko wariant — aktualna koncepcja zmienia się dopiero po kliknięciu **Zastosuj**.
+- Propozycja pojawia się bez przeładowania strony, z animacją pracy i krótkim dźwiękiem po sukcesie. Błąd AI nie blokuje ręcznej edycji.
+- Integracja ma osobną flagę `GROWTH_AI_ENABLED`, centralnie ustawiany model, walidację structured output, limity, timeout, retry i log metadanych bez treści koncepcji ani danych osobowych.
+- Kanon: [PNE Growth OS Current](docs/growth-os/CURRENT.md), [AI](docs/pne-growth-os/06-AI.md)
+
 ## 1.2 — 2026-09-23
 
 Dopisanie do nagrania po szkoleniu.
