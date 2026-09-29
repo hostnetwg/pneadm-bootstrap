@@ -64,7 +64,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
-| PNE Growth OS — Etap 0.1 | `sail artisan test tests/Feature/GrowthOS/GrowthOsAccessTest.php` — flaga wyłączona/nieprawidłowa, gość, brak uprawnienia, `super_admin`, widoczność menu i demonstracyjny pulpit; kanon: [pne-growth-os/README.md](./pne-growth-os/README.md) |
+| PNE Growth OS — Etap 0.1–0.3 | `sail artisan test tests/Feature/GrowthOS` — flaga, role, menu; sesyjny flow webinaru TIK od zera (Dzisiaj, Projekty, Pomysły, Inbox, workspace, materiały); kanon: [pne-growth-os/README.md](./pne-growth-os/README.md) |
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
 | Edycja użytkownika pnedu.pl w ADM | `--filter=PneduUserUpdateTest`, `--filter=PneduUserSetPasswordTest`; kanon: [PNEDU_USERS_ADMIN.md](./PNEDU_USERS_ADMIN.md) |
 | Dopisanie do nagrania po szkoleniu | `--filter=RecordingEnrollmentApiTest`; **pnedu:** `--filter=RecordingEnrollmentTest` (założenie konta pomijane, gdy `testing.users` nie ma `deleted_at` / `first_name` / `email_verified_at`; nie równolegle z suite pneadm); kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md) |
@@ -106,9 +106,11 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Publiczny katalog, checkout i fulfillment kursów nagranych | **pnedu:** `sail artisan test tests/Feature/ProductCheckoutTest.php`, `sail artisan test tests/Feature/DashboardPendingProductCoursesTest.php`, `sail artisan test tests/Unit/ProductAccessExpiryServiceTest.php`, `sail artisan test tests/Unit/ProductLegalCheckoutServiceTest.php`, `sail artisan test tests/Unit/WithdrawalWindowServiceTest.php`, `sail artisan test tests/Feature/LegalDocumentsTest.php` |
 | Pełny suite | `sail test` |
 
-## Weryfikacja PNE Growth OS — Etap 0.1 (2026-09-29)
+## Weryfikacja PNE Growth OS — Etap 0.1–0.3 (2026-09-29)
 
-- `GrowthOsAccessTest`: **5 passed, 16 assertions** — flaga wyłączona, wartość nieprawidłowa, gość, zwykły admin, `super_admin`, menu i pulpit demo.
+- `GrowthOsAccessTest`: flaga wyłączona, wartość nieprawidłowa, gość, zwykły admin, `super_admin`, menu **PNE Rozwój**.
+- `GrowthOsStage02PrototypeTest` (zawiera scenariusz 0.3): Dzisiaj bez projektu, utworzenie projektu webinaru w sesji, workspace, etapy kierunek/koncepcja, materiał, Inbox linkujący do projektu, 404 dla nieznanego projektu/materiału.
+- Ręcznie: włączyć `PNE_GROWTH_OS_ENABLED=true`, jako `super_admin` przejść Dzisiaj → Zaplanuj webinar TIK → Utwórz projekt → zatwierdzić kierunek → otworzyć materiał i zmienić status. Potwierdzić brak zapisu w DB i brak publikacji.
 - `route:list -v --path=growth`: trasa ma middleware `web`, `auth`, `check.user.status`, `growth_os.access`.
 - `view:cache`: zaliczone.
 - Pint zmienionych plików PHP: zaliczony.

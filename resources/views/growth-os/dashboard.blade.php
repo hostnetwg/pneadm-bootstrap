@@ -1,92 +1,106 @@
 <x-app-layout>
     <x-slot name="header">
-        PNE Growth OS
+        PNE Rozwój — Dzisiaj
     </x-slot>
 
     <div class="container-fluid px-0">
         <section class="rounded border bg-light p-4 mb-4">
             <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
                 <div>
-                    <h2 class="h4 mb-2">PNE Growth OS</h2>
-                    <p class="text-secondary mb-0">Pomagamy planować treści, kampanie i rozwój PNE.</p>
+                    <h2 class="h4 mb-2">Dzisiaj</h2>
+                    <p class="text-secondary mb-0">Operacyjny widok producenta: co powinienem zrobić teraz?</p>
                 </div>
                 <span class="badge bg-warning text-dark align-self-start align-self-lg-center">
-                    Moduł w wersji przygotowawczej
+                    Etap 0.3 · prototyp sesyjny
                 </span>
             </div>
         </section>
 
-        <section class="mb-4" aria-labelledby="growth-attention-heading">
-            <h2 class="h5 mb-3" id="growth-attention-heading">Wymaga Twojej uwagi</h2>
-            <div class="alert alert-success mb-2" role="status">
-                <i class="fas fa-check-circle me-2" aria-hidden="true"></i>
-                Brak zadań wymagających decyzji.
-            </div>
-            <p class="small text-secondary mb-0">
-                Docelowo pojawią się tutaj materiały do zatwierdzenia, propozycje tematów,
-                grafiki, kampanie i materiały ekspertów.
-            </p>
-        </section>
-
-        <section class="mb-4" aria-labelledby="growth-upcoming-heading">
-            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <h2 class="h5 mb-0" id="growth-upcoming-heading">Nadchodzące</h2>
-                <span class="badge bg-secondary">Dane demonstracyjne</span>
-            </div>
-            <div class="list-group">
-                <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                    <span><i class="fas fa-video text-primary me-2" aria-hidden="true"></i>Webinar TIK</span>
-                    <span class="small text-secondary">Przykład</span>
-                </div>
-                <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                    <span><i class="fas fa-chalkboard-teacher text-primary me-2" aria-hidden="true"></i>Szkolenie eksperta</span>
-                    <span class="small text-secondary">Przykład</span>
-                </div>
-                <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                    <span><i class="fas fa-envelope text-primary me-2" aria-hidden="true"></i>Newsletter</span>
-                    <span class="small text-secondary">Przykład</span>
-                </div>
-            </div>
-        </section>
-
-        <section class="mb-4" aria-labelledby="growth-areas-heading">
-            <h2 class="h5 mb-3" id="growth-areas-heading">Obszary systemu</h2>
-            <div class="row g-3">
-                @foreach ([
-                    ['Radar', 'fa-satellite-dish'],
-                    ['Kampanie', 'fa-bullhorn'],
-                    ['Treści', 'fa-file-alt'],
-                    ['Eksperci', 'fa-user-tie'],
-                    ['Odbiorcy', 'fa-users'],
-                    ['Szkoły / CRM', 'fa-school'],
-                    ['Produkty', 'fa-box-open'],
-                    ['Analityka', 'fa-chart-line'],
-                ] as [$label, $icon])
-                    <div class="col-12 col-sm-6 col-xl-3">
-                        <div class="card h-100 border">
-                            <div class="card-body">
-                                <i class="fas {{ $icon }} text-primary mb-3" aria-hidden="true"></i>
-                                <h3 class="h6 card-title">{{ $label }}</h3>
-                                <span class="badge bg-light text-secondary border">Planowane</span>
-                            </div>
-                        </div>
+        <section class="card border-primary mb-4" aria-labelledby="next-action-heading">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                    <div>
+                        <h2 class="h5 mb-2" id="next-action-heading">Najważniejszy następny krok</h2>
+                        <p class="text-secondary mb-0">{{ $nextAction['meta'] }}</p>
                     </div>
-                @endforeach
+                    <div class="text-lg-end">
+                        <a href="{{ $nextAction['href'] }}" class="btn btn-primary">
+                            {{ $nextAction['label'] }}
+                        </a>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <section aria-labelledby="growth-ai-heading">
-            <div class="card border-primary-subtle">
-                <div class="card-body">
-                    <h2 class="h5 card-title" id="growth-ai-heading">
-                        <i class="fas fa-wand-magic-sparkles text-primary me-2" aria-hidden="true"></i>
-                        AI Producer
-                    </h2>
-                    <p class="card-text text-secondary mb-0">
-                        W przyszłości AI będzie tutaj pomagało przygotowywać kampanie,
-                        treści i rekomendacje.
-                    </p>
+        <section class="mb-4" aria-labelledby="today-important-heading">
+            <h2 class="h5 mb-3" id="today-important-heading">Najważniejsze</h2>
+
+            @if($project)
+                <div class="card border">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge text-bg-primary">{{ $projectStatusLabels[$project['status']] ?? $project['status'] }}</span>
+                            <span class="badge bg-light text-secondary border">Dane demonstracyjne</span>
+                        </div>
+                        <h3 class="h5 mb-2">TIK — {{ $project['live_date'] }} {{ $project['live_time'] }}</h3>
+                        <p class="mb-1"><strong>Temat:</strong> {{ $project['topic'] }}</p>
+                        <p class="mb-1"><strong>Prowadzący:</strong> {{ $project['host'] }}</p>
+                        <p class="mb-3 text-secondary">
+                            {{ $health['days_label'] }}
+                            <span class="{{ $health['critical_count'] > 0 ? 'text-danger' : 'text-success' }}">
+                                {{ $health['critical_label'] }}
+                            </span>
+                        </p>
+                        <a href="{{ route('growth.projects.show', $project['id']) }}" class="btn btn-outline-primary">
+                            Kontynuuj przygotowanie
+                        </a>
+                    </div>
                 </div>
+            @else
+                <div class="card border">
+                    <div class="card-body">
+                        <h3 class="h5 mb-2">Nie ma jeszcze projektu webinaru TIK</h3>
+                        <p class="text-secondary mb-3">
+                            Zacznij od prostego planu: data live, prowadzący, cel i temat. Prototyp zapisze to tylko w sesji.
+                        </p>
+                        <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">
+                            Zaplanuj webinar TIK
+                        </a>
+                    </div>
+                </div>
+            @endif
+        </section>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <section class="card border h-100" aria-labelledby="today-decisions-heading">
+                    <div class="card-body">
+                        <h2 class="h6 text-secondary" id="today-decisions-heading">Decyzje</h2>
+                        <p class="display-6 mb-2">{{ $inboxCount }}</p>
+                        <p class="text-secondary mb-3">wymagają uwagi w Inboxie</p>
+                        <a href="{{ route('growth.inbox.index') }}" class="btn btn-sm btn-outline-primary">Otwórz Inbox</a>
+                    </div>
+                </section>
+            </div>
+            <div class="col-md-6">
+                <section class="card border h-100" aria-labelledby="today-ideas-heading">
+                    <div class="card-body">
+                        <h2 class="h6 text-secondary" id="today-ideas-heading">Pomysły</h2>
+                        <p class="display-6 mb-2">{{ $ideasCount }}</p>
+                        <p class="text-secondary mb-3">symulowane sugestie tematów TIK</p>
+                        <a href="{{ route('growth.ideas.index') }}" class="btn btn-sm btn-outline-primary">Zobacz pomysły</a>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <section class="mt-4" aria-labelledby="growth-note-heading">
+            <div class="alert alert-info mb-0" role="note">
+                <h2 class="h6" id="growth-note-heading">Granice prototypu</h2>
+                <p class="mb-0 small">
+                    To nie jest Course, MarketingCampaign ani prawdziwa wysyłka. Wszystko działa tylko w sesji HTTP.
+                    AI jest symulowane, a publikacje i maile nie są uruchamiane.
+                </p>
             </div>
         </section>
     </div>

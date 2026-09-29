@@ -73,15 +73,45 @@ Przed produkcją:
 - wykonać smoke logowania i menu,
 - opcjonalne włączenie tylko po świadomej decyzji właściciela.
 
-## Etap 0.2 — prototyp UX bez side effectu
+## Etap 0.2 — prototyp UX bez side effectu — wdrożony lokalnie
 
-Opcjonalny przed modelem danych:
+Zakres:
 
-- klikalny prototyp Pulpitu, Inboxu i Kampanii,
-- dane fikcyjne lub fixture wyłącznie lokalne,
-- test z Waldemarem: język, statusy, decyzje, gęstość informacji.
+- klikalny Pulpit, Inbox „Do zatwierdzenia” i karta Kampanii,
+- scenariusz demonstracyjny webinaru TIK (Canva AI),
+- decyzje z podglądem, uzasadnieniem i modalami Bootstrap,
+- status zatwierdzenia wyłącznie w sesji HTTP,
+- brak zapisu do bazy, AI, jobów i integracji.
 
-Brak zapisu i integracji.
+Cel:
+
+- sprawdzić z Waldemarem język, gęstość informacji i flow decyzji na realnym przypadku webinaru,
+- zbierać wnioski przed modelem danych v0.1.
+
+Wniosek:
+
+- sam Inbox jest zbyt późnym miejscem startu; główny interfejs musi zaczynać od zaplanowania webinaru.
+
+## Etap 0.3 — webinar TIK od zera — wdrożony lokalnie
+
+Zakres:
+
+- menu **PNE Rozwój** ograniczone do: Dzisiaj, Projekty, Pomysły, Inbox,
+- start **Zaplanuj webinar TIK**,
+- projekt webinaru w sesji HTTP,
+- workspace: Pomysł i kierunek, Koncepcja, Materiały, Przygotowanie, LIVE, Follow-up,
+- jedno główne CTA „Najważniejszy następny krok”,
+- checklista czasowa względem daty live,
+- materiały ze statusami: Nie rozpoczęto, Draft, Do sprawdzenia, Zatwierdzone, Opublikowane / zaplanowane,
+- Inbox jako pomocniczy widok prowadzący do miejsca w projekcie.
+
+Poza zakresem:
+
+- migracje DB,
+- prawdziwa AI,
+- YouTube/Sendy/Meta/Canva API,
+- publikacje, wysyłki i joby,
+- rozbudowa Growth OS poza przypadek webinaru TIK.
 
 ## v0.1 — Campaign + Producer + AI w trybie draft
 

@@ -24,8 +24,11 @@ use App\Http\Controllers\DashboardOrdersController;
 use App\Http\Controllers\DashboardOrdersStatsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
-use App\Http\Controllers\GusLookupController;
+use App\Http\Controllers\GrowthOS\ApprovalController as GrowthOsApprovalController;
 use App\Http\Controllers\GrowthOS\DashboardController as GrowthOsDashboardController;
+use App\Http\Controllers\GrowthOS\IdeaController as GrowthOsIdeaController;
+use App\Http\Controllers\GrowthOS\ProjectController as GrowthOsProjectController;
+use App\Http\Controllers\GusLookupController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\MarketingCampaignController;
@@ -66,9 +69,18 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::redirect('/dashboard', '/');
     Route::redirect('/dashboard/zamowienia', '/');
 
-    Route::get('/growth', GrowthOsDashboardController::class)
-        ->middleware('growth_os.access')
-        ->name('growth.dashboard');
+    Route::middleware('growth_os.access')->prefix('growth')->name('growth.')->group(function () {
+        Route::get('/', GrowthOsDashboardController::class)->name('dashboard');
+        Route::get('/projects', [GrowthOsProjectController::class, 'index'])->name('projects.index');
+        Route::get('/projects/create', [GrowthOsProjectController::class, 'create'])->name('projects.create');
+        Route::post('/projects', [GrowthOsProjectController::class, 'store'])->name('projects.store');
+        Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
+        Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
+        Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');
+        Route::post('/projects/{project}/materials/{material}/status', [GrowthOsProjectController::class, 'updateMaterialStatus'])->name('projects.materials.status');
+        Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');
+        Route::get('/inbox', [GrowthOsApprovalController::class, 'index'])->name('inbox.index');
+    });
 
     Route::get('/dashboard/ankiety', [DashboardController::class, 'index'])->name('dashboard.surveys');
     Route::post('/dashboard/ankiety/refresh', [DashboardController::class, 'refresh'])->name('dashboard.surveys.refresh');

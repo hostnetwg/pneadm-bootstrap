@@ -3,6 +3,19 @@
 Data utworzenia/aktualizacji: 2026-09-29
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## PNE Growth OS — Etap 0.3 wdrożony lokalnie (2026-09-29)
+
+Etap 0.3 zastępuje wcześniejszy prototyp 0.2 jako główny kierunek UX. Zamiast zaczynać od gotowego webinaru i Inboxa, użytkownik zaczyna od **Zaplanuj webinar TIK**:
+
+- menu **PNE Rozwój** → Dzisiaj / Projekty / Pomysły / Inbox,
+- formularz startowy webinaru TIK,
+- workspace projektu: Pomysł i kierunek → Koncepcja → Materiały → Przygotowanie → LIVE → Follow-up,
+- jedno główne CTA „Najważniejszy następny krok”,
+- checklista czasowa względem daty live,
+- wszystko tylko w sesji HTTP — bez bazy, AI, wysyłek i publikacji.
+
+Następny krok: ręczna walidacja flow z Waldemarem: czy bez instrukcji wiadomo, jak utworzyć webinar, co jest gotowe, co wymaga decyzji, ile czasu zostało do live i czy webinar jest gotowy. Dopiero po tej walidacji decyzje do modelu danych (patrz [10-DECISIONS.md](./pne-growth-os/10-DECISIONS.md)).
+
 ## PNE Growth OS — Etap 0.1 wdrożony lokalnie (2026-09-29)
 
 Etap 0 został zaakceptowany. Powstał kanon [pne-growth-os/README.md](./pne-growth-os/README.md): wizja, analiza obecnego systemu, architektura, logiczny model domenowy, UX, AI, integracje, bezpieczeństwo, roadmapa i rejestr decyzji.
@@ -13,7 +26,7 @@ Nie utworzono tabel, modeli domenowych, AI, jobów, cronów ani integracji. `pne
 
 Runbook: [deploy/2026-09-pne-growth-os-stage-0-1-deploy.md](./deploy/2026-09-pne-growth-os-stage-0-1-deploy.md).
 
-Następny najmniejszy krok do decyzji: ręczna walidacja prototypu UX z Waldemarem i doprecyzowanie ekranu „Do zatwierdzenia” na danych demonstracyjnych. Bez modelu danych do czasu decyzji zapisanych w [pne-growth-os/10-DECISIONS.md](./pne-growth-os/10-DECISIONS.md).
+Następny najmniejszy krok po 0.1 został wykonany jako Etap 0.3 (sekcja powyżej).
 
 ## Ostatnio (2026-09-28) — Edycja danych użytkownika pnedu.pl w ADM
 

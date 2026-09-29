@@ -50,7 +50,7 @@ class GrowthOsAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertDontSee('PNE Growth OS');
+            ->assertDontSee('PNE Rozwój');
     }
 
     public function test_growth_os_fails_closed_for_invalid_config_value(): void
@@ -75,7 +75,7 @@ class GrowthOsAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('profile.edit'))
             ->assertOk()
-            ->assertDontSee('PNE Growth OS');
+            ->assertDontSee('PNE Rozwój');
     }
 
     public function test_authorized_user_can_open_demo_dashboard_and_see_menu_item(): void
@@ -86,13 +86,13 @@ class GrowthOsAccessTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.dashboard'))
             ->assertOk()
-            ->assertSee('PNE Growth OS')
             ->assertSee('PNE Rozwój')
-            ->assertSee('Pulpit')
-            ->assertSee('Moduł w wersji przygotowawczej')
-            ->assertSee('Brak zadań wymagających decyzji.')
-            ->assertSee('Dane demonstracyjne')
-            ->assertSee('AI Producer')
+            ->assertSee('Dzisiaj')
+            ->assertSee('Projekty')
+            ->assertSee('Pomysły')
+            ->assertSee('Inbox')
+            ->assertSee('Etap 0.3')
+            ->assertSee('Zaplanuj webinar TIK')
             ->assertSee(route('growth.dashboard'), false);
     }
 

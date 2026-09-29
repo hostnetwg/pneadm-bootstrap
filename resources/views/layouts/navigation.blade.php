@@ -81,7 +81,28 @@
                             <a href="{{ route('growth.dashboard') }}"
                                class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.dashboard') ? 'active fw-semibold text-white' : '' }}"
                                onclick="event.stopPropagation();">
-                                Pulpit
+                                Dzisiaj
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('growth.projects.index') }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.projects.*') ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                Projekty
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('growth.ideas.index') }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.ideas.*') ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                Pomysły
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('growth.inbox.index') }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.inbox.*') ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                Inbox
                             </a>
                         </li>
                     </ul>

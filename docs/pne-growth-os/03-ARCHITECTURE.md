@@ -63,13 +63,20 @@ adm.pnedu.pl — moduł Growth OS
 
 Osobna, spokojna sekcja panelu:
 
-- Pulpit,
-- Do zatwierdzenia,
+Etap 0.3:
+
+- Dzisiaj,
+- Projekty,
+- Pomysły,
+- Inbox.
+
+Docelowo, dopiero gdy będzie użyteczna zawartość:
+
 - Tematy,
 - Kampanie,
 - Eksperci,
 - Biblioteka,
-- później Radar, CRM szkół i Analityka Growth.
+- Radar, CRM szkół i Analityka Growth.
 
 UI używa obecnego stosu Blade + Bootstrap. Nie ma potrzeby wprowadzania SPA ani zmiany frameworka.
 

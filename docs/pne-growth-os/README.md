@@ -1,8 +1,8 @@
 # PNE Growth OS
 
 Data utworzenia/aktualizacji: 2026-09-29
-Wersja dokumentacji: 0.1.1
-Status: Etap 0.1 wdrożony lokalnie jako bezpieczny szkielet, bez logiki biznesowej
+Wersja dokumentacji: 0.3.0
+Status: Etap 0.3 wdrożony lokalnie jako sesyjny prototyp przygotowania webinaru TIK od zera
 
 ## Cel
 
@@ -11,6 +11,29 @@ PNE Growth OS ma być prostą biznesowo warstwą wewnątrz `adm.pnedu.pl`, któr
 To nie jest osobna aplikacja ani przebudowa istniejącego systemu. Rozwój ma być addytywny i odwracalny. Po wyłączeniu Growth OS obecne `adm.pnedu.pl` i `pnedu.pl` muszą działać jak wcześniej.
 
 ## Status
+
+### Etap 0.3 — webinar TIK od zera
+
+Wdrożono lokalnie (bez bazy i side effectów):
+
+- menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox,
+- startowy flow **Zaplanuj webinar TIK**,
+- sesyjny projekt webinaru (`DemoTikWebinarProject`),
+- workspace projektu: Pomysł i kierunek, Koncepcja, Materiały, Przygotowanie, LIVE, Follow-up,
+- jedno główne CTA „Najważniejszy następny krok”,
+- checklistę czasową względem daty live,
+- materiały z sesyjnymi statusami,
+- Inbox jako pomocniczy widok prowadzący do konkretnego miejsca w projekcie.
+
+Nie utworzono tabel, modeli domenowych, jobów, integracji ani połączeń z AI. `pnedu.pl` nie uczestniczy w Etapie 0.3.
+
+### Etap 0.2 — prototyp UX wokół gotowego webinaru TIK
+
+Wykonano lokalnie jako etap przejściowy, ale koncepcja została zastąpiona w 0.3:
+
+- gotowy demonstracyjny webinar TIK,
+- inbox decyzji z podglądem,
+- karta kampanii read-only.
 
 ### Etap 0.1 — szkielet modułu
 
@@ -61,6 +84,7 @@ Wykonano wyłącznie:
 - [09-ROADMAP.md](./09-ROADMAP.md) — etapy rozwoju i bramki.
 - [10-DECISIONS.md](./10-DECISIONS.md) — decyzje zaakceptowane koncepcyjnie i otwarte.
 - [CHANGELOG.md](./CHANGELOG.md) — historia tej dokumentacji.
+- [../consultations/2026-09-growth-os-0-3-chatgpt-package.md](../consultations/2026-09-growth-os-0-3-chatgpt-package.md) — pakiet read-only do konsultacji z zewnętrznym ChatGPT.
 
 ## Dokumenty systemowe powiązane
 

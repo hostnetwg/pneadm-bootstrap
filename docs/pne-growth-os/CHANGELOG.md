@@ -2,6 +2,65 @@
 
 Ten changelog dotyczy warstwy i dokumentacji PNE Growth OS. Nie zastępuje głównych `CHANGELOG.md` aplikacji `pneadm` i `pnedu`.
 
+## 2026-09-29 — Etap 0.3: webinar TIK od zera
+
+### Added
+
+- sesyjny projekt webinaru `DemoTikWebinarProject`,
+- menu: Dzisiaj, Projekty, Pomysły, Inbox,
+- startowy flow **Zaplanuj webinar TIK**,
+- workspace projektu z etapami: Pomysł i kierunek, Koncepcja, Materiały, Przygotowanie, LIVE, Follow-up,
+- jedno główne CTA „Najważniejszy następny krok”,
+- checklista czasowa względem daty live,
+- materiały ze statusami sesyjnymi,
+- Inbox linkujący do konkretnego miejsca w projekcie.
+
+### Changed
+
+- 0.3 zastępuje 0.2 jako główny prototyp UX,
+- Inbox przestał być osią pracy; jest widokiem pomocniczym.
+
+### Migration
+
+- brak.
+
+### Risk
+
+- stan znika po zakończeniu sesji,
+- „Opublikowane / zaplanowane” jest tylko symulowanym statusem.
+
+### Rollback
+
+- wyłączyć flagę albo wycofać kod; brak danych DB.
+
+## 2026-09-29 — Etap 0.2: prototyp webinaru TIK
+
+### Added
+
+- scenariusz demonstracyjny `DemoTikWebinarScenario` (kampania Canva AI / TIK),
+- trasy `/growth/approvals`, `/growth/approvals/{decision}`, `/growth/campaigns/{campaign}`,
+- zatwierdzanie decyzji tylko w sesji HTTP,
+- pozycje menu: Pulpit, Do zatwierdzenia, Kampania TIK,
+- testy prototypu `GrowthOsStage02PrototypeTest`.
+
+### Changed
+
+- pulpit pokazuje uwagę wokół kampanii TIK zamiast pustego sukcesu,
+- dokumentacja roadmapy i README opisuje Etap 0.2 jako wdrożony lokalnie.
+
+### Migration
+
+- brak.
+
+### Risk
+
+- dane są fikcyjne; łatwo pomylić z produkcyjnym szkoleniem — wszędzie oznaczenie „demonstracja”,
+- statusy w sesji znikają po wylogowaniu / nowej sesji.
+
+### Rollback
+
+- wyłączyć flagę albo wycofać commit; brak danych DB.
+
 ## 2026-09-29 — Etap 0.1: bezpieczny szkielet
 
 ### Added
