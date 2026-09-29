@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-29 16:50 CEST<br>
 Branch: main<br>
-Commit: working tree / pending commit (base 6511722)<br>
+Commit: db765f5<br>
 Stage: 0.3.2 OpenAI concept-revision pilot<br>
 Current blocker: none
 
