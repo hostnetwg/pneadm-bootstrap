@@ -87,6 +87,8 @@ class GrowthOsAccessTest extends TestCase
             ->get(route('growth.dashboard'))
             ->assertOk()
             ->assertSee('PNE Growth OS')
+            ->assertSee('PNE Rozwój')
+            ->assertSee('Pulpit')
             ->assertSee('Moduł w wersji przygotowawczej')
             ->assertSee('Brak zadań wymagających decyzji.')
             ->assertSee('Dane demonstracyjne')

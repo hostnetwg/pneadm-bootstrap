@@ -64,13 +64,28 @@
 
         @if(config('growth_os.enabled') === true && auth()->user()?->isSuperAdmin())
             <li class="mb-1">
-                <a href="{{ route('growth.dashboard') }}"
-                   class="btn d-inline-flex align-items-center rounded border-0 text-light w-100 {{ request()->routeIs('growth.*') ? 'active fw-semibold' : '' }}">
+                <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('growth.*') ? '' : 'collapsed' }}"
+                        data-bs-toggle="collapse" data-bs-target="#growth-collapse"
+                        aria-expanded="{{ request()->routeIs('growth.*') ? 'true' : 'false' }}">
                     <svg class="bi pe-none me-2" width="16" height="16" fill="white">
                         <use xlink:href="#grid"></use>
                     </svg>
-                    PNE Growth OS
-                </a>
+                    PNE Rozwój
+                    <svg class="bi pe-none ms-auto" width="16" height="16">
+                        <use xlink:href="#chevron-right"></use>
+                    </svg>
+                </button>
+                <div class="collapse {{ request()->routeIs('growth.*') ? 'show' : '' }}" id="growth-collapse" data-bs-parent="#menuAccordion">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-4">
+                        <li>
+                            <a href="{{ route('growth.dashboard') }}"
+                               class="link-light d-inline-flex text-decoration-none rounded {{ request()->routeIs('growth.dashboard') ? 'active fw-semibold text-white' : '' }}"
+                               onclick="event.stopPropagation();">
+                                Pulpit
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </li>
         @endif
 
