@@ -158,4 +158,12 @@ Date: 2026-09-29<br>
 Status: ACTIVE<br>
 Decision: GrowthTask utrwala prostą checklistę operacyjną kampanii. Pierwszy zestaw to 9 zadań ze stabilnym `key`. W obecnym UX widać tylko `todo` i `done`. Odhaczenie nie tworzy decyzji i nie zmienia „Najważniejszego następnego kroku”.<br>
 Rationale: Cała checklista czasowa dublowałaby główny flow, koncepcję i sesyjne materiały. Trwałe mają być tylko czynności operacyjne, których nie opisuje ani artifact, ani decyzja.<br>
-Consequences: `growth_tasks.key` jest unikalny w kampanii. Termin `due_at` liczy się od `live_at`. `assignee_user_id` i `growth_artifact_id` zostają puste. Zadania powstają przy utworzeniu kampanii oraz przez jawną komendę `growth:seed-operational-tasks`, nie przy wejściu na ekran. Kierunek i materiały nadal nie są trwałe.
+Consequences: `growth_tasks.key` jest unikalny w kampanii. Termin `due_at` liczy się od `live_at`. `assignee_user_id` i `growth_artifact_id` zostają puste. Zadania powstają przy utworzeniu kampanii oraz przez jawną komendę `growth:seed-operational-tasks`, nie przy wejściu na ekran. Kierunek i materiały nadal nie są trwałe. Trwałość materiałów opisuje późniejszy DEC-021.
+
+## DEC-021
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Dziesięć materiałów roboczych webinaru zapisuje się jako artifacty typu `material` ze stabilnym `key`, statusem i szkicem. Zapis następuje przy jawnym „Zapisz materiał”, nie przy wejściu na ekran. Kierunek pozostaje w sesji.<br>
+Rationale: To ten sam kontrakt co koncepcja. Status i szkic mają wracać po zalogowaniu, bez nowego ekranu, bez AI i bez decyzji człowieka.<br>
+Consequences: Klucze: `youtube-description`, `main-graphic`, `facebook-post`, `main-mail`, `reminder-mail`, `landing`, `host-script`, `participant-material`, `obs-intro`, `follow-up`. `schema_version` = 1. `payload` trzyma status widoczny w UX oraz szkic. Etykieta „Opublikowane / zaplanowane” zostaje w `payload.status`, a kolumna `status` dostaje `approved`, bo `published` nie jest statusem artifactu. Zapis nie tworzy `growth_decisions` i nie zmienia reguł następnego kroku. Kierunek, propozycja AI i prowadzący nadal nie są trwałe.

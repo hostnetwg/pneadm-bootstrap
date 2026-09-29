@@ -13,7 +13,7 @@ use Carbon\CarbonImmutable;
 /**
  * Etap 0.3: sesyjny prototyp przygotowania webinaru TIK od zera.
  *
- * Kampania i koncepcja są zapisywane w bazie. Reszta stanu żyje w sesji HTTP.
+ * Kampania, koncepcja i dziesięć materiałów roboczych są zapisywane w bazie. Kierunek, propozycja AI i prowadzący żyją w sesji HTTP.
  */
 class DemoTikWebinarProject
 {
@@ -555,6 +555,19 @@ class DemoTikWebinarProject
 
     /**
      * @param  array<string, mixed>  $project
+     */
+    private static function persistMaterial(array $project, string $materialId): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->persistMaterial($project, $user, $materialId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
      * @return array<string, mixed>
      */
     private static function pushConceptVersion(array $project, string $label): array
@@ -719,7 +732,7 @@ class DemoTikWebinarProject
     /**
      * @return array<string, mixed>
      */
-    public static function updateMaterialStatus(string $projectId, string $materialId, string $status): array
+    public static function updateMaterialStatus(string $projectId, string $materialId, string $status, ?string $draft = null): array
     {
         $project = self::requireProject($projectId);
         abort_unless(array_key_exists($status, self::materialStatusLabels()), 422);
@@ -727,8 +740,12 @@ class DemoTikWebinarProject
         foreach ($project['materials'] as $index => $material) {
             if (($material['id'] ?? null) === $materialId) {
                 $project['materials'][$index]['status'] = $status;
+                if ($draft !== null) {
+                    $project['materials'][$index]['draft'] = $draft;
+                }
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
                 self::saveProject($project);
+                self::persistMaterial($project, $materialId);
 
                 return $project['materials'][$index];
             }
@@ -964,7 +981,7 @@ class DemoTikWebinarProject
         };
 
         $criticalLabel = $criticalMaterials === 0
-            ? 'Elementy krytyczne są gotowe w tej sesji.'
+            ? 'Elementy krytyczne są gotowe.'
             : "{$criticalMaterials} elementy krytyczne nie są gotowe.";
 
         return [

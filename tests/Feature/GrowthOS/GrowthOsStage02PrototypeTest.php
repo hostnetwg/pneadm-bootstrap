@@ -89,7 +89,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'youtube-description']))
             ->assertOk()
-            ->assertSee('Draft / sugestia AI')
+            ->assertSee('Szkic')
             ->assertSee('nic nie jest publikowane', false);
 
         $this->actingAs($user)

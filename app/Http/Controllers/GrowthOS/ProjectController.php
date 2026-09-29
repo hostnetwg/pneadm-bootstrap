@@ -277,14 +277,20 @@ class ProjectController extends Controller
 
     public function updateMaterialStatus(Request $request, string $project, string $material): RedirectResponse
     {
-        $status = $request->validate([
+        $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(DemoTikWebinarProject::materialStatusLabels()))],
-        ])['status'];
+            'draft' => ['nullable', 'string', 'max:20000'],
+        ]);
 
-        DemoTikWebinarProject::updateMaterialStatus($project, $material, $status);
+        DemoTikWebinarProject::updateMaterialStatus(
+            $project,
+            $material,
+            $data['status'],
+            array_key_exists('draft', $data) ? (string) $data['draft'] : null,
+        );
 
         return redirect()
             ->route('growth.projects.materials.show', [$project, $material])
-            ->with('success', 'Status materiału zmieniono tylko w tej sesji. Nic nie opublikowano.');
+            ->with('success', 'Status i szkic materiału zostały zapisane. Nic nie opublikowano.');
     }
 }

@@ -6,16 +6,19 @@ use App\Models\GrowthOS\GrowthArtifact;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
+use App\Support\GrowthOS\DemoTikWebinarProject;
 use Carbon\CarbonImmutable;
 
 /**
- * Zapisuje z sesyjnego prototypu tylko kampanię i materiał koncepcji.
+ * Zapisuje z sesyjnego prototypu kampanię, koncepcję i dziesięć materiałów roboczych.
  */
 class GrowthSessionConceptStore
 {
     public const CONCEPT_KEY = 'concept';
 
     public const CONCEPT_TYPE = 'concept';
+
+    public const MATERIAL_TYPE = 'material';
 
     public const SCHEMA_VERSION = 1;
 
@@ -145,6 +148,8 @@ class GrowthSessionConceptStore
             $project['concept'] = $artifact->payload;
         }
 
+        $project = $this->overlayMaterials($project, $campaign->id);
+
         $approval = $this->latestConceptApproval((int) $campaign->id);
         $completed = $project['completed_steps'] ?? [];
         if (! is_array($completed)) {
@@ -205,6 +210,46 @@ class GrowthSessionConceptStore
             ->update(['status' => GrowthDecision::STATUS_SUPERSEDED]);
     }
 
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public function persistMaterial(array $project, User $actor, string $materialId): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        $materials = $project['materials'] ?? null;
+        if (! is_numeric($campaignId) || ! is_array($materials)) {
+            return;
+        }
+
+        $material = collect($materials)->first(
+            fn (mixed $item): bool => is_array($item) && ($item['id'] ?? null) === $materialId,
+        );
+        if (! is_array($material)) {
+            return;
+        }
+
+        $workspaceStatus = (string) ($material['status'] ?? 'DRAFT');
+        $artifact = GrowthArtifact::query()->firstOrNew([
+            'growth_campaign_id' => (int) $campaignId,
+            'key' => $materialId,
+        ]);
+
+        $artifact->type = self::MATERIAL_TYPE;
+        $artifact->status = $this->artifactStatus($workspaceStatus);
+        $artifact->title = mb_substr(trim((string) ($material['name'] ?? '')), 0, 180) ?: null;
+        $artifact->summary = trim((string) ($material['summary'] ?? '')) ?: null;
+        $artifact->schema_version = self::SCHEMA_VERSION;
+        $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
+        $artifact->payload = [
+            'status' => $workspaceStatus,
+            'draft' => (string) ($material['draft'] ?? ''),
+        ];
+        if (! $artifact->exists) {
+            $artifact->created_by_user_id = $actor->id;
+        }
+        $artifact->save();
+    }
+
     public function latestConceptApproval(int $campaignId): ?GrowthDecision
     {
         $decision = GrowthDecision::query()
@@ -238,6 +283,57 @@ class GrowthSessionConceptStore
         return match ($status) {
             GrowthCampaign::STATUS_PREPARING => 'PREPARING',
             default => 'PLANNING',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private function overlayMaterials(array $project, int $campaignId): array
+    {
+        $materials = $project['materials'] ?? null;
+        if (! is_array($materials)) {
+            return $project;
+        }
+
+        $artifacts = GrowthArtifact::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('type', self::MATERIAL_TYPE)
+            ->get()
+            ->keyBy('key');
+
+        foreach ($materials as $index => $material) {
+            if (! is_array($material)) {
+                continue;
+            }
+
+            $artifact = $artifacts->get($material['id'] ?? null);
+            if (! $artifact instanceof GrowthArtifact || ! is_array($artifact->payload)) {
+                continue;
+            }
+
+            $status = $artifact->payload['status'] ?? null;
+            if (is_string($status) && array_key_exists($status, DemoTikWebinarProject::materialStatusLabels())) {
+                $materials[$index]['status'] = $status;
+            }
+            if (is_string($artifact->payload['draft'] ?? null)) {
+                $materials[$index]['draft'] = $artifact->payload['draft'];
+            }
+        }
+
+        $project['materials'] = $materials;
+
+        return $project;
+    }
+
+    private function artifactStatus(string $workspaceStatus): string
+    {
+        return match ($workspaceStatus) {
+            'NOT_STARTED' => GrowthArtifact::STATUS_NOT_STARTED,
+            'REVIEW' => GrowthArtifact::STATUS_REVIEW,
+            'APPROVED', 'PUBLISHED' => GrowthArtifact::STATUS_APPROVED,
+            default => GrowthArtifact::STATUS_DRAFT,
         };
     }
 }

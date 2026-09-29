@@ -139,7 +139,7 @@ class GrowthOsConceptPersistenceTest extends TestCase
             ->assertDontSee('Waldemar Grabowski');
 
         $material = DemoTikWebinarProject::material(DemoTikWebinarProject::PROJECT_ID, 'facebook-post');
-        $this->assertSame('DRAFT', $material['status']);
+        $this->assertSame('APPROVED', $material['status']);
 
         session()->forget(DemoTikWebinarProject::SESSION_PROJECT);
 

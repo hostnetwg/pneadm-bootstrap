@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Dziewięć zadań operacyjnych wraca po zalogowaniu. Kierunek i materiały zostają w przeglądarce.
+Dziesięć materiałów wraca po zalogowaniu razem ze statusem i szkicem. Kierunek zostaje w przeglądarce.
 
 ## NEXT
 
-Dalsze materiały poza koncepcją. Bez przenoszenia kierunku i bez sterowania głównym CTA przez zadania.
+Trwały kierunek. Bez propozycji AI, bez prowadzącego i bez sterowania głównym CTA przez zadania.
 
 ## LATER
 
@@ -79,7 +79,7 @@ Kolejność wdrożenia:
 5. trwałe odtworzenie projektu po ponownym wejściu — zrobione dla kampanii i koncepcji,
 6. Decision — zrobione dla decyzji przy koncepcji,
 7. Task — zrobione dla 9 zadań operacyjnych,
-8. później dalsze materiały.
+8. dalsze materiały — zrobione dla 10 materiałów roboczych (status i szkic).
 
 Kryterium sukcesu:
 

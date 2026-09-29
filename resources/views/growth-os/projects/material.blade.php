@@ -32,10 +32,11 @@
             <div class="col-lg-7">
                 <section class="card border h-100" aria-labelledby="material-preview-heading">
                     <div class="card-header bg-white">
-                        <h3 class="h6 mb-0" id="material-preview-heading">Draft / sugestia AI</h3>
+                        <h3 class="h6 mb-0" id="material-preview-heading">Szkic</h3>
                     </div>
                     <div class="card-body">
-                        <p class="mb-0" style="white-space: pre-line;">{{ $material['draft'] }}</p>
+                        <label for="draft" class="form-label">Szkic</label>
+                        <textarea id="draft" name="draft" form="material-save" class="form-control" rows="10">{{ $material['draft'] }}</textarea>
                     </div>
                 </section>
             </div>
@@ -47,14 +48,14 @@
                     <div class="card-body">
                         <p>{{ $material['why'] }}</p>
                         <ul class="small mb-0">
-                            <li>Zmiana dotyczy tylko tej sesji przeglądarki.</li>
-                            <li>Nic nie trafia do Sendy, YouTube, Meta ani bazy.</li>
-                            <li>„Opublikowane / zaplanowane” jest wyłącznie symulacją statusu.</li>
+                            <li>Status i szkic wracają po zalogowaniu.</li>
+                            <li>Nic nie trafia do Sendy, YouTube ani Meta.</li>
+                            <li>„Opublikowane / zaplanowane” jest wyłącznie etykietą statusu.</li>
                         </ul>
                     </div>
                 </section>
 
-                <form method="POST" action="{{ route('growth.projects.materials.status', [$project['id'], $material['id']]) }}" class="card border">
+                <form id="material-save" method="POST" action="{{ route('growth.projects.materials.status', [$project['id'], $material['id']]) }}" class="card border">
                     @csrf
                     <div class="card-body">
                         <label for="status" class="form-label">Status materiału</label>
@@ -65,7 +66,7 @@
                         </select>
                     </div>
                     <div class="card-footer bg-white d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Zapisz status w sesji</button>
+                        <button type="submit" class="btn btn-primary">Zapisz materiał</button>
                     </div>
                 </form>
             </div>
