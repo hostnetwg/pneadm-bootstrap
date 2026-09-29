@@ -135,7 +135,8 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 - `GrowthOsConceptPersistenceTest`: utworzenie projektu zapisuje kampanię; ręczny zapis i „Zastosuj” zapisują artifact `concept`; sama propozycja i „Odrzuć” nie zmieniają koncepcji; inna sesja właściciela odtwarza kampanię, koncepcję i decyzję „Koncepcja gotowa”; zatwierdzenie kierunku nie tworzy decyzji; cofnięcie oznacza poprzednią decyzję jako zastąpioną.
 - `GrowthOsOperationalTasksTest`: nowa kampania dostaje 9 zadań ze stabilnym `key`; ponowna inicjalizacja nie dubluje; `due_at` liczy się od `live_at`, a bez terminu zostaje puste; checkbox przełącza `done` i czyści `completed_at`; odhaczenie nie tworzy decyzji i nie zmienia następnego kroku; samo otwarcie ekranu nie dopisuje zadań.
 - `GrowthOsMaterialPersistenceTest`: samo otwarcie materiału nie tworzy artifactu; zapis dziesięciu materiałów utrwala status i szkic bez decyzji; etykieta publikacji zostaje w payloadzie, a kolumna dostaje `approved`; nowa sesja odtwarza materiały i nie odtwarza niezapisanej zmiany kierunku.
-- `GrowthOsDirectionPersistenceTest`: samo otwarcie projektu nie zapisuje kierunku; „Zapisz kierunek” utrwala pięć pól bez decyzji; zatwierdzenie wraca po nowej sesji i nie przywraca prowadzącego; edycja oraz cofnięcie zastępują decyzję zatwierdzenia.
+- `GrowthOsDirectionPersistenceTest`: samo otwarcie projektu nie zapisuje kierunku; „Zapisz kierunek” utrwala pięć pól bez decyzji; zatwierdzenie i prowadzący wracają po nowej sesji; edycja oraz cofnięcie zastępują decyzję zatwierdzenia.
+- Zapis prowadzącego: utworzenie projektu ustawia `host_name`, zmiana na ekranie projektu aktualizuje imię, `primary_instructor_id` zostaje puste.
 - Ręczny smoke test z prawdziwym OpenAI wymaga lokalnego `OPENAI_API_KEY` i jawnego `GROWTH_AI_ENABLED=true`; nie jest częścią automatycznego suite.
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).

@@ -25,9 +25,19 @@
                         <span class="badge bg-warning text-dark">Prototyp sesyjny</span>
                     </div>
                     <h2 class="h4 mb-2">{{ $project['topic'] }}</h2>
-                    <p class="text-secondary mb-0">
-                        {{ $project['type'] }} · {{ $project['live_date'] }} {{ $project['live_time'] }} · {{ $project['host'] }}
+                    <p class="text-secondary mb-2">
+                        {{ $project['type'] }} · {{ $project['live_date'] }} {{ $project['live_time'] }}
                     </p>
+                    <form id="project-host" method="POST" action="{{ route('growth.projects.host.update', $project['id']) }}" class="d-flex flex-wrap align-items-end gap-2">
+                        @csrf
+                        @method('PUT')
+                        <div>
+                            <label for="project_host" class="form-label small mb-1">Prowadzący</label>
+                            <input id="project_host" name="host" class="form-control form-control-sm @error('host') is-invalid @enderror" value="{{ old('host', $project['host']) }}" maxlength="120" required>
+                            @error('host')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Zapisz prowadzącego</button>
+                    </form>
                 </div>
                 <div class="text-lg-end">
                     <div class="fw-semibold">{{ $health['days_label'] }}</div>

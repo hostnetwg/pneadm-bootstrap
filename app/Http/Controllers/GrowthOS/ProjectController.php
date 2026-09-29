@@ -50,7 +50,21 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project['id'])
-            ->with('success', 'Utworzono projekt webinaru. Kampania jest zapisana. Prowadzący i reszta procesu zostają w tej sesji.');
+            ->with('success', 'Utworzono projekt webinaru. Kampania i prowadzący są zapisane.');
+    }
+
+    public function updateHost(Request $request, string $project): RedirectResponse
+    {
+        $host = $request->validate([
+            'host' => ['required', 'string', 'max:120'],
+        ])['host'];
+
+        DemoTikWebinarProject::updateHost($project, $host);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zapisano prowadzącego.')
+            ->withFragment('project-host');
     }
 
     public function show(string $project): View

@@ -61,7 +61,7 @@
                     <div class="card-body">
                         <h3 class="h5 mb-2">Nie ma jeszcze projektu webinaru TIK</h3>
                         <p class="text-secondary mb-3">
-                            Zacznij od prostego planu: data live, prowadzący, cel i temat. Kampania zostanie zapisana, a prowadzący zostaje w tej sesji.
+                            Zacznij od prostego planu: data live, prowadzący, cel i temat. Kampania i prowadzący zostaną zapisane.
                         </p>
                         <a href="{{ route('growth.projects.create') }}" class="btn btn-primary">
                             Zaplanuj webinar TIK

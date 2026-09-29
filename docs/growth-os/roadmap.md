@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Kierunek wraca po zalogowaniu razem z zatwierdzeniem. Propozycja AI i prowadzący zostają w przeglądarce.
+Prowadzący wraca po zalogowaniu jako imię przy kampanii. Propozycja AI zostaje w przeglądarce.
 
 ## NEXT
 
-Trwały prowadzący. Bez zapisu propozycji AI i bez sterowania głównym CTA przez zadania.
+Propozycja AI zostaje w sesji. Nie zapisywać jej bez osobnej decyzji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 
@@ -80,7 +80,8 @@ Kolejność wdrożenia:
 6. Decision — zrobione dla decyzji przy koncepcji,
 7. Task — zrobione dla 9 zadań operacyjnych,
 8. dalsze materiały — zrobione dla 10 materiałów roboczych (status i szkic),
-9. kierunek — zrobione dla pięciu pól i decyzji zatwierdzenia.
+9. kierunek — zrobione dla pięciu pól i decyzji zatwierdzenia,
+10. prowadzący — zrobione jako `host_name`, bez powiązania z instruktorem.
 
 Kryterium sukcesu:
 

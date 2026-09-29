@@ -8,7 +8,7 @@
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                 <div>
                     <h2 class="h4 mb-2">Projekty</h2>
-                    <p class="text-secondary mb-0">Kampania i koncepcja wracają po zalogowaniu. Kierunek, materiały i checklista zostają w przeglądarce, w której powstały.</p>
+                    <p class="text-secondary mb-0">Kampania, prowadzący, kierunek, koncepcja i zapisane materiały wracają po zalogowaniu. Propozycja AI zostaje w przeglądarce, w której powstała.</p>
                 </div>
                 <a href="{{ route('growth.projects.create') }}" class="btn btn-primary align-self-start">
                     Zaplanuj webinar TIK

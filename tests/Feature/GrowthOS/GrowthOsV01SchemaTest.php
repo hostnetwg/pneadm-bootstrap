@@ -28,6 +28,7 @@ class GrowthOsV01SchemaTest extends TestCase
             'type',
             'status',
             'goal',
+            'host_name',
             'owner_user_id',
             'primary_instructor_id',
             'working_topic',

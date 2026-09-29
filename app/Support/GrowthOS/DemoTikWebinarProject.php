@@ -13,7 +13,7 @@ use Carbon\CarbonImmutable;
 /**
  * Etap 0.3: sesyjny prototyp przygotowania webinaru TIK od zera.
  *
- * Kampania, kierunek, koncepcja i dziesięć materiałów roboczych są zapisywane w bazie. Propozycja AI i prowadzący żyją w sesji HTTP.
+ * Kampania, prowadzący, kierunek, koncepcja i dziesięć materiałów roboczych są zapisywane w bazie. Propozycja AI żyje w sesji HTTP.
  */
 class DemoTikWebinarProject
 {
@@ -99,6 +99,19 @@ class DemoTikWebinarProject
         }
 
         self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function updateHost(string $projectId, string $host): array
+    {
+        $project = self::requireProject($projectId);
+        $project['host'] = trim($host);
+        self::saveProject($project);
+        app(GrowthSessionConceptStore::class)->persistHost($project, $project['host']);
 
         return $project;
     }

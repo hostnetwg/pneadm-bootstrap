@@ -48,6 +48,7 @@ class GrowthCampaign extends Model
         'type',
         'status',
         'goal',
+        'host_name',
         'owner_user_id',
         'primary_instructor_id',
         'working_topic',

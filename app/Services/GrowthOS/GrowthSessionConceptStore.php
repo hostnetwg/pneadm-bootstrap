@@ -51,6 +51,7 @@ class GrowthSessionConceptStore
             'type' => mb_substr(trim((string) ($project['type'] ?? 'webinar')), 0, 40),
             'status' => $this->databaseStatus((string) ($project['status'] ?? 'PLANNING')),
             'goal' => mb_substr(trim((string) ($project['goal'] ?? '')), 0, 120) ?: null,
+            'host_name' => $this->hostName((string) ($project['host'] ?? '')),
             'owner_user_id' => $owner->id,
             'primary_instructor_id' => null,
             'working_topic' => $topic !== '' ? $topic : null,
@@ -106,6 +107,21 @@ class GrowthSessionConceptStore
         $artifact->save();
     }
 
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public function persistHost(array $project, string $host): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        GrowthCampaign::query()->whereKey((int) $campaignId)->update([
+            'host_name' => $this->hostName($host),
+        ]);
+    }
+
     public function latestOwnedCampaign(User $owner): ?GrowthCampaign
     {
         $campaign = GrowthCampaign::query()
@@ -137,6 +153,9 @@ class GrowthSessionConceptStore
         }
         if (filled($campaign->goal)) {
             $project['goal'] = $campaign->goal;
+        }
+        if (filled($campaign->host_name)) {
+            $project['host'] = $campaign->host_name;
         }
         $project['type'] = $campaign->type;
         $project['status'] = $this->sessionStatus($campaign->status);
@@ -328,6 +347,13 @@ class GrowthSessionConceptStore
             ->first();
 
         return $decision instanceof GrowthDecision ? $decision : null;
+    }
+
+    private function hostName(string $host): ?string
+    {
+        $host = mb_substr(trim($host), 0, 120);
+
+        return $host !== '' ? $host : null;
     }
 
     private function liveAt(string $date, string $time): ?CarbonImmutable

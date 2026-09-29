@@ -52,7 +52,8 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 `growth_campaigns`
 
 - główny workspace strategiczny,
-- pola: `id`, `name`, `type`, `status`, `goal`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `timestamps`,
+- pola: `id`, `name`, `type`, `status`, `goal`, `host_name`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `timestamps`,
+- `host_name` to imię prowadzącego wpisane w projekcie, bez powiązania z `instructors`,
 - `primary_instructor_id` jest opcjonalnym powiązaniem z istniejącym `instructors.id`,
 - `slug` nie jest obowiązkowy w v0.1.
 
@@ -214,9 +215,9 @@ Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, 
 
 ## Obecny Etap 0.3.2
 
-Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu, artifact `direction` przy „Zapisz kierunek” i przy zatwierdzeniu kierunku, artifact `concept` przy ręcznym zapisie i przy „Zastosuj” oraz dziesięć materiałów typu `material` przy „Zapisz materiał”. Odświeżenie w tej samej sesji czyta te dane z bazy. Propozycja AI i prowadzący zostają w sesji.
+Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu, artifact `direction` przy „Zapisz kierunek” i przy zatwierdzeniu kierunku, artifact `concept` przy ręcznym zapisie i przy „Zastosuj” oraz dziesięć materiałów typu `material` przy „Zapisz materiał”. Odświeżenie w tej samej sesji czyta te dane z bazy. Utworzenie projektu zapisuje też `host_name`. Propozycja AI zostaje w sesji.
 
-Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Następny krok to trwały prowadzący.
+Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, prowadzący (`host_name`), kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Propozycja AI zostaje w sesji.
 
 Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
 

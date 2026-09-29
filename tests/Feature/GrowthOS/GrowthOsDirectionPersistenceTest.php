@@ -80,7 +80,7 @@ class GrowthOsDirectionPersistenceTest extends TestCase
         $this->assertSame('Dla dyrektorów', $artifact->fresh()->payload['audience']);
     }
 
-    public function test_approval_returns_after_a_new_session_and_host_does_not(): void
+    public function test_approval_and_host_return_after_a_new_session(): void
     {
         $user = $this->superAdmin();
         $this->actingAs($user)->post(route('growth.projects.store'), $this->projectPayload());
@@ -109,11 +109,11 @@ class GrowthOsDirectionPersistenceTest extends TestCase
             ->assertSee('Dla nauczycieli wczesnoszkolnych')
             ->assertSee('Kierunek zatwierdzony.')
             ->assertSee('Cofnij zatwierdzenie')
-            ->assertDontSee('Waldemar Grabowski');
+            ->assertSee('Waldemar Grabowski');
 
         $restored = DemoTikWebinarProject::project();
         $this->assertIsArray($restored);
-        $this->assertSame('—', $restored['host']);
+        $this->assertSame('Waldemar Grabowski', $restored['host']);
         $this->assertArrayHasKey('direction', $restored['completed_steps']);
     }
 

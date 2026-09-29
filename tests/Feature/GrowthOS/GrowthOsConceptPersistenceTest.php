@@ -49,6 +49,7 @@ class GrowthOsConceptPersistenceTest extends TestCase
         $this->assertNotNull($campaign);
         $this->assertSame($user->id, $campaign->owner_user_id);
         $this->assertNull($campaign->primary_instructor_id);
+        $this->assertSame('Waldemar Grabowski', $campaign->host_name);
         $this->assertSame('Canva AI w pracy nauczyciela', $campaign->working_topic);
         $this->assertSame(GrowthCampaign::STATUS_PLANNING, $campaign->status);
         $this->assertSame(0, GrowthArtifact::query()->count());
@@ -136,7 +137,7 @@ class GrowthOsConceptPersistenceTest extends TestCase
             ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
             ->assertOk()
             ->assertSee('Tytuł z bazy')
-            ->assertDontSee('Waldemar Grabowski');
+            ->assertSee('Waldemar Grabowski');
 
         $material = DemoTikWebinarProject::material(DemoTikWebinarProject::PROJECT_ID, 'facebook-post');
         $this->assertSame('APPROVED', $material['status']);
@@ -148,6 +149,31 @@ class GrowthOsConceptPersistenceTest extends TestCase
             ->assertOk()
             ->assertDontSee('Tytuł z bazy')
             ->assertDontSee('Canva AI w pracy nauczyciela');
+    }
+
+    public function test_host_can_be_changed_without_linking_an_instructor(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), $this->projectPayload());
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.host.update', DemoTikWebinarProject::PROJECT_ID), [
+                'host' => 'Anna Nowak',
+            ])
+            ->assertRedirect();
+
+        $campaign = GrowthCampaign::query()->first();
+        $this->assertNotNull($campaign);
+        $this->assertSame('Anna Nowak', $campaign->host_name);
+        $this->assertNull($campaign->primary_instructor_id);
+
+        session()->forget(DemoTikWebinarProject::SESSION_PROJECT);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Anna Nowak')
+            ->assertDontSee('Waldemar Grabowski');
     }
 
     public function test_concept_decisions_are_stored_and_return_after_a_new_session(): void

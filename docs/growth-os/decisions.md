@@ -174,4 +174,12 @@ Date: 2026-09-29<br>
 Status: ACTIVE<br>
 Decision: Kierunek webinaru zapisuje się jako artifact `direction` z pięcioma polami. „Zatwierdź kierunek” i cofnięcie są decyzją `direction_approval`. Propozycja AI przy kierunku i prowadzący zostają w sesji.<br>
 Rationale: Po zalogowaniu ma wracać treść kierunku i fakt zatwierdzenia, tak jak przy koncepcji. Stała podpowiedź AI nie jest decyzją ani treścią właściciela.<br>
-Consequences: Klucz `direction`, `type=direction`, `schema_version=1`. `payload`: `why_now`, `audience`, `problem`, `takeaway`, `sell_later`. Zapis jest jawny. Zatwierdzenie tworzy decyzję `approved` i utrwala bieżące pola. Cofnięcie oznacza poprzednią decyzję jako `superseded` i dodaje `changes_requested`. Edycja zatwierdzonego kierunku też oznacza decyzję jako `superseded`, bez nowej decyzji. „Zastosuj” przy koncepcji, jeśli zmienia odbiorców, zapisuje kierunek i cofa jego zatwierdzenie. Prowadzący i propozycja AI nadal nie są trwałe.
+Consequences: Klucz `direction`, `type=direction`, `schema_version=1`. `payload`: `why_now`, `audience`, `problem`, `takeaway`, `sell_later`. Zapis jest jawny. Zatwierdzenie tworzy decyzję `approved` i utrwala bieżące pola. Cofnięcie oznacza poprzednią decyzję jako `superseded` i dodaje `changes_requested`. Edycja zatwierdzonego kierunku też oznacza decyzję jako `superseded`, bez nowej decyzji. „Zastosuj” przy koncepcji, jeśli zmienia odbiorców, zapisuje kierunek i cofa jego zatwierdzenie. Prowadzący i propozycja AI nadal nie są trwałe. Trwałość prowadzącego opisuje późniejszy DEC-023.
+
+## DEC-023
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Prowadzący zapisuje się jako `growth_campaigns.host_name`. To wolny tekst z formularza, bez powiązania z `instructors` i bez `primary_instructor_id`.<br>
+Rationale: Po zalogowaniu ma wracać imię wpisane przy projekcie. Istniejący instruktor zostaje osobnym, opcjonalnym wskazaniem eksperta.<br>
+Consequences: Utworzenie projektu zapisuje `host_name`. Na ekranie projektu można je zmienić przyciskiem „Zapisz prowadzącego”. Puste pole nie czyści zapisanego imienia przy samym odtworzeniu. Propozycja AI nadal nie jest trwała.
