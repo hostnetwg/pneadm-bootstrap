@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-29 13:10  
 Branch: main  
-Commit: fe1dc6c  
+Commit: implementation baseline fe1dc6c (CURRENT metadata may be updated by later docs-only commits)  
 Stage: 0.3 UX prototype  
 Current blocker: flow edycji i cofania zatwierdzenia koncepcji
 
