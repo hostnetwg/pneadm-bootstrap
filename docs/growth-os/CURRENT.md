@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-29 17:03 CEST<br>
 Branch: main<br>
-Commit: working tree / pending commit (base c9209dc)<br>
+Commit: 7137962<br>
 Stage: v0.1 data model documentation<br>
 Current blocker: none
 
