@@ -79,3 +79,19 @@ Status: ACTIVE
 Decision: Growth OS ma prowadzić użytkownika krok po kroku.  
 Rationale: To ma być inteligentny producent/asystent, nie CRM ani system ticketowy.  
 Consequences: Ekrany mają pokazywać kontekst, stan i następny krok, a nie tylko listy rekordów.
+
+## DEC-011
+
+Date: 2026-09-29  
+Status: ACTIVE  
+Decision: W etapie Koncepcja AI tworzy wariant do przyjęcia lub odrzucenia, a nie nadpisuje treści automatycznie.  
+Rationale: Użytkownik musi zachować kontrolę nad kierunkiem i porównać propozycję z obecną wersją.  
+Consequences: „Poproś AI o zmianę” zapisuje `concept_ai_proposal` w sesji; dopiero „Zastosuj” zmienia bieżącą koncepcję.
+
+## DEC-012
+
+Date: 2026-09-29  
+Status: ACTIVE  
+Decision: Status etapu Koncepcja w prototypie to **Do dopracowania** / **Gotowe**, z możliwością cofnięcia.  
+Rationale: Prostszy model niż Draft / Review / Approved wystarcza do walidacji UX przed bazą danych.  
+Consequences: Cofnięcie usuwa zatwierdzenie z sesji i wraca do pracy nad treścią.

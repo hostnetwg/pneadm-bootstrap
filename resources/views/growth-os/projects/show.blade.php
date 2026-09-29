@@ -116,35 +116,158 @@
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="concept-heading">Koncepcja webinaru</h2>
                 @if(isset($project['completed_steps']['concept']))
-                    <span class="badge text-bg-success">Gotowe w sesji</span>
+                    <span class="badge text-bg-success">Gotowe</span>
                 @else
                     <span class="badge text-bg-danger">Do dopracowania</span>
                 @endif
             </div>
             <div class="card-body">
-                <h3 class="h6 text-secondary">Tytuł webinaru</h3>
-                <p class="h5">{{ $project['concept']['title'] }}</p>
-                <p><strong>Podtytuł:</strong> {{ $project['concept']['subtitle'] }}</p>
-                <p><strong>Główna obietnica:</strong> {{ $project['concept']['promise'] }}</p>
-                <h3 class="h6 text-secondary">3-5 głównych punktów</h3>
-                <ul>
-                    @foreach($project['concept']['points'] as $point)
-                        <li>{{ $point }}</li>
-                    @endforeach
-                </ul>
-                <p><strong>Plan webinaru:</strong> {{ $project['concept']['plan'] }}</p>
-                <p><strong>Główne CTA:</strong> {{ $project['concept']['cta'] }}</p>
-                <p><strong>Materiał dodatkowy / lead magnet:</strong> {{ $project['concept']['lead_magnet'] }}</p>
-                <p><strong>Czy prowadzi do produktu:</strong> {{ $project['concept']['next_product'] }}</p>
-                <div class="alert alert-info small mb-3">
-                    Sugestia AI: przygotuj 2 warianty tytułu - jeden praktyczny, drugi bardziej społecznościowy. Na tym etapie nic nie jest publikowane.
+                @php
+                    $concept = $project['concept'] ?? [];
+                    $proposal = $project['concept_ai_proposal'] ?? null;
+                    $versions = $project['concept_versions'] ?? [];
+                    $pointsText = implode("\n", is_array($concept['points'] ?? null) ? $concept['points'] : []);
+                @endphp
+
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <form method="POST" action="{{ route('growth.projects.concept.update', $project['id']) }}">
+                            @csrf
+                            @method('PUT')
+
+                            <div class="mb-3">
+                                <label for="concept_title" class="form-label">Tytuł webinaru</label>
+                                <input id="concept_title" name="title" type="text" class="form-control @error('title') is-invalid @enderror" value="{{ old('title', $concept['title'] ?? '') }}" required>
+                                @error('title')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_subtitle" class="form-label">Podtytuł</label>
+                                <input id="concept_subtitle" name="subtitle" type="text" class="form-control @error('subtitle') is-invalid @enderror" value="{{ old('subtitle', $concept['subtitle'] ?? '') }}" required>
+                                @error('subtitle')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_promise" class="form-label">Główna obietnica</label>
+                                <textarea id="concept_promise" name="promise" rows="2" class="form-control @error('promise') is-invalid @enderror" required>{{ old('promise', $concept['promise'] ?? '') }}</textarea>
+                                @error('promise')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_points" class="form-label">Główne punkty (jeden w linijce)</label>
+                                <textarea id="concept_points" name="points" rows="5" class="form-control @error('points') is-invalid @enderror" required>{{ old('points', $pointsText) }}</textarea>
+                                @error('points')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_plan" class="form-label">Plan webinaru</label>
+                                <textarea id="concept_plan" name="plan" rows="2" class="form-control @error('plan') is-invalid @enderror" required>{{ old('plan', $concept['plan'] ?? '') }}</textarea>
+                                @error('plan')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_cta" class="form-label">Główne CTA</label>
+                                <input id="concept_cta" name="cta" type="text" class="form-control @error('cta') is-invalid @enderror" value="{{ old('cta', $concept['cta'] ?? '') }}" required>
+                                @error('cta')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_lead_magnet" class="form-label">Materiał dodatkowy / lead magnet</label>
+                                <input id="concept_lead_magnet" name="lead_magnet" type="text" class="form-control @error('lead_magnet') is-invalid @enderror" value="{{ old('lead_magnet', $concept['lead_magnet'] ?? '') }}" required>
+                                @error('lead_magnet')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="concept_next_product" class="form-label">Czy prowadzi do produktu</label>
+                                <select id="concept_next_product" name="next_product" class="form-select @error('next_product') is-invalid @enderror" required>
+                                    @foreach(['nie', 'być może', 'tak'] as $option)
+                                        <option value="{{ $option }}" @selected(old('next_product', $concept['next_product'] ?? 'być może') === $option)>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                                @error('next_product')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-outline-primary">Zapisz koncepcję</button>
+                            </div>
+                        </form>
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            @unless(isset($project['completed_steps']['concept']))
+                                <form method="POST" action="{{ route('growth.projects.steps.complete', [$project['id'], 'concept']) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary">Koncepcja gotowa</button>
+                                </form>
+                            @else
+                                <form method="POST" action="{{ route('growth.projects.steps.reopen', [$project['id'], 'concept']) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline-secondary">Cofnij zatwierdzenie</button>
+                                </form>
+                            @endunless
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <section class="border rounded p-3 mb-3" aria-labelledby="concept-ai-heading">
+                            <h3 class="h6" id="concept-ai-heading">Poproś AI o zmianę</h3>
+                            <p class="small text-secondary">AI przygotuje wariant. Obecna koncepcja nie zostanie nadpisana, dopóki nie klikniesz „Zastosuj”.</p>
+                            <form method="POST" action="{{ route('growth.projects.concept.ai', $project['id']) }}">
+                                @csrf
+                                <label for="concept_ai_intent" class="form-label">Co zmienić?</label>
+                                <select id="concept_ai_intent" name="intent" class="form-select mb-2" required>
+                                    @foreach($conceptAiIntents as $intent)
+                                        <option value="{{ $intent['value'] }}">{{ $intent['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-outline-primary btn-sm">Wygeneruj propozycję</button>
+                            </form>
+                        </section>
+
+                        @if(is_array($proposal))
+                            <section class="border border-warning rounded p-3 mb-3" aria-labelledby="concept-proposal-heading">
+                                <h3 class="h6" id="concept-proposal-heading">Propozycja AI</h3>
+                                <p class="small mb-2">
+                                    <span class="badge text-bg-warning text-dark">{{ $proposal['intent_label'] ?? 'Wariant' }}</span>
+                                    {{ $proposal['note'] ?? '' }}
+                                </p>
+                                <p class="fw-semibold mb-1">{{ $proposal['concept']['title'] ?? '' }}</p>
+                                <p class="small text-secondary mb-2">{{ $proposal['concept']['subtitle'] ?? '' }}</p>
+                                <p class="small mb-2">{{ $proposal['concept']['promise'] ?? '' }}</p>
+                                <ul class="small">
+                                    @foreach(($proposal['concept']['points'] ?? []) as $point)
+                                        <li>{{ $point }}</li>
+                                    @endforeach
+                                </ul>
+                                <p class="small mb-3"><strong>CTA:</strong> {{ $proposal['concept']['cta'] ?? '' }}</p>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <form method="POST" action="{{ route('growth.projects.concept.ai.apply', $project['id']) }}">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary btn-sm">Zastosuj</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('growth.projects.concept.ai.reject', $project['id']) }}">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Odrzuć</button>
+                                    </form>
+                                </div>
+                            </section>
+                        @endif
+
+                        @if(is_array($versions) && count($versions) > 0)
+                            <section class="border rounded p-3" aria-labelledby="concept-versions-heading">
+                                <h3 class="h6" id="concept-versions-heading">Historia (sesja)</h3>
+                                <ul class="small mb-0 list-unstyled">
+                                    @foreach(array_slice($versions, 0, 5) as $index => $version)
+                                        <li class="mb-2">
+                                            <strong>v{{ count($versions) - $index }}</strong>
+                                            · {{ $version['label'] ?? 'Wersja' }}
+                                            <div class="text-secondary">{{ $version['concept']['title'] ?? '' }}</div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </section>
+                        @endif
+                    </div>
                 </div>
-                @unless(isset($project['completed_steps']['concept']))
-                    <form method="POST" action="{{ route('growth.projects.steps.complete', [$project['id'], 'concept']) }}">
-                        @csrf
-                        <button type="submit" class="btn btn-primary">Koncepcja gotowa</button>
-                    </form>
-                @endunless
             </div>
         </section>
 

@@ -60,6 +60,7 @@ class ProjectController extends Controller
             'timeline' => DemoTikWebinarProject::timeline(),
             'projectStatusLabels' => DemoTikWebinarProject::projectStatusLabels(),
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
+            'conceptAiIntents' => DemoTikWebinarProject::conceptAiIntents(),
         ]);
     }
 
@@ -73,7 +74,73 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', $message);
+            ->with('success', $message)
+            ->withFragment($step === 'direction' ? 'direction' : 'concept');
+    }
+
+    public function reopenStep(string $project, string $step): RedirectResponse
+    {
+        DemoTikWebinarProject::reopenStep($project, $step);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Cofnięto zatwierdzenie w tej sesji. Etap wrócił do „Do dopracowania”.')
+            ->withFragment($step);
+    }
+
+    public function updateConcept(Request $request, string $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'subtitle' => ['required', 'string', 'max:220'],
+            'promise' => ['required', 'string', 'max:500'],
+            'points' => ['required', 'string', 'max:2000'],
+            'plan' => ['required', 'string', 'max:1000'],
+            'cta' => ['required', 'string', 'max:400'],
+            'lead_magnet' => ['required', 'string', 'max:300'],
+            'next_product' => ['required', Rule::in(['nie', 'być może', 'tak'])],
+        ]);
+
+        DemoTikWebinarProject::updateConcept($project, $data);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zapisano koncepcję w tej sesji. Nic nie opublikowano.')
+            ->withFragment('concept');
+    }
+
+    public function requestConceptAi(Request $request, string $project): RedirectResponse
+    {
+        $intent = $request->validate([
+            'intent' => ['required', Rule::in(collect(DemoTikWebinarProject::conceptAiIntents())->pluck('value')->all())],
+        ])['intent'];
+
+        DemoTikWebinarProject::requestConceptAiProposal($project, $intent);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'AI przygotowało propozycję (symulacja). Obecna koncepcja nie została nadpisana.')
+            ->withFragment('concept');
+    }
+
+    public function applyConceptAi(string $project): RedirectResponse
+    {
+        DemoTikWebinarProject::applyConceptAiProposal($project);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zastosowano propozycję AI w tej sesji. Sprawdź koncepcję i zatwierdź, gdy będzie gotowa.')
+            ->withFragment('concept');
+    }
+
+    public function rejectConceptAi(string $project): RedirectResponse
+    {
+        DemoTikWebinarProject::rejectConceptAiProposal($project);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Odrzucono propozycję AI. Została poprzednia koncepcja.')
+            ->withFragment('concept');
     }
 
     public function material(string $project, string $material): View

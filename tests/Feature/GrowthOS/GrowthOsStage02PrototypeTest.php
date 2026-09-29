@@ -39,7 +39,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
             ->assertOk()
             ->assertSee('Dzisiaj')
             ->assertSee('Zaplanuj webinar TIK')
-            ->assertSee('Etap 0.3');
+            ->assertSee('Etap 0.3.1');
     }
 
     public function test_start_form_creates_session_project_and_redirects_to_workspace(): void
@@ -66,7 +66,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']))
-            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID));
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#direction');
 
         $project = DemoTikWebinarProject::project();
         $this->assertIsArray($project);
@@ -74,7 +74,7 @@ class GrowthOsStage02PrototypeTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'concept']))
-            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID));
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#concept');
 
         $project = DemoTikWebinarProject::project();
         $this->assertSame('PREPARING', $project['status']);
@@ -127,6 +127,75 @@ class GrowthOsStage02PrototypeTest extends TestCase
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'missing-material']))
             ->assertNotFound();
+    }
+
+    public function test_concept_can_be_edited_reopened_and_ai_proposal_stays_optional(): void
+    {
+        $user = $this->superAdmin();
+        $this->createSessionProject($user);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']));
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.concept.update', DemoTikWebinarProject::PROJECT_ID), [
+                'title' => 'Canva AI — nowy tytuł',
+                'subtitle' => 'Podtytuł testowy',
+                'promise' => 'Obietnica testowa',
+                'points' => "Punkt 1\nPunkt 2\nPunkt 3",
+                'plan' => 'Plan testowy',
+                'cta' => 'CTA testowe',
+                'lead_magnet' => 'Lead magnet',
+                'next_product' => 'nie',
+            ])
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('Canva AI — nowy tytuł', $project['concept']['title']);
+        $this->assertNotEmpty($project['concept_versions']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'concept']));
+
+        $this->assertArrayHasKey('concept', DemoTikWebinarProject::project()['completed_steps']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.reopen', [DemoTikWebinarProject::PROJECT_ID, 'concept']))
+            ->assertRedirect();
+
+        $this->assertArrayNotHasKey('concept', DemoTikWebinarProject::project()['completed_steps'] ?? []);
+
+        $beforeTitle = DemoTikWebinarProject::project()['concept']['title'];
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'shorter',
+            ])
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame($beforeTitle, $project['concept']['title']);
+        $this->assertIsArray($project['concept_ai_proposal']);
+        $this->assertNotSame($beforeTitle, $project['concept_ai_proposal']['concept']['title']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai.apply', DemoTikWebinarProject::PROJECT_ID))
+            ->assertRedirect();
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertNull($project['concept_ai_proposal']);
+        $this->assertNotSame($beforeTitle, $project['concept']['title']);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'practical',
+            ]);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai.reject', DemoTikWebinarProject::PROJECT_ID))
+            ->assertRedirect();
+
+        $this->assertNull(DemoTikWebinarProject::project()['concept_ai_proposal']);
     }
 
     private function createSessionProject(User $user): void

@@ -1,10 +1,10 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 13:10  
+Last updated: 2026-09-29 13:40  
 Branch: main  
-Commit: implementation baseline fe1dc6c (CURRENT metadata may be updated by later docs-only commits)  
-Stage: 0.3 UX prototype  
-Current blocker: flow edycji i cofania zatwierdzenia koncepcji
+Commit: working tree / pending commit (base 7e200da)  
+Stage: 0.3.1 UX prototype  
+Current blocker: none
 
 ## 1. Cel projektu
 
@@ -16,10 +16,11 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Main workspace: **Projekt webinaru**.
 - Primary UX principle: zawsze widoczny **Następny krok**.
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
+- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, propozycja AI jako wariant do przyjęcia/odrzucenia.
 
 ## 2. Aktualny etap
 
-Etap 0.3 — prototyp UX przygotowania webinaru TIK od zera.
+Etap 0.3.1 — praca nad koncepcją webinaru TIK w sesji HTTP.
 
 ## 3. Co już działa
 
@@ -28,6 +29,9 @@ Etap 0.3 — prototyp UX przygotowania webinaru TIK od zera.
 - Formularz **Zaplanuj webinar TIK**.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
+- Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
+- Symulowane **Poproś AI o zmianę**: wariant nie nadpisuje bieżącej koncepcji aż do „Zastosuj”.
+- Prosta historia wersji koncepcji w sesji (do 5 pozycji).
 - Pomysły i sugestie AI są symulowane.
 - Inbox prowadzi do miejsca w projekcie, nie jest głównym flow.
 
@@ -38,7 +42,7 @@ Do tej sekcji wpisujemy wyłącznie rzeczy faktycznie istniejące w aktualnym ko
 ```text
 Zaplanuj TIK
 → Pomysł i kierunek
-→ Koncepcja
+→ Koncepcja (edycja / AI / zatwierdź / cofnij)
 → Materiały
 → Przygotowanie
 → LIVE
@@ -51,6 +55,7 @@ Zaplanuj TIK
 - Projekt webinaru jest głównym workspace.
 - Inbox jest pomocniczy.
 - AI draftuje i sugeruje; człowiek zatwierdza.
+- Propozycja AI dla koncepcji tworzy **wariant**, a nie nadpisuje od razu.
 - Na górze projektu zawsze ma być widoczny najważniejszy następny krok.
 - Nie budujemy dużego dashboardu ani pełnej platformy na zapas.
 
@@ -63,28 +68,26 @@ Zaplanuj TIK
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i side effectów.
 - Wszystko działa tylko w sesji HTTP.
+- Brak pełnej edycji AI dla wszystkich materiałów (tylko Koncepcja w 0.3.1).
 
 ## 7. Otwarte pytania
 
-- Jak edytować i cofać zatwierdzenie etapów?
-- Jak pokazać „Poproś AI o zmianę” bez oddawania kontroli AI?
-- Czy etap ma mieć statusy Draft / Do dopracowania / Gotowe / Zatwierdzone?
-- Czy propozycja AI tworzy wariant, wersję roboczą czy nadpisuje treść?
-- Jak prosto pokazać historię wersji w prototypie sesyjnym?
+- Czy analogiczny flow edycji/AI przenieść od razu na „Pomysł i kierunek”?
+- Czy historia wersji ma mieć „przywróć wersję”, czy tylko podgląd?
+- Który materiał jest kolejnym kandydatem do takiego samego UX: mailing, opis YouTube, czy scenariusz?
 
 ## 8. Następny krok
 
-Etap 0.3.1: dodać do etapu **Koncepcja** edycję ręczną, cofnięcie zatwierdzenia i symulowane „Poproś AI o zmianę” z propozycją do przyjęcia lub odrzucenia.
+Walidacja 0.3.1 z właścicielem na ekranie Koncepcji, potem decyzja: rozszerzyć ten sam wzorzec na kierunek/materiały albo przejść do modelu danych v0.1.
 
 ## 9. Ostatnie zmiany
 
-- Utworzono sesyjny flow webinaru TIK od zera.
-- Zmieniono menu na Dzisiaj / Projekty / Pomysły / Inbox.
-- Zastąpiono stary prototyp „gotowy webinar + Inbox” workspace projektu.
-- Dodano materiały z sesyjnymi statusami.
-- Dodano checklistę czasową względem daty live.
-- Dodano pakiet konsultacyjny dla zewnętrznego ChatGPT.
-- Utworzono nową strukturę dokumentacji `docs/growth-os/`.
+- Dodano edycję koncepcji w sesji.
+- Dodano cofnięcie zatwierdzenia koncepcji.
+- Dodano symulowane „Poproś AI o zmianę” z Zastosuj / Odrzuć.
+- Dodano krótką historię wersji koncepcji.
+- Uporządkowano dokumentację `docs/growth-os/`.
+- Wcześniej: sesyjny flow webinaru TIK od zera, menu Dzisiaj/Projekty/Pomysły/Inbox.
 
 ## 10. Pliki referencyjne
 
@@ -97,8 +100,4 @@ Etap 0.3.1: dodać do etapu **Koncepcja** edycję ręczną, cofnięcie zatwierdz
 
 ## Question for consultant
 
-Current question: Jak zaprojektować edycję, cofnięcie zatwierdzenia i „Poproś AI o zmianę” dla etapu **Koncepcja** bez zamieniania workspace w ciężki CRM?
-
-Context: Etap 0.3 pokazuje proces webinaru TIK od zera, ale etapy są jeszcze zbyt jednorazowe: użytkownik może głównie zatwierdzić kierunek i koncepcję. Następny etap 0.3.1 ma pokazać prawdziwą pracę nad treścią w sesji HTTP.
-
-Expected output: rekomendowany UX dla etapu Koncepcja, statusy, akcje na ekranie, zasady wariantów AI i minimalny zakres prototypu 0.3.1.
+Current question: none

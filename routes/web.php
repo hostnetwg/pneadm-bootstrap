@@ -76,6 +76,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects', [GrowthOsProjectController::class, 'store'])->name('projects.store');
         Route::get('/projects/{project}', [GrowthOsProjectController::class, 'show'])->name('projects.show');
         Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
+        Route::post('/projects/{project}/steps/{step}/reopen', [GrowthOsProjectController::class, 'reopenStep'])->name('projects.steps.reopen');
+        Route::put('/projects/{project}/concept', [GrowthOsProjectController::class, 'updateConcept'])->name('projects.concept.update');
+        Route::post('/projects/{project}/concept/ai', [GrowthOsProjectController::class, 'requestConceptAi'])->name('projects.concept.ai');
+        Route::post('/projects/{project}/concept/ai/apply', [GrowthOsProjectController::class, 'applyConceptAi'])->name('projects.concept.ai.apply');
+        Route::post('/projects/{project}/concept/ai/reject', [GrowthOsProjectController::class, 'rejectConceptAi'])->name('projects.concept.ai.reject');
         Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');
         Route::post('/projects/{project}/materials/{material}/status', [GrowthOsProjectController::class, 'updateMaterialStatus'])->name('projects.materials.status');
         Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');

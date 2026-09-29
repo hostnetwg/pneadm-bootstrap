@@ -110,6 +110,8 @@ class DemoTikWebinarProject
                 'lead_magnet' => 'PDF: 7 promptów Canva AI dla nauczyciela.',
                 'next_product' => 'być może',
             ],
+            'concept_versions' => [],
+            'concept_ai_proposal' => null,
             'materials' => self::defaultMaterials(),
         ];
 
@@ -172,6 +174,287 @@ class DemoTikWebinarProject
     /**
      * @return array<string, mixed>
      */
+    public static function reopenStep(string $projectId, string $step): array
+    {
+        $project = self::requireProject($projectId);
+        abort_unless(in_array($step, ['direction', 'concept'], true), 404);
+
+        $completed = $project['completed_steps'] ?? [];
+        if (! is_array($completed)) {
+            $completed = [];
+        }
+
+        unset($completed[$step]);
+        $project['completed_steps'] = $completed;
+        $project['status'] = isset($completed['concept']) ? 'PREPARING' : 'PLANNING';
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    public static function conceptAiIntents(): array
+    {
+        return [
+            ['value' => 'shorter', 'label' => 'Skróć i uprość'],
+            ['value' => 'practical', 'label' => 'Bardziej praktycznie'],
+            ['value' => 'directors', 'label' => 'Bardziej dla dyrektora'],
+            ['value' => 'less_sales', 'label' => 'Mniej sprzedażowo'],
+            ['value' => 'expand', 'label' => 'Rozbuduj program'],
+        ];
+    }
+
+    /**
+     * @param  array{
+     *     title: string,
+     *     subtitle: string,
+     *     promise: string,
+     *     points: list<string>|string,
+     *     plan: string,
+     *     cta: string,
+     *     lead_magnet: string,
+     *     next_product: string
+     * }  $data
+     * @return array<string, mixed>
+     */
+    public static function updateConcept(string $projectId, array $data, string $source = 'manual'): array
+    {
+        $project = self::requireProject($projectId);
+        $concept = self::normalizeConcept($data);
+
+        $project = self::pushConceptVersion($project, $source === 'manual' ? 'Edycja ręczna' : 'Zmiana koncepcji');
+        $project['concept'] = $concept;
+
+        if (isset($project['completed_steps']['concept'])) {
+            unset($project['completed_steps']['concept']);
+            $project['status'] = 'PLANNING';
+        }
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function requestConceptAiProposal(string $projectId, string $intent): array
+    {
+        $project = self::requireProject($projectId);
+        abort_unless(in_array($intent, collect(self::conceptAiIntents())->pluck('value')->all(), true), 422);
+
+        $current = $project['concept'] ?? [];
+        $intentLabel = collect(self::conceptAiIntents())->firstWhere('value', $intent)['label'] ?? $intent;
+
+        $project['concept_ai_proposal'] = [
+            'intent' => $intent,
+            'intent_label' => $intentLabel,
+            'created_at' => now()->toIso8601String(),
+            'note' => 'Symulowana propozycja AI. Nic nie zostało nadpisane — możesz przyjąć albo odrzucić.',
+            'concept' => self::simulatedConceptProposal(is_array($current) ? $current : [], $intent),
+        ];
+
+        if (isset($project['completed_steps']['concept'])) {
+            unset($project['completed_steps']['concept']);
+            $project['status'] = 'PLANNING';
+        }
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function applyConceptAiProposal(string $projectId): array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = $project['concept_ai_proposal'] ?? null;
+        abort_if(! is_array($proposal) || ! isset($proposal['concept']) || ! is_array($proposal['concept']), 404);
+
+        $project = self::pushConceptVersion(
+            $project,
+            'Zastosowano propozycję AI: '.($proposal['intent_label'] ?? 'zmiana')
+        );
+        $project['concept'] = self::normalizeConcept($proposal['concept']);
+        $project['concept_ai_proposal'] = null;
+
+        if (isset($project['completed_steps']['concept'])) {
+            unset($project['completed_steps']['concept']);
+            $project['status'] = 'PLANNING';
+        }
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function rejectConceptAiProposal(string $projectId): array
+    {
+        $project = self::requireProject($projectId);
+        $project['concept_ai_proposal'] = null;
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private static function pushConceptVersion(array $project, string $label): array
+    {
+        $versions = $project['concept_versions'] ?? [];
+        if (! is_array($versions)) {
+            $versions = [];
+        }
+
+        if (isset($project['concept']) && is_array($project['concept'])) {
+            array_unshift($versions, [
+                'label' => $label,
+                'at' => now()->toIso8601String(),
+                'concept' => $project['concept'],
+            ]);
+            $versions = array_slice($versions, 0, 5);
+        }
+
+        $project['concept_versions'] = $versions;
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{
+     *     title: string,
+     *     subtitle: string,
+     *     promise: string,
+     *     points: list<string>,
+     *     plan: string,
+     *     cta: string,
+     *     lead_magnet: string,
+     *     next_product: string
+     * }
+     */
+    private static function normalizeConcept(array $data): array
+    {
+        $points = $data['points'] ?? [];
+        if (is_string($points)) {
+            $points = preg_split("/\r\n|\n|\r/", $points) ?: [];
+        }
+
+        $points = collect(is_array($points) ? $points : [])
+            ->map(fn ($point) => trim((string) $point))
+            ->filter()
+            ->values()
+            ->all();
+
+        return [
+            'title' => trim((string) ($data['title'] ?? '')),
+            'subtitle' => trim((string) ($data['subtitle'] ?? '')),
+            'promise' => trim((string) ($data['promise'] ?? '')),
+            'points' => $points,
+            'plan' => trim((string) ($data['plan'] ?? '')),
+            'cta' => trim((string) ($data['cta'] ?? '')),
+            'lead_magnet' => trim((string) ($data['lead_magnet'] ?? '')),
+            'next_product' => trim((string) ($data['next_product'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $current
+     * @return array<string, mixed>
+     */
+    private static function simulatedConceptProposal(array $current, string $intent): array
+    {
+        $title = (string) ($current['title'] ?? 'Webinar TIK');
+        $points = is_array($current['points'] ?? null) ? $current['points'] : [];
+
+        return match ($intent) {
+            'shorter' => [
+                'title' => $title.' — w 45 minut',
+                'subtitle' => 'Krótko, konkretnie, bez żargonu',
+                'promise' => 'Jeden prosty workflow Canva AI, który oszczędza czas jeszcze dziś.',
+                'points' => array_slice(array_values($points) ?: [
+                    '1 funkcja, która daje największy zwrot czasu.',
+                    'Przykład z karty pracy.',
+                    'Co zrobić po webinarze w 10 minut.',
+                ], 0, 3),
+                'plan' => 'Intro 5 min -> pokaz 20 min -> pytania 10 min -> CTA 5 min.',
+                'cta' => 'Pobierz krótką checklistę i wróć do lekcji.',
+                'lead_magnet' => '1-stronicowa checklista promptów.',
+                'next_product' => 'nie',
+            ],
+            'practical' => [
+                'title' => str_contains($title, 'praktycznie') ? $title : $title.' — praktycznie',
+                'subtitle' => 'Konkretne przykłady z lekcji, nie teoria AI',
+                'promise' => 'Wyjdź z szablonami, które od razu użyjesz na jutrzejszej lekcji.',
+                'points' => [
+                    'Karta pracy: od pomysłu do gotowego pliku.',
+                    'Prezentacja: szybkie warianty dla różnych poziomów.',
+                    'Dyplom / podziękowanie bez ręcznej roboty.',
+                    'Typowe błędy promptów i szybkie poprawki.',
+                ],
+                'plan' => 'Problem nauczyciela -> pokaz na żywo -> wspólna mini-praca -> checklista.',
+                'cta' => 'Pobierz szablony i checklistę promptów.',
+                'lead_magnet' => 'Pakiet 3 szablonów Canva AI + 7 promptów.',
+                'next_product' => (string) ($current['next_product'] ?? 'być może'),
+            ],
+            'directors' => [
+                'title' => 'Canva AI dla szkoły: bezpiecznie i z oszczędnością czasu',
+                'subtitle' => 'Webinar TIK dla dyrektorów i nauczycieli wiodących',
+                'promise' => 'Pokażemy, jak wdrożyć AI w szkole bez chaosu i bez ryzyka wizerunkowego.',
+                'points' => [
+                    'Gdzie AI realnie pomaga nauczycielom.',
+                    'Jakie ryzyka warto wykluczyć od razu.',
+                    'Jak mówić o AI na radzie pedagogicznej.',
+                    'Prosty standard odpowiedzialnego użycia.',
+                ],
+                'plan' => 'Kontekst szkoły -> przykłady -> ryzyka -> rekomendowany standard -> pytania.',
+                'cta' => 'Pobierz 1-stronicowy standard użycia AI w szkole.',
+                'lead_magnet' => 'Mini-standard AI dla rady pedagogicznej.',
+                'next_product' => 'być może',
+            ],
+            'less_sales' => [
+                'title' => $title,
+                'subtitle' => 'Wartość edukacyjna bez nacisku sprzedażowego',
+                'promise' => 'Dostaniesz praktyczne narzędzia do lekcji — bez agresywnego CTA produktowego.',
+                'points' => $points ?: [
+                    'Praktyczne zastosowania Canva AI.',
+                    'Bezpieczne użycie w szkole.',
+                    'Materiały do samodzielnej pracy.',
+                ],
+                'plan' => (string) ($current['plan'] ?? 'Pokaz -> przykłady -> pytania -> podsumowanie.'),
+                'cta' => 'Zostaw e-mail i odbierz checklistę po spotkaniu.',
+                'lead_magnet' => (string) ($current['lead_magnet'] ?? 'Checklista promptów.'),
+                'next_product' => 'nie',
+            ],
+            default => [
+                'title' => $title,
+                'subtitle' => (string) ($current['subtitle'] ?? 'Rozbudowany program webinaru TIK'),
+                'promise' => (string) ($current['promise'] ?? 'Pokażemy praktyczne zastosowania Canva AI.'),
+                'points' => array_values(array_unique(array_merge($points, [
+                    'Mini-workshop: prompt -> wynik -> poprawka.',
+                    'Jak przygotować materiał na 2 poziomy trudności.',
+                ]))),
+                'plan' => 'Wprowadzenie -> pokaz 5 funkcji -> mini-workshop -> Q&A -> follow-up.',
+                'cta' => (string) ($current['cta'] ?? 'Pobierz materiały po webinarze.'),
+                'lead_magnet' => (string) ($current['lead_magnet'] ?? 'PDF z promptami.'),
+                'next_product' => (string) ($current['next_product'] ?? 'być może'),
+            ],
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public static function material(string $projectId, string $materialId): array
     {
         $project = self::requireProject($projectId);
@@ -227,11 +510,19 @@ class DemoTikWebinarProject
                 'status' => 'Do decyzji',
                 'href' => route('growth.projects.show', $project['id']).'#direction',
             ];
+        } elseif (is_array($project['concept_ai_proposal'] ?? null)) {
+            $items[] = [
+                'type' => 'Koncepcja',
+                'title' => 'Propozycja AI do koncepcji',
+                'summary' => 'AI przygotowało wariant. Przyjmij albo odrzuć — bez automatycznego nadpisania.',
+                'status' => 'Do decyzji',
+                'href' => route('growth.projects.show', $project['id']).'#concept',
+            ];
         } elseif (! isset($completed['concept'])) {
             $items[] = [
                 'type' => 'Koncepcja',
                 'title' => 'Koncepcja webinaru',
-                'summary' => 'Sprawdź tytuł, obietnicę, plan spotkania i CTA.',
+                'summary' => 'Edytuj, poproś AI o wariant albo zatwierdź koncepcję.',
                 'status' => 'Do decyzji',
                 'href' => route('growth.projects.show', $project['id']).'#concept',
             ];
@@ -278,11 +569,19 @@ class DemoTikWebinarProject
             ];
         }
 
+        if (is_array($project['concept_ai_proposal'] ?? null)) {
+            return [
+                'label' => 'Następny krok: oceń propozycję AI',
+                'href' => route('growth.projects.show', $project['id']).'#concept',
+                'meta' => 'AI przygotowało wariant koncepcji. Przyjmij albo odrzuć — bez nadpisywania automatycznego.',
+            ];
+        }
+
         if (! isset($completed['concept'])) {
             return [
                 'label' => 'Następny krok: dopracuj koncepcję',
                 'href' => route('growth.projects.show', $project['id']).'#concept',
-                'meta' => 'Tytuł, obietnica, plan i CTA muszą być jasne przed materiałami.',
+                'meta' => 'Edytuj ręcznie albo poproś AI o wariant, potem oznacz koncepcję jako gotową.',
             ];
         }
 

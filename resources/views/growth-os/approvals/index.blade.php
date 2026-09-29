@@ -13,7 +13,7 @@
                     </p>
                 </div>
                 <div class="text-lg-end">
-                    <div class="badge bg-warning text-dark mb-2">Etap 0.3</div>
+                    <div class="badge bg-warning text-dark mb-2">Etap 0.3.1</div>
                     <div class="small text-secondary">Bez publikacji i wysyłek</div>
                 </div>
             </div>

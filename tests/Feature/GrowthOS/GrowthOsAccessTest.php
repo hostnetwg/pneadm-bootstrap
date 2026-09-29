@@ -91,7 +91,7 @@ class GrowthOsAccessTest extends TestCase
             ->assertSee('Projekty')
             ->assertSee('Pomysły')
             ->assertSee('Inbox')
-            ->assertSee('Etap 0.3')
+            ->assertSee('Etap 0.3.1')
             ->assertSee('Zaplanuj webinar TIK')
             ->assertSee(route('growth.dashboard'), false);
     }

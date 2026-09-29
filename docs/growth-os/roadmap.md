@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Utrzymujemy Etap 0.3 jako sesyjny prototyp UX webinaru TIK od zera. Aktualny priorytet to walidacja, czy flow jest zrozumiały: gdzie jestem, co jest gotowe, co wymaga decyzji i co mam zrobić teraz.
+Etap 0.3.1 jest wdrożony lokalnie jako sesyjny prototyp pracy nad Koncepcją: edycja, cofnięcie, propozycja AI jako wariant. Aktualny priorytet: ręczna walidacja UX z właścicielem.
 
 ## NEXT
 
-Etap 0.3.1: praca nad **Koncepcją**. Najbliższy logiczny krok to edycja ręczna, cofnięcie zatwierdzenia i symulowane „Poproś AI o zmianę” z propozycją do przyjęcia lub odrzucenia.
+Po walidacji 0.3.1: albo rozszerzyć ten sam wzorzec na Pomysł i kierunek / wybrane materiały, albo przejść do modelu danych v0.1.
 
 ## LATER
 
@@ -31,9 +31,9 @@ Cel:
 - sprawdzić, czy właściciel chce pracować w takim flow,
 - sprawdzić czy jasne jest: co robię, gdzie jestem, co jest gotowe i co następne.
 
-## Etap 0.3.1 — Edycja I Praca Nad Koncepcją
+## Etap 0.3.1 — Edycja I Praca Nad Koncepcją — wdrożony lokalnie
 
-Zakres sugerowany:
+Zakres:
 
 - edycja ręczna koncepcji w sesji,
 - cofnięcie zatwierdzenia,

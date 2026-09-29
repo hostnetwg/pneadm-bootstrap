@@ -11,7 +11,7 @@
                     <p class="text-secondary mb-0">Operacyjny widok producenta: co powinienem zrobić teraz?</p>
                 </div>
                 <span class="badge bg-warning text-dark align-self-start align-self-lg-center">
-                    Etap 0.3 · prototyp sesyjny
+                    Etap 0.3.1 · prototyp sesyjny
                 </span>
             </div>
         </section>
