@@ -1,6 +1,6 @@
 # Przegląd Architektury Systemu
 
-Data utworzenia/aktualizacji: 2026-09-19
+Data utworzenia/aktualizacji: 2026-09-29
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -129,6 +129,23 @@ Najważniejsze miejsca w kodzie:
 
 Strategia produktowa (uczestnik przez pnedu.pl, CM jako fallback): [strategy/PNEDU_PLATFORM_FIRST.md](../strategy/PNEDU_PLATFORM_FIRST.md).  
 Szczegóły tokenów ClickMeeting i provision: `docs/FORM_ORDERS_PNEDU_PROVISION.md`.
+
+### Warstwa PNE Growth OS
+
+PNE Growth OS jest planowany jako wydzielony, addytywny moduł wewnątrz `adm.pnedu.pl`, a nie trzecia aplikacja. Ma obejmować tematy, kampanie strategiczne, ekspertów, bibliotekę treści, approval, AI i integracje wykonawcze.
+
+Stan na 2026-09-29: Etap 0.1 wdrożony lokalnie jako fail-closed szkielet. Istnieją tylko konfiguracja, chroniona trasa `/growth`, warunkowe menu, demonstracyjny ekran read-only i testy. Brak modeli domenowych, tabel, AI, kolejek i integracji.
+
+Granice architektoniczne:
+
+- `pneadm` pozostaje source of truth dla stanu Growth OS,
+- `pnedu.pl` nie zależy od włączonego modułu Growth,
+- istniejący `MarketingCampaign` pozostaje kampanią atrybucyjną/linkową i nie jest automatycznie kampanią Growth,
+- `Instructor` jest kotwicą przyszłego profilu eksperta,
+- Growth OS nie wchodzi synchronicznie w zapis zamówień, płatności, faktur, certyfikatów ani provisioningu,
+- moduł jest domyślnie wyłączony przez feature flag; w Etapie 0.1 dostęp ma tymczasowo tylko `super_admin`.
+
+Kanon: [pne-growth-os/README.md](../pne-growth-os/README.md).
 
 ## Bazy Danych I Relacje
 

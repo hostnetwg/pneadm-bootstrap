@@ -1,7 +1,19 @@
 # Następne Kroki
 
-Data utworzenia/aktualizacji: 2026-09-28
+Data utworzenia/aktualizacji: 2026-09-29
 Status: plan roboczy, do potwierdzenia przez właściciela
+
+## PNE Growth OS — Etap 0.1 wdrożony lokalnie (2026-09-29)
+
+Etap 0 został zaakceptowany. Powstał kanon [pne-growth-os/README.md](./pne-growth-os/README.md): wizja, analiza obecnego systemu, architektura, logiczny model domenowy, UX, AI, integracje, bezpieczeństwo, roadmapa i rejestr decyzji.
+
+Etap 0.1 dodaje w `pneadm` fail-closed flagę `PNE_GROWTH_OS_ENABLED`, chronioną trasę `/growth`, warunkowe menu i demonstracyjny pulpit. Dostęp tymczasowo ma tylko `super_admin`.
+
+Nie utworzono tabel, modeli domenowych, AI, jobów, cronów ani integracji. `pnedu.pl` nie zostało zmienione w Etapie 0.1.
+
+Runbook: [deploy/2026-09-pne-growth-os-stage-0-1-deploy.md](./deploy/2026-09-pne-growth-os-stage-0-1-deploy.md).
+
+Następny najmniejszy krok do decyzji: ręczna walidacja prototypu UX z Waldemarem i doprecyzowanie ekranu „Do zatwierdzenia” na danych demonstracyjnych. Bez modelu danych do czasu decyzji zapisanych w [pne-growth-os/10-DECISIONS.md](./pne-growth-os/10-DECISIONS.md).
 
 ## Ostatnio (2026-09-28) — Edycja danych użytkownika pnedu.pl w ADM
 

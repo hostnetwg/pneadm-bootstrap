@@ -1,6 +1,6 @@
 # Kontekst Projektu PNEdu
 
-Data utworzenia/aktualizacji: 2026-08-08  
+Data utworzenia/aktualizacji: 2026-09-29
 Status: wersja robocza, do potwierdzenia przez właściciela
 
 ## Cel Dokumentu
@@ -66,6 +66,22 @@ Priorytet długoterminowy:
 - publiczny asystent wyboru szkolenia na `pnedu.pl`,
 - RAG i bezpieczna baza wiedzy,
 - ekspansja do JST, CUW, administracji publicznej, księgowości budżetowej, kadr, płac, zamówień publicznych i compliance.
+
+## PNE Growth OS
+
+Od 2026-09-29 planowana jest addytywna warstwa **PNE Growth OS** wewnątrz `adm.pnedu.pl`. Ma wspierać cały cykl od potrzeby rynku i tematu, przez eksperta, kampanię i treści, po relację, opcjonalny produkt, wyniki i kolejne działania.
+
+Status: dokumentacja v0.1 zaakceptowana; Etap 0.1 wdrożony lokalnie jako fail-closed szkielet z demonstracyjnym ekranem `/growth`. Nie utworzono modeli domenowych, tabel, integracji ani funkcji AI.
+
+Najważniejsze granice:
+
+- `adm.pnedu.pl` pozostaje centrum i source of truth,
+- `pnedu.pl` pozostaje publicznym portalem, checkoutem i panelem uczestnika,
+- rozwój jest addytywny, za feature flag; Etap 0.1 używa tymczasowo istniejącej roli `super_admin`,
+- wyłączenie Growth OS nie może zmieniać działania obecnego systemu,
+- operacje wysokiego ryzyka wymagają human approval.
+
+Kanon: [docs/pne-growth-os/README.md](./pne-growth-os/README.md).
 
 ## Systemy
 

@@ -62,6 +62,18 @@
             </div>
         </li>
 
+        @if(config('growth_os.enabled') === true && auth()->user()?->isSuperAdmin())
+            <li class="mb-1">
+                <a href="{{ route('growth.dashboard') }}"
+                   class="btn d-inline-flex align-items-center rounded border-0 text-light w-100 {{ request()->routeIs('growth.*') ? 'active fw-semibold' : '' }}">
+                    <svg class="bi pe-none me-2" width="16" height="16" fill="white">
+                        <use xlink:href="#grid"></use>
+                    </svg>
+                    PNE Growth OS
+                </a>
+            </li>
+        @endif
+
         <!-- Szkolenia -->
         <li class="mb-1">
             <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 text-light {{ request()->routeIs('courses.*') || request()->routeIs('training-offers.*') || request()->routeIs('online-courses.*') ? '' : 'collapsed' }}"

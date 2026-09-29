@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.token' => \App\Http\Middleware\VerifyApiToken::class,
             'super_admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
             'analytics.debug.access' => \App\Http\Middleware\EnsureAnalyticsDebugAccess::class,
+            'growth_os.access' => \App\Http\Middleware\GrowthOS\EnsureGrowthOsAccess::class,
         ]);
         
         // Dodaj middleware globalnie do wszystkich tras web

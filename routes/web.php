@@ -25,6 +25,7 @@ use App\Http\Controllers\DashboardOrdersStatsController;
 use App\Http\Controllers\EducationController;
 use App\Http\Controllers\FormOrdersController;
 use App\Http\Controllers\GusLookupController;
+use App\Http\Controllers\GrowthOS\DashboardController as GrowthOsDashboardController;
 use App\Http\Controllers\IfirmaController;
 use App\Http\Controllers\InstructorsController;
 use App\Http\Controllers\MarketingCampaignController;
@@ -64,6 +65,10 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
     Route::get('/', [DashboardOrdersController::class, 'index'])->name('dashboard');
     Route::redirect('/dashboard', '/');
     Route::redirect('/dashboard/zamowienia', '/');
+
+    Route::get('/growth', GrowthOsDashboardController::class)
+        ->middleware('growth_os.access')
+        ->name('growth.dashboard');
 
     Route::get('/dashboard/ankiety', [DashboardController::class, 'index'])->name('dashboard.surveys');
     Route::post('/dashboard/ankiety/refresh', [DashboardController::class, 'refresh'])->name('dashboard.surveys.refresh');

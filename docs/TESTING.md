@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-28
+Data aktualizacji: 2026-09-29
 
 ## Cel
 
@@ -64,6 +64,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
+| PNE Growth OS — Etap 0.1 | `sail artisan test tests/Feature/GrowthOS/GrowthOsAccessTest.php` — flaga wyłączona/nieprawidłowa, gość, brak uprawnienia, `super_admin`, widoczność menu i demonstracyjny pulpit; kanon: [pne-growth-os/README.md](./pne-growth-os/README.md) |
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
 | Edycja użytkownika pnedu.pl w ADM | `--filter=PneduUserUpdateTest`, `--filter=PneduUserSetPasswordTest`; kanon: [PNEDU_USERS_ADMIN.md](./PNEDU_USERS_ADMIN.md) |
 | Dopisanie do nagrania po szkoleniu | `--filter=RecordingEnrollmentApiTest`; **pnedu:** `--filter=RecordingEnrollmentTest` (założenie konta pomijane, gdy `testing.users` nie ma `deleted_at` / `first_name` / `email_verified_at`; nie równolegle z suite pneadm); kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md) |
@@ -104,6 +105,17 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Status operacyjny zamówień produktowych | `--filter=FormOrderOperationalStatusTest`, `--filter=FormOrderOperationalStatusServiceSqlTest` |
 | Publiczny katalog, checkout i fulfillment kursów nagranych | **pnedu:** `sail artisan test tests/Feature/ProductCheckoutTest.php`, `sail artisan test tests/Feature/DashboardPendingProductCoursesTest.php`, `sail artisan test tests/Unit/ProductAccessExpiryServiceTest.php`, `sail artisan test tests/Unit/ProductLegalCheckoutServiceTest.php`, `sail artisan test tests/Unit/WithdrawalWindowServiceTest.php`, `sail artisan test tests/Feature/LegalDocumentsTest.php` |
 | Pełny suite | `sail test` |
+
+## Weryfikacja PNE Growth OS — Etap 0.1 (2026-09-29)
+
+- `GrowthOsAccessTest`: **5 passed, 16 assertions** — flaga wyłączona, wartość nieprawidłowa, gość, zwykły admin, `super_admin`, menu i pulpit demo.
+- `route:list -v --path=growth`: trasa ma middleware `web`, `auth`, `check.user.status`, `growth_os.access`.
+- `view:cache`: zaliczone.
+- Pint zmienionych plików PHP: zaliczony.
+- Regresja `AuthenticationTest`, `ProfileTest`, `ExampleTest`, `ReleaseChangelogTest`: **14 passed, 1 failed, 1 risky**.
+  - Istniejący `ReleaseChangelogTest` oczekuje `adm.pnedu.pl v 1.1`, chociaż główny changelog miał już wersję `1.2` przed Etapem 0.1.
+  - Istniejący `ProfileTest::profile page is displayed` zgłasza niezamknięty output buffer.
+  - Zgodnie z zakresem nie naprawiano tych niezwiązanych problemów.
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
 
