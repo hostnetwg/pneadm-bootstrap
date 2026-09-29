@@ -43,7 +43,7 @@ Consequences: Przy `PNE_GROWTH_OS_ENABLED=false` moduł ma być niedostępny.
 ## DEC-006
 
 Date: 2026-09-29  
-Status: ACTIVE  
+Status: SUPERSEDED by DEC-013<br>
 Decision: W prototypie nie ma side effectów.  
 Rationale: Najpierw testujemy UX i proces, nie integracje.  
 Consequences: Brak DB, API, publikacji, wysyłek, jobów i zewnętrznych operacji.
@@ -51,7 +51,7 @@ Consequences: Brak DB, API, publikacji, wysyłek, jobów i zewnętrznych operacj
 ## DEC-007
 
 Date: 2026-09-29  
-Status: ACTIVE  
+Status: SUPERSEDED by DEC-013<br>
 Decision: Etap 0.3 pozostaje bez DB i API.  
 Rationale: Model danych powinien powstać po walidacji flow z właścicielem.  
 Consequences: Stan projektu i materiałów jest tylko w sesji HTTP.
@@ -95,3 +95,35 @@ Status: ACTIVE
 Decision: Status etapu Koncepcja w prototypie to **Do dopracowania** / **Gotowe**, z możliwością cofnięcia.  
 Rationale: Prostszy model niż Draft / Review / Approved wystarcza do walidacji UX przed bazą danych.  
 Consequences: Cofnięcie usuwa zatwierdzenie z sesji i wraca do pracy nad treścią.
+
+## DEC-013
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Etap 0.3.2 dopuszcza jeden kontrolowany wyjątek od braku API: opcjonalne OpenAI wyłącznie dla zadania `concept_revision`.<br>
+Rationale: Chcemy zweryfikować wartość prawdziwego AI w najmniejszym możliwym zakresie bez budowania modelu danych ani automatyzacji całego procesu.<br>
+Consequences: Integracja ma osobną, domyślnie wyłączoną flagę; jest dostępna tylko dla `super_admin`; stan projektu i propozycja pozostają w sesji; nie ma publikacji, wysyłek ani innych zewnętrznych działań.
+
+## DEC-014
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Growth OS wywołuje AI przez warstwę zadania i abstrakcję providera; pierwszym providerem jest OpenAI, bez automatycznego fallbacku.<br>
+Rationale: Model ma być konfigurowany centralnie, a przyszłe dodanie Anthropic lub Gemini nie może wymagać przebudowy logiki etapu Koncepcja.<br>
+Consequences: Kontroler i stan sesji nie wywołują API OpenAI bezpośrednio. Zmiana providera wymaga jawnej implementacji i decyzji dotyczącej danych, a nie automatycznego przełączenia.
+
+## DEC-015
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Do zewnętrznego AI wolno wysłać wyłącznie allowlistę pól koncepcji webinaru i instrukcję zmiany; PII, sekrety oraz dane klientów, zamówień i płatności są zabronione.<br>
+Rationale: Pilotaż nie wymaga danych operacyjnych ADM, a minimalizacja danych ogranicza ryzyko prywatności.<br>
+Consequences: Zadanie buduje nowy payload z dozwolonych pól, waliduje wejście i structured output, ustawia `store: false`, a log techniczny nie zawiera promptu, odpowiedzi ani treści koncepcji.
+
+## DEC-016
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Prawdziwe AI zachowuje ten sam model akceptacji co symulacja: tworzy propozycję, nigdy nie nadpisuje koncepcji automatycznie.<br>
+Rationale: Człowiek pozostaje właścicielem treści i musi móc porównać wariant z bieżącą wersją.<br>
+Consequences: Dopiero „Zastosuj” zmienia koncepcję; „Odrzuć”, błędny JSON, timeout, 429 lub 5xx pozostawiają bieżący stan bez zmian.

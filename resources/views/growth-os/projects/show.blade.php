@@ -7,6 +7,9 @@
         @if(session('success'))
             <div class="alert alert-success" role="status">{{ session('success') }}</div>
         @endif
+        @if(session('error'))
+            <div class="alert alert-danger" role="alert">{{ session('error') }}</div>
+        @endif
 
         <nav class="mb-3 small" aria-label="Okruszki">
             <a href="{{ route('growth.projects.index') }}">Projekty</a>
@@ -211,46 +214,226 @@
                         <section class="border rounded p-3 mb-3" aria-labelledby="concept-ai-heading">
                             <h3 class="h6" id="concept-ai-heading">Poproś AI o zmianę</h3>
                             <p class="small text-secondary">AI przygotuje wariant. Obecna koncepcja nie zostanie nadpisana, dopóki nie klikniesz „Zastosuj”.</p>
-                            <form method="POST" action="{{ route('growth.projects.concept.ai', $project['id']) }}">
+                            <p class="small mb-2">
+                                <span class="badge bg-light text-secondary border">
+                                    @if($growthAiEnabled)
+                                        AI: {{ ucfirst($growthAiProvider) }} / {{ $growthAiModel }}
+                                    @else
+                                        AI: symulacja lokalna
+                                    @endif
+                                </span>
+                            </p>
+                            <form
+                                id="growth-concept-ai-form"
+                                method="POST"
+                                action="{{ route('growth.projects.concept.ai', $project['id']) }}"
+                            >
                                 @csrf
                                 <label for="concept_ai_intent" class="form-label">Co zmienić?</label>
-                                <select id="concept_ai_intent" name="intent" class="form-select mb-2" required>
+                                <select id="concept_ai_intent" name="intent" class="form-select mb-2 @error('intent') is-invalid @enderror" required>
                                     @foreach($conceptAiIntents as $intent)
-                                        <option value="{{ $intent['value'] }}">{{ $intent['label'] }}</option>
+                                        <option value="{{ $intent['value'] }}" @selected(old('intent') === $intent['value'])>{{ $intent['label'] }}</option>
                                     @endforeach
                                 </select>
-                                <button type="submit" class="btn btn-outline-primary btn-sm">Wygeneruj propozycję</button>
+                                @error('intent')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
+
+                                <label for="concept_ai_instruction" class="form-label small">Dodatkowa instrukcja (opcjonalnie)</label>
+                                <textarea
+                                    id="concept_ai_instruction"
+                                    name="instruction"
+                                    rows="3"
+                                    maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
+                                    class="form-control form-control-sm mb-2 @error('instruction') is-invalid @enderror"
+                                    placeholder="Np. uprość język i dodaj dwa przykłady z lekcji"
+                                >{{ old('instruction') }}</textarea>
+                                @error('instruction')<div class="invalid-feedback mb-2">{{ $message }}</div>@enderror
+                                @if($growthAiEnabled)
+                                    <p class="small text-secondary mb-2">
+                                        Wysyłana jest tylko koncepcja i ta instrukcja. Nie wpisuj danych osobowych, danych klientów ani sekretów.
+                                    </p>
+                                @endif
+
+                                <button
+                                    id="growth-concept-ai-submit"
+                                    type="submit"
+                                    class="btn btn-outline-primary btn-sm"
+                                >
+                                    Wygeneruj propozycję
+                                </button>
+                                <p id="growth-concept-ai-wait-hint" class="small text-secondary mt-2 mb-0 d-none" aria-live="polite">
+                                    To trwa dłużej niż zwykle — propozycja zwykle wraca w 10–60 sekund.
+                                </p>
                             </form>
+                            <div id="growth-concept-ai-status" class="alert mt-3 mb-0 d-none" role="status"></div>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    const form = document.getElementById('growth-concept-ai-form');
+                                    const button = document.getElementById('growth-concept-ai-submit');
+                                    const hint = document.getElementById('growth-concept-ai-wait-hint');
+                                    const status = document.getElementById('growth-concept-ai-status');
+                                    const proposalContainer = document.getElementById('growth-concept-ai-proposal');
+                                    if (!form || !button || !hint || !status || !proposalContainer) {
+                                        return;
+                                    }
+
+                                    const idleLabel = 'Wygeneruj propozycję';
+                                    let waitTimer = null;
+                                    let audioCtx = null;
+
+                                    const clearTimers = function () {
+                                        window.clearTimeout(waitTimer);
+                                        waitTimer = null;
+                                    };
+
+                                    const setIdle = function () {
+                                        clearTimers();
+                                        hint.classList.add('d-none');
+                                        button.disabled = false;
+                                        button.removeAttribute('aria-busy');
+                                        button.innerHTML = idleLabel;
+                                    };
+
+                                    const showStatus = function (message, type) {
+                                        status.className = 'alert mt-3 mb-0 alert-' + type;
+                                        status.textContent = message;
+                                    };
+
+                                    const setLoading = function () {
+                                        button.disabled = true;
+                                        button.setAttribute('aria-busy', 'true');
+                                        button.innerHTML =
+                                            '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' +
+                                            'AI przygotowuje propozycję…';
+                                        clearTimers();
+                                        waitTimer = window.setTimeout(function () {
+                                            hint.classList.remove('d-none');
+                                        }, 20000);
+                                    };
+
+                                    const unlockAudio = function () {
+                                        try {
+                                            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                                            if (!AudioContextClass) {
+                                                return null;
+                                            }
+                                            if (!audioCtx) {
+                                                audioCtx = new AudioContextClass();
+                                                const oscillator = audioCtx.createOscillator();
+                                                const gain = audioCtx.createGain();
+                                                gain.gain.value = 0.0001;
+                                                oscillator.connect(gain);
+                                                gain.connect(audioCtx.destination);
+                                                oscillator.start();
+                                                oscillator.stop(audioCtx.currentTime + 0.01);
+                                            }
+                                            if (audioCtx.state === 'suspended') {
+                                                audioCtx.resume();
+                                            }
+                                            return audioCtx;
+                                        } catch (error) {
+                                            return null;
+                                        }
+                                    };
+
+                                    const playSuccessChime = function () {
+                                        try {
+                                            const ctx = unlockAudio();
+                                            if (!ctx) {
+                                                return;
+                                            }
+
+                                            const play = function () {
+                                                const now = ctx.currentTime;
+                                                [
+                                                    { frequency: 523.25, start: 0, duration: 0.16 },
+                                                    { frequency: 659.25, start: 0.12, duration: 0.18 },
+                                                    { frequency: 783.99, start: 0.26, duration: 0.28 },
+                                                ].forEach(function (tone) {
+                                                    const oscillator = ctx.createOscillator();
+                                                    const gain = ctx.createGain();
+                                                    oscillator.type = 'sine';
+                                                    oscillator.frequency.value = tone.frequency;
+                                                    gain.gain.setValueAtTime(0.0001, now + tone.start);
+                                                    gain.gain.exponentialRampToValueAtTime(0.12, now + tone.start + 0.02);
+                                                    gain.gain.exponentialRampToValueAtTime(0.0001, now + tone.start + tone.duration);
+                                                    oscillator.connect(gain);
+                                                    gain.connect(ctx.destination);
+                                                    oscillator.start(now + tone.start);
+                                                    oscillator.stop(now + tone.start + tone.duration + 0.05);
+                                                });
+                                            };
+
+                                            if (ctx.state === 'suspended') {
+                                                ctx.resume().then(play).catch(function () {});
+                                            } else {
+                                                play();
+                                            }
+                                        } catch (error) {
+                                            // Dźwięk jest opcjonalny.
+                                        }
+                                    };
+
+                                    form.addEventListener('submit', function (event) {
+                                        event.preventDefault();
+                                        if (button.getAttribute('aria-busy') === 'true') {
+                                            return;
+                                        }
+
+                                        unlockAudio();
+                                        setLoading();
+
+                                        fetch(form.action, {
+                                            method: 'POST',
+                                            body: new FormData(form),
+                                            headers: {
+                                                'Accept': 'application/json',
+                                                'X-Requested-With': 'XMLHttpRequest',
+                                            },
+                                            credentials: 'same-origin',
+                                        }).then(async function (response) {
+                                            let payload = null;
+                                            try {
+                                                payload = await response.json();
+                                            } catch (error) {
+                                                payload = null;
+                                            }
+
+                                            if (response.ok && payload && payload.ok && typeof payload.proposal_html === 'string') {
+                                                proposalContainer.innerHTML = payload.proposal_html;
+                                                setIdle();
+                                                showStatus(payload.message || 'AI przygotowało propozycję.', 'success');
+                                                playSuccessChime();
+                                                window.setTimeout(function () {
+                                                    const proposal = proposalContainer.querySelector('section');
+                                                    if (proposal) {
+                                                        proposal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                                    }
+                                                }, 100);
+                                                return;
+                                            }
+
+                                            setIdle();
+                                            showStatus(
+                                                (payload && payload.message) || 'Nie udało się przygotować propozycji AI. Możesz kontynuować ręcznie.',
+                                                'danger'
+                                            );
+                                        }).catch(function () {
+                                            setIdle();
+                                            showStatus('AI jest chwilowo niedostępne. Możesz kontynuować ręcznie.', 'danger');
+                                        });
+                                    });
+
+                                    window.addEventListener('pageshow', setIdle);
+                                });
+                            </script>
                         </section>
 
-                        @if(is_array($proposal))
-                            <section class="border border-warning rounded p-3 mb-3" aria-labelledby="concept-proposal-heading">
-                                <h3 class="h6" id="concept-proposal-heading">Propozycja AI</h3>
-                                <p class="small mb-2">
-                                    <span class="badge text-bg-warning text-dark">{{ $proposal['intent_label'] ?? 'Wariant' }}</span>
-                                    {{ $proposal['note'] ?? '' }}
-                                </p>
-                                <p class="fw-semibold mb-1">{{ $proposal['concept']['title'] ?? '' }}</p>
-                                <p class="small text-secondary mb-2">{{ $proposal['concept']['subtitle'] ?? '' }}</p>
-                                <p class="small mb-2">{{ $proposal['concept']['promise'] ?? '' }}</p>
-                                <ul class="small">
-                                    @foreach(($proposal['concept']['points'] ?? []) as $point)
-                                        <li>{{ $point }}</li>
-                                    @endforeach
-                                </ul>
-                                <p class="small mb-3"><strong>CTA:</strong> {{ $proposal['concept']['cta'] ?? '' }}</p>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <form method="POST" action="{{ route('growth.projects.concept.ai.apply', $project['id']) }}">
-                                        @csrf
-                                        <button type="submit" class="btn btn-primary btn-sm">Zastosuj</button>
-                                    </form>
-                                    <form method="POST" action="{{ route('growth.projects.concept.ai.reject', $project['id']) }}">
-                                        @csrf
-                                        <button type="submit" class="btn btn-outline-secondary btn-sm">Odrzuć</button>
-                                    </form>
-                                </div>
-                            </section>
-                        @endif
+                        <div id="growth-concept-ai-proposal" aria-live="polite">
+                            @include('growth-os.projects.partials.concept-ai-proposal', [
+                                'proposal' => $proposal,
+                                'projectId' => $project['id'],
+                            ])
+                        </div>
 
                         @if(is_array($versions) && count($versions) > 0)
                             <section class="border rounded p-3" aria-labelledby="concept-versions-heading">
@@ -309,4 +492,5 @@
             </div>
         </section>
     </div>
+
 </x-app-layout>

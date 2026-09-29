@@ -34,11 +34,29 @@ Status: architektura koncepcyjna, bez migracji.
 
 `Growth Campaign` może prowadzić do `Course`, może korzystać z istniejącego `Course`, albo w ogóle nie mieć produktu sprzedażowego.
 
-## Obecny Etap 0.3
+## Obecny Etap 0.3.2
 
 Obecnie nie ma jeszcze tabel domenowych Growth OS. Prototyp działa tylko w sesji HTTP i nie zapisuje stanu do bazy.
 
 Nie tworzymy jeszcze migracji.
+
+Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
+
+```text
+Etap Koncepcja
+→ GrowthAiService
+→ ConceptRevisionTask (allowlista danych, prompt i schema)
+→ GrowthAiProvider
+→ OpenAiProvider
+→ OpenAI Responses API
+→ parsowanie i walidacja
+→ propozycja w sesji
+→ jawne Zastosuj / Odrzuć
+```
+
+Logika etapu Koncepcja nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. W pilotażu istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy.
+
+Stan projektu i pełna propozycja pozostają w sesji HTTP. Log plikowy przechowuje wyłącznie minimalne metadane techniczne wywołania, bez promptu, odpowiedzi i treści koncepcji.
 
 ## Granice
 

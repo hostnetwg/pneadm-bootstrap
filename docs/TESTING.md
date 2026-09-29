@@ -64,7 +64,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 
 | Moduł | Filtr / plik |
 |-------|----------------|
-| PNE Growth OS — Etap 0.1–0.3 | `sail artisan test tests/Feature/GrowthOS` — flaga, role, menu; sesyjny flow webinaru TIK od zera (Dzisiaj, Projekty, Pomysły, Inbox, workspace, materiały); kanon: [pne-growth-os/README.md](./pne-growth-os/README.md) |
+| PNE Growth OS — Etap 0.1–0.3.2 | `sail artisan test tests/Feature/GrowthOS` oraz `sail artisan test tests/Unit/GrowthOS` — flaga, role, menu; sesyjny flow webinaru; bezpieczny pilotaż OpenAI bez prawdziwych requestów; kanon: [growth-os/CURRENT.md](./growth-os/CURRENT.md) |
 | ClickMeeting / provision PNEDU | `--filter=ClickMeetingServiceTest`, `PneduProvisionEmailContextBuilderTest`, `ParticipantLiveAccessServiceTest`, `SystemMailConfigurationTest` |
 | Edycja użytkownika pnedu.pl w ADM | `--filter=PneduUserUpdateTest`, `--filter=PneduUserSetPasswordTest`; kanon: [PNEDU_USERS_ADMIN.md](./PNEDU_USERS_ADMIN.md) |
 | Dopisanie do nagrania po szkoleniu | `--filter=RecordingEnrollmentApiTest`; **pnedu:** `--filter=RecordingEnrollmentTest` (założenie konta pomijane, gdy `testing.users` nie ma `deleted_at` / `first_name` / `email_verified_at`; nie równolegle z suite pneadm); kanon: [RECORDING_ENROLLMENT.md](./RECORDING_ENROLLMENT.md) |
@@ -118,6 +118,14 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
   - Istniejący `ReleaseChangelogTest` oczekuje `adm.pnedu.pl v 1.1`, chociaż główny changelog miał już wersję `1.2` przed Etapem 0.1.
   - Istniejący `ProfileTest::profile page is displayed` zgłasza niezamknięty output buffer.
   - Zgodnie z zakresem nie naprawiano tych niezwiązanych problemów.
+
+## Weryfikacja PNE Growth OS — Etap 0.3.2 (2026-09-29)
+
+- `GrowthAiPilotTest`: wyłączona flaga bez wywołania providera, dostęp wyłącznie `super_admin`, proposal bez automatycznego nadpisania, Zastosuj/Odrzuć, invalid payload i awaria połączenia bez uszkodzenia sesji, dalsza edycja ręczna.
+- `OpenAiProviderTest`: Responses API, `store: false`, structured output, jedna ponowna próba dla 429/5xx, bezpieczny błąd po wyczerpaniu retry i odrzucenie błędnego JSON.
+- Wszystkie testy używają fake/mock HTTP lub fake providera; `Http::preventStrayRequests()` blokuje prawdziwe i płatne wywołania.
+- Wynik: testy jednostkowe Growth OS **5 passed / 13 assertions**; testy feature Growth OS **20 passed / 109 assertions**; razem **25 passed / 122 assertions**.
+- Ręczny smoke test z prawdziwym OpenAI wymaga lokalnego `OPENAI_API_KEY` i jawnego `GROWTH_AI_ENABLED=true`; nie jest częścią automatycznego suite.
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).
 

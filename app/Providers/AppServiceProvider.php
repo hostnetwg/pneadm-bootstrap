@@ -14,13 +14,19 @@ use App\Observers\DebtCaseObserver;
 use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 use App\Observers\ProductPriceObserver;
+use App\Services\GrowthOS\AI\Contracts\GrowthAiProvider;
+use App\Services\GrowthOS\AI\Providers\OpenAiProvider;
 use App\Services\ReleaseChangelogService;
 use App\Support\DestructiveDatabaseGuard;
 use App\Support\OutboundMailCapture;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use LogicException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,7 +35,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(GrowthAiProvider::class, function (): GrowthAiProvider {
+            return match ((string) config('growth_ai.provider')) {
+                'openai' => app(OpenAiProvider::class),
+                default => throw new LogicException('Unsupported Growth AI provider.'),
+            };
+        });
     }
 
     /**
@@ -38,6 +49,19 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DestructiveDatabaseGuard::register();
+
+        RateLimiter::for('growth-ai', function (Request $request): Limit {
+            if (config('growth_ai.enabled') !== true) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute((int) config('growth_ai.limits.per_minute'))
+                ->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip()))
+                ->response(fn () => redirect()->back()->with(
+                    'error',
+                    'Limit krótkich wywołań AI został osiągnięty. Spróbuj ponownie za chwilę lub kontynuuj ręcznie.',
+                ));
+        });
 
         Paginator::useBootstrapFour();
 

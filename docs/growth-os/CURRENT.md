@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 14:12  
-Branch: main  
-Commit: implementation baseline 5d894ac (CURRENT metadata may be updated by later docs-only commits)  
-Stage: 0.3.1 UX prototype  
+Last updated: 2026-09-29 16:50 CEST<br>
+Branch: main<br>
+Commit: working tree / pending commit (base 6511722)<br>
+Stage: 0.3.2 OpenAI concept-revision pilot<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -16,11 +16,11 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Main workspace: **Projekt webinaru**.
 - Primary UX principle: zawsze widoczny **Następny krok**.
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
-- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, propozycja AI jako wariant do przyjęcia/odrzucenia.
+- Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia.
 
 ## 2. Aktualny etap
 
-Etap 0.3.1 — praca nad koncepcją webinaru TIK w sesji HTTP.
+Etap 0.3.2 — wąski pilotaż prawdziwego OpenAI dla zmiany/rozbudowy koncepcji webinaru TIK. Stan projektu nadal istnieje wyłącznie w sesji HTTP.
 
 ## 3. Co już działa
 
@@ -30,9 +30,14 @@ Etap 0.3.1 — praca nad koncepcją webinaru TIK w sesji HTTP.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
-- Symulowane **Poproś AI o zmianę**: wariant nie nadpisuje bieżącej koncepcji aż do „Zastosuj”.
+- **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
+- Propozycja AI nigdy nie nadpisuje bieżącej koncepcji aż do jawnego „Zastosuj”; można ją odrzucić.
+- Osobna, domyślnie wyłączona flaga `GROWTH_AI_ENABLED`; prawdziwe AI jest dostępne tylko dla `super_admin`.
+- Provider i model są konfigurowane centralnie i widoczne w UI; logika Growth OS korzysta z abstrakcji providera.
+- Walidacja structured output, allowlista danych koncepcji, blokada e-maili/telefonów/sekretów, timeout, jeden retry, limity wywołań i prosty circuit breaker.
+- Osobny log techniczny zawiera tylko metadane wywołania — bez promptu, odpowiedzi, koncepcji, PII i sekretów.
 - Prosta historia wersji koncepcji w sesji (do 5 pozycji).
-- Pomysły i sugestie AI są symulowane.
+- Pozostałe pomysły i sugestie AI są nadal symulowane.
 - Inbox prowadzi do miejsca w projekcie, nie jest głównym flow.
 
 Do tej sekcji wpisujemy wyłącznie rzeczy faktycznie istniejące w aktualnym kodzie/prototypie. Wizja, planowane API, przyszłe modele i pomysły konsultacyjne należą do `vision.md` albo `roadmap.md`.
@@ -56,36 +61,43 @@ Zaplanuj TIK
 - Inbox jest pomocniczy.
 - AI draftuje i sugeruje; człowiek zatwierdza.
 - Propozycja AI dla koncepcji tworzy **wariant**, a nie nadpisuje od razu.
+- OpenAI jest pierwszym providerem pilotażu, ale kod domenowy nie zależy bezpośrednio od jego API.
+- Do AI trafia wyłącznie allowlista pól koncepcji; PII, dane klientów, zamówień i płatności są zabronione.
 - Na górze projektu zawsze ma być widoczny najważniejszy następny krok.
 - Nie budujemy dużego dashboardu ani pełnej platformy na zapas.
 
 ## 6. Czego świadomie jeszcze NIE robimy
 
 - Brak migracji DB.
-- Brak prawdziwego OpenAI API.
+- Brak zapisu wywołań AI do DB; propozycja pozostaje w sesji HTTP.
+- Brak Anthropic, Gemini, OpenRouter, automatycznego routingu modeli i fallbacku między providerami.
 - Brak YouTube API.
 - Brak Sendy API.
 - Brak Meta / Canva API.
-- Brak publikacji, wysyłek, jobów i side effectów.
-- Wszystko działa tylko w sesji HTTP.
-- Brak pełnej edycji AI dla wszystkich materiałów (tylko Koncepcja w 0.3.1).
+- Brak publikacji, wysyłek, jobów i biznesowych side effectów.
+- Stan projektu i propozycji działa tylko w sesji HTTP; poza nią powstaje wyłącznie techniczny log metadanych AI.
+- Brak AI poza etapem Koncepcja.
 
 ## 7. Otwarte pytania
 
-- Czy analogiczny flow edycji/AI przenieść od razu na „Pomysł i kierunek”?
+- Czy po walidacji pilotażu dodać drugiego providera, czy najpierw model danych v0.1?
 - Czy historia wersji ma mieć „przywróć wersję”, czy tylko podgląd?
-- Który materiał jest kolejnym kandydatem do takiego samego UX: mailing, opis YouTube, czy scenariusz?
 
 ## 8. Następny krok
 
-Walidacja 0.3.1 z właścicielem na ekranie Koncepcji, potem decyzja: rozszerzyć ten sam wzorzec na kierunek/materiały albo przejść do modelu danych v0.1.
+Smoke test 0.3.2 zaliczony (AJAX podgląd, dźwięk, Zastosuj/Odrzuć). Następna decyzja: drugi provider AI albo model danych v0.1.
 
 ## 9. Ostatnie zmiany
 
-- Dodano edycję koncepcji w sesji.
-- Dodano cofnięcie zatwierdzenia koncepcji.
-- Dodano symulowane „Poproś AI o zmianę” z Zastosuj / Odrzuć.
-- Dodano krótką historię wersji koncepcji.
+- Dodano opcjonalny OpenAI Responses API dla zadania `concept_revision`.
+- Dodano abstrakcję providera i wersjonowany prompt/schema.
+- Dodano structured output, walidację i bezpieczny zapis propozycji dopiero po pełnej walidacji.
+- Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
+- Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
+- Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
+- Zachowano symulację lokalną przy wyłączonym prawdziwym AI.
+- Dodano automatyczne testy bez prawdziwych i płatnych requestów.
+- Wcześniej: edycja, cofnięcie zatwierdzenia i historia koncepcji w sesji.
 - Uporządkowano dokumentację `docs/growth-os/`.
 - Wcześniej: sesyjny flow webinaru TIK od zera, menu Dzisiaj/Projekty/Pomysły/Inbox.
 

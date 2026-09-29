@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Etap 0.3.1 jest wdrożony lokalnie jako sesyjny prototyp pracy nad Koncepcją: edycja, cofnięcie, propozycja AI jako wariant. Aktualny priorytet: ręczna walidacja UX z właścicielem.
+Etap 0.3.2: pilotaż OpenAI dla zmiany koncepcji zweryfikowany ręcznie (AJAX, dźwięk, Zastosuj/Odrzuć). Aktualny priorytet: decyzja — drugi provider albo model danych v0.1.
 
 ## NEXT
 
-Po walidacji 0.3.1: albo rozszerzyć ten sam wzorzec na Pomysł i kierunek / wybrane materiały, albo przejść do modelu danych v0.1.
+Po walidacji 0.3.2: zdecydować, czy najpierw dodać drugiego providera w tym samym use case, czy przejść do modelu danych v0.1. Nie rozszerzać AI na kolejne obszary bez tej decyzji.
 
 ## LATER
 
@@ -41,6 +41,19 @@ Zakres:
 - propozycja AI do przyjęcia albo odrzucenia,
 - prosta historia wersji w sesji.
 
+## Etap 0.3.2 — Pilotaż OpenAI Dla Koncepcji — zaimplementowany, oczekuje na smoke test
+
+Zakres:
+
+- osobna flaga `GROWTH_AI_ENABLED`,
+- OpenAI Responses API i centralnie ustawiany model,
+- jedno zadanie `concept_revision`,
+- abstrakcja providera bez drugiego dostawcy i bez fallbacku,
+- structured output, walidacja i allowlista danych koncepcji,
+- propozycja w sesji z obowiązkowym Zastosuj / Odrzuć,
+- timeout, jeden retry, rate limit, limit dzienny i prosty circuit breaker,
+- bezpieczne logowanie metadanych oraz testy bez prawdziwego API.
+
 ## v0.1 — Model Danych
 
 Zakres kierunkowy:
@@ -61,7 +74,7 @@ Warunek:
 
 Zakres:
 
-- OpenAI lub inny provider AI,
+- rozwinięcie sprawdzonej warstwy providerów poza pilotaż OpenAI,
 - drafty treści,
 - research,
 - wersjonowanie promptów,

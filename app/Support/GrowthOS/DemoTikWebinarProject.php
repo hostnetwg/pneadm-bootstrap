@@ -2,6 +2,7 @@
 
 namespace App\Support\GrowthOS;
 
+use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use Carbon\CarbonImmutable;
 
 /**
@@ -268,6 +269,49 @@ class DemoTikWebinarProject
     }
 
     /**
+     * Store a validated real-AI proposal without changing the current concept.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeConceptAiProposal(
+        string $projectId,
+        string $intent,
+        string $intentLabel,
+        ConceptRevisionResult $result,
+    ): array {
+        $project = self::requireProject($projectId);
+        $current = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+
+        $project['concept_ai_proposal'] = [
+            'intent' => $intent,
+            'intent_label' => $intentLabel,
+            'created_at' => now()->toIso8601String(),
+            'note' => 'Propozycja prawdziwego AI. Bieżąca koncepcja pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            'source' => 'real_ai',
+            'provider' => $result->provider,
+            'model' => $result->model,
+            'prompt_version' => $result->promptVersion,
+            'schema_version' => $result->schemaVersion,
+            'request_id' => $result->requestId,
+            'changed_fields' => $result->changedFields,
+            'change_summary' => $result->changeSummary,
+            'concept' => [
+                ...$result->concept,
+                'next_product' => (string) ($current['next_product'] ?? ''),
+            ],
+        ];
+
+        if (isset($project['completed_steps']['concept'])) {
+            unset($project['completed_steps']['concept']);
+            $project['status'] = 'PLANNING';
+        }
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function applyConceptAiProposal(string $projectId): array
@@ -280,6 +324,11 @@ class DemoTikWebinarProject
             $project,
             'Zastosowano propozycję AI: '.($proposal['intent_label'] ?? 'zmiana')
         );
+
+        if (isset($proposal['concept']['audience'])) {
+            $project['direction']['audience'] = trim((string) $proposal['concept']['audience']);
+        }
+
         $project['concept'] = self::normalizeConcept($proposal['concept']);
         $project['concept_ai_proposal'] = null;
 

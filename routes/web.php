@@ -78,7 +78,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects/{project}/steps/{step}', [GrowthOsProjectController::class, 'completeStep'])->name('projects.steps.complete');
         Route::post('/projects/{project}/steps/{step}/reopen', [GrowthOsProjectController::class, 'reopenStep'])->name('projects.steps.reopen');
         Route::put('/projects/{project}/concept', [GrowthOsProjectController::class, 'updateConcept'])->name('projects.concept.update');
-        Route::post('/projects/{project}/concept/ai', [GrowthOsProjectController::class, 'requestConceptAi'])->name('projects.concept.ai');
+        Route::post('/projects/{project}/concept/ai', [GrowthOsProjectController::class, 'requestConceptAi'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.concept.ai');
         Route::post('/projects/{project}/concept/ai/apply', [GrowthOsProjectController::class, 'applyConceptAi'])->name('projects.concept.ai.apply');
         Route::post('/projects/{project}/concept/ai/reject', [GrowthOsProjectController::class, 'rejectConceptAi'])->name('projects.concept.ai.reject');
         Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');

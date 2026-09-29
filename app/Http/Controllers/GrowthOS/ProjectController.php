@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\GrowthOS;
 
 use App\Http\Controllers\Controller;
+use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\GrowthAiService;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -61,6 +64,9 @@ class ProjectController extends Controller
             'projectStatusLabels' => DemoTikWebinarProject::projectStatusLabels(),
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'conceptAiIntents' => DemoTikWebinarProject::conceptAiIntents(),
+            'growthAiEnabled' => config('growth_ai.enabled') === true,
+            'growthAiProvider' => (string) config('growth_ai.provider'),
+            'growthAiModel' => (string) config('growth_ai.model'),
         ]);
     }
 
@@ -109,18 +115,99 @@ class ProjectController extends Controller
             ->withFragment('concept');
     }
 
-    public function requestConceptAi(Request $request, string $project): RedirectResponse
-    {
-        $intent = $request->validate([
+    public function requestConceptAi(
+        Request $request,
+        string $project,
+    ): RedirectResponse|JsonResponse {
+        $data = $request->validate([
             'intent' => ['required', Rule::in(collect(DemoTikWebinarProject::conceptAiIntents())->pluck('value')->all())],
-        ])['intent'];
+            'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+        ]);
+        $intent = (string) $data['intent'];
+        $intentLabel = (string) (
+            collect(DemoTikWebinarProject::conceptAiIntents())->firstWhere('value', $intent)['label']
+            ?? $intent
+        );
+        $wantsJson = $request->expectsJson()
+            || $request->header('X-Requested-With') === 'XMLHttpRequest';
 
-        DemoTikWebinarProject::requestConceptAiProposal($project, $intent);
+        if (config('growth_ai.enabled') !== true) {
+            $updatedProject = DemoTikWebinarProject::requestConceptAiProposal($project, $intent);
+
+            if ($wantsJson) {
+                return response()->json([
+                    'ok' => true,
+                    'message' => 'AI przygotowało propozycję (symulacja). Obecna koncepcja nie została nadpisana.',
+                    'proposal_html' => $this->renderConceptAiProposal($updatedProject, $project),
+                ]);
+            }
+
+            return redirect()
+                ->route('growth.projects.show', $project)
+                ->with('success', 'AI przygotowało propozycję (symulacja). Obecna koncepcja nie została nadpisana.')
+                ->with('growth_ai_completed', true)
+                ->withFragment('concept');
+        }
+
+        $growthAiService = app(GrowthAiService::class);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $instruction = $intentLabel;
+        if (filled($data['instruction'] ?? null)) {
+            $instruction .= '. Dodatkowa instrukcja użytkownika: '.trim((string) $data['instruction']);
+        }
+
+        try {
+            $result = $growthAiService->reviseConcept(
+                user: $request->user(),
+                concept: is_array($item['concept'] ?? null) ? $item['concept'] : [],
+                audience: (string) data_get($item, 'direction.audience', ''),
+                instruction: $instruction,
+            );
+
+            $updatedProject = DemoTikWebinarProject::storeConceptAiProposal(
+                projectId: $project,
+                intent: $intent,
+                intentLabel: $intentLabel,
+                result: $result,
+            );
+        } catch (GrowthAiException $exception) {
+            if ($wantsJson) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $exception->userMessage,
+                ], 422);
+            }
+
+            return redirect()
+                ->route('growth.projects.show', $project)
+                ->with('error', $exception->userMessage)
+                ->withFragment('concept');
+        }
+
+        if ($wantsJson) {
+            return response()->json([
+                'ok' => true,
+                'message' => 'AI przygotowało propozycję. Obecna koncepcja nie została nadpisana.',
+                'proposal_html' => $this->renderConceptAiProposal($updatedProject, $project),
+            ]);
+        }
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'AI przygotowało propozycję (symulacja). Obecna koncepcja nie została nadpisana.')
+            ->with('success', 'AI przygotowało propozycję. Obecna koncepcja nie została nadpisana.')
+            ->with('growth_ai_completed', true)
             ->withFragment('concept');
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private function renderConceptAiProposal(array $project, string $projectId): string
+    {
+        return view('growth-os.projects.partials.concept-ai-proposal', [
+            'proposal' => $project['concept_ai_proposal'] ?? null,
+            'projectId' => $projectId,
+        ])->render();
     }
 
     public function applyConceptAi(string $project): RedirectResponse

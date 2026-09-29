@@ -73,6 +73,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'growth_ai' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/growth-ai.log'),
+            'level' => env('GROWTH_AI_LOG_LEVEL', 'info'),
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
