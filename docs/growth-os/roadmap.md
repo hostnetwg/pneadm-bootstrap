@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Etap 0.3.2: pilotaż OpenAI dla zmiany koncepcji zweryfikowany ręcznie (AJAX, dźwięk, Zastosuj/Odrzuć). Aktualny priorytet: decyzja — drugi provider albo model danych v0.1.
+Projekt modelu danych v0.1 jest dokumentowany przed migracjami. Zakres minimalny: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
 
 ## NEXT
 
-Po walidacji 0.3.2: zdecydować, czy najpierw dodać drugiego providera w tym samym use case, czy przejść do modelu danych v0.1. Nie rozszerzać AI na kolejne obszary bez tej decyzji.
+Po akceptacji dokumentacji modelu v0.1: przygotować migracje w `pneadm/database/migrations/`, bez przenoszenia jeszcze całego UX z sesji do DB.
 
 ## LATER
 
@@ -56,10 +56,10 @@ Zakres:
 
 ## v0.1 — Model Danych
 
-Zakres kierunkowy:
+Zakres minimalny:
 
 - DB,
-- Campaign,
+- GrowthCampaign,
 - Topic,
 - Expert,
 - Artifact,
@@ -68,7 +68,9 @@ Zakres kierunkowy:
 
 Warunek:
 
-- zaakceptowany flow 0.3 / 0.3.1.
+- zaakceptowana dokumentacja modelu danych w `architecture.md`.
+- migracje w `pneadm`, bo tabele należą do bazy `pneadm`.
+- bez Customer Graph, Metrics, Content/Product Graph, publikacji i wysyłek.
 
 ## v0.2 — AI Drafts I Research
 

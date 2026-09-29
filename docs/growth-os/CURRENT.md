@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 16:50 CEST<br>
+Last updated: 2026-09-29 17:03 CEST<br>
 Branch: main<br>
-Commit: 8d61f23<br>
-Stage: 0.3.2 OpenAI concept-revision pilot<br>
+Commit: working tree / pending commit (base c9209dc)<br>
+Stage: v0.1 data model documentation<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap 0.3.2 — wąski pilotaż prawdziwego OpenAI dla zmiany/rozbudowy koncepcji webinaru TIK. Stan projektu nadal istnieje wyłącznie w sesji HTTP.
+Etap v0.1 — dokumentacja minimalnego modelu danych przed migracjami. Prototyp UX i propozycje AI nadal działają w sesji HTTP.
 
 ## 3. Co już działa
 
@@ -77,15 +77,16 @@ Zaplanuj TIK
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
 - Stan projektu i propozycji działa tylko w sesji HTTP; poza nią powstaje wyłącznie techniczny log metadanych AI.
 - Brak AI poza etapem Koncepcja.
+- Model danych v0.1 jest obecnie opisany koncepcyjnie; migracje nie zostały jeszcze utworzone.
 
 ## 7. Otwarte pytania
 
-- Czy po walidacji pilotażu dodać drugiego providera, czy najpierw model danych v0.1?
+- Czy zaakceptować zaproponowane tabele v0.1 i przejść do migracji?
 - Czy historia wersji ma mieć „przywróć wersję”, czy tylko podgląd?
 
 ## 8. Następny krok
 
-Smoke test 0.3.2 zaliczony (AJAX podgląd, dźwięk, Zastosuj/Odrzuć). Następna decyzja: drugi provider AI albo model danych v0.1.
+Po akceptacji dokumentacji modelu danych v0.1 przygotować migracje w `pneadm/database/migrations/` dla GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
 
 ## 9. Ostatnie zmiany
 
@@ -95,6 +96,7 @@ Smoke test 0.3.2 zaliczony (AJAX podgląd, dźwięk, Zastosuj/Odrzuć). Następn
 - Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
 - Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
 - Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
+- Udokumentowano minimalny model danych v0.1 przed migracjami: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.
 - Zachowano symulację lokalną przy wyłączonym prawdziwym AI.
 - Dodano automatyczne testy bez prawdziwych i płatnych requestów.
 - Wcześniej: edycja, cofnięcie zatwierdzenia i historia koncepcji w sesji.

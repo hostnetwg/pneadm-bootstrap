@@ -127,3 +127,11 @@ Status: ACTIVE<br>
 Decision: Prawdziwe AI zachowuje ten sam model akceptacji co symulacja: tworzy propozycję, nigdy nie nadpisuje koncepcji automatycznie.<br>
 Rationale: Człowiek pozostaje właścicielem treści i musi móc porównać wariant z bieżącą wersją.<br>
 Consequences: Dopiero „Zastosuj” zmienia koncepcję; „Odrzuć”, błędny JSON, timeout, 429 lub 5xx pozostawiają bieżący stan bez zmian.
+
+## DEC-017
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: Model danych v0.1 zaczynamy od minimalnego fundamentu: GrowthCampaign, Topic, Expert, Artifact, Task i Decision.<br>
+Rationale: Po walidacji prototypu i pilotażu AI potrzebujemy trwałego stanu procesu, ale bez budowania pełnego CRM, grafu klientów ani integracji wykonawczych na zapas.<br>
+Consequences: Najpierw dokumentacja modelu w `docs/growth-os/architecture.md`, potem migracje w `pneadm/database/migrations/` po akceptacji. Poza zakresem v0.1 pozostają Customer Graph, Metrics, Content/Product Graph, publikacje, wysyłki i RAG.
