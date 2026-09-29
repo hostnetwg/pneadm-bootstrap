@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-29 20:15 CEST<br>
 Branch: main<br>
-Commit: working tree / pending commit (base b44b083)<br>
+Commit: 2af2bc7<br>
 Stage: v0.1 concept decisions<br>
 Current blocker: none
 
