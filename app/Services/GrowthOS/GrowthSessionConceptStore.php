@@ -49,6 +49,7 @@ class GrowthSessionConceptStore
         ]);
 
         $project['growth_campaign_id'] = $campaign->id;
+        app(GrowthOperationalTasks::class)->ensureForCampaign($campaign);
 
         return $project;
     }

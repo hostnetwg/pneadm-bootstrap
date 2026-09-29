@@ -69,7 +69,8 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 `growth_tasks`
 
 - zadania operacyjne wewnątrz kampanii,
-- pola kierunkowe: `id`, `growth_campaign_id`, `growth_artifact_id`, `title`, `description`, `status`, `assignee_user_id`, `due_at`, `completed_at`, `timestamps`,
+- pola: `id`, `growth_campaign_id`, `key`, `growth_artifact_id`, `title`, `description`, `status`, `assignee_user_id`, `due_at`, `completed_at`, `timestamps`,
+- `key` jest stabilnym identyfikatorem zadania w kampanii, niezależnym od tytułu,
 - `growth_artifact_id` i `assignee_user_id` są opcjonalne,
 - nie zastępuje systemu ticketowego; ma prowadzić proces Growth OS krok po kroku.
 
@@ -169,6 +170,7 @@ Nie tworzymy w v0.1 innych grafów ani pivotów.
 - `growth_campaigns.owner_user_id`,
 - `growth_artifacts`: `unique(growth_campaign_id, key)`,
 - `growth_artifacts`: `index(growth_campaign_id, status)`,
+- `growth_tasks`: `unique(growth_campaign_id, key)`,
 - `growth_tasks`: `index(growth_campaign_id, status)`,
 - `growth_tasks.due_at`,
 - `growth_decisions`: `index(growth_campaign_id, status)`.
@@ -214,7 +216,7 @@ Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, 
 
 Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu oraz jeden artifact `concept` przy ręcznym zapisie i przy „Zastosuj”. Odświeżenie w tej samej sesji czyta te dane z bazy. Kierunek, materiały, checklista, propozycja AI, zadania i decyzje zostają w sesji.
 
-Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, artifact `concept` i decyzje przy koncepcji. Następny krok to zapis zadań operacyjnych.
+Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, artifact `concept`, decyzje przy koncepcji i 9 zadań operacyjnych. Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Następny krok to trwałe materiały poza koncepcją.
 
 Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
 

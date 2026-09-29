@@ -29,6 +29,7 @@ class GrowthTask extends Model
 
     protected $fillable = [
         'growth_campaign_id',
+        'key',
         'growth_artifact_id',
         'title',
         'description',

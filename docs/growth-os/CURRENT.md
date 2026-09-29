@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 20:15 CEST<br>
+Last updated: 2026-09-29 20:45 CEST<br>
 Branch: main<br>
-Commit: 2af2bc7<br>
-Stage: v0.1 concept decisions<br>
+Commit: working tree / pending commit (base cb075bc)<br>
+Stage: v0.1 operational tasks<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap v0.1 — decyzje przy koncepcji zapisują się w bazie i wracają po zalogowaniu. Kierunek, materiały, checklista, propozycja AI i zadania zostają w przeglądarce, w której powstały.
+Etap v0.1 — 9 zadań operacyjnych zapisuje się przy kampanii i wraca po zalogowaniu. Kierunek, materiały i propozycja AI zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -28,10 +28,11 @@ Etap v0.1 — decyzje przy koncepcji zapisują się w bazie i wracają po zalogo
 - Menu **PNE Rozwój**: Dzisiaj, Projekty, Pomysły, Inbox.
 - Formularz **Zaplanuj webinar TIK**.
 - Sesyjny projekt webinaru (`DemoTikWebinarProject`).
-- Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii i koncepcji.
+- Modele Eloquent v0.1 i relacje: właściciel, instruktor, materiał, zadanie, decyzja. Workspace używa kampanii, koncepcji, decyzji przy koncepcji i 9 zadań operacyjnych.
 - Testy integralności: unikalny klucz materiału w kampanii, puste relacje, usuwanie kampanii razem z dziećmi, czyszczenie opcjonalnych powiązań.
 - Utworzenie projektu zapisuje `growth_campaigns`. Ręczny zapis koncepcji i „Zastosuj” zapisują jeden artifact `concept`. „Odrzuć” i sama propozycja AI nie zapisują koncepcji.
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
+- Checklista pokazuje 9 zadań operacyjnych z checkboxem. Pozostałe punkty osi czasu są informacją i nie mają checkboxa.
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
 - **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
 - Propozycja AI nigdy nie nadpisuje bieżącej koncepcji aż do jawnego „Zastosuj”; można ją odrzucić.
@@ -71,14 +72,14 @@ Zaplanuj TIK
 
 ## 6. Czego świadomie jeszcze NIE robimy
 
-- Prototyp nie zapisuje jeszcze kierunku, materiałów, checklisty ani zadań do bazy.
+- Prototyp nie zapisuje jeszcze kierunku ani materiałów do bazy.
 - Brak zapisu wywołań AI do DB; propozycja pozostaje w sesji HTTP.
 - Brak Anthropic, Gemini, OpenRouter, automatycznego routingu modeli i fallbacku między providerami.
 - Brak YouTube API.
 - Brak Sendy API.
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
-- Kierunek, materiały, checklista i propozycja AI działają w sesji HTTP. Poza sesją zostaje kampania, zapisana koncepcja i techniczny log metadanych AI.
+- Kierunek, materiały i propozycja AI działają w sesji HTTP. Poza sesją zostaje kampania, zapisana koncepcja, decyzje przy koncepcji, 9 zadań operacyjnych i techniczny log metadanych AI.
 - Brak AI poza etapem Koncepcja.
 - Prowadzący nie jest jeszcze zapisywany. Po odtworzeniu projektu pole prowadzącego jest puste.
 - `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
@@ -89,7 +90,7 @@ Zaplanuj TIK
 
 ## 8. Następny krok
 
-Zapis zadań operacyjnych. Nie przenosić jeszcze kierunku ani materiałów.
+Dalsze materiały poza koncepcją. Nie przenosić jeszcze kierunku. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
 
@@ -99,6 +100,7 @@ Zapis zadań operacyjnych. Nie przenosić jeszcze kierunku ani materiałów.
 - Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
 - Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
 - Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
+- Nowa kampania dostaje 9 zadań operacyjnych ze stabilnym `key`. Checkbox przełącza `todo` i `done`. Istniejące kampanie uzupełnia komenda `growth:seed-operational-tasks`.
 - Zastosuj, Odrzuć, „Koncepcja gotowa” i cofnięcie zatwierdzenia zapisują decyzję człowieka.
 - Zalogowanie bez sesji odtwarza ostatnią kampanię właściciela i artifact `concept`.
 - Utworzenie projektu zapisuje kampanię, a zapis koncepcji i „Zastosuj” zapisują artifact `concept`.
@@ -122,6 +124,7 @@ Zapis zadań operacyjnych. Nie przenosić jeszcze kierunku ani materiałów.
 - [roadmap.md](./roadmap.md)
 - [CONSULTING.md](./CONSULTING.md)
 - [consultations/2026-09-growth-os-0-3-chatgpt-package.md](./consultations/2026-09-growth-os-0-3-chatgpt-package.md)
+- [consultations/2026-09-29-growth-os-operational-tasks-decision.md](./consultations/2026-09-29-growth-os-operational-tasks-decision.md)
 
 ## Question for consultant
 

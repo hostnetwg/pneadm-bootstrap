@@ -83,6 +83,7 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             ->name('projects.concept.ai');
         Route::post('/projects/{project}/concept/ai/apply', [GrowthOsProjectController::class, 'applyConceptAi'])->name('projects.concept.ai.apply');
         Route::post('/projects/{project}/concept/ai/reject', [GrowthOsProjectController::class, 'rejectConceptAi'])->name('projects.concept.ai.reject');
+        Route::post('/projects/{project}/tasks/{taskKey}', [GrowthOsProjectController::class, 'updateOperationalTask'])->name('projects.tasks.update');
         Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');
         Route::post('/projects/{project}/materials/{material}/status', [GrowthOsProjectController::class, 'updateMaterialStatus'])->name('projects.materials.status');
         Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');

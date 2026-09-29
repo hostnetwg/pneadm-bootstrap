@@ -497,9 +497,32 @@
                         <div class="card border h-100">
                             <div class="card-body">
                                 <h3 class="h6">{{ $group['period'] }}</h3>
-                                <ul class="small mb-0">
+                                <ul class="small mb-0 list-unstyled">
                                     @foreach($group['items'] as $item)
-                                        <li>{{ $item }}</li>
+                                        @php
+                                            $task = ($item['task_key'] ?? null) ? ($operationalTasks[$item['task_key']] ?? null) : null;
+                                            $isDone = $task && $task->status === \App\Models\GrowthOS\GrowthTask::STATUS_DONE;
+                                        @endphp
+                                        <li class="mb-2">
+                                            @if($task)
+                                                <form method="POST" action="{{ route('growth.projects.tasks.update', [$project['id'], $task->key]) }}">
+                                                    @csrf
+                                                    <input type="hidden" name="done" value="{{ $isDone ? '0' : '1' }}">
+                                                    <label class="form-check mb-0">
+                                                        <input
+                                                            class="form-check-input"
+                                                            type="checkbox"
+                                                            @checked($isDone)
+                                                            onchange="this.form.submit()"
+                                                            aria-label="{{ $item['label'] }}"
+                                                        >
+                                                        <span class="form-check-label">{{ $item['label'] }}</span>
+                                                    </label>
+                                                </form>
+                                            @else
+                                                <span>{{ $item['label'] }}</span>
+                                            @endif
+                                        </li>
                                     @endforeach
                                 </ul>
                             </div>

@@ -151,3 +151,11 @@ Status: ACTIVE<br>
 Decision: Artifact ma kontrakt `key` + `type` + `schema_version` + `payload`, osobne statusy encji są kanoniczne, a wersjonowanie artifactów w v0.1 ogranicza się do licznika `version`.<br>
 Rationale: `payload` JSON daje elastyczność dla różnych materiałów, ale tylko pod warunkiem walidowanego kontraktu `type + schema_version`. Pełna historia wersji zwiększyłaby zakres v0.1 ponad potrzebę trwałego stanu procesu.<br>
 Consequences: `growth_artifacts` ma `unique(growth_campaign_id, key)`. `published` nie jest statusem artifactu; publikacja będzie później osobną domeną. Pełna historia/przywracanie wersji może powstać później w osobnej tabeli.
+
+## DEC-020
+
+Date: 2026-09-29<br>
+Status: ACTIVE<br>
+Decision: GrowthTask utrwala prostą checklistę operacyjną kampanii. Pierwszy zestaw to 9 zadań ze stabilnym `key`. W obecnym UX widać tylko `todo` i `done`. Odhaczenie nie tworzy decyzji i nie zmienia „Najważniejszego następnego kroku”.<br>
+Rationale: Cała checklista czasowa dublowałaby główny flow, koncepcję i sesyjne materiały. Trwałe mają być tylko czynności operacyjne, których nie opisuje ani artifact, ani decyzja.<br>
+Consequences: `growth_tasks.key` jest unikalny w kampanii. Termin `due_at` liczy się od `live_at`. `assignee_user_id` i `growth_artifact_id` zostają puste. Zadania powstają przy utworzeniu kampanii oraz przez jawną komendę `growth:seed-operational-tasks`, nie przy wejściu na ekran. Kierunek i materiały nadal nie są trwałe.

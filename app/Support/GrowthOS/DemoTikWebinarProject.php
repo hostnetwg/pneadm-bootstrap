@@ -6,6 +6,7 @@ use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use Carbon\CarbonImmutable;
 
@@ -860,19 +861,77 @@ class DemoTikWebinarProject
     }
 
     /**
-     * @return list<array{period: string, items: list<string>}>
+     * @param  array<string, mixed>  $project
+     * @return array<string, \App\Models\GrowthOS\GrowthTask>
+     */
+    public static function operationalTasks(array $project): array
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return [];
+        }
+
+        return \App\Models\GrowthOS\GrowthTask::query()
+            ->where('growth_campaign_id', (int) $campaignId)
+            ->whereIn('key', GrowthOperationalTasks::keys())
+            ->get()
+            ->keyBy('key')
+            ->all();
+    }
+
+    /**
+     * @return list<array{period: string, items: list<array{label: string, task_key: string|null}>}>
      */
     public static function timeline(): array
     {
         return [
-            ['period' => 'T-7 dni', 'items' => ['temat', 'kierunek', 'koncepcja']],
-            ['period' => 'T-5 dni', 'items' => ['YouTube Live', 'grafika', 'landing']],
-            ['period' => 'T-3 dni', 'items' => ['mailing główny', 'Facebook']],
-            ['period' => 'T-1 dzień', 'items' => ['scenariusz', 'materiały', 'test techniczny']],
-            ['period' => 'T-3 godziny', 'items' => ['przypomnienie', 'social reminder']],
-            ['period' => 'LIVE', 'items' => ['webinar', 'formularz zaświadczenia']],
-            ['period' => 'T+1', 'items' => ['nagranie', 'transkrypcja', 'zagadnienia do zaświadczenia']],
-            ['period' => 'T+2 / T+3', 'items' => ['follow-up', 'content repurposing']],
+            ['period' => 'T-7 dni', 'items' => [
+                self::timelineItem('temat'),
+                self::timelineItem('kierunek'),
+                self::timelineItem('koncepcja'),
+            ]],
+            ['period' => 'T-5 dni', 'items' => [
+                self::timelineItem('YouTube Live', GrowthOperationalTasks::KEY_YOUTUBE_LIVE),
+                self::timelineItem('grafika'),
+                self::timelineItem('landing'),
+            ]],
+            ['period' => 'T-3 dni', 'items' => [
+                self::timelineItem('mailing główny'),
+                self::timelineItem('Facebook'),
+            ]],
+            ['period' => 'T-1 dzień', 'items' => [
+                self::timelineItem('scenariusz'),
+                self::timelineItem('materiały'),
+                self::timelineItem('Test techniczny', GrowthOperationalTasks::KEY_TECHNICAL_TEST),
+            ]],
+            ['period' => 'T-3 godziny', 'items' => [
+                self::timelineItem('przypomnienie'),
+                self::timelineItem('Social reminder', GrowthOperationalTasks::KEY_SOCIAL_REMINDER),
+            ]],
+            ['period' => 'LIVE', 'items' => [
+                self::timelineItem('Webinar', GrowthOperationalTasks::KEY_LIVE_WEBINAR),
+                self::timelineItem('Formularz zaświadczenia', GrowthOperationalTasks::KEY_CERTIFICATE_FORM),
+            ]],
+            ['period' => 'T+1', 'items' => [
+                self::timelineItem('Nagranie', GrowthOperationalTasks::KEY_RECORDING),
+                self::timelineItem('Transkrypcja', GrowthOperationalTasks::KEY_TRANSCRIPTION),
+                self::timelineItem('Zagadnienia do zaświadczenia', GrowthOperationalTasks::KEY_CERTIFICATE_TOPICS),
+            ]],
+            ['period' => 'T+2 / T+3', 'items' => [
+                self::timelineItem('follow-up'),
+                self::timelineItem('Content repurposing', GrowthOperationalTasks::KEY_CONTENT_REPURPOSING),
+            ]],
+        ];
+    }
+
+    /**
+     * @return array{label: string, task_key: string|null}
+     */
+    private static function timelineItem(string $label, ?string $taskKey = null): array
+    {
+        return [
+            'label' => $label,
+            'task_key' => $taskKey,
         ];
     }
 

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\GrowthOS;
 
 use App\Http\Controllers\Controller;
+use App\Models\GrowthOS\GrowthTask;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\GrowthAiService;
+use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -68,6 +70,7 @@ class ProjectController extends Controller
             'growthAiProvider' => (string) config('growth_ai.provider'),
             'growthAiModel' => (string) config('growth_ai.model'),
             'conceptDecisions' => DemoTikWebinarProject::conceptDecisions($item),
+            'operationalTasks' => DemoTikWebinarProject::operationalTasks($item),
         ]);
     }
 
@@ -231,6 +234,33 @@ class ProjectController extends Controller
             ->route('growth.projects.show', $project)
             ->with('success', 'Odrzucono propozycję AI. Decyzja została zapisana. Została poprzednia koncepcja.')
             ->withFragment('concept');
+    }
+
+    public function updateOperationalTask(Request $request, string $project, string $taskKey): RedirectResponse
+    {
+        abort_unless(in_array($taskKey, GrowthOperationalTasks::keys(), true), 404);
+
+        $done = $request->validate([
+            'done' => ['required', 'boolean'],
+        ])['done'];
+
+        $item = DemoTikWebinarProject::requireProject($project);
+        $campaignId = $item['growth_campaign_id'] ?? null;
+        abort_unless(is_numeric($campaignId), 404);
+
+        $task = GrowthTask::query()
+            ->where('growth_campaign_id', (int) $campaignId)
+            ->where('key', $taskKey)
+            ->firstOrFail();
+
+        $task->status = $done ? GrowthTask::STATUS_DONE : GrowthTask::STATUS_TODO;
+        $task->completed_at = $done ? now() : null;
+        $task->save();
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', $done ? 'Zadanie oznaczono jako gotowe.' : 'Zadanie wróciło do zrobienia.')
+            ->withFragment('timeline');
     }
 
     public function material(string $project, string $material): View
