@@ -4,6 +4,7 @@ namespace Tests\Feature\GrowthOS;
 
 use App\Models\GrowthOS\GrowthArtifact;
 use App\Models\GrowthOS\GrowthCampaign;
+use App\Models\GrowthOS\GrowthDecision;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
@@ -147,6 +148,54 @@ class GrowthOsConceptPersistenceTest extends TestCase
             ->assertOk()
             ->assertDontSee('Tytuł z bazy')
             ->assertDontSee('Canva AI w pracy nauczyciela');
+    }
+
+    public function test_concept_decisions_are_stored_and_return_after_a_new_session(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), $this->projectPayload());
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'direction']));
+
+        $this->assertSame(0, GrowthDecision::query()->count());
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.complete', [DemoTikWebinarProject::PROJECT_ID, 'concept']));
+
+        $approval = GrowthDecision::query()->first();
+        $this->assertNotNull($approval);
+        $this->assertSame(GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL, $approval->type);
+        $this->assertSame(GrowthDecision::STATUS_APPROVED, $approval->status);
+        $this->assertSame($user->id, $approval->decided_by_user_id);
+
+        session()->forget(DemoTikWebinarProject::SESSION_PROJECT);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Koncepcja oznaczona jako gotowa.')
+            ->assertSee('Cofnij zatwierdzenie');
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.steps.reopen', [DemoTikWebinarProject::PROJECT_ID, 'concept']));
+
+        $this->assertSame(
+            GrowthDecision::STATUS_SUPERSEDED,
+            $approval->fresh()->status,
+        );
+        $this->assertSame(1, GrowthDecision::query()->where('status', GrowthDecision::STATUS_CHANGES_REQUESTED)->count());
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai', DemoTikWebinarProject::PROJECT_ID), [
+                'intent' => 'shorter',
+            ]);
+        $before = GrowthArtifact::query()->count();
+        $this->actingAs($user)
+            ->post(route('growth.projects.concept.ai.reject', DemoTikWebinarProject::PROJECT_ID));
+
+        $this->assertSame($before, GrowthArtifact::query()->count());
+        $this->assertSame(1, GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_CONCEPT_AI_REJECT)->count());
     }
 
     /**

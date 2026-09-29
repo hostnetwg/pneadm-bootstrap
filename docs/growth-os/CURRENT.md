@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 20:00 CEST<br>
+Last updated: 2026-09-29 20:15 CEST<br>
 Branch: main<br>
-Commit: 6d54b1a<br>
-Stage: v0.1 campaign restore<br>
+Commit: working tree / pending commit (base b44b083)<br>
+Stage: v0.1 concept decisions<br>
 Current blocker: none
 
 ## 1. Cel projektu
@@ -20,7 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 
 ## 2. Aktualny etap
 
-Etap v0.1 — po zalogowaniu w innej przeglądarce wraca ostatnia kampania właściciela i zapisana koncepcja. Kierunek, materiały, checklista, propozycja AI, zadania i decyzje zostają w przeglądarce, w której powstały.
+Etap v0.1 — decyzje przy koncepcji zapisują się w bazie i wracają po zalogowaniu. Kierunek, materiały, checklista, propozycja AI i zadania zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -71,7 +71,7 @@ Zaplanuj TIK
 
 ## 6. Czego świadomie jeszcze NIE robimy
 
-- Prototyp nie zapisuje jeszcze kierunku, materiałów, checklisty, zadań ani decyzji do bazy.
+- Prototyp nie zapisuje jeszcze kierunku, materiałów, checklisty ani zadań do bazy.
 - Brak zapisu wywołań AI do DB; propozycja pozostaje w sesji HTTP.
 - Brak Anthropic, Gemini, OpenRouter, automatycznego routingu modeli i fallbacku między providerami.
 - Brak YouTube API.
@@ -89,7 +89,7 @@ Zaplanuj TIK
 
 ## 8. Następny krok
 
-Zapis decyzji człowieka jako osobnego rekordu. Nie przenosić jeszcze kierunku, materiałów ani zadań.
+Zapis zadań operacyjnych. Nie przenosić jeszcze kierunku ani materiałów.
 
 ## 9. Ostatnie zmiany
 
@@ -99,6 +99,7 @@ Zapis decyzji człowieka jako osobnego rekordu. Nie przenosić jeszcze kierunku,
 - Dodano flagę, timeout, jeden retry, limity, circuit breaker i metadane kosztowe.
 - Dodano AJAX: propozycja pojawia się bez przeładowania strony, spinner resetuje się, a dźwięk odtwarza się bezpośrednio po sukcesie.
 - Zwiększono odporność parsera odpowiedzi OpenAI na różne formaty `output_text` i niepełne odpowiedzi.
+- Zastosuj, Odrzuć, „Koncepcja gotowa” i cofnięcie zatwierdzenia zapisują decyzję człowieka.
 - Zalogowanie bez sesji odtwarza ostatnią kampanię właściciela i artifact `concept`.
 - Utworzenie projektu zapisuje kampanię, a zapis koncepcji i „Zastosuj” zapisują artifact `concept`.
 - Dodano testy integralności v0.1: unikalność klucza, puste relacje, cascade kampanii, `nullOnDelete` i blokada usunięcia właściciela.

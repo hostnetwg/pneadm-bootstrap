@@ -132,7 +132,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 - `GrowthOsV01RelationsTest`: kampania, właściciel, instruktor, materiał, zadanie i decyzja.
 - `GrowthOsV01IntegrityTest`: ten sam klucz w drugiej kampanii, puste relacje, usunięcie kampanii kasuje dzieci, usunięcie materiału lub zadania czyści powiązania, usunięcie instruktora czyści wskazanie, usunięcie właściciela jest zablokowane, brak `SoftDeletes` na tabelach Growth OS.
 - Wynik `GrowthOsV01IntegrityTest`: **6 passed / 39 assertions**.
-- `GrowthOsConceptPersistenceTest`: utworzenie projektu zapisuje kampanię; ręczny zapis i „Zastosuj” zapisują artifact `concept`; sama propozycja i „Odrzuć” nie zmieniają zapisu; inna sesja tego samego właściciela odtwarza kampanię i koncepcję, bez statusu materiałów; inny użytkownik tej kampanii nie widzi.
+- `GrowthOsConceptPersistenceTest`: utworzenie projektu zapisuje kampanię; ręczny zapis i „Zastosuj” zapisują artifact `concept`; sama propozycja i „Odrzuć” nie zmieniają koncepcji; inna sesja właściciela odtwarza kampanię, koncepcję i decyzję „Koncepcja gotowa”; zatwierdzenie kierunku nie tworzy decyzji; cofnięcie oznacza poprzednią decyzję jako zastąpioną.
 - Ręczny smoke test z prawdziwym OpenAI wymaga lokalnego `OPENAI_API_KEY` i jawnego `GROWTH_AI_ENABLED=true`; nie jest częścią automatycznego suite.
 
 Szczegóły provision PNEDU: [FORM_ORDERS_PNEDU_PROVISION.md](./FORM_ORDERS_PNEDU_PROVISION.md).

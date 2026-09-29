@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Ostatnia kampania i koncepcja wracają po zalogowaniu. Reszta procesu zostaje w przeglądarce, w której powstała.
+Decyzje przy koncepcji zapisują się i wracają po zalogowaniu. Kierunek, materiały i zadania zostają w przeglądarce.
 
 ## NEXT
 
-Zapis decyzji człowieka. Bez przenoszenia kierunku, materiałów i zadań.
+Zapis zadań operacyjnych. Bez przenoszenia kierunku i materiałów.
 
 ## LATER
 
@@ -77,7 +77,7 @@ Kolejność wdrożenia:
 3. testy integralności — zrobione,
 4. pierwszy vertical slice: Campaign + Concept Artifact — zrobione,
 5. trwałe odtworzenie projektu po ponownym wejściu — zrobione dla kampanii i koncepcji,
-6. Decision,
+6. Decision — zrobione dla decyzji przy koncepcji,
 7. Task,
 8. później dalsze materiały.
 

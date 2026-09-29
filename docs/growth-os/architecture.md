@@ -214,7 +214,7 @@ Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, 
 
 Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu oraz jeden artifact `concept` przy ręcznym zapisie i przy „Zastosuj”. Odświeżenie w tej samej sesji czyta te dane z bazy. Kierunek, materiały, checklista, propozycja AI, zadania i decyzje zostają w sesji.
 
-Po zalogowaniu bez sesji wraca ostatnia kampania właściciela i artifact `concept`. Następny krok to zapis decyzji człowieka.
+Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, artifact `concept` i decyzje przy koncepcji. Następny krok to zapis zadań operacyjnych.
 
 Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
 

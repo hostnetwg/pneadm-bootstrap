@@ -67,6 +67,7 @@ class ProjectController extends Controller
             'growthAiEnabled' => config('growth_ai.enabled') === true,
             'growthAiProvider' => (string) config('growth_ai.provider'),
             'growthAiModel' => (string) config('growth_ai.model'),
+            'conceptDecisions' => DemoTikWebinarProject::conceptDecisions($item),
         ]);
     }
 
@@ -76,7 +77,7 @@ class ProjectController extends Controller
 
         $message = $step === 'direction'
             ? 'Kierunek zatwierdzony w tej sesji. Przejdź do koncepcji webinaru.'
-            : 'Koncepcja gotowa w tej sesji. Możesz przygotowywać materiały.';
+            : 'Koncepcja gotowa. Decyzja została zapisana.';
 
         return redirect()
             ->route('growth.projects.show', $project)
@@ -90,7 +91,9 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Cofnięto zatwierdzenie w tej sesji. Etap wrócił do „Do dopracowania”.')
+            ->with('success', $step === 'concept'
+                ? 'Cofnięto zatwierdzenie koncepcji. Decyzja została zapisana.'
+                : 'Cofnięto zatwierdzenie w tej sesji. Etap wrócił do „Do dopracowania”.')
             ->withFragment($step);
     }
 
@@ -216,7 +219,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Zastosowano propozycję AI i zapisano koncepcję. Sprawdź ją i zatwierdź, gdy będzie gotowa.')
+            ->with('success', 'Zastosowano propozycję AI i zapisano koncepcję oraz decyzję. Sprawdź ją i zatwierdź, gdy będzie gotowa.')
             ->withFragment('concept');
     }
 
@@ -226,7 +229,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Odrzucono propozycję AI. Została poprzednia koncepcja.')
+            ->with('success', 'Odrzucono propozycję AI. Decyzja została zapisana. Została poprzednia koncepcja.')
             ->withFragment('concept');
     }
 

@@ -435,6 +435,23 @@
                             ])
                         </div>
 
+                        @if(count($conceptDecisions) > 0)
+                            <section class="border rounded p-3 mb-3" aria-labelledby="concept-decisions-heading">
+                                <h3 class="h6" id="concept-decisions-heading">Decyzje</h3>
+                                <ul class="small mb-0 list-unstyled">
+                                    @foreach($conceptDecisions as $conceptDecision)
+                                        <li class="mb-2">
+                                            <strong>{{ $conceptDecision['decided_at'] }}</strong>
+                                            · {{ $conceptDecision['decision'] }}
+                                            @if($conceptDecision['actor'] !== '')
+                                                <div class="text-secondary">{{ $conceptDecision['actor'] }}</div>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </section>
+                        @endif
+
                         @if(is_array($versions) && count($versions) > 0)
                             <section class="border rounded p-3" aria-labelledby="concept-versions-heading">
                                 <h3 class="h6" id="concept-versions-heading">Historia (sesja)</h3>

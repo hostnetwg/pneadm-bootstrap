@@ -3,6 +3,7 @@
 namespace App\Support\GrowthOS;
 
 use App\Models\GrowthOS\GrowthCampaign;
+use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
@@ -152,6 +153,15 @@ class DemoTikWebinarProject
         $project['status'] = $step === 'direction' ? 'PLANNING' : 'PREPARING';
 
         self::saveProject($project);
+        if ($step === 'concept') {
+            self::recordConceptDecision(
+                $project,
+                GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL,
+                GrowthDecision::STATUS_APPROVED,
+                'Czy koncepcja webinaru jest gotowa?',
+                'Koncepcja oznaczona jako gotowa.',
+            );
+        }
 
         return $project;
     }
@@ -173,7 +183,20 @@ class DemoTikWebinarProject
         $project['completed_steps'] = $completed;
         $project['status'] = isset($completed['concept']) ? 'PREPARING' : 'PLANNING';
 
+        if ($step === 'concept') {
+            self::supersedeConceptApproval($project);
+        }
+
         self::saveProject($project);
+        if ($step === 'concept') {
+            self::recordConceptDecision(
+                $project,
+                GrowthSessionConceptStore::DECISION_CONCEPT_APPROVAL,
+                GrowthDecision::STATUS_CHANGES_REQUESTED,
+                'Czy cofnąć zatwierdzenie koncepcji?',
+                'Cofnięto zatwierdzenie koncepcji.',
+            );
+        }
 
         return $project;
     }
@@ -216,6 +239,7 @@ class DemoTikWebinarProject
         if (isset($project['completed_steps']['concept'])) {
             unset($project['completed_steps']['concept']);
             $project['status'] = 'PLANNING';
+            self::supersedeConceptApproval($project);
         }
 
         self::persistConcept($project);
@@ -246,6 +270,7 @@ class DemoTikWebinarProject
         if (isset($project['completed_steps']['concept'])) {
             unset($project['completed_steps']['concept']);
             $project['status'] = 'PLANNING';
+            self::supersedeConceptApproval($project);
         }
 
         self::saveProject($project);
@@ -289,6 +314,7 @@ class DemoTikWebinarProject
         if (isset($project['completed_steps']['concept'])) {
             unset($project['completed_steps']['concept']);
             $project['status'] = 'PLANNING';
+            self::supersedeConceptApproval($project);
         }
 
         self::saveProject($project);
@@ -320,10 +346,22 @@ class DemoTikWebinarProject
         if (isset($project['completed_steps']['concept'])) {
             unset($project['completed_steps']['concept']);
             $project['status'] = 'PLANNING';
+            self::supersedeConceptApproval($project);
         }
 
         self::persistConcept($project);
         self::saveProject($project);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_CONCEPT_AI_APPLY,
+            GrowthDecision::STATUS_APPROVED,
+            'Czy zastosować propozycję AI?',
+            'Zastosowano propozycję AI: '.($proposal['intent_label'] ?? 'zmiana'),
+            [
+                'intent' => (string) ($proposal['intent'] ?? ''),
+                'intent_label' => (string) ($proposal['intent_label'] ?? ''),
+            ],
+        );
 
         return $project;
     }
@@ -334,8 +372,20 @@ class DemoTikWebinarProject
     public static function rejectConceptAiProposal(string $projectId): array
     {
         $project = self::requireProject($projectId);
+        $proposal = $project['concept_ai_proposal'] ?? null;
         $project['concept_ai_proposal'] = null;
         self::saveProject($project);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_CONCEPT_AI_REJECT,
+            GrowthDecision::STATUS_REJECTED,
+            'Czy odrzucić propozycję AI?',
+            'Odrzucono propozycję AI: '.(is_array($proposal) ? ($proposal['intent_label'] ?? 'zmiana') : 'zmiana'),
+            [
+                'intent' => is_array($proposal) ? (string) ($proposal['intent'] ?? '') : '',
+                'intent_label' => is_array($proposal) ? (string) ($proposal['intent_label'] ?? '') : '',
+            ],
+        );
 
         return $project;
     }
@@ -418,6 +468,75 @@ class DemoTikWebinarProject
             'concept_ai_proposal' => null,
             'materials' => self::defaultMaterials(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $meta
+     */
+    private static function recordConceptDecision(
+        array $project,
+        string $type,
+        string $status,
+        string $question,
+        string $decision,
+        array $meta = [],
+    ): void {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->recordConceptDecision(
+            $project,
+            $user,
+            $type,
+            $status,
+            $question,
+            $decision,
+            $meta,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function supersedeConceptApproval(array $project): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        app(GrowthSessionConceptStore::class)->supersedeApprovedConcept((int) $campaignId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return list<array{decision: string, status: string, decided_at: string, actor: string}>
+     */
+    public static function conceptDecisions(array $project): array
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return [];
+        }
+
+        return GrowthDecision::query()
+            ->with('decidedBy')
+            ->where('growth_campaign_id', (int) $campaignId)
+            ->latest('id')
+            ->limit(8)
+            ->get()
+            ->map(function (GrowthDecision $decision): array {
+                return [
+                    'decision' => (string) $decision->decision,
+                    'status' => $decision->status,
+                    'decided_at' => $decision->decided_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') ?? '',
+                    'actor' => (string) ($decision->decidedBy?->name ?? ''),
+                ];
+            })
+            ->all();
     }
 
     /**

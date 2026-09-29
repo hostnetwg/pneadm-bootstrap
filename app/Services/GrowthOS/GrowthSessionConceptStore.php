@@ -4,6 +4,7 @@ namespace App\Services\GrowthOS;
 
 use App\Models\GrowthOS\GrowthArtifact;
 use App\Models\GrowthOS\GrowthCampaign;
+use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -17,6 +18,12 @@ class GrowthSessionConceptStore
     public const CONCEPT_TYPE = 'concept';
 
     public const SCHEMA_VERSION = 1;
+
+    public const DECISION_CONCEPT_APPROVAL = 'concept_approval';
+
+    public const DECISION_CONCEPT_AI_APPLY = 'concept_ai_apply';
+
+    public const DECISION_CONCEPT_AI_REJECT = 'concept_ai_reject';
 
     /**
      * @param  array<string, mixed>  $project
@@ -137,7 +144,75 @@ class GrowthSessionConceptStore
             $project['concept'] = $artifact->payload;
         }
 
+        $approval = $this->latestConceptApproval((int) $campaign->id);
+        $completed = $project['completed_steps'] ?? [];
+        if (! is_array($completed)) {
+            $completed = [];
+        }
+        if ($approval instanceof GrowthDecision && $approval->status === GrowthDecision::STATUS_APPROVED) {
+            $completed['concept'] = $approval->decided_at?->toIso8601String() ?? now()->toIso8601String();
+        } elseif ($approval instanceof GrowthDecision) {
+            unset($completed['concept']);
+        }
+        $project['completed_steps'] = $completed;
+
         return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $meta
+     */
+    public function recordConceptDecision(
+        array $project,
+        User $actor,
+        string $type,
+        string $status,
+        string $question,
+        string $decision,
+        array $meta = [],
+    ): void {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        $artifact = GrowthArtifact::query()
+            ->where('growth_campaign_id', (int) $campaignId)
+            ->where('key', self::CONCEPT_KEY)
+            ->first();
+
+        GrowthDecision::query()->create([
+            'growth_campaign_id' => (int) $campaignId,
+            'growth_artifact_id' => $artifact?->id,
+            'type' => $type,
+            'status' => $status,
+            'question' => $question,
+            'decision' => $decision,
+            'decided_by_user_id' => $actor->id,
+            'decided_at' => now(),
+            'meta' => $meta === [] ? null : $meta,
+        ]);
+    }
+
+    public function supersedeApprovedConcept(int $campaignId): void
+    {
+        GrowthDecision::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('type', self::DECISION_CONCEPT_APPROVAL)
+            ->where('status', GrowthDecision::STATUS_APPROVED)
+            ->update(['status' => GrowthDecision::STATUS_SUPERSEDED]);
+    }
+
+    public function latestConceptApproval(int $campaignId): ?GrowthDecision
+    {
+        $decision = GrowthDecision::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('type', self::DECISION_CONCEPT_APPROVAL)
+            ->latest('id')
+            ->first();
+
+        return $decision instanceof GrowthDecision ? $decision : null;
     }
 
     private function liveAt(string $date, string $time): ?CarbonImmutable
