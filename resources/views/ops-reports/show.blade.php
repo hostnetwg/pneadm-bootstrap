@@ -89,7 +89,15 @@
                                     <td>
                                         <span class="badge {{ $itemStatus['badge_class'] }}">{{ $itemStatus['label'] }}</span>
                                     </td>
-                                    <td class="small">{{ $item->message }}</td>
+                                    <td class="small">
+                                        {{ $item->message }}
+                                        @if(!empty($item->payload['next_check_at']))
+                                            <div class="text-muted">
+                                                Następna próba:
+                                                {{ \Carbon\Carbon::parse($item->payload['next_check_at'])->timezone('Europe/Warsaw')->format('d.m.Y H:i:s') }}
+                                            </div>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>

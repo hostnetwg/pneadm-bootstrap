@@ -11,6 +11,7 @@ PNE Growth OS — pilotaż prawdziwego AI w etapie Koncepcja webinaru.
 - Integracja ma osobną flagę `GROWTH_AI_ENABLED`, centralnie ustawiany model, walidację structured output, limity, timeout, retry i log metadanych bez treści koncepcji ani danych osobowych.
 - Kanon: [PNE Growth OS Current](docs/growth-os/CURRENT.md), [AI](docs/pne-growth-os/06-AI.md)
 - **Hotfix 2026-09-30:** wyczyszczenie numeru faktury na [zamówieniu FORM](/form-orders) usuwa także stare ID iFirma i dane KSeF. Po korekcie anulującej nowa faktura z czerwonego przycisku dostaje nowe ID/numer i jest ponownie wysyłana do KSeF. Kanon: [KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md)
+- **Hotfix 2026-09-30:** ograniczono liczbę requestów na szczegółach zamówienia: brak ciągłego pollingu KSeF, najwyżej 3 kontrole w widocznej karcie, a numer KSeF dociąga niezależna kolejka z coraz dłuższymi odstępami. Kanon: [KSEF_FORM_ORDERS.md](docs/KSEF_FORM_ORDERS.md)
 
 ## 1.2 — 2026-09-23
 

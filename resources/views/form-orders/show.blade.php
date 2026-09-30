@@ -175,11 +175,13 @@
                                value="{{ request('course_id') }}"
                                title="Wprowadź ID szkolenia (courses.id) do filtrowania zamówień przy Poprzednie/Następne">
                     </div>
+                    @php
+                        $hasNavigationFilter = !empty($navFilterQuery);
+                    @endphp
                     <span id="navigationFilterCountBadge"
-                          class="badge text-bg-secondary align-self-center"
+                          class="badge {{ $hasNavigationFilter ? 'text-bg-primary' : 'text-bg-secondary' }} align-self-center"
                           style="min-width: 2.25rem;"
-                          title="Liczba zamówień według aktywnych filtrów (ładowane po stronie)"
-                          data-count-url="{{ route('form-orders.navigation-filter-count') }}">…</span>
+                          title="Zamówień w zakresie nawigacji: {{ $navigationFilterCount }}">{{ $navigationFilterCount }}</span>
 
                     <div class="btn-group me-2" role="group">
                         <a href="{{ $prevOrder ? route('form-orders.show', array_merge(['id' => $prevOrder->id], $navFilterQuery)) : '#' }}" 
@@ -2752,7 +2754,6 @@ nowoczesna-edukacja.pl `;
                 applyKsefNumberDisplay(data.ksef_number);
             }
             enableCreateDebtCaseButtonAfterInvoice();
-            refreshOperationalStatusPanel();
         }
 
         function enableCreateDebtCaseButtonAfterInvoice() {
@@ -2895,10 +2896,11 @@ nowoczesna-edukacja.pl `;
 
         let ksefStatusPollTimer = null;
         let ksefStatusPollHeard = false;
+        const ksefStatusPollDelaysMs = [15000, 45000, 120000];
 
         function stopKsefStatusPoll() {
             if (ksefStatusPollTimer) {
-                clearInterval(ksefStatusPollTimer);
+                clearTimeout(ksefStatusPollTimer);
                 ksefStatusPollTimer = null;
             }
         }
@@ -2929,14 +2931,25 @@ nowoczesna-edukacja.pl `;
         function startKsefStatusPoll(orderId) {
             stopKsefStatusPoll();
             ksefStatusPollHeard = false;
-            let attempts = 0;
-            const maxAttempts = 180;
-            const tick = async function () {
-                attempts += 1;
-                if (attempts > maxAttempts) {
+            let attemptIndex = 0;
+
+            const scheduleNext = function () {
+                if (attemptIndex >= ksefStatusPollDelaysMs.length) {
                     stopKsefStatusPoll();
                     return;
                 }
+
+                const delay = ksefStatusPollDelaysMs[attemptIndex];
+                ksefStatusPollTimer = window.setTimeout(tick, delay);
+            };
+
+            const tick = async function () {
+                if (document.visibilityState !== 'visible') {
+                    ksefStatusPollTimer = window.setTimeout(tick, 30000);
+                    return;
+                }
+
+                attemptIndex += 1;
                 try {
                     const response = await fetch(`/form-orders/${orderId}/ifirma/ksef-status`, {
                         headers: {
@@ -2945,7 +2958,12 @@ nowoczesna-edukacja.pl `;
                         },
                         credentials: 'same-origin',
                     });
+                    if (response.status === 429) {
+                        stopKsefStatusPoll();
+                        return;
+                    }
                     if (!response.ok) {
+                        scheduleNext();
                         return;
                     }
                     const data = await response.json();
@@ -2969,12 +2987,16 @@ nowoczesna-edukacja.pl `;
                             }
                         }
                     }
+                    if (!data.ksef_number && data.ksef_status !== 'failed') {
+                        scheduleNext();
+                    }
                 } catch (e) {
                     console.error(e);
+                    scheduleNext();
                 }
             };
-            tick();
-            ksefStatusPollTimer = setInterval(tick, 5000);
+
+            scheduleNext();
         }
 
         function applyIfirmaInvoiceIdDisplay(invoiceId) {
@@ -3165,7 +3187,6 @@ nowoczesna-edukacja.pl `;
 
         document.addEventListener('DOMContentLoaded', function () {
             const orderId = {{ $zamowienie->id }};
-            const ksefAwaitingOnLoad = @json($zamowienie->isAwaitingKsefNumber());
             const syncKsefBtn = document.getElementById('syncIfirmaKsefBtn');
             if (syncKsefBtn) {
                 syncKsefBtn.addEventListener('click', function () {
@@ -3195,9 +3216,6 @@ nowoczesna-edukacja.pl `;
                         icon: document.getElementById('syncIfirmaByIdIcon'),
                     });
                 });
-            }
-            if (ksefAwaitingOnLoad) {
-                startKsefStatusPoll(orderId);
             }
         });
 
@@ -3824,74 +3842,7 @@ nowoczesna-edukacja.pl `;
                 }
             });
 
-            // Licznik rekordów wg filtrów — po wczytaniu strony (nie blokuje Poprzednie/Następne)
-            loadNavigationFilterCount();
         });
-
-        function loadNavigationFilterCount() {
-            const badge = document.getElementById('navigationFilterCountBadge');
-            if (!badge) {
-                return;
-            }
-            const url = new URL(badge.dataset.countUrl || '/form-orders/navigation-filter-count', window.location.origin);
-            const pageUrl = new URL(window.location.href);
-            ['filter_no_participant', 'filter_no_invoice', 'filter_no_ksef', 'filter_payment_gateway', 'filter_new'].forEach(function (key) {
-                if (pageUrl.searchParams.get(key) === '1') {
-                    url.searchParams.set(key, '1');
-                }
-            });
-            const courseId = pageUrl.searchParams.get('course_id')
-                || (document.getElementById('courseIdFilter')?.value || '').trim();
-            if (courseId) {
-                url.searchParams.set('course_id', courseId);
-            }
-
-            badge.textContent = '…';
-            badge.classList.remove('text-bg-primary', 'text-bg-warning');
-            badge.classList.add('text-bg-secondary');
-
-            fetch(url.toString(), {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-            })
-                .then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(function (data) {
-                    const count = Number(data.count || 0);
-                    badge.textContent = String(count);
-                    const hasFilter = !!(data.filter_no_participant || data.filter_no_invoice || data.filter_no_ksef || data.filter_payment_gateway || data.course_id);
-                    badge.classList.remove('text-bg-secondary', 'text-bg-primary', 'text-bg-warning');
-                    badge.classList.add(hasFilter ? 'text-bg-primary' : 'text-bg-secondary');
-                    let title = 'Zamówień w zakresie nawigacji: ' + count;
-                    if (data.course_id) {
-                        title += ' · szkolenie #' + data.course_id;
-                    }
-                    if (data.filter_no_participant) {
-                        title += ' · bez wprowadzonego uczestnika';
-                    }
-                    if (data.filter_no_invoice) {
-                        title += ' · bez wystawionej faktury';
-                    }
-                    if (data.filter_no_ksef) {
-                        title += ' · tylko z NIP bez KSeF';
-                    }
-                    if (data.filter_payment_gateway) {
-                        title += ' · bramka płatności';
-                    }
-                    badge.title = title;
-                })
-                .catch(function () {
-                    badge.textContent = '—';
-                    badge.title = 'Nie udało się pobrać liczby zamówień';
-                });
-        }
 
         // Inicjalizacja tooltipów Bootstrap
         document.addEventListener('DOMContentLoaded', function() {
@@ -3931,35 +3882,7 @@ nowoczesna-edukacja.pl `;
                 applyParticipantInRemarks();
             }
 
-            function loadPreferences() {
-                return new Promise(function (resolve) {
-                    var csrfToken = document.querySelector('meta[name="csrf-token"]');
-                    if (!csrfToken) {
-                        resolve({});
-                        return;
-                    }
-
-                    fetch('/api/user/preferences', {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken.getAttribute('content'),
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        credentials: 'same-origin',
-                    })
-                        .then(function (response) {
-                            return response.ok ? response.json() : { preferences: {} };
-                        })
-                        .then(function (data) {
-                            resolve(data.preferences || {});
-                        })
-                        .catch(function () {
-                            resolve({});
-                        });
-                });
-            }
+            const preferences = @json($ifirmaPreferences);
 
             function savePreference(key, value) {
                 var csrfToken = document.querySelector('meta[name="csrf-token"]');
@@ -3980,33 +3903,31 @@ nowoczesna-edukacja.pl `;
                 }).catch(function () {});
             }
 
-            loadPreferences().then(function (preferences) {
-                sendEmailEntries.forEach(function (entry) {
-                    if (preferences[entry.key] !== undefined) {
-                        entry.element.checked = !!preferences[entry.key];
-                    }
-
-                    entry.element.addEventListener('change', function () {
-                        savePreference(entry.key, this.checked);
-                    });
-                });
-
-                // Checkbox „Dodaj w uwagach faktury UCZESTNIKÓW” — domyślnie zaznaczony, potem ostatni stan admina
-                if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled) {
-                    var savedParticipantRemarks = preferences[PARTICIPANT_REMARKS_KEY];
-                    participantRemarksCheckbox.checked = savedParticipantRemarks === undefined
-                        ? true
-                        : !!savedParticipantRemarks;
-                    applyParticipantInRemarks();
-
-                    participantRemarksCheckbox.addEventListener('change', function () {
-                        applyParticipantInRemarks();
-                        savePreference(PARTICIPANT_REMARKS_KEY, this.checked);
-                    });
-                } else if (participantRemarksCheckbox) {
-                    participantRemarksCheckbox.addEventListener('change', applyParticipantInRemarks);
+            sendEmailEntries.forEach(function (entry) {
+                if (preferences[entry.key] !== undefined) {
+                    entry.element.checked = !!preferences[entry.key];
                 }
+
+                entry.element.addEventListener('change', function () {
+                    savePreference(entry.key, this.checked);
+                });
             });
+
+            // Checkbox „Dodaj w uwagach faktury UCZESTNIKÓW” — domyślnie zaznaczony, potem ostatni stan admina
+            if (participantRemarksCheckbox && !participantRemarksCheckbox.disabled) {
+                var savedParticipantRemarks = preferences[PARTICIPANT_REMARKS_KEY];
+                participantRemarksCheckbox.checked = savedParticipantRemarks === undefined
+                    ? true
+                    : !!savedParticipantRemarks;
+                applyParticipantInRemarks();
+
+                participantRemarksCheckbox.addEventListener('change', function () {
+                    applyParticipantInRemarks();
+                    savePreference(PARTICIPANT_REMARKS_KEY, this.checked);
+                });
+            } else if (participantRemarksCheckbox) {
+                participantRemarksCheckbox.addEventListener('change', applyParticipantInRemarks);
+            }
         }
         
         // Wywołaj inicjalizację po załadowaniu DOM

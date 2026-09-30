@@ -922,6 +922,27 @@ class FormOrdersController extends Controller
         $prevOrder = $prevQuery->orderByDesc('id')->first();
         $nextOrder = $nextQuery->orderBy('id')->first();
 
+        $navigationCountQuery = FormOrder::query();
+        $this->applyShowNavigationFilters(
+            $navigationCountQuery,
+            $filterNoParticipant,
+            $filterNoInvoice,
+            $filterNoKsef,
+            $filterPaymentGateway,
+            $courseId
+        );
+        $navigationFilterCount = (int) $navigationCountQuery->count();
+
+        $ifirmaPreferenceKeys = [
+            'ifirma_send_email_proforma',
+            'ifirma_send_email_invoice',
+            'ifirma_send_email_invoice_with_ksef',
+            'ifirma_send_email_invoice_with_receiver',
+            'ifirma_include_participant_in_remarks',
+        ];
+        $userPreferences = (array) ($request->user()?->preferences ?? []);
+        $ifirmaPreferences = array_intersect_key($userPreferences, array_flip($ifirmaPreferenceKeys));
+
         $duplicateSiblingsCount = FormOrder::findDuplicatesFor($id)->count();
 
         $zamowienie->ensureIdent();
@@ -944,6 +965,8 @@ class FormOrdersController extends Controller
             'filterNoInvoice',
             'filterNoKsef',
             'filterPaymentGateway',
+            'navigationFilterCount',
+            'ifirmaPreferences',
             'duplicateSiblingsCount',
             'pneduOrderFormEditUrl'
         ));

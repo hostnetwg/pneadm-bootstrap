@@ -83,8 +83,18 @@ return [
         // HTTP nie czeka: job w tle dociąga NumerKSeF (bez sleep w workerze).
         'ksef_poll_max_seconds' => (int) env('IFIRMA_KSEF_POLL_MAX_SECONDS', 300),
         'ksef_poll_interval_seconds' => (int) env('IFIRMA_KSEF_POLL_INTERVAL_SECONDS', 3),
-        'ksef_background_max_attempts' => (int) env('IFIRMA_KSEF_BACKGROUND_MAX_ATTEMPTS', 40),
-        'ksef_background_retry_seconds' => (int) env('IFIRMA_KSEF_BACKGROUND_RETRY_SECONDS', 60),
+        // Kolejne opóźnienia jobów pobierających NumerKSeF (sekundy).
+        // Domyślnie 7 prób przez ok. 2 godziny, zamiast częstego pollingu co minutę.
+        'ksef_background_retry_delays_seconds' => array_values(array_filter(
+            array_map(
+                static fn (string $delay): int => (int) trim($delay),
+                explode(',', (string) env(
+                    'IFIRMA_KSEF_BACKGROUND_RETRY_DELAYS_SECONDS',
+                    '60,120,300,600,900,1800,3600'
+                ))
+            ),
+            static fn (int $delay): bool => $delay > 0
+        )),
     ],
 
     'pneadm' => [

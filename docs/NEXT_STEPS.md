@@ -3,6 +3,15 @@
 Data utworzenia/aktualizacji: 2026-09-29
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-30) — Ograniczenie requestów przy oczekiwaniu na KSeF
+
+Strona zamówienia nie uruchamia już ciągłego pollingu co 5 sekund ani dodatkowych
+requestów po licznik nawigacji i preferencje iFirma. Po wystawieniu wykonuje
+najwyżej 3 lekkie kontrole w widocznej karcie. Niezależna kolejka dociąga numer
+KSeF coraz rzadziej przez około 2 godziny i zapisuje plan następnej próby.
+Kanon: [KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md) oraz
+[OPS_REPORTS.md](./OPS_REPORTS.md).
+
 ## Ostatnio (2026-09-30) — Korekta anulująca i nowa faktura iFirma/KSeF
 
 Wyczyszczenie numeru faktury na zamówieniu usuwa także stare ID iFirma i komplet

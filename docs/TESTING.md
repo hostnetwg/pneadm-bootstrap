@@ -1,6 +1,6 @@
 # Testy — pneadm (Laravel Sail)
 
-Data aktualizacji: 2026-09-29
+Data aktualizacji: 2026-09-30
 
 ## Cel
 
@@ -78,7 +78,7 @@ Testy integracyjne z prawdziwym API Sendy — wyjątki mockowane przez `Http::fa
 | Osadzony pokój na pnedu (`embed_on_pnedu`) / radio live / link embed w mailu | migracje `2026_08_20_200210_*`, `2026_08_21_181500_*`, `2026_08_21_182800_*`, `2026_08_22_131100_*`; kanon: `pnedu/docs/DASHBOARD_LIVE_EMBED.md` |
 | Belka zasobów na `/transmisja` (panel live ADM) | `--filter=CourseLivePanelTest` (przełączniki; zaświadczenie; lista **teraz na live**; oferta **auto-ukrycie 2 min**; gość `/live/{token}` na zamkniętych; **Na czat ClickMeeting**); `--filter=GuestLiveLinkServiceTest`; **pnedu:** `--filter=LiveTransmissionResourceBar`, `--filter=DashboardTransmisjaLiveOfferModalTest`, `--filter=GuestLiveTransmission` (formularz imię/nazwisko/e-mail → `participants` → iframe), `--filter=LiveEmbedPresence`, `--filter=LiveTransmissionMeetingStatusResourceBar`, `--filter=LiveTransmissionPresenceServiceTest`, `--filter=DashboardTransmisjaPresenceScriptTest` (poll nie ginie po `hidden`/powrocie na kartę; 401/419 → reload); ręcznie: oferta 2 min + brak przyciemnienia po Zamknij; długa inna karta → powrót bez F5 → belka i „Teraz na live”; kanon: [LIVE_EMBED_RESOURCE_BAR.md](./LIVE_EMBED_RESOURCE_BAR.md) |
 | Wybór szkolenia w nowym zamówieniu FORM | `--filter=FormOrderCourseSearchTest` |
-| KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaFormOrderKsefBackgroundServiceTest`, `--filter=FormOrderInvoiceMetadataResetTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest`, `--filter=FormOrderIfirmaInvoiceNamePrefixTest` |
+| KSeF / iFirma | `--filter=FormOrderKsefHelpersTest`, `--filter=IfirmaAdditionalEntityMapperTest`, `--filter=IfirmaKontrahentBuilderTest`, `--filter=IfirmaFormOrderKsefSyncServiceTest`, `--filter=IfirmaFormOrderKsefSubmissionServiceTest`, `--filter=IfirmaFormOrderKsefBackgroundServiceTest` (rzadki backoff, czas joba, limit prób), `--filter=FormOrderInvoiceMetadataResetTest`, `--filter=IfirmaPelnyNumerExtractionTest`, `--filter=FormOrdersNavigationFilterCountTest`, `--filter=FormOrderIfirmaInvoiceNamePrefixTest` |
 | Raporty automatów | `--filter=IfirmaFormOrderKsefBackgroundServiceTest` (lista `/ops-reports`); kanon: [OPS_REPORTS.md](./OPS_REPORTS.md) |
 | Windykacja | `--filter=AccountingCollectionsTest`, `--filter=AccountingDebtorsLookupKsefTest`, `--filter=IfirmaInvoicePaymentStatusServiceTest`, `--filter=IfirmaInvoicePaymentRegistrationServiceTest`, `--filter=DebtCaseAutoCloseServiceTest`, `--filter=BankStatementImportTest`, `--filter=MbankStatementParserTest`, `--filter=PaymentTitleExtractorTest`, `--filter=BankTransactionMatcherTest` |
 | Analityka lejka | `--filter=AnalyticsOrderFormFunnelAggregationTest` |

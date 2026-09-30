@@ -34,7 +34,8 @@ class IfirmaFormOrderKsefSyncService
      *     email_sent?: bool,
      *     emails_sent?: list<string>,
      *     email_errors?: list<array{email: string, error: string}>,
-     *     ksef_email_pending?: bool
+     *     ksef_email_pending?: bool,
+     *     invoice_payload?: array<string, mixed>
      * }
      */
     public function syncFromIfirmaInvoiceId(
@@ -240,6 +241,7 @@ class IfirmaFormOrderKsefSyncService
                 'changed' => $changed,
                 'ksef_cleared' => false,
                 'ksef_email_pending' => (bool) $order->ksef_email_pending,
+                'invoice_payload' => $payload,
             ], $datesPayload);
         }
 

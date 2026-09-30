@@ -326,6 +326,20 @@ Raport dnia: **Admin → Raporty automatów**. Szczegóły: [OPS_REPORTS.md](./O
 w `invoice_number`. Serwisy: `IfirmaFormOrderKsefBackgroundService`,
 `IfirmaFormOrderKsefSubmissionService`.
 
+**Ochrona hostingu przed nadmiarem requestów (2026-09-30):**
+
+- brak automatycznego pollingu KSeF po samym otwarciu oczekującego zamówienia;
+- po wystawieniu najwyżej 3 lekkie odczyty lokalnego statusu: po 15 s, następnie
+  po 45 s i 120 s; tylko gdy karta jest widoczna, HTTP 429 natychmiast kończy polling;
+- licznik zakresu nawigacji i preferencje checkboxów iFirma są w HTML pierwszej
+  odpowiedzi — strona nie pobiera ich osobnymi requestami;
+- właściwe dociąganie numeru jest niezależne od przeglądarki: kolejka sprawdza
+  iFirma po 1, 2, 5, 10, 15, 30 i 60 minutach (około 2 godziny łącznie);
+- jedna próba kolejki wykonuje jeden `GET` dokumentu iFirma (bez drugiego,
+  powtórzonego odczytu do sprawdzania odrzucenia);
+- payload joba zapisuje czas zakolejkowania i planowanego wykonania, a raport
+  automatu pokazuje następną próbę.
+
 **Filtr nawigacji „Tylko z NIP bez KSeF” (2026-08):** na `/form-orders/{id}` checkbox
 `filter_no_ksef=1` — zamówienia z **NIP nabywcy** (`buyer_nip` z cyframi),
 wypełnionym klasycznym `invoice_number` i pustym `ksef_number`

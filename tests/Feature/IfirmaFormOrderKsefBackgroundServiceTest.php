@@ -9,6 +9,7 @@ use App\Models\OpsRun;
 use App\Models\User;
 use App\Services\IfirmaApiService;
 use App\Services\IfirmaFormOrderKsefBackgroundService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -48,7 +49,7 @@ class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
         ]);
 
         $api = \Mockery::mock(IfirmaApiService::class)->makePartial();
-        $api->shouldReceive('getInvoice')->andReturn([
+        $api->shouldReceive('getInvoice')->once()->andReturn([
             'status' => 'success',
             'data' => [
                 'PelnyNumer' => '10/9/2026',
@@ -77,6 +78,8 @@ class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
     public function test_fetch_without_number_dispatches_delayed_retry(): void
     {
         Queue::fake();
+        $this->travelTo(Carbon::parse('2026-09-30 09:00:00', 'Europe/Warsaw'));
+        config()->set('services.ifirma.ksef_background_retry_delays_seconds', [60, 300]);
 
         $order = FormOrder::create([
             'product_name' => 'Szkolenie',
@@ -87,7 +90,7 @@ class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
         ]);
 
         $api = \Mockery::mock(IfirmaApiService::class)->makePartial();
-        $api->shouldReceive('getInvoice')->andReturn([
+        $api->shouldReceive('getInvoice')->once()->andReturn([
             'status' => 'success',
             'data' => ['PelnyNumer' => '11/9/2026'],
         ]);
@@ -106,8 +109,44 @@ class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
         $this->assertSame('pending', $order->ksef_status);
 
         Queue::assertPushed(FetchFormOrderKsefNumberJob::class, function (FetchFormOrderKsefNumberJob $job) use ($order) {
-            return $job->formOrderId === $order->id && $job->attempt === 2;
+            return $job->formOrderId === $order->id
+                && $job->attempt === 2
+                && $job->queuedAt === now()->toIso8601String()
+                && $job->scheduledFor === now()->addSeconds(60)->toIso8601String()
+                && $job->delay?->getTimestamp() === now()->addSeconds(60)->getTimestamp();
         });
+    }
+
+    public function test_fetch_stops_after_sparse_retry_schedule_is_exhausted(): void
+    {
+        Queue::fake();
+        config()->set('services.ifirma.ksef_background_retry_delays_seconds', [60]);
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie',
+            'orderer_email' => 'wait-final@example.test',
+            'ifirma_invoice_id' => '558',
+            'invoice_number' => '13/9/2026',
+            'ksef_status' => 'pending',
+        ]);
+
+        $api = \Mockery::mock(IfirmaApiService::class)->makePartial();
+        $api->shouldReceive('getInvoice')->once()->andReturn([
+            'status' => 'success',
+            'data' => ['PelnyNumer' => '13/9/2026'],
+        ]);
+        $api->shouldReceive('extractNumerKSeFFromInvoicePayload')->andReturn(null);
+        $api->shouldReceive('detectKsefRejectionFromInvoicePayload')->andReturn(null);
+        $api->shouldReceive('unwrapInvoicePayload')->andReturnUsing(function ($payload) {
+            return is_array($payload) ? $payload : [];
+        });
+        $api->shouldReceive('normalizeInvoiceNumber')->andReturnUsing(fn ($n) => strtolower(str_replace(' ', '', (string) $n)));
+        $this->app->instance(IfirmaApiService::class, $api);
+
+        app(IfirmaFormOrderKsefBackgroundService::class)->fetchOrReschedule($order->fresh(), 2);
+
+        Queue::assertNotPushed(FetchFormOrderKsefNumberJob::class);
+        $this->assertStringContainsString('nie nadało jeszcze numeru KSeF', (string) $order->fresh()->ksef_error);
     }
 
     public function test_ksef_status_endpoint_returns_awaiting_flag(): void

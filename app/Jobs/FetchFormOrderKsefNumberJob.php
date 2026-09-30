@@ -20,12 +20,20 @@ class FetchFormOrderKsefNumberJob implements ShouldQueue
 
     public ?string $expectedInvoiceId = null;
 
+    public ?string $queuedAt = null;
+
+    public ?string $scheduledFor = null;
+
     public function __construct(
         public int $formOrderId,
         public int $attempt = 1,
-        ?string $expectedInvoiceId = null
+        ?string $expectedInvoiceId = null,
+        ?string $queuedAt = null,
+        ?string $scheduledFor = null
     ) {
         $this->expectedInvoiceId = $expectedInvoiceId;
+        $this->queuedAt = $queuedAt ?? now()->toIso8601String();
+        $this->scheduledFor = $scheduledFor;
     }
 
     public function handle(IfirmaFormOrderKsefBackgroundService $background): void

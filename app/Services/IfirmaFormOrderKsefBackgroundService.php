@@ -41,13 +41,14 @@ class IfirmaFormOrderKsefBackgroundService
 
         if ($order->ksef_status === 'pending') {
             $order->save();
+            $scheduledFor = $this->dispatchFetch($order->id, 1, $invoiceId);
             $this->recordItem(
                 $order,
                 OpsRunItem::STATUS_PENDING,
                 'Faktura już przekazana do KSeF — dociąganie numeru w tle.',
-                $actorUserId
+                $actorUserId,
+                ['next_check_at' => $scheduledFor?->format(DATE_ATOM)]
             );
-            $this->dispatchFetch($order->id, 1, $invoiceId);
 
             return;
         }
@@ -171,17 +172,17 @@ class IfirmaFormOrderKsefBackgroundService
             return;
         }
 
-        $invoiceDetails = $this->api->getInvoice($invoiceId);
-        if (($invoiceDetails['status'] ?? null) === 'success' && isset($invoiceDetails['data']) && is_array($invoiceDetails['data'])) {
-            $rejection = $this->api->detectKsefRejectionFromInvoicePayload($invoiceDetails['data']);
-            if ($rejection !== null) {
-                $this->markFailed($order, $rejection);
+        $invoicePayload = $sync['invoice_payload'] ?? null;
+        $rejection = is_array($invoicePayload)
+            ? $this->api->detectKsefRejectionFromInvoicePayload($invoicePayload)
+            : null;
+        if (is_string($rejection) && trim($rejection) !== '') {
+            $this->markFailed($order, $rejection);
 
-                return;
-            }
+            return;
         }
 
-        $maxAttempts = max(1, (int) config('services.ifirma.ksef_background_max_attempts', 40));
+        $maxAttempts = count($this->retryDelaysSeconds()) + 1;
         if ($attempt >= $maxAttempts) {
             $msg = 'Faktura jest w iFirma i została przekazana do KSeF, ale Ministerstwo Finansów nie nadało jeszcze numeru KSeF. Można dociągnąć ikoną Odśwież przy numerze faktury.';
             $order->ksef_status = 'pending';
@@ -200,15 +201,20 @@ class IfirmaFormOrderKsefBackgroundService
             return;
         }
 
+        $nextAttempt = $attempt + 1;
+        $scheduledFor = $this->dispatchFetch($order->id, $nextAttempt, $invoiceId);
         $this->recordItem(
             $order,
             OpsRunItem::STATUS_PENDING,
             'Oczekiwanie na numer KSeF (próba '.$attempt.').',
             null,
-            ['attempt' => $attempt, 'invoice_number' => $order->invoice_number]
+            [
+                'attempt' => $attempt,
+                'next_attempt' => $nextAttempt,
+                'next_check_at' => $scheduledFor?->format(DATE_ATOM),
+                'invoice_number' => $order->invoice_number,
+            ]
         );
-
-        $this->dispatchFetch($order->id, $attempt + 1, $invoiceId);
     }
 
     /**
@@ -321,23 +327,53 @@ class IfirmaFormOrderKsefBackgroundService
         ];
     }
 
-    private function dispatchFetch(int $formOrderId, int $attempt, string $expectedInvoiceId): void
-    {
+    private function dispatchFetch(
+        int $formOrderId,
+        int $attempt,
+        string $expectedInvoiceId
+    ): ?\DateTimeInterface {
         if ($this->wouldExecuteInline()) {
             Log::warning('iFirma KSeF tło: pominięto kolejkę dociągnięcia numeru (sync queue)', [
                 'order_id' => $formOrderId,
                 'attempt' => $attempt,
             ]);
 
-            return;
+            return null;
         }
 
-        $delay = $attempt <= 1
-            ? max(15, (int) config('services.ifirma.ksef_background_retry_seconds', 60))
-            : max(30, (int) config('services.ifirma.ksef_background_retry_seconds', 60));
+        $delays = $this->retryDelaysSeconds();
+        $delayIndex = max(0, min(count($delays) - 1, $attempt - 2));
+        $delay = $delays[$delayIndex];
+        $queuedAt = now();
+        $scheduledFor = $queuedAt->copy()->addSeconds($delay);
 
-        FetchFormOrderKsefNumberJob::dispatch($formOrderId, $attempt, $expectedInvoiceId)
-            ->delay(now()->addSeconds($delay));
+        FetchFormOrderKsefNumberJob::dispatch(
+            $formOrderId,
+            $attempt,
+            $expectedInvoiceId,
+            $queuedAt->toIso8601String(),
+            $scheduledFor->toIso8601String()
+        )->delay($scheduledFor);
+
+        return $scheduledFor;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function retryDelaysSeconds(): array
+    {
+        $configured = config('services.ifirma.ksef_background_retry_delays_seconds', []);
+        if (! is_array($configured)) {
+            return [60, 120, 300, 600, 900, 1800, 3600];
+        }
+
+        $delays = array_values(array_filter(
+            array_map(static fn (mixed $delay): int => (int) $delay, $configured),
+            static fn (int $delay): bool => $delay > 0
+        ));
+
+        return $delays !== [] ? $delays : [60, 120, 300, 600, 900, 1800, 3600];
     }
 
     private function wouldExecuteInline(): bool
