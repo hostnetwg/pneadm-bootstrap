@@ -47,7 +47,7 @@ class IfirmaFormOrderKsefBackgroundService
                 'Faktura już przekazana do KSeF — dociąganie numeru w tle.',
                 $actorUserId
             );
-            $this->dispatchFetch($order->id, 1);
+            $this->dispatchFetch($order->id, 1, $invoiceId);
 
             return;
         }
@@ -64,7 +64,7 @@ class IfirmaFormOrderKsefBackgroundService
             ['invoice_number' => $order->invoice_number]
         );
 
-        SubmitFormOrderToKsefJob::dispatch($order->id);
+        SubmitFormOrderToKsefJob::dispatch($order->id, $invoiceId);
     }
 
     public function sendAndScheduleFetch(FormOrder $order): void
@@ -208,7 +208,7 @@ class IfirmaFormOrderKsefBackgroundService
             ['attempt' => $attempt, 'invoice_number' => $order->invoice_number]
         );
 
-        $this->dispatchFetch($order->id, $attempt + 1);
+        $this->dispatchFetch($order->id, $attempt + 1, $invoiceId);
     }
 
     /**
@@ -237,7 +237,7 @@ class IfirmaFormOrderKsefBackgroundService
             $order->ksef_status = 'pending';
             $order->ksef_error = null;
             $order->save();
-            $this->dispatchFetch($order->id, 1);
+            $this->dispatchFetch($order->id, 1, $invoiceId);
 
             return true;
         }
@@ -251,7 +251,11 @@ class IfirmaFormOrderKsefBackgroundService
         $order->refresh();
 
         if (! $order->hasConfirmedKsef()) {
-            $this->dispatchFetch($order->id, 1);
+            $this->dispatchFetch(
+                $order->id,
+                1,
+                trim((string) ($order->ifirma_invoice_id ?? ''))
+            );
 
             return;
         }
@@ -317,7 +321,7 @@ class IfirmaFormOrderKsefBackgroundService
         ];
     }
 
-    private function dispatchFetch(int $formOrderId, int $attempt): void
+    private function dispatchFetch(int $formOrderId, int $attempt, string $expectedInvoiceId): void
     {
         if ($this->wouldExecuteInline()) {
             Log::warning('iFirma KSeF tło: pominięto kolejkę dociągnięcia numeru (sync queue)', [
@@ -332,7 +336,7 @@ class IfirmaFormOrderKsefBackgroundService
             ? max(15, (int) config('services.ifirma.ksef_background_retry_seconds', 60))
             : max(30, (int) config('services.ifirma.ksef_background_retry_seconds', 60));
 
-        FetchFormOrderKsefNumberJob::dispatch($formOrderId, $attempt)
+        FetchFormOrderKsefNumberJob::dispatch($formOrderId, $attempt, $expectedInvoiceId)
             ->delay(now()->addSeconds($delay));
     }
 

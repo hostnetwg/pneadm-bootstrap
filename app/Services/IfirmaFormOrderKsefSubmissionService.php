@@ -19,12 +19,16 @@ class IfirmaFormOrderKsefSubmissionService
         ?string $invoiceNumber,
         Request $request
     ): JsonResponse {
-        $invoiceNumber = $this->resolveHumanInvoiceNumber($invoiceNumber, $zamowienie, $invoiceId);
         $sendEmail = filter_var($request->input('send_email', false), FILTER_VALIDATE_BOOLEAN);
 
-        if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== (string) $invoiceId) {
+        if ((string) ($zamowienie->ifirma_invoice_id ?? '') !== (string) $invoiceId) {
+            // Obrona dla wywołania fazy KSeF z nowym dokumentem: stary NumerKSeF
+            // nie może zatrzymać kolejki przez hasConfirmedKsef().
+            $zamowienie->clearInvoiceIntegrationMetadata();
             $zamowienie->ifirma_invoice_id = (string) $invoiceId;
         }
+
+        $invoiceNumber = $this->resolveHumanInvoiceNumber($invoiceNumber, $zamowienie, $invoiceId);
 
         if ($sendEmail && ! $zamowienie->ksef_email_pending) {
             $zamowienie->ksef_email_pending = true;

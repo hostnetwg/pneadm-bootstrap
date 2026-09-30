@@ -74,6 +74,45 @@ class IfirmaFormOrderKsefSubmissionServiceTest extends TestCase
         $this->assertSame('pending', $order->ksef_status);
     }
 
+    public function test_new_ifirma_id_resets_old_ksef_and_queues_new_document(): void
+    {
+        Queue::fake();
+
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie',
+            'orderer_email' => 'replacement@example.test',
+            'ifirma_invoice_id' => 'OLD-ID',
+            'invoice_number' => '577/9/2026',
+            'ksef_number' => '7392137630-20260920-OLD000000001-11',
+            'ksef_sent_at' => now(),
+            'ksef_status' => 'sent',
+            'ksef_error' => 'stary błąd',
+        ]);
+
+        $request = Request::create('/test', 'POST', ['send_email' => false]);
+        $response = app(IfirmaFormOrderKsefSubmissionService::class)->submit(
+            $order,
+            app(\App\Services\IfirmaApiService::class),
+            'NEW-ID',
+            '689/9/2026',
+            $request
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        $order->refresh();
+        $this->assertSame('NEW-ID', $order->ifirma_invoice_id);
+        $this->assertNull($order->ksef_number);
+        $this->assertNull($order->ksef_sent_at);
+        $this->assertSame('pending', $order->ksef_status);
+        $this->assertNull($order->ksef_error);
+
+        Queue::assertPushed(SubmitFormOrderToKsefJob::class, function (SubmitFormOrderToKsefJob $job) use ($order) {
+            return $job->formOrderId === $order->id
+                && $job->expectedInvoiceId === 'NEW-ID';
+        });
+    }
+
     public function test_does_not_use_ifirma_id_as_invoice_number_in_payload(): void
     {
         Queue::fake();

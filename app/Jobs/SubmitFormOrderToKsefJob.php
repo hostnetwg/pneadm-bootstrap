@@ -21,19 +21,31 @@ class SubmitFormOrderToKsefJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 180;
 
+    public ?string $expectedInvoiceId = null;
+
     public function __construct(
-        public int $formOrderId
-    ) {}
+        public int $formOrderId,
+        ?string $expectedInvoiceId = null
+    ) {
+        $this->expectedInvoiceId = $expectedInvoiceId;
+    }
 
     public function uniqueId(): string
     {
-        return 'form-order-ksef-send-'.$this->formOrderId;
+        return 'form-order-ksef-send-'.$this->formOrderId.'-'.($this->expectedInvoiceId ?? 'legacy');
     }
 
     public function handle(IfirmaFormOrderKsefBackgroundService $background): void
     {
         $order = FormOrder::query()->find($this->formOrderId);
         if (! $order) {
+            return;
+        }
+
+        if (
+            $this->expectedInvoiceId !== null
+            && trim((string) ($order->ifirma_invoice_id ?? '')) !== $this->expectedInvoiceId
+        ) {
             return;
         }
 

@@ -728,6 +728,40 @@ class FormOrder extends Model
     }
 
     /**
+     * Czy zamówienie nadal przechowuje powiązanie z bieżącym dokumentem iFirma/KSeF.
+     */
+    public function hasInvoiceIntegrationMetadata(): bool
+    {
+        return $this->hasIfirmaInvoiceId()
+            || filled($this->invoice_number)
+            || filled($this->invoice_issue_date)
+            || filled($this->invoice_due_date)
+            || filled($this->ksef_number)
+            || filled($this->ksef_sent_at)
+            || filled($this->ksef_status)
+            || filled($this->ksef_error)
+            || (bool) $this->ksef_email_pending;
+    }
+
+    /**
+     * Usuwa powiązanie z anulowaną / zastępowaną fakturą.
+     *
+     * Notatki pozostają bez zmian, dzięki czemu można zachować numer korekty.
+     */
+    public function clearInvoiceIntegrationMetadata(): void
+    {
+        $this->invoice_number = null;
+        $this->invoice_issue_date = null;
+        $this->invoice_due_date = null;
+        $this->ifirma_invoice_id = null;
+        $this->ksef_number = null;
+        $this->ksef_sent_at = null;
+        $this->ksef_status = null;
+        $this->ksef_error = null;
+        $this->ksef_email_pending = false;
+    }
+
+    /**
      * Czy zamówienie ma wystawioną fakturę (warunek utworzenia sprawy windykacyjnej z panelu).
      */
     public function hasIssuedInvoice(): bool

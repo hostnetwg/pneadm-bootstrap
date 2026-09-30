@@ -1140,6 +1140,16 @@ class FormOrdersController extends Controller
                 return redirect()->route('form-orders.index')->with('error', 'Zamówienie nie zostało znalezione.');
             }
 
+            $clearInvoiceIntegration = $request->has('invoice_number')
+                && trim((string) $request->input('invoice_number')) === ''
+                && $zamowienie->hasInvoiceIntegrationMetadata();
+            $clearedInvoiceMetadata = $clearInvoiceIntegration ? [
+                'invoice_number' => $zamowienie->invoice_number,
+                'ifirma_invoice_id' => $zamowienie->ifirma_invoice_id,
+                'ksef_number' => $zamowienie->ksef_number,
+                'ksef_status' => $zamowienie->ksef_status,
+            ] : null;
+
             // Analityka (ADR-005): ręczna edycja numeru faktury → invoice_path_type=manual.
             \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(
                 \App\Services\Analytics\InvoiceAnalyticsTracker::PATH_MANUAL
@@ -1253,8 +1263,32 @@ class FormOrdersController extends Controller
                 $zamowienie->status_completed = $request->has('status_completed') ? 1 : 0;
             }
 
+            if ($clearInvoiceIntegration) {
+                $zamowienie->clearInvoiceIntegrationMetadata();
+            }
+
             $zamowienie->updated_manually_at = now();
             $zamowienie->save();
+
+            if ($clearInvoiceIntegration) {
+                \App\Models\ActivityLog::logCustom(
+                    'Zamówienie FORM: wyczyszczono powiązanie faktury iFirma/KSeF',
+                    'Wyczyszczono bieżącą fakturę dla zamówienia #'.$zamowienie->id
+                        .'. Notatki pozostawiono bez zmian; można wystawić nową fakturę i wysłać ją do KSeF.',
+                    [
+                        'model_type' => FormOrder::class,
+                        'model_id' => $zamowienie->id,
+                        'model_name' => $zamowienie->ident,
+                        'old_values' => $clearedInvoiceMetadata,
+                        'new_values' => [
+                            'invoice_number' => null,
+                            'ifirma_invoice_id' => null,
+                            'ksef_number' => null,
+                            'ksef_status' => null,
+                        ],
+                    ]
+                );
+            }
 
             if ($isFromEditPage) {
                 app(FormOrderAdminParticipantService::class)->sync($zamowienie, $participantRows);
@@ -3293,7 +3327,8 @@ class FormOrdersController extends Controller
                     ], 400);
                 }
 
-                if (empty($zamowienie->ifirma_invoice_id) || (string) $zamowienie->ifirma_invoice_id !== $invoiceId) {
+                if ((string) ($zamowienie->ifirma_invoice_id ?? '') !== $invoiceId) {
+                    $zamowienie->clearInvoiceIntegrationMetadata();
                     $zamowienie->ifirma_invoice_id = $invoiceId;
                     $zamowienie->save();
                 }
@@ -3487,6 +3522,12 @@ class FormOrdersController extends Controller
             // Aktualizacja numeru faktury w bazie — invoice_number = PelnyNumer, nigdy Identyfikator iFirma.
             // Analityka (ADR-005): numer ustawiony przez iFirma (KSeF) → invoice_path_type=ifirma.
             $oldInvoiceNumber = $zamowienie->invoice_number;
+            $oldIfirmaInvoiceId = trim((string) ($zamowienie->ifirma_invoice_id ?? ''));
+            if ($oldIfirmaInvoiceId !== (string) $invoiceId) {
+                // Nowy dokument nie może odziedziczyć numeru/statusu KSeF poprzedniej,
+                // skorygowanej lub anulowanej faktury.
+                $zamowienie->clearInvoiceIntegrationMetadata();
+            }
             if ($invoiceNumber !== null && $invoiceNumber !== ''
                 && ($ifirmaService->isMissingOrIfirmaDocumentId($oldInvoiceNumber) || $force)) {
                 \App\Services\Analytics\InvoiceAnalyticsTracker::hintSource(

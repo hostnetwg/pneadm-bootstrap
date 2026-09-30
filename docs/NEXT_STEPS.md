@@ -3,6 +3,14 @@
 Data utworzenia/aktualizacji: 2026-09-29
 Status: plan roboczy, do potwierdzenia przez właściciela
 
+## Ostatnio (2026-09-30) — Korekta anulująca i nowa faktura iFirma/KSeF
+
+Wyczyszczenie numeru faktury na zamówieniu usuwa także stare ID iFirma i komplet
+metadanych KSeF, pozostawiając notatkę o korekcie. Nowa faktura z czerwonego
+przycisku zapisuje nowe ID/numer i jest ponownie wysyłana do KSeF. Opóźnione
+joby starego dokumentu nie dotykają nowego. Kanon:
+[KSEF_FORM_ORDERS.md](./KSEF_FORM_ORDERS.md).
+
 ## PNE Growth OS — Etap 0.3 wdrożony lokalnie (2026-09-29)
 
 Etap 0.3 zastępuje wcześniejszy prototyp 0.2 jako główny kierunek UX. Zamiast zaczynać od gotowego webinaru i Inboxa, użytkownik zaczyna od **Zaplanuj webinar TIK**:

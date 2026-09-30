@@ -504,3 +504,21 @@ Zapis `ifirma_invoice_id` przy wystawianiu FV krajowej, FV z odbiorcą oraz FV+K
 ustawia tego pola (ani `invoice_number`). W UI szczegółów zamówienia: „ID iFirma”
 pod numerem faktury (z ikoną odświeżenia po ID). Historyczne zamówienia bez ID dostaną je przy kolejnym kontakcie
 z iFirma (wystawienie / faza KSeF) albo przy przyszłym backfillu.
+
+## Korekta anulująca i ponowne wystawienie faktury
+
+Korekta jest wystawiana bezpośrednio w iFirma, a jej numer operator zapisuje
+w `notes`. Gdy następnie na szczegółach zamówienia wyczyści `invoice_number`
+i zapisze formularz, ADM usuwa całe powiązanie z anulowaną fakturą:
+
+- `invoice_number`, `invoice_issue_date`, `invoice_due_date`,
+- `ifirma_invoice_id`,
+- `ksef_number`, `ksef_sent_at`, `ksef_status`, `ksef_error`,
+- `ksef_email_pending`.
+
+`notes` nie są czyszczone. Ponowne użycie czerwonego przycisku zapisuje nowe
+`PelnyNumer` i `Identyfikator` iFirma, zeruje pozostałości KSeF starego dokumentu
+i kolejkuje `POST ksef/send` dla nowego ID.
+
+Joby KSeF przenoszą oczekiwany `ifirma_invoice_id`. Opóźniony job starej faktury
+kończy się bez działania, jeżeli zamówienie wskazuje już inny dokument.

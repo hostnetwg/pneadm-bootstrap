@@ -18,15 +18,27 @@ class FetchFormOrderKsefNumberJob implements ShouldQueue
 
     public int $timeout = 90;
 
+    public ?string $expectedInvoiceId = null;
+
     public function __construct(
         public int $formOrderId,
-        public int $attempt = 1
-    ) {}
+        public int $attempt = 1,
+        ?string $expectedInvoiceId = null
+    ) {
+        $this->expectedInvoiceId = $expectedInvoiceId;
+    }
 
     public function handle(IfirmaFormOrderKsefBackgroundService $background): void
     {
         $order = FormOrder::query()->find($this->formOrderId);
         if (! $order) {
+            return;
+        }
+
+        if (
+            $this->expectedInvoiceId !== null
+            && trim((string) ($order->ifirma_invoice_id ?? '')) !== $this->expectedInvoiceId
+        ) {
             return;
         }
 

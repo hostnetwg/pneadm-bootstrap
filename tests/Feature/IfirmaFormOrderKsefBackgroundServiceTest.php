@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\FetchFormOrderKsefNumberJob;
+use App\Jobs\SubmitFormOrderToKsefJob;
 use App\Models\FormOrder;
 use App\Models\OpsRun;
 use App\Models\User;
@@ -15,6 +16,24 @@ use Tests\TestCase;
 class IfirmaFormOrderKsefBackgroundServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_stale_jobs_do_not_touch_replacement_invoice(): void
+    {
+        $order = FormOrder::create([
+            'product_name' => 'Szkolenie',
+            'orderer_email' => 'replacement@example.test',
+            'ifirma_invoice_id' => 'NEW-ID',
+            'invoice_number' => '689/9/2026',
+            'ksef_status' => 'pending',
+        ]);
+
+        $background = \Mockery::mock(IfirmaFormOrderKsefBackgroundService::class);
+        $background->shouldNotReceive('sendAndScheduleFetch');
+        $background->shouldNotReceive('fetchOrReschedule');
+
+        (new SubmitFormOrderToKsefJob($order->id, 'OLD-ID'))->handle($background);
+        (new FetchFormOrderKsefNumberJob($order->id, 2, 'OLD-ID'))->handle($background);
+    }
 
     public function test_fetch_with_ksef_number_records_success_item(): void
     {
