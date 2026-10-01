@@ -155,3 +155,21 @@ Jeśli przy migracjach Growth OS jest `Pending`, wykonać backup bazy według [M
 ### Rollback
 
 Najpierw `PNE_GROWTH_OS_ENABLED=false` i `config:cache`. Tabel Growth OS nie usuwać — nie są używane przy wyłączonej fladze.
+
+## Historia wersji materiałów (DEC-027, 2026-10-01)
+
+Nowa migracja: `2026_10_01_230000_create_growth_artifact_versions_table` (tabela `growth_artifact_versions`). Tylko dodaje tabelę; nie zmienia istniejących danych.
+
+**Wymaga migracji przed użyciem.** Bez niej przy włączonej fladze „Zapisz materiał” i „Zastosuj” szkicu AI dają HTTP 500, bo zapis materiału dopisuje wersję do brakującej tabeli.
+
+Kolejność jak wyżej: `migrate:status | grep -i growth`. Jeśli migracja jest `Pending`, zrobić backup według [MYSQL_BACKUP.md](./MYSQL_BACKUP.md), a potem `migrate --force` i komendy cache.
+
+Istniejących materiałów nie trzeba uzupełniać. Przy pierwszej zmianie treści materiał dostaje wersję „Stan sprzed historii” z dotychczasowym tekstem, a potem nową wersję.
+
+Smoke:
+
+1. Zmienić treść jednego materiału i zapisać. Pod szkicem pojawia się „Historia wersji” z dwiema pozycjami.
+2. „Podgląd i przywróć” przy starszej wersji, potem „Przywróć tę wersję”. Szkic wraca, status to Draft, w historii jest nowa pozycja „Przywrócenie z vN”.
+3. Sama zmiana statusu nie dodaje pozycji do historii.
+
+Rollback: kod bez tej funkcji nie czyta tabeli, więc wystarczy cofnąć kod. Tabeli nie usuwać.

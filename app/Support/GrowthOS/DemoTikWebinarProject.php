@@ -2,6 +2,7 @@
 
 namespace App\Support\GrowthOS;
 
+use App\Models\GrowthOS\GrowthArtifactVersion;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 /**
  * Etap 0.3: sesyjny prototyp przygotowania webinaru TIK od zera.
@@ -661,14 +663,67 @@ class DemoTikWebinarProject
     /**
      * @param  array<string, mixed>  $project
      */
-    private static function persistMaterial(array $project, string $materialId): void
-    {
+    private static function persistMaterial(
+        array $project,
+        string $materialId,
+        string $source = GrowthArtifactVersion::SOURCE_MANUAL,
+        ?int $restoredFromVersion = null,
+    ): void {
         $user = auth()->user();
         if (! $user instanceof User) {
             return;
         }
 
-        app(GrowthSessionConceptStore::class)->persistMaterial($project, $user, $materialId);
+        app(GrowthSessionConceptStore::class)->persistMaterial($project, $user, $materialId, $source, $restoredFromVersion);
+    }
+
+    /**
+     * Newest first, at most GrowthArtifactVersion::KEEP_LATEST. Empty when the project is not in the database yet.
+     *
+     * @param  array<string, mixed>  $project
+     * @return EloquentCollection<int, GrowthArtifactVersion>
+     */
+    public static function materialVersions(array $project, string $materialId): EloquentCollection
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return new EloquentCollection;
+        }
+
+        return app(GrowthSessionConceptStore::class)->materialVersions((int) $campaignId, $materialId);
+    }
+
+    /**
+     * Restoring writes the old text as a new version with status DRAFT; history is never rewritten.
+     *
+     * @return array{ok: bool, unchanged: bool}
+     */
+    public static function restoreMaterialVersion(string $projectId, string $materialId, int $version): array
+    {
+        $project = self::requireProject($projectId);
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        $row = is_numeric($campaignId)
+            ? app(GrowthSessionConceptStore::class)->materialVersion((int) $campaignId, $materialId, $version)
+            : null;
+        abort_if($row === null, 404);
+
+        $draft = (string) ($row->payload['draft'] ?? '');
+        if ($draft === self::materialDraft($project, $materialId)) {
+            return ['ok' => false, 'unchanged' => true];
+        }
+
+        foreach ($project['materials'] as $index => $material) {
+            if (($material['id'] ?? null) === $materialId) {
+                $project['materials'][$index]['draft'] = $draft;
+                $project['materials'][$index]['status'] = 'DRAFT';
+                $project['materials'][$index]['updated_at'] = now()->toIso8601String();
+            }
+        }
+
+        self::saveProject($project);
+        self::persistMaterial($project, $materialId, GrowthArtifactVersion::SOURCE_RESTORE, $row->version);
+
+        return ['ok' => true, 'unchanged' => false];
     }
 
     /**
@@ -1064,7 +1119,7 @@ class DemoTikWebinarProject
 
         unset($project['material_ai_proposals'][$materialId]);
         self::saveProject($project);
-        self::persistMaterial($project, $materialId);
+        self::persistMaterial($project, $materialId, GrowthArtifactVersion::SOURCE_AI_APPLY);
         self::recordConceptDecision(
             $project,
             GrowthSessionConceptStore::DECISION_MATERIAL_AI_APPLY,

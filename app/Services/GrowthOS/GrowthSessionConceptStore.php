@@ -3,11 +3,14 @@
 namespace App\Services\GrowthOS;
 
 use App\Models\GrowthOS\GrowthArtifact;
+use App\Models\GrowthOS\GrowthArtifactVersion;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Zapisuje z sesyjnego prototypu kampanię, kierunek, koncepcję i dziesięć materiałów roboczych.
@@ -251,8 +254,13 @@ class GrowthSessionConceptStore
     /**
      * @param  array<string, mixed>  $project
      */
-    public function persistMaterial(array $project, User $actor, string $materialId): void
-    {
+    public function persistMaterial(
+        array $project,
+        User $actor,
+        string $materialId,
+        string $source = GrowthArtifactVersion::SOURCE_MANUAL,
+        ?int $restoredFromVersion = null,
+    ): void {
         $campaignId = $project['growth_campaign_id'] ?? null;
         $materials = $project['materials'] ?? null;
         if (! is_numeric($campaignId) || ! is_array($materials)) {
@@ -272,20 +280,92 @@ class GrowthSessionConceptStore
             'key' => $materialId,
         ]);
 
-        $artifact->type = self::MATERIAL_TYPE;
-        $artifact->status = $this->artifactStatus($workspaceStatus);
-        $artifact->title = mb_substr(trim((string) ($material['name'] ?? '')), 0, 180) ?: null;
-        $artifact->summary = trim((string) ($material['summary'] ?? '')) ?: null;
-        $artifact->schema_version = self::SCHEMA_VERSION;
-        $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
-        $artifact->payload = [
-            'status' => $workspaceStatus,
-            'draft' => (string) ($material['draft'] ?? ''),
-        ];
-        if (! $artifact->exists) {
-            $artifact->created_by_user_id = $actor->id;
+        $draft = (string) ($material['draft'] ?? '');
+        $previousPayload = $artifact->exists && is_array($artifact->payload) ? $artifact->payload : null;
+        $draftChanged = $previousPayload === null || (string) ($previousPayload['draft'] ?? '') !== $draft;
+
+        DB::transaction(function () use ($artifact, $material, $workspaceStatus, $draft, $previousPayload, $draftChanged, $actor, $source, $restoredFromVersion): void {
+            if ($draftChanged && $previousPayload !== null && ! $artifact->versions()->exists()) {
+                $artifact->versions()->create([
+                    'version' => (int) $artifact->version,
+                    'source' => GrowthArtifactVersion::SOURCE_BASELINE,
+                    'payload' => $previousPayload,
+                    'created_by_user_id' => null,
+                ]);
+            }
+
+            $artifact->type = self::MATERIAL_TYPE;
+            $artifact->status = $this->artifactStatus($workspaceStatus);
+            $artifact->title = mb_substr(trim((string) ($material['name'] ?? '')), 0, 180) ?: null;
+            $artifact->summary = trim((string) ($material['summary'] ?? '')) ?: null;
+            $artifact->schema_version = self::SCHEMA_VERSION;
+            $artifact->version = $artifact->exists ? ((int) $artifact->version + 1) : 1;
+            $artifact->payload = [
+                'status' => $workspaceStatus,
+                'draft' => $draft,
+            ];
+            if (! $artifact->exists) {
+                $artifact->created_by_user_id = $actor->id;
+            }
+            $artifact->save();
+
+            if (! $draftChanged) {
+                return;
+            }
+
+            $artifact->versions()->create([
+                'version' => (int) $artifact->version,
+                'source' => $source,
+                'restored_from_version' => $source === GrowthArtifactVersion::SOURCE_RESTORE ? $restoredFromVersion : null,
+                'payload' => $artifact->payload,
+                'created_by_user_id' => $actor->id,
+            ]);
+
+            $staleIds = $artifact->versions()
+                ->orderByDesc('version')
+                ->skip(GrowthArtifactVersion::KEEP_LATEST)
+                ->take(PHP_INT_MAX)
+                ->pluck('id');
+            if ($staleIds->isNotEmpty()) {
+                GrowthArtifactVersion::query()->whereIn('id', $staleIds)->delete();
+            }
+        });
+    }
+
+    /**
+     * @return Collection<int, GrowthArtifactVersion>
+     */
+    public function materialVersions(int $campaignId, string $materialId): Collection
+    {
+        $artifact = $this->materialArtifact($campaignId, $materialId);
+        if ($artifact === null) {
+            return new Collection;
         }
-        $artifact->save();
+
+        return $artifact->versions()->with('createdBy:id,name')->orderByDesc('version')->get();
+    }
+
+    public function materialVersion(int $campaignId, string $materialId, int $version): ?GrowthArtifactVersion
+    {
+        $artifact = $this->materialArtifact($campaignId, $materialId);
+        if ($artifact === null) {
+            return null;
+        }
+
+        $row = $artifact->versions()->where('version', $version)->first();
+
+        return $row instanceof GrowthArtifactVersion ? $row : null;
+    }
+
+    private function materialArtifact(int $campaignId, string $materialId): ?GrowthArtifact
+    {
+        $artifact = GrowthArtifact::query()
+            ->where('growth_campaign_id', $campaignId)
+            ->where('key', $materialId)
+            ->where('type', self::MATERIAL_TYPE)
+            ->first();
+
+        return $artifact instanceof GrowthArtifact ? $artifact : null;
     }
 
     public function supersedeApprovedDirection(int $campaignId): void

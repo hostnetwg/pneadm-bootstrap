@@ -83,6 +83,13 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 - `Artifact.status` odpowiada na pytanie: „w jakim stanie jest materiał?”,
 - `Decision` odpowiada na pytanie: „kto, kiedy i jaką decyzję podjął?”.
 
+`growth_artifact_versions` (DEC-027, poza zakresem v0.1)
+
+- historia treści materiału: `growth_artifact_id`, `version`, `source` (`baseline`, `manual`, `ai_apply`, `restore`), `restored_from_version`, `payload` (`status`, `draft`), `created_by_user_id`, `created_at`,
+- `unique(growth_artifact_id, version)`, kasowanie razem z artifactem,
+- wiersz powstaje tylko przy zmianie szkicu; zostaje ostatnie 20 na artifact,
+- przywrócenie dopisuje nowy wiersz, nigdy nie zmienia starych.
+
 ### Statusy Kanoniczne
 
 `growth_campaigns.status`
@@ -140,7 +147,8 @@ GrowthArtifact
 ├── belongsTo GrowthCampaign
 ├── belongsTo User jako createdBy (nullable)
 ├── hasMany GrowthTask
-└── hasMany GrowthDecision
+├── hasMany GrowthDecision
+└── hasMany GrowthArtifactVersion (DEC-027)
 
 GrowthTask
 ├── belongsTo GrowthCampaign

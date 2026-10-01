@@ -93,6 +93,9 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
             ->name('projects.materials.ai');
         Route::post('/projects/{project}/materials/{material}/ai/apply', [GrowthOsProjectController::class, 'applyMaterialAi'])->name('projects.materials.ai.apply');
         Route::post('/projects/{project}/materials/{material}/ai/reject', [GrowthOsProjectController::class, 'rejectMaterialAi'])->name('projects.materials.ai.reject');
+        Route::post('/projects/{project}/materials/{material}/versions/{version}/restore', [GrowthOsProjectController::class, 'restoreMaterialVersion'])
+            ->whereNumber('version')
+            ->name('projects.materials.versions.restore');
         Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');
         Route::get('/inbox', [GrowthOsApprovalController::class, 'index'])->name('inbox.index');
     });

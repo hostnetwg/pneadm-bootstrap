@@ -68,4 +68,9 @@ class GrowthArtifact extends Model
     {
         return $this->hasMany(GrowthDecision::class);
     }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(GrowthArtifactVersion::class);
+    }
 }

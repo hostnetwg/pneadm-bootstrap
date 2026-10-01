@@ -4,11 +4,19 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-v0.2, drugi wycinek: szkic AI dla materiału **Post Facebook** (`facebook-post`), tym samym wzorcem co opis YouTube (DEC-026). Wdrożone lokalnie, czeka na ręczną weryfikację Waldemara. Pierwszy wycinek (opis YouTube) Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji.
+v0.2, drugi wycinek: szkic AI dla materiału **Post Facebook** (`facebook-post`), tym samym wzorcem co opis YouTube (DEC-026), zweryfikowany przez Waldemara 2026-10-01. Pierwszy wycinek (opis YouTube) Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji.
 
 ## NEXT
 
-Po Post Facebook: pierwszy materiał krytyczny, czyli mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Historia wersji materiałów (DEC-027): wdrożona lokalnie, czeka na weryfikację Waldemara i migrację na produkcji.
+
+Potem grafika główna, w etapach:
+
+1. Tekstowy brief grafiki przez AI (nagłówek, podtytuł, termin, kierunek wizualny, opis obrazu). Ten sam wzorzec co post Facebook.
+2. Obraz z AI przez OpenAI (bez tekstu na obrazie, bo modele graficzne mylą polskie znaki i daty). Nowy koszt i przechowywanie plików, osobny DEC.
+3. Projekt w Canvie: szablon marki z polami do wypełnienia przez Canva Connect Autofill API. Według ogłoszenia Canvy z 2026-09-23 Autofill działa od planu Pro, także w Canva Education; Waldemar ma Pro i Education. Wymaga integracji w Canva Developer Portal (MFA), połączenia konta przez OAuth i przechowywania tokenów. Część dokumentacji Canvy nadal wymienia Enterprise, więc trzeba to potwierdzić przed wdrożeniem.
+
+Przełącznik trybu grafiki (obraz AI / projekt w Canvie / połączenie) dopiero, gdy działają co najmniej dwa tryby. Potem mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 

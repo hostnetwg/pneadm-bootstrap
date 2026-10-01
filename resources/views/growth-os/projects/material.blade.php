@@ -173,6 +173,86 @@
             </section>
         @endif
 
+        @if($materialVersions->isNotEmpty())
+            @php
+                $versionSourceLabels = [
+                    'baseline' => 'Stan sprzed historii',
+                    'manual' => 'Zapis ręczny',
+                    'ai_apply' => 'Zastosowany szkic AI',
+                    'restore' => 'Przywrócenie',
+                ];
+                $currentVersion = $materialVersions->first();
+                $currentIsLatest = (string) ($currentVersion->payload['draft'] ?? '') === (string) $material['draft'];
+                $firstVersionByText = [];
+                foreach ($materialVersions->sortBy('version') as $version) {
+                    $firstVersionByText[hash('sha256', (string) ($version->payload['draft'] ?? ''))] ??= $version->version;
+                }
+            @endphp
+            <section class="card border mt-4" id="material-versions" aria-labelledby="material-versions-heading">
+                <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h3 class="h6 mb-0" id="material-versions-heading">Historia wersji</h3>
+                    <span class="small text-secondary">Ostatnie {{ \App\Models\GrowthOS\GrowthArtifactVersion::KEEP_LATEST }} zmian treści</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @foreach($materialVersions as $version)
+                        @php
+                            $isCurrent = $loop->first && $currentIsLatest;
+                            $sameAsVersion = $firstVersionByText[hash('sha256', (string) ($version->payload['draft'] ?? ''))] ?? null;
+                        @endphp
+                        <li class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div>
+                                <span class="badge text-bg-secondary me-1">v{{ $version->version }}</span>
+                                @if($isCurrent)
+                                    <span class="badge text-bg-success me-1">Aktualna</span>
+                                @endif
+                                <span class="fw-semibold">
+                                    {{ $versionSourceLabels[$version->source] ?? $version->source }}{{ $version->source === 'restore' && $version->restored_from_version ? ' z v'.$version->restored_from_version : '' }}
+                                </span>
+                                @if($sameAsVersion !== null && $sameAsVersion !== $version->version)
+                                    <span class="badge bg-light text-secondary border ms-1">ten sam tekst co v{{ $sameAsVersion }}</span>
+                                @endif
+                                <div class="small text-secondary">
+                                    {{ $version->created_at?->format('Y-m-d H:i') }}{{ $version->createdBy ? ' · '.$version->createdBy->name : '' }} · {{ mb_strlen((string) ($version->payload['draft'] ?? '')) }} znaków
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#material-version-{{ $version->version }}">
+                                {{ $isCurrent ? 'Podgląd' : 'Podgląd i przywróć' }}
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+
+            @foreach($materialVersions as $version)
+                @php $isCurrent = $loop->first && $currentIsLatest; @endphp
+                <div class="modal fade" id="material-version-{{ $version->version }}" tabindex="-1" aria-labelledby="material-version-{{ $version->version }}-label" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h4 class="modal-title h6" id="material-version-{{ $version->version }}-label">Wersja {{ $version->version }} · {{ $version->created_at?->format('Y-m-d H:i') }}</h4>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                            </div>
+                            <div class="modal-body growth-readable p-3">
+                                <div class="growth-compare">{{ $version->payload['draft'] ?? '' }}</div>
+                                @unless($isCurrent)
+                                    <p class="small text-secondary mt-3 mb-0">Przywrócenie zapisze ten tekst jako nową wersję ze statusem Draft. Obecny szkic zostaje w historii.</p>
+                                @endunless
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                                @unless($isCurrent)
+                                    <form method="POST" action="{{ route('growth.projects.materials.versions.restore', [$project['id'], $material['id'], $version->version]) }}">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary">Przywróć tę wersję</button>
+                                    </form>
+                                @endunless
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        @endif
+
         @if($aiDraftSupported)
             <script>
                 document.querySelectorAll('[data-growth-ai-form]').forEach((form) => {

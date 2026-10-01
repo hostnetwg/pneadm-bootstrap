@@ -320,7 +320,21 @@ class ProjectController extends Controller
             'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
             'aiModel' => (string) config('growth_ai.model'),
+            'materialVersions' => DemoTikWebinarProject::materialVersions($projectItem, $material),
         ]);
+    }
+
+    public function restoreMaterialVersion(string $project, string $material, int $version): RedirectResponse
+    {
+        DemoTikWebinarProject::material($project, $material);
+        $outcome = DemoTikWebinarProject::restoreMaterialVersion($project, $material, $version);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if ($outcome['unchanged']) {
+            return $back->with('success', 'Ta wersja jest taka sama jak obecny szkic. Nic nie zmieniono.');
+        }
+
+        return $back->with('success', 'Przywrócono wersję '.$version.' jako nową wersję. Materiał ma status Draft — sprawdź go przed dalszą pracą.');
     }
 
     public function requestMaterialAi(Request $request, string $project, string $material): RedirectResponse

@@ -3,7 +3,7 @@
 Last updated: 2026-10-01 CEST<br>
 Branch: main<br>
 Commit: 2adcb02<br>
-Stage: v0.2 — szkice AI opisu YouTube i posta Facebook<br>
+Stage: v0.2 — szkice AI opisu YouTube i posta Facebook, historia wersji materiałów<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
 ## 1. Cel projektu
@@ -19,10 +19,11 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia.
 - Materiał „Opis YouTube”: „Poproś AI o szkic” po zatwierdzeniu kierunku i koncepcji, obecny szkic obok propozycji, Zastosuj / Odrzuć.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
+- Każdy materiał: „Historia wersji” pod szkicem (ostatnie 20 zmian treści), podgląd w modalu i „Przywróć tę wersję”.
 
 ## 2. Aktualny etap
 
-Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-024), Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji. Drugi wycinek, szkic AI dla materiału `facebook-post` (DEC-026), jest wdrożony lokalnie i czeka na ręczną weryfikację Waldemara. Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
+Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-024), Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji. Drugi wycinek, szkic AI dla materiału `facebook-post` (DEC-026), Waldemar zweryfikował 2026-10-01. Historia wersji materiałów (DEC-027) jest wdrożona lokalnie i czeka na ręczną weryfikację; na produkcji wymaga migracji. Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -36,14 +37,16 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
 - Checklista pokazuje 9 zadań operacyjnych z checkboxem. Pozostałe punkty osi czasu są informacją i nie mają checkboxa.
 - Dziesięć materiałów ma edytowalny szkic i status. „Zapisz materiał” zapisuje artifact `material`. Samo otwarcie ekranu nie tworzy wiersza.
+- Historia wersji materiałów (DEC-027): tabela `growth_artifact_versions`, nowa wersja przy każdej zmianie treści („Zapisz materiał”, „Zastosuj” szkicu AI, przywrócenie), bez wersji przy samej zmianie statusu, ostatnie 20 na materiał. Materiał sprzed wdrożenia dostaje przy pierwszej zmianie wersję „Stan sprzed historii”. Przywrócenie po potwierdzeniu w modalu zapisuje stary tekst jako nową wersję ze statusem Draft. Wersja powtarzająca wcześniejszy tekst ma znaczek „ten sam tekst co vN”.
 - Etap **Kierunek**: edycja pięciu pól, zatwierdzenie i cofnięcie. Stała podpowiedź AI nie jest zapisywana.
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
 - **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
 - Propozycja AI nigdy nie nadpisuje bieżącej koncepcji aż do jawnego „Zastosuj”; można ją odrzucić.
-- **Poproś AI o szkic** (tylko „Opis YouTube”): wymaga zatwierdzonego kierunku i koncepcji. Zadanie `material_draft`, prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`. Checkbox „Dodaj emotikony do opisu” (domyślnie włączony) wysyła `style.emojis`. Opcjonalna „Dodatkowa instrukcja dla AI” (do 1000 znaków, blokada danych osobowych) wysyła `instruction`; zasady promptu mają pierwszeństwo. Przy wyłączonej fladze — symulacja lokalna z tym samym UX. Propozycja w sesji, obok obecnego szkicu. „Zastosuj” sprawdza, czy kierunek, koncepcja, szkic i prowadzący się nie zmienili, potem zapisuje szkic, status `DRAFT` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`. Pozostałe dziewięć materiałów nie ma AI.
+- **Poproś AI o szkic** („Opis YouTube”; „Post Facebook” opisuje punkt niżej): wymaga zatwierdzonego kierunku i koncepcji. Zadanie `material_draft`, prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`. Checkbox „Dodaj emotikony do opisu” (domyślnie włączony) wysyła `style.emojis`. Opcjonalna „Dodatkowa instrukcja dla AI” (do 1000 znaków, blokada danych osobowych) wysyła `instruction`; zasady promptu mają pierwszeństwo. Przy wyłączonej fladze — symulacja lokalna z tym samym UX. Propozycja w sesji, obok obecnego szkicu. „Zastosuj” sprawdza, czy kierunek, koncepcja, szkic i prowadzący się nie zmienili, potem zapisuje szkic, status `DRAFT` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`. Pozostałe osiem materiałów nie ma AI.
+- **Poproś AI o szkic** dla „Post Facebook” (DEC-026): prompt `material_facebook_post_v1`, ten sam UX, dodatkowo checkbox hashtagów. AI dostaje opis YouTube tylko ze statusem Zatwierdzone lub Opublikowane i wstawia `[LINK DO ZAPISU]`. Propozycje są w sesji osobno dla każdego materiału.
 - Osobna, domyślnie wyłączona flaga `GROWTH_AI_ENABLED`; prawdziwe AI jest dostępne tylko dla `super_admin`.
 - Provider i model są konfigurowane centralnie i widoczne w UI; logika Growth OS korzysta z abstrakcji providera.
-- Walidacja structured output, allowlisty danych (koncepcja; opis YouTube z `host_name`, bez innych materiałów — DEC-025), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla obu zadań.
+- Walidacja structured output, allowlisty danych (koncepcja; opis YouTube z `host_name` — DEC-025; post Facebook dodatkowo z zatwierdzonym opisem YouTube — DEC-026; poza tym bez innych materiałów), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla obu zadań.
 - Osobny log techniczny zawiera tylko metadane wywołania (w tym `task_type`: `concept_revision` albo `material_draft`) — bez promptu, odpowiedzi, treści, PII i sekretów.
 - Prosta historia wersji koncepcji w sesji (do 5 pozycji).
 - Pozostałe pomysły i sugestie AI są nadal symulowane.
@@ -84,21 +87,23 @@ Zaplanuj TIK
 - Brak Sendy API.
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
-- Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicu AI opisu YouTube, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) i techniczny log metadanych AI.
-- Brak AI poza etapem Koncepcja i materiałem „Opis YouTube”. Brak innych materiałów w kontekście AI.
+- Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicach AI materiałów, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) z historią do 20 wersji i techniczny log metadanych AI.
+- Brak AI poza etapem Koncepcja oraz materiałami „Opis YouTube” i „Post Facebook”. Jedynym innym materiałem w kontekście AI jest zatwierdzony opis YouTube dla posta.
+- Brak generowania obrazów i integracji z Canvą (plan: najpierw tekstowy brief grafiki; Waldemar ma Canva Pro i Education).
 - Brak ostrzeżenia na zapisanym materiale, że kierunek lub koncepcja zmieniły się po jego przygotowaniu (opcjonalne w DEC-024, nie zrobione).
 - `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
 
 ## 7. Otwarte pytania
 
-- Czy historia wersji ma mieć „przywróć wersję”, czy tylko podgląd?
+- Grafika główna: z jakich części ma się składać brief i czy później obraz z AI, projekt w Canvie, czy połączenie obu (szczegóły w roadmapie).
 
 ## 8. Następny krok
 
-Ręczna weryfikacja szkicu AI posta Facebook przez Waldemara (z `GROWTH_AI_ENABLED=true` i bez, z zatwierdzonym i niezatwierdzonym opisem YouTube). Do potwierdzenia: hashtagi domyślnie włączone i długość około 800 znaków. Później mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Ręczna weryfikacja historii wersji przez Waldemara, potem migracja na produkcji ([runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md), sekcja „Historia wersji materiałów”). Następnie grafika główna jako tekstowy brief, potem mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
 
+- Historia wersji materiałów (DEC-027): nowa tabela `growth_artifact_versions` (migracja `2026_10_01_230000`), ostatnie 20 zmian treści na materiał, podgląd i przywracanie w modalu Bootstrap.
 - v0.2: szkic AI dla materiału `facebook-post` (DEC-026), drugi profil zadania `material_draft`. Korzysta tylko z zatwierdzonego opisu YouTube, wstawia `[LINK DO ZAPISU]`, ma opcje emotikon i hashtagów. Propozycje AI są w sesji osobno dla każdego materiału.
 - v0.2: szkic AI dla materiału `youtube-description` (zadanie `material_draft`, DEC-024). `GrowthAiService` obsługuje dwa zadania przez mały kontrakt `GrowthAiTask`; `concept_revision` działa bez zmian.
 - Zatwierdzone karty „Pomysł i kierunek” i „Koncepcja”, gotowe etapy przygotowania oraz blok z tytułem (gdy wszystkie etapy są gotowe) mają jasnozielone tło i zielony pasek z lewej.
