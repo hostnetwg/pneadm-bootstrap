@@ -2,12 +2,15 @@
 
 namespace App\Support\GrowthOS;
 
+use App\Models\GrowthOS\GrowthArtifact;
+use App\Models\GrowthOS\GrowthArtifactImage;
 use App\Models\GrowthOS\GrowthArtifactVersion;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
+use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
@@ -727,6 +730,82 @@ class DemoTikWebinarProject
     }
 
     /**
+     * Newest first, at most GrowthArtifactImage::KEEP_LATEST. Empty when the project is not in the database yet.
+     *
+     * @param  array<string, mixed>  $project
+     * @return EloquentCollection<int, GrowthArtifactImage>
+     */
+    public static function materialImages(array $project, string $materialId): EloquentCollection
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return new EloquentCollection;
+        }
+
+        return app(GrowthSessionConceptStore::class)->materialImages((int) $campaignId, $materialId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public static function requireMaterialImage(array $project, string $materialId, int $imageId): GrowthArtifactImage
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        $image = is_numeric($campaignId)
+            ? app(GrowthSessionConceptStore::class)->materialImage((int) $campaignId, $materialId, $imageId)
+            : null;
+        abort_if($image === null, 404);
+
+        return $image;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public static function materialImageArtifact(array $project, string $materialId): ?GrowthArtifact
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return app(GrowthSessionConceptStore::class)->ensureMaterialArtifact($project, $user, $materialId);
+    }
+
+    /**
+     * Headline line of the saved graphic brief, falling back to the concept title.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public static function graphicHeadline(array $project): string
+    {
+        $draft = self::materialDraft($project, MaterialDraftTask::GRAPHIC_MATERIAL_KEY);
+        if (preg_match('/^Nagłówek:[ \t]*(.+)$/mu', $draft, $match) === 1 && trim($match[1]) !== '') {
+            return trim($match[1]);
+        }
+
+        return trim((string) data_get($project, 'concept.title', $project['topic'] ?? ''));
+    }
+
+    /**
+     * Image description from the saved graphic brief, falling back to its visual direction.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public static function graphicImageDescription(array $project): string
+    {
+        $draft = self::materialDraft($project, MaterialDraftTask::GRAPHIC_MATERIAL_KEY);
+
+        foreach (['Opis obrazu dla AI (bez tekstu na obrazie):', 'Kierunek wizualny:'] as $label) {
+            if (preg_match('/^'.preg_quote($label, '/').'\R(.+?)(?:\R\R|\z)/msu', $draft, $match) === 1 && trim($match[1]) !== '') {
+                return mb_substr(trim($match[1]), 0, GraphicImageTask::MAX_PROMPT_CHARS);
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * @param  array<string, mixed>  $project
      * @return array<string, mixed>
      */
@@ -926,7 +1005,7 @@ class DemoTikWebinarProject
 
     /**
      * Allow-listed context for the AI material draft. The only other material ever included is an
-     * approved YouTube description for the Facebook post (DEC-026). No personal data.
+     * approved YouTube description for the Facebook post and the graphic brief (DEC-026, DEC-029). No personal data.
      *
      * @param  array<string, mixed>  $project
      * @param  array{emojis?: bool, hashtags?: bool}  $style
@@ -946,16 +1025,18 @@ class DemoTikWebinarProject
                 'live_time' => (string) ($project['live_time'] ?? ''),
                 'timezone' => (string) config('app.timezone'),
                 'host_name' => self::aiHostName($project),
+                'live_label' => self::liveLabel($project),
             ],
             'direction' => self::fingerprintDirection($direction),
             'concept' => self::fingerprintConcept($concept),
-            'source_materials' => $materialId === MaterialDraftTask::FACEBOOK_MATERIAL_KEY
+            'source_materials' => MaterialDraftTask::usesYoutubeSource($materialId)
                 ? ['youtube_description' => self::approvedYoutubeDescription($project)]
                 : [],
             'current_draft' => self::materialDraft($project, $materialId),
             'style' => [
                 'emojis' => (bool) ($style['emojis'] ?? true),
                 'hashtags' => (bool) ($style['hashtags'] ?? true),
+                'elements' => self::graphicElements($style),
             ],
             'instruction' => trim($instruction),
         ];
@@ -977,11 +1058,49 @@ class DemoTikWebinarProject
             'host' => self::hash(['host_name' => self::aiHostName($project)]),
         ];
 
-        if ($materialId === MaterialDraftTask::FACEBOOK_MATERIAL_KEY) {
+        if (MaterialDraftTask::usesYoutubeSource($materialId)) {
             $fingerprint['source_materials'] = self::hash(['youtube_description' => self::approvedYoutubeDescription($project)]);
         }
 
         return $fingerprint;
+    }
+
+    /**
+     * Polish date with weekday, computed here so the model never has to work out the day of the week.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public static function liveLabel(array $project): string
+    {
+        $date = trim((string) ($project['live_date'] ?? ''));
+        $time = trim((string) ($project['live_time'] ?? ''));
+        if ($date === '') {
+            return '';
+        }
+
+        try {
+            $liveAt = CarbonImmutable::parse(trim($date.' '.$time))->locale('pl');
+        } catch (\Throwable) {
+            return trim($date.' '.$time);
+        }
+
+        return $time !== ''
+            ? $liveAt->translatedFormat('l, j F Y, \g\o\d\z. H:i')
+            : $liveAt->translatedFormat('l, j F Y');
+    }
+
+    /**
+     * @param  array{elements?: array<string, bool>}  $style
+     * @return array<string, bool>
+     */
+    private static function graphicElements(array $style): array
+    {
+        $elements = [];
+        foreach (array_keys(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS) as $key) {
+            $elements[$key] = (bool) ($style['elements'][$key] ?? true);
+        }
+
+        return $elements;
     }
 
     /**
@@ -1027,9 +1146,11 @@ class DemoTikWebinarProject
 
         $project['material_ai_proposals'][$materialId] = [
             'material_key' => $materialId,
-            'draft' => $materialId === MaterialDraftTask::FACEBOOK_MATERIAL_KEY
-                ? self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true))
-                : self::simulatedYoutubeDescription($project, $concept, $emojis),
+            'draft' => match ($materialId) {
+                MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
+                MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
+                default => self::simulatedYoutubeDescription($project, $concept, $emojis),
+            },
             'change_summary' => 'Symulacja lokalna: szkic złożony z zatwierdzonej koncepcji (tytuł, termin, obietnica, program, CTA).'
                 .($instruction !== '' ? ' Symulacja nie interpretuje dodatkowej instrukcji — uwzględni ją prawdziwe AI.' : ''),
             'instruction' => $instruction,
@@ -1271,6 +1392,30 @@ class DemoTikWebinarProject
             $points !== '' ? $icon('📌')."Program:\n".$points : '',
             $cta !== '' ? $icon('👉').$cta : '',
         ])));
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $concept
+     * @param  array<string, bool>  $elements
+     */
+    private static function simulatedGraphicBrief(array $project, array $concept, array $elements): string
+    {
+        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+
+        return MaterialDraftTask::composeGraphicBrief(
+            [
+                'headline' => $title,
+                'subtitle' => trim((string) ($concept['subtitle'] ?? '')),
+                'cta' => 'Zapisz się',
+                'visual_direction' => 'Spokojna, profesjonalna kolorystyka dla edukacji: granat, biel i jeden ciepły akcent. Motyw: nauczyciel przy laptopie z materiałami lekcyjnymi. Najważniejsze elementy w środku kadru, z miejscem na nagłówek, żeby kompozycja działała w obu formatach.',
+                'image_prompt' => 'Jasne, nowoczesne biurko nauczyciela z laptopem, kolorowymi kartami pracy i kubkiem kawy, miękkie światło dzienne. Bez żadnego tekstu, liter, cyfr i logotypów.',
+                'alt_text' => 'Grafika zapowiadająca webinar „'.$title.'”.',
+            ],
+            self::liveLabel($project),
+            self::aiHostName($project),
+            $elements,
+        );
     }
 
     /**

@@ -73,4 +73,9 @@ class GrowthArtifact extends Model
     {
         return $this->hasMany(GrowthArtifactVersion::class);
     }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(GrowthArtifactImage::class);
+    }
 }

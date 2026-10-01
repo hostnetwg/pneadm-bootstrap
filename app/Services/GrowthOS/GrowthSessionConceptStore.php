@@ -3,6 +3,7 @@
 namespace App\Services\GrowthOS;
 
 use App\Models\GrowthOS\GrowthArtifact;
+use App\Models\GrowthOS\GrowthArtifactImage;
 use App\Models\GrowthOS\GrowthArtifactVersion;
 use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
@@ -355,6 +356,53 @@ class GrowthSessionConceptStore
         $row = $artifact->versions()->where('version', $version)->first();
 
         return $row instanceof GrowthArtifactVersion ? $row : null;
+    }
+
+    /**
+     * Images need a database artifact; a material that was never saved is persisted first.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public function ensureMaterialArtifact(array $project, User $actor, string $materialId): ?GrowthArtifact
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return null;
+        }
+
+        $artifact = $this->materialArtifact((int) $campaignId, $materialId);
+        if ($artifact !== null) {
+            return $artifact;
+        }
+
+        $this->persistMaterial($project, $actor, $materialId);
+
+        return $this->materialArtifact((int) $campaignId, $materialId);
+    }
+
+    /**
+     * @return Collection<int, GrowthArtifactImage>
+     */
+    public function materialImages(int $campaignId, string $materialId): Collection
+    {
+        $artifact = $this->materialArtifact($campaignId, $materialId);
+        if ($artifact === null) {
+            return new Collection;
+        }
+
+        return $artifact->images()->with('createdBy:id,name')->orderByDesc('id')->get();
+    }
+
+    public function materialImage(int $campaignId, string $materialId, int $imageId): ?GrowthArtifactImage
+    {
+        $artifact = $this->materialArtifact($campaignId, $materialId);
+        if ($artifact === null) {
+            return null;
+        }
+
+        $image = $artifact->images()->whereKey($imageId)->first();
+
+        return $image instanceof GrowthArtifactImage ? $image : null;
     }
 
     private function materialArtifact(int $campaignId, string $materialId): ?GrowthArtifact

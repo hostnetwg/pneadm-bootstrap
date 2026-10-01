@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 
 /**
- * Szkic materiału webinaru. Profile: opis YouTube (DEC-024) i post Facebook (DEC-026).
+ * Szkic materiału webinaru. Profile: opis YouTube (DEC-024), post Facebook (DEC-026) i brief grafiki głównej (DEC-028).
  */
 final class MaterialDraftTask implements GrowthAiTask
 {
@@ -39,6 +39,42 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const LINK_PLACEHOLDER = '[LINK DO ZAPISU]';
 
+    public const GRAPHIC_MATERIAL_KEY = 'main-graphic';
+
+    public const GRAPHIC_PROFILE = 'graphic_brief_v1';
+
+    public const GRAPHIC_PROMPT_VERSION = 'material_graphic_brief_v2';
+
+    public const GRAPHIC_SCHEMA_VERSION = 'material_graphic_brief_schema_v1';
+
+    public const GRAPHIC_FORMATS = '16:9 (1920×1080) i kwadrat (1080×1080)';
+
+    /**
+     * Optional brief elements with their labels. Headline, date and visual direction are always included.
+     *
+     * @var array<string, string>
+     */
+    public const GRAPHIC_OPTIONAL_ELEMENTS = [
+        'subtitle' => 'Podtytuł',
+        'host' => 'Prowadzący',
+        'cta' => 'Wezwanie do działania',
+        'image_prompt' => 'Opis obrazu dla AI',
+        'alt_text' => 'Tekst alternatywny (alt)',
+    ];
+
+    /**
+     * @var array<string, int>
+     */
+    private const GRAPHIC_FIELD_LIMITS = [
+        'headline' => 80,
+        'subtitle' => 160,
+        'cta' => 40,
+        'visual_direction' => 800,
+        'image_prompt' => 1200,
+        'alt_text' => 300,
+        'change_summary' => 1000,
+    ];
+
     /**
      * @var array<string, array{profile: string, name: string, type: string, prompt_version: string, schema_version: string, max_chars: int}>
      */
@@ -59,6 +95,14 @@ final class MaterialDraftTask implements GrowthAiTask
             'schema_version' => self::FACEBOOK_SCHEMA_VERSION,
             'max_chars' => self::FACEBOOK_MAX_DRAFT_CHARS,
         ],
+        self::GRAPHIC_MATERIAL_KEY => [
+            'profile' => self::GRAPHIC_PROFILE,
+            'name' => 'Grafika główna',
+            'type' => 'graphic_brief',
+            'prompt_version' => self::GRAPHIC_PROMPT_VERSION,
+            'schema_version' => self::GRAPHIC_SCHEMA_VERSION,
+            'max_chars' => self::MAX_DRAFT_CHARS,
+        ],
     ];
 
     public function __construct(private readonly string $materialKey = self::MATERIAL_KEY)
@@ -71,6 +115,14 @@ final class MaterialDraftTask implements GrowthAiTask
     public static function supports(string $materialKey): bool
     {
         return array_key_exists($materialKey, self::PROFILES);
+    }
+
+    /**
+     * Materials that receive the approved YouTube description as a source (DEC-026, DEC-029).
+     */
+    public static function usesYoutubeSource(string $materialKey): bool
+    {
+        return in_array($materialKey, [self::FACEBOOK_MATERIAL_KEY, self::GRAPHIC_MATERIAL_KEY], true);
     }
 
     public function forMaterial(string $materialKey): self
@@ -100,9 +152,11 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public function instructions(): string
     {
-        return $this->materialKey === self::FACEBOOK_MATERIAL_KEY
-            ? $this->facebookPostInstructions()
-            : $this->youtubeDescriptionInstructions();
+        return match ($this->materialKey) {
+            self::FACEBOOK_MATERIAL_KEY => $this->facebookPostInstructions(),
+            self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
+            default => $this->youtubeDescriptionInstructions(),
+        };
     }
 
     /**
@@ -118,6 +172,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $concept = is_array($context['concept'] ?? null) ? $context['concept'] : [];
         $profile = self::PROFILES[$this->materialKey];
         $isFacebook = $this->materialKey === self::FACEBOOK_MATERIAL_KEY;
+        $isGraphic = $this->materialKey === self::GRAPHIC_MATERIAL_KEY;
 
         $input = [
             'material' => [
@@ -151,14 +206,26 @@ final class MaterialDraftTask implements GrowthAiTask
             ],
         ];
 
-        if ($isFacebook) {
+        if ($isGraphic) {
+            $input['campaign']['live_label'] = $this->string($campaign['live_label'] ?? '');
+        }
+
+        if (self::usesYoutubeSource($this->materialKey)) {
             $input['source_materials'] = [
                 'youtube_description' => $this->string(data_get($context, 'source_materials.youtube_description', '')),
             ];
         }
 
         $input['current_draft'] = $this->string($context['current_draft'] ?? '');
-        $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', true)];
+
+        if ($isGraphic) {
+            $input['style'] = [
+                'formats' => self::GRAPHIC_FORMATS,
+                'elements' => $this->graphicElements($context),
+            ];
+        } else {
+            $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', true)];
+        }
 
         if ($isFacebook) {
             $input['style']['hashtags'] = (bool) data_get($context, 'style.hashtags', true);
@@ -186,6 +253,17 @@ final class MaterialDraftTask implements GrowthAiTask
      */
     public function schema(): array
     {
+        if ($this->materialKey === self::GRAPHIC_MATERIAL_KEY) {
+            $fields = array_keys(self::GRAPHIC_FIELD_LIMITS);
+
+            return [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => array_fill_keys($fields, ['type' => 'string']),
+                'required' => $fields,
+            ];
+        }
+
         return [
             'type' => 'object',
             'additionalProperties' => false,
@@ -202,6 +280,10 @@ final class MaterialDraftTask implements GrowthAiTask
      */
     public function validateAndNormalize(AiProviderResponse $response, array $input): MaterialDraftResult
     {
+        if ($this->materialKey === self::GRAPHIC_MATERIAL_KEY) {
+            return $this->validateGraphicBrief($response, $input);
+        }
+
         $validator = Validator::make($response->payload, [
             'draft' => ['required', 'string', 'max:'.self::PROFILES[$this->materialKey]['max_chars']],
             'change_summary' => ['required', 'string', 'max:1000'],
@@ -222,16 +304,7 @@ final class MaterialDraftTask implements GrowthAiTask
             throw GrowthAiException::invalidResponse('empty_required_field');
         }
 
-        if (ProhibitedData::containsIgnoringDates($draft."\n".$changeSummary)) {
-            throw GrowthAiException::invalidResponse('prohibited_output_data');
-        }
-
-        $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        foreach (ProhibitedData::urls($draft."\n".$changeSummary) as $url) {
-            if (! in_array($url, $allowedUrls, true)) {
-                throw GrowthAiException::invalidResponse('unexpected_url');
-            }
-        }
+        $this->assertSafeOutput($draft."\n".$changeSummary, $input);
 
         return new MaterialDraftResult(
             draft: $draft,
@@ -242,6 +315,132 @@ final class MaterialDraftTask implements GrowthAiTask
             schemaVersion: $this->schemaVersion(),
             requestId: $response->requestId,
         );
+    }
+
+    /**
+     * Fixed labels; date and host come from the application, never from the model.
+     *
+     * @param  array<string, string>  $fields
+     * @param  array<string, bool>  $elements
+     */
+    public static function composeGraphicBrief(array $fields, string $liveLabel, string $hostName, array $elements): string
+    {
+        $field = static fn (string $key): string => trim((string) ($fields[$key] ?? ''));
+        $enabled = static fn (string $key): bool => (bool) ($elements[$key] ?? true);
+
+        $header = array_filter([
+            'Formaty: '.self::GRAPHIC_FORMATS,
+            'Nagłówek: '.$field('headline'),
+            $enabled('subtitle') && $field('subtitle') !== '' ? 'Podtytuł: '.$field('subtitle') : '',
+            'Termin: '.$liveLabel,
+            $enabled('host') && trim($hostName) !== '' ? 'Prowadzący: '.trim($hostName) : '',
+            $enabled('cta') && $field('cta') !== '' ? 'Wezwanie do działania: '.$field('cta') : '',
+        ]);
+
+        $sections = array_filter([
+            implode("\n", $header),
+            "Kierunek wizualny:\n".$field('visual_direction'),
+            $enabled('image_prompt') && $field('image_prompt') !== '' ? "Opis obrazu dla AI (bez tekstu na obrazie):\n".$field('image_prompt') : '',
+            $enabled('alt_text') && $field('alt_text') !== '' ? "Tekst alternatywny (alt):\n".$field('alt_text') : '',
+        ]);
+
+        return implode("\n\n", $sections);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function validateGraphicBrief(AiProviderResponse $response, array $input): MaterialDraftResult
+    {
+        $rules = [];
+        foreach (self::GRAPHIC_FIELD_LIMITS as $field => $limit) {
+            $rules[$field] = ['present', 'string', 'max:'.$limit];
+        }
+
+        if (Validator::make($response->payload, $rules)->fails()) {
+            throw GrowthAiException::invalidResponse();
+        }
+
+        if (array_diff(array_keys($response->payload), array_keys(self::GRAPHIC_FIELD_LIMITS)) !== []) {
+            throw GrowthAiException::invalidResponse('unexpected_fields');
+        }
+
+        $fields = array_map(static fn (mixed $value): string => trim((string) $value), $response->payload);
+        if ($fields['headline'] === '' || $fields['visual_direction'] === '' || $fields['change_summary'] === '') {
+            throw GrowthAiException::invalidResponse('empty_required_field');
+        }
+
+        $draft = self::composeGraphicBrief(
+            $fields,
+            (string) data_get($input, 'campaign.live_label', ''),
+            (string) data_get($input, 'campaign.host_name', ''),
+            (array) data_get($input, 'style.elements', []),
+        );
+
+        $this->assertSafeOutput($draft."\n".$fields['change_summary'], $input);
+
+        return new MaterialDraftResult(
+            draft: $draft,
+            changeSummary: $fields['change_summary'],
+            provider: $response->provider,
+            model: $response->model,
+            promptVersion: $this->promptVersion(),
+            schemaVersion: $this->schemaVersion(),
+            requestId: $response->requestId,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function assertSafeOutput(string $output, array $input): void
+    {
+        if (ProhibitedData::containsIgnoringDates($output)) {
+            throw GrowthAiException::invalidResponse('prohibited_output_data');
+        }
+
+        $allowedUrls = ProhibitedData::urls(json_encode($input, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        foreach (ProhibitedData::urls($output) as $url) {
+            if (! in_array($url, $allowedUrls, true)) {
+                throw GrowthAiException::invalidResponse('unexpected_url');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, bool>
+     */
+    private function graphicElements(array $context): array
+    {
+        $elements = [];
+        foreach (array_keys(self::GRAPHIC_OPTIONAL_ELEMENTS) as $key) {
+            $elements[$key] = (bool) data_get($context, 'style.elements.'.$key, true);
+        }
+
+        return $elements;
+    }
+
+    private function graphicBriefInstructions(): string
+    {
+        return <<<'PROMPT'
+Jesteś projektantem materiałów promocyjnych webinarów edukacyjnych PNE. Przygotuj tekstowy brief grafiki głównej webinaru. Grafika powstanie później ręcznie w Canvie albo z pomocą modelu graficznego, w dwóch formatach: style.formats.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Odbiorców określ na podstawie pola direction.audience.
+headline: krótki nagłówek na grafikę, najlepiej do 40 znaków, oparty na concept.title. Bez daty i godziny.
+subtitle: jeżeli style.elements.subtitle ma wartość true, krótki podtytuł do około 80 znaków; w przeciwnym razie pusty tekst.
+cta: jeżeli style.elements.cta ma wartość true, bardzo krótkie wezwanie na grafikę (2–4 słowa, np. „Zapisz się”); w przeciwnym razie pusty tekst. Bez ceny, „za darmo”, certyfikatów ani sztucznej pilności, chyba że wynika to wprost z wejścia.
+visual_direction: 2–4 zdania o nastroju, kolorystyce, motywie i kompozycji, która działa w obu formatach (najważniejsze elementy w środku, miejsce na tekst). PNE nie ma jeszcze stałych kolorów ani fontów marki: zaproponuj spokojny, profesjonalny kierunek dla edukacji. Jeżeli instruction zawiera sugestie właściciela (kolory, motyw, styl), oprzyj na nich kierunek.
+image_prompt: jeżeli style.elements.image_prompt ma wartość true, opis ilustracji dla modelu graficznego, 2–4 zdania. Obraz ma być bez żadnego tekstu, liter, cyfr, logotypów i znaków towarowych oraz bez wizerunku konkretnych, rozpoznawalnych osób; w przeciwnym razie pusty tekst.
+alt_text: jeżeli style.elements.alt_text ma wartość true, tekst alternatywny opisujący grafikę dla osób niewidomych, 1–2 zdania z tytułem webinaru; w przeciwnym razie pusty tekst.
+Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu (nagłówek, podtytuł, motyw), ale nie przepisuj z niego długich fragmentów.
+Termin (campaign.live_label) i prowadzącego (campaign.host_name) aplikacja wstawia sama — nie wpisuj ich w headline, subtitle ani cta i nie zmieniaj terminu.
+Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, funkcji produktów, adresów URL, ceny, certyfikatów, akredytacji ani dofinansowania.
+Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
+To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+Zwróć wyłącznie dane zgodne z przekazanym schematem.
+PROMPT;
     }
 
     private function youtubeDescriptionInstructions(): string

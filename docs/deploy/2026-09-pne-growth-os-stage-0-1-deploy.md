@@ -158,6 +158,8 @@ Najpierw `PNE_GROWTH_OS_ENABLED=false` i `config:cache`. Tabel Growth OS nie usu
 
 ## Historia wersji materiałów (DEC-027, 2026-10-01)
 
+Potwierdzone 2026-10-01: migracja wykonana na produkcji, smoke OK (Waldemar).
+
 Nowa migracja: `2026_10_01_230000_create_growth_artifact_versions_table` (tabela `growth_artifact_versions`). Tylko dodaje tabelę; nie zmienia istniejących danych.
 
 **Wymaga migracji przed użyciem.** Bez niej przy włączonej fladze „Zapisz materiał” i „Zastosuj” szkicu AI dają HTTP 500, bo zapis materiału dopisuje wersję do brakującej tabeli.
@@ -173,3 +175,29 @@ Smoke:
 3. Sama zmiana statusu nie dodaje pozycji do historii.
 
 Rollback: kod bez tej funkcji nie czyta tabeli, więc wystarczy cofnąć kod. Tabeli nie usuwać.
+
+## Generator obrazu grafiki głównej (DEC-029, 2026-10-02)
+
+Nowa migracja: `2026_10_02_000000_create_growth_artifact_images_table` (tabela `growth_artifact_images`). Tylko dodaje tabelę.
+
+**Wymaga migracji przed użyciem.** Bez niej strona „Grafika główna” daje HTTP 500, bo czyta galerię z brakującej tabeli.
+
+Kolejność jak wyżej: `migrate:status | grep -i growth`, backup, `migrate --force` i komendy cache.
+
+Konfiguracja (`.env`, opcjonalna — domyślne wartości są w `config/growth_ai.php`): `GROWTH_AI_IMAGE_MODEL=gpt-image-2` (DEC-030), `GROWTH_AI_IMAGE_QUALITY=medium`, `GROWTH_AI_IMAGE_DAILY_LIMIT_PER_USER=10`, `GROWTH_AI_IMAGE_TIMEOUT_SECONDS=180`, koszty szacunkowe `GROWTH_AI_IMAGE_COST_LANDSCAPE=0.042`, `GROWTH_AI_IMAGE_COST_SQUARE=0.053`, `GROWTH_AI_IMAGE_COST_ADAPT=0.07`. Klucz to ten sam `OPENAI_API_KEY`. Konto OpenAI może wymagać weryfikacji organizacji, zanim `gpt-image-2` zadziała. Bez niej generowanie kończy się komunikatem o konfiguracji AI.
+
+Pliki trafiają do `storage/app/private/growth-os/images/`. Katalog `storage` musi być zapisywalny dla PHP, tak jak dla logów. Pliki nie są publiczne i nie potrzebują `storage:link`. Wchodzą do backupu plików aplikacji, a nie do backupu MySQL.
+
+Generowanie trwa do 1–2 minut w jednym żądaniu. Aplikacja podnosi `set_time_limit`, ale serwer WWW lub proxy też nie może przerwać żądania wcześniej. Jeśli po około minucie pojawia się błąd 502/504, trzeba podnieść limit czasu żądania w hostingu.
+
+Smoke:
+
+1. „Grafika główna” otwiera się bez błędu, pod szkicem jest „Generator obrazu”.
+2. „Generuj obraz” w formacie poziomym: w galerii pojawia się obraz 1920×1080, „Pobierz” zapisuje plik JPEG.
+3. „Wybierz jako grafikę główną” daje zielone obramowanie i znaczek „✓ Grafika główna”.
+4. „Usuń” pyta w modalu i usuwa obraz z galerii.
+5. W logu `growth_ai` jest wpis `material_image` z rozmiarem i kosztem, bez opisu obrazu.
+6. „Utwórz wersję kwadratową” przy obrazie poziomym (DEC-030): w galerii pojawia się kwadrat 1080×1080 ze znaczkiem „Kwadrat z poziomego #id” i tymi samymi elementami, nie przycięty.
+7. Licznik „wykorzystano X z Y” rośnie po każdym obrazie, a „Zresetuj limit” po potwierdzeniu w modalu wraca do 0.
+
+Rollback: cofnąć kod. Tabeli i plików nie usuwać.

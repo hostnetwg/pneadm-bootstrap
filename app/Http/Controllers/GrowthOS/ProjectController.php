@@ -3,23 +3,31 @@
 namespace App\Http\Controllers\GrowthOS;
 
 use App\Http\Controllers\Controller;
+use App\Models\GrowthOS\GrowthArtifactImage;
 use App\Models\GrowthOS\GrowthTask;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\GrowthAiService;
+use App\Services\GrowthOS\AI\GrowthImageService;
+use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectController extends Controller
 {
     public const MATERIAL_AI_PRECONDITION_MESSAGE = 'Najpierw zatwierdź kierunek i koncepcję webinaru.';
 
     public const MATERIAL_AI_STALE_MESSAGE = 'Kierunek, koncepcja lub materiał zmieniły się od czasu wygenerowania szkicu. Wygeneruj nową propozycję.';
+
+    public const IMAGE_NOT_PERSISTED_MESSAGE = 'Projekt nie jest jeszcze zapisany w bazie, więc obrazu nie da się przechować.';
 
     public function index(): View
     {
@@ -314,14 +322,145 @@ class ProjectController extends Controller
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
             'aiDraftIsFacebookPost' => $isFacebookPost,
-            'aiDraftUsesYoutubeDescription' => $isFacebookPost
+            'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
+            'aiDraftLiveLabel' => DemoTikWebinarProject::liveLabel($projectItem),
+            'aiDraftUsesYoutubeSource' => MaterialDraftTask::usesYoutubeSource($material),
+            'aiDraftUsesYoutubeDescription' => MaterialDraftTask::usesYoutubeSource($material)
                 && DemoTikWebinarProject::approvedYoutubeDescription($projectItem) !== '',
             'aiDraftAllowed' => $aiDraftSupported && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
             'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
             'aiModel' => (string) config('growth_ai.model'),
             'materialVersions' => DemoTikWebinarProject::materialVersions($projectItem, $material),
+            'imageGeneratorEnabled' => $material === GraphicImageTask::MATERIAL_KEY,
+            'imageGeneratorReady' => is_numeric($projectItem['growth_campaign_id'] ?? null),
+            'imageDescription' => $material === GraphicImageTask::MATERIAL_KEY
+                ? DemoTikWebinarProject::graphicImageDescription($projectItem)
+                : '',
+            'imageHeadline' => $material === GraphicImageTask::MATERIAL_KEY
+                ? DemoTikWebinarProject::graphicHeadline($projectItem)
+                : '',
+            'imageModel' => (string) config('growth_ai.images.model'),
+            'imageQuality' => (string) config('growth_ai.images.quality'),
+            'imageDailyUsed' => $material === GraphicImageTask::MATERIAL_KEY
+                ? app(GrowthImageService::class)->dailyUsage(auth()->user())
+                : 0,
+            'materialImages' => $material === GraphicImageTask::MATERIAL_KEY
+                ? DemoTikWebinarProject::materialImages($projectItem, $material)
+                : new EloquentCollection,
         ]);
+    }
+
+    public function generateMaterialImage(Request $request, string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $data = $request->validate([
+            'format' => ['required', Rule::in(array_keys(GraphicImageTask::FORMATS))],
+            'image_prompt' => ['required', 'string', 'max:'.GraphicImageTask::MAX_PROMPT_CHARS],
+            'include_headline' => ['nullable', 'boolean'],
+        ]);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        $artifact = DemoTikWebinarProject::materialImageArtifact($item, $material);
+        if ($artifact === null) {
+            return $back->withInput()->with('error', self::IMAGE_NOT_PERSISTED_MESSAGE);
+        }
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit((int) config('growth_ai.images.timeout_seconds') + 60);
+        }
+
+        try {
+            $image = app(GrowthImageService::class)->generate(
+                user: $request->user(),
+                artifact: $artifact,
+                format: (string) $data['format'],
+                description: (string) $data['image_prompt'],
+                includeHeadline: $request->boolean('include_headline'),
+                headline: DemoTikWebinarProject::graphicHeadline($item),
+                liveLabel: DemoTikWebinarProject::liveLabel($item),
+            );
+        } catch (GrowthAiException $exception) {
+            return $back->withInput()->with('error', $exception->userMessage);
+        }
+
+        return $back->with('success', $image->source === GrowthArtifactImage::SOURCE_SIMULATION
+            ? 'Przygotowano obraz zastępczy (symulacja lokalna, bez wywołania OpenAI).'
+            : 'Wygenerowano obraz. Sprawdź go w galerii. Nic nie opublikowano.');
+    }
+
+    public function adaptMaterialImageToSquare(string $project, string $material, int $image): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $source = DemoTikWebinarProject::requireMaterialImage($item, $material, $image);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit((int) config('growth_ai.images.timeout_seconds') + 60);
+        }
+
+        try {
+            $square = app(GrowthImageService::class)->adaptToSquare(auth()->user(), $source);
+        } catch (GrowthAiException $exception) {
+            return $back->with('error', $exception->userMessage);
+        }
+
+        return $back->with('success', $square->source === GrowthArtifactImage::SOURCE_SIMULATION
+            ? 'Przygotowano kwadratowy obraz zastępczy (symulacja lokalna, bez wywołania OpenAI).'
+            : 'Utworzono wersję kwadratową z obrazu poziomego. Sprawdź, czy wszystkie elementy się zmieściły.');
+    }
+
+    public function resetMaterialImageLimit(Request $request, string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === GraphicImageTask::MATERIAL_KEY, 404);
+        DemoTikWebinarProject::requireProject($project);
+        app(GrowthImageService::class)->resetDailyLimit($request->user());
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Zresetowano dzienny limit obrazów AI. Możesz znów generować obrazy.');
+    }
+
+    public function showMaterialImage(Request $request, string $project, string $material, int $image): StreamedResponse
+    {
+        $row = DemoTikWebinarProject::requireMaterialImage(DemoTikWebinarProject::requireProject($project), $material, $image);
+        $disk = Storage::disk($row->disk);
+        abort_unless($disk->exists($row->path), 404);
+        $headers = ['Content-Type' => $row->mime, 'Cache-Control' => 'private, max-age=3600'];
+
+        return $request->boolean('download')
+            ? $disk->download($row->path, $row->downloadName(), $headers)
+            : $disk->response($row->path, $row->downloadName(), $headers);
+    }
+
+    public function selectMaterialImage(string $project, string $material, int $image): RedirectResponse
+    {
+        $row = DemoTikWebinarProject::requireMaterialImage(DemoTikWebinarProject::requireProject($project), $material, $image);
+        app(GrowthImageService::class)->select($row);
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Wybrano obraz jako grafikę główną. Nic nie opublikowano.');
+    }
+
+    public function deleteMaterialImage(string $project, string $material, int $image): RedirectResponse
+    {
+        $row = DemoTikWebinarProject::requireMaterialImage(DemoTikWebinarProject::requireProject($project), $material, $image);
+        app(GrowthImageService::class)->delete($row);
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Usunięto obraz z galerii.');
     }
 
     public function restoreMaterialVersion(string $project, string $material, int $version): RedirectResponse
@@ -348,6 +487,9 @@ class ProjectController extends Controller
         $style = [
             'emojis' => $request->boolean('emojis', true),
             'hashtags' => $request->boolean('hashtags', true),
+            'elements' => collect(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS)
+                ->mapWithKeys(fn (string $label, string $key): array => [$key => $request->boolean('elements.'.$key, true)])
+                ->all(),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
 

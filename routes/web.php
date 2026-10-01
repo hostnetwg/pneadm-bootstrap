@@ -96,6 +96,24 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects/{project}/materials/{material}/versions/{version}/restore', [GrowthOsProjectController::class, 'restoreMaterialVersion'])
             ->whereNumber('version')
             ->name('projects.materials.versions.restore');
+        Route::post('/projects/{project}/materials/{material}/images', [GrowthOsProjectController::class, 'generateMaterialImage'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.materials.images.generate');
+        Route::get('/projects/{project}/materials/{material}/images/{image}', [GrowthOsProjectController::class, 'showMaterialImage'])
+            ->whereNumber('image')
+            ->name('projects.materials.images.show');
+        Route::post('/projects/{project}/materials/{material}/images/limit/reset', [GrowthOsProjectController::class, 'resetMaterialImageLimit'])
+            ->name('projects.materials.images.limit.reset');
+        Route::post('/projects/{project}/materials/{material}/images/{image}/square', [GrowthOsProjectController::class, 'adaptMaterialImageToSquare'])
+            ->whereNumber('image')
+            ->middleware('throttle:growth-ai')
+            ->name('projects.materials.images.square');
+        Route::post('/projects/{project}/materials/{material}/images/{image}/select', [GrowthOsProjectController::class, 'selectMaterialImage'])
+            ->whereNumber('image')
+            ->name('projects.materials.images.select');
+        Route::delete('/projects/{project}/materials/{material}/images/{image}', [GrowthOsProjectController::class, 'deleteMaterialImage'])
+            ->whereNumber('image')
+            ->name('projects.materials.images.delete');
         Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');
         Route::get('/inbox', [GrowthOsApprovalController::class, 'index'])->name('inbox.index');
     });

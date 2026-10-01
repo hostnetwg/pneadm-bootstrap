@@ -14,7 +14,9 @@ use App\Observers\DebtCaseObserver;
 use App\Observers\FormOrderObserver;
 use App\Observers\ParticipantObserver;
 use App\Observers\ProductPriceObserver;
+use App\Services\GrowthOS\AI\Contracts\GrowthAiImageProvider;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiProvider;
+use App\Services\GrowthOS\AI\Providers\OpenAiImageProvider;
 use App\Services\GrowthOS\AI\Providers\OpenAiProvider;
 use App\Services\ReleaseChangelogService;
 use App\Support\DestructiveDatabaseGuard;
@@ -38,6 +40,13 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(GrowthAiProvider::class, function (): GrowthAiProvider {
             return match ((string) config('growth_ai.provider')) {
                 'openai' => app(OpenAiProvider::class),
+                default => throw new LogicException('Unsupported Growth AI provider.'),
+            };
+        });
+
+        $this->app->bind(GrowthAiImageProvider::class, function (): GrowthAiImageProvider {
+            return match ((string) config('growth_ai.provider')) {
+                'openai' => app(OpenAiImageProvider::class),
                 default => throw new LogicException('Unsupported Growth AI provider.'),
             };
         });

@@ -26,6 +26,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
     private const FACEBOOK = 'facebook-post';
 
+    private const GRAPHIC = 'main-graphic';
+
     private const FACEBOOK_DRAFT = "🎓 Canva AI w pracy nauczyciela — 6 października 2026 r., godz. 20:00.\n\nZapisz się: [LINK DO ZAPISU]\n\n#nauczyciele #TIK";
 
     private const AI_DRAFT = "Webinar „Canva AI w pracy nauczyciela” — 6 października 2026 r., godz. 20:00.\n\nPokażemy praktyczne zastosowania Canva AI w przygotowaniu materiałów.";
@@ -93,7 +95,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach (['main-mail', 'main-graphic', 'landing'] as $key) {
+        foreach (['main-mail', 'reminder-mail', 'landing'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();
@@ -877,8 +879,193 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertStringNotContainsString('Canva', $log);
     }
 
+    public function test_graphic_page_shows_element_checkboxes_and_app_date(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertOk()
+            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Dodatkowe elementy briefu')
+            ->assertSee('id="material_ai_element_subtitle" checked', false)
+            ->assertSee('id="material_ai_element_alt_text" checked', false)
+            ->assertSee($this->liveLabel())
+            ->assertDontSee('material_ai_emojis');
+    }
+
+    public function test_graphic_payload_and_schema(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+
+        $this->requestFor($user, self::GRAPHIC)->assertSessionHas('success');
+
+        $input = $this->provider->input;
+        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'], array_keys($input));
+        $this->assertSame(['youtube_description' => ''], $input['source_materials']);
+        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name', 'live_label'], array_keys($input['campaign']));
+        $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
+        $this->assertSame(['formats', 'elements'], array_keys($input['style']));
+        $this->assertSame(array_keys(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS), array_keys($input['style']['elements']));
+        $this->assertSame(['key' => self::GRAPHIC, 'name' => 'Grafika główna', 'type' => 'graphic_brief'], $input['material']);
+        $this->assertSame(
+            ['headline', 'subtitle', 'cta', 'visual_direction', 'image_prompt', 'alt_text', 'change_summary'],
+            $this->provider->schema['required'],
+        );
+        $this->assertStringContainsString('bez żadnego tekstu', $this->provider->instructions);
+        $this->assertStringContainsString('source_materials.youtube_description', $this->provider->instructions);
+    }
+
+    public function test_graphic_brief_uses_only_approved_youtube_description(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+
+        $this->saveMaterial($user, self::MATERIAL, 'REVIEW', 'Opis YouTube do sprawdzenia');
+        $this->requestFor($user, self::GRAPHIC);
+        $this->assertSame('', $this->provider->input['source_materials']['youtube_description']);
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertSee('Opis YouTube nie jest zatwierdzony, więc AI go nie dostanie.');
+
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Zatwierdzony opis YouTube');
+        $this->requestFor($user, self::GRAPHIC);
+        $this->assertSame('Zatwierdzony opis YouTube', $this->provider->input['source_materials']['youtube_description']);
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertSee('AI użyje zatwierdzonego opisu YouTube jako źródła.');
+    }
+
+    public function test_graphic_proposal_goes_stale_when_youtube_description_changes(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Zatwierdzony opis YouTube');
+        $this->requestFor($user, self::GRAPHIC);
+
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Inny zatwierdzony opis YouTube');
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertSessionHas('error', ProjectController::MATERIAL_AI_STALE_MESSAGE);
+        $this->assertNull($this->proposal(self::GRAPHIC));
+    }
+
+    public function test_graphic_brief_is_composed_with_app_date_and_host(): void
+    {
+        $user = $this->readyProject();
+        $payload = $this->graphicPayload();
+        $payload['subtitle'] = 'Praktyczny webinar TIK';
+        $this->provider->payload = $payload;
+
+        $this->requestFor($user, self::GRAPHIC);
+
+        $draft = $this->proposal(self::GRAPHIC)['draft'];
+        $this->assertStringContainsString('Formaty: '.MaterialDraftTask::GRAPHIC_FORMATS, $draft);
+        $this->assertStringContainsString('Nagłówek: Canva AI w pracy nauczyciela', $draft);
+        $this->assertStringContainsString('Podtytuł: Praktyczny webinar TIK', $draft);
+        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $draft);
+        $this->assertStringContainsString('Prowadzący: Waldemar Grabowski', $draft);
+        $this->assertStringContainsString('Wezwanie do działania: Zapisz się', $draft);
+        $this->assertStringContainsString("Kierunek wizualny:\nGranat i biel.", $draft);
+        $this->assertStringContainsString("Opis obrazu dla AI (bez tekstu na obrazie):\nBiurko z laptopem.", $draft);
+        $this->assertStringContainsString("Tekst alternatywny (alt):\nGrafika webinaru.", $draft);
+        $this->assertSame(MaterialDraftTask::GRAPHIC_PROMPT_VERSION, $this->proposal(self::GRAPHIC)['prompt_version']);
+    }
+
+    public function test_unchecked_graphic_elements_are_sent_false_and_left_out(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+
+        $this->requestFor($user, self::GRAPHIC, [
+            'elements' => ['subtitle' => '0', 'host' => '0', 'cta' => '1', 'image_prompt' => '0', 'alt_text' => '0'],
+        ]);
+
+        $elements = $this->provider->input['style']['elements'];
+        $this->assertSame(['subtitle' => false, 'host' => false, 'cta' => true, 'image_prompt' => false, 'alt_text' => false], $elements);
+
+        $draft = $this->proposal(self::GRAPHIC)['draft'];
+        $this->assertStringNotContainsString('Podtytuł:', $draft);
+        $this->assertStringNotContainsString('Prowadzący:', $draft);
+        $this->assertStringNotContainsString('Opis obrazu dla AI', $draft);
+        $this->assertStringNotContainsString('Tekst alternatywny', $draft);
+        $this->assertStringContainsString('Wezwanie do działania: Zapisz się', $draft);
+        $this->assertStringContainsString('Termin: ', $draft);
+    }
+
+    public function test_graphic_response_with_missing_extra_or_empty_fields_is_rejected(): void
+    {
+        $user = $this->readyProject();
+
+        $missing = $this->graphicPayload();
+        unset($missing['alt_text']);
+        $extra = $this->graphicPayload() + ['live_date' => '2030-01-01'];
+        $empty = array_merge($this->graphicPayload(), ['headline' => '  ']);
+
+        foreach ([$missing, $extra, $empty] as $payload) {
+            $this->provider->payload = $payload;
+            $this->requestFor($user, self::GRAPHIC)->assertSessionHas('error', self::INVALID_MESSAGE);
+            $this->assertNull($this->proposal(self::GRAPHIC));
+        }
+    }
+
+    public function test_graphic_apply_writes_brief_with_graphic_versions(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->graphicPayload();
+        $this->requestFor($user, self::GRAPHIC);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::GRAPHIC]))
+            ->assertSessionHas('success');
+
+        $artifact = GrowthArtifact::query()->where('key', self::GRAPHIC)->first();
+        $this->assertNotNull($artifact);
+        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $artifact->payload['draft']);
+        $decision = GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_MATERIAL_AI_APPLY)->first();
+        $this->assertSame(self::GRAPHIC, $decision->meta['material_key']);
+        $this->assertSame(MaterialDraftTask::GRAPHIC_PROMPT_VERSION, $decision->meta['prompt_version']);
+    }
+
+    public function test_graphic_simulation_uses_app_date_and_follows_elements(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::GRAPHIC, ['elements' => ['alt_text' => '0']]);
+
+        $draft = $this->proposal(self::GRAPHIC)['draft'];
+        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $draft);
+        $this->assertStringContainsString('Nagłówek: Canva AI w pracy nauczyciela', $draft);
+        $this->assertStringNotContainsString('Tekst alternatywny', $draft);
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    private function liveLabel(): string
+    {
+        return now()->addDays(7)->setTime(20, 0)->locale('pl')->translatedFormat('l, j F Y, \g\o\d\z. H:i');
+    }
+
     /**
-     * @param  array<string, string>  $data
+     * @return array<string, string>
+     */
+    private function graphicPayload(): array
+    {
+        return [
+            'headline' => 'Canva AI w pracy nauczyciela',
+            'subtitle' => '',
+            'cta' => 'Zapisz się',
+            'visual_direction' => 'Granat i biel.',
+            'image_prompt' => 'Biurko z laptopem.',
+            'alt_text' => 'Grafika webinaru.',
+            'change_summary' => 'Przygotowano brief grafiki.',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
      */
     private function requestFor(User $user, string $key, array $data = []): \Illuminate\Testing\TestResponse
     {

@@ -8,12 +8,12 @@ v0.2, drugi wycinek: szkic AI dla materiału **Post Facebook** (`facebook-post`)
 
 ## NEXT
 
-Historia wersji materiałów (DEC-027): wdrożona lokalnie, czeka na weryfikację Waldemara i migrację na produkcji.
+Historia wersji materiałów (DEC-027): działa na produkcji od 2026-10-01.
 
 Potem grafika główna, w etapach:
 
-1. Tekstowy brief grafiki przez AI (nagłówek, podtytuł, termin, kierunek wizualny, opis obrazu). Ten sam wzorzec co post Facebook.
-2. Obraz z AI przez OpenAI (bez tekstu na obrazie, bo modele graficzne mylą polskie znaki i daty). Nowy koszt i przechowywanie plików, osobny DEC.
+1. Tekstowy brief grafiki przez AI (DEC-028), od DEC-029 z zatwierdzonym opisem YouTube: wdrożony lokalnie, czeka na weryfikację Waldemara.
+2. Obraz z AI przez OpenAI (DEC-029): generator z podglądem i galerią, od DEC-030 `gpt-image-2` medium z natywnym 16:9 i wersją kwadratową przekomponowaną z obrazu poziomego, domyślnie bez tekstu na obrazie, napis z nagłówkiem i terminem jako opcja. Wdrożony lokalnie, czeka na weryfikację Waldemara i migrację na produkcji.
 3. Projekt w Canvie: szablon marki z polami do wypełnienia przez Canva Connect Autofill API. Według ogłoszenia Canvy z 2026-09-23 Autofill działa od planu Pro, także w Canva Education; Waldemar ma Pro i Education. Wymaga integracji w Canva Developer Portal (MFA), połączenia konta przez OAuth i przechowywania tokenów. Część dokumentacji Canvy nadal wymienia Enterprise, więc trzeba to potwierdzić przed wdrożeniem.
 
 Przełącznik trybu grafiki (obraz AI / projekt w Canvie / połączenie) dopiero, gdy działają co najmniej dwa tryby. Potem mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.

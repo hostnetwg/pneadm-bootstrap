@@ -47,4 +47,22 @@ return [
         'input_per_million' => max(0, (float) env('GROWTH_AI_INPUT_COST_PER_MILLION', 0.25)),
         'output_per_million' => max(0, (float) env('GROWTH_AI_OUTPUT_COST_PER_MILLION', 2.00)),
     ],
+
+    /*
+    | Generator obrazu grafiki głównej (DEC-029, DEC-030). Ta sama flaga `enabled`;
+    | osobny limit dzienny i obwód awaryjny. Ceny to szacunek USD za obraz
+    | (gpt-image-2, jakość medium); wersja kwadratowa z poziomej płaci też za obraz wejściowy.
+    */
+    'images' => [
+        'model' => env('GROWTH_AI_IMAGE_MODEL', 'gpt-image-2'),
+        'quality' => env('GROWTH_AI_IMAGE_QUALITY', 'medium'),
+        'timeout_seconds' => max(30, (int) env('GROWTH_AI_IMAGE_TIMEOUT_SECONDS', 180)),
+        'daily_per_user' => max(1, (int) env('GROWTH_AI_IMAGE_DAILY_LIMIT_PER_USER', 10)),
+        'disk' => env('GROWTH_AI_IMAGE_DISK', 'local'),
+        'cost_per_image' => [
+            'landscape' => max(0, (float) env('GROWTH_AI_IMAGE_COST_LANDSCAPE', 0.042)),
+            'square' => max(0, (float) env('GROWTH_AI_IMAGE_COST_SQUARE', 0.053)),
+            'square_from_landscape' => max(0, (float) env('GROWTH_AI_IMAGE_COST_ADAPT', 0.07)),
+        ],
+    ],
 ];
