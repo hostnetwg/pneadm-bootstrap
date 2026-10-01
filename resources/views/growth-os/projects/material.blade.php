@@ -69,8 +69,19 @@
                         </div>
                         <div class="card-body">
                             <p class="small text-secondary">
-                                AI przygotowuje wyłącznie propozycję na podstawie zatwierdzonego kierunku i koncepcji. Obecny szkic zmienia się dopiero po kliknięciu „Zastosuj”. Nic nie jest publikowane.
+                                AI przygotowuje wyłącznie propozycję na podstawie zatwierdzonego kierunku i koncepcji{{ $aiDraftIsFacebookPost ? ' oraz zatwierdzonego opisu YouTube' : '' }}. Obecny szkic zmienia się dopiero po kliknięciu „Zastosuj”. Nic nie jest publikowane.
                             </p>
+
+                            @if($aiDraftIsFacebookPost)
+                                <p class="small mb-3">
+                                    @if($aiDraftUsesYoutubeDescription)
+                                        <span class="badge text-bg-success">✓ Opis YouTube</span> AI użyje zatwierdzonego opisu YouTube jako źródła.
+                                    @else
+                                        <span class="badge bg-light text-secondary border">Opis YouTube</span> Opis YouTube nie jest zatwierdzony, więc AI go nie dostanie.
+                                    @endif
+                                </p>
+                                <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
+                            @endif
 
                             @if(! $aiDraftAllowed)
                                 <div class="alert alert-warning small mb-3" role="status">Najpierw zatwierdź kierunek i koncepcję webinaru.</div>
@@ -81,8 +92,15 @@
                                 <input type="hidden" name="emojis" value="0">
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" name="emojis" value="1" id="material_ai_emojis" @checked(old('emojis', '1') === '1') @disabled(! $aiDraftAllowed)>
-                                    <label class="form-check-label" for="material_ai_emojis">Dodaj emotikony do opisu</label>
+                                    <label class="form-check-label" for="material_ai_emojis">{{ $aiDraftIsFacebookPost ? 'Dodaj emotikony do posta' : 'Dodaj emotikony do opisu' }}</label>
                                 </div>
+                                @if($aiDraftIsFacebookPost)
+                                    <input type="hidden" name="hashtags" value="0">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" name="hashtags" value="1" id="material_ai_hashtags" @checked(old('hashtags', '1') === '1') @disabled(! $aiDraftAllowed)>
+                                        <label class="form-check-label" for="material_ai_hashtags">Dodaj hashtagi (3–5)</label>
+                                    </div>
+                                @endif
                                 <label for="material_ai_instruction" class="form-label">Dodatkowa instrukcja dla AI (opcjonalnie)</label>
                                 <textarea
                                     id="material_ai_instruction"
@@ -90,7 +108,7 @@
                                     rows="4"
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control @error('instruction') is-invalid @enderror"
-                                    placeholder="Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki"
+                                    placeholder="{{ $aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki' }}"
                                     @disabled(! $aiDraftAllowed)
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror

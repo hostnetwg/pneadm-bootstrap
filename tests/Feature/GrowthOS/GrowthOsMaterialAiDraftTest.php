@@ -24,6 +24,10 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
     private const MATERIAL = 'youtube-description';
 
+    private const FACEBOOK = 'facebook-post';
+
+    private const FACEBOOK_DRAFT = "🎓 Canva AI w pracy nauczyciela — 6 października 2026 r., godz. 20:00.\n\nZapisz się: [LINK DO ZAPISU]\n\n#nauczyciele #TIK";
+
     private const AI_DRAFT = "Webinar „Canva AI w pracy nauczyciela” — 6 października 2026 r., godz. 20:00.\n\nPokażemy praktyczne zastosowania Canva AI w przygotowaniu materiałów.";
 
     private const UNAVAILABLE_MESSAGE = 'AI jest chwilowo niedostępne. Możesz kontynuować ręcznie.';
@@ -67,18 +71,20 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_material_page_shows_ai_action_only_for_youtube_description(): void
+    public function test_material_page_shows_ai_action_only_for_supported_materials(): void
     {
         $user = $this->readyProject();
 
-        $this->actingAs($user)
-            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]))
-            ->assertOk()
-            ->assertSee('Poproś AI o szkic')
-            ->assertSee('AI: OpenAI / '.config('growth_ai.model'));
+        foreach ([self::MATERIAL, self::FACEBOOK] as $key) {
+            $this->actingAs($user)
+                ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, $key]))
+                ->assertOk()
+                ->assertSee('Poproś AI o szkic')
+                ->assertSee('AI: OpenAI / '.config('growth_ai.model'));
+        }
 
         $this->actingAs($user)
-            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'facebook-post']))
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'main-mail']))
             ->assertOk()
             ->assertDontSee('Poproś AI o szkic');
     }
@@ -87,7 +93,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach (['main-mail', 'facebook-post', 'landing'] as $key) {
+        foreach (['main-mail', 'main-graphic', 'landing'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();
@@ -480,7 +486,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestDraft($user);
 
         $stored = session(DemoTikWebinarProject::SESSION_PROJECT);
-        $stored['material_ai_proposal']['fingerprint']['concept'] = hash('sha256', 'inna koncepcja');
+        $stored['material_ai_proposals'][self::MATERIAL]['fingerprint']['concept'] = hash('sha256', 'inna koncepcja');
         session([DemoTikWebinarProject::SESSION_PROJECT => $stored]);
 
         $this->assertStaleApply($user);
@@ -667,6 +673,220 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_facebook_page_shows_hashtags_checkbox_and_link_placeholder(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
+            ->assertOk()
+            ->assertSee('Dodaj emotikony do posta')
+            ->assertSee('id="material_ai_hashtags" checked', false)
+            ->assertSee(MaterialDraftTask::LINK_PLACEHOLDER)
+            ->assertSee('Opis YouTube nie jest zatwierdzony, więc AI go nie dostanie.');
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]))
+            ->assertDontSee('material_ai_hashtags');
+    }
+
+    public function test_facebook_payload_contains_only_allow_listed_data(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::FACEBOOK)->assertSessionHas('success');
+
+        $input = $this->provider->input;
+        $this->assertSame(
+            ['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'],
+            array_keys($input),
+        );
+        $this->assertSame(['youtube_description'], array_keys($input['source_materials']));
+        $this->assertSame(['emojis', 'hashtags'], array_keys($input['style']));
+        $this->assertSame(['key' => self::FACEBOOK, 'name' => 'Post Facebook', 'type' => 'facebook_post'], $input['material']);
+        $this->assertTrue($input['style']['hashtags']);
+        $this->assertSame(MaterialDraftTask::TYPE, $this->provider->taskType);
+        $this->assertStringContainsString('posta na Facebooku', $this->provider->instructions);
+        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $this->provider->instructions);
+        $this->assertStringContainsString('style.hashtags', $this->provider->instructions);
+    }
+
+    public function test_facebook_gets_youtube_description_only_when_approved(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, self::MATERIAL, 'REVIEW', 'Opis YouTube do sprawdzenia');
+
+        $this->requestFor($user, self::FACEBOOK);
+        $this->assertSame('', $this->provider->input['source_materials']['youtube_description']);
+
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Zatwierdzony opis YouTube');
+
+        $this->requestFor($user, self::FACEBOOK);
+        $this->assertSame('Zatwierdzony opis YouTube', $this->provider->input['source_materials']['youtube_description']);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
+            ->assertSee('AI użyje zatwierdzonego opisu YouTube jako źródła.');
+    }
+
+    public function test_facebook_never_receives_other_materials(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, 'main-mail', 'APPROVED', 'Sekretny szkic mailingu');
+        $this->saveMaterial($user, 'host-script', 'APPROVED', 'Sekretny scenariusz');
+
+        $this->requestFor($user, self::FACEBOOK);
+
+        $encoded = json_encode($this->provider->input, JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString('Sekretny', $encoded);
+        $this->assertStringNotContainsString('main-mail', $encoded);
+    }
+
+    public function test_youtube_payload_does_not_get_facebook_fields(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, self::FACEBOOK, 'APPROVED', 'Sekretny szkic posta Facebook');
+
+        $this->requestDraft($user);
+
+        $this->assertArrayNotHasKey('source_materials', $this->provider->input);
+        $this->assertSame(['emojis'], array_keys($this->provider->input['style']));
+    }
+
+    public function test_unchecked_hashtags_box_is_sent_as_false(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::FACEBOOK, ['hashtags' => '0']);
+
+        $this->assertFalse($this->provider->input['style']['hashtags']);
+    }
+
+    public function test_facebook_apply_writes_post_with_facebook_versions(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload['draft'] = self::FACEBOOK_DRAFT;
+
+        $this->requestFor($user, self::FACEBOOK);
+        $proposal = $this->proposal(self::FACEBOOK);
+        $this->assertSame(MaterialDraftTask::FACEBOOK_PROMPT_VERSION, $proposal['prompt_version']);
+        $this->assertSame(MaterialDraftTask::FACEBOOK_SCHEMA_VERSION, $proposal['schema_version']);
+        $this->assertSame(['direction', 'concept', 'material', 'host', 'source_materials'], array_keys($proposal['fingerprint']));
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
+            ->assertSessionHas('success');
+
+        $artifact = GrowthArtifact::query()->where('key', self::FACEBOOK)->first();
+        $this->assertNotNull($artifact);
+        $this->assertSame(self::FACEBOOK_DRAFT, $artifact->payload['draft']);
+        $this->assertSame('DRAFT', DemoTikWebinarProject::material(DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK)['status']);
+
+        $decision = GrowthDecision::query()->where('type', GrowthSessionConceptStore::DECISION_MATERIAL_AI_APPLY)->first();
+        $this->assertSame(self::FACEBOOK, $decision->meta['material_key']);
+        $this->assertSame(MaterialDraftTask::FACEBOOK_PROMPT_VERSION, $decision->meta['prompt_version']);
+    }
+
+    public function test_youtube_description_change_blocks_old_facebook_apply(): void
+    {
+        $user = $this->readyProject();
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Zatwierdzony opis YouTube');
+        $this->requestFor($user, self::FACEBOOK);
+
+        $this->saveMaterial($user, self::MATERIAL, 'REVIEW', 'Zatwierdzony opis YouTube');
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
+            ->assertSessionHas('error', ProjectController::MATERIAL_AI_STALE_MESSAGE);
+
+        $this->assertNull($this->proposal(self::FACEBOOK));
+        $this->assertNull(GrowthArtifact::query()->where('key', self::FACEBOOK)->first());
+    }
+
+    public function test_youtube_and_facebook_proposals_are_kept_separately(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestDraft($user);
+        $this->provider->payload['draft'] = self::FACEBOOK_DRAFT;
+        $this->requestFor($user, self::FACEBOOK);
+
+        $this->assertSame(self::AI_DRAFT, $this->proposal()['draft']);
+        $this->assertSame(self::FACEBOOK_DRAFT, $this->proposal(self::FACEBOOK)['draft']);
+
+        $this->rejectDraft($user);
+
+        $this->assertNull($this->proposal());
+        $this->assertSame(self::FACEBOOK_DRAFT, $this->proposal(self::FACEBOOK)['draft']);
+    }
+
+    public function test_facebook_simulation_uses_placeholder_and_follows_hashtags_choice(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::FACEBOOK, ['emojis' => '1', 'hashtags' => '1']);
+        $draft = $this->proposal(self::FACEBOOK)['draft'];
+        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $draft);
+        $this->assertStringContainsString('#nauczyciele', $draft);
+        $this->assertStringContainsString('📅', $draft);
+
+        $this->requestFor($user, self::FACEBOOK, ['emojis' => '0', 'hashtags' => '0']);
+        $draft = $this->proposal(self::FACEBOOK)['draft'];
+        $this->assertStringNotContainsString('#', $draft);
+        $this->assertStringNotContainsString('📅', $draft);
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_too_long_facebook_post_is_rejected(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload['draft'] = str_repeat('a', MaterialDraftTask::FACEBOOK_MAX_DRAFT_CHARS + 1);
+
+        $this->requestFor($user, self::FACEBOOK)->assertSessionHas('error', self::INVALID_MESSAGE);
+
+        $this->assertNull($this->proposal(self::FACEBOOK));
+    }
+
+    public function test_url_in_facebook_post_is_rejected(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload['draft'] = "Zapisz się: https://pnedu.pl/zapisy\n\n#TIK";
+
+        $this->requestFor($user, self::FACEBOOK)->assertSessionHas('error', self::INVALID_MESSAGE);
+
+        $this->assertNull($this->proposal(self::FACEBOOK));
+    }
+
+    public function test_log_uses_facebook_prompt_version(): void
+    {
+        $this->logPath = storage_path('logs/growth-ai-facebook-test-'.uniqid().'.log');
+        config()->set('logging.channels.growth_ai_facebook_test', [
+            'driver' => 'single',
+            'path' => $this->logPath,
+            'level' => 'debug',
+        ]);
+        config()->set('growth_ai.log_channel', 'growth_ai_facebook_test');
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::FACEBOOK);
+
+        $log = (string) file_get_contents($this->logPath);
+        $this->assertStringContainsString('"prompt_version":"'.MaterialDraftTask::FACEBOOK_PROMPT_VERSION.'"', $log);
+        $this->assertStringContainsString('"schema_version":"'.MaterialDraftTask::FACEBOOK_SCHEMA_VERSION.'"', $log);
+        $this->assertStringNotContainsString('Canva', $log);
+    }
+
+    /**
+     * @param  array<string, string>  $data
+     */
+    private function requestFor(User $user, string $key, array $data = []): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]), $data)
+            ->assertRedirect(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, $key]));
+    }
+
     private function assertStaleApply(User $user): void
     {
         $this->actingAs($user)
@@ -782,11 +1002,11 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     /**
      * @return array<string, mixed>|null
      */
-    private function proposal(): ?array
+    private function proposal(string $key = self::MATERIAL): ?array
     {
         $project = DemoTikWebinarProject::project();
 
-        return is_array($project) ? DemoTikWebinarProject::materialAiProposal($project, self::MATERIAL) : null;
+        return is_array($project) ? DemoTikWebinarProject::materialAiProposal($project, $key) : null;
     }
 
     private function artifact(): GrowthArtifact

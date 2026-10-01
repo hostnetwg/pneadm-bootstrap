@@ -46,11 +46,11 @@ final class GrowthAiService
     /**
      * @param  array<string, mixed>  $context
      */
-    public function draftMaterial(User $user, array $context): MaterialDraftResult
+    public function draftMaterial(User $user, string $materialKey, array $context): MaterialDraftResult
     {
         $this->ensureAllowed($user);
 
-        $task = $this->materialDraftTask;
+        $task = $this->materialDraftTask->forMaterial($materialKey);
         $input = $task->input($context);
 
         return $this->run(

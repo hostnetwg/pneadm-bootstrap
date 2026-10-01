@@ -4,11 +4,11 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-v0.2, pierwszy wycinek: szkic AI opisu YouTube (`youtube-description`) z jawnym Zastosuj / Odrzuć. Wdrożone lokalnie, czeka na ręczną weryfikację Waldemara.
+v0.2, drugi wycinek: szkic AI dla materiału **Post Facebook** (`facebook-post`), tym samym wzorcem co opis YouTube (DEC-026). Wdrożone lokalnie, czeka na ręczną weryfikację Waldemara. Pierwszy wycinek (opis YouTube) Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji.
 
 ## NEXT
 
-Po ręcznej weryfikacji szkicu opisu YouTube: decyzja, czy i który kolejny materiał dostaje AI. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Po Post Facebook: pierwszy materiał krytyczny, czyli mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 

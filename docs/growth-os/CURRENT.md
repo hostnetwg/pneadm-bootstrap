@@ -3,7 +3,7 @@
 Last updated: 2026-10-01 CEST<br>
 Branch: main<br>
 Commit: badcc3c<br>
-Stage: v0.2 — szkic AI opisu YouTube<br>
+Stage: v0.2 — szkice AI opisu YouTube i posta Facebook<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
 ## 1. Cel projektu
@@ -18,10 +18,11 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
 - Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia.
 - Materiał „Opis YouTube”: „Poproś AI o szkic” po zatwierdzeniu kierunku i koncepcji, obecny szkic obok propozycji, Zastosuj / Odrzuć.
+- Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
 
 ## 2. Aktualny etap
 
-Etap v0.2, pierwszy wycinek — szkic AI tylko dla materiału `youtube-description` (DEC-024). Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
+Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-024), Waldemar zweryfikował 2026-10-01, z prawdziwym AI i w symulacji. Drugi wycinek, szkic AI dla materiału `facebook-post` (DEC-026), jest wdrożony lokalnie i czeka na ręczną weryfikację Waldemara. Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -94,10 +95,11 @@ Zaplanuj TIK
 
 ## 8. Następny krok
 
-Ręczna weryfikacja szkicu AI opisu YouTube przez Waldemara (z `GROWTH_AI_ENABLED=true` i bez). Potem decyzja, czy i który kolejny materiał dostaje AI. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Ręczna weryfikacja szkicu AI posta Facebook przez Waldemara (z `GROWTH_AI_ENABLED=true` i bez, z zatwierdzonym i niezatwierdzonym opisem YouTube). Do potwierdzenia: hashtagi domyślnie włączone i długość około 800 znaków. Później mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
 
+- v0.2: szkic AI dla materiału `facebook-post` (DEC-026), drugi profil zadania `material_draft`. Korzysta tylko z zatwierdzonego opisu YouTube, wstawia `[LINK DO ZAPISU]`, ma opcje emotikon i hashtagów. Propozycje AI są w sesji osobno dla każdego materiału.
 - v0.2: szkic AI dla materiału `youtube-description` (zadanie `material_draft`, DEC-024). `GrowthAiService` obsługuje dwa zadania przez mały kontrakt `GrowthAiTask`; `concept_revision` działa bez zmian.
 - Zatwierdzone karty „Pomysł i kierunek” i „Koncepcja”, gotowe etapy przygotowania oraz blok z tytułem (gdy wszystkie etapy są gotowe) mają jasnozielone tło i zielony pasek z lewej.
 - Statusy materiałów mają kolory: zielony „✓ Zatwierdzone” z zielonym paskiem na liście, żółty „Do sprawdzenia”, niebieski „✓ Opublikowane / zaplanowane”, szary Draft i jasny „Nie rozpoczęto”.

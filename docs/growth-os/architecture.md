@@ -1,6 +1,6 @@
 # PNE Growth OS — Architecture
 
-Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. Propozycje AI (koncepcja i szkic opisu YouTube) zostają w sesji HTTP.
+Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. Propozycje AI (koncepcja oraz szkice opisu YouTube i posta Facebook) zostają w sesji HTTP.
 
 ## Zasada Główna
 
@@ -213,16 +213,16 @@ Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, 
 - RAG, embeddings i vector DB,
 - automatyczne działania zewnętrzne.
 
-## Obecny Etap: v0.1 + v0.2 (szkic AI opisu YouTube)
+## Obecny Etap: v0.1 + v0.2 (szkice AI opisu YouTube i posta Facebook)
 
 Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu, artifact `direction` przy „Zapisz kierunek” i przy zatwierdzeniu kierunku, artifact `concept` przy ręcznym zapisie i przy „Zastosuj” oraz dziesięć materiałów typu `material` przy „Zapisz materiał”. Odświeżenie w tej samej sesji czyta te dane z bazy. Utworzenie projektu zapisuje też `host_name`. Propozycja AI zostaje w sesji.
 
 Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, prowadzący (`host_name`), kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Ręczny zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Propozycje AI zostają w sesji i nie wracają po nowym zalogowaniu.
 
-Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w dwóch zadaniach: rewizja koncepcji (`concept_revision`) i szkic opisu YouTube (`material_draft`, tylko materiał `youtube-description`):
+Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w dwóch zadaniach: rewizja koncepcji (`concept_revision`) i szkic materiału (`material_draft`, tylko materiały `youtube-description` i `facebook-post`):
 
 ```text
-Etap Koncepcja / ekran materiału „Opis YouTube”
+Etap Koncepcja / ekran materiału „Opis YouTube” albo „Post Facebook”
 → GrowthAiService (flaga, super_admin, circuit breaker, wspólny limit dzienny, log)
 → ConceptRevisionTask albo MaterialDraftTask (allowlista danych, prompt, schema, walidacja)
 → GrowthAiProvider
@@ -237,7 +237,9 @@ Oba zadania implementują mały kontrakt `GrowthAiTask` (`type`, `promptVersion`
 
 `MaterialDraftTask` (DEC-024): prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`, profil `youtube_description_v1`. Wejście to allowlista: `material` (klucz, nazwa, typ), `campaign` (`working_topic`, etykieta celu, `live_date`, `live_time`, strefa aplikacji, `host_name`), pięć pól kierunku, pola koncepcji (`title`, `subtitle`, `promise`, `points`, `plan`, `cta`, `additional_material`), bieżący szkic tego materiału, `style.emojis` i opcjonalna `instruction` właściciela. Bez innych materiałów. `host_name` trafia do AI od DEC-025; pusty lub „—” jest wysyłany jako pusty, a prompt każe przepisać imię i nazwisko bez dopisywania biografii. Wyjście: `draft` i `change_summary`; dodatkowe pola, dane osobowe i linki spoza wejścia odrzucają odpowiedź. Data i godzina idą osobno, a przy kontroli telefonów wzorce dat są pomijane, żeby termin nie wyglądał jak numer telefonu.
 
-Propozycja szkicu ma odcisk sha256 czterech źródeł: pól kierunku, pól koncepcji, bieżącego szkicu materiału i prowadzącego. „Zastosuj” liczy odcisk ponownie i sprawdza oba zatwierdzenia. Różnica czyści propozycję i niczego nie zapisuje. Zgodność zapisuje szkic, ustawia status `DRAFT`, zapisuje artifact `material` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`.
+Profil `facebook-post` (DEC-026): prompt `material_facebook_post_v1`, schema `material_facebook_post_schema_v1`, profil `facebook_post_v1`. Wejście to ta sama allowlista plus `source_materials.youtube_description` (opis YouTube tylko ze statusem Zatwierdzone lub Opublikowane, w innym wypadku pusty) i `style.hashtags`. Żadne inne materiały. AI wstawia `[LINK DO ZAPISU]` zamiast adresu. Twardy limit odpowiedzi to 1500 znaków. Profil wybiera `MaterialDraftTask::forMaterial($klucz)`; nieobsługiwany klucz daje 404 w kontrolerze.
+
+Propozycje są w sesji osobno dla każdego materiału (`material_ai_proposals[klucz]`). Propozycja szkicu ma odcisk sha256 czterech źródeł: pól kierunku, pól koncepcji, bieżącego szkicu materiału i prowadzącego. Przy poście dochodzi piąte źródło, `source_materials` (zatwierdzony opis YouTube). „Zastosuj” liczy odcisk ponownie i sprawdza oba zatwierdzenia. Różnica czyści propozycję i niczego nie zapisuje. Zgodność zapisuje szkic, ustawia status `DRAFT`, zapisuje artifact `material` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`.
 
 Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy.
 

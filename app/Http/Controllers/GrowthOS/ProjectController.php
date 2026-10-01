@@ -305,13 +305,17 @@ class ProjectController extends Controller
         $item = DemoTikWebinarProject::material($project, $material);
         $projectItem = DemoTikWebinarProject::requireProject($project);
 
-        $aiDraftSupported = $material === MaterialDraftTask::MATERIAL_KEY;
+        $aiDraftSupported = MaterialDraftTask::supports($material);
+        $isFacebookPost = $material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY;
 
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
+            'aiDraftIsFacebookPost' => $isFacebookPost,
+            'aiDraftUsesYoutubeDescription' => $isFacebookPost
+                && DemoTikWebinarProject::approvedYoutubeDescription($projectItem) !== '',
             'aiDraftAllowed' => $aiDraftSupported && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
             'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
@@ -321,13 +325,16 @@ class ProjectController extends Controller
 
     public function requestMaterialAi(Request $request, string $project, string $material): RedirectResponse
     {
-        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        abort_unless(MaterialDraftTask::supports($material), 404);
         $item = DemoTikWebinarProject::requireProject($project);
         $data = $request->validate([
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
-        $emojis = $request->boolean('emojis', true);
+        $style = [
+            'emojis' => $request->boolean('emojis', true),
+            'hashtags' => $request->boolean('hashtags', true),
+        ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
 
         if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
@@ -335,7 +342,7 @@ class ProjectController extends Controller
         }
 
         if (config('growth_ai.enabled') !== true) {
-            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $emojis, $instruction);
+            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction);
 
             return $back->with('success', 'AI przygotowało szkic (symulacja lokalna). Obecny szkic nie został nadpisany.');
         }
@@ -343,7 +350,8 @@ class ProjectController extends Controller
         try {
             $result = app(GrowthAiService::class)->draftMaterial(
                 $request->user(),
-                DemoTikWebinarProject::materialAiContext($item, $material, $emojis, $instruction),
+                $material,
+                DemoTikWebinarProject::materialAiContext($item, $material, $style, $instruction),
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
@@ -360,7 +368,7 @@ class ProjectController extends Controller
 
     public function applyMaterialAi(string $project, string $material): RedirectResponse
     {
-        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        abort_unless(MaterialDraftTask::supports($material), 404);
         $outcome = DemoTikWebinarProject::applyMaterialAiProposal($project, $material);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
 
@@ -373,7 +381,7 @@ class ProjectController extends Controller
 
     public function rejectMaterialAi(string $project, string $material): RedirectResponse
     {
-        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        abort_unless(MaterialDraftTask::supports($material), 404);
         DemoTikWebinarProject::rejectMaterialAiProposal($project, $material);
 
         return redirect()
