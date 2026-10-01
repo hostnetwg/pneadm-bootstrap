@@ -99,6 +99,8 @@ Ręczna weryfikacja szkicu AI opisu YouTube przez Waldemara (z `GROWTH_AI_ENABLE
 ## 9. Ostatnie zmiany
 
 - v0.2: szkic AI dla materiału `youtube-description` (zadanie `material_draft`, DEC-024). `GrowthAiService` obsługuje dwa zadania przez mały kontrakt `GrowthAiTask`; `concept_revision` działa bez zmian.
+- Zatwierdzone karty „Pomysł i kierunek” i „Koncepcja”, gotowe etapy przygotowania oraz blok z tytułem (gdy wszystkie etapy są gotowe) mają jasnozielone tło i zielony pasek z lewej.
+- Statusy materiałów mają kolory: zielony „✓ Zatwierdzone” z zielonym paskiem na liście, żółty „Do sprawdzenia”, niebieski „✓ Opublikowane / zaplanowane”, szary Draft i jasny „Nie rozpoczęto”.
 - Opis YouTube: opcja emotikon i dodatkowa instrukcja dla AI (prompt v2). AI dostaje prowadzącego (`host_name`) i może go wymienić (DEC-025); zmiana prowadzącego unieważnia starą propozycję. Ekrany projektu i materiału mają czytelniejszy wygląd: szare tło strony, białe karty, wyraźne obramowanie pól i pogrubione etykiety (`growth-os/partials/readable-styles.blade.php`).
 - Dodano Zastosuj / Odrzuć szkicu jako decyzje `material_ai_apply` / `material_ai_reject`; nieaktualna propozycja (zmieniony kierunek, koncepcja lub szkic) jest odrzucana.
 

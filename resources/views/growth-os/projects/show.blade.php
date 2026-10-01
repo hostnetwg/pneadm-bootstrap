@@ -19,7 +19,10 @@
             <span>{{ $project['topic'] }}</span>
         </nav>
 
-        <section class="rounded border growth-hero p-4 mb-4">
+        @php
+            $allStagesDone = collect($stages)->every(fn (array $stage) => isset($project['completed_steps'][$stage['id']]));
+        @endphp
+        <section class="rounded border growth-hero p-4 mb-4 {{ $allStagesDone ? 'growth-done' : '' }}">
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                 <div>
                     <div class="d-flex flex-wrap gap-2 mb-2">
@@ -66,7 +69,7 @@
                 @foreach($stages as $stage)
                     @php $done = isset($project['completed_steps'][$stage['id']]); @endphp
                     <div class="col-md-4 col-xl-2">
-                        <a href="#{{ $stage['anchor'] }}" class="card border text-decoration-none text-reset h-100">
+                        <a href="#{{ $stage['anchor'] }}" class="card border text-decoration-none text-reset h-100 {{ $done ? 'growth-done' : '' }}">
                             <div class="card-body p-3">
                                 <span class="badge {{ $done ? 'text-bg-success' : 'bg-light text-secondary border' }}">
                                     {{ $done ? 'Gotowe' : 'Przed nami' }}
@@ -79,7 +82,7 @@
             </div>
         </section>
 
-        <section id="direction" class="card border mb-4" aria-labelledby="direction-heading">
+        <section id="direction" class="card border mb-4 {{ isset($project['completed_steps']['direction']) ? 'growth-done' : '' }}" aria-labelledby="direction-heading">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="direction-heading">Pomysł i kierunek</h2>
                 @if(isset($project['completed_steps']['direction']))
@@ -143,7 +146,7 @@
             </div>
         </section>
 
-        <section id="concept" class="card border mb-4" aria-labelledby="concept-heading">
+        <section id="concept" class="card border mb-4 {{ isset($project['completed_steps']['concept']) ? 'growth-done' : '' }}" aria-labelledby="concept-heading">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
                 <h2 class="h5 mb-0" id="concept-heading">Koncepcja webinaru</h2>
                 @if(isset($project['completed_steps']['concept']))
@@ -502,15 +505,18 @@
         <section id="materials" class="mb-4" aria-labelledby="materials-heading">
             <h2 class="h5 mb-3" id="materials-heading">Materiały</h2>
             <div class="list-group">
+                @php
+                    $materialBadgeClasses = \App\Support\GrowthOS\DemoTikWebinarProject::materialStatusBadgeClasses();
+                @endphp
                 @foreach($project['materials'] as $material)
-                    <a href="{{ route('growth.projects.materials.show', [$project['id'], $material['id']]) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
+                    <a href="{{ route('growth.projects.materials.show', [$project['id'], $material['id']]) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3 growth-material-{{ strtolower($material['status']) }}">
                         <span>
                             <span class="badge text-bg-secondary me-2">{{ $material['kind'] }}</span>
                             <span class="fw-semibold">{{ $material['name'] }}</span>
                             <span class="d-block small text-secondary mt-1">{{ $material['summary'] }}</span>
                         </span>
-                        <span class="badge bg-light text-secondary border text-nowrap">
-                            {{ $materialStatusLabels[$material['status']] ?? $material['status'] }}
+                        <span class="badge {{ $materialBadgeClasses[$material['status']] ?? 'bg-light text-secondary border' }} text-nowrap">
+                            {{ in_array($material['status'], ['APPROVED', 'PUBLISHED'], true) ? '✓ ' : '' }}{{ $materialStatusLabels[$material['status']] ?? $material['status'] }}
                         </span>
                     </a>
                 @endforeach

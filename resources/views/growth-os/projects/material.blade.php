@@ -24,7 +24,7 @@
                 <div>
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <span class="badge text-bg-secondary">{{ $material['kind'] }}</span>
-                        <span class="badge bg-light text-secondary border">{{ $materialStatusLabels[$material['status']] ?? $material['status'] }}</span>
+                        <span class="badge {{ \App\Support\GrowthOS\DemoTikWebinarProject::materialStatusBadgeClasses()[$material['status']] ?? 'bg-light text-secondary border' }}">{{ in_array($material['status'], ['APPROVED', 'PUBLISHED'], true) ? '✓ ' : '' }}{{ $materialStatusLabels[$material['status']] ?? $material['status'] }}</span>
                     </div>
                     <h2 class="h4 mb-2">{{ $material['name'] }}</h2>
                     <p class="text-secondary mb-0">{{ $material['summary'] }}</p>

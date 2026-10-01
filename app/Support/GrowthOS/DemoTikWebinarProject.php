@@ -1454,6 +1454,20 @@ class DemoTikWebinarProject
     }
 
     /**
+     * @return array<string, string>
+     */
+    public static function materialStatusBadgeClasses(): array
+    {
+        return [
+            'NOT_STARTED' => 'bg-light text-secondary border',
+            'DRAFT' => 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+            'REVIEW' => 'text-bg-warning',
+            'APPROVED' => 'text-bg-success',
+            'PUBLISHED' => 'text-bg-primary',
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private static function materialTemplate(

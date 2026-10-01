@@ -7,6 +7,9 @@
         --growth-input-border: #a3aebd;
         --growth-text: #1f2937;
         --growth-text-muted: #556070;
+        --growth-done-surface: #e8f5ec;
+        --growth-done-surface-muted: #d6ecdd;
+        --growth-done-border: #a9d5b6;
         background: var(--growth-page-bg);
         border-radius: .75rem;
         padding: 1rem;
@@ -101,6 +104,32 @@
 
     .growth-readable .form-check-input {
         border-color: var(--growth-input-border);
+    }
+
+    .growth-readable .list-group-item.growth-material-approved {
+        border-left: 4px solid var(--bs-success);
+        background: var(--growth-done-surface);
+    }
+
+    .growth-readable .card.growth-done,
+    .growth-readable .growth-hero.growth-done {
+        background: var(--growth-done-surface) !important;
+        border-color: var(--growth-done-border) !important;
+        border-left: 4px solid var(--bs-success) !important;
+    }
+
+    .growth-readable .card.growth-done > .card-header,
+    .growth-readable .card.growth-done > .card-footer {
+        background: var(--growth-done-surface-muted) !important;
+        border-color: var(--growth-done-border);
+    }
+
+    .growth-readable .list-group-item.growth-material-published {
+        border-left: 4px solid var(--bs-primary);
+    }
+
+    .growth-readable .list-group-item.growth-material-review {
+        border-left: 4px solid var(--bs-warning);
     }
 
     .growth-readable .growth-draft-editor {
