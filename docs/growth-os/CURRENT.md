@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-01 CEST<br>
 Branch: main<br>
-Commit: 6af03a4 (wycinek v0.2 jeszcze bez commita)<br>
+Commit: 8612292<br>
 Stage: v0.2 — szkic AI opisu YouTube<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
