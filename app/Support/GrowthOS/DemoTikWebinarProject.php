@@ -6,6 +6,7 @@ use App\Models\GrowthOS\GrowthCampaign;
 use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Services\GrowthOS\GrowthSessionConceptStore;
 use Carbon\CarbonImmutable;
@@ -511,6 +512,7 @@ class DemoTikWebinarProject
             ],
             'concept_versions' => [],
             'concept_ai_proposal' => null,
+            'material_ai_proposal' => null,
             'materials' => self::defaultMaterials(),
         ];
     }
@@ -854,6 +856,331 @@ class DemoTikWebinarProject
         }
 
         abort(404);
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public static function canDraftMaterialWithAi(array $project): bool
+    {
+        $completed = is_array($project['completed_steps'] ?? null) ? $project['completed_steps'] : [];
+
+        return isset($completed['direction'], $completed['concept']);
+    }
+
+    /**
+     * Allow-listed context for the AI material draft. No host, no other materials, no personal data.
+     *
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    public static function materialAiContext(array $project, string $materialId, bool $emojis = true, string $instruction = ''): array
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+        $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+        $goal = (string) ($project['goal'] ?? '');
+
+        return [
+            'campaign' => [
+                'working_topic' => (string) ($project['topic'] ?? ''),
+                'goal' => (string) (collect(self::goals())->firstWhere('value', $goal)['label'] ?? $goal),
+                'live_date' => (string) ($project['live_date'] ?? ''),
+                'live_time' => (string) ($project['live_time'] ?? ''),
+                'timezone' => (string) config('app.timezone'),
+                'host_name' => self::aiHostName($project),
+            ],
+            'direction' => self::fingerprintDirection($direction),
+            'concept' => self::fingerprintConcept($concept),
+            'current_draft' => self::materialDraft($project, $materialId),
+            'style' => ['emojis' => $emojis],
+            'instruction' => trim($instruction),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array{direction: string, concept: string, material: string, host: string}
+     */
+    public static function materialAiFingerprint(array $project, string $materialId): array
+    {
+        $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
+        $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+
+        return [
+            'direction' => self::hash(self::fingerprintDirection($direction)),
+            'concept' => self::hash(self::fingerprintConcept($concept)),
+            'material' => self::hash(['draft' => self::materialDraft($project, $materialId)]),
+            'host' => self::hash(['host_name' => self::aiHostName($project)]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function aiHostName(array $project): string
+    {
+        $host = trim((string) ($project['host'] ?? ''));
+
+        return $host === '—' ? '' : $host;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function requestMaterialAiProposal(
+        string $projectId,
+        string $materialId,
+        bool $emojis = true,
+        string $instruction = '',
+    ): array {
+        $project = self::requireProject($projectId);
+        $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
+        $instruction = trim($instruction);
+
+        $project['material_ai_proposal'] = [
+            'material_key' => $materialId,
+            'draft' => self::simulatedYoutubeDescription($project, $concept, $emojis),
+            'change_summary' => 'Symulacja lokalna: szkic złożony z zatwierdzonej koncepcji (tytuł, termin, obietnica, program, CTA).'
+                .($instruction !== '' ? ' Symulacja nie interpretuje dodatkowej instrukcji — uwzględni ją prawdziwe AI.' : ''),
+            'instruction' => $instruction,
+            'source' => 'simulation',
+            'provider' => null,
+            'model' => null,
+            'prompt_version' => null,
+            'schema_version' => null,
+            'fingerprint' => self::materialAiFingerprint($project, $materialId),
+            'created_at' => now()->toIso8601String(),
+            'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+        ];
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * Store a validated real-AI draft without changing the current material.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeMaterialAiProposal(
+        string $projectId,
+        string $materialId,
+        MaterialDraftResult $result,
+        string $instruction = '',
+    ): array {
+        $project = self::requireProject($projectId);
+
+        $project['material_ai_proposal'] = [
+            'material_key' => $materialId,
+            'draft' => $result->draft,
+            'change_summary' => $result->changeSummary,
+            'instruction' => trim($instruction),
+            'source' => 'real_ai',
+            'provider' => $result->provider,
+            'model' => $result->model,
+            'prompt_version' => $result->promptVersion,
+            'schema_version' => $result->schemaVersion,
+            'fingerprint' => self::materialAiFingerprint($project, $materialId),
+            'created_at' => now()->toIso8601String(),
+            'note' => 'Propozycja prawdziwego AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+        ];
+
+        self::saveProject($project);
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>|null
+     */
+    public static function materialAiProposal(array $project, string $materialId): ?array
+    {
+        $proposal = $project['material_ai_proposal'] ?? null;
+
+        return is_array($proposal) && ($proposal['material_key'] ?? null) === $materialId ? $proposal : null;
+    }
+
+    /**
+     * @return array{ok: bool, project: array<string, mixed>}
+     */
+    public static function applyMaterialAiProposal(string $projectId, string $materialId): array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::materialAiProposal($project, $materialId);
+        abort_if($proposal === null, 404);
+
+        if (! self::canDraftMaterialWithAi($project)
+            || ($proposal['fingerprint'] ?? null) !== self::materialAiFingerprint($project, $materialId)) {
+            $project['material_ai_proposal'] = null;
+            self::saveProject($project);
+
+            return ['ok' => false, 'project' => $project];
+        }
+
+        foreach ($project['materials'] as $index => $material) {
+            if (($material['id'] ?? null) === $materialId) {
+                $project['materials'][$index]['draft'] = (string) $proposal['draft'];
+                $project['materials'][$index]['status'] = 'DRAFT';
+                $project['materials'][$index]['updated_at'] = now()->toIso8601String();
+            }
+        }
+
+        $project['material_ai_proposal'] = null;
+        self::saveProject($project);
+        self::persistMaterial($project, $materialId);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_MATERIAL_AI_APPLY,
+            GrowthDecision::STATUS_APPROVED,
+            'Czy zastosować szkic AI materiału?',
+            'Zastosowano szkic AI: '.self::materialName($project, $materialId),
+            self::materialAiDecisionMeta($proposal),
+            $materialId,
+        );
+
+        return ['ok' => true, 'project' => $project];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function rejectMaterialAiProposal(string $projectId, string $materialId): array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::materialAiProposal($project, $materialId);
+        abort_if($proposal === null, 404);
+
+        $project['material_ai_proposal'] = null;
+        self::saveProject($project);
+        self::recordConceptDecision(
+            $project,
+            GrowthSessionConceptStore::DECISION_MATERIAL_AI_REJECT,
+            GrowthDecision::STATUS_REJECTED,
+            'Czy odrzucić szkic AI materiału?',
+            'Odrzucono szkic AI: '.self::materialName($project, $materialId),
+            self::materialAiDecisionMeta($proposal),
+            $materialId,
+        );
+
+        return $project;
+    }
+
+    /**
+     * @param  array<string, mixed>  $proposal
+     * @return array{material_key: string, prompt_version: string, source: string}
+     */
+    private static function materialAiDecisionMeta(array $proposal): array
+    {
+        return [
+            'material_key' => (string) ($proposal['material_key'] ?? ''),
+            'prompt_version' => (string) ($proposal['prompt_version'] ?? ''),
+            'source' => (string) ($proposal['source'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function materialName(array $project, string $materialId): string
+    {
+        foreach ($project['materials'] ?? [] as $material) {
+            if (($material['id'] ?? null) === $materialId) {
+                return (string) ($material['name'] ?? $materialId);
+            }
+        }
+
+        return $materialId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function materialDraft(array $project, string $materialId): string
+    {
+        foreach ($project['materials'] ?? [] as $material) {
+            if (($material['id'] ?? null) === $materialId) {
+                return trim((string) ($material['draft'] ?? ''));
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $direction
+     * @return array<string, string>
+     */
+    private static function fingerprintDirection(array $direction): array
+    {
+        return [
+            'why_now' => trim((string) ($direction['why_now'] ?? '')),
+            'audience' => trim((string) ($direction['audience'] ?? '')),
+            'problem' => trim((string) ($direction['problem'] ?? '')),
+            'takeaway' => trim((string) ($direction['takeaway'] ?? '')),
+            'sell_later' => trim((string) ($direction['sell_later'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $concept
+     * @return array<string, mixed>
+     */
+    private static function fingerprintConcept(array $concept): array
+    {
+        $points = $concept['points'] ?? [];
+
+        return [
+            'title' => trim((string) ($concept['title'] ?? '')),
+            'subtitle' => trim((string) ($concept['subtitle'] ?? '')),
+            'promise' => trim((string) ($concept['promise'] ?? '')),
+            'points' => array_values(array_map(
+                static fn (mixed $point): string => trim((string) $point),
+                is_array($points) ? $points : [],
+            )),
+            'plan' => trim((string) ($concept['plan'] ?? '')),
+            'cta' => trim((string) ($concept['cta'] ?? '')),
+            'additional_material' => trim((string) ($concept['lead_magnet'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    private static function hash(array $value): string
+    {
+        return hash('sha256', json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $concept
+     */
+    private static function simulatedYoutubeDescription(array $project, array $concept, bool $emojis = true): string
+    {
+        $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
+        $bullet = $emojis ? '✅ ' : '• ';
+
+        $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->map(fn (string $point): string => $bullet.$point)
+            ->implode("\n");
+
+        $title = trim((string) ($concept['title'] ?? ''));
+        $cta = trim((string) ($concept['cta'] ?? ''));
+        $host = self::aiHostName($project);
+
+        return trim(implode("\n\n", array_filter([
+            $title !== '' ? $icon('🎓').$title : '',
+            trim((string) ($concept['subtitle'] ?? '')),
+            $icon('📅').'Termin: '.($project['live_date'] ?? '').', godz. '.($project['live_time'] ?? '').'.',
+            $host !== '' ? $icon('🎤').'Prowadzący: '.$host : '',
+            trim((string) ($concept['promise'] ?? '')),
+            $points !== '' ? $icon('📌')."Program:\n".$points : '',
+            $cta !== '' ? $icon('👉').$cta : '',
+        ])));
     }
 
     /**

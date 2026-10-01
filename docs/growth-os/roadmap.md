@@ -4,15 +4,15 @@ Status: roadmapa kierunkowa, nie sztywny harmonogram.
 
 ## NOW
 
-Prowadzący wraca po zalogowaniu jako imię przy kampanii. Propozycja AI zostaje w przeglądarce.
+v0.2, pierwszy wycinek: szkic AI opisu YouTube (`youtube-description`) z jawnym Zastosuj / Odrzuć. Wdrożone lokalnie, czeka na ręczną weryfikację Waldemara.
 
 ## NEXT
 
-Propozycja AI zostaje w sesji. Nie zapisywać jej bez osobnej decyzji. Zadania operacyjne nie sterują głównym CTA.
+Po ręcznej weryfikacji szkicu opisu YouTube: decyzja, czy i który kolejny materiał dostaje AI. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 
-Po walidacji UX: model danych v0.1, AI drafts/research, integracje wykonawcze, post-produkcja, analityka i grafy relacji.
+AI dla kolejnych materiałów, research, integracje wykonawcze, post-produkcja, analityka i grafy relacji. Model danych v0.1 jest już wdrożony.
 
 ## Etap 0.3 — Prototyp UX Webinaru TIK
 
@@ -97,7 +97,9 @@ Poza v0.1:
 
 ## v0.2 — AI Drafts I Research
 
-Zakres:
+Wdrożone (DEC-024): zadanie `material_draft` tylko dla `youtube-description`. Propozycja w sesji, wymagane zatwierdzenie kierunku i koncepcji, Zastosuj / Odrzuć jako decyzje, status po Zastosuj = `DRAFT`, bez innych materiałów w kontekście. Prowadzący trafia do AI od DEC-025.
+
+Zakres docelowy:
 
 - rozwinięcie sprawdzonej warstwy providerów poza pilotaż OpenAI,
 - drafty treści,

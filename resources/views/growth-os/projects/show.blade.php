@@ -3,7 +3,9 @@
         PNE Rozwój — Projekt webinaru
     </x-slot>
 
-    <div class="container-fluid px-0">
+    @include('growth-os.partials.readable-styles')
+
+    <div class="container-fluid growth-readable">
         @if(session('success'))
             <div class="alert alert-success" role="status">{{ session('success') }}</div>
         @endif
@@ -17,7 +19,7 @@
             <span>{{ $project['topic'] }}</span>
         </nav>
 
-        <section class="rounded border bg-light p-4 mb-4">
+        <section class="rounded border growth-hero p-4 mb-4">
             <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                 <div>
                     <div class="d-flex flex-wrap gap-2 mb-2">
@@ -237,7 +239,7 @@
                     </div>
 
                     <div class="col-lg-5">
-                        <section class="border rounded p-3 mb-3" aria-labelledby="concept-ai-heading">
+                        <section class="border rounded growth-panel p-3 mb-3" aria-labelledby="concept-ai-heading">
                             <h3 class="h6" id="concept-ai-heading">Poproś AI o zmianę</h3>
                             <p class="small text-secondary">AI przygotuje wariant. Obecna koncepcja nie zostanie nadpisana, dopóki nie klikniesz „Zastosuj”.</p>
                             <p class="small mb-2">
@@ -462,7 +464,7 @@
                         </div>
 
                         @if(count($conceptDecisions) > 0)
-                            <section class="border rounded p-3 mb-3" aria-labelledby="concept-decisions-heading">
+                            <section class="border rounded growth-panel p-3 mb-3" aria-labelledby="concept-decisions-heading">
                                 <h3 class="h6" id="concept-decisions-heading">Decyzje</h3>
                                 <ul class="small mb-0 list-unstyled">
                                     @foreach($conceptDecisions as $conceptDecision)
@@ -479,7 +481,7 @@
                         @endif
 
                         @if(is_array($versions) && count($versions) > 0)
-                            <section class="border rounded p-3" aria-labelledby="concept-versions-heading">
+                            <section class="border rounded growth-panel p-3" aria-labelledby="concept-versions-heading">
                                 <h3 class="h6" id="concept-versions-heading">Historia (sesja)</h3>
                                 <ul class="small mb-0 list-unstyled">
                                     @foreach(array_slice($versions, 0, 5) as $index => $version)

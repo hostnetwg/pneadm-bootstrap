@@ -91,7 +91,7 @@ final class OpenAiProvider implements GrowthAiProvider
         } catch (JsonException $exception) {
             throw new GrowthAiException(
                 errorType: 'invalid_json',
-                userMessage: 'Nie udało się przygotować poprawnej propozycji AI. Twoja obecna koncepcja nie została zmieniona.',
+                userMessage: GrowthAiException::INVALID_RESPONSE_MESSAGE,
                 previous: $exception,
             );
         }

@@ -34,6 +34,10 @@ class GrowthSessionConceptStore
 
     public const DECISION_CONCEPT_AI_REJECT = 'concept_ai_reject';
 
+    public const DECISION_MATERIAL_AI_APPLY = 'material_ai_apply';
+
+    public const DECISION_MATERIAL_AI_REJECT = 'material_ai_reject';
+
     /**
      * @param  array<string, mixed>  $project
      * @return array<string, mixed>

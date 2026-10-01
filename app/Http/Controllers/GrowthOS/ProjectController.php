@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\GrowthOS\GrowthTask;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\GrowthAiService;
+use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
 use Illuminate\Contracts\View\View;
@@ -16,6 +17,10 @@ use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
+    public const MATERIAL_AI_PRECONDITION_MESSAGE = 'Najpierw zatwierdź kierunek i koncepcję webinaru.';
+
+    public const MATERIAL_AI_STALE_MESSAGE = 'Kierunek, koncepcja lub materiał zmieniły się od czasu wygenerowania szkicu. Wygeneruj nową propozycję.';
+
     public function index(): View
     {
         return view('growth-os.projects.index', [
@@ -300,11 +305,80 @@ class ProjectController extends Controller
         $item = DemoTikWebinarProject::material($project, $material);
         $projectItem = DemoTikWebinarProject::requireProject($project);
 
+        $aiDraftSupported = $material === MaterialDraftTask::MATERIAL_KEY;
+
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
+            'aiDraftSupported' => $aiDraftSupported,
+            'aiDraftAllowed' => $aiDraftSupported && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
+            'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
+            'aiRealEnabled' => config('growth_ai.enabled') === true,
+            'aiModel' => (string) config('growth_ai.model'),
         ]);
+    }
+
+    public function requestMaterialAi(Request $request, string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        $item = DemoTikWebinarProject::requireProject($project);
+        $data = $request->validate([
+            'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+        ]);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        $emojis = $request->boolean('emojis', true);
+        $instruction = trim((string) ($data['instruction'] ?? ''));
+
+        if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
+            return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
+        }
+
+        if (config('growth_ai.enabled') !== true) {
+            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $emojis, $instruction);
+
+            return $back->with('success', 'AI przygotowało szkic (symulacja lokalna). Obecny szkic nie został nadpisany.');
+        }
+
+        try {
+            $result = app(GrowthAiService::class)->draftMaterial(
+                $request->user(),
+                DemoTikWebinarProject::materialAiContext($item, $material, $emojis, $instruction),
+            );
+        } catch (GrowthAiException $exception) {
+            $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
+                ? 'Nie udało się przygotować poprawnej propozycji AI. Obecny szkic nie został zmieniony.'
+                : $exception->userMessage;
+
+            return $back->withInput()->with('error', $message);
+        }
+
+        DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction);
+
+        return $back->with('success', 'AI przygotowało szkic. Obecny szkic nie został nadpisany.');
+    }
+
+    public function applyMaterialAi(string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        $outcome = DemoTikWebinarProject::applyMaterialAiProposal($project, $material);
+        $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (! $outcome['ok']) {
+            return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
+        }
+
+        return $back->with('success', 'Zastosowano szkic AI. Materiał ma status Draft — sprawdź go przed dalszą pracą. Nic nie opublikowano.');
+    }
+
+    public function rejectMaterialAi(string $project, string $material): RedirectResponse
+    {
+        abort_unless($material === MaterialDraftTask::MATERIAL_KEY, 404);
+        DemoTikWebinarProject::rejectMaterialAiProposal($project, $material);
+
+        return redirect()
+            ->route('growth.projects.materials.show', [$project, $material])
+            ->with('success', 'Odrzucono szkic AI. Obecny szkic pozostał bez zmian.');
     }
 
     public function updateMaterialStatus(Request $request, string $project, string $material): RedirectResponse

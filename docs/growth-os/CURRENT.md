@@ -1,9 +1,9 @@
 # PNE Growth OS — Current State
 
-Last updated: 2026-09-29 22:10 CEST<br>
+Last updated: 2026-10-01 CEST<br>
 Branch: main<br>
-Commit: c09a609<br>
-Stage: v0.1 host name<br>
+Commit: 6af03a4 (wycinek v0.2 jeszcze bez commita)<br>
+Stage: v0.2 — szkic AI opisu YouTube<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
 ## 1. Cel projektu
@@ -17,10 +17,11 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Primary UX principle: zawsze widoczny **Następny krok**.
 - Supporting views: **Dzisiaj / Projekty / Pomysły / Inbox**.
 - Concept stage: edycja ręczna, cofnięcie zatwierdzenia, opcjonalna propozycja OpenAI jako wariant do przyjęcia/odrzucenia.
+- Materiał „Opis YouTube”: „Poproś AI o szkic” po zatwierdzeniu kierunku i koncepcji, obecny szkic obok propozycji, Zastosuj / Odrzuć.
 
 ## 2. Aktualny etap
 
-Etap v0.1 — prowadzący zapisuje się przy kampanii i wraca po zalogowaniu. Propozycja AI zostaje w przeglądarce, w której powstała.
+Etap v0.2, pierwszy wycinek — szkic AI tylko dla materiału `youtube-description` (DEC-024). Model danych v0.1 działa na produkcji. Propozycje AI zostają w przeglądarce, w której powstały.
 
 ## 3. Co już działa
 
@@ -38,10 +39,11 @@ Etap v0.1 — prowadzący zapisuje się przy kampanii i wraca po zalogowaniu. Pr
 - Etap **Koncepcja**: edycja ręczna, status Do dopracowania / Gotowe, cofnięcie zatwierdzenia.
 - **Poproś AI o zmianę**: przy wyłączonej fladze działa symulacja lokalna, a przy włączonej — ustrukturyzowana propozycja OpenAI.
 - Propozycja AI nigdy nie nadpisuje bieżącej koncepcji aż do jawnego „Zastosuj”; można ją odrzucić.
+- **Poproś AI o szkic** (tylko „Opis YouTube”): wymaga zatwierdzonego kierunku i koncepcji. Zadanie `material_draft`, prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`. Checkbox „Dodaj emotikony do opisu” (domyślnie włączony) wysyła `style.emojis`. Opcjonalna „Dodatkowa instrukcja dla AI” (do 1000 znaków, blokada danych osobowych) wysyła `instruction`; zasady promptu mają pierwszeństwo. Przy wyłączonej fladze — symulacja lokalna z tym samym UX. Propozycja w sesji, obok obecnego szkicu. „Zastosuj” sprawdza, czy kierunek, koncepcja, szkic i prowadzący się nie zmienili, potem zapisuje szkic, status `DRAFT` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`. Pozostałe dziewięć materiałów nie ma AI.
 - Osobna, domyślnie wyłączona flaga `GROWTH_AI_ENABLED`; prawdziwe AI jest dostępne tylko dla `super_admin`.
 - Provider i model są konfigurowane centralnie i widoczne w UI; logika Growth OS korzysta z abstrakcji providera.
-- Walidacja structured output, allowlista danych koncepcji, blokada e-maili/telefonów/sekretów, timeout, jeden retry, limity wywołań i prosty circuit breaker.
-- Osobny log techniczny zawiera tylko metadane wywołania — bez promptu, odpowiedzi, koncepcji, PII i sekretów.
+- Walidacja structured output, allowlisty danych (koncepcja; opis YouTube z `host_name`, bez innych materiałów — DEC-025), blokada e-maili/telefonów/sekretów i linków spoza wejścia, timeout, jeden retry, limity wywołań i prosty circuit breaker. Limit dzienny i circuit breaker są wspólne dla obu zadań.
+- Osobny log techniczny zawiera tylko metadane wywołania (w tym `task_type`: `concept_revision` albo `material_draft`) — bez promptu, odpowiedzi, treści, PII i sekretów.
 - Prosta historia wersji koncepcji w sesji (do 5 pozycji).
 - Pozostałe pomysły i sugestie AI są nadal symulowane.
 - Inbox prowadzi do miejsca w projekcie, nie jest głównym flow.
@@ -81,8 +83,9 @@ Zaplanuj TIK
 - Brak Sendy API.
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
-- Propozycja AI działa w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) i techniczny log metadanych AI.
-- Brak AI poza etapem Koncepcja.
+- Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicu AI opisu YouTube, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) i techniczny log metadanych AI.
+- Brak AI poza etapem Koncepcja i materiałem „Opis YouTube”. Brak innych materiałów w kontekście AI.
+- Brak ostrzeżenia na zapisanym materiale, że kierunek lub koncepcja zmieniły się po jego przygotowaniu (opcjonalne w DEC-024, nie zrobione).
 - `Topic` i `Expert` nie należą do v0.1. Ekspert wskazuje opcjonalnie istniejący `Instructor` przez `primary_instructor_id`.
 
 ## 7. Otwarte pytania
@@ -91,9 +94,13 @@ Zaplanuj TIK
 
 ## 8. Następny krok
 
-Propozycja AI zostaje w sesji. Nie zapisywać jej bez osobnej decyzji. Zadania operacyjne nie sterują głównym CTA.
+Ręczna weryfikacja szkicu AI opisu YouTube przez Waldemara (z `GROWTH_AI_ENABLED=true` i bez). Potem decyzja, czy i który kolejny materiał dostaje AI. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
+
+- v0.2: szkic AI dla materiału `youtube-description` (zadanie `material_draft`, DEC-024). `GrowthAiService` obsługuje dwa zadania przez mały kontrakt `GrowthAiTask`; `concept_revision` działa bez zmian.
+- Opis YouTube: opcja emotikon i dodatkowa instrukcja dla AI (prompt v2). AI dostaje prowadzącego (`host_name`) i może go wymienić (DEC-025); zmiana prowadzącego unieważnia starą propozycję. Ekrany projektu i materiału mają czytelniejszy wygląd: szare tło strony, białe karty, wyraźne obramowanie pól i pogrubione etykiety (`growth-os/partials/readable-styles.blade.php`).
+- Dodano Zastosuj / Odrzuć szkicu jako decyzje `material_ai_apply` / `material_ai_reject`; nieaktualna propozycja (zmieniony kierunek, koncepcja lub szkic) jest odrzucana.
 
 - Dodano opcjonalny OpenAI Responses API dla zadania `concept_revision`.
 - Dodano abstrakcję providera i wersjonowany prompt/schema.
@@ -132,6 +139,7 @@ Propozycja AI zostaje w sesji. Nie zapisywać jej bez osobnej decyzji. Zadania o
 - [consultations/2026-09-29-growth-os-material-artifacts-decision.md](./consultations/2026-09-29-growth-os-material-artifacts-decision.md)
 - [consultations/2026-09-29-growth-os-direction-decision.md](./consultations/2026-09-29-growth-os-direction-decision.md)
 - [consultations/2026-09-29-growth-os-host-name-decision.md](./consultations/2026-09-29-growth-os-host-name-decision.md)
+- [consultations/2026-10-01-growth-os-youtube-description-ai-draft.md](./consultations/2026-10-01-growth-os-youtube-description-ai-draft.md)
 
 ## Question for consultant
 

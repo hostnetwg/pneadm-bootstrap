@@ -2,13 +2,15 @@
 
 namespace App\Services\GrowthOS\AI\Tasks;
 
+use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
-final class ConceptRevisionTask
+final class ConceptRevisionTask implements GrowthAiTask
 {
     public const TYPE = 'concept_revision';
 
@@ -23,6 +25,11 @@ final class ConceptRevisionTask
         'cta',
         'additional_material',
     ];
+
+    public function type(): string
+    {
+        return self::TYPE;
+    }
 
     public function promptVersion(): string
     {
@@ -216,9 +223,7 @@ PROMPT;
 
     private function containsProhibitedData(string $value): bool
     {
-        return preg_match('/[\w.+-]+@[\w.-]+\.[a-z]{2,}/iu', $value) === 1
-            || preg_match('/(?<!\d)(?:\+?48[\s.-]?)?(?:\d[\s.-]?){9}(?!\d)/u', $value) === 1
-            || preg_match('/\b(?:api[_ -]?key|bearer\s+[a-z0-9._-]+|hasło|password|token\s*[:=])\b/iu', $value) === 1;
+        return ProhibitedData::contains($value);
     }
 
     /**

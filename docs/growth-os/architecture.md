@@ -1,6 +1,6 @@
 # PNE Growth OS — Architecture
 
-Status: kampania i koncepcja zapisują się z prototypu; reszta procesu zostaje w sesji.
+Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjnych i 10 materiałów zapisują się z prototypu. Propozycje AI (koncepcja i szkic opisu YouTube) zostają w sesji HTTP.
 
 ## Zasada Główna
 
@@ -213,18 +213,18 @@ Sukces v0.1 nie oznacza wyłącznie „mamy modele i tabele”. Sukces oznacza, 
 - RAG, embeddings i vector DB,
 - automatyczne działania zewnętrzne.
 
-## Obecny Etap 0.3.2
+## Obecny Etap: v0.1 + v0.2 (szkic AI opisu YouTube)
 
 Tabele domenowe v0.1 są w migracji `database/migrations/2026_09_29_191500_create_growth_os_v0_1_tables.php`. Modele są w `app/Models/GrowthOS/`. Istniejący ekran projektu zapisuje kampanię przy utworzeniu, artifact `direction` przy „Zapisz kierunek” i przy zatwierdzeniu kierunku, artifact `concept` przy ręcznym zapisie i przy „Zastosuj” oraz dziesięć materiałów typu `material` przy „Zapisz materiał”. Odświeżenie w tej samej sesji czyta te dane z bazy. Utworzenie projektu zapisuje też `host_name`. Propozycja AI zostaje w sesji.
 
-Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, prowadzący (`host_name`), kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Propozycja AI zostaje w sesji.
+Po zalogowaniu bez sesji wraca ostatnia kampania właściciela, prowadzący (`host_name`), kierunek, artifact `concept`, decyzje przy kierunku i koncepcji, 9 zadań operacyjnych oraz zapisane materiały (status i szkic). Zadania mają stabilny `key`, termin liczony od `live_at` oraz w UX tylko `todo` i `done`. Nie tworzą decyzji i nie zmieniają następnego kroku. Ręczny zapis materiału też nie tworzy decyzji. Etykieta „Opublikowane / zaplanowane” jest tylko w `payload.status`; kolumna artifactu dostaje `approved`. Propozycje AI zostają w sesji i nie wracają po nowym zalogowaniu.
 
-Jedyną rzeczywistą integracją zewnętrzną pilotażu jest opcjonalna rewizja koncepcji przez OpenAI:
+Jedyną rzeczywistą integracją zewnętrzną jest opcjonalne OpenAI w dwóch zadaniach: rewizja koncepcji (`concept_revision`) i szkic opisu YouTube (`material_draft`, tylko materiał `youtube-description`):
 
 ```text
-Etap Koncepcja
-→ GrowthAiService
-→ ConceptRevisionTask (allowlista danych, prompt i schema)
+Etap Koncepcja / ekran materiału „Opis YouTube”
+→ GrowthAiService (flaga, super_admin, circuit breaker, wspólny limit dzienny, log)
+→ ConceptRevisionTask albo MaterialDraftTask (allowlista danych, prompt, schema, walidacja)
 → GrowthAiProvider
 → OpenAiProvider
 → OpenAI Responses API
@@ -233,9 +233,15 @@ Etap Koncepcja
 → jawne Zastosuj / Odrzuć
 ```
 
-Logika etapu Koncepcja nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. W pilotażu istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy.
+Oba zadania implementują mały kontrakt `GrowthAiTask` (`type`, `promptVersion`, `schemaVersion`, `instructions`, `schema`). Serwis loguje typ i wersje z zadania, więc nie ma w nim stałych pod koncepcję. Nie ma rejestru zadań ani routera modeli.
 
-Stan projektu i pełna propozycja pozostają w sesji HTTP. Log plikowy przechowuje wyłącznie minimalne metadane techniczne wywołania, bez promptu, odpowiedzi i treści koncepcji.
+`MaterialDraftTask` (DEC-024): prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`, profil `youtube_description_v1`. Wejście to allowlista: `material` (klucz, nazwa, typ), `campaign` (`working_topic`, etykieta celu, `live_date`, `live_time`, strefa aplikacji, `host_name`), pięć pól kierunku, pola koncepcji (`title`, `subtitle`, `promise`, `points`, `plan`, `cta`, `additional_material`), bieżący szkic tego materiału, `style.emojis` i opcjonalna `instruction` właściciela. Bez innych materiałów. `host_name` trafia do AI od DEC-025; pusty lub „—” jest wysyłany jako pusty, a prompt każe przepisać imię i nazwisko bez dopisywania biografii. Wyjście: `draft` i `change_summary`; dodatkowe pola, dane osobowe i linki spoza wejścia odrzucają odpowiedź. Data i godzina idą osobno, a przy kontroli telefonów wzorce dat są pomijane, żeby termin nie wyglądał jak numer telefonu.
+
+Propozycja szkicu ma odcisk sha256 czterech źródeł: pól kierunku, pól koncepcji, bieżącego szkicu materiału i prowadzącego. „Zastosuj” liczy odcisk ponownie i sprawdza oba zatwierdzenia. Różnica czyści propozycję i niczego nie zapisuje. Zgodność zapisuje szkic, ustawia status `DRAFT`, zapisuje artifact `material` i decyzję `material_ai_apply`. „Odrzuć” zapisuje tylko decyzję `material_ai_reject`.
+
+Logika Growth OS nie zależy bezpośrednio od endpointu ani SDK OpenAI. Provider i model są konfiguracją centralną. Istnieje tylko implementacja OpenAI; nie ma automatycznego routingu ani fallbacku do innego dostawcy.
+
+Pełna propozycja AI pozostaje w sesji HTTP. Log plikowy przechowuje wyłącznie minimalne metadane techniczne wywołania (`task_type`, wersje, tokeny, koszt, status), bez promptu, odpowiedzi i treści.
 
 ## Granice
 

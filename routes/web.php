@@ -88,6 +88,11 @@ Route::middleware(['auth', 'check.user.status'])->group(function () {
         Route::post('/projects/{project}/tasks/{taskKey}', [GrowthOsProjectController::class, 'updateOperationalTask'])->name('projects.tasks.update');
         Route::get('/projects/{project}/materials/{material}', [GrowthOsProjectController::class, 'material'])->name('projects.materials.show');
         Route::post('/projects/{project}/materials/{material}/status', [GrowthOsProjectController::class, 'updateMaterialStatus'])->name('projects.materials.status');
+        Route::post('/projects/{project}/materials/{material}/ai', [GrowthOsProjectController::class, 'requestMaterialAi'])
+            ->middleware('throttle:growth-ai')
+            ->name('projects.materials.ai');
+        Route::post('/projects/{project}/materials/{material}/ai/apply', [GrowthOsProjectController::class, 'applyMaterialAi'])->name('projects.materials.ai.apply');
+        Route::post('/projects/{project}/materials/{material}/ai/reject', [GrowthOsProjectController::class, 'rejectMaterialAi'])->name('projects.materials.ai.reject');
         Route::get('/ideas', [GrowthOsIdeaController::class, 'index'])->name('ideas.index');
         Route::get('/inbox', [GrowthOsApprovalController::class, 'index'])->name('inbox.index');
     });

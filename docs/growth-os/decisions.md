@@ -183,3 +183,19 @@ Status: ACTIVE<br>
 Decision: Prowadzący zapisuje się jako `growth_campaigns.host_name`. To wolny tekst z formularza, bez powiązania z `instructors` i bez `primary_instructor_id`.<br>
 Rationale: Po zalogowaniu ma wracać imię wpisane przy projekcie. Istniejący instruktor zostaje osobnym, opcjonalnym wskazaniem eksperta.<br>
 Consequences: Utworzenie projektu zapisuje `host_name`. Na ekranie projektu można je zmienić przyciskiem „Zapisz prowadzącego”. Puste pole nie czyści zapisanego imienia przy samym odtworzeniu. Propozycja AI nadal nie jest trwała.
+
+## DEC-024
+
+Date: 2026-10-01<br>
+Status: ACTIVE<br>
+Decision: Pierwszym materiałem z AI jest `youtube-description`. Nowe zadanie `material_draft` (profil `youtube_description_v1`, prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`) przygotowuje szkic. Prompt v2 dodaje opcję emotikon (`style.emojis`, domyślnie włączoną) i opcjonalną instrukcję właściciela (`instruction`), której nadrzędne są zasady promptu. Wymaga zatwierdzonego kierunku i zatwierdzonej koncepcji. Propozycja żyje tylko w sesji HTTP. „Zastosuj” i „Odrzuć” są decyzjami człowieka.<br>
+Rationale: Opis YouTube najprościej wynika z zatwierdzonej koncepcji i nie wymaga integracji. Ten sam wzorzec co przy koncepcji (propozycja → Zastosuj / Odrzuć) sprawdza AI na materiale bez ryzyka publikacji.<br>
+Consequences: Do AI trafia tylko allowlista: temat roboczy, cel, data i godzina live w strefie aplikacji, pięć pól kierunku, pola koncepcji i bieżący szkic tego materiału. `host_name`, inne materiały i dane klientów, zamówień, płatności oraz kontaktowe nie są wysyłane. Odpowiedź ma tylko `draft` i `change_summary`. „Zastosuj” sprawdza odcisk kierunku, koncepcji i szkicu; nieaktualna propozycja jest odrzucana. Po „Zastosuj” zmienia się tylko `payload.draft`, status materiału to `DRAFT`, powstaje decyzja `material_ai_apply`. „Odrzuć” nie zmienia materiału i zapisuje `material_ai_reject`. Decyzje wskazują artifact materiału, jeśli istnieje; `meta` ma tylko klucz materiału, wersję promptu i źródło. Ręczny „Zapisz materiał” nadal nie tworzy decyzji. Flaga, limit dzienny i circuit breaker są wspólne z `concept_revision`. Brak publikacji, wysyłek, integracji wykonawczych i AI dla pozostałych materiałów. `schema_version` materiałów zostaje 1. Regułę o `host_name` zmienia DEC-025.
+
+## DEC-025
+
+Date: 2026-10-01<br>
+Status: ACTIVE<br>
+Decision: Szkic AI opisu YouTube dostaje imię i nazwisko prowadzącego (`growth_campaigns.host_name`) i może je wymienić. Zastępuje regułę „`host_name` poza AI” z DEC-024.<br>
+Rationale: Waldemar: imię i nazwisko prowadzącego nie są tajne, a opis YouTube zwykle przedstawia prowadzącego.<br>
+Consequences: `campaign.host_name` jest w allowliście `material_draft`; pusty lub „—” idzie jako pusty. Prompt każe przepisać imię i nazwisko dokładnie, bez tytułów, stanowisk i biografii, a przy pustym polu nie wymyślać prowadzącego. Prowadzący jest częścią odcisku propozycji, więc jego zmiana unieważnia starą propozycję. Pozostałe zakazy DEC-024 bez zmian (inne materiały, dane klientów, kontaktowe, zamówień i płatności).

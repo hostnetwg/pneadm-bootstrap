@@ -4,10 +4,14 @@ namespace App\Services\GrowthOS\AI;
 
 use App\Models\User;
 use App\Services\GrowthOS\AI\Contracts\GrowthAiProvider;
+use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
+use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Tasks\ConceptRevisionTask;
+use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
+use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,12 +22,46 @@ final class GrowthAiService
     public function __construct(
         private readonly GrowthAiProvider $provider,
         private readonly ConceptRevisionTask $conceptRevisionTask,
+        private readonly MaterialDraftTask $materialDraftTask,
     ) {}
 
     /**
      * @param  array<string, mixed>  $concept
      */
     public function reviseConcept(User $user, array $concept, string $audience, string $instruction): ConceptRevisionResult
+    {
+        $this->ensureAllowed($user);
+
+        $task = $this->conceptRevisionTask;
+        $input = $task->input($concept, $audience, $instruction);
+
+        return $this->run(
+            $user,
+            $task,
+            $input,
+            fn (AiProviderResponse $response): ConceptRevisionResult => $task->validateAndNormalize($response, $input),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function draftMaterial(User $user, array $context): MaterialDraftResult
+    {
+        $this->ensureAllowed($user);
+
+        $task = $this->materialDraftTask;
+        $input = $task->input($context);
+
+        return $this->run(
+            $user,
+            $task,
+            $input,
+            fn (AiProviderResponse $response): MaterialDraftResult => $task->validateAndNormalize($response, $input),
+        );
+    }
+
+    private function ensureAllowed(User $user): void
     {
         if (config('growth_ai.enabled') !== true) {
             throw new GrowthAiException(
@@ -38,10 +76,17 @@ final class GrowthAiService
                 userMessage: 'Nie masz dostępu do tej funkcji.',
             );
         }
+    }
 
-        $task = $this->conceptRevisionTask;
-        $input = $task->input($concept, $audience, $instruction);
-
+    /**
+     * @template TResult
+     *
+     * @param  array<string, mixed>  $input
+     * @param  Closure(AiProviderResponse): TResult  $validate
+     * @return TResult
+     */
+    private function run(User $user, GrowthAiTask $task, array $input, Closure $validate): mixed
+    {
         $this->ensureCircuitIsClosed();
         $this->ensureDailyLimit($user);
 
@@ -49,15 +94,15 @@ final class GrowthAiService
 
         try {
             $response = $this->provider->generateStructured(
-                taskType: ConceptRevisionTask::TYPE,
+                taskType: $task->type(),
                 instructions: $task->instructions(),
                 input: $input,
                 schema: $task->schema(),
             );
 
-            $result = $task->validateAndNormalize($response, $input);
+            $result = $validate($response);
             $this->resetCircuit();
-            $this->logInvocation('success', 'valid', $response);
+            $this->logInvocation($task, 'success', 'valid', $response);
 
             return $result;
         } catch (GrowthAiException $exception) {
@@ -65,12 +110,12 @@ final class GrowthAiService
                 $this->recordFailure();
             }
 
-            $this->logInvocation('failed', 'invalid', $response, $exception->errorType);
+            $this->logInvocation($task, 'failed', 'invalid', $response, $exception->errorType);
 
             throw $exception;
         } catch (Throwable $exception) {
             $this->recordFailure();
-            $this->logInvocation('failed', 'not_completed', $response, 'unexpected_error');
+            $this->logInvocation($task, 'failed', 'not_completed', $response, 'unexpected_error');
 
             throw GrowthAiException::unavailable('unexpected_error', previous: $exception);
         }
@@ -150,6 +195,7 @@ final class GrowthAiService
     }
 
     private function logInvocation(
+        GrowthAiTask $task,
         string $status,
         string $validationResult,
         ?AiProviderResponse $response = null,
@@ -164,11 +210,11 @@ final class GrowthAiService
             ) / 1_000_000;
 
             Log::channel((string) config('growth_ai.log_channel'))->info('Growth AI invocation', [
-                'task_type' => ConceptRevisionTask::TYPE,
+                'task_type' => $task->type(),
                 'provider' => $response?->provider ?? $this->provider->name(),
                 'model' => $response?->model ?? $this->provider->model(),
-                'prompt_version' => $this->conceptRevisionTask->promptVersion(),
-                'schema_version' => $this->conceptRevisionTask->schemaVersion(),
+                'prompt_version' => $task->promptVersion(),
+                'schema_version' => $task->schemaVersion(),
                 'latency_ms' => $response?->latencyMs,
                 'input_tokens' => $inputTokens,
                 'output_tokens' => $outputTokens,

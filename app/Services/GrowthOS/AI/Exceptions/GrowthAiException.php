@@ -6,6 +6,8 @@ use RuntimeException;
 
 class GrowthAiException extends RuntimeException
 {
+    public const INVALID_RESPONSE_MESSAGE = 'Nie udało się przygotować poprawnej propozycji AI. Twoja obecna koncepcja nie została zmieniona.';
+
     public function __construct(
         public readonly string $errorType,
         public readonly string $userMessage,
@@ -29,7 +31,7 @@ class GrowthAiException extends RuntimeException
     {
         return new self(
             errorType: $errorType,
-            userMessage: 'Nie udało się przygotować poprawnej propozycji AI. Twoja obecna koncepcja nie została zmieniona.',
+            userMessage: self::INVALID_RESPONSE_MESSAGE,
         );
     }
 
