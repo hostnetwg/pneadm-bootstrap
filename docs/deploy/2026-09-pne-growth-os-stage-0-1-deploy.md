@@ -1,7 +1,7 @@
 # PNE Growth OS — deploy Etapu 0.1
 
 Data: 2026-09-29
-Status: runbook przygotowany; wdrożenie produkcyjne nie zostało wykonane
+Status: sekcje „Etap 0.1” poniżej są historyczne. Aktualny stan i wymagane komendy opisuje sekcja „Model danych v0.1” na końcu pliku.
 
 ## Zakres
 
@@ -99,3 +99,59 @@ Lokalnie:
 sail artisan test tests/Feature/GrowthOS/GrowthOsAccessTest.php
 sail pint config/growth_os.php app/Http/Middleware/GrowthOS/EnsureGrowthOsAccess.php app/Http/Controllers/GrowthOS/DashboardController.php tests/Feature/GrowthOS/GrowthOsAccessTest.php
 ```
+
+## Model danych v0.1 (aktualne, 2026-10-01)
+
+Od commita `6d54b1a` Growth OS zapisuje dane w bazie `pneadm`. Produkcja pobrała `main` do `c5213db`.
+
+Potwierdzone 2026-10-01: `migrate:status` na produkcji pokazuje trzy migracje Growth OS jako `Ran` (batch 116), a `/growth` otwiera się poprawnie.
+
+Migracje Growth OS:
+
+- `2026_09_29_191500_create_growth_os_v0_1_tables` — `growth_campaigns`, `growth_artifacts`, `growth_tasks`, `growth_decisions`,
+- `2026_09_29_204500_add_key_to_growth_tasks_table`,
+- `2026_09_29_220500_add_host_name_to_growth_campaigns_table`.
+
+Od `4db7b1b` (szkielet Growth OS) w repozytorium nie dodano innych migracji.
+
+### Objaw bez migracji
+
+Przy `PNE_GROWTH_OS_ENABLED=true` wejście na `/growth` daje HTTP 500. Pulpit szuka ostatniej kampanii właściciela w `growth_campaigns`, a tej tabeli nie ma. Przy wyłączonej fladze middleware zwraca 404 przed odczytem bazy.
+
+### Kolejność na produkcji
+
+Najpierw sprawdzić, co jest do uruchomienia (tylko odczyt):
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+/opt/alt/php82/usr/bin/php artisan migrate:status | grep -i growth
+```
+
+Jeśli przy migracjach Growth OS jest `Pending`, wykonać backup bazy według [MYSQL_BACKUP.md](./MYSQL_BACKUP.md), a potem:
+
+```bash
+/opt/alt/php82/usr/bin/php artisan migrate --force
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+/opt/alt/php82/usr/bin/php artisan config:cache
+/opt/alt/php82/usr/bin/php artisan route:cache
+/opt/alt/php82/usr/bin/php artisan view:cache
+/opt/alt/php82/usr/bin/php artisan queue:restart
+```
+
+`migrate --force` dokłada tylko brakujące migracje i nie kasuje danych. Nie używać `migrate:fresh`, `migrate:refresh`, `migrate:reset` ani `db:wipe`.
+
+`growth:seed-operational-tasks` nie jest potrzebne przy pierwszym wdrożeniu: na produkcji nie ma jeszcze kampanii, a nowa kampania dostaje 9 zadań sama.
+
+`GROWTH_AI_ENABLED` jest osobną flagą. Bez niej koncepcja używa symulacji lokalnej.
+
+### Smoke po migracji
+
+1. `super_admin` otwiera `/growth` bez błędu.
+2. „Zaplanuj webinar TIK” → „Utwórz projekt” tworzy kampanię.
+3. Zapis kierunku, koncepcji i jednego materiału; odhaczenie jednego zadania.
+4. Wylogowanie i ponowne logowanie (albo inna przeglądarka): wracają kampania, prowadzący, kierunek, koncepcja, materiał i zadanie.
+5. Zwykły `admin` dostaje 403.
+
+### Rollback
+
+Najpierw `PNE_GROWTH_OS_ENABLED=false` i `config:cache`. Tabel Growth OS nie usuwać — nie są używane przy wyłączonej fladze.

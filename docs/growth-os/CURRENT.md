@@ -4,7 +4,7 @@ Last updated: 2026-09-29 22:10 CEST<br>
 Branch: main<br>
 Commit: c09a609<br>
 Stage: v0.1 host name<br>
-Current blocker: none
+Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
 ## 1. Cel projektu
 
