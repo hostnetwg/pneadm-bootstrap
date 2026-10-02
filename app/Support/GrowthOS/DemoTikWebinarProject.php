@@ -1007,7 +1007,8 @@ class DemoTikWebinarProject
 
     /**
      * Allow-listed context for the AI material draft. The only other material ever included is an
-     * approved YouTube description for the Facebook post and the graphic brief (DEC-026, DEC-029). No personal data.
+     * approved YouTube description for the Facebook post, the graphic brief and the main mail (DEC-026, DEC-029, DEC-032).
+     * No personal data.
      *
      * @param  array<string, mixed>  $project
      * @param  array{emojis?: bool, hashtags?: bool}  $style
@@ -1039,6 +1040,7 @@ class DemoTikWebinarProject
                 'emojis' => (bool) ($style['emojis'] ?? true),
                 'hashtags' => (bool) ($style['hashtags'] ?? true),
                 'elements' => self::graphicElements($style),
+                'length' => MaterialDraftTask::mailLength($style['length'] ?? null),
             ],
             'instruction' => trim($instruction),
         ];
@@ -1151,6 +1153,7 @@ class DemoTikWebinarProject
             'draft' => match ($materialId) {
                 MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
                 MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
+                MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null)),
                 default => self::simulatedYoutubeDescription($project, $concept, $emojis),
             },
             'change_summary' => 'Symulacja lokalna: szkic złożony z zatwierdzonej koncepcji (tytuł, termin, obietnica, program, CTA).'
@@ -1417,6 +1420,43 @@ class DemoTikWebinarProject
             self::liveLabel($project),
             self::aiHostName($project),
             $elements,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $concept
+     */
+    private static function simulatedMainMail(array $project, array $concept, bool $emojis, string $length): string
+    {
+        $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
+        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+        $host = self::aiHostName($project);
+        $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->take($length === 'long' ? 6 : 3)
+            ->map(fn (string $point): string => '• '.$point)
+            ->implode("\n");
+        $plan = trim((string) ($concept['plan'] ?? ''));
+        $extra = trim((string) ($concept['additional_material'] ?? ''));
+
+        $body = implode("\n\n", array_filter([
+            'Dzień dobry,',
+            'zapraszamy Państwa na webinar „'.$title.'”. '.trim((string) ($concept['promise'] ?? '')),
+            $points !== '' ? $icon('📌')."Czego się Państwo dowiedzą:\n".$points : '',
+            $length === 'long' && $plan !== '' ? 'Plan spotkania: '.$plan : '',
+            $length === 'long' && $extra !== '' ? 'Po webinarze otrzymają Państwo: '.$extra : '',
+            $icon('📅').'Termin: '.self::liveLabel($project),
+            $host !== '' ? 'Prowadzący: '.$host : '',
+            "Zapisz się:\n".MaterialDraftTask::LINK_PLACEHOLDER,
+            "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
+        ]));
+
+        return MaterialDraftTask::composeMainMail(
+            ['Zaproszenie: '.$title, $title.' — webinar dla nauczycieli', 'Praktyczny webinar: '.$title],
+            'Termin: '.self::liveLabel($project).'. Udział wymaga zapisu.',
+            $body,
         );
     }
 

@@ -322,10 +322,14 @@ class ProjectController extends Controller
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
+            'mailFields' => $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+                ? MaterialDraftTask::parseMainMail((string) ($item['draft'] ?? ''))
+                : null,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
             'aiDraftIsFacebookPost' => $isFacebookPost,
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
+            'aiDraftIsMail' => $material === MaterialDraftTask::MAIL_MATERIAL_KEY,
             'aiDraftLiveLabel' => DemoTikWebinarProject::liveLabel($projectItem),
             'aiDraftUsesYoutubeSource' => MaterialDraftTask::usesYoutubeSource($material),
             'aiDraftUsesYoutubeDescription' => MaterialDraftTask::usesYoutubeSource($material)
@@ -497,14 +501,16 @@ class ProjectController extends Controller
         $item = DemoTikWebinarProject::requireProject($project);
         $data = $request->validate([
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            'length' => ['nullable', Rule::in(array_keys(MaterialDraftTask::MAIL_LENGTHS))],
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
         $style = [
-            'emojis' => $request->boolean('emojis', true),
+            'emojis' => $request->boolean('emojis', $material !== MaterialDraftTask::MAIL_MATERIAL_KEY),
             'hashtags' => $request->boolean('hashtags', true),
             'elements' => collect(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS)
                 ->mapWithKeys(fn (string $label, string $key): array => [$key => $request->boolean('elements.'.$key, true)])
                 ->all(),
+            'length' => MaterialDraftTask::mailLength($data['length'] ?? null),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
 
@@ -573,7 +579,19 @@ class ProjectController extends Controller
         $data = $request->validate([
             'status' => ['required', Rule::in(array_keys(DemoTikWebinarProject::materialStatusLabels()))],
             'draft' => ['nullable', 'string', 'max:20000'],
+            'mail_subject' => ['nullable', 'string', 'max:200'],
+            'mail_preheader' => ['nullable', 'string', 'max:200'],
+            'mail_body' => ['nullable', 'string', 'max:20000'],
         ]);
+
+        if ($material === MaterialDraftTask::MAIL_MATERIAL_KEY && $request->has('mail_body')) {
+            $subject = trim(preg_replace('/\s+/u', ' ', (string) ($data['mail_subject'] ?? '')));
+            $data['draft'] = MaterialDraftTask::composeMainMail(
+                $subject !== '' ? [$subject] : [],
+                preg_replace('/\s+/u', ' ', (string) ($data['mail_preheader'] ?? '')),
+                (string) ($data['mail_body'] ?? ''),
+            );
+        }
 
         $wasSkipped = DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material));
         $saved = DemoTikWebinarProject::updateMaterialStatus(

@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 
 /**
- * Szkic materiału webinaru. Profile: opis YouTube (DEC-024), post Facebook (DEC-026) i brief grafiki głównej (DEC-028).
+ * Szkic materiału webinaru. Profile: opis YouTube (DEC-024), post Facebook (DEC-026), brief grafiki głównej (DEC-028)
+ * i mailing główny (DEC-032).
  */
 final class MaterialDraftTask implements GrowthAiTask
 {
@@ -48,6 +49,36 @@ final class MaterialDraftTask implements GrowthAiTask
     public const GRAPHIC_SCHEMA_VERSION = 'material_graphic_brief_schema_v1';
 
     public const GRAPHIC_FORMATS = '16:9 (1920×1080) i kwadrat (1080×1080)';
+
+    public const MAIL_MATERIAL_KEY = 'main-mail';
+
+    public const MAIL_PROFILE = 'main_mail_v1';
+
+    public const MAIL_PROMPT_VERSION = 'material_main_mail_v1';
+
+    public const MAIL_SCHEMA_VERSION = 'material_main_mail_schema_v1';
+
+    public const MAIL_SUBJECT_COUNT = 3;
+
+    public const MAIL_DEFAULT_LENGTH = 'short';
+
+    /**
+     * @var array<string, string>
+     */
+    public const MAIL_LENGTHS = [
+        'short' => 'Krótki (ok. 150–250 słów)',
+        'long' => 'Dłuższy (ok. 300–450 słów)',
+    ];
+
+    /**
+     * @var array<string, int>
+     */
+    private const MAIL_FIELD_LIMITS = [
+        'subject' => 120,
+        'preheader' => 160,
+        'body' => 6000,
+        'change_summary' => 1000,
+    ];
 
     /**
      * Optional brief elements with their labels. Headline, date and visual direction are always included.
@@ -103,6 +134,14 @@ final class MaterialDraftTask implements GrowthAiTask
             'schema_version' => self::GRAPHIC_SCHEMA_VERSION,
             'max_chars' => self::MAX_DRAFT_CHARS,
         ],
+        self::MAIL_MATERIAL_KEY => [
+            'profile' => self::MAIL_PROFILE,
+            'name' => 'Mailing główny',
+            'type' => 'main_mail',
+            'prompt_version' => self::MAIL_PROMPT_VERSION,
+            'schema_version' => self::MAIL_SCHEMA_VERSION,
+            'max_chars' => self::MAIL_FIELD_LIMITS['body'],
+        ],
     ];
 
     public function __construct(private readonly string $materialKey = self::MATERIAL_KEY)
@@ -118,11 +157,16 @@ final class MaterialDraftTask implements GrowthAiTask
     }
 
     /**
-     * Materials that receive the approved YouTube description as a source (DEC-026, DEC-029).
+     * Materials that receive the approved YouTube description as a source (DEC-026, DEC-029, DEC-032).
      */
     public static function usesYoutubeSource(string $materialKey): bool
     {
-        return in_array($materialKey, [self::FACEBOOK_MATERIAL_KEY, self::GRAPHIC_MATERIAL_KEY], true);
+        return in_array($materialKey, [self::FACEBOOK_MATERIAL_KEY, self::GRAPHIC_MATERIAL_KEY, self::MAIL_MATERIAL_KEY], true);
+    }
+
+    public static function mailLength(mixed $value): string
+    {
+        return is_string($value) && array_key_exists($value, self::MAIL_LENGTHS) ? $value : self::MAIL_DEFAULT_LENGTH;
     }
 
     public function forMaterial(string $materialKey): self
@@ -155,6 +199,7 @@ final class MaterialDraftTask implements GrowthAiTask
         return match ($this->materialKey) {
             self::FACEBOOK_MATERIAL_KEY => $this->facebookPostInstructions(),
             self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
+            self::MAIL_MATERIAL_KEY => $this->mainMailInstructions(),
             default => $this->youtubeDescriptionInstructions(),
         };
     }
@@ -173,6 +218,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $profile = self::PROFILES[$this->materialKey];
         $isFacebook = $this->materialKey === self::FACEBOOK_MATERIAL_KEY;
         $isGraphic = $this->materialKey === self::GRAPHIC_MATERIAL_KEY;
+        $isMail = $this->materialKey === self::MAIL_MATERIAL_KEY;
 
         $input = [
             'material' => [
@@ -206,7 +252,7 @@ final class MaterialDraftTask implements GrowthAiTask
             ],
         ];
 
-        if ($isGraphic) {
+        if ($isGraphic || $isMail) {
             $input['campaign']['live_label'] = $this->string($campaign['live_label'] ?? '');
         }
 
@@ -222,6 +268,11 @@ final class MaterialDraftTask implements GrowthAiTask
             $input['style'] = [
                 'formats' => self::GRAPHIC_FORMATS,
                 'elements' => $this->graphicElements($context),
+            ];
+        } elseif ($isMail) {
+            $input['style'] = [
+                'emojis' => (bool) data_get($context, 'style.emojis', false),
+                'length' => self::mailLength(data_get($context, 'style.length')),
             ];
         } else {
             $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', true)];
@@ -253,6 +304,20 @@ final class MaterialDraftTask implements GrowthAiTask
      */
     public function schema(): array
     {
+        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+            return [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => [
+                    'subject_options' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'preheader' => ['type' => 'string'],
+                    'body' => ['type' => 'string'],
+                    'change_summary' => ['type' => 'string'],
+                ],
+                'required' => ['subject_options', 'preheader', 'body', 'change_summary'],
+            ];
+        }
+
         if ($this->materialKey === self::GRAPHIC_MATERIAL_KEY) {
             $fields = array_keys(self::GRAPHIC_FIELD_LIMITS);
 
@@ -282,6 +347,10 @@ final class MaterialDraftTask implements GrowthAiTask
     {
         if ($this->materialKey === self::GRAPHIC_MATERIAL_KEY) {
             return $this->validateGraphicBrief($response, $input);
+        }
+
+        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+            return $this->validateMainMail($response, $input);
         }
 
         $validator = Validator::make($response->payload, [
@@ -345,6 +414,116 @@ final class MaterialDraftTask implements GrowthAiTask
         ]);
 
         return implode("\n\n", $sections);
+    }
+
+    /**
+     * Fixed labels; the first subject is the main one.
+     *
+     * @param  list<string>  $subjects
+     */
+    public static function composeMainMail(array $subjects, string $preheader, string $body): string
+    {
+        $subjects = array_values(array_filter(array_map('trim', $subjects), static fn (string $subject): bool => $subject !== ''));
+        $alternatives = array_map(static fn (string $subject): string => '- '.$subject, array_slice($subjects, 1));
+
+        $header = array_filter([
+            isset($subjects[0]) ? 'Temat: '.$subjects[0] : '',
+            $alternatives !== [] ? "Inne propozycje tematu:\n".implode("\n", $alternatives) : '',
+            trim($preheader) !== '' ? 'Preheader: '.trim($preheader) : '',
+        ]);
+
+        return $header === [] ? trim($body) : trim(implode("\n", $header)."\n\n".trim($body));
+    }
+
+    /**
+     * Reverse of composeMainMail. A draft without the leading labels goes to the body unchanged.
+     *
+     * @return array{subject: string, alternatives: list<string>, preheader: string, body: string}
+     */
+    public static function parseMainMail(string $draft): array
+    {
+        $result = ['subject' => '', 'alternatives' => [], 'preheader' => '', 'body' => trim($draft)];
+        $lines = preg_split('/\R/u', trim($draft)) ?: [];
+        $inAlternatives = false;
+
+        foreach ($lines as $index => $line) {
+            if (preg_match('/^Temat:[ \t]*(.*)$/u', $line, $match) === 1 && $result['subject'] === '') {
+                $result['subject'] = trim($match[1]);
+                $inAlternatives = false;
+            } elseif (trim($line) === 'Inne propozycje tematu:') {
+                $inAlternatives = true;
+            } elseif ($inAlternatives && preg_match('/^-[ \t]*(.+)$/u', $line, $match) === 1) {
+                $result['alternatives'][] = trim($match[1]);
+            } elseif (preg_match('/^Preheader:[ \t]*(.*)$/u', $line, $match) === 1 && $result['preheader'] === '') {
+                $result['preheader'] = trim($match[1]);
+                $inAlternatives = false;
+            } elseif (trim($line) === '' && $index > 0) {
+                $result['body'] = trim(implode("\n", array_slice($lines, $index + 1)));
+
+                return $result;
+            } else {
+                return $index === 0
+                    ? $result
+                    : ['subject' => '', 'alternatives' => [], 'preheader' => '', 'body' => trim($draft)];
+            }
+        }
+
+        $result['body'] = '';
+
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function validateMainMail(AiProviderResponse $response, array $input): MaterialDraftResult
+    {
+        $validator = Validator::make($response->payload, [
+            'subject_options' => ['required', 'array', 'size:'.self::MAIL_SUBJECT_COUNT],
+            'subject_options.*' => ['required', 'string', 'max:'.self::MAIL_FIELD_LIMITS['subject']],
+            'preheader' => ['required', 'string', 'max:'.self::MAIL_FIELD_LIMITS['preheader']],
+            'body' => ['required', 'string', 'max:'.self::MAIL_FIELD_LIMITS['body']],
+            'change_summary' => ['required', 'string', 'max:'.self::MAIL_FIELD_LIMITS['change_summary']],
+        ]);
+
+        if ($validator->fails()) {
+            throw GrowthAiException::invalidResponse();
+        }
+
+        if (array_diff(array_keys($response->payload), ['subject_options', 'preheader', 'body', 'change_summary']) !== []) {
+            throw GrowthAiException::invalidResponse('unexpected_fields');
+        }
+
+        $subjects = array_map(static fn (mixed $subject): string => self::upperFirstLetter(trim((string) $subject)), $response->payload['subject_options']);
+        $preheader = self::upperFirstLetter(trim((string) $response->payload['preheader']));
+        $body = trim((string) $response->payload['body']);
+        $changeSummary = trim((string) $response->payload['change_summary']);
+
+        if (in_array('', $subjects, true) || $preheader === '' || $body === '' || $changeSummary === '') {
+            throw GrowthAiException::invalidResponse('empty_required_field');
+        }
+
+        $draft = self::composeMainMail($subjects, $preheader, $body);
+        $this->assertSafeOutput($draft."\n".$changeSummary, $input);
+
+        return new MaterialDraftResult(
+            draft: $draft,
+            changeSummary: $changeSummary,
+            provider: $response->provider,
+            model: $response->model,
+            promptVersion: $this->promptVersion(),
+            schemaVersion: $this->schemaVersion(),
+            requestId: $response->requestId,
+        );
+    }
+
+    private static function upperFirstLetter(string $value): string
+    {
+        return (string) preg_replace_callback(
+            '/^(\P{L}*)(\p{L})/u',
+            static fn (array $match): string => $match[1].mb_strtoupper($match[2]),
+            $value,
+        );
     }
 
     /**
@@ -437,6 +616,32 @@ Termin (campaign.live_label) i prowadzącego (campaign.host_name) aplikacja wsta
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, funkcji produktów, adresów URL, ceny, certyfikatów, akredytacji ani dofinansowania.
 Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
+To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+Zwróć wyłącznie dane zgodne z przekazanym schematem.
+PROMPT;
+    }
+
+    private function mainMailInstructions(): string
+    {
+        return <<<'PROMPT'
+Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic głównego maila zapraszającego na webinar. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”. Treść maila zacznij od „Dzień dobry,”.
+subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
+preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
+body: treść maila, bez tematu i preheadera.
+Jeżeli style.length ma wartość "short", body ma około 150–250 słów: 2–3 zdania o problemie lub korzyści odbiorcy, 3 punkty „Czego się Państwo dowiedzą” oparte na concept.points, termin, prowadzący i jedno wezwanie do zapisu.
+Jeżeli style.length ma wartość "long", body ma około 300–450 słów: szerszy kontekst problemu, pełniejszy program oparty na concept.points i concept.plan, krótki akapit o prowadzącym, informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste) i jedno wezwanie do zapisu.
+Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
+Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
+Nie podawaj żadnego adresu URL. W miejscu linku lub przycisku zapisu wstaw w osobnej linii dokładnie znacznik [LINK DO ZAPISU], który właściciel podmieni ręcznie.
+Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
+Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
+Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
+Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
+Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
 Zwróć wyłącznie dane zgodne z przekazanym schematem.

@@ -28,6 +28,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
     private const GRAPHIC = 'main-graphic';
 
+    private const MAIL = 'main-mail';
+
     private const FACEBOOK_DRAFT = "🎓 Canva AI w pracy nauczyciela — 6 października 2026 r., godz. 20:00.\n\nZapisz się: [LINK DO ZAPISU]\n\n#nauczyciele #TIK";
 
     private const AI_DRAFT = "Webinar „Canva AI w pracy nauczyciela” — 6 października 2026 r., godz. 20:00.\n\nPokażemy praktyczne zastosowania Canva AI w przygotowaniu materiałów.";
@@ -86,7 +88,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'main-mail']))
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'reminder-mail']))
             ->assertOk()
             ->assertDontSee('Poproś AI o szkic');
     }
@@ -95,7 +97,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach (['main-mail', 'reminder-mail', 'landing'] as $key) {
+        foreach (['reminder-mail', 'landing', 'follow-up'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();
@@ -1041,6 +1043,233 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertStringContainsString('Nagłówek: Canva AI w pracy nauczyciela', $draft);
         $this->assertStringNotContainsString('Tekst alternatywny', $draft);
         $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_mail_page_offers_length_switch_and_emojis(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertOk()
+            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Długość maila')
+            ->assertSee('Krótki (ok. 150–250 słów)')
+            ->assertSee('Dłuższy (ok. 300–450 słów)')
+            ->assertSee('Dodaj emotikony do treści maila')
+            ->assertSee($this->liveLabel())
+            ->assertSee(MaterialDraftTask::LINK_PLACEHOLDER);
+    }
+
+    public function test_mail_payload_and_schema(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->requestFor($user, self::MAIL)->assertSessionHas('success');
+
+        $input = $this->provider->input;
+        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'source_materials', 'current_draft', 'style', 'instruction'], array_keys($input));
+        $this->assertSame(['key' => self::MAIL, 'name' => 'Mailing główny', 'type' => 'main_mail'], $input['material']);
+        $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
+        $this->assertSame(['youtube_description' => ''], $input['source_materials']);
+        $this->assertSame(['emojis' => false, 'length' => 'short'], $input['style']);
+        $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
+        $this->assertSame(MaterialDraftTask::MAIL_PROMPT_VERSION, $this->proposal(self::MAIL)['prompt_version']);
+        foreach (['Dzień dobry,', 'Państwo', 'Zespół PNE', MaterialDraftTask::LINK_PLACEHOLDER, 'style.length', 'campaign.live_label'] as $rule) {
+            $this->assertStringContainsString($rule, $this->provider->instructions);
+        }
+    }
+
+    public function test_mail_length_and_emojis_reach_the_model(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->requestFor($user, self::MAIL, ['length' => 'long', 'emojis' => '1']);
+
+        $this->assertSame(['emojis' => true, 'length' => 'long'], $this->provider->input['style']);
+
+        $this->actingAs($user)
+            ->from(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), ['length' => 'huge'])
+            ->assertSessionHasErrors('length');
+        $this->assertSame(1, $this->provider->calls);
+    }
+
+    public function test_mail_uses_only_approved_youtube_description(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->saveMaterial($user, self::MATERIAL, 'REVIEW', 'Opis YouTube do sprawdzenia');
+        $this->requestFor($user, self::MAIL);
+        $this->assertSame('', $this->provider->input['source_materials']['youtube_description']);
+
+        $this->saveMaterial($user, self::MATERIAL, 'APPROVED', 'Zatwierdzony opis YouTube');
+        $this->requestFor($user, self::MAIL);
+        $this->assertSame('Zatwierdzony opis YouTube', $this->provider->input['source_materials']['youtube_description']);
+    }
+
+    public function test_mail_draft_is_composed_from_subjects_preheader_and_body(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+        $this->requestFor($user, self::MAIL);
+
+        $this->assertSame(
+            "Temat: Canva AI w pracy nauczyciela\nInne propozycje tematu:\n- Zaproszenie na webinar TIK\n- Praktyczna Canva AI w szkole\nPreheader: Praktyczny webinar dla nauczycieli.\n\n".$this->mailPayload()['body'],
+            $this->proposal(self::MAIL)['draft'],
+        );
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertSessionHas('success');
+        $this->assertStringStartsWith('Temat: Canva AI w pracy nauczyciela', GrowthArtifact::query()->where('key', self::MAIL)->sole()->payload['draft']);
+    }
+
+    public function test_mail_subjects_and_preheader_start_with_a_capital_letter(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = array_merge($this->mailPayload(), [
+            'subject_options' => ['canva ai w pracy nauczyciela', '„canva AI” w szkole', 'Już gotowe prompty'],
+            'preheader' => 'praktyczny pokaz z promptami.',
+        ]);
+
+        $this->requestFor($user, self::MAIL);
+
+        $fields = MaterialDraftTask::parseMainMail($this->proposal(self::MAIL)['draft']);
+        $this->assertSame('Canva ai w pracy nauczyciela', $fields['subject']);
+        $this->assertSame(['„Canva AI” w szkole', 'Już gotowe prompty'], $fields['alternatives']);
+        $this->assertSame('Praktyczny pokaz z promptami.', $fields['preheader']);
+    }
+
+    public function test_mail_response_with_wrong_shape_or_unsafe_content_is_rejected(): void
+    {
+        $user = $this->readyProject();
+
+        $twoSubjects = array_merge($this->mailPayload(), ['subject_options' => ['Jeden', 'Dwa']]);
+        $extra = $this->mailPayload() + ['live_date' => '2030-01-01'];
+        $emptyPreheader = array_merge($this->mailPayload(), ['preheader' => ' ']);
+        $emptySubject = array_merge($this->mailPayload(), ['subject_options' => ['Jeden', ' ', 'Trzy']]);
+        $url = array_merge($this->mailPayload(), ['body' => "Dzień dobry,\nzapisy: https://example.com/zapisy"]);
+
+        foreach ([$twoSubjects, $extra, $emptyPreheader, $emptySubject, $url] as $payload) {
+            $this->provider->payload = $payload;
+            $this->requestFor($user, self::MAIL)->assertSessionHas('error', self::INVALID_MESSAGE);
+            $this->assertNull($this->proposal(self::MAIL));
+        }
+    }
+
+    public function test_mail_simulation_follows_length_and_emojis(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::MAIL, ['length' => 'short', 'emojis' => '0']);
+        $short = $this->proposal(self::MAIL)['draft'];
+        $this->assertStringStartsWith('Temat: ', $short);
+        $this->assertStringContainsString("Dzień dobry,\n\nzapraszamy Państwa", $short);
+        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $short);
+        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $short);
+        $this->assertStringContainsString("Z pozdrowieniami,\nWaldemar Grabowski\nZespół PNE", $short);
+        $this->assertStringNotContainsString('📅', $short);
+        $this->assertStringNotContainsString('Plan spotkania:', $short);
+
+        $this->requestFor($user, self::MAIL, ['length' => 'long', 'emojis' => '1']);
+        $long = $this->proposal(self::MAIL)['draft'];
+        $this->assertStringContainsString('📅', $long);
+        $this->assertStringContainsString('Plan spotkania:', $long);
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_mail_page_has_separate_subject_preheader_and_body_fields(): void
+    {
+        $user = $this->readyProject();
+        $template = DemoTikWebinarProject::material(DemoTikWebinarProject::PROJECT_ID, self::MAIL)['draft'];
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertOk()
+            ->assertSee('name="mail_subject"', false)
+            ->assertSee('name="mail_preheader"', false)
+            ->assertSee('name="mail_body"', false)
+            ->assertDontSee('name="draft"', false)
+            ->assertSee('Kopiuj kod HTML preheadera')
+            ->assertSee('>'.e($template).'</textarea>', false);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::FACEBOOK]))
+            ->assertSee('name="draft"', false)
+            ->assertDontSee('name="mail_subject"', false);
+    }
+
+    public function test_mail_fields_are_saved_as_one_labelled_draft(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), [
+                'status' => 'REVIEW',
+                'mail_subject' => "  Mój temat\n",
+                'mail_preheader' => 'Mój preheader',
+                'mail_body' => "Dzień dobry,\n\nTreść.",
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            "Temat: Mój temat\nPreheader: Mój preheader\n\nDzień dobry,\n\nTreść.",
+            GrowthArtifact::query()->where('key', self::MAIL)->sole()->payload['draft'],
+        );
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertSee('value="Mój temat"', false)
+            ->assertSee('value="Mój preheader"', false);
+    }
+
+    public function test_applied_ai_subjects_are_offered_until_the_mail_is_saved(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+        $this->requestFor($user, self::MAIL);
+        $this->actingAs($user)->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]));
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertSee('value="Canva AI w pracy nauczyciela"', false)
+            ->assertSee('Propozycje tematu od AI')
+            ->assertSee('data-mail-use-subject="Canva AI w pracy nauczyciela"', false)
+            ->assertSee('data-mail-use-subject="Zaproszenie na webinar TIK"', false)
+            ->assertSee('data-mail-use-subject="Praktyczna Canva AI w szkole"', false)
+            ->assertSee('value="Praktyczny webinar dla nauczycieli."', false);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]), [
+                'status' => 'REVIEW',
+                'mail_subject' => 'Zaproszenie na webinar TIK',
+                'mail_preheader' => 'Praktyczny webinar dla nauczycieli.',
+                'mail_body' => $this->mailPayload()['body'],
+            ]);
+
+        $draft = GrowthArtifact::query()->where('key', self::MAIL)->sole()->payload['draft'];
+        $this->assertStringStartsWith("Temat: Zaproszenie na webinar TIK\nPreheader: ", $draft);
+        $this->assertStringNotContainsString('Inne propozycje tematu', $draft);
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MAIL]))
+            ->assertDontSee('Propozycje tematu od AI');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mailPayload(): array
+    {
+        return [
+            'subject_options' => ['Canva AI w pracy nauczyciela', 'Zaproszenie na webinar TIK', 'Praktyczna Canva AI w szkole'],
+            'preheader' => 'Praktyczny webinar dla nauczycieli.',
+            'body' => "Dzień dobry,\n\nzapraszamy Państwa na webinar.\n\nZapisz się:\n[LINK DO ZAPISU]\n\nZ pozdrowieniami,\nWaldemar Grabowski\nZespół PNE",
+            'change_summary' => 'Przygotowano mailing główny.',
+        ];
     }
 
     private function liveLabel(): string

@@ -213,3 +213,16 @@ Smoke:
 3. Zmiana statusu na „Draft” włącza materiał ze szkicem sprzed wyłączenia.
 
 Rollback: cofnąć kod. Materiały zapisane jako „Nie dotyczy” wrócą wtedy do statusu z szablonu, bo stary kod nie zna `SKIPPED`. W bazie zostają z `archived`.
+
+## Szkic AI mailingu głównego (DEC-032, 2026-10-02)
+
+Bez migracji i bez nowych zmiennych `.env`. Korzysta z tego samego klucza, modelu i limitów co pozostałe szkice AI. Po `git pull` wystarczą komendy cache z sekcji „Deploy ADM”.
+
+Smoke:
+
+1. „Mailing główny” ma kartę „Szkic z pomocą AI” z przełącznikiem „Długość maila” i checkboxem emotikon (domyślnie wyłączonym).
+2. „Poproś AI o szkic” w wersji krótkiej: propozycja zaczyna się od „Temat:”, ma dwie inne propozycje tematu, preheader, „Dzień dobry,”, `[LINK DO ZAPISU]` i podpis „Zespół PNE”.
+3. Wersja dłuższa daje wyraźnie dłuższą treść. „Zastosuj” zapisuje szkic ze statusem Draft i nową wersją w historii.
+4. Po „Zastosuj” szkic jest w polach Temat, Preheader i Treść, a pod tematem lista „Propozycje tematu od AI” ze wszystkimi trzema tematami (aktualny oznaczony „w polu”). Tematy i preheader zaczynają się wielką literą. „Kopiuj kod HTML preheadera” kopiuje ukryty `div`.
+
+Rollback: cofnąć kod. Zapisane szkice mailingu zostają.

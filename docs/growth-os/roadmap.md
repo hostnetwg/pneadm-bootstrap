@@ -16,7 +16,9 @@ Potem grafika główna, w etapach:
 2. Obraz z AI przez OpenAI (DEC-029): generator z podglądem i galerią, od DEC-030 `gpt-image-2` medium z natywnym 16:9 i wersją kwadratową przekomponowaną z obrazu poziomego, domyślnie bez tekstu na obrazie, napis z nagłówkiem i terminem jako opcja. Wdrożony lokalnie, czeka na weryfikację Waldemara i migrację na produkcji.
 3. Projekt w Canvie: szablon marki z polami do wypełnienia przez Canva Connect Autofill API. Według ogłoszenia Canvy z 2026-09-23 Autofill działa od planu Pro, także w Canva Education; Waldemar ma Pro i Education. Wymaga integracji w Canva Developer Portal (MFA), połączenia konta przez OAuth i przechowywania tokenów. Część dokumentacji Canvy nadal wymienia Enterprise, więc trzeba to potwierdzić przed wdrożeniem.
 
-Przełącznik trybu grafiki (obraz AI / projekt w Canvie / połączenie) dopiero, gdy działają co najmniej dwa tryby. Potem mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Przełącznik trybu grafiki (obraz AI / projekt w Canvie / połączenie) dopiero, gdy działają co najmniej dwa tryby.
+
+Mailing główny (DEC-032): szkic AI z 3 tematami, preheaderem, treścią i przełącznikiem długości, wdrożony lokalnie, czeka na weryfikację Waldemara. Potem zapis propozycji AI w bazie albo kolejne materiały (mailing przypominający, landing). Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 

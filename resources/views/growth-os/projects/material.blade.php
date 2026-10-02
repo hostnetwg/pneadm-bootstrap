@@ -48,8 +48,52 @@
                         <h3 class="h6 mb-0" id="material-preview-heading">Szkic</h3>
                     </div>
                     <div class="card-body">
-                        <label for="draft" class="visually-hidden">Szkic</label>
-                        <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ $material['draft'] }}</textarea>
+                        @if($mailFields !== null)
+                            <div class="mb-3">
+                                <label for="mail_subject" class="form-label">Temat</label>
+                                <input type="text" id="mail_subject" name="mail_subject" maxlength="200" class="form-control @error('mail_subject') is-invalid @enderror" value="{{ old('mail_subject', $mailFields['subject']) }}" @readonly($materialSkipped) data-mail-counter="60">
+                                @error('mail_subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text"><span data-mail-counter-for="mail_subject">0</span> znaków, zalecane do 60.</div>
+                                @if($mailFields['alternatives'] !== [] && ! $materialSkipped)
+                                    <div class="small mt-2">
+                                        <div class="fw-semibold mb-1">Propozycje tematu od AI</div>
+                                        <ul class="list-unstyled mb-1">
+                                            @foreach(array_values(array_unique(array_filter([$mailFields['subject'], ...$mailFields['alternatives']]))) as $option)
+                                                <li class="d-flex align-items-center gap-2 mb-1">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm py-0" data-mail-use-subject="{{ $option }}">Użyj</button>
+                                                    <span>{{ $option }}</span>
+                                                    <span class="badge text-bg-light border d-none" data-mail-subject-current>w polu</span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                        <div class="text-secondary">Po zapisie zostaje tylko temat z pola powyżej.</div>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="mb-3">
+                                <label for="mail_preheader" class="form-label">Preheader</label>
+                                <input type="text" id="mail_preheader" name="mail_preheader" maxlength="200" class="form-control @error('mail_preheader') is-invalid @enderror" value="{{ old('mail_preheader', $mailFields['preheader']) }}" @readonly($materialSkipped) data-mail-counter="100">
+                                @error('mail_preheader')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">
+                                    <span data-mail-counter-for="mail_preheader">0</span> znaków, zalecane 40–100. Skrzynka pokazuje go na liście maili obok tematu. Sendy nie ma na niego pola: skopiuj kod i wklej na samym początku treści w trybie HTML.
+                                </div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-mail-copy-preheader>Kopiuj kod HTML preheadera</button>
+                                    <span class="small text-success d-none" role="status" data-mail-copy-status>Skopiowano. Wklej kod na początku treści maila w trybie HTML.</span>
+                                </div>
+                                <details class="small mt-2">
+                                    <summary>Pokaż kod HTML preheadera</summary>
+                                    <label for="mail_preheader_html" class="visually-hidden">Kod HTML preheadera</label>
+                                    <textarea id="mail_preheader_html" class="form-control form-control-sm font-monospace mt-2" rows="3" readonly data-mail-preheader-html></textarea>
+                                </details>
+                            </div>
+                            <label for="mail_body" class="form-label">Treść</label>
+                            <textarea id="mail_body" name="mail_body" class="form-control growth-draft-editor @error('mail_body') is-invalid @enderror" rows="16" @readonly($materialSkipped)>{{ old('mail_body', $mailFields['body']) }}</textarea>
+                            @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        @else
+                            <label for="draft" class="visually-hidden">Szkic</label>
+                            <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ $material['draft'] }}</textarea>
+                        @endif
                     </div>
                     <div class="card-footer d-flex flex-column flex-sm-row align-items-sm-end justify-content-between gap-3">
                         <div>
@@ -271,7 +315,14 @@
                                 </p>
                             @endif
 
-                            @if($aiDraftIsFacebookPost)
+                            @if($aiDraftIsMail)
+                                <p class="small text-secondary mb-3">
+                                    AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść. Zwrot „Dzień dobry,” i forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
+                                    Termin: <span class="fw-semibold">{{ $aiDraftLiveLabel }}</span>. Stopkę i link do wypisania dodaje system mailingowy.
+                                </p>
+                            @endif
+
+                            @if($aiDraftIsFacebookPost || $aiDraftIsMail)
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
 
@@ -299,10 +350,21 @@
                                         @endforeach
                                     </fieldset>
                                 @else
-                                    <input type="hidden" name="emojis" value="0">
+                                    @if($aiDraftIsMail)
+                                        <fieldset class="mb-3">
+                                            <legend class="form-label fs-6">Długość maila</legend>
+                                            @foreach(\App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::MAIL_LENGTHS as $lengthKey => $lengthLabel)
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="length" value="{{ $lengthKey }}" id="material_ai_length_{{ $lengthKey }}" @checked(old('length', \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::MAIL_DEFAULT_LENGTH) === $lengthKey) @disabled(! $aiDraftAllowed)>
+                                                    <label class="form-check-label" for="material_ai_length_{{ $lengthKey }}">{{ $lengthLabel }}</label>
+                                                </div>
+                                            @endforeach
+                                        </fieldset>
+                                    @endif
                                     <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" name="emojis" value="1" id="material_ai_emojis" @checked(old('emojis', '1') === '1') @disabled(! $aiDraftAllowed)>
-                                        <label class="form-check-label" for="material_ai_emojis">{{ $aiDraftIsFacebookPost ? 'Dodaj emotikony do posta' : 'Dodaj emotikony do opisu' }}</label>
+                                        <input type="hidden" name="emojis" value="0">
+                                        <input class="form-check-input" type="checkbox" name="emojis" value="1" id="material_ai_emojis" @checked(old('emojis', $aiDraftIsMail ? '0' : '1') === '1') @disabled(! $aiDraftAllowed)>
+                                        <label class="form-check-label" for="material_ai_emojis">{{ $aiDraftIsMail ? 'Dodaj emotikony do treści maila' : ($aiDraftIsFacebookPost ? 'Dodaj emotikony do posta' : 'Dodaj emotikony do opisu') }}</label>
                                     </div>
                                 @endif
                                 @if($aiDraftIsFacebookPost)
@@ -319,7 +381,7 @@
                                     rows="4"
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control @error('instruction') is-invalid @enderror"
-                                    placeholder="{{ $aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki') }}"
+                                    placeholder="{{ $aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki')) }}"
                                     @disabled(! $aiDraftAllowed)
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -475,6 +537,65 @@
                         form.querySelector('[data-growth-ai-spinner]').classList.remove('d-none');
                     });
                 });
+            </script>
+        @endif
+
+        @if($mailFields !== null)
+            <script>
+                (() => {
+                    const subject = document.getElementById('mail_subject');
+                    const preheader = document.getElementById('mail_preheader');
+                    const htmlField = document.querySelector('[data-mail-preheader-html]');
+                    const copyStatus = document.querySelector('[data-mail-copy-status]');
+                    const escapeHtml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+                    const preheaderHtml = () => '<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'
+                        + escapeHtml(preheader.value.trim())
+                        + '&nbsp;&zwnj;'.repeat(40)
+                        + '</div>';
+
+                    const refresh = () => {
+                        document.querySelectorAll('[data-mail-counter]').forEach((input) => {
+                            const counter = document.querySelector('[data-mail-counter-for="' + input.id + '"]');
+                            const length = [...input.value.trim()].length;
+                            counter.textContent = length;
+                            counter.classList.toggle('text-danger', length > Number(input.dataset.mailCounter));
+                        });
+                        htmlField.value = preheaderHtml();
+                        document.querySelectorAll('[data-mail-use-subject]').forEach((button) => {
+                            const isCurrent = button.dataset.mailUseSubject === subject.value.trim();
+                            button.disabled = isCurrent;
+                            button.parentElement.querySelector('[data-mail-subject-current]').classList.toggle('d-none', ! isCurrent);
+                        });
+                    };
+
+                    document.querySelectorAll('[data-mail-use-subject]').forEach((button) => {
+                        button.addEventListener('click', () => {
+                            subject.value = button.dataset.mailUseSubject;
+                            refresh();
+                            subject.focus();
+                        });
+                    });
+
+                    document.querySelector('[data-mail-copy-preheader]').addEventListener('click', async () => {
+                        refresh();
+                        try {
+                            await navigator.clipboard.writeText(htmlField.value);
+                        } catch {
+                            htmlField.closest('details').open = true;
+                            htmlField.select();
+                            document.execCommand('copy');
+                        }
+                        copyStatus.classList.remove('d-none');
+                    });
+
+                    subject.addEventListener('input', refresh);
+                    preheader.addEventListener('input', () => {
+                        copyStatus.classList.add('d-none');
+                        refresh();
+                    });
+                    refresh();
+                })();
             </script>
         @endif
     </div>
