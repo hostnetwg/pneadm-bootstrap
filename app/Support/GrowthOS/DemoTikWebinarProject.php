@@ -26,6 +26,8 @@ class DemoTikWebinarProject
 {
     public const PROJECT_ID = 'tik-webinar-session';
 
+    public const MATERIAL_SKIPPED = 'SKIPPED';
+
     public const SESSION_PROJECT = 'growth_os.demo_tik_project';
 
     /**
@@ -979,7 +981,7 @@ class DemoTikWebinarProject
         foreach ($project['materials'] as $index => $material) {
             if (($material['id'] ?? null) === $materialId) {
                 $project['materials'][$index]['status'] = $status;
-                if ($draft !== null) {
+                if ($draft !== null && ! self::isMaterialSkipped($material)) {
                     $project['materials'][$index]['draft'] = $draft;
                 }
                 $project['materials'][$index]['updated_at'] = now()->toIso8601String();
@@ -1554,7 +1556,7 @@ class DemoTikWebinarProject
         }
 
         foreach ($project['materials'] ?? [] as $material) {
-            if (! in_array(($material['status'] ?? null), ['APPROVED', 'PUBLISHED'], true)) {
+            if (! in_array(($material['status'] ?? null), ['APPROVED', 'PUBLISHED', self::MATERIAL_SKIPPED], true)) {
                 return [
                     'label' => 'Następny krok: przygotuj '.$material['name'],
                     'href' => route('growth.projects.materials.show', [$project['id'], $material['id']]),
@@ -1663,7 +1665,7 @@ class DemoTikWebinarProject
         $days = (int) now()->startOfDay()->diffInDays($liveAt->startOfDay(), false);
         $criticalMaterials = collect($project['materials'] ?? [])
             ->whereIn('id', ['landing', 'reminder-mail', 'host-script'])
-            ->reject(fn (array $material) => in_array($material['status'], ['APPROVED', 'PUBLISHED'], true))
+            ->reject(fn (array $material) => in_array($material['status'], ['APPROVED', 'PUBLISHED', self::MATERIAL_SKIPPED], true))
             ->count();
 
         $daysLabel = match (true) {
@@ -1714,7 +1716,16 @@ class DemoTikWebinarProject
             'REVIEW' => 'Do sprawdzenia',
             'APPROVED' => 'Zatwierdzone',
             'PUBLISHED' => 'Opublikowane / zaplanowane',
+            self::MATERIAL_SKIPPED => 'Nie dotyczy',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $material
+     */
+    public static function isMaterialSkipped(array $material): bool
+    {
+        return ($material['status'] ?? null) === self::MATERIAL_SKIPPED;
     }
 
     /**
@@ -1728,6 +1739,7 @@ class DemoTikWebinarProject
             'REVIEW' => 'text-bg-warning',
             'APPROVED' => 'text-bg-success',
             'PUBLISHED' => 'text-bg-primary',
+            self::MATERIAL_SKIPPED => 'bg-light text-secondary border border-secondary-subtle',
         ];
     }
 

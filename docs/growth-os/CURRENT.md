@@ -20,6 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Materiał „Opis YouTube”: „Poproś AI o szkic” po zatwierdzeniu kierunku i koncepcji, obecny szkic obok propozycji, Zastosuj / Odrzuć.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
 - Materiał „Grafika główna”: „Poproś AI o szkic” daje tekstowy brief (nagłówek, termin z aplikacji, kierunek wizualny i opcjonalne elementy z checkboxami) dla formatów 16:9 i kwadrat, z zatwierdzonym opisem YouTube jako źródłem. Pod szkicem „Generator obrazu”: format, opis obrazu (wstępnie z briefu), checkbox „Dodaj nagłówek i termin na obrazie”, „Generuj obraz”, licznik dziennego limitu z „Zresetuj limit” i galeria z Pobierz / Wybierz jako grafikę główną / Usuń, a przy obrazie poziomym „Utwórz wersję kwadratową”.
+- Każdy materiał: status „Nie dotyczy” wyłącza go w tym projekcie (wyszarzony na liście, bez wpływu na następny krok).
 - Każdy materiał: „Historia wersji” pod szkicem (ostatnie 20 zmian treści), podgląd w modalu i „Przywróć tę wersję”.
 
 ## 2. Aktualny etap
@@ -38,6 +39,7 @@ Etap v0.2. Pierwszy wycinek, szkic AI dla materiału `youtube-description` (DEC-
 - Workspace projektu z etapami, materiałami, checklistą czasową i jednym głównym CTA.
 - Checklista pokazuje 9 zadań operacyjnych z checkboxem. Pozostałe punkty osi czasu są informacją i nie mają checkboxa.
 - Dziesięć materiałów ma edytowalny szkic i status. „Zapisz materiał” zapisuje artifact `material`. Samo otwarcie ekranu nie tworzy wiersza.
+- Status „Nie dotyczy” (DEC-031, `SKIPPED`, w bazie `archived`) wyłącza materiał w tym jednym projekcie. Materiał zostaje na swoim miejscu na liście, wyszarzony. Nie liczy się do „Następnego kroku” ani elementów krytycznych. Szkic jest tylko do odczytu, a „Poproś AI o szkic”, „Zastosuj”, przywracanie wersji i generator obrazu są zablokowane. Wyłączony opis YouTube nie jest źródłem dla posta i briefu grafiki. Zmiana statusu na inny włącza materiał ze szkicem sprzed wyłączenia.
 - v0.2: brief AI grafiki głównej (DEC-028), trzeci profil `material_draft`: osobne pola, termin z dniem tygodnia liczony przez aplikację, opcjonalne elementy z checkboxami, formaty 16:9 i kwadrat.
 - Historia wersji materiałów (DEC-027): tabela `growth_artifact_versions`, nowa wersja przy każdej zmianie treści („Zapisz materiał”, „Zastosuj” szkicu AI, przywrócenie), bez wersji przy samej zmianie statusu, ostatnie 20 na materiał. Materiał sprzed wdrożenia dostaje przy pierwszej zmianie wersję „Stan sprzed historii”. Przywrócenie po potwierdzeniu w modalu zapisuje stary tekst jako nową wersję ze statusem Draft. Wersja powtarzająca wcześniejszy tekst ma znaczek „ten sam tekst co vN”.
 - Etap **Kierunek**: edycja pięciu pól, zatwierdzenie i cofnięcie. Stała podpowiedź AI nie jest zapisywana.
@@ -105,6 +107,8 @@ Zaplanuj TIK
 Ręczna weryfikacja briefu grafiki i generatora obrazu przez Waldemara: brief z zatwierdzonym opisem YouTube i bez niego, obraz poziomy i kwadratowy, z napisem i bez, wersja kwadratowa z obrazu poziomego, wybór i usuwanie w galerii. Na produkcji: backup, migracja `growth_artifact_images`, smoke z runbooka (kroki 1–7) i sprawdzenie, czy konto OpenAI ma dostęp do `gpt-image-2`. Potem mailing główny. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
+
+- Status materiału „Nie dotyczy” (DEC-031): wyłączenie materiału w projekcie bez migracji (`SKIPPED` w payloadzie, `archived` w `growth_artifacts.status`), blokada edycji i AI, pomijanie w następnym kroku i elementach krytycznych.
 
 - Generator obrazu grafiki głównej (DEC-029): nowa tabela `growth_artifact_images` (migracja `2026_10_02_000000`), `OpenAiImageProvider`, `GrowthImageService`, prywatne pliki JPEG, galeria z wyborem grafiki głównej. Brief grafiki korzysta z zatwierdzonego opisu YouTube (prompt `material_graphic_brief_v2`). DEC-030: domyślny model `gpt-image-2` z natywnym 16:9 oraz wersja kwadratowa z obrazu poziomego (`POST /images/edits`, kolumny `source_image_id`, `overlay_headline`, `overlay_date`).
 

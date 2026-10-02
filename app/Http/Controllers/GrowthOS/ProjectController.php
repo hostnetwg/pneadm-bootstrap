@@ -25,6 +25,8 @@ class ProjectController extends Controller
 {
     public const MATERIAL_AI_PRECONDITION_MESSAGE = 'Najpierw zatwierdź kierunek i koncepcję webinaru.';
 
+    public const MATERIAL_SKIPPED_MESSAGE = 'Ten materiał jest wyłączony (status „Nie dotyczy”). Zmień status, żeby z nim pracować.';
+
     public const MATERIAL_AI_STALE_MESSAGE = 'Kierunek, koncepcja lub materiał zmieniły się od czasu wygenerowania szkicu. Wygeneruj nową propozycję.';
 
     public const IMAGE_NOT_PERSISTED_MESSAGE = 'Projekt nie jest jeszcze zapisany w bazie, więc obrazu nie da się przechować.';
@@ -315,6 +317,7 @@ class ProjectController extends Controller
 
         $aiDraftSupported = MaterialDraftTask::supports($material);
         $isFacebookPost = $material === MaterialDraftTask::FACEBOOK_MATERIAL_KEY;
+        $skipped = DemoTikWebinarProject::isMaterialSkipped($item);
 
         return view('growth-os.projects.material', [
             'project' => $projectItem,
@@ -327,7 +330,8 @@ class ProjectController extends Controller
             'aiDraftUsesYoutubeSource' => MaterialDraftTask::usesYoutubeSource($material),
             'aiDraftUsesYoutubeDescription' => MaterialDraftTask::usesYoutubeSource($material)
                 && DemoTikWebinarProject::approvedYoutubeDescription($projectItem) !== '',
-            'aiDraftAllowed' => $aiDraftSupported && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
+            'materialSkipped' => $skipped,
+            'aiDraftAllowed' => $aiDraftSupported && ! $skipped && DemoTikWebinarProject::canDraftMaterialWithAi($projectItem),
             'aiDraftProposal' => $aiDraftSupported ? DemoTikWebinarProject::materialAiProposal($projectItem, $material) : null,
             'aiRealEnabled' => config('growth_ai.enabled') === true,
             'aiModel' => (string) config('growth_ai.model'),
@@ -361,6 +365,10 @@ class ProjectController extends Controller
             'include_headline' => ['nullable', 'boolean'],
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->withInput()->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
 
         if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
             return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
@@ -400,6 +408,10 @@ class ProjectController extends Controller
         $item = DemoTikWebinarProject::requireProject($project);
         $source = DemoTikWebinarProject::requireMaterialImage($item, $material, $image);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
 
         if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
             return $back->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
@@ -465,9 +477,12 @@ class ProjectController extends Controller
 
     public function restoreMaterialVersion(string $project, string $material, int $version): RedirectResponse
     {
-        DemoTikWebinarProject::material($project, $material);
-        $outcome = DemoTikWebinarProject::restoreMaterialVersion($project, $material, $version);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        $outcome = DemoTikWebinarProject::restoreMaterialVersion($project, $material, $version);
 
         if ($outcome['unchanged']) {
             return $back->with('success', 'Ta wersja jest taka sama jak obecny szkic. Nic nie zmieniono.');
@@ -492,6 +507,10 @@ class ProjectController extends Controller
                 ->all(),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
+
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->withInput()->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
 
         if (! DemoTikWebinarProject::canDraftMaterialWithAi($item)) {
             return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
@@ -525,8 +544,12 @@ class ProjectController extends Controller
     public function applyMaterialAi(string $project, string $material): RedirectResponse
     {
         abort_unless(MaterialDraftTask::supports($material), 404);
-        $outcome = DemoTikWebinarProject::applyMaterialAiProposal($project, $material);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
+        if (DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material))) {
+            return $back->with('error', self::MATERIAL_SKIPPED_MESSAGE);
+        }
+
+        $outcome = DemoTikWebinarProject::applyMaterialAiProposal($project, $material);
 
         if (! $outcome['ok']) {
             return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
@@ -552,15 +575,22 @@ class ProjectController extends Controller
             'draft' => ['nullable', 'string', 'max:20000'],
         ]);
 
-        DemoTikWebinarProject::updateMaterialStatus(
+        $wasSkipped = DemoTikWebinarProject::isMaterialSkipped(DemoTikWebinarProject::material($project, $material));
+        $saved = DemoTikWebinarProject::updateMaterialStatus(
             $project,
             $material,
             $data['status'],
             array_key_exists('draft', $data) ? (string) $data['draft'] : null,
         );
 
+        $message = match (true) {
+            DemoTikWebinarProject::isMaterialSkipped($saved) => 'Materiał wyłączony (Nie dotyczy). Nie liczy się do następnego kroku ani elementów krytycznych. Szkic został zachowany.',
+            $wasSkipped => 'Materiał jest znowu aktywny. Szkic jest taki jak przed wyłączeniem.',
+            default => 'Status i szkic materiału zostały zapisane. Nic nie opublikowano.',
+        };
+
         return redirect()
             ->route('growth.projects.materials.show', [$project, $material])
-            ->with('success', 'Status i szkic materiału zostały zapisane. Nic nie opublikowano.');
+            ->with('success', $message);
     }
 }

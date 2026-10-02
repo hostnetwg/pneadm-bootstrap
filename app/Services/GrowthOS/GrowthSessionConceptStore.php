@@ -591,6 +591,7 @@ class GrowthSessionConceptStore
             'NOT_STARTED' => GrowthArtifact::STATUS_NOT_STARTED,
             'REVIEW' => GrowthArtifact::STATUS_REVIEW,
             'APPROVED', 'PUBLISHED' => GrowthArtifact::STATUS_APPROVED,
+            DemoTikWebinarProject::MATERIAL_SKIPPED => GrowthArtifact::STATUS_ARCHIVED,
             default => GrowthArtifact::STATUS_DRAFT,
         };
     }

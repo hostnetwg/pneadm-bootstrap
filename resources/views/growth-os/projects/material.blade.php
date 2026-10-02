@@ -33,6 +33,13 @@
             </div>
         </section>
 
+        @if($materialSkipped)
+            <div class="alert alert-secondary" role="status">
+                Ten materiał jest wyłączony w tym projekcie (status „Nie dotyczy”). Nie liczy się do następnego kroku ani elementów krytycznych, a szkic, AI i historia wersji są zablokowane.
+                Żeby go włączyć, wybierz inny status i kliknij „Zapisz materiał”. Szkic wróci taki, jaki był.
+            </div>
+        @endif
+
         <div class="row g-4">
             <div class="col-xl-8">
                 <form id="material-save" method="POST" action="{{ route('growth.projects.materials.status', [$project['id'], $material['id']]) }}" class="card border">
@@ -42,7 +49,7 @@
                     </div>
                     <div class="card-body">
                         <label for="draft" class="visually-hidden">Szkic</label>
-                        <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14">{{ $material['draft'] }}</textarea>
+                        <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ $material['draft'] }}</textarea>
                     </div>
                     <div class="card-footer d-flex flex-column flex-sm-row align-items-sm-end justify-content-between gap-3">
                         <div>
@@ -101,7 +108,9 @@
                                 </div>
                             </div>
 
-                            @if(! $aiDraftAllowed)
+                            @if($materialSkipped)
+                                <div class="alert alert-secondary small mb-3" role="status">{{ \App\Http\Controllers\GrowthOS\ProjectController::MATERIAL_SKIPPED_MESSAGE }}</div>
+                            @elseif(! $aiDraftAllowed)
                                 <div class="alert alert-warning small mb-3" role="status">Najpierw zatwierdź kierunek i koncepcję webinaru.</div>
                             @elseif(! $imageGeneratorReady)
                                 <div class="alert alert-warning small mb-3" role="status">{{ \App\Http\Controllers\GrowthOS\ProjectController::IMAGE_NOT_PERSISTED_MESSAGE }}</div>
@@ -266,7 +275,9 @@
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
 
-                            @if(! $aiDraftAllowed)
+                            @if($materialSkipped)
+                                <div class="alert alert-secondary small mb-3" role="status">{{ \App\Http\Controllers\GrowthOS\ProjectController::MATERIAL_SKIPPED_MESSAGE }}</div>
+                            @elseif(! $aiDraftAllowed)
                                 <div class="alert alert-warning small mb-3" role="status">Najpierw zatwierdź kierunek i koncepcję webinaru.</div>
                             @endif
 
@@ -361,10 +372,12 @@
                     <p class="small mt-3 mb-0"><span class="fw-semibold">Co zmieniono:</span> {{ $aiDraftProposal['change_summary'] }}</p>
                 </div>
                 <div class="card-footer d-flex flex-wrap gap-2">
-                    <form method="POST" action="{{ route('growth.projects.materials.ai.apply', [$project['id'], $material['id']]) }}">
-                        @csrf
-                        <button type="submit" class="btn btn-primary">Zastosuj</button>
-                    </form>
+                    @unless($materialSkipped)
+                        <form method="POST" action="{{ route('growth.projects.materials.ai.apply', [$project['id'], $material['id']]) }}">
+                            @csrf
+                            <button type="submit" class="btn btn-primary">Zastosuj</button>
+                        </form>
+                    @endunless
                     <form method="POST" action="{{ route('growth.projects.materials.ai.reject', [$project['id'], $material['id']]) }}">
                         @csrf
                         <button type="submit" class="btn btn-outline-secondary">Odrzuć</button>
@@ -440,7 +453,7 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
-                                @unless($isCurrent)
+                                @unless($isCurrent || $materialSkipped)
                                     <form method="POST" action="{{ route('growth.projects.materials.versions.restore', [$project['id'], $material['id'], $version->version]) }}">
                                         @csrf
                                         <button type="submit" class="btn btn-primary">Przywróć tę wersję</button>

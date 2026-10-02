@@ -128,6 +128,16 @@
         border-left: 4px solid var(--bs-primary);
     }
 
+    .growth-readable .list-group-item.growth-material-skipped {
+        border-left: 4px solid var(--bs-gray-400);
+        background: var(--bs-gray-100);
+        opacity: 0.6;
+    }
+
+    .growth-readable .list-group-item.growth-material-skipped:hover {
+        opacity: 0.85;
+    }
+
     .growth-readable .list-group-item.growth-material-review {
         border-left: 4px solid var(--bs-warning);
     }

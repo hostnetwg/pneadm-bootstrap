@@ -201,3 +201,15 @@ Smoke:
 7. Licznik „wykorzystano X z Y” rośnie po każdym obrazie, a „Zresetuj limit” po potwierdzeniu w modalu wraca do 0.
 
 Rollback: cofnąć kod. Tabeli i plików nie usuwać.
+
+## Status materiału „Nie dotyczy” (DEC-031, 2026-10-02)
+
+Bez migracji i bez nowych zmiennych `.env`. Po `git pull` wystarczą komendy cache z sekcji „Deploy ADM”.
+
+Smoke:
+
+1. W dowolnym materiale wybrać status „Nie dotyczy” i „Zapisz materiał”. Pojawia się komunikat o wyłączeniu, szkic jest tylko do odczytu, a przyciski AI są nieaktywne.
+2. Na liście materiałów w projekcie materiał jest w tym samym miejscu, wyszarzony, ze znaczkiem „Nie dotyczy”. „Następny krok” go pomija.
+3. Zmiana statusu na „Draft” włącza materiał ze szkicem sprzed wyłączenia.
+
+Rollback: cofnąć kod. Materiały zapisane jako „Nie dotyczy” wrócą wtedy do statusu z szablonu, bo stary kod nie zna `SKIPPED`. W bazie zostają z `archived`.
