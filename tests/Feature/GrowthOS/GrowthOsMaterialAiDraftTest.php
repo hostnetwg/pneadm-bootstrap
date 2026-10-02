@@ -1310,7 +1310,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame(['key' => self::REMINDER, 'name' => 'Mailing przypominający', 'type' => 'reminder_mail'], $input['material']);
         $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
         $this->assertSame(['youtube_description' => '', 'main_mail' => ''], $input['source_materials']);
-        $this->assertSame(['emojis' => false, 'length' => 'short', 'timing' => 'day_before'], $input['style']);
+        $this->assertSame(['emojis' => false, 'length' => 'short', 'timing' => 'same_day'], $input['style']);
         $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
         $this->assertSame(MaterialDraftTask::REMINDER_PROMPT_VERSION, $this->proposal(self::REMINDER)['prompt_version']);
         foreach ([MaterialDraftTask::ROOM_LINK_PLACEHOLDER, MaterialDraftTask::LINK_PLACEHOLDER, 'style.timing', 'source_materials.main_mail', 'Dzień dobry,', 'Zespół PNE'] as $rule) {

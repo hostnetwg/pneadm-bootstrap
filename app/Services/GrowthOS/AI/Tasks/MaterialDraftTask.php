@@ -88,7 +88,7 @@ final class MaterialDraftTask implements GrowthAiTask
         'long' => 'Dłuższy (ok. 180–280 słów)',
     ];
 
-    public const REMINDER_DEFAULT_TIMING = 'day_before';
+    public const REMINDER_DEFAULT_TIMING = 'same_day';
 
     /**
      * @var array<string, string>
