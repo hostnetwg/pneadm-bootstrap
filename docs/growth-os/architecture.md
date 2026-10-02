@@ -28,6 +28,14 @@ Status: kampania, prowadzący, kierunek, koncepcja, decyzje, 9 zadań operacyjny
 
 `Growth Campaign` to strategiczny projekt pracy: temat, ekspert, cel, treści, decyzje, zadania i wyniki.
 
+### Operator ≠ Prowadzący ≠ Głos komunikacji (DEC-035)
+
+- **Operator** — zalogowany `User` (`owner_user_id`, `decided_by_user_id`). Służy do logowania i audytu, nie do treści.
+- **Prowadzący** — `primary_instructor_id` (instruktor z bazy) albo osoba spoza bazy (`null`). `host_name` jest zawsze kopią imienia i nazwiska z chwili zapisu i działa jako fallback.
+- **Głos komunikacji** — `communication_voice_instructor_id`; `null` oznacza „PNE — neutralnie”. Czyim stylem AI pisze. Niezależny od prowadzącego i od Operatora.
+
+Instruktor istnieje bez konta `User`. Do AI z rekordu instruktora trafia tylko imię i nazwisko oraz `ai_voice_profile` (bazowe zasady PNE są w `PneVoice`). Głos jest zapisany przy kampanii, nie przy wersji materiału: historia wersji nie mówi, jakim głosem powstała starsza wersja (future). Zewnętrzny prowadzący bez rekordu instruktora nie buduje historii stylu.
+
 ### Course ≠ Growth Campaign
 
 `Course` to konkretne szkolenie lub wydarzenie z terminem.
@@ -53,7 +61,8 @@ Nie tworzymy w v0.1 tabel `growth_topics`, `growth_experts`, `growth_campaign_to
 
 - główny workspace strategiczny,
 - pola: `id`, `name`, `type`, `status`, `goal`, `host_name`, `owner_user_id`, `primary_instructor_id`, `working_topic`, `summary`, `live_at`, `starts_at`, `ends_at`, `timestamps`,
-- `host_name` to imię prowadzącego wpisane w projekcie, bez powiązania z `instructors`,
+- `host_name` to imię i nazwisko prowadzącego z chwili zapisu: kopia `full_name` instruktora albo wpisana osoba spoza bazy (DEC-035),
+- `communication_voice_instructor_id` (DEC-035, migracja `2026_10_02_130000`) to opcjonalny głos komunikacji (`instructors.id`, `nullOnDelete`); `null` = głos PNE,
 - `primary_instructor_id` jest opcjonalnym powiązaniem z istniejącym `instructors.id`,
 - `slug` nie jest obowiązkowy w v0.1.
 
@@ -139,6 +148,7 @@ Nie dodajemy statusu `published`; publikacja będzie później osobną domeną C
 GrowthCampaign
 ├── belongsTo User jako owner
 ├── belongsTo Instructor jako primaryInstructor (nullable)
+├── belongsTo Instructor jako communicationVoiceInstructor (nullable, DEC-035)
 ├── hasMany GrowthArtifact
 ├── hasMany GrowthTask
 └── hasMany GrowthDecision
@@ -166,7 +176,8 @@ User
 └── hasMany GrowthCampaign jako ownedGrowthCampaigns
 
 Instructor
-└── hasMany GrowthCampaign jako primaryGrowthCampaigns
+├── hasMany GrowthCampaign jako primaryGrowthCampaigns
+└── hasMany GrowthCampaign jako voiceGrowthCampaigns (DEC-035)
 ```
 
 Nie tworzymy w v0.1 innych grafów ani pivotów.
@@ -244,6 +255,8 @@ Etap Koncepcja / ekran materiału „Opis YouTube”, „Post Facebook” albo �
 Oba zadania implementują mały kontrakt `GrowthAiTask` (`type`, `promptVersion`, `schemaVersion`, `instructions`, `schema`). Serwis loguje typ i wersje z zadania, więc nie ma w nim stałych pod koncepcję. Nie ma rejestru zadań ani routera modeli.
 
 `MaterialDraftTask` (DEC-024): prompt `material_youtube_description_v2`, schema `material_youtube_description_schema_v1`, profil `youtube_description_v1`. Wejście to allowlista: `material` (klucz, nazwa, typ), `campaign` (`working_topic`, etykieta celu, `live_date`, `live_time`, strefa aplikacji, `host_name`), pięć pól kierunku, pola koncepcji (`title`, `subtitle`, `promise`, `points`, `plan`, `cta`, `additional_material`), bieżący szkic tego materiału, `style.emojis` i opcjonalna `instruction` właściciela. Bez innych materiałów. `host_name` trafia do AI od DEC-025; pusty lub „—” jest wysyłany jako pusty, a prompt każe przepisać imię i nazwisko bez dopisywania biografii. Wyjście: `draft` i `change_summary`; dodatkowe pola, dane osobowe i linki spoza wejścia odrzucają odpowiedź. Data i godzina idą osobno, a przy kontroli telefonów wzorce dat są pomijane, żeby termin nie wyglądał jak numer telefonu.
+
+Od DEC-036 profil `youtube-description` używa promptu `material_youtube_description_v3` i trybów `generate` / `refine` / `iterate` (`mode`). Zamiast `campaign.host_name` i `current_draft` wejście ma `presenter.name` (nadal `host_name`), `voice` (`pne_version`, `pne_rules`, `personal` = `{name, profile}` albo `null`) oraz `author_draft` (refine, tekst z pola szkicu) albo `previous_proposal` (iterate). Generate nie dostaje obecnego szkicu. Odcisk propozycji ma dodatkowo część `voice` (id, status, imię i nazwisko, skrót profilu, wersja `PneVoice`). Tryb, numer poprawki i skrót wysłanego tekstu są zapisane przy propozycji. Pozostałe profile nie dostają `voice` ani `mode`.
 
 Profil `facebook-post` (DEC-026): prompt `material_facebook_post_v1`, schema `material_facebook_post_schema_v1`, profil `facebook_post_v1`. Wejście to ta sama allowlista plus `source_materials.youtube_description` (opis YouTube tylko ze statusem Zatwierdzone lub Opublikowane, w innym wypadku pusty) i `style.hashtags`. Żadne inne materiały. AI wstawia `[LINK DO ZAPISU]` zamiast adresu. Twardy limit odpowiedzi to 1500 znaków. Profil wybiera `MaterialDraftTask::forMaterial($klucz)`; nieobsługiwany klucz daje 404 w kontrolerze.
 

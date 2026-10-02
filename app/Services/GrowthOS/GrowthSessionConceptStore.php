@@ -61,7 +61,8 @@ class GrowthSessionConceptStore
             'goal' => mb_substr(trim((string) ($project['goal'] ?? '')), 0, 120) ?: null,
             'host_name' => $this->hostName((string) ($project['host'] ?? '')),
             'owner_user_id' => $owner->id,
-            'primary_instructor_id' => null,
+            'primary_instructor_id' => $this->instructorId($project['host_instructor_id'] ?? null),
+            'communication_voice_instructor_id' => $this->instructorId($project['voice_instructor_id'] ?? null),
             'working_topic' => $topic !== '' ? $topic : null,
             'live_at' => $liveAt,
         ]);
@@ -118,7 +119,7 @@ class GrowthSessionConceptStore
     /**
      * @param  array<string, mixed>  $project
      */
-    public function persistHost(array $project, string $host): void
+    public function persistPeople(array $project): void
     {
         $campaignId = $project['growth_campaign_id'] ?? null;
         if (! is_numeric($campaignId)) {
@@ -126,7 +127,9 @@ class GrowthSessionConceptStore
         }
 
         GrowthCampaign::query()->whereKey((int) $campaignId)->update([
-            'host_name' => $this->hostName($host),
+            'host_name' => $this->hostName((string) ($project['host'] ?? '')),
+            'primary_instructor_id' => $this->instructorId($project['host_instructor_id'] ?? null),
+            'communication_voice_instructor_id' => $this->instructorId($project['voice_instructor_id'] ?? null),
         ]);
     }
 
@@ -165,6 +168,8 @@ class GrowthSessionConceptStore
         if (filled($campaign->host_name)) {
             $project['host'] = $campaign->host_name;
         }
+        $project['host_instructor_id'] = $this->instructorId($campaign->primary_instructor_id);
+        $project['voice_instructor_id'] = $this->instructorId($campaign->communication_voice_instructor_id);
         $project['type'] = $campaign->type;
         $project['status'] = $this->sessionStatus($campaign->status);
         if ($campaign->live_at !== null) {
@@ -479,6 +484,11 @@ class GrowthSessionConceptStore
             ->first();
 
         return $decision instanceof GrowthDecision ? $decision : null;
+    }
+
+    private function instructorId(mixed $id): ?int
+    {
+        return is_numeric($id) && (int) $id > 0 ? (int) $id : null;
     }
 
     private function hostName(string $host): ?string

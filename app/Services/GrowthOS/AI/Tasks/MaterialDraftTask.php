@@ -6,6 +6,7 @@ use App\Services\GrowthOS\AI\Contracts\GrowthAiTask;
 use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
+use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
@@ -23,7 +24,16 @@ final class MaterialDraftTask implements GrowthAiTask
 
     public const PROFILE = 'youtube_description_v1';
 
-    public const PROMPT_VERSION = 'material_youtube_description_v2';
+    public const PROMPT_VERSION = 'material_youtube_description_v3';
+
+    public const MODE_GENERATE = 'generate';
+
+    public const MODE_REFINE = 'refine';
+
+    public const MODE_ITERATE = 'iterate';
+
+    /** Materials with generate / refine / iterate and the communication voice (DEC-035, DEC-036). */
+    public const VOICE_MATERIALS = [self::MATERIAL_KEY];
 
     public const SCHEMA_VERSION = 'material_youtube_description_schema_v1';
 
@@ -245,6 +255,16 @@ final class MaterialDraftTask implements GrowthAiTask
         return self::SOURCE_MATERIALS[$materialKey] ?? [];
     }
 
+    public static function usesVoice(string $materialKey): bool
+    {
+        return in_array($materialKey, self::VOICE_MATERIALS, true);
+    }
+
+    public static function aiMode(mixed $value): string
+    {
+        return in_array($value, [self::MODE_REFINE, self::MODE_ITERATE], true) ? $value : self::MODE_GENERATE;
+    }
+
     public static function usesYoutubeSource(string $materialKey): bool
     {
         return in_array('youtube_description', self::sourceMaterialKeys($materialKey), true);
@@ -395,7 +415,11 @@ final class MaterialDraftTask implements GrowthAiTask
             }
         }
 
-        $input['current_draft'] = $this->string($context['current_draft'] ?? '');
+        if (self::usesVoice($this->materialKey)) {
+            $this->addVoiceAndWork($input, $context);
+        } else {
+            $input['current_draft'] = $this->string($context['current_draft'] ?? '');
+        }
 
         if ($isGraphic) {
             $input['style'] = [
@@ -417,7 +441,7 @@ final class MaterialDraftTask implements GrowthAiTask
                 $input['style']['timing'] = self::reminderTiming(data_get($context, 'style.timing'));
             }
         } else {
-            $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', true)];
+            $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', ! self::usesVoice($this->materialKey))];
         }
 
         if ($isFacebook) {
@@ -439,6 +463,36 @@ final class MaterialDraftTask implements GrowthAiTask
         }
 
         return $input;
+    }
+
+    /**
+     * Presenter facts and the communication voice are separate keys, so the model never mixes who speaks with who
+     * presents. Only the voice owner's full name and profile are sent (DEC-035). Mode decides the working text (DEC-036).
+     *
+     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed>  $context
+     */
+    private function addVoiceAndWork(array &$input, array $context): void
+    {
+        $input['presenter'] = ['name' => $input['campaign']['host_name']];
+        unset($input['campaign']['host_name']);
+
+        $name = $this->string(data_get($context, 'voice.name', ''));
+        $profile = $this->string(data_get($context, 'voice.profile', ''));
+        $input['voice'] = [
+            'pne_version' => PneVoice::VERSION,
+            'pne_rules' => PneVoice::rules(),
+            'personal' => $name !== '' && $profile !== '' ? ['name' => $name, 'profile' => $profile] : null,
+        ];
+
+        $mode = self::aiMode(data_get($context, 'work.mode'));
+        $text = $this->string(data_get($context, 'work.text', ''));
+        $input['mode'] = $mode;
+        if ($mode === self::MODE_REFINE) {
+            $input['author_draft'] = $text;
+        } elseif ($mode === self::MODE_ITERATE) {
+            $input['previous_proposal'] = $text;
+        }
     }
 
     /**
@@ -847,18 +901,31 @@ PROMPT;
     private function youtubeDescriptionInstructions(): string
     {
         return <<<'PROMPT'
-Jesteś redaktorem materiałów promocyjnych webinarów edukacyjnych PNE. Przygotuj szkic opisu webinaru na YouTube.
-Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton profesjonalny, ekspercki i przystępny.
-Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy).
+Jesteś redaktorem materiałów promocyjnych webinarów edukacyjnych PNE. Pracujesz nad opisem webinaru na YouTube.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy).
+
+TRYB PRACY (pole mode):
+- "generate": napisz nowy opis od zera na podstawie kierunku i koncepcji. Nie ma wcześniejszego tekstu.
+- "refine": author_draft to tekst autora. Redaguj tekst autora. Nie zastępuj jego głosu swoim. Zachowaj jego strukturę, kolejność, sformułowania i długość, chyba że instruction mówi inaczej. Poprawiaj tylko to, co wymaga poprawy: błędy, niejasności, zgodność z faktami z wejścia. Nie dopisuj nowych akapitów, jeżeli nie są potrzebne.
+- "iterate": previous_proposal to Twoja poprzednia propozycja, a instruction mówi, co jeszcze poprawić. Zmień tylko to, o co prosi instruction; resztę tekstu zostaw bez zmian.
+Polecenia lokalne traktuj dosłownie i zmieniaj tylko wskazany fragment, np.: „popraw tylko CTA” — zmień wyłącznie wezwanie do działania; „zostaw pierwszy akapit bez zmian” — pierwszy akapit ma pozostać identyczny co do znaku; „popraw tylko literówki” — popraw wyłącznie literówki i interpunkcję, bez zmiany słów i stylu.
+
+FAKTY O PROWADZĄCYM (pole presenter):
+Jeżeli presenter.name nie jest puste, przedstaw prowadzącego webinar dokładnie tym imieniem i nazwiskiem, w trzeciej osobie, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
+
+GŁOS I STYL AUTORA (pole voice):
+voice.pne_rules to podstawowe zasady komunikacji PNE — stosuj je zawsze.
+Jeżeli voice.personal nie jest null, voice.personal.profile opisuje styl pisania osoby voice.personal.name: dopasuj do niego ton, rytm i dobór słów. Profil opisuje wyłącznie styl, nie fakty — nie przenoś z niego do tekstu żadnych informacji.
+Głos komunikacji to nie jest prowadzący. Nie pisz w pierwszej osobie w sposób, który sugeruje, że autor tekstu prowadzi webinar, jeżeli to nie wynika z presenter. Nie wymyślaj relacji między autorem a prowadzącym (np. „zaprosiłem”, „mój gość”, „razem z kolegą”). Jeżeli voice.personal.name i presenter.name to ta sama osoba, możesz pisać w jej imieniu w pierwszej osobie.
+
+TREŚĆ:
 Pisz językiem korzyści, bez przesady. Bez agresywnej sprzedaży, sztucznej pilności i clickbaitu. Bez obietnic bez pokrycia.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, linków, ceny, certyfikatów, akredytacji ani dofinansowania.
-Datę i godzinę webinaru przepisz dokładnie z campaign.live_date i campaign.live_time, słownie z nazwą miesiąca (np. „6 października 2026 r., godz. 20:00”). Nie zmieniaj ani nie poprawiaj terminu.
-Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
-Jeżeli current_draft nie jest pusty, popraw go i rozwiń zgodnie z koncepcją, zamiast pisać od zera.
-Jeżeli style.emojis ma wartość true, dodaj umiarkowaną liczbę adekwatnych emotikon (około 5–10), np. przy tytule, terminie, punktach programu i wezwaniu do działania. Emotikony mają porządkować tekst, a nie zastępować słów. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
-Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, linków, cen, certyfikatów ani agresywnej sprzedaży.
+Datę i godzinę webinaru przepisz dokładnie z campaign.live_date i campaign.live_time, słownie z nazwą miesiąca (np. „6 października 2026 r., godz. 20:00”). Nie zmieniaj ani nie poprawiaj terminu, także w tekście autora.
+Jeżeli style.emojis ma wartość true, dodaj umiarkowaną liczbę adekwatnych emotikon (około 5–10), np. przy tytule, terminie, punktach programu i wezwaniu do działania. Jeżeli style.emojis ma wartość false, nie używaj emotikon; w trybach "refine" i "iterate" zachowaj emotikony, które już są w tekście, chyba że instruction mówi inaczej.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, linków, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
-W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+W change_summary opisz krótko i konkretnie, co zmieniłeś (w trybie "generate": co przygotowałeś).
 Zwróć wyłącznie dane zgodne z przekazanym schematem.
 PROMPT;
     }

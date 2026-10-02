@@ -12,6 +12,7 @@ use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
 use App\Support\GrowthOS\DemoTikWebinarProject;
+use App\Support\GrowthOS\GrowthPeople;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,11 @@ class ProjectController extends Controller
 
     public const MATERIAL_SKIPPED_MESSAGE = 'Ten materiał jest wyłączony (status „Nie dotyczy”). Zmień status, żeby z nim pracować.';
 
-    public const MATERIAL_AI_STALE_MESSAGE = 'Kierunek, koncepcja lub materiał zmieniły się od czasu wygenerowania szkicu. Wygeneruj nową propozycję.';
+    public const MATERIAL_AI_STALE_MESSAGE = 'Kierunek, koncepcja lub szkic zmieniły się od czasu przygotowania propozycji. Wygeneruj ją ponownie.';
+
+    public const MATERIAL_AI_REFINE_EMPTY_MESSAGE = 'Najpierw wpisz własny szkic.';
+
+    public const MATERIAL_AI_ITERATE_EMPTY_MESSAGE = 'Napisz, co jeszcze poprawić.';
 
     public const IMAGE_NOT_PERSISTED_MESSAGE = 'Projekt nie jest jeszcze zapisany w bazie, więc obrazu nie da się przechować.';
 
@@ -45,6 +50,7 @@ class ProjectController extends Controller
         return view('growth-os.projects.create', [
             'goals' => DemoTikWebinarProject::goals(),
             'ideas' => DemoTikWebinarProject::ideas(),
+            'instructorOptions' => GrowthPeople::instructorOptions(),
         ]);
     }
 
@@ -56,12 +62,12 @@ class ProjectController extends Controller
             'type' => ['required', 'string', 'max:40'],
             'live_date' => ['required', 'date'],
             'live_time' => ['required', 'date_format:H:i'],
-            'host' => ['required', 'string', 'max:120'],
             'goal' => ['required', Rule::in($goalValues)],
             'topic' => ['nullable', 'string', 'max:180'],
-        ]);
+            ...GrowthPeople::rules(),
+        ], GrowthPeople::messages());
 
-        $project = DemoTikWebinarProject::createProject($data);
+        $project = DemoTikWebinarProject::createProject([...$data, ...GrowthPeople::fromInput($data)]);
 
         return redirect()
             ->route('growth.projects.show', $project['id'])
@@ -70,15 +76,13 @@ class ProjectController extends Controller
 
     public function updateHost(Request $request, string $project): RedirectResponse
     {
-        $host = $request->validate([
-            'host' => ['required', 'string', 'max:120'],
-        ])['host'];
+        $data = $request->validate(GrowthPeople::rules(), GrowthPeople::messages());
 
-        DemoTikWebinarProject::updateHost($project, $host);
+        DemoTikWebinarProject::updatePeople($project, GrowthPeople::fromInput($data));
 
         return redirect()
             ->route('growth.projects.show', $project)
-            ->with('success', 'Zapisano prowadzącego.')
+            ->with('success', 'Zapisano prowadzącego i głos komunikacji.')
             ->withFragment('project-host');
     }
 
@@ -100,6 +104,11 @@ class ProjectController extends Controller
             'growthAiModel' => (string) config('growth_ai.model'),
             'conceptDecisions' => DemoTikWebinarProject::conceptDecisions($item),
             'operationalTasks' => DemoTikWebinarProject::operationalTasks($item),
+            'instructorOptions' => GrowthPeople::instructorOptions([
+                $item['host_instructor_id'] ?? null,
+                $item['voice_instructor_id'] ?? null,
+            ]),
+            'voice' => GrowthPeople::voice($item),
         ]);
     }
 
@@ -327,6 +336,8 @@ class ProjectController extends Controller
                 : null,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
+            'aiDraftUsesVoice' => MaterialDraftTask::usesVoice($material),
+            'aiDraftVoice' => MaterialDraftTask::usesVoice($material) ? GrowthPeople::voice($projectItem) : null,
             'aiDraftIsFacebookPost' => $isFacebookPost,
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
             'aiDraftIsMail' => MaterialDraftTask::isMail($material),
@@ -507,6 +518,8 @@ class ProjectController extends Controller
         $item = DemoTikWebinarProject::requireProject($project);
         $data = $request->validate([
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
+            'mode' => ['nullable', Rule::in([MaterialDraftTask::MODE_GENERATE, MaterialDraftTask::MODE_REFINE, MaterialDraftTask::MODE_ITERATE])],
+            'author_draft' => ['nullable', 'string', 'max:20000'],
             'length' => ['nullable', Rule::in(array_keys(MaterialDraftTask::MAIL_LENGTHS))],
             'timing' => ['nullable', Rule::in(array_keys(MaterialDraftTask::REMINDER_TIMINGS))],
             'duration' => ['nullable', Rule::in([...array_map('strval', MaterialDraftTask::HOST_SCRIPT_DURATIONS), 'custom'])],
@@ -525,7 +538,7 @@ class ProjectController extends Controller
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
         $style = [
-            'emojis' => $request->boolean('emojis', ! MaterialDraftTask::isMail($material)),
+            'emojis' => $request->boolean('emojis', ! MaterialDraftTask::isMail($material) && ! MaterialDraftTask::usesVoice($material)),
             'hashtags' => $request->boolean('hashtags', true),
             'elements' => collect(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS)
                 ->mapWithKeys(fn (string $label, string $key): array => [$key => $request->boolean('elements.'.$key, true)])
@@ -546,8 +559,32 @@ class ProjectController extends Controller
             return $back->withInput()->with('error', self::MATERIAL_AI_PRECONDITION_MESSAGE);
         }
 
+        $work = [];
+        if (MaterialDraftTask::usesVoice($material)) {
+            $mode = MaterialDraftTask::aiMode($data['mode'] ?? null);
+            $work = ['mode' => $mode, 'text' => ''];
+
+            if ($mode === MaterialDraftTask::MODE_REFINE) {
+                $work['text'] = trim((string) ($data['author_draft'] ?? ''));
+                if ($work['text'] === '') {
+                    return $back->withInput()->with('error', self::MATERIAL_AI_REFINE_EMPTY_MESSAGE);
+                }
+            }
+
+            if ($mode === MaterialDraftTask::MODE_ITERATE) {
+                if ($instruction === '') {
+                    return $back->withInput()->with('error', self::MATERIAL_AI_ITERATE_EMPTY_MESSAGE);
+                }
+                $previous = DemoTikWebinarProject::iterableMaterialAiProposal($project, $material);
+                if ($previous === null) {
+                    return $back->with('error', self::MATERIAL_AI_STALE_MESSAGE);
+                }
+                $work['text'] = (string) $previous['draft'];
+            }
+        }
+
         if (config('growth_ai.enabled') !== true) {
-            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction);
+            DemoTikWebinarProject::requestMaterialAiProposal($project, $material, $style, $instruction, $work);
 
             return $back->with('success', 'AI przygotowało szkic (symulacja lokalna). Obecny szkic nie został nadpisany.');
         }
@@ -556,7 +593,7 @@ class ProjectController extends Controller
             $result = app(GrowthAiService::class)->draftMaterial(
                 $request->user(),
                 $material,
-                DemoTikWebinarProject::materialAiContext($item, $material, $style, $instruction),
+                DemoTikWebinarProject::materialAiContext($item, $material, $style, $instruction, $work),
             );
         } catch (GrowthAiException $exception) {
             $message = $exception->userMessage === GrowthAiException::INVALID_RESPONSE_MESSAGE
@@ -566,7 +603,7 @@ class ProjectController extends Controller
             return $back->withInput()->with('error', $message);
         }
 
-        DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction);
+        DemoTikWebinarProject::storeMaterialAiProposal($project, $material, $result, $instruction, $work);
 
         return $back->with('success', 'AI przygotowało szkic. Obecny szkic nie został nadpisany.');
     }
@@ -591,11 +628,21 @@ class ProjectController extends Controller
     public function rejectMaterialAi(string $project, string $material): RedirectResponse
     {
         abort_unless(MaterialDraftTask::supports($material), 404);
+        $proposal = DemoTikWebinarProject::materialAiProposal(DemoTikWebinarProject::requireProject($project), $material);
         DemoTikWebinarProject::rejectMaterialAiProposal($project, $material);
+        $restore = trim((string) ($proposal['restore_draft'] ?? ''));
 
-        return redirect()
+        $back = redirect()
             ->route('growth.projects.materials.show', [$project, $material])
             ->with('success', 'Odrzucono szkic AI. Obecny szkic pozostał bez zmian.');
+
+        if ($restore !== '' && $restore !== trim(DemoTikWebinarProject::material($project, $material)['draft'] ?? '')) {
+            return $back
+                ->with('material_restored_draft', $restore)
+                ->with('success', 'Odrzucono propozycję AI. Twój niezapisany szkic wrócił do pola — zapisz go, jeżeli chcesz go zachować.');
+        }
+
+        return $back;
     }
 
     public function updateMaterialStatus(Request $request, string $project, string $material): RedirectResponse

@@ -51,6 +51,7 @@ class GrowthCampaign extends Model
         'host_name',
         'owner_user_id',
         'primary_instructor_id',
+        'communication_voice_instructor_id',
         'working_topic',
         'summary',
         'live_at',
@@ -75,6 +76,14 @@ class GrowthCampaign extends Model
     public function primaryInstructor(): BelongsTo
     {
         return $this->belongsTo(Instructor::class, 'primary_instructor_id');
+    }
+
+    /**
+     * Whose style the communication follows. Null means the neutral PNE voice (DEC-035).
+     */
+    public function communicationVoiceInstructor(): BelongsTo
+    {
+        return $this->belongsTo(Instructor::class, 'communication_voice_instructor_id');
     }
 
     public function artifacts(): HasMany

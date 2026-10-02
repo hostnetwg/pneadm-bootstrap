@@ -10,6 +10,7 @@ use App\Models\GrowthOS\GrowthDecision;
 use App\Models\User;
 use App\Services\GrowthOS\AI\Data\ConceptRevisionResult;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
+use App\Services\GrowthOS\AI\Support\PneVoice;
 use App\Services\GrowthOS\AI\Tasks\GraphicImageTask;
 use App\Services\GrowthOS\AI\Tasks\MaterialDraftTask;
 use App\Services\GrowthOS\GrowthOperationalTasks;
@@ -82,7 +83,7 @@ class DemoTikWebinarProject
     }
 
     /**
-     * @param  array{type: string, live_date: string, live_time: string, host: string, goal: string, topic?: string|null}  $data
+     * @param  array{type: string, live_date: string, live_time: string, host: string, goal: string, topic?: string|null, host_instructor_id?: int|null, voice_instructor_id?: int|null}  $data
      * @return array<string, mixed>
      */
     public static function createProject(array $data): array
@@ -97,6 +98,8 @@ class DemoTikWebinarProject
             'live_date' => $data['live_date'],
             'live_time' => $data['live_time'],
             'host' => $data['host'],
+            'host_instructor_id' => $data['host_instructor_id'] ?? null,
+            'voice_instructor_id' => $data['voice_instructor_id'] ?? null,
             'goal' => $data['goal'],
             'topic' => $topic,
             'status' => 'PLANNING',
@@ -115,12 +118,18 @@ class DemoTikWebinarProject
     /**
      * @return array<string, mixed>
      */
-    public static function updateHost(string $projectId, string $host): array
+    /**
+     * @param  array{host: string, host_instructor_id: int|null, voice_instructor_id: int|null}  $people
+     * @return array<string, mixed>
+     */
+    public static function updatePeople(string $projectId, array $people): array
     {
         $project = self::requireProject($projectId);
-        $project['host'] = trim($host);
+        $project['host'] = trim($people['host']);
+        $project['host_instructor_id'] = $people['host_instructor_id'];
+        $project['voice_instructor_id'] = $people['voice_instructor_id'];
         self::saveProject($project);
-        app(GrowthSessionConceptStore::class)->persistHost($project, $project['host']);
+        app(GrowthSessionConceptStore::class)->persistPeople($project);
 
         return $project;
     }
@@ -490,6 +499,8 @@ class DemoTikWebinarProject
             'live_date' => $fields['live_date'] ?? now()->toDateString(),
             'live_time' => $fields['live_time'] ?? '20:00',
             'host' => $fields['host'] ?? '—',
+            'host_instructor_id' => $fields['host_instructor_id'] ?? null,
+            'voice_instructor_id' => $fields['voice_instructor_id'] ?? null,
             'goal' => $fields['goal'] ?? 'unknown',
             'topic' => $topic,
             'status' => $fields['status'] ?? 'PLANNING',
@@ -1011,15 +1022,21 @@ class DemoTikWebinarProject
      *
      * @param  array<string, mixed>  $project
      * @param  array{emojis?: bool, hashtags?: bool}  $style
+     * @param  array{mode?: string, text?: string}  $work
      * @return array<string, mixed>
      */
-    public static function materialAiContext(array $project, string $materialId, array $style = [], string $instruction = ''): array
-    {
+    public static function materialAiContext(
+        array $project,
+        string $materialId,
+        array $style = [],
+        string $instruction = '',
+        array $work = [],
+    ): array {
         $direction = is_array($project['direction'] ?? null) ? $project['direction'] : [];
         $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
         $goal = (string) ($project['goal'] ?? '');
 
-        return [
+        $context = [
             'campaign' => [
                 'working_topic' => (string) ($project['topic'] ?? ''),
                 'goal' => (string) (collect(self::goals())->firstWhere('value', $goal)['label'] ?? $goal),
@@ -1043,6 +1060,17 @@ class DemoTikWebinarProject
             ],
             'instruction' => trim($instruction),
         ];
+
+        if (MaterialDraftTask::usesVoice($materialId)) {
+            $voice = GrowthPeople::voice($project);
+            $context['voice'] = ['name' => $voice['name'], 'profile' => $voice['profile']];
+            $context['work'] = [
+                'mode' => MaterialDraftTask::aiMode($work['mode'] ?? null),
+                'text' => trim((string) ($work['text'] ?? '')),
+            ];
+        }
+
+        return $context;
     }
 
     /**
@@ -1063,6 +1091,17 @@ class DemoTikWebinarProject
 
         if (MaterialDraftTask::sourceMaterialKeys($materialId) !== []) {
             $fingerprint['source_materials'] = self::hash(self::approvedSourceMaterials($project, $materialId));
+        }
+
+        if (MaterialDraftTask::usesVoice($materialId)) {
+            $voice = GrowthPeople::voice($project);
+            $fingerprint['voice'] = self::hash([
+                'voice_instructor_id' => $voice['instructor_id'],
+                'status' => $voice['status'],
+                'name' => $voice['name'],
+                'profile' => hash('sha256', $voice['profile']),
+                'pne_voice' => PneVoice::VERSION,
+            ]);
         }
 
         return $fingerprint;
@@ -1187,11 +1226,37 @@ class DemoTikWebinarProject
         string $materialId,
         array $style = [],
         string $instruction = '',
+        array $work = [],
     ): array {
         $project = self::requireProject($projectId);
         $concept = is_array($project['concept'] ?? null) ? $project['concept'] : [];
         $instruction = trim($instruction);
-        $emojis = (bool) ($style['emojis'] ?? true);
+        $emojis = (bool) ($style['emojis'] ?? ! MaterialDraftTask::usesVoice($materialId));
+        $mode = MaterialDraftTask::aiMode($work['mode'] ?? null);
+        $text = trim((string) ($work['text'] ?? ''));
+
+        if (MaterialDraftTask::usesVoice($materialId) && $mode !== MaterialDraftTask::MODE_GENERATE) {
+            $project['material_ai_proposals'][$materialId] = [
+                'material_key' => $materialId,
+                'draft' => self::simulatedRevision($text),
+                'change_summary' => $mode === MaterialDraftTask::MODE_REFINE
+                    ? 'Symulacja lokalna: Twój szkic z uporządkowanymi odstępami. Prawdziwe AI zredaguje go Twoim głosem.'
+                    : 'Symulacja lokalna: poprzednia propozycja z uporządkowanymi odstępami. Prawdziwe AI uwzględni Twoją uwagę.',
+                'instruction' => $instruction,
+                'source' => 'simulation',
+                'provider' => null,
+                'model' => null,
+                'prompt_version' => null,
+                'schema_version' => null,
+                'fingerprint' => self::materialAiFingerprint($project, $materialId),
+                'created_at' => now()->toIso8601String(),
+                'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+                ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
+            ];
+            self::saveProject($project);
+
+            return $project;
+        }
 
         $project['material_ai_proposals'][$materialId] = [
             'material_key' => $materialId,
@@ -1224,11 +1289,75 @@ class DemoTikWebinarProject
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
             'note' => 'Symulowana propozycja AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            ...self::materialAiWorkMeta($project, $materialId, $mode, $text),
         ];
 
         self::saveProject($project);
 
         return $project;
+    }
+
+    /**
+     * Mode details kept with a voice-material proposal (DEC-036). Not part of the fingerprint: they describe the request,
+     * while the fingerprint describes the saved project state.
+     *
+     * @param  array<string, mixed>  $project
+     * @return array<string, mixed>
+     */
+    private static function materialAiWorkMeta(array $project, string $materialId, string $mode, string $text): array
+    {
+        if (! MaterialDraftTask::usesVoice($materialId)) {
+            return [];
+        }
+
+        $previous = self::materialAiProposal($project, $materialId);
+        $iterate = $mode === MaterialDraftTask::MODE_ITERATE && $previous !== null;
+
+        return [
+            'mode' => $mode,
+            'iteration_count' => $iterate ? (int) ($previous['iteration_count'] ?? 0) + 1 : 0,
+            'compare_draft' => $mode === MaterialDraftTask::MODE_GENERATE ? self::materialDraft($project, $materialId) : $text,
+            'restore_draft' => match (true) {
+                $iterate => (string) ($previous['restore_draft'] ?? ''),
+                $mode === MaterialDraftTask::MODE_REFINE => $text,
+                default => '',
+            },
+            'text_hash' => $text !== '' ? hash('sha256', $text) : null,
+            'voice_instructor_id' => GrowthPeople::voice($project)['instructor_id'],
+        ];
+    }
+
+    /**
+     * Previous proposal that iterate may build on; a stale one is removed so iterate never works on an outdated base.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function iterableMaterialAiProposal(string $projectId, string $materialId): ?array
+    {
+        $project = self::requireProject($projectId);
+        $proposal = self::materialAiProposal($project, $materialId);
+        if ($proposal === null) {
+            return null;
+        }
+
+        if (($proposal['fingerprint'] ?? null) !== self::materialAiFingerprint($project, $materialId)) {
+            unset($project['material_ai_proposals'][$materialId]);
+            self::saveProject($project);
+
+            return null;
+        }
+
+        return $proposal;
+    }
+
+    private static function simulatedRevision(string $text): string
+    {
+        $paragraphs = preg_split('/\R{2,}/u', trim($text)) ?: [];
+
+        return implode("\n\n", array_map(
+            static fn (string $paragraph): string => trim((string) preg_replace('/[ \t]+/u', ' ', $paragraph)),
+            $paragraphs,
+        ));
     }
 
     /**
@@ -1241,6 +1370,7 @@ class DemoTikWebinarProject
         string $materialId,
         MaterialDraftResult $result,
         string $instruction = '',
+        array $work = [],
     ): array {
         $project = self::requireProject($projectId);
 
@@ -1257,6 +1387,12 @@ class DemoTikWebinarProject
             'fingerprint' => self::materialAiFingerprint($project, $materialId),
             'created_at' => now()->toIso8601String(),
             'note' => 'Propozycja prawdziwego AI. Obecny szkic pozostaje bez zmian do chwili wybrania „Zastosuj”.',
+            ...self::materialAiWorkMeta(
+                $project,
+                $materialId,
+                MaterialDraftTask::aiMode($work['mode'] ?? null),
+                trim((string) ($work['text'] ?? '')),
+            ),
         ];
 
         self::saveProject($project);
@@ -1342,15 +1478,25 @@ class DemoTikWebinarProject
 
     /**
      * @param  array<string, mixed>  $proposal
-     * @return array{material_key: string, prompt_version: string, source: string}
+     * @return array<string, string|int|null>
      */
     private static function materialAiDecisionMeta(array $proposal): array
     {
-        return [
+        $meta = [
             'material_key' => (string) ($proposal['material_key'] ?? ''),
             'prompt_version' => (string) ($proposal['prompt_version'] ?? ''),
             'source' => (string) ($proposal['source'] ?? ''),
         ];
+
+        if (isset($proposal['mode'])) {
+            $meta['ai_mode'] = (string) $proposal['mode'];
+            $meta['iteration_count'] = (int) ($proposal['iteration_count'] ?? 0);
+            $meta['communication_voice_instructor_id'] = is_int($proposal['voice_instructor_id'] ?? null)
+                ? $proposal['voice_instructor_id']
+                : null;
+        }
+
+        return $meta;
     }
 
     /**

@@ -31,6 +31,7 @@ class InstructorsController extends Controller
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'nullable|string', // Sprawdzamy, czy is_active jest przesyłane jako string
             'notes' => 'nullable|string|max:5000',
+            'ai_voice_profile' => 'nullable|string|max:4000',
             'website_url' => 'nullable|url|max:255',
             'linkedin_url' => 'nullable|url|max:255',
             'facebook_url' => 'nullable|url|max:255',
@@ -55,7 +56,7 @@ class InstructorsController extends Controller
                 '<p><br><strong><b><em><i><u><ul><ol><li><h1><h2><h3><h4><h5><h6><a><img><div><span>');
         }
         
-        Instructor::create([
+        $instructor = Instructor::create([
             'title' => $request->input('title'),            
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
@@ -74,6 +75,11 @@ class InstructorsController extends Controller
             'youtube_url' => $request->input('youtube_url'),
             'x_com_url' => $request->input('x_com_url'),
         ]);
+
+        if ($this->canEditAiVoiceProfile($request)) {
+            $instructor->ai_voice_profile = $this->aiVoiceProfile($request);
+            $instructor->save();
+        }
     
         return redirect()->route('courses.instructors.index')->with('success', 'Instruktor został dodany.');
     }
@@ -115,6 +121,7 @@ class InstructorsController extends Controller
             'remove_photo' => 'nullable|string',
             'remove_signature' => 'nullable|string',
             'notes' => 'nullable|string|max:5000',
+            'ai_voice_profile' => 'nullable|string|max:4000',
             'website_url' => 'nullable|url|max:255',
             'linkedin_url' => 'nullable|url|max:255',
             'facebook_url' => 'nullable|url|max:255',
@@ -182,6 +189,9 @@ class InstructorsController extends Controller
         $instructor->facebook_url = $request->input('facebook_url');
         $instructor->youtube_url = $request->input('youtube_url');
         $instructor->x_com_url = $request->input('x_com_url');
+        if ($this->canEditAiVoiceProfile($request)) {
+            $instructor->ai_voice_profile = $this->aiVoiceProfile($request);
+        }
     
         $instructor->save();
     
@@ -218,4 +228,19 @@ class InstructorsController extends Controller
     }
             
     
+
+    /**
+     * Profil komunikacji dla AI (DEC-035) zmienia tylko super_admin; zapis innych użytkowników go nie rusza.
+     */
+    private function canEditAiVoiceProfile(Request $request): bool
+    {
+        return $request->user()?->isSuperAdmin() === true;
+    }
+
+    private function aiVoiceProfile(Request $request): ?string
+    {
+        $profile = trim((string) $request->input('ai_voice_profile', ''));
+
+        return $profile !== '' ? $profile : null;
+    }
 }

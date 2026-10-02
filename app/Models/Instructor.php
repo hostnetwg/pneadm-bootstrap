@@ -29,6 +29,7 @@ class Instructor extends Model
         'is_active',      // Czy instruktor jest aktywny
         'default_settlement_type',
         'notes',          // Notatki na temat trenera
+        'ai_voice_profile', // Profil komunikacji dla AI (DEC-035), edytuje tylko super_admin
         'website_url',    // URL strony WWW
         'linkedin_url',   // URL profilu LinkedIn
         'facebook_url',   // URL profilu Facebook
@@ -91,6 +92,11 @@ class Instructor extends Model
     public function primaryGrowthCampaigns(): HasMany
     {
         return $this->hasMany(GrowthCampaign::class, 'primary_instructor_id');
+    }
+
+    public function voiceGrowthCampaigns(): HasMany
+    {
+        return $this->hasMany(GrowthCampaign::class, 'communication_voice_instructor_id');
     }
 
     /**

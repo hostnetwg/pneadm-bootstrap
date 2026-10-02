@@ -42,9 +42,13 @@
                         </div>
 
                         <div class="mt-3">
-                            <label for="host" class="form-label">Prowadzący</label>
-                            <input id="host" name="host" class="form-control @error('host') is-invalid @enderror" value="{{ old('host', 'Waldemar Grabowski') }}" required>
-                            @error('host')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @include('growth-os.projects.partials.people-fields', [
+                                'idPrefix' => 'create',
+                                'hostInstructorId' => null,
+                                'hostName' => '',
+                                'voiceInstructorId' => null,
+                                'defaultHostSource' => $instructorOptions !== [] ? 'instructor' : 'manual',
+                            ])
                         </div>
 
                         <div class="mt-3">

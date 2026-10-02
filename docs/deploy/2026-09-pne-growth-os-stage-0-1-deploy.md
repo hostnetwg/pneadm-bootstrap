@@ -252,3 +252,37 @@ Smoke:
 4. „Zastosuj” zapisuje scenariusz ze statusem Draft i nową wersją w historii.
 
 Rollback: cofnąć kod. Zapisane scenariusze zostają.
+
+## Prowadzący, głos komunikacji i tryby opisu YouTube (DEC-035, DEC-036, 2026-10-02)
+
+**Wymaga migracji.** Dwie nowe kolumny, obie `NULL`, bez wypełniania danych:
+
+- `2026_10_02_130000_add_communication_voice_instructor_id_to_growth_campaigns_table` — `growth_campaigns.communication_voice_instructor_id` (klucz obcy do `instructors`, `ON DELETE SET NULL`),
+- `2026_10_02_130100_add_ai_voice_profile_to_instructors_table` — `instructors.ai_voice_profile` (TEXT).
+
+Bez nowych zmiennych `.env`. Kolejność na produkcji:
+
+```bash
+cd /home/srv66127/domains/adm.pnedu.pl/pneadm
+git pull
+/bin/bash /home/srv66127/domains/adm.pnedu.pl/pneadm/docs/deploy/scripts/prod-mysql-nightly-backup.sh
+/opt/alt/php82/usr/bin/php artisan migrate --force
+/opt/alt/php82/usr/bin/php artisan optimize:clear
+/opt/alt/php82/usr/bin/php artisan config:cache
+/opt/alt/php82/usr/bin/php artisan route:cache
+/opt/alt/php82/usr/bin/php artisan view:cache
+```
+
+Sprawdzenie: `/opt/alt/php82/usr/bin/php artisan migrate:status | grep 2026_10_02_1301` pokazuje obie migracje jako `Ran`.
+
+Smoke:
+
+1. Formularz instruktora (jako `super_admin`) ma pole „Profil komunikacji dla AI”; wpisz i zapisz profil Waldemara. Zwykły admin tego pola nie widzi.
+2. „Zaplanuj webinar TIK”: „Prowadzący” z bazy albo spoza bazy, „Głos komunikacji” domyślnie „PNE — neutralnie”. Utwórz webinar z prowadzącym spoza bazy i głosem Waldemara.
+3. Karta projektu pokazuje prowadzącego i głos; „Zmień prowadzącego lub głos komunikacji” zapisuje zmianę. Po wylogowaniu i zalogowaniu oba wracają.
+4. „Opis YouTube”: „Poproś AI o nowy szkic” (emotikony domyślnie wyłączone) i „Popraw mój szkic” na własnym, niezapisanym tekście. Puste pole daje „Najpierw wpisz własny szkic.”.
+5. Na karcie propozycji „Co jeszcze poprawić?” → „Popraw ponownie” (np. „popraw tylko CTA”) daje „Poprawkę nr 1”, a materiał się nie zmienia, dopóki nie klikniesz „Zastosuj”.
+6. „Odrzuć” po „Popraw mój szkic” przywraca niezapisany tekst do pola.
+7. Pozostałe materiały AI (post, grafika, mailingi, scenariusz) działają jak wcześniej.
+
+Rollback: cofnąć kod; kolumny mogą zostać (są `NULL` i nic ich nie wymaga). Pełne cofnięcie: `/opt/alt/php82/usr/bin/php artisan migrate:rollback --step=2 --force` po backupie (usuwa wybrane głosy i wpisane profile).

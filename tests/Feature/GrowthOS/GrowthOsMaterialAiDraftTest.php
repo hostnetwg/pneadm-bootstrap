@@ -83,11 +83,11 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach ([self::MATERIAL, self::FACEBOOK] as $key) {
+        foreach ([self::MATERIAL => 'Poproś AI o nowy szkic', self::FACEBOOK => 'Poproś AI o szkic'] as $key => $button) {
             $this->actingAs($user)
                 ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertOk()
-                ->assertSee('Poproś AI o szkic')
+                ->assertSee($button)
                 ->assertSee('AI: OpenAI / '.config('growth_ai.model'));
         }
 
@@ -180,11 +180,15 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->requestDraft($user);
 
         $input = $this->provider->input;
-        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'current_draft', 'style', 'instruction'], array_keys($input));
+        $this->assertSame(['material', 'campaign', 'direction', 'concept', 'presenter', 'voice', 'mode', 'style', 'instruction'], array_keys($input));
         $this->assertSame('', $input['instruction']);
         $this->assertSame(['emojis'], array_keys($input['style']));
         $this->assertSame(['key', 'name', 'type'], array_keys($input['material']));
-        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone', 'host_name'], array_keys($input['campaign']));
+        $this->assertSame(['working_topic', 'goal', 'live_date', 'live_time', 'timezone'], array_keys($input['campaign']));
+        $this->assertSame(['name'], array_keys($input['presenter']));
+        $this->assertSame(['pne_version', 'pne_rules', 'personal'], array_keys($input['voice']));
+        $this->assertNull($input['voice']['personal']);
+        $this->assertSame(MaterialDraftTask::MODE_GENERATE, $input['mode']);
         $this->assertSame(['why_now', 'audience', 'problem', 'takeaway', 'sell_later'], array_keys($input['direction']));
         $this->assertSame(
             ['title', 'subtitle', 'promise', 'points', 'plan', 'cta', 'additional_material'],
@@ -196,16 +200,27 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertArrayNotHasKey('next_product', $input['concept']);
     }
 
-    public function test_emojis_are_requested_by_default_and_checkbox_is_checked(): void
+    public function test_emojis_are_off_by_default_and_checkbox_is_unchecked(): void
     {
         $user = $this->readyProject();
 
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]))
             ->assertSee('Dodaj emotikony do opisu')
-            ->assertSee('id="material_ai_emojis" checked', false);
+            ->assertDontSee('id="material_ai_emojis" checked', false);
 
         $this->requestDraft($user);
+
+        $this->assertFalse($this->provider->input['style']['emojis']);
+    }
+
+    public function test_checked_emojis_box_is_sent_as_true(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]), ['emojis' => '1'])
+            ->assertRedirect();
 
         $this->assertTrue($this->provider->input['style']['emojis']);
     }
@@ -294,8 +309,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $this->requestDraft($user);
 
-        $this->assertSame('Waldemar Grabowski', $this->provider->input['campaign']['host_name']);
-        $this->assertStringContainsString('campaign.host_name', $this->provider->instructions);
+        $this->assertSame('Waldemar Grabowski', $this->provider->input['presenter']['name']);
+        $this->assertStringContainsString('presenter.name', $this->provider->instructions);
     }
 
     public function test_placeholder_host_is_sent_as_empty(): void
@@ -308,7 +323,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
         $this->requestDraft($user);
 
-        $this->assertSame('', $this->provider->input['campaign']['host_name']);
+        $this->assertSame('', $this->provider->input['presenter']['name']);
     }
 
     public function test_host_change_blocks_old_apply(): void
@@ -362,7 +377,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $this->assertSame('test-model', $proposal['model']);
         $this->assertSame(MaterialDraftTask::PROMPT_VERSION, $proposal['prompt_version']);
         $this->assertSame(MaterialDraftTask::SCHEMA_VERSION, $proposal['schema_version']);
-        $this->assertSame(['direction', 'concept', 'material', 'host'], array_keys($proposal['fingerprint']));
+        $this->assertSame(['direction', 'concept', 'material', 'host', 'voice'], array_keys($proposal['fingerprint']));
 
         $this->actingAs($user)
             ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::MATERIAL]))
@@ -441,6 +456,9 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         $meta = $decision->meta;
         ksort($meta);
         $this->assertSame([
+            'ai_mode' => MaterialDraftTask::MODE_GENERATE,
+            'communication_voice_instructor_id' => null,
+            'iteration_count' => 0,
             'material_key' => self::MATERIAL,
             'prompt_version' => MaterialDraftTask::PROMPT_VERSION,
             'source' => 'real_ai',

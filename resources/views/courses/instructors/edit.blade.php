@@ -160,6 +160,15 @@
                     <small class="form-text text-muted">Pole do robienia notatek na temat trenera. Widoczne tylko w panelu administracyjnym.</small>
                 </div>
 
+                @if(auth()->user()?->isSuperAdmin())
+                    <div class="mb-3">
+                        <label for="ai_voice_profile" class="form-label">Profil komunikacji dla AI</label>
+                        <textarea name="ai_voice_profile" class="form-control @error('ai_voice_profile') is-invalid @enderror" id="ai_voice_profile" rows="6" maxlength="4000" placeholder="Np. Pisze do nauczycieli jak praktyk do praktyków. Ton naturalny i bezpośredni, krótkie akapity, bez języka urzędowego.">{{ old('ai_voice_profile', $instructor->ai_voice_profile) }}</textarea>
+                        @error('ai_voice_profile')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <small class="form-text text-muted">Reguły stylu, którymi AI w PNE Rozwój pisze treści głosem tego instruktora. Wpisuj tylko styl, bez e-maili, telefonów i danych osobowych. Do AI trafia tylko ten tekst oraz imię i nazwisko. Widoczne tylko dla super_admin.</small>
+                    </div>
+                @endif
+
                 <!-- Sekcja linków społecznościowych -->
                 <div class="card mb-3">
                     <div class="card-header">

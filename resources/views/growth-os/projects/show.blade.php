@@ -33,16 +33,28 @@
                     <p class="text-secondary mb-2">
                         {{ $project['type'] }} · {{ $project['live_date'] }} {{ $project['live_time'] }}
                     </p>
-                    <form id="project-host" method="POST" action="{{ route('growth.projects.host.update', $project['id']) }}" class="d-flex flex-wrap align-items-end gap-2">
-                        @csrf
-                        @method('PUT')
-                        <div>
-                            <label for="project_host" class="form-label small mb-1">Prowadzący</label>
-                            <input id="project_host" name="host" class="form-control form-control-sm @error('host') is-invalid @enderror" value="{{ old('host', $project['host']) }}" maxlength="120" required>
-                            @error('host')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <button type="submit" class="btn btn-outline-primary btn-sm">Zapisz prowadzącego</button>
-                    </form>
+                    <p class="small mb-1">
+                        <span class="text-secondary">Prowadzący:</span> <span class="fw-semibold">{{ $project['host'] }}</span>
+                        · <span class="text-secondary">Głos komunikacji:</span>
+                        <span class="fw-semibold">{{ $voice['name'] !== '' ? $voice['name'] : 'PNE — neutralnie' }}</span>
+                    </p>
+                    @if($voice['status'] === \App\Support\GrowthOS\GrowthPeople::VOICE_UNAVAILABLE)
+                        <p class="small text-warning-emphasis mb-1">Instruktor wybrany jako głos jest nieaktywny albo usunięty. AI użyje głosu PNE.</p>
+                    @endif
+                    <details class="mt-1" @if($errors->hasAny(['host', 'host_source', 'host_instructor_id', 'voice_instructor_id'])) open @endif>
+                        <summary class="small">Zmień prowadzącego lub głos komunikacji</summary>
+                        <form id="project-host" method="POST" action="{{ route('growth.projects.host.update', $project['id']) }}" class="mt-2" style="max-width: 28rem;">
+                            @csrf
+                            @method('PUT')
+                            @include('growth-os.projects.partials.people-fields', [
+                                'idPrefix' => 'project',
+                                'hostInstructorId' => $project['host_instructor_id'] ?? null,
+                                'hostName' => $project['host'],
+                                'voiceInstructorId' => $project['voice_instructor_id'] ?? null,
+                            ])
+                            <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Zapisz prowadzącego i głos</button>
+                        </form>
+                    </details>
                 </div>
                 <div class="text-lg-end">
                     <div class="fw-semibold">{{ $health['days_label'] }}</div>

@@ -92,7 +92,7 @@
                             @error('mail_body')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         @else
                             <label for="draft" class="visually-hidden">Szkic</label>
-                            <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ $material['draft'] }}</textarea>
+                            <textarea id="draft" name="draft" class="form-control growth-draft-editor" rows="14" @readonly($materialSkipped)>{{ session('material_restored_draft', $material['draft']) }}</textarea>
                         @endif
                     </div>
                     <div class="card-footer d-flex flex-column flex-sm-row align-items-sm-end justify-content-between gap-3">
@@ -338,6 +338,22 @@
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
 
+                            @if($aiDraftUsesVoice && $aiDraftVoice !== null)
+                                <p class="small mb-1" data-ai-voice>
+                                    <span class="text-secondary">Prowadzący:</span> <span class="fw-semibold">{{ $project['host'] }}</span>
+                                    · <span class="text-secondary">Głos komunikacji:</span>
+                                    <span class="fw-semibold">{{ $aiDraftVoice['name'] !== '' ? $aiDraftVoice['name'] : 'PNE — neutralnie' }}</span>
+                                    · <a href="{{ route('growth.projects.show', $project['id']) }}#project-host">zmień</a>
+                                </p>
+                                @if($aiDraftVoice['status'] === \App\Support\GrowthOS\GrowthPeople::VOICE_NO_PROFILE)
+                                    <p class="small text-warning-emphasis mb-3">Ten instruktor nie ma jeszcze indywidualnego profilu komunikacji. AI użyje głosu PNE.</p>
+                                @elseif($aiDraftVoice['status'] === \App\Support\GrowthOS\GrowthPeople::VOICE_UNAVAILABLE)
+                                    <p class="small text-warning-emphasis mb-3">Instruktor wybrany jako głos jest nieaktywny albo usunięty. AI użyje głosu PNE.</p>
+                                @else
+                                    <p class="small text-secondary mb-3">„Poproś AI o nowy szkic” pisze od zera. „Popraw mój szkic” redaguje tekst z pola powyżej (także niezapisany), zachowując Twój styl.</p>
+                                @endif
+                            @endif
+
                             @if($materialSkipped)
                                 <div class="alert alert-secondary small mb-3" role="status">{{ \App\Http\Controllers\GrowthOS\ProjectController::MATERIAL_SKIPPED_MESSAGE }}</div>
                             @elseif(! $aiDraftAllowed)
@@ -410,7 +426,7 @@
                                     @endif
                                     <div class="form-check mb-3">
                                         <input type="hidden" name="emojis" value="0">
-                                        <input class="form-check-input" type="checkbox" name="emojis" value="1" id="material_ai_emojis" @checked(old('emojis', $aiDraftIsMail ? '0' : '1') === '1') @disabled(! $aiDraftAllowed)>
+                                        <input class="form-check-input" type="checkbox" name="emojis" value="1" id="material_ai_emojis" @checked(old('emojis', $aiDraftIsMail || $aiDraftUsesVoice ? '0' : '1') === '1') @disabled(! $aiDraftAllowed)>
                                         <label class="form-check-label" for="material_ai_emojis">{{ $aiDraftIsMail ? 'Dodaj emotikony do treści maila' : ($aiDraftIsFacebookPost ? 'Dodaj emotikony do posta' : 'Dodaj emotikony do opisu') }}</label>
                                     </div>
                                 @endif
@@ -433,10 +449,25 @@
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <div class="form-text mb-3">Nie wpisuj danych osobowych, danych klientów ani sekretów. Instrukcja nie zmieni terminu ani prowadzącego.</div>
-                                <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
-                                    <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
-                                    Poproś AI o szkic
-                                </button>
+                                @if($aiDraftUsesVoice)
+                                    <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
+                                    <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="generate">
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Poproś AI o nowy szkic
+                                        </button>
+                                        <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit data-growth-ai-mode="refine">
+                                            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                            Popraw mój szkic
+                                        </button>
+                                    </div>
+                                @else
+                                    <button type="submit" class="btn btn-outline-primary" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
+                                        <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                        Poproś AI o szkic
+                                    </button>
+                                @endif
                             </form>
                         </div>
                     </section>
@@ -467,11 +498,24 @@
                     </span>
                 </div>
                 <div class="card-body">
-                    <p class="small text-secondary mb-3">{{ $aiDraftProposal['note'] ?? '' }}</p>
+                    @php
+                        $proposalMode = $aiDraftProposal['mode'] ?? null;
+                        $compareLabel = match ($proposalMode) {
+                            'refine' => 'Twój szkic (wysłany do AI)',
+                            'iterate' => 'Poprzednia propozycja',
+                            default => 'Obecny szkic',
+                        };
+                    @endphp
+                    <p class="small text-secondary mb-3">
+                        {{ $aiDraftProposal['note'] ?? '' }}
+                        @if(($aiDraftProposal['iteration_count'] ?? 0) > 0)
+                            <span class="badge bg-light text-secondary border">Poprawka nr {{ $aiDraftProposal['iteration_count'] }}</span>
+                        @endif
+                    </p>
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <div class="small fw-semibold mb-1">Obecny szkic</div>
-                            <div class="growth-compare">{{ $material['draft'] }}</div>
+                            <div class="small fw-semibold mb-1">{{ $compareLabel }}</div>
+                            <div class="growth-compare">{{ $proposalMode !== null ? ($aiDraftProposal['compare_draft'] ?? '') : $material['draft'] }}</div>
                         </div>
                         <div class="col-lg-6">
                             <div class="small fw-semibold mb-1">Propozycja AI</div>
@@ -479,6 +523,18 @@
                         </div>
                     </div>
                     <p class="small mt-3 mb-0"><span class="fw-semibold">Co zmieniono:</span> {{ $aiDraftProposal['change_summary'] }}</p>
+                    @if($aiDraftUsesVoice && ! $materialSkipped)
+                        <form method="POST" action="{{ route('growth.projects.materials.ai', [$project['id'], $material['id']]) }}" class="mt-3" data-growth-ai-form>
+                            @csrf
+                            <input type="hidden" name="mode" value="iterate">
+                            <label for="material_ai_iterate_instruction" class="form-label small fw-semibold">Co jeszcze poprawić?</label>
+                            <textarea id="material_ai_iterate_instruction" name="instruction" rows="2" maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}" class="form-control form-control-sm" placeholder="Np. popraw tylko CTA; zostaw pierwszy akapit bez zmian; popraw tylko literówki" @disabled(! $aiDraftAllowed)></textarea>
+                            <button type="submit" class="btn btn-outline-primary btn-sm mt-2" @disabled(! $aiDraftAllowed) data-growth-ai-submit>
+                                <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true" data-growth-ai-spinner></span>
+                                Popraw ponownie
+                            </button>
+                        </form>
+                    @endif
                 </div>
                 <div class="card-footer d-flex flex-wrap gap-2">
                     @unless($materialSkipped)
@@ -583,10 +639,18 @@
                     });
                 });
                 document.querySelectorAll('[data-growth-ai-form]').forEach((form) => {
-                    form.addEventListener('submit', () => {
-                        const button = form.querySelector('[data-growth-ai-submit]');
-                        button.disabled = true;
-                        form.querySelector('[data-growth-ai-spinner]').classList.remove('d-none');
+                    form.addEventListener('submit', (event) => {
+                        const modeInput = form.querySelector('[data-growth-ai-mode-input]');
+                        if (modeInput) {
+                            modeInput.value = event.submitter?.dataset.growthAiMode || 'generate';
+                            form.querySelector('[data-growth-ai-author-draft]').value = modeInput.value === 'refine'
+                                ? (document.getElementById('draft')?.value || '')
+                                : '';
+                        }
+                        form.querySelectorAll('[data-growth-ai-submit]').forEach((button) => {
+                            button.disabled = true;
+                        });
+                        (event.submitter?.querySelector('[data-growth-ai-spinner]') || form.querySelector('[data-growth-ai-spinner]')).classList.remove('d-none');
                     });
                 });
             </script>
