@@ -20,6 +20,7 @@ PNE Growth OS / PNE Rozwój to moduł w `adm.pnedu.pl`, który ma prowadzić wł
 - Materiał „Opis YouTube”: „Poproś AI o szkic” po zatwierdzeniu kierunku i koncepcji, obecny szkic obok propozycji, Zastosuj / Odrzuć.
 - Materiał „Post Facebook”: ten sam wzorzec, plus checkbox hashtagów; AI korzysta z opisu YouTube tylko zatwierdzonego i wstawia `[LINK DO ZAPISU]` zamiast linku.
 - Materiał „Grafika główna”: „Poproś AI o szkic” daje tekstowy brief (nagłówek, termin z aplikacji, kierunek wizualny i opcjonalne elementy z checkboxami) dla formatów 16:9 i kwadrat, z zatwierdzonym opisem YouTube jako źródłem. Pod szkicem „Generator obrazu”: format, opis obrazu (wstępnie z briefu), checkbox „Dodaj nagłówek i termin na obrazie”, „Generuj obraz”, licznik dziennego limitu z „Zresetuj limit” i galeria z Pobierz / Wybierz jako grafikę główną / Usuń, a przy obrazie poziomym „Utwórz wersję kwadratową”.
+- Materiał „Scenariusz prowadzącego” (DEC-034): „Poproś AI o szkic” z przełącznikiem „Czas trwania webinaru” (45, 60, 90 minut albo własna liczba minut). Scenariusz ma checklistę przed startem, bloki z godzinami, w każdym „Cel:”, „Do powiedzenia:” i „Przejście:”, pytania na czat, pytania i odpowiedzi oraz zakończenie z CTA.
 - Każdy materiał: status „Nie dotyczy” wyłącza go w tym projekcie (wyszarzony na liście, bez wpływu na następny krok).
 - Każdy materiał: „Historia wersji” pod szkicem (ostatnie 20 zmian treści), podgląd w modalu i „Przywróć tę wersję”.
 
@@ -96,7 +97,7 @@ Zaplanuj TIK
 - Brak Meta / Canva API.
 - Brak publikacji, wysyłek, jobów i biznesowych side effectów.
 - Propozycje AI działają w sesji HTTP. Poza sesją zostaje kampania, prowadzący, zapisany kierunek, zapisana koncepcja, decyzje przy kierunku, koncepcji i szkicach AI materiałów, 9 zadań operacyjnych, 10 materiałów (po jawnym zapisie) z historią do 20 wersji i techniczny log metadanych AI.
-- Brak AI poza etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz) , „Mailing główny” i „Mailing przypominający”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki i obu mailingów) oraz zatwierdzony mailing główny (dla przypomnienia).
+- Brak AI poza etapem Koncepcja oraz materiałami „Opis YouTube”, „Post Facebook”, „Grafika główna” (brief i obraz) , „Mailing główny”, „Mailing przypominający” i „Scenariusz prowadzącego”. Innymi materiałami w kontekście AI są tylko zatwierdzony opis YouTube (dla posta, briefu grafiki, obu mailingów i scenariusza) oraz zatwierdzony mailing główny (dla przypomnienia).
 - Brak wysyłki maili i integracji z Sendy: mailing główny to tekst do skopiowania.
 - Brak integracji z Canvą i innych dostawców obrazów niż OpenAI. Edycja obrazu służy tylko do wersji kwadratowej z obrazu poziomego (DEC-030). Brak dowolnej edycji, wariantów w jednym kliknięciu i obu formatów naraz (Waldemar ma Canva Pro i Education).
 - Brak ostrzeżenia na zapisanym materiale, że kierunek lub koncepcja zmieniły się po jego przygotowaniu (opcjonalne w DEC-024, nie zrobione).
@@ -107,9 +108,11 @@ Zaplanuj TIK
 - Czy później dodać projekt w Canvie (Autofill) obok obrazu z OpenAI.
 ## 8. Następny krok
 
-Ręczna weryfikacja briefu grafiki i generatora obrazu przez Waldemara: brief z zatwierdzonym opisem YouTube i bez niego, obraz poziomy i kwadratowy, z napisem i bez, wersja kwadratowa z obrazu poziomego, wybór i usuwanie w galerii. Na produkcji: backup, migracja `growth_artifact_images`, smoke z runbooka (kroki 1–7) i sprawdzenie, czy konto OpenAI ma dostęp do `gpt-image-2`. Ręczna weryfikacja szkicu AI mailingu głównego (DEC-032): krótki i dłuższy, z opisem YouTube i bez. Ręczna weryfikacja szkicu AI mailingu przypominającego (DEC-033): „jutro” i „dziś”, z zatwierdzonym mailingiem głównym i bez. Potem kolejne materiały (landing, scenariusz prowadzącego, follow-up) albo zapis propozycji AI w bazie. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Ręczna weryfikacja briefu grafiki i generatora obrazu przez Waldemara: brief z zatwierdzonym opisem YouTube i bez niego, obraz poziomy i kwadratowy, z napisem i bez, wersja kwadratowa z obrazu poziomego, wybór i usuwanie w galerii. Na produkcji: backup, migracja `growth_artifact_images`, smoke z runbooka (kroki 1–7) i sprawdzenie, czy konto OpenAI ma dostęp do `gpt-image-2`. Ręczna weryfikacja szkicu AI mailingu głównego (DEC-032): krótki i dłuższy, z opisem YouTube i bez. Ręczna weryfikacja szkicu AI mailingu przypominającego (DEC-033): „jutro” i „dziś”, z zatwierdzonym mailingiem głównym i bez. Ręczna weryfikacja scenariusza prowadzącego (DEC-034): 45 i 90 minut oraz własny czas. Potem kolejne materiały (landing, follow-up) albo zapis propozycji AI w bazie. Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## 9. Ostatnie zmiany
+
+- Szkic AI scenariusza prowadzącego (DEC-034): szósty profil `material_draft` (`host_script_v1`), czas trwania z przełącznika albo własny, godzina końca liczona w aplikacji, bez migracji.
 
 - Szkic AI mailingu przypominającego (DEC-033): piąty profil `material_draft` (`reminder_mail_v1`), źródła opis YouTube i mailing główny, przełącznik „jutro” / „dziś”, dwa znaczniki linków, bez migracji.
 

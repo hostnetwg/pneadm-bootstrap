@@ -1039,6 +1039,7 @@ class DemoTikWebinarProject
                 'elements' => self::graphicElements($style),
                 'length' => MaterialDraftTask::mailLength($style['length'] ?? null),
                 'timing' => MaterialDraftTask::reminderTiming($style['timing'] ?? null),
+                'duration_minutes' => MaterialDraftTask::hostScriptDuration($style['duration_minutes'] ?? null),
             ],
             'instruction' => trim($instruction),
         ];
@@ -1204,6 +1205,11 @@ class DemoTikWebinarProject
                     $emojis,
                     MaterialDraftTask::mailLength($style['length'] ?? null),
                     MaterialDraftTask::reminderTiming($style['timing'] ?? null),
+                ),
+                MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY => self::simulatedHostScript(
+                    $project,
+                    $concept,
+                    MaterialDraftTask::hostScriptDuration($style['duration_minutes'] ?? null),
                 ),
                 default => self::simulatedYoutubeDescription($project, $concept, $emojis),
             },
@@ -1552,6 +1558,72 @@ class DemoTikWebinarProject
             'Termin: '.self::liveLabel($project).'. Link do pokoju i zapisu w środku.',
             $body,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $concept
+     */
+    private static function simulatedHostScript(array $project, array $concept, int $minutes): string
+    {
+        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+        $host = self::aiHostName($project);
+        $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->take(4)
+            ->values();
+        if ($points->isEmpty()) {
+            $points = collect([$title]);
+        }
+
+        $intro = max(3, (int) round($minutes * 0.1));
+        $questions = max(5, (int) round($minutes * 0.15));
+        $ending = max(3, (int) round($minutes * 0.1));
+        $content = max($points->count(), $minutes - $intro - $questions - $ending);
+        $blocks = [['Intro', $intro, [
+            'Cel: przywitać uczestników i pokazać, co wyniosą ze spotkania.',
+            "Do powiedzenia:\n- Dzień dobry Państwu, witam na webinarze „".$title."”.\n- Spotkanie jest nagrywane.".($host !== '' ? "\n- Nazywam się ".$host.'.' : '')."\n- ".trim((string) ($concept['promise'] ?? '')),
+            'Pytanie na czat: Skąd Państwo dziś do nas dołączają?',
+            'Przejście: Zaczynamy od pierwszego tematu.',
+        ]]];
+        foreach ($points as $index => $point) {
+            $length = intdiv($content, $points->count()) + ($index < $content % $points->count() ? 1 : 0);
+            $blocks[] = [$point, $length, array_values(array_filter([
+                'Cel: omówić temat „'.$point.'” na przykładzie.',
+                "Do powiedzenia:\n- Najważniejsza myśl tego bloku.\n- Pokaz na ekranie krok po kroku.",
+                $index === 0 ? 'Pytanie na czat: Czy korzystali już Państwo z tego rozwiązania?' : '',
+                'Przejście: Przechodzimy dalej.',
+            ]))];
+        }
+        $blocks[] = ['Pytania i odpowiedzi', $questions, [
+            'Cel: odpowiedzieć na pytania z czatu.',
+            'Pytanie na czat: Co chcieliby Państwo jeszcze zobaczyć?',
+            'Przejście: Zbliżamy się do końca.',
+        ]];
+        $extra = trim((string) ($concept['additional_material'] ?? ''));
+        $blocks[] = ['Zakończenie', $ending, array_values(array_filter([
+            'Cel: podsumować spotkanie i zaprosić do dalszego działania.',
+            "Do powiedzenia:\n- Krótkie podsumowanie trzech najważniejszych wniosków.\n- ".trim((string) ($concept['cta'] ?? '')),
+            $extra !== '' ? 'Materiał dodatkowy: '.$extra : '',
+            'Dziękuję Państwu za udział.',
+        ]))];
+
+        $start = CarbonImmutable::createFromFormat('H:i', (string) ($project['live_time'] ?? '20:00'));
+        $sections = [
+            'Scenariusz: '.$title."\nTermin: ".self::liveLabel($project).', '.$minutes.' minut',
+            "Checklista przed startem\n- Dźwięk i kamera\n- Udostępniany ekran i otwarte materiały\n- Włączone nagrywanie\n- Znaczniki linków pod ręką",
+        ];
+        foreach ($blocks as $index => [$name, $length, $lines]) {
+            $end = $start->addMinutes($length);
+            if ($index === array_key_last($blocks)) {
+                $lines = array_values(array_filter($lines, fn (string $line): bool => ! str_starts_with($line, 'Przejście:')));
+            }
+            $sections[] = $start->format('H:i').'–'.$end->format('H:i').' '.$name."\n".implode("\n", $lines);
+            $start = $end;
+        }
+
+        return implode("\n\n", $sections);
     }
 
     /**

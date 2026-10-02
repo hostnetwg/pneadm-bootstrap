@@ -331,6 +331,7 @@ class ProjectController extends Controller
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
             'aiDraftIsMail' => MaterialDraftTask::isMail($material),
             'aiDraftIsReminder' => $material === MaterialDraftTask::REMINDER_MATERIAL_KEY,
+            'aiDraftIsHostScript' => $material === MaterialDraftTask::HOST_SCRIPT_MATERIAL_KEY,
             'aiDraftMailLengths' => MaterialDraftTask::mailLengths($material),
             'aiDraftUsesMainMailSource' => in_array('main_mail', MaterialDraftTask::sourceMaterialKeys($material), true),
             'aiDraftUsesMainMail' => in_array('main_mail', MaterialDraftTask::sourceMaterialKeys($material), true)
@@ -508,6 +509,19 @@ class ProjectController extends Controller
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
             'length' => ['nullable', Rule::in(array_keys(MaterialDraftTask::MAIL_LENGTHS))],
             'timing' => ['nullable', Rule::in(array_keys(MaterialDraftTask::REMINDER_TIMINGS))],
+            'duration' => ['nullable', Rule::in([...array_map('strval', MaterialDraftTask::HOST_SCRIPT_DURATIONS), 'custom'])],
+            'duration_custom' => [
+                'nullable',
+                'required_if:duration,custom',
+                'integer',
+                'min:'.MaterialDraftTask::HOST_SCRIPT_MIN_DURATION,
+                'max:'.MaterialDraftTask::HOST_SCRIPT_MAX_DURATION,
+            ],
+        ], [
+            'duration_custom.required_if' => 'Wpisz czas trwania w minutach.',
+            'duration_custom.integer' => 'Czas trwania podaj jako liczbę minut.',
+            'duration_custom.min' => 'Czas trwania musi wynosić co najmniej :min minut.',
+            'duration_custom.max' => 'Czas trwania może wynosić najwyżej :max minut.',
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
         $style = [
@@ -518,6 +532,9 @@ class ProjectController extends Controller
                 ->all(),
             'length' => MaterialDraftTask::mailLength($data['length'] ?? null),
             'timing' => MaterialDraftTask::reminderTiming($data['timing'] ?? null),
+            'duration_minutes' => MaterialDraftTask::hostScriptDuration(
+                ($data['duration'] ?? null) === 'custom' ? ($data['duration_custom'] ?? null) : ($data['duration'] ?? null),
+            ),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
 

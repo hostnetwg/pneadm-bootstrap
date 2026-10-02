@@ -7,12 +7,13 @@ use App\Services\GrowthOS\AI\Data\AiProviderResponse;
 use App\Services\GrowthOS\AI\Data\MaterialDraftResult;
 use App\Services\GrowthOS\AI\Exceptions\GrowthAiException;
 use App\Services\GrowthOS\AI\Support\ProhibitedData;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 
 /**
  * Szkic materiału webinaru. Profile: opis YouTube (DEC-024), post Facebook (DEC-026), brief grafiki głównej (DEC-028)
- * mailing główny (DEC-032) i mailing przypominający (DEC-033).
+ * mailing główny (DEC-032), mailing przypominający (DEC-033) i scenariusz prowadzącego (DEC-034).
  */
 final class MaterialDraftTask implements GrowthAiTask
 {
@@ -98,6 +99,27 @@ final class MaterialDraftTask implements GrowthAiTask
         'same_day' => 'W dniu webinaru („dziś”)',
     ];
 
+    public const HOST_SCRIPT_MATERIAL_KEY = 'host-script';
+
+    public const HOST_SCRIPT_PROFILE = 'host_script_v1';
+
+    public const HOST_SCRIPT_PROMPT_VERSION = 'material_host_script_v1';
+
+    public const HOST_SCRIPT_SCHEMA_VERSION = 'material_host_script_schema_v1';
+
+    public const HOST_SCRIPT_MAX_DRAFT_CHARS = 12000;
+
+    /**
+     * @var list<int>
+     */
+    public const HOST_SCRIPT_DURATIONS = [45, 60, 90];
+
+    public const HOST_SCRIPT_DEFAULT_DURATION = 60;
+
+    public const HOST_SCRIPT_MIN_DURATION = 15;
+
+    public const HOST_SCRIPT_MAX_DURATION = 240;
+
     /**
      * Approved materials passed to the model as sources, by material key.
      *
@@ -108,6 +130,7 @@ final class MaterialDraftTask implements GrowthAiTask
         self::GRAPHIC_MATERIAL_KEY => ['youtube_description'],
         self::MAIL_MATERIAL_KEY => ['youtube_description'],
         self::REMINDER_MATERIAL_KEY => ['youtube_description', 'main_mail'],
+        self::HOST_SCRIPT_MATERIAL_KEY => ['youtube_description'],
     ];
 
     /**
@@ -190,6 +213,14 @@ final class MaterialDraftTask implements GrowthAiTask
             'schema_version' => self::REMINDER_SCHEMA_VERSION,
             'max_chars' => self::MAIL_FIELD_LIMITS['body'],
         ],
+        self::HOST_SCRIPT_MATERIAL_KEY => [
+            'profile' => self::HOST_SCRIPT_PROFILE,
+            'name' => 'Scenariusz prowadzącego',
+            'type' => 'host_script',
+            'prompt_version' => self::HOST_SCRIPT_PROMPT_VERSION,
+            'schema_version' => self::HOST_SCRIPT_SCHEMA_VERSION,
+            'max_chars' => self::HOST_SCRIPT_MAX_DRAFT_CHARS,
+        ],
     ];
 
     public function __construct(private readonly string $materialKey = self::MATERIAL_KEY)
@@ -240,6 +271,27 @@ final class MaterialDraftTask implements GrowthAiTask
         return is_string($value) && array_key_exists($value, self::MAIL_LENGTHS) ? $value : self::MAIL_DEFAULT_LENGTH;
     }
 
+    public static function hostScriptDuration(mixed $value): int
+    {
+        $minutes = filter_var($value, FILTER_VALIDATE_INT);
+
+        return is_int($minutes) && $minutes >= self::HOST_SCRIPT_MIN_DURATION && $minutes <= self::HOST_SCRIPT_MAX_DURATION
+            ? $minutes
+            : self::HOST_SCRIPT_DEFAULT_DURATION;
+    }
+
+    /**
+     * End of the live as H:i, computed here so the model never has to add up the time.
+     */
+    public static function hostScriptEndTime(string $liveTime, int $minutes): string
+    {
+        try {
+            return CarbonImmutable::createFromFormat('H:i', trim($liveTime))->addMinutes($minutes)->format('H:i');
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
     public static function reminderTiming(mixed $value): string
     {
         return is_string($value) && array_key_exists($value, self::REMINDER_TIMINGS) ? $value : self::REMINDER_DEFAULT_TIMING;
@@ -277,6 +329,7 @@ final class MaterialDraftTask implements GrowthAiTask
             self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
             self::MAIL_MATERIAL_KEY => $this->mainMailInstructions(),
             self::REMINDER_MATERIAL_KEY => $this->reminderMailInstructions(),
+            self::HOST_SCRIPT_MATERIAL_KEY => $this->hostScriptInstructions(),
             default => $this->youtubeDescriptionInstructions(),
         };
     }
@@ -296,6 +349,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $isFacebook = $this->materialKey === self::FACEBOOK_MATERIAL_KEY;
         $isGraphic = $this->materialKey === self::GRAPHIC_MATERIAL_KEY;
         $isMail = self::isMail($this->materialKey);
+        $isHostScript = $this->materialKey === self::HOST_SCRIPT_MATERIAL_KEY;
 
         $input = [
             'material' => [
@@ -329,7 +383,7 @@ final class MaterialDraftTask implements GrowthAiTask
             ],
         ];
 
-        if ($isGraphic || $isMail) {
+        if ($isGraphic || $isMail || $isHostScript) {
             $input['campaign']['live_label'] = $this->string($campaign['live_label'] ?? '');
         }
 
@@ -347,6 +401,12 @@ final class MaterialDraftTask implements GrowthAiTask
             $input['style'] = [
                 'formats' => self::GRAPHIC_FORMATS,
                 'elements' => $this->graphicElements($context),
+            ];
+        } elseif ($isHostScript) {
+            $minutes = self::hostScriptDuration(data_get($context, 'style.duration_minutes'));
+            $input['style'] = [
+                'duration_minutes' => $minutes,
+                'end_time' => self::hostScriptEndTime($input['campaign']['live_time'], $minutes),
             ];
         } elseif ($isMail) {
             $input['style'] = [
@@ -752,6 +812,32 @@ Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, stat
 Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i linkach), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
 Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
+To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+Zwróć wyłącznie dane zgodne z przekazanym schematem.
+PROMPT;
+    }
+
+    private function hostScriptInstructions(): string
+    {
+        return <<<'PROMPT'
+Jesteś doświadczonym prowadzącym webinary edukacyjne PNE. Przygotuj scenariusz dla prowadzącego webinar na żywo. Scenariusz czyta tylko prowadzący, nie jest publikowany.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, ekspercki i spokojny. Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy); do widzów prowadzący zwraca się w formie „Państwo”.
+Format: zwykły tekst bez Markdown (bez #, ** i tabel), bez emotikon. Nagłówki sekcji i bloków w osobnych liniach, punkty zaczynające się od „- ”, pusta linia między blokami.
+Zacznij od sekcji „Checklista przed startem” dla prowadzącego: 4–6 krótkich punktów, np. dźwięk i kamera, udostępniany ekran, otwarte materiały i karty przeglądarki, włączone nagrywanie, znaczniki linków pod ręką.
+Webinar trwa style.duration_minutes minut: od campaign.live_time do style.end_time. Podziel go na bloki z nagłówkami w formacie „20:00–20:05 Nazwa bloku”. Bloki następują po sobie bez przerw: pierwszy zaczyna się o campaign.live_time, ostatni kończy się o style.end_time. Długość bloków dopasuj do czasu trwania.
+Kolejność bloków: Intro, bloki merytoryczne oparte na concept.points i concept.plan, „Pytania i odpowiedzi” (około 10–15% czasu), Zakończenie.
+W Intro: powitanie, zdanie do widzów, że spotkanie jest nagrywane, przedstawienie prowadzącego, co uczestnicy wyniosą (concept.promise) i krótki plan spotkania.
+W każdym bloku trzy części, każda w osobnej linii: „Cel:” jedno zdanie; „Do powiedzenia:” i pod nim 2–4 kluczowe myśli w punktach (prowadzący mówi własnymi słowami, więc to nie jest pełny tekst); „Przejście:” jedno zdanie prowadzące do następnego bloku. Ostatni blok nie ma przejścia.
+Interakcja: w różnych blokach łącznie 3–4 pytania do widzów, każde w osobnej linii zaczynającej się od „Pytanie na czat:”, np. o doświadczenia i potrzeby uczestników. Nie wymyślaj ankiet ani narzędzi spoza wejścia.
+Zakończenie: krótkie podsumowanie, delikatne wezwanie do działania oparte na concept.cta, informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste) i podziękowanie. Jeżeli direction.sell_later nie jest puste, dodaj jedno spokojne zdanie o dalszej ofercie, bez nacisku, ceny i pilności.
+Jeżeli campaign.host_name nie jest puste, prowadzący przedstawia się dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
+Termin to campaign.live_label. Nie zmieniaj go.
+Nie podawaj żadnego adresu URL. Jeżeli w scenariuszu potrzebny jest link, wstaw znacznik [LINK DO MATERIAŁU] albo [LINK DO ZAPISU].
+Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Scenariusz ma realizować obietnice z tego opisu.
+Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
+Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją i czasem trwania.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w scenariuszu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu, czasu trwania ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen ani certyfikatów.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
 W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
 Zwróć wyłącznie dane zgodne z przekazanym schematem.

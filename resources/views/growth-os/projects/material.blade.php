@@ -361,6 +361,30 @@
                                             </div>
                                         @endforeach
                                     </fieldset>
+                                @elseif($aiDraftIsHostScript)
+                                    @php
+                                        $durationChoice = (string) old('duration', \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_DEFAULT_DURATION);
+                                    @endphp
+                                    <p class="small mb-2">
+                                        Scenariusz ma checklistę przed startem, bloki z godzinami od <span class="fw-semibold">{{ $project['live_time'] ?? '' }}</span>, pytania na czat, pytania i odpowiedzi oraz zakończenie z CTA.
+                                    </p>
+                                    <fieldset class="mb-3">
+                                        <legend class="form-label fs-6">Czas trwania webinaru</legend>
+                                        @foreach(\App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_DURATIONS as $minutes)
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="duration" value="{{ $minutes }}" id="material_ai_duration_{{ $minutes }}" @checked($durationChoice === (string) $minutes) @disabled(! $aiDraftAllowed)>
+                                                <label class="form-check-label" for="material_ai_duration_{{ $minutes }}">{{ $minutes }} minut</label>
+                                            </div>
+                                        @endforeach
+                                        <div class="form-check d-flex flex-wrap align-items-center gap-2">
+                                            <input class="form-check-input" type="radio" name="duration" value="custom" id="material_ai_duration_custom" @checked($durationChoice === 'custom') @disabled(! $aiDraftAllowed)>
+                                            <label class="form-check-label" for="material_ai_duration_custom">Inny:</label>
+                                            <input type="number" name="duration_custom" id="material_ai_duration_custom_minutes" class="form-control form-control-sm w-auto @error('duration_custom') is-invalid @enderror" min="{{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_MIN_DURATION }}" max="{{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_MAX_DURATION }}" step="1" value="{{ old('duration_custom') }}" aria-label="Własny czas trwania w minutach" data-duration-custom @disabled(! $aiDraftAllowed)>
+                                            <span class="small">minut</span>
+                                            @error('duration_custom')<div class="invalid-feedback d-block w-100">{{ $message }}</div>@enderror
+                                        </div>
+                                        <div class="form-text">Własny czas: od {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_MIN_DURATION }} do {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::HOST_SCRIPT_MAX_DURATION }} minut.</div>
+                                    </fieldset>
                                 @else
                                     @if($aiDraftIsReminder)
                                         <fieldset class="mb-3">
@@ -404,7 +428,7 @@
                                     rows="4"
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control @error('instruction') is-invalid @enderror"
-                                    placeholder="{{ $aiDraftIsReminder ? 'Np. dodaj, że warto przygotować konto Canva przed spotkaniem' : ($aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki'))) }}"
+                                    placeholder="{{ $aiDraftIsHostScript ? 'Np. dodaj krótki pokaz na żywo w drugim bloku, mniej teorii' : ($aiDraftIsReminder ? 'Np. dodaj, że warto przygotować konto Canva przed spotkaniem' : ($aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki')))) }}"
                                     @disabled(! $aiDraftAllowed)
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -553,6 +577,11 @@
 
         @if($aiDraftSupported)
             <script>
+                document.querySelectorAll('[data-duration-custom]').forEach((input) => {
+                    input.addEventListener('input', () => {
+                        document.getElementById('material_ai_duration_custom').checked = true;
+                    });
+                });
                 document.querySelectorAll('[data-growth-ai-form]').forEach((form) => {
                     form.addEventListener('submit', () => {
                         const button = form.querySelector('[data-growth-ai-submit]');

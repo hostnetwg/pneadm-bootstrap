@@ -239,3 +239,16 @@ Smoke:
 4. „Zastosuj” rozdziela szkic na pola, a pod tematem są 3 propozycje z „Użyj”.
 
 Rollback: cofnąć kod. Zapisane szkice przypomnienia zostają, ale wracają do jednego pola tekstowego.
+
+## Szkic AI scenariusza prowadzącego (DEC-034, 2026-10-02)
+
+Bez migracji i bez nowych zmiennych `.env`. Po `git pull` wystarczą komendy cache z sekcji „Deploy ADM”.
+
+Smoke:
+
+1. „Scenariusz prowadzącego” ma kartę „Szkic z pomocą AI” z przełącznikiem „Czas trwania webinaru” (domyślnie 60 minut) i opcją „Inny” z polem minut.
+2. „Inny” bez liczby albo z liczbą spoza 15–240 pokazuje błąd przy polu i nie wywołuje AI.
+3. „Poproś AI o szkic” dla 60 minut: szkic zaczyna się od „Checklista przed startem”, bloki mają godziny od początku webinaru do godziny o 60 minut późniejszej, są linie „Pytanie na czat:” i blok „Pytania i odpowiedzi”.
+4. „Zastosuj” zapisuje scenariusz ze statusem Draft i nową wersją w historii.
+
+Rollback: cofnąć kod. Zapisane scenariusze zostają.

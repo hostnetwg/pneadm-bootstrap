@@ -32,6 +32,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
     private const REMINDER = 'reminder-mail';
 
+    private const HOST_SCRIPT = 'host-script';
+
     private const FACEBOOK_DRAFT = "🎓 Canva AI w pracy nauczyciela — 6 października 2026 r., godz. 20:00.\n\nZapisz się: [LINK DO ZAPISU]\n\n#nauczyciele #TIK";
 
     private const AI_DRAFT = "Webinar „Canva AI w pracy nauczyciela” — 6 października 2026 r., godz. 20:00.\n\nPokażemy praktyczne zastosowania Canva AI w przygotowaniu materiałów.";
@@ -99,7 +101,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach (['landing', 'host-script', 'follow-up'] as $key) {
+        foreach (['landing', 'participant-material', 'follow-up'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();
@@ -1404,6 +1406,103 @@ class GrowthOsMaterialAiDraftTest extends TestCase
             "Temat: Jutro webinar\nPreheader: Link do pokoju w środku.\n\nDzień dobry,\n\nprzypominamy.",
             GrowthArtifact::query()->where('key', self::REMINDER)->sole()->payload['draft'],
         );
+    }
+
+    public function test_host_script_page_offers_duration_switch_with_custom_value(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]))
+            ->assertOk()
+            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Czas trwania webinaru')
+            ->assertSee('45 minut')
+            ->assertSee('90 minut')
+            ->assertSee('id="material_ai_duration_60" checked', false)
+            ->assertSee('name="duration_custom"', false)
+            ->assertDontSee('id="material_ai_emojis"', false);
+    }
+
+    public function test_host_script_payload_and_prompt(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::HOST_SCRIPT)->assertSessionHas('success');
+
+        $input = $this->provider->input;
+        $this->assertSame(['key' => self::HOST_SCRIPT, 'name' => 'Scenariusz prowadzącego', 'type' => 'host_script'], $input['material']);
+        $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
+        $this->assertSame(['youtube_description' => ''], $input['source_materials']);
+        $this->assertSame(['duration_minutes' => 60, 'end_time' => '21:00'], $input['style']);
+        $this->assertSame(['draft', 'change_summary'], $this->provider->schema['required']);
+        $this->assertSame(MaterialDraftTask::HOST_SCRIPT_PROMPT_VERSION, $this->proposal(self::HOST_SCRIPT)['prompt_version']);
+        foreach (['Checklista przed startem', 'nagrywane', 'Pytanie na czat:', 'Pytania i odpowiedzi', 'Przejście:', 'style.end_time', 'direction.sell_later', 'concept.cta'] as $rule) {
+            $this->assertStringContainsString($rule, $this->provider->instructions);
+        }
+    }
+
+    public function test_host_script_duration_options_and_custom_value_reach_the_model(): void
+    {
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::HOST_SCRIPT, ['duration' => '90']);
+        $this->assertSame(['duration_minutes' => 90, 'end_time' => '21:30'], $this->provider->input['style']);
+
+        $this->requestFor($user, self::HOST_SCRIPT, ['duration' => 'custom', 'duration_custom' => '75']);
+        $this->assertSame(['duration_minutes' => 75, 'end_time' => '21:15'], $this->provider->input['style']);
+
+        $page = route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);
+        $url = route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]);
+        $this->actingAs($user)->from($page)->post($url, ['duration' => 'custom'])->assertSessionHasErrors('duration_custom');
+        $this->actingAs($user)->from($page)->post($url, ['duration' => 'custom', 'duration_custom' => '5'])->assertSessionHasErrors('duration_custom');
+        $this->actingAs($user)->from($page)->post($url, ['duration' => 'custom', 'duration_custom' => '500'])->assertSessionHasErrors('duration_custom');
+        $this->actingAs($user)->from($page)->post($url, ['duration' => '30'])->assertSessionHasErrors('duration');
+        $this->assertSame(2, $this->provider->calls);
+    }
+
+    public function test_host_script_is_applied_as_draft(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = [
+            'draft' => "Checklista przed startem\n- Dźwięk\n\n20:00–20:06 Intro\nCel: powitanie.",
+            'change_summary' => 'Przygotowano scenariusz.',
+        ];
+        $this->requestFor($user, self::HOST_SCRIPT);
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::HOST_SCRIPT]))
+            ->assertSessionHas('success');
+
+        $artifact = GrowthArtifact::query()->where('key', self::HOST_SCRIPT)->sole();
+        $this->assertStringStartsWith('Checklista przed startem', $artifact->payload['draft']);
+        $this->assertSame('DRAFT', $artifact->payload['status']);
+    }
+
+    public function test_host_script_simulation_fills_the_whole_duration(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::HOST_SCRIPT, ['duration' => 'custom', 'duration_custom' => '75']);
+        $draft = $this->proposal(self::HOST_SCRIPT)['draft'];
+
+        $this->assertStringContainsString('Checklista przed startem', $draft);
+        $this->assertMatchesRegularExpression('/^20:00–\d{2}:\d{2} Intro$/mu', $draft);
+        $this->assertMatchesRegularExpression('/^\d{2}:\d{2}–21:15 Zakończenie$/mu', $draft);
+        $this->assertStringContainsString('Spotkanie jest nagrywane.', $draft);
+        $this->assertStringContainsString('Pytanie na czat:', $draft);
+        $this->assertStringContainsString('Pytania i odpowiedzi', $draft);
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_host_script_end_time_handles_midnight_and_missing_time(): void
+    {
+        $this->assertSame('00:30', MaterialDraftTask::hostScriptEndTime('23:30', 60));
+        $this->assertSame('', MaterialDraftTask::hostScriptEndTime('', 60));
+        $this->assertSame(60, MaterialDraftTask::hostScriptDuration('abc'));
+        $this->assertSame(60, MaterialDraftTask::hostScriptDuration(500));
+        $this->assertSame(120, MaterialDraftTask::hostScriptDuration('120'));
     }
 
     /**
