@@ -1006,9 +1006,8 @@ class DemoTikWebinarProject
     }
 
     /**
-     * Allow-listed context for the AI material draft. The only other material ever included is an
-     * approved YouTube description for the Facebook post, the graphic brief and the main mail (DEC-026, DEC-029, DEC-032).
-     * No personal data.
+     * Allow-listed context for the AI material draft. The only other materials ever included are approved ones listed in
+     * MaterialDraftTask::sourceMaterialKeys (DEC-026, DEC-029, DEC-032, DEC-033). No personal data.
      *
      * @param  array<string, mixed>  $project
      * @param  array{emojis?: bool, hashtags?: bool}  $style
@@ -1032,15 +1031,14 @@ class DemoTikWebinarProject
             ],
             'direction' => self::fingerprintDirection($direction),
             'concept' => self::fingerprintConcept($concept),
-            'source_materials' => MaterialDraftTask::usesYoutubeSource($materialId)
-                ? ['youtube_description' => self::approvedYoutubeDescription($project)]
-                : [],
+            'source_materials' => self::approvedSourceMaterials($project, $materialId),
             'current_draft' => self::materialDraft($project, $materialId),
             'style' => [
                 'emojis' => (bool) ($style['emojis'] ?? true),
                 'hashtags' => (bool) ($style['hashtags'] ?? true),
                 'elements' => self::graphicElements($style),
                 'length' => MaterialDraftTask::mailLength($style['length'] ?? null),
+                'timing' => MaterialDraftTask::reminderTiming($style['timing'] ?? null),
             ],
             'instruction' => trim($instruction),
         ];
@@ -1062,8 +1060,8 @@ class DemoTikWebinarProject
             'host' => self::hash(['host_name' => self::aiHostName($project)]),
         ];
 
-        if (MaterialDraftTask::usesYoutubeSource($materialId)) {
-            $fingerprint['source_materials'] = self::hash(['youtube_description' => self::approvedYoutubeDescription($project)]);
+        if (MaterialDraftTask::sourceMaterialKeys($materialId) !== []) {
+            $fingerprint['source_materials'] = self::hash(self::approvedSourceMaterials($project, $materialId));
         }
 
         return $fingerprint;
@@ -1112,8 +1110,54 @@ class DemoTikWebinarProject
      */
     public static function approvedYoutubeDescription(array $project): string
     {
+        return self::approvedMaterialDraft($project, MaterialDraftTask::MATERIAL_KEY);
+    }
+
+    /**
+     * Approved main mail without the alternative subjects, which are not part of the sent mail.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    public static function approvedMainMail(array $project): string
+    {
+        $draft = self::approvedMaterialDraft($project, MaterialDraftTask::MAIL_MATERIAL_KEY);
+        if ($draft === '') {
+            return '';
+        }
+
+        $mail = MaterialDraftTask::parseMainMail($draft);
+
+        return MaterialDraftTask::composeMainMail(
+            $mail['subject'] !== '' ? [$mail['subject']] : [],
+            $mail['preheader'],
+            $mail['body'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @return array<string, string>
+     */
+    public static function approvedSourceMaterials(array $project, string $materialId): array
+    {
+        $sources = [];
+        foreach (MaterialDraftTask::sourceMaterialKeys($materialId) as $source) {
+            $sources[$source] = match ($source) {
+                'main_mail' => self::approvedMainMail($project),
+                default => self::approvedYoutubeDescription($project),
+            };
+        }
+
+        return $sources;
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    private static function approvedMaterialDraft(array $project, string $materialId): string
+    {
         foreach ($project['materials'] ?? [] as $material) {
-            if (($material['id'] ?? null) === MaterialDraftTask::MATERIAL_KEY) {
+            if (($material['id'] ?? null) === $materialId) {
                 return in_array($material['status'] ?? null, ['APPROVED', 'PUBLISHED'], true)
                     ? trim((string) ($material['draft'] ?? ''))
                     : '';
@@ -1154,6 +1198,13 @@ class DemoTikWebinarProject
                 MaterialDraftTask::FACEBOOK_MATERIAL_KEY => self::simulatedFacebookPost($project, $concept, $emojis, (bool) ($style['hashtags'] ?? true)),
                 MaterialDraftTask::GRAPHIC_MATERIAL_KEY => self::simulatedGraphicBrief($project, $concept, self::graphicElements($style)),
                 MaterialDraftTask::MAIL_MATERIAL_KEY => self::simulatedMainMail($project, $concept, $emojis, MaterialDraftTask::mailLength($style['length'] ?? null)),
+                MaterialDraftTask::REMINDER_MATERIAL_KEY => self::simulatedReminderMail(
+                    $project,
+                    $concept,
+                    $emojis,
+                    MaterialDraftTask::mailLength($style['length'] ?? null),
+                    MaterialDraftTask::reminderTiming($style['timing'] ?? null),
+                ),
                 default => self::simulatedYoutubeDescription($project, $concept, $emojis),
             },
             'change_summary' => 'Symulacja lokalna: szkic złożony z zatwierdzonej koncepcji (tytuł, termin, obietnica, program, CTA).'
@@ -1456,6 +1507,49 @@ class DemoTikWebinarProject
         return MaterialDraftTask::composeMainMail(
             ['Zaproszenie: '.$title, $title.' — webinar dla nauczycieli', 'Praktyczny webinar: '.$title],
             'Termin: '.self::liveLabel($project).'. Udział wymaga zapisu.',
+            $body,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $project
+     * @param  array<string, mixed>  $concept
+     */
+    private static function simulatedReminderMail(array $project, array $concept, bool $emojis, string $length, string $timing): string
+    {
+        $icon = static fn (string $emoji): string => $emojis ? $emoji.' ' : '';
+        $title = trim((string) ($concept['title'] ?? $project['topic'] ?? ''));
+        $host = self::aiHostName($project);
+        $when = $timing === 'same_day' ? 'dziś' : 'jutro';
+        $points = collect(is_array($concept['points'] ?? null) ? $concept['points'] : [])
+            ->map(fn (mixed $point): string => trim((string) $point))
+            ->filter(fn (string $point): bool => $point !== '')
+            ->take($length === 'long' ? 5 : 3)
+            ->map(fn (string $point): string => '• '.$point)
+            ->implode("\n");
+        $plan = trim((string) ($concept['plan'] ?? ''));
+        $extra = trim((string) ($concept['additional_material'] ?? ''));
+
+        $body = implode("\n\n", array_filter([
+            'Dzień dobry,',
+            'przypominamy, że już '.$when.' odbędzie się webinar „'.$title.'”.',
+            $points !== '' ? "Najważniejsze tematy:\n".$points : '',
+            $length === 'long' && $plan !== '' ? 'Plan spotkania: '.$plan : '',
+            $length === 'long' && $extra !== '' ? 'Po webinarze otrzymają Państwo: '.$extra : '',
+            $icon('📅').'Termin: '.self::liveLabel($project),
+            $host !== '' ? 'Prowadzący: '.$host : '',
+            $icon('👉')."Jeśli są Państwo zapisani, zapraszamy do pokoju webinaru:\n".MaterialDraftTask::ROOM_LINK_PLACEHOLDER,
+            "Jeśli jeszcze się Państwo nie zapisali, można to zrobić tutaj:\n".MaterialDraftTask::LINK_PLACEHOLDER,
+            "Z pozdrowieniami,\n".($host !== '' ? $host."\n" : '').'Zespół PNE',
+        ]));
+
+        return MaterialDraftTask::composeMainMail(
+            [
+                ucfirst($when).' webinar: '.$title,
+                'Przypomnienie: '.$title,
+                'Do zobaczenia '.$when.' na webinarze',
+            ],
+            'Termin: '.self::liveLabel($project).'. Link do pokoju i zapisu w środku.',
             $body,
         );
     }

@@ -30,6 +30,8 @@ class GrowthOsMaterialAiDraftTest extends TestCase
 
     private const MAIL = 'main-mail';
 
+    private const REMINDER = 'reminder-mail';
+
     private const FACEBOOK_DRAFT = "🎓 Canva AI w pracy nauczyciela — 6 października 2026 r., godz. 20:00.\n\nZapisz się: [LINK DO ZAPISU]\n\n#nauczyciele #TIK";
 
     private const AI_DRAFT = "Webinar „Canva AI w pracy nauczyciela” — 6 października 2026 r., godz. 20:00.\n\nPokażemy praktyczne zastosowania Canva AI w przygotowaniu materiałów.";
@@ -88,7 +90,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'reminder-mail']))
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, 'landing']))
             ->assertOk()
             ->assertDontSee('Poproś AI o szkic');
     }
@@ -97,7 +99,7 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     {
         $user = $this->readyProject();
 
-        foreach (['reminder-mail', 'landing', 'follow-up'] as $key) {
+        foreach (['landing', 'host-script', 'follow-up'] as $key) {
             $this->actingAs($user)
                 ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, $key]))
                 ->assertNotFound();
@@ -1275,6 +1277,133 @@ class GrowthOsMaterialAiDraftTest extends TestCase
     private function liveLabel(): string
     {
         return now()->addDays(7)->setTime(20, 0)->locale('pl')->translatedFormat('l, j F Y, \g\o\d\z. H:i');
+    }
+
+    public function test_reminder_page_offers_timing_length_and_both_links(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
+            ->assertOk()
+            ->assertSee('Poproś AI o szkic')
+            ->assertSee('Kiedy wysyłasz przypomnienie')
+            ->assertSee('Dzień przed webinarem („jutro”)', false)
+            ->assertSee('W dniu webinaru („dziś”)', false)
+            ->assertSee('Krótki (ok. 80–150 słów)')
+            ->assertSee('Dłuższy (ok. 180–280 słów)')
+            ->assertSee(MaterialDraftTask::ROOM_LINK_PLACEHOLDER)
+            ->assertSee(MaterialDraftTask::LINK_PLACEHOLDER)
+            ->assertSee('Mailing główny nie jest zatwierdzony')
+            ->assertSee('id="mail_subject"', false)
+            ->assertSee('id="mail_preheader"', false);
+    }
+
+    public function test_reminder_payload_and_prompt(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->requestFor($user, self::REMINDER)->assertSessionHas('success');
+
+        $input = $this->provider->input;
+        $this->assertSame(['key' => self::REMINDER, 'name' => 'Mailing przypominający', 'type' => 'reminder_mail'], $input['material']);
+        $this->assertSame($this->liveLabel(), $input['campaign']['live_label']);
+        $this->assertSame(['youtube_description' => '', 'main_mail' => ''], $input['source_materials']);
+        $this->assertSame(['emojis' => false, 'length' => 'short', 'timing' => 'day_before'], $input['style']);
+        $this->assertSame(['subject_options', 'preheader', 'body', 'change_summary'], $this->provider->schema['required']);
+        $this->assertSame(MaterialDraftTask::REMINDER_PROMPT_VERSION, $this->proposal(self::REMINDER)['prompt_version']);
+        foreach ([MaterialDraftTask::ROOM_LINK_PLACEHOLDER, MaterialDraftTask::LINK_PLACEHOLDER, 'style.timing', 'source_materials.main_mail', 'Dzień dobry,', 'Zespół PNE'] as $rule) {
+            $this->assertStringContainsString($rule, $this->provider->instructions);
+        }
+    }
+
+    public function test_reminder_timing_and_length_reach_the_model(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+
+        $this->requestFor($user, self::REMINDER, ['timing' => 'same_day', 'length' => 'long', 'emojis' => '1']);
+        $this->assertSame(['emojis' => true, 'length' => 'long', 'timing' => 'same_day'], $this->provider->input['style']);
+
+        $this->actingAs($user)
+            ->from(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
+            ->post(route('growth.projects.materials.ai', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]), ['timing' => 'week_before'])
+            ->assertSessionHasErrors('timing');
+        $this->assertSame(1, $this->provider->calls);
+    }
+
+    public function test_reminder_uses_only_approved_main_mail_without_alternative_subjects(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+        $mainMail = "Temat: Temat główny\nInne propozycje tematu:\n- Drugi temat\n- Trzeci temat\nPreheader: Krótki preheader.\n\nDzień dobry,\n\nTreść zaproszenia.";
+
+        $this->saveMaterial($user, self::MAIL, 'REVIEW', $mainMail);
+        $this->requestFor($user, self::REMINDER);
+        $this->assertSame('', $this->provider->input['source_materials']['main_mail']);
+
+        $this->saveMaterial($user, self::MAIL, 'APPROVED', $mainMail);
+        $this->requestFor($user, self::REMINDER);
+        $this->assertSame(
+            "Temat: Temat główny\nPreheader: Krótki preheader.\n\nDzień dobry,\n\nTreść zaproszenia.",
+            $this->provider->input['source_materials']['main_mail'],
+        );
+        $this->actingAs($user)
+            ->get(route('growth.projects.materials.show', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
+            ->assertSee('AI użyje zatwierdzonego mailingu głównego');
+    }
+
+    public function test_reminder_proposal_is_stale_after_main_mail_changes(): void
+    {
+        $user = $this->readyProject();
+        $this->provider->payload = $this->mailPayload();
+        $this->requestFor($user, self::REMINDER);
+
+        $this->saveMaterial($user, self::MAIL, 'APPROVED', "Temat: Nowy temat\n\nDzień dobry,\n\nNowa treść.");
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.ai.apply', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]))
+            ->assertSessionHas('error', ProjectController::MATERIAL_AI_STALE_MESSAGE);
+        $this->assertNull(GrowthArtifact::query()->where('key', self::REMINDER)->first());
+    }
+
+    public function test_reminder_simulation_follows_timing(): void
+    {
+        config()->set('growth_ai.enabled', false);
+        $user = $this->readyProject();
+
+        $this->requestFor($user, self::REMINDER, ['timing' => 'day_before']);
+        $draft = $this->proposal(self::REMINDER)['draft'];
+        $fields = MaterialDraftTask::parseMainMail($draft);
+        $this->assertCount(2, $fields['alternatives']);
+        $this->assertStringContainsString('już jutro', $fields['body']);
+        $this->assertStringContainsString(MaterialDraftTask::ROOM_LINK_PLACEHOLDER, $fields['body']);
+        $this->assertStringContainsString(MaterialDraftTask::LINK_PLACEHOLDER, $fields['body']);
+        $this->assertStringContainsString('Termin: '.$this->liveLabel(), $fields['body']);
+
+        $this->requestFor($user, self::REMINDER, ['timing' => 'same_day']);
+        $this->assertStringContainsString('już dziś', $this->proposal(self::REMINDER)['draft']);
+        $this->assertSame(0, $this->provider->calls);
+    }
+
+    public function test_reminder_is_saved_from_separate_fields(): void
+    {
+        $user = $this->readyProject();
+
+        $this->actingAs($user)
+            ->post(route('growth.projects.materials.status', [DemoTikWebinarProject::PROJECT_ID, self::REMINDER]), [
+                'status' => 'REVIEW',
+                'mail_subject' => 'Jutro webinar',
+                'mail_preheader' => 'Link do pokoju w środku.',
+                'mail_body' => "Dzień dobry,\n\nprzypominamy.",
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(
+            "Temat: Jutro webinar\nPreheader: Link do pokoju w środku.\n\nDzień dobry,\n\nprzypominamy.",
+            GrowthArtifact::query()->where('key', self::REMINDER)->sole()->payload['draft'],
+        );
     }
 
     /**

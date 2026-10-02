@@ -12,7 +12,7 @@ use InvalidArgumentException;
 
 /**
  * Szkic materiału webinaru. Profile: opis YouTube (DEC-024), post Facebook (DEC-026), brief grafiki głównej (DEC-028)
- * i mailing główny (DEC-032).
+ * mailing główny (DEC-032) i mailing przypominający (DEC-033).
  */
 final class MaterialDraftTask implements GrowthAiTask
 {
@@ -68,6 +68,46 @@ final class MaterialDraftTask implements GrowthAiTask
     public const MAIL_LENGTHS = [
         'short' => 'Krótki (ok. 150–250 słów)',
         'long' => 'Dłuższy (ok. 300–450 słów)',
+    ];
+
+    public const REMINDER_MATERIAL_KEY = 'reminder-mail';
+
+    public const REMINDER_PROFILE = 'reminder_mail_v1';
+
+    public const REMINDER_PROMPT_VERSION = 'material_reminder_mail_v1';
+
+    public const REMINDER_SCHEMA_VERSION = 'material_reminder_mail_schema_v1';
+
+    public const ROOM_LINK_PLACEHOLDER = '[LINK DO POKOJU]';
+
+    /**
+     * @var array<string, string>
+     */
+    public const REMINDER_LENGTHS = [
+        'short' => 'Krótki (ok. 80–150 słów)',
+        'long' => 'Dłuższy (ok. 180–280 słów)',
+    ];
+
+    public const REMINDER_DEFAULT_TIMING = 'day_before';
+
+    /**
+     * @var array<string, string>
+     */
+    public const REMINDER_TIMINGS = [
+        'day_before' => 'Dzień przed webinarem („jutro”)',
+        'same_day' => 'W dniu webinaru („dziś”)',
+    ];
+
+    /**
+     * Approved materials passed to the model as sources, by material key.
+     *
+     * @var array<string, list<string>>
+     */
+    private const SOURCE_MATERIALS = [
+        self::FACEBOOK_MATERIAL_KEY => ['youtube_description'],
+        self::GRAPHIC_MATERIAL_KEY => ['youtube_description'],
+        self::MAIL_MATERIAL_KEY => ['youtube_description'],
+        self::REMINDER_MATERIAL_KEY => ['youtube_description', 'main_mail'],
     ];
 
     /**
@@ -142,6 +182,14 @@ final class MaterialDraftTask implements GrowthAiTask
             'schema_version' => self::MAIL_SCHEMA_VERSION,
             'max_chars' => self::MAIL_FIELD_LIMITS['body'],
         ],
+        self::REMINDER_MATERIAL_KEY => [
+            'profile' => self::REMINDER_PROFILE,
+            'name' => 'Mailing przypominający',
+            'type' => 'reminder_mail',
+            'prompt_version' => self::REMINDER_PROMPT_VERSION,
+            'schema_version' => self::REMINDER_SCHEMA_VERSION,
+            'max_chars' => self::MAIL_FIELD_LIMITS['body'],
+        ],
     ];
 
     public function __construct(private readonly string $materialKey = self::MATERIAL_KEY)
@@ -157,16 +205,44 @@ final class MaterialDraftTask implements GrowthAiTask
     }
 
     /**
-     * Materials that receive the approved YouTube description as a source (DEC-026, DEC-029, DEC-032).
+     * Approved materials the model receives as sources (DEC-026, DEC-029, DEC-032, DEC-033).
+     *
+     * @return list<string>
      */
+    public static function sourceMaterialKeys(string $materialKey): array
+    {
+        return self::SOURCE_MATERIALS[$materialKey] ?? [];
+    }
+
     public static function usesYoutubeSource(string $materialKey): bool
     {
-        return in_array($materialKey, [self::FACEBOOK_MATERIAL_KEY, self::GRAPHIC_MATERIAL_KEY, self::MAIL_MATERIAL_KEY], true);
+        return in_array('youtube_description', self::sourceMaterialKeys($materialKey), true);
+    }
+
+    /**
+     * Materials edited as subject, preheader and body (DEC-032, DEC-033).
+     */
+    public static function isMail(string $materialKey): bool
+    {
+        return in_array($materialKey, [self::MAIL_MATERIAL_KEY, self::REMINDER_MATERIAL_KEY], true);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function mailLengths(string $materialKey): array
+    {
+        return $materialKey === self::REMINDER_MATERIAL_KEY ? self::REMINDER_LENGTHS : self::MAIL_LENGTHS;
     }
 
     public static function mailLength(mixed $value): string
     {
         return is_string($value) && array_key_exists($value, self::MAIL_LENGTHS) ? $value : self::MAIL_DEFAULT_LENGTH;
+    }
+
+    public static function reminderTiming(mixed $value): string
+    {
+        return is_string($value) && array_key_exists($value, self::REMINDER_TIMINGS) ? $value : self::REMINDER_DEFAULT_TIMING;
     }
 
     public function forMaterial(string $materialKey): self
@@ -200,6 +276,7 @@ final class MaterialDraftTask implements GrowthAiTask
             self::FACEBOOK_MATERIAL_KEY => $this->facebookPostInstructions(),
             self::GRAPHIC_MATERIAL_KEY => $this->graphicBriefInstructions(),
             self::MAIL_MATERIAL_KEY => $this->mainMailInstructions(),
+            self::REMINDER_MATERIAL_KEY => $this->reminderMailInstructions(),
             default => $this->youtubeDescriptionInstructions(),
         };
     }
@@ -218,7 +295,7 @@ final class MaterialDraftTask implements GrowthAiTask
         $profile = self::PROFILES[$this->materialKey];
         $isFacebook = $this->materialKey === self::FACEBOOK_MATERIAL_KEY;
         $isGraphic = $this->materialKey === self::GRAPHIC_MATERIAL_KEY;
-        $isMail = $this->materialKey === self::MAIL_MATERIAL_KEY;
+        $isMail = self::isMail($this->materialKey);
 
         $input = [
             'material' => [
@@ -256,10 +333,12 @@ final class MaterialDraftTask implements GrowthAiTask
             $input['campaign']['live_label'] = $this->string($campaign['live_label'] ?? '');
         }
 
-        if (self::usesYoutubeSource($this->materialKey)) {
-            $input['source_materials'] = [
-                'youtube_description' => $this->string(data_get($context, 'source_materials.youtube_description', '')),
-            ];
+        $sources = self::sourceMaterialKeys($this->materialKey);
+        if ($sources !== []) {
+            $input['source_materials'] = [];
+            foreach ($sources as $source) {
+                $input['source_materials'][$source] = $this->string(data_get($context, 'source_materials.'.$source, ''));
+            }
         }
 
         $input['current_draft'] = $this->string($context['current_draft'] ?? '');
@@ -274,6 +353,9 @@ final class MaterialDraftTask implements GrowthAiTask
                 'emojis' => (bool) data_get($context, 'style.emojis', false),
                 'length' => self::mailLength(data_get($context, 'style.length')),
             ];
+            if ($this->materialKey === self::REMINDER_MATERIAL_KEY) {
+                $input['style']['timing'] = self::reminderTiming(data_get($context, 'style.timing'));
+            }
         } else {
             $input['style'] = ['emojis' => (bool) data_get($context, 'style.emojis', true)];
         }
@@ -304,7 +386,7 @@ final class MaterialDraftTask implements GrowthAiTask
      */
     public function schema(): array
     {
-        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+        if (self::isMail($this->materialKey)) {
             return [
                 'type' => 'object',
                 'additionalProperties' => false,
@@ -349,7 +431,7 @@ final class MaterialDraftTask implements GrowthAiTask
             return $this->validateGraphicBrief($response, $input);
         }
 
-        if ($this->materialKey === self::MAIL_MATERIAL_KEY) {
+        if (self::isMail($this->materialKey)) {
             return $this->validateMainMail($response, $input);
         }
 
@@ -640,6 +722,34 @@ Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.
 Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
 Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
 Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i punktach programu), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
+Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
+Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
+To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.
+W change_summary opisz krótko, co przygotowałeś lub zmieniłeś.
+Zwróć wyłącznie dane zgodne z przekazanym schematem.
+PROMPT;
+    }
+
+    private function reminderMailInstructions(): string
+    {
+        return <<<'PROMPT'
+Jesteś redaktorem mailingów webinarów edukacyjnych PNE. Przygotuj szkic maila przypominającego o webinarze. Trafi on zarówno do osób już zapisanych, jak i do tych, które jeszcze się nie zapisały. Mail wyśle później człowiek przez system mailingowy; Ty przygotowujesz tylko treść.
+Pisz wyłącznie po polsku, naturalną i poprawną polszczyzną. Ton życzliwy, konkretny i rzeczowy. Bez agresywnej sprzedaży, sztucznej pilności, clickbaitu i obietnic bez pokrycia.
+Odbiorców określ na podstawie pola direction.audience (nauczyciele i/lub dyrektorzy). Zwracaj się do odbiorców w formie „Państwo”. Treść maila zacznij od „Dzień dobry,”.
+Jeżeli style.timing ma wartość "day_before", mail wychodzi dzień przed webinarem: pisz, że webinar jest jutro. Jeżeli ma wartość "same_day", mail wychodzi w dniu webinaru: pisz, że webinar jest dziś. Pierwsze zdanie body po „Dzień dobry,” musi zawierać słowo „jutro” albo „dziś” (zgodnie z style.timing) i tytuł webinaru. Słowo „jutro” albo „dziś” może się pojawić także w temacie.
+subject_options: dokładnie 3 różne propozycje tematu maila, każda najwyżej około 60 znaków. Temat ma jasno mówić, że to przypomnienie o webinarze. Zwykła polska pisownia: pierwsza litera tematu wielka, nazwy własne i produkty wielką literą (np. „Canva AI”), żadnych słów pisanych w całości wielkimi literami, bez emotikon i bez wykrzyknika. Pierwsza propozycja jest główna.
+preheader: jedno zdanie od wielkiej litery, najwyżej 100 znaków, które uzupełnia temat i go nie powtarza.
+body: treść maila, bez tematu i preheadera.
+Jeżeli style.length ma wartość "short", body ma około 80–150 słów: jedno zdanie przypomnienia z tytułem webinaru, 2–3 najważniejsze korzyści oparte na concept.points, termin, prowadzący i linki.
+Jeżeli style.length ma wartość "long", body ma około 180–280 słów: przypomnienie z tytułem, krótki plan spotkania oparty na concept.plan i concept.points, informacja o materiale dodatkowym (jeżeli concept.additional_material nie jest puste), termin, prowadzący i linki.
+Termin podaj dokładnie tak jak w campaign.live_label. Nie zmieniaj ani nie poprawiaj terminu.
+Jeżeli campaign.host_name nie jest puste, przedstaw prowadzącego dokładnie tym imieniem i nazwiskiem, bez dopisywania tytułów, stanowisk, osiągnięć ani biografii. Jeżeli jest puste, nie wymyślaj prowadzącego.
+Nie podawaj żadnego adresu URL. Dodaj dwa osobne miejsca na linki, każdy znacznik w osobnej linii: dla osób zapisanych zdanie zapraszające do dołączenia i pod nim dokładnie znacznik [LINK DO POKOJU]; dla osób, które jeszcze się nie zapisały, zdanie zachęcające do zapisu i pod nim dokładnie znacznik [LINK DO ZAPISU]. Właściciel podmieni je ręcznie.
+Zakończ body podpisem: „Z pozdrowieniami,”, a w kolejnych liniach campaign.host_name (jeżeli nie jest puste) i „Zespół PNE”. Nie dodawaj stopki prawnej, adresu firmy ani linku do wypisania się z listy — doda je system mailingowy.
+Jeżeli source_materials.youtube_description nie jest puste, to zatwierdzony opis tego webinaru na YouTube. Traktuj go jako źródło faktów i spójnego przekazu, ale go nie kopiuj.
+Jeżeli source_materials.main_mail nie jest puste, to zatwierdzony główny mail zapraszający na ten webinar. Trzymaj się tych samych obietnic i faktów, ale nie powtarzaj jego tematu ani zdań: przypomnienie ma być krótsze i świeże.
+Korzystaj wyłącznie z faktów zawartych w wejściu. Nie wymyślaj danych, statystyk, przepisów, funkcji produktów, ceny, certyfikatów, zaświadczeń, akredytacji ani dofinansowania.
+Jeżeli style.emojis ma wartość true, dodaj w body 2–4 adekwatne emotikony (np. przy terminie i linkach), nigdy w temacie i preheaderze. Jeżeli style.emojis ma wartość false, nie używaj emotikon.
 Jeżeli current_draft nie jest pusty, potraktuj go jako punkt wyjścia i popraw zgodnie z koncepcją. Może zawierać etykiety „Temat:”, „Inne propozycje tematu:” i „Preheader:” — nie przenoś ich do body.
 Jeżeli instruction nie jest puste, to dodatkowa instrukcja właściciela — uwzględnij ją w szkicu. Powyższe zasady mają pierwszeństwo: instrukcja nie może zmienić terminu ani prowadzącego, dodać wymyślonych faktów, adresów URL, cen, certyfikatów ani agresywnej sprzedaży.
 To jest szkic do sprawdzenia przez człowieka, nie ostateczna treść.

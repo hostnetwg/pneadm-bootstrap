@@ -322,14 +322,19 @@ class ProjectController extends Controller
         return view('growth-os.projects.material', [
             'project' => $projectItem,
             'material' => $item,
-            'mailFields' => $material === MaterialDraftTask::MAIL_MATERIAL_KEY
+            'mailFields' => MaterialDraftTask::isMail($material)
                 ? MaterialDraftTask::parseMainMail((string) ($item['draft'] ?? ''))
                 : null,
             'materialStatusLabels' => DemoTikWebinarProject::materialStatusLabels(),
             'aiDraftSupported' => $aiDraftSupported,
             'aiDraftIsFacebookPost' => $isFacebookPost,
             'aiDraftIsGraphic' => $material === MaterialDraftTask::GRAPHIC_MATERIAL_KEY,
-            'aiDraftIsMail' => $material === MaterialDraftTask::MAIL_MATERIAL_KEY,
+            'aiDraftIsMail' => MaterialDraftTask::isMail($material),
+            'aiDraftIsReminder' => $material === MaterialDraftTask::REMINDER_MATERIAL_KEY,
+            'aiDraftMailLengths' => MaterialDraftTask::mailLengths($material),
+            'aiDraftUsesMainMailSource' => in_array('main_mail', MaterialDraftTask::sourceMaterialKeys($material), true),
+            'aiDraftUsesMainMail' => in_array('main_mail', MaterialDraftTask::sourceMaterialKeys($material), true)
+                && DemoTikWebinarProject::approvedMainMail($projectItem) !== '',
             'aiDraftLiveLabel' => DemoTikWebinarProject::liveLabel($projectItem),
             'aiDraftUsesYoutubeSource' => MaterialDraftTask::usesYoutubeSource($material),
             'aiDraftUsesYoutubeDescription' => MaterialDraftTask::usesYoutubeSource($material)
@@ -502,15 +507,17 @@ class ProjectController extends Controller
         $data = $request->validate([
             'instruction' => ['nullable', 'string', 'max:'.config('growth_ai.limits.max_instruction_chars')],
             'length' => ['nullable', Rule::in(array_keys(MaterialDraftTask::MAIL_LENGTHS))],
+            'timing' => ['nullable', Rule::in(array_keys(MaterialDraftTask::REMINDER_TIMINGS))],
         ]);
         $back = redirect()->route('growth.projects.materials.show', [$project, $material]);
         $style = [
-            'emojis' => $request->boolean('emojis', $material !== MaterialDraftTask::MAIL_MATERIAL_KEY),
+            'emojis' => $request->boolean('emojis', ! MaterialDraftTask::isMail($material)),
             'hashtags' => $request->boolean('hashtags', true),
             'elements' => collect(MaterialDraftTask::GRAPHIC_OPTIONAL_ELEMENTS)
                 ->mapWithKeys(fn (string $label, string $key): array => [$key => $request->boolean('elements.'.$key, true)])
                 ->all(),
             'length' => MaterialDraftTask::mailLength($data['length'] ?? null),
+            'timing' => MaterialDraftTask::reminderTiming($data['timing'] ?? null),
         ];
         $instruction = trim((string) ($data['instruction'] ?? ''));
 
@@ -584,7 +591,7 @@ class ProjectController extends Controller
             'mail_body' => ['nullable', 'string', 'max:20000'],
         ]);
 
-        if ($material === MaterialDraftTask::MAIL_MATERIAL_KEY && $request->has('mail_body')) {
+        if (MaterialDraftTask::isMail($material) && $request->has('mail_body')) {
             $subject = trim(preg_replace('/\s+/u', ' ', (string) ($data['mail_subject'] ?? '')));
             $data['draft'] = MaterialDraftTask::composeMainMail(
                 $subject !== '' ? [$subject] : [],

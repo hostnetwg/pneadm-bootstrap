@@ -302,7 +302,7 @@
                         </div>
                         <div class="card-body">
                             <p class="small text-secondary">
-                                AI przygotowuje wyłącznie propozycję na podstawie zatwierdzonego kierunku i koncepcji{{ $aiDraftUsesYoutubeSource ? ' oraz zatwierdzonego opisu YouTube' : '' }}. Obecny szkic zmienia się dopiero po kliknięciu „Zastosuj”. Nic nie jest publikowane.
+                                AI przygotowuje wyłącznie propozycję na podstawie zatwierdzonego kierunku i koncepcji{{ $aiDraftUsesMainMailSource ? ' oraz zatwierdzonego opisu YouTube i mailingu głównego' : ($aiDraftUsesYoutubeSource ? ' oraz zatwierdzonego opisu YouTube' : '') }}. Obecny szkic zmienia się dopiero po kliknięciu „Zastosuj”. Nic nie jest publikowane.
                             </p>
 
                             @if($aiDraftUsesYoutubeSource)
@@ -315,6 +315,16 @@
                                 </p>
                             @endif
 
+                            @if($aiDraftUsesMainMailSource)
+                                <p class="small mb-3">
+                                    @if($aiDraftUsesMainMail)
+                                        <span class="badge text-bg-success">✓ Mailing główny</span> AI użyje zatwierdzonego mailingu głównego, żeby przypomnienie go nie powtarzało.
+                                    @else
+                                        <span class="badge bg-light text-secondary border">Mailing główny</span> Mailing główny nie jest zatwierdzony, więc AI go nie dostanie.
+                                    @endif
+                                </p>
+                            @endif
+
                             @if($aiDraftIsMail)
                                 <p class="small text-secondary mb-3">
                                     AI zwraca 3 propozycje tematu (pierwsza jest główna), preheader i treść. Zwrot „Dzień dobry,” i forma „Państwo”, podpis prowadzącego i „Zespół PNE”.
@@ -322,7 +332,9 @@
                                 </p>
                             @endif
 
-                            @if($aiDraftIsFacebookPost || $aiDraftIsMail)
+                            @if($aiDraftIsReminder)
+                                <p class="small text-secondary mb-3">AI nie poda linków. Wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::ROOM_LINK_PLACEHOLDER }} dla zapisanych i {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} dla osób, które jeszcze się nie zapisały, do ręcznej podmiany.</p>
+                            @elseif($aiDraftIsFacebookPost || $aiDraftIsMail)
                                 <p class="small text-secondary mb-3">AI nie poda linku. W jego miejscu wstawi {{ \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::LINK_PLACEHOLDER }} do ręcznej podmiany.</p>
                             @endif
 
@@ -350,10 +362,21 @@
                                         @endforeach
                                     </fieldset>
                                 @else
+                                    @if($aiDraftIsReminder)
+                                        <fieldset class="mb-3">
+                                            <legend class="form-label fs-6">Kiedy wysyłasz przypomnienie</legend>
+                                            @foreach(\App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::REMINDER_TIMINGS as $timingKey => $timingLabel)
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="timing" value="{{ $timingKey }}" id="material_ai_timing_{{ $timingKey }}" @checked(old('timing', \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::REMINDER_DEFAULT_TIMING) === $timingKey) @disabled(! $aiDraftAllowed)>
+                                                    <label class="form-check-label" for="material_ai_timing_{{ $timingKey }}">{{ $timingLabel }}</label>
+                                                </div>
+                                            @endforeach
+                                        </fieldset>
+                                    @endif
                                     @if($aiDraftIsMail)
                                         <fieldset class="mb-3">
                                             <legend class="form-label fs-6">Długość maila</legend>
-                                            @foreach(\App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::MAIL_LENGTHS as $lengthKey => $lengthLabel)
+                                            @foreach($aiDraftMailLengths as $lengthKey => $lengthLabel)
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" name="length" value="{{ $lengthKey }}" id="material_ai_length_{{ $lengthKey }}" @checked(old('length', \App\Services\GrowthOS\AI\Tasks\MaterialDraftTask::MAIL_DEFAULT_LENGTH) === $lengthKey) @disabled(! $aiDraftAllowed)>
                                                     <label class="form-check-label" for="material_ai_length_{{ $lengthKey }}">{{ $lengthLabel }}</label>
@@ -381,7 +404,7 @@
                                     rows="4"
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control @error('instruction') is-invalid @enderror"
-                                    placeholder="{{ $aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki')) }}"
+                                    placeholder="{{ $aiDraftIsReminder ? 'Np. dodaj, że warto przygotować konto Canva przed spotkaniem' : ($aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki'))) }}"
                                     @disabled(! $aiDraftAllowed)
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror

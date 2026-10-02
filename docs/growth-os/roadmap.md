@@ -18,7 +18,7 @@ Potem grafika główna, w etapach:
 
 Przełącznik trybu grafiki (obraz AI / projekt w Canvie / połączenie) dopiero, gdy działają co najmniej dwa tryby.
 
-Mailing główny (DEC-032): szkic AI z 3 tematami, preheaderem, treścią i przełącznikiem długości, wdrożony lokalnie, czeka na weryfikację Waldemara. Potem zapis propozycji AI w bazie albo kolejne materiały (mailing przypominający, landing). Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
+Mailing główny (DEC-032): szkic AI z 3 tematami, preheaderem, treścią i przełącznikiem długości, wdrożony na produkcji. Mailing przypominający (DEC-033): ten sam wzór, przełącznik „jutro” / „dziś”, `[LINK DO POKOJU]` i `[LINK DO ZAPISU]`, źródłem jest też zatwierdzony mailing główny; wdrożony lokalnie, czeka na weryfikację Waldemara. Potem zapis propozycji AI w bazie albo kolejne materiały (landing, scenariusz prowadzącego, follow-up). Propozycje AI zostają w sesji. Zadania operacyjne nie sterują głównym CTA.
 
 ## LATER
 

@@ -226,3 +226,16 @@ Smoke:
 4. Po „Zastosuj” szkic jest w polach Temat, Preheader i Treść, a pod tematem lista „Propozycje tematu od AI” ze wszystkimi trzema tematami (aktualny oznaczony „w polu”). Tematy i preheader zaczynają się wielką literą. „Kopiuj kod HTML preheadera” kopiuje ukryty `div`.
 
 Rollback: cofnąć kod. Zapisane szkice mailingu zostają.
+
+## Szkic AI mailingu przypominającego (DEC-033, 2026-10-02)
+
+Bez migracji i bez nowych zmiennych `.env`. Po `git pull` wystarczą komendy cache z sekcji „Deploy ADM”.
+
+Smoke:
+
+1. „Mailing przypominający” ma pola Temat, Preheader i Treść oraz kartę „Szkic z pomocą AI” z przełącznikami „Kiedy wysyłasz przypomnienie” i „Długość maila”.
+2. Karta pokazuje, czy AI dostanie zatwierdzony opis YouTube i zatwierdzony mailing główny.
+3. „Poproś AI o szkic” z opcją „Dzień przed”: treść mówi o „jutro”, ma termin, `[LINK DO POKOJU]`, `[LINK DO ZAPISU]` i podpis „Zespół PNE”. Opcja „W dniu webinaru” daje „dziś”.
+4. „Zastosuj” rozdziela szkic na pola, a pod tematem są 3 propozycje z „Użyj”.
+
+Rollback: cofnąć kod. Zapisane szkice przypomnienia zostają, ale wracają do jednego pola tekstowego.
