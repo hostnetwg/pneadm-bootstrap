@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-02 CEST<br>
 Branch: main<br>
-Commit: 243e267<br>
+Commit: 6364354<br>
 Stage: v0.2 — szkice AI opisu YouTube, posta Facebook i briefu grafiki, generator obrazu grafiki głównej, historia wersji materiałów<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
