@@ -121,7 +121,7 @@ Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw
 
 ## 9. Ostatnie zmiany
 
-- Mailing główny (DEC-049): treść jest w Tiptap (licencja MIT). Szablony Klasyczny PNE, Osobisty i Minimalny. AI pisze tekst, aplikacja składa HTML z jednym przyciskiem zapisu. Klucz szablonu jest w zapisie materiału i w historii wersji. Mailing przypominający zostaje przy dotychczasowym oknie. Bez migracji.
+- Mailing główny (DEC-049): treść jest w Tiptap (licencja MIT). Szablony Klasyczny PNE, Osobisty i Minimalny mają gotowy układ HTML w `resources/growth-os/mail-templates/`. AI pisze tekst, aplikacja składa HTML z jednym przyciskiem zapisu. Kod HTML jest podglądem do skopiowania, nie edytorem układu. Klucz szablonu jest w zapisie materiału i w historii wersji. Mailing przypominający zostaje przy dotychczasowym oknie. Bez migracji.
 
 - Treść maila (DEC-048): okno edycji z przełącznikiem Edycja / Kod HTML oraz pogrubieniem, kursywą, podkreśleniem, listami i linkiem. Własny edytor, bez zewnętrznej biblioteki. Od DEC-049 dotyczy mailingu przypominającego. Bez migracji.
 

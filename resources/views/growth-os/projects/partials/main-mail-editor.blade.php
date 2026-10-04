@@ -2,7 +2,6 @@
     $mailTemplateKey = \App\Support\GrowthOS\MailTemplates::key(old('template_key', $material['template_key'] ?? null));
     $mailEditorContent = \App\Support\GrowthOS\MailHtmlFormatter::editorContent((string) old('mail_body', $mailFields['body'] ?? ''));
     $mailFinalHtml = \App\Support\GrowthOS\MailHtmlFormatter::copyHtml((string) old('mail_preheader', $mailFields['preheader'] ?? ''), $mailEditorContent, $mailTemplateKey);
-    $mailTheme = \App\Support\GrowthOS\MailTemplates::theme($mailTemplateKey);
 @endphp
 <fieldset class="mb-3">
     <legend class="form-label fs-6">Szablon</legend>
@@ -36,23 +35,13 @@
     <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-mail-copy-html>Kopiuj HTML maila</button>
     <span class="small text-success d-none" role="status" data-mail-copy-html-status>Skopiowano. Wklej w Sendy w trybie HTML.</span>
 </div>
-<div class="border rounded mb-2" data-mail-frame data-mail-template="{{ $mailTemplateKey }}" style="background:{{ $mailTheme['page'] }}">
-    <div class="px-3 py-2 small fw-semibold" data-mail-frame-header style="background:{{ $mailTheme['header_bg'] }};color:{{ $mailTheme['header_color'] }}">{{ $mailTheme['header'] }}</div>
-    <div
-        id="mail_body_editor"
-        data-mail-editor
-        @if($materialSkipped) data-mail-locked="1" @endif
-    ></div>
-    <div class="px-3 pb-3" data-mail-frame-cta>
-        <span class="btn btn-sm text-white disabled" data-mail-frame-button style="background:{{ $mailTheme['button'] }}">{{ \App\Support\GrowthOS\MailHtmlFormatter::CTA_LABEL }}</span>
-    </div>
-    <div class="px-3 py-2 border-top small text-secondary" data-mail-frame-footer>{{ $mailTheme['footer'] }}</div>
+<div class="mb-2" data-mail-frame data-mail-template="{{ $mailTemplateKey }}">
+    {!! \App\Support\GrowthOS\MailHtmlFormatter::editorFrame($mailTemplateKey, (bool) $materialSkipped) !!}
 </div>
 <textarea id="mail_body" name="mail_body" class="d-none" aria-labelledby="mail_body_label" @readonly($materialSkipped)>{{ $mailEditorContent }}</textarea>
 <label for="mail_body_html" class="visually-hidden">Kod HTML maila</label>
 <textarea id="mail_body_html" class="form-control font-monospace d-none mb-2" rows="16" readonly data-mail-final-html>{{ $mailFinalHtml }}</textarea>
-<p class="form-text">Edycja formatuje samą treść. Kod HTML to gotowy mail z wybranym szablonem, przyciskiem zapisu i preheaderem. Przycisku nie da się usunąć z treści.</p>
+<p class="form-text">Edycja formatuje samą treść. Kod HTML to gotowy mail do skopiowania: układ bierze się z wybranego szablonu i nie edytuje się go w tym polu.</p>
 @foreach(\App\Support\GrowthOS\MailTemplates::keys() as $templateKey)
     <template id="mail-shell-{{ $templateKey }}">{!! \App\Support\GrowthOS\MailHtmlFormatter::render('', $templateKey) !!}</template>
 @endforeach
-<script type="application/json" id="mail-template-themes">@json(collect(\App\Support\GrowthOS\MailTemplates::labels())->mapWithKeys(fn (string $label, string $key): array => [$key => \App\Support\GrowthOS\MailTemplates::theme($key)])->all())</script>

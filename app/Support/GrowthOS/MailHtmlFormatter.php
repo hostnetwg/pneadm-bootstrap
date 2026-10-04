@@ -64,24 +64,23 @@ final class MailHtmlFormatter
 
     public static function render(string $content, ?string $templateKey = null): string
     {
-        $key = MailTemplates::key($templateKey);
-        $theme = MailTemplates::theme($key);
-        $inner = self::emailize(self::sanitizeContent($content));
+        return self::fillBody(
+            self::shell($templateKey),
+            self::emailize(self::sanitizeContent($content)),
+        );
+    }
 
-        return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '.self::MARKER.' data-pne-mail-template="'.self::escape($key).'" style="background-color:'.$theme['page'].';">'
-            .'<tr><td align="center" style="padding:24px 12px;">'
-            .'<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background-color:'.$theme['card'].';border:'.$theme['border'].';">'
-            .self::headerRow($theme)
-            .'<tr><td data-pne-mail-body="1" style="padding:'.$theme['content_pad'].';font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#243040;">'
-            .$inner
-            .'</td></tr>'
-            .'<tr><td data-pne-mail-cta="1" style="padding:8px 28px 24px;font-family:Arial,Helvetica,sans-serif;">'
-            .self::button($theme['button'])
-            .'</td></tr>'
-            .'<tr><td data-pne-mail-footer="1" style="padding:16px 28px 24px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;color:#6b7785;border-top:1px solid #e6eaee;">'
-            .self::escape($theme['footer'])
-            .'</td></tr>'
-            .'</table></td></tr></table>';
+    /**
+     * Same shell as the copied mail, with the editor mounted in the content cell.
+     */
+    public static function editorFrame(string $templateKey, bool $locked = false): string
+    {
+        $lockedAttr = $locked ? ' data-mail-locked="1"' : '';
+
+        return self::fillBody(
+            self::shell($templateKey),
+            '<div id="mail_body_editor" data-mail-editor'.$lockedAttr.'></div>',
+        );
     }
 
     public static function finalHtml(string $content, ?string $templateKey = null): string
@@ -148,21 +147,64 @@ final class MailHtmlFormatter
         return trim($result);
     }
 
-    private static function headerRow(array $theme): string
+    private static function shell(?string $templateKey): string
     {
-        return '<tr><td data-pne-mail-header="1" style="padding:18px 28px;font-family:Arial,Helvetica,sans-serif;font-size:13px;letter-spacing:0.04em;font-weight:bold;background-color:'.$theme['header_bg'].';color:'.$theme['header_color'].';">'
-            .self::escape($theme['header'])
-            .'</td></tr>';
+        $key = MailTemplates::key($templateKey);
+        $path = dirname(__DIR__, 3).'/resources/growth-os/mail-templates/'.$key.'.html';
+        $html = is_file($path) ? file_get_contents($path) : '';
+
+        return is_string($html) ? $html : '';
     }
 
-    private static function button(string $color): string
+    private static function fillBody(string $shell, string $innerHtml): string
     {
-        $href = MaterialDraftTask::LINK_PLACEHOLDER;
+        $document = new DOMDocument;
+        $internal = libxml_use_internal_errors(true);
+        $document->loadHTML('<?xml encoding="UTF-8"><div id="pne-shell-root">'.$shell.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($internal);
 
-        return '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-            .'<td bgcolor="'.$color.'" style="border-radius:6px;">'
-            .'<a href="'.$href.'" style="display:inline-block;padding:12px 22px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.2;color:#ffffff;text-decoration:none;font-weight:bold;">'.self::CTA_LABEL.'</a>'
-            .'</td></tr></table>';
+        $root = $document->getElementById('pne-shell-root');
+        $cell = null;
+        if ($root instanceof DOMElement) {
+            foreach ($root->getElementsByTagName('td') as $candidate) {
+                if ($candidate instanceof DOMElement && $candidate->getAttribute('data-pne-mail-body') === '1') {
+                    $cell = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if (! $cell instanceof DOMElement) {
+            return $shell;
+        }
+
+        while ($cell->firstChild !== null) {
+            $cell->removeChild($cell->firstChild);
+        }
+
+        if (trim($innerHtml) !== '') {
+            $fragment = new DOMDocument;
+            $fragmentInternal = libxml_use_internal_errors(true);
+            $fragment->loadHTML('<?xml encoding="UTF-8"><div id="pne-mail-root">'.$innerHtml.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            libxml_clear_errors();
+            libxml_use_internal_errors($fragmentInternal);
+            $innerRoot = $fragment->getElementById('pne-mail-root');
+            if ($innerRoot instanceof DOMElement) {
+                $children = [];
+                foreach ($innerRoot->childNodes as $child) {
+                    $children[] = $child;
+                }
+                foreach ($children as $child) {
+                    $cell->appendChild($document->importNode($child, true));
+                }
+            }
+        }
+
+        $table = $root->getElementsByTagName('table')->item(0);
+        $html = $table instanceof DOMElement ? (string) $document->saveHTML($table) : $shell;
+
+        return str_ireplace('%5BLINK%20DO%20ZAPISU%5D', MaterialDraftTask::LINK_PLACEHOLDER, $html);
     }
 
     private static function plainToContent(string $plain): string

@@ -21,7 +21,6 @@ if (mount && field) {
     const frame = document.querySelector('[data-mail-frame]');
     const tools = document.querySelector('[data-mail-frame]')?.parentElement.querySelector('[data-mail-tools]');
     const finalField = document.querySelector('[data-mail-final-html]');
-    const themes = JSON.parse(document.getElementById('mail-template-themes')?.textContent || '{}');
     let dirty = false;
     let mode = 'visual';
 
@@ -100,28 +99,23 @@ if (mount && field) {
 
     const selectedTemplate = () => document.querySelector('[data-mail-template-choice]:checked')?.value || 'classic';
 
-    const paint = () => {
-        const theme = themes[selectedTemplate()] || themes.classic;
-        if (!theme || !frame) {
+    const showTemplate = () => {
+        const shell = document.getElementById(`mail-shell-${selectedTemplate()}`);
+        const editorNode = document.getElementById('mail_body_editor');
+        if (!shell || !frame || !editorNode) {
             return;
         }
 
-        frame.style.background = theme.page;
+        const parsed = new DOMParser().parseFromString(shell.innerHTML, 'text/html');
+        const table = parsed.querySelector('table[data-pne-mail]');
+        const cell = table?.querySelector('[data-pne-mail-body]');
+        if (!table || !cell) {
+            return;
+        }
+
+        cell.appendChild(editorNode);
+        frame.replaceChildren(table);
         frame.dataset.mailTemplate = selectedTemplate();
-        const header = frame.querySelector('[data-mail-frame-header]');
-        const footer = frame.querySelector('[data-mail-frame-footer]');
-        const button = frame.querySelector('[data-mail-frame-button]');
-        if (header) {
-            header.textContent = theme.header;
-            header.style.background = theme.header_bg;
-            header.style.color = theme.header_color;
-        }
-        if (footer) {
-            footer.textContent = theme.footer;
-        }
-        if (button) {
-            button.style.background = theme.button;
-        }
     };
 
     const finalHtml = () => {
@@ -230,7 +224,7 @@ if (mount && field) {
 
     document.querySelectorAll('[data-mail-template-choice]').forEach((input) => {
         input.addEventListener('change', () => {
-            paint();
+            showTemplate();
             if (mode === 'html') {
                 refreshFinal();
             }
@@ -251,6 +245,5 @@ if (mount && field) {
         });
     }
 
-    paint();
     refreshFinal();
 }

@@ -53,9 +53,10 @@ class MailHtmlFormatterTest extends TestCase
             $this->assertStringContainsString('data-pne-mail-template="'.$template.'"', $html);
         }
 
-        $this->assertStringContainsString('List od prowadzącego', MailHtmlFormatter::finalHtml('Treść', 'personal'));
+        $this->assertStringContainsString('Spotkajmy się na kolejnym webinarze', MailHtmlFormatter::finalHtml('Treść', 'personal'));
         $this->assertStringContainsString('pnedu.pl', MailHtmlFormatter::finalHtml('Treść', 'minimal'));
-        $this->assertStringContainsString('Zaproszenie PNE', MailHtmlFormatter::finalHtml('Treść', 'classic'));
+        $this->assertStringContainsString('Praktyczna wiedza dla nauczycieli i dyrektorów', MailHtmlFormatter::finalHtml('Treść', 'classic'));
+        $this->assertStringNotContainsString('SAMPLE', MailHtmlFormatter::finalHtml('Treść', 'classic'));
     }
 
     public function test_copy_prepends_the_preheader_and_plain_text_for_ai_drops_the_layout(): void
@@ -65,7 +66,7 @@ class MailHtmlFormatterTest extends TestCase
 
         $this->assertStringStartsWith('<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Krótki preheader.', $copied);
         $this->assertSame(1, substr_count($copied, 'href="'.MaterialDraftTask::LINK_PLACEHOLDER.'"'));
-        $this->assertStringContainsString('List od prowadzącego', $copied);
+        $this->assertStringContainsString('Spotkajmy się na kolejnym webinarze', $copied);
 
         $plain = MailHtmlFormatter::plainForAi("Temat: Temat\nPreheader: Krótki preheader.\n\n".$html);
         $this->assertStringNotContainsString(MailHtmlFormatter::MARKER, $plain);
@@ -76,7 +77,7 @@ class MailHtmlFormatterTest extends TestCase
         $this->assertStringContainsString('Preheader: Krótki preheader.', $plain);
         $this->assertStringContainsString('Dzień dobry,', $plain);
         $this->assertStringContainsString('Treść zaproszenia.', $plain);
-        $this->assertStringNotContainsString('List od prowadzącego', $plain);
+        $this->assertStringNotContainsString('Spotkajmy się na kolejnym webinarze', $plain);
     }
 
     public function test_plain_editor_content_is_stored_unchanged(): void
