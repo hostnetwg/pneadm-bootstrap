@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-04 CEST<br>
 Branch: main<br>
-Commit: 95d6376<br>
+Commit: a3ebbfb<br>
 Stage: v0.2 — Asystent planowania kierunku, szkice AI materiałów, generator obrazu, historia wersji<br>
 Current blocker: none (produkcja: migracje v0.1 `Ran`, `/growth` działa — [runbook](../deploy/2026-09-pne-growth-os-stage-0-1-deploy.md))
 
