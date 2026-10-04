@@ -121,6 +121,8 @@ Ręczna weryfikacja asystenta kierunku w otwartym projekcie (DEC-039): „Popraw
 
 ## 9. Ostatnie zmiany
 
+- Data i godzina webinaru: na karcie projektu można je zmienić. Terminy checklisty operacyjnej przeliczają się od nowej daty. Zapisane materiały nie zmieniają się same. Bez migracji.
+
 - Dodatkowa instrukcja dla AI na materiałach: limit 4000 znaków (było 1000) i wyższe pole. Opis obrazu na grafice głównej: 4000 znaków (było 2000). Bez migracji.
 
 - Mailing główny (DEC-049): treść jest w Tiptap (licencja MIT). Szablony Klasyczny PNE, Osobisty i Minimalny mają gotowy układ HTML w `resources/growth-os/mail-templates/`. AI pisze tekst, aplikacja składa HTML z jednym przyciskiem zapisu. Kod HTML jest podglądem do skopiowania, nie edytorem układu. Klucz szablonu jest w zapisie materiału i w historii wersji. Mailing przypominający zostaje przy dotychczasowym oknie. Bez migracji.

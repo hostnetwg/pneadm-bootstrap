@@ -452,6 +452,21 @@ class DemoTikWebinarProject
     }
 
     /**
+     * @param  array{live_date: string, live_time: string}  $schedule
+     * @return array<string, mixed>
+     */
+    public static function updateSchedule(string $projectId, array $schedule): array
+    {
+        $project = self::requireProject($projectId);
+        $project['live_date'] = $schedule['live_date'];
+        $project['live_time'] = $schedule['live_time'];
+        self::saveProject($project);
+        app(GrowthSessionConceptStore::class)->persistSchedule($project);
+
+        return $project;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function project(): ?array

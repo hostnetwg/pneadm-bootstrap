@@ -31,6 +31,27 @@
                     <p class="text-secondary mb-2">
                         {{ $project['type'] }} · {{ $project['live_date'] }} {{ $project['live_time'] }}
                     </p>
+                    <details class="mb-2" id="project-schedule" @if($errors->hasAny(['live_date', 'live_time'])) open @endif>
+                        <summary class="small">Zmień datę lub godzinę webinaru</summary>
+                        <form method="POST" action="{{ route('growth.projects.schedule.update', $project['id']) }}" class="mt-2" style="max-width: 28rem;">
+                            @csrf
+                            @method('PUT')
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label for="project_live_date" class="form-label small">Data live</label>
+                                    <input id="project_live_date" name="live_date" type="date" class="form-control form-control-sm @error('live_date') is-invalid @enderror" value="{{ old('live_date', $project['live_date']) }}" required>
+                                    @error('live_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-sm-6">
+                                    <label for="project_live_time" class="form-label small">Godzina</label>
+                                    <input id="project_live_time" name="live_time" type="time" class="form-control form-control-sm @error('live_time') is-invalid @enderror" value="{{ old('live_time', $project['live_time']) }}" required>
+                                    @error('live_time')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            </div>
+                            <p class="form-text mb-2">Terminy checklisty operacyjnej przeliczą się od nowej daty. Zapisane materiały nie zmienią się same — w razie potrzeby popraw je albo poproś AI o nowy szkic.</p>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Zapisz datę i godzinę</button>
+                        </form>
+                    </details>
                     <p class="small mb-1">
                         <span class="text-secondary">Prowadzący:</span> <span class="fw-semibold">{{ $project['host'] }}</span>
                         · <span class="text-secondary">Głos komunikacji:</span>

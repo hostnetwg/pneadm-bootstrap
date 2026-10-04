@@ -213,6 +213,24 @@ class ProjectController extends Controller
             ->withFragment('project-host');
     }
 
+    public function updateSchedule(Request $request, string $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'live_date' => ['required', 'date'],
+            'live_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        DemoTikWebinarProject::updateSchedule($project, [
+            'live_date' => $data['live_date'],
+            'live_time' => $data['live_time'],
+        ]);
+
+        return redirect()
+            ->route('growth.projects.show', $project)
+            ->with('success', 'Zapisano datę i godzinę webinaru.')
+            ->withFragment('project-schedule');
+    }
+
     public function show(string $project): View
     {
         $item = DemoTikWebinarProject::requireProject($project);

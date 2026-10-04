@@ -135,6 +135,33 @@ class GrowthSessionConceptStore
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $project
+     */
+    public function persistSchedule(array $project): void
+    {
+        $campaignId = $project['growth_campaign_id'] ?? null;
+        if (! is_numeric($campaignId)) {
+            return;
+        }
+
+        $liveAt = $this->liveAt(
+            (string) ($project['live_date'] ?? ''),
+            (string) ($project['live_time'] ?? ''),
+        );
+
+        $campaign = GrowthCampaign::query()->find((int) $campaignId);
+        if (! $campaign instanceof GrowthCampaign) {
+            return;
+        }
+
+        $campaign->live_at = $liveAt;
+        $campaign->save();
+
+        app(GrowthOperationalTasks::class)->ensureForCampaign($campaign);
+        app(GrowthOperationalTasks::class)->resyncDueDates($campaign->fresh());
+    }
+
     public function latestOwnedCampaign(User $owner): ?GrowthCampaign
     {
         $campaign = $this->ownedCampaigns($owner)->first();

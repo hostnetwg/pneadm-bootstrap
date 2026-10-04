@@ -81,6 +81,46 @@ class GrowthOsOperationalTasksTest extends TestCase
         );
     }
 
+    public function test_schedule_update_changes_live_at_and_resyncs_task_due_dates(): void
+    {
+        $user = $this->superAdmin();
+        $this->actingAs($user)->post(route('growth.projects.store'), $this->projectPayload());
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('Zmień datę lub godzinę webinaru');
+
+        $this->actingAs($user)
+            ->put(route('growth.projects.schedule.update', DemoTikWebinarProject::PROJECT_ID), [
+                'live_date' => '2026-11-13',
+                'live_time' => '19:30',
+            ])
+            ->assertRedirect(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID).'#project-schedule')
+            ->assertSessionHas('success');
+
+        $campaign = GrowthCampaign::query()->first();
+        $this->assertNotNull($campaign);
+        $this->assertSame('2026-11-13 19:30', $campaign->live_at?->format('Y-m-d H:i'));
+
+        $project = DemoTikWebinarProject::project();
+        $this->assertSame('2026-11-13', $project['live_date']);
+        $this->assertSame('19:30', $project['live_time']);
+
+        $tasks = GrowthTask::query()->where('growth_campaign_id', $campaign->id)->get()->keyBy('key');
+        $this->assertSame('2026-11-08 19:30', $tasks[GrowthOperationalTasks::KEY_YOUTUBE_LIVE]->due_at?->format('Y-m-d H:i'));
+        $this->assertSame('2026-11-13 16:30', $tasks[GrowthOperationalTasks::KEY_SOCIAL_REMINDER]->due_at?->format('Y-m-d H:i'));
+        $this->assertSame('2026-11-13 19:30', $tasks[GrowthOperationalTasks::KEY_LIVE_WEBINAR]->due_at?->format('Y-m-d H:i'));
+
+        session()->forget(DemoTikWebinarProject::SESSION_PROJECT);
+
+        $this->actingAs($user)
+            ->get(route('growth.projects.show', DemoTikWebinarProject::PROJECT_ID))
+            ->assertOk()
+            ->assertSee('2026-11-13')
+            ->assertSee('19:30');
+    }
+
     public function test_task_key_is_unique_inside_campaign(): void
     {
         $user = User::factory()->create();

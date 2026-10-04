@@ -72,6 +72,18 @@ class GrowthOperationalTasks
         }
     }
 
+    public function resyncDueDates(GrowthCampaign $campaign): void
+    {
+        foreach (self::templates() as $template) {
+            GrowthTask::query()
+                ->where('growth_campaign_id', $campaign->id)
+                ->where('key', $template['key'])
+                ->update([
+                    'due_at' => $this->dueAt($campaign->live_at, $template['days'], $template['hours']),
+                ]);
+        }
+    }
+
     public function dueAt(?CarbonInterface $liveAt, int $days, int $hours): ?Carbon
     {
         if ($liveAt === null) {
