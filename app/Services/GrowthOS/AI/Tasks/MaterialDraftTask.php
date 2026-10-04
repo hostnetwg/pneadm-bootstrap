@@ -175,7 +175,7 @@ final class MaterialDraftTask implements GrowthAiTask
         'subtitle' => 160,
         'cta' => 40,
         'visual_direction' => 800,
-        'image_prompt' => 1200,
+        'image_prompt' => 4000,
         'alt_text' => 300,
         'change_summary' => 1000,
     ];

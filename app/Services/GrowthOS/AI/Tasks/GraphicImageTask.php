@@ -24,7 +24,7 @@ final class GraphicImageTask
 
     public const MAX_REVISE_CHARS = 500;
 
-    public const MAX_PROMPT_CHARS = 2000;
+    public const MAX_PROMPT_CHARS = 4000;
 
     public const INVALID_IMAGE_MESSAGE = 'Nie udało się przygotować poprawnego obrazu. Spróbuj ponownie lub zmień opis.';
 

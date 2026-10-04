@@ -263,7 +263,7 @@
                                 <textarea
                                     id="material_image_prompt"
                                     name="image_prompt"
-                                    rows="5"
+                                    rows="8"
                                     maxlength="{{ \App\Services\GrowthOS\AI\Tasks\GraphicImageTask::MAX_PROMPT_CHARS }}"
                                     class="form-control @error('image_prompt') is-invalid @enderror"
                                     placeholder="Np. jasne biurko nauczyciela z laptopem i kartami pracy, miękkie światło dzienne, granat i pomarańcz"
@@ -271,6 +271,7 @@
                                 >{{ old('image_prompt', $imageDescription) }}</textarea>
                                 @error('image_prompt')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <div class="form-text mb-3">
+                                    Do {{ number_format((int) \App\Services\GrowthOS\AI\Tasks\GraphicImageTask::MAX_PROMPT_CHARS, 0, ',', ' ') }} znaków.
                                     {{ $imageDescription !== '' ? 'Wstępnie wypełnione z zapisanego briefu. Możesz poprawić opis przed generowaniem.' : 'Zapisz brief z sekcją „Opis obrazu dla AI” albo wpisz opis sam.' }}
                                     Nie wpisuj danych osobowych.
                                 </div>
@@ -656,14 +657,14 @@
                                 <textarea
                                     id="material_ai_instruction"
                                     name="instruction"
-                                    rows="4"
+                                    rows="8"
                                     maxlength="{{ config('growth_ai.limits.max_instruction_chars') }}"
                                     class="form-control @error('instruction') is-invalid @enderror"
                                     placeholder="{{ $aiDraftIsHostScript ? 'Np. dodaj krótki pokaz na żywo w drugim bloku, mniej teorii' : ($aiDraftIsReminder ? 'Np. dodaj, że warto przygotować konto Canva przed spotkaniem' : ($aiDraftIsMail ? 'Np. podkreśl, że webinar jest dla początkujących, dodaj zdanie o nagraniu' : ($aiDraftIsGraphic ? 'Np. kolory granat i pomarańcz, motyw tablicy i laptopa, spokojny styl' : ($aiDraftIsFacebookPost ? 'Np. zacznij od pytania do nauczycieli, pisz bardziej na luzie' : 'Np. zacznij od pytania do nauczycieli, podkreśl, że nie trzeba umieć grafiki')))) }}"
                                     @disabled(! $aiDraftAllowed)
                                 >{{ old('instruction', $aiDraftProposal['instruction'] ?? '') }}</textarea>
                                 @error('instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                <div class="form-text mb-3">Nie wpisuj danych osobowych, danych klientów ani sekretów. Instrukcja nie zmieni terminu ani prowadzącego.</div>
+                                <div class="form-text mb-3">Do {{ number_format((int) config('growth_ai.limits.max_instruction_chars'), 0, ',', ' ') }} znaków. Nie wpisuj danych osobowych, danych klientów ani sekretów. Instrukcja nie zmieni terminu ani prowadzącego.</div>
                                 @if($aiDraftUsesWorkModes)
                                     <input type="hidden" name="mode" value="generate" data-growth-ai-mode-input>
                                     <input type="hidden" name="author_draft" value="" data-growth-ai-author-draft @if($aiDraftIsMail && ! $aiDraftIsReminder) data-growth-ai-author-source="mail" @endif>

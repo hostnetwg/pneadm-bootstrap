@@ -40,7 +40,7 @@ return [
     'limits' => [
         'max_output_tokens' => max(256, (int) env('GROWTH_AI_MAX_OUTPUT_TOKENS', 4000)),
         'max_input_chars' => max(1000, (int) env('GROWTH_AI_MAX_INPUT_CHARS', 12000)),
-        'max_instruction_chars' => max(100, (int) env('GROWTH_AI_MAX_INSTRUCTION_CHARS', 1000)),
+        'max_instruction_chars' => max(100, (int) env('GROWTH_AI_MAX_INSTRUCTION_CHARS', 4000)),
         'per_minute' => max(1, (int) env('GROWTH_AI_RATE_LIMIT_PER_MINUTE', 5)),
         'daily_per_user' => max(1, (int) env('GROWTH_AI_DAILY_LIMIT_PER_USER', 30)),
     ],
